@@ -4,6 +4,7 @@
  */
 
 import { IsVaultError, brandOf } from '../helpers/consts'
+import type { BadAct } from '../shapes/shapes-enums'
 import type { Capacity } from '../shapes/shapes-storage'
 
 // == [Kinds and families]: refusalkindVals, Refusalkind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
@@ -140,11 +141,11 @@ export type RefusalMeta = {
   /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */
   fieldnames?:   readonly string[]
   /** A vaultDB's refusal: the verb that refused. */
-  call?:         string
+  oplabel?:      string
   /** A vaultDB's refusal: what happened, when it is not said by the refusalkind alone. */
-  act?:          string
-  /** A vaultDB's refusal: the request's scope, vault_tok and other safe metadata. */
-  req_params?:   Readonly<Record<string, unknown>>
+  act?:          BadAct
+  /** A vaultDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a record's payload. */
+  ask?:          Readonly<Record<string, unknown>>
 }
 
 /** The rows `err` hands a vaultDB's answer, empty where it has none. */

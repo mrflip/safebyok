@@ -31,7 +31,7 @@ const makeVaultDB = (opts: IdbVaultDBOpts = {}): IdbVaultDB => {
 async function connectionOf(vaultDB: IdbVaultDB): Promise<unknown> {
   const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
   try {
-    await vaultDB.listVaults(TH.bankScope)
+    await vaultDB.listVaults(TH.vaultListAsk)
     return transaction.mock.contexts[0]
   } finally {
     transaction.mockRestore()
@@ -121,9 +121,9 @@ describe("IdbVaultDB's databases", () => {
     const vaultDB = makeVaultDB()
     const other = makeVaultDB()
     await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
-    const { val: otherListed } = await other.listVaults(TH.bankScope)
+    const { val: otherListed } = await other.listVaults(TH.vaultListAsk)
     const twin = await makeTwin(vaultDB)
-    const { val: twinListed } = await twin.listVaults(TH.bankScope)
+    const { val: twinListed } = await twin.listVaults(TH.vaultListAsk)
     expect(otherListed.vaults).to.be.empty
     expect(twinListed.vaults).to.have.lengthOf(1)
   })
@@ -134,9 +134,9 @@ describe("IdbVaultDB's databases", () => {
     await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt()))
     await vaultDB.putVault(TH.vaultPutAskOf(TH.vaultAt(0, 'life1', longer)))
     await vaultDB.putBox(TH.boxPutAskOf(TH.boxAt(0, 'life1', longer)))
-    const { val: listed } = await vaultDB.listVaults(TH.bankScope)
-    const { val: boxesListed } = await vaultDB.listBoxes({ ...TH.vaultScope, vault_tok: 'life1' })
-    const { val: tidied } = await vaultDB.tidyGone(TH.bankScope)
+    const { val: listed } = await vaultDB.listVaults(TH.vaultListAsk)
+    const { val: boxesListed } = await vaultDB.listBoxes({ op: 'list', ...TH.vaultScope, vault_tok: 'life1' })
+    const { val: tidied } = await vaultDB.tidyGone(TH.boxTidyAsk)
     expect(listed.vaults).to.have.lengthOf(1)
     expect(boxesListed.boxes).to.be.empty
     expect(tidied.totalCount).to.eq(0)
@@ -157,7 +157,7 @@ describe("IdbVaultDB's databases", () => {
 describe("IdbVaultDB's database name and wipe", () => {
   it("names its database with its version", async () => {
     const vaultDB = makeVaultDB()
-    await vaultDB.listVaults(TH.bankScope)
+    await vaultDB.listVaults(TH.vaultListAsk)
     expect(await dbNamesNow()).to.include(`${dbNameOf.get(vaultDB)!}:vaults-v${DB.VaultsDBVersion}`)
     expect(DB.VaultsDBVersion).to.match(/^\d{3}-\d{3}-\d{3}$/)
   })
@@ -167,7 +167,7 @@ describe("IdbVaultDB's database name and wipe", () => {
     const oldnames = [`${dbName}:vaults`, `${dbName}:vaults-v1`, `${dbName}:vaults-v001-001-000`, `${dbName}:vaults-v000-009-009`]
     for (const oldname of oldnames) { await plantClosedDB(oldname) }
     expect(await dbNamesNow()).to.include.members(oldnames)
-    await new IdbVaultDB({ dbName }).listVaults(TH.bankScope)
+    await new IdbVaultDB({ dbName }).listVaults(TH.vaultListAsk)
     await vi.waitFor(async () => {
       const dbnames = await dbNamesNow()
       expect(dbnames.filter((dbname) => oldnames.includes(dbname))).to.deep.equal([])
@@ -178,7 +178,7 @@ describe("IdbVaultDB's database name and wipe", () => {
     const dbName = `test-${crypto.randomUUID()}`
     const kept = [`${dbName}:vaults-v001-002-000`, `${dbName}:device_db`, `${dbName}:device-v001-001-001`, `other-${dbName}:vaults`]
     for (const keptname of kept) { await plantClosedDB(keptname) }
-    await new IdbVaultDB({ dbName }).listVaults(TH.bankScope)
+    await new IdbVaultDB({ dbName }).listVaults(TH.vaultListAsk)
     await TH.aWhile()
     expect(await dbNamesNow()).to.include.members(kept)
   })

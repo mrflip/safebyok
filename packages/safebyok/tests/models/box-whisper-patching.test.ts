@@ -15,7 +15,7 @@ function lock() { world.mw.setLocked(true) }
 async function unexposedOf(): Promise<TestableBox> {
   const record = fullBoxRecord()
   world.mw.seedPut(record)
-  const box = await boxListingOf(world.mw).build(record)
+  const box = boxListingOf(world.mw).deliverRecord(record)
   return box.put({ whisper: Stored })
 }
 

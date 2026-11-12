@@ -158,4 +158,4 @@ export abstract class DeviceDB {
 }
 
 /** The refusal for a verb's throw. A throw that is not a refusal becomes `storage_unavailable`. */
-function refusalOf(thrown: unknown, call: string): VaultError { return (isVaultError(thrown) ? thrown : Refuse.deviceDBFailed(call, thrown)) }
+function refusalOf(thrown: unknown, oplabel: string): VaultError { return (isVaultError(thrown) ? thrown : Refuse.deviceDBFailed(oplabel, thrown)) }

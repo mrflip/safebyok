@@ -1,4 +1,5 @@
 import { ForeverMillis, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
+import type { GoodAct } from '../shapes/shapes-enums'
 import { nowMillis } from '../helpers/clock'
 import { Checkers } from '../helpers/validator'
 import { isTestDeriver } from '../deriver/basederiver'
@@ -18,7 +19,7 @@ import type { AnyGating, AskUser, RequestCleartext } from '../shapes/shapes-gate
 import * as VX from '../shapes/shapes-vaultish'
 import type { BadNewsHandler, BankAnnouncement, BankEvent, BankOpts, BankSnapshot, BankStage, GuardedLifecycleHandler, LifecycleHandler, VacateStory } from '../shapes/shapes-vaultish'
 import type { DeviceDB } from '../storage/device-db'
-import { bankDisabled, helloFirst, insecureContext } from '../refusals/throwers'
+import { bankDisabled, helloFirst, insecureContext, unexpectedError } from '../refusals/throwers'
 import { DefaultLeaseMillis, type Vault } from './vault'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
 import { VaultListing } from './vault-listing'
@@ -48,8 +49,14 @@ export class Bank {
   /** The host's `onLifecycle`, guarded, and its `onBadNews`, called while the bank is enabled and by its vacate. */
   readonly #hostHandlers: Handlers
 
-  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through. */
-  readonly #tellBadNews = brandGuarded((badnews: readonly VaultError[]): void => { tellBadNewsTo(this.#handlers.onBadNews, this, badnews) })
+  /** Tell bad news no caller waits on to the host, its every listing and box coming straight here: the friend they tell it through.
+   * A refusal is told as it is, anything else thrown as `unexpected_error`, and a `disabled` refusal not at all.
+   */
+  readonly #tellBadNews = brandGuarded((badnews: readonly unknown[]): void => {
+    const refusals = badnews.map((news) => (isVaultError(news) ? news : unexpectedError(news)))
+    // A thing disabled since is no news: the host swept or vacated it, or its vault went away.
+    tellBadNewsTo(this.#handlers.onBadNews, this, refusals.filter((refusal) => refusal.refusalkind !== 'disabled'))
+  })
   // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
   /** Tell the host's `onLifecycle` what happened, its every listing and vault coming straight here: the friend they announce through. */
   readonly #announce = brandGuarded((announcement: BankAnnouncement): void => { void this.#handlers.onLifecycle({ ...announcement, bank: this }) })
@@ -119,7 +126,7 @@ export class Bank {
     this.#vaultListing = new VaultListing(this, { vaultDB, maxMillisSinceRefresh, bankFriend: { panic, announce: this.#announce, tellBadNews: this.#tellBadNews, askUser } })
     this.#vaultListing.subscribe(this.#remakeSnapshot)
     this.#snapshot = this.#makeSnapshot()
-    if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { call: 'Bank.make' }) }
+    if (isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { oplabel: 'Bank.make' }) }
     Object.freeze(this)
   }
 
@@ -277,7 +284,7 @@ export class Bank {
 
   async #probe(asked: VX.ProbeAsked, opts: VX.ProbeOpts): Promise<VX.ProbeReport> {
     const { vaultlabel, boxlabel, whisper, sidecar } = VX.probeAsked.parse(asked)
-    const { maxMillisSinceRefresh } = VX.probeOpts.parse(opts)
+    const { maxMillisSinceRefresh, maxMillisAtGetBack } = VX.probeOpts.parse(opts)
     const vault = await this.ensureVault({ vaultlabel })
     await vault.ensureUnlocked()
     const horizons = { maxMillisSinceRefresh, maxWorldMillis: maxMillisSinceRefresh }
@@ -288,7 +295,7 @@ export class Bank {
     const boxscope = { ...vault.scope, boxlabel }
     const replacing = { ifAbsent: 'add', ifPresent: 'repl' } as const
     const put = probeStepOf(demandGood(await vault.boxListing.puttable(boxscope, replacing).tryPut({ whisper, sidecar }, { ...horizons, ...replacing })))
-    const fetched = demandGood(await vault.boxListing.tryFetch(boxscope))
+    const fetched = demandGood(await vault.boxListing.tryGet(boxscope, { maxMillisSinceRefresh: maxMillisAtGetBack }))
     const fetch = probeStepOf(fetched)
     await fetched.val?.extractWhisper({ maxMillisSinceRefresh: Infinity })
     return { timely, put, fetch, unseal: { ok: true, timestamp: nowMillis() } }
@@ -353,7 +360,7 @@ const HostChecks = Checkers('bad_option', ({ fn }) => ({
 
 /** The `onBadNews` a bank has when given none: each news to the bank's logger. */
 export const DefaultOnBadNews: BadNewsHandler = ({ news, bank }) => {
-  bank.logger.warn(news.message, { call: 'Bank.onBadNews', refusalkind: news.refusalkind })
+  bank.logger.warn(news.message, { oplabel: 'Bank.onBadNews', refusalkind: news.refusalkind })
 }
 
 /** Tell `onBadNews` each of `badnews` that reached `bank`, awaiting none: the handler's throw or rejection reaches only the platform. */
@@ -374,7 +381,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, bank: Bank, badnews: re
 // The logger too, as a platform with no reportError (Node, SSR) would hear nothing of it.
 /** `refusal` to `bank`'s logger at error, and to the platform. */
 function reportAtError(refusal: VaultError, bank: Bank): void {
-  bank.logger.error(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
+  bank.logger.error(refusal.message, { oplabel: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
   reportToPlatform(refusal)
 }
 
@@ -382,7 +389,7 @@ function reportAtError(refusal: VaultError, bank: Bank): void {
 /** The default's answer to a cached lease that outlived its revoke. */
 function heedRevokeFailed({ refusal, vault, where, bank }: Extract<BankEvent, { kind: 'lease_revoke_failed' }>): void {
   if (where === 'tombstone' || where === 'undeleted') {
-    bank.logger.warn(refusal.message, { call: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
+    bank.logger.warn(refusal.message, { oplabel: 'Bank.onLifecycle', refusalkind: refusal.refusalkind })
     return
   }
   reportAtError(refusal, bank)
@@ -402,7 +409,7 @@ export const DefaultOnLifecycle: LifecycleHandler = (event) => {
   }
   case 'helloed': {
     const { outcome, bank } = event
-    if (! outcome.ok && outcome.err.refusalkind !== 'disabled') { bank.logger.warn(outcome.err.message, { call: 'Bank.onLifecycle', refusalkind: outcome.err.refusalkind }) }
+    if (! outcome.ok && outcome.err.refusalkind !== 'disabled') { bank.logger.warn(outcome.err.message, { oplabel: 'Bank.onLifecycle', refusalkind: outcome.err.refusalkind }) }
     break
   }
   }
@@ -448,8 +455,8 @@ const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifec
 // == [Helpers]: millisOf, checkSecureContext, probeStepOf
 
 /** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
-function probeStepOf({ act, req_params, val, world }: GoodAnswer<Box | null, string, unknown>): VX.ProbeStep {
-  return { ok: true, act, req_params, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
+function probeStepOf({ act, ask, val, world }: GoodAnswer<Box | null, GoodAct, unknown>): VX.ProbeStep {
+  return { ok: true, act, ask, val: SX.boxSparse.parse(val?.sparse), world: SX.vaultSparse.parse(world), timestamp: nowMillis() }
 }
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.

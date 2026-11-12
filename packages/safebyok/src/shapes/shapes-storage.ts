@@ -52,19 +52,32 @@ export type Revision = Readonly<Z.infer<typeof revision>>
 export type Times    = Readonly<Z.infer<typeof times>>
 // --
 
-// == [Scopes]: vaultQuery, boxQuery, watchScope, VaultQuery, BoxQuery, WatchScope
+// == [Scopes]: vaultQuery, boxQuery, watchScope, vaultList, boxList, boxTidy, VaultQuery, BoxQuery, WatchScope, VaultListAsk, BoxListAsk, BoxTidyAsk
 
-// A scope's validator is CX's, frozen; `unwrap()` is its object, to extend.
-/** The checks of a vaultDB verb's request: a vault or box scope under its `vault_tok`, and the scope of a watch. */
-export const { vaultQuery, boxQuery, watchScope } = Checkers('bad_scope', ({ vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => ({
-  vaultQuery: vaultScope.unwrap().extend({ vault_tok }),
-  boxQuery:   boxscope.unwrap().extend({ vault_tok }),
-  watchScope: bankScope.unwrap().extend({ vaultlabel: vaultlabel.optional() }),
-}), [CX])
+// A scope's validator is CX's, frozen; `unwrap()` is its object, to extend. A listing's or tidying's ask is its scope and its
+// `op`, so it refuses as a scope does.
+/** The checks of a vault or box scope under its `vault_tok`, the scope of a watch, and the asks of `listVaults`, `listBoxes` and `tidyGone`. */
+export const { vaultQuery, boxQuery, watchScope, vaultList, boxList, boxTidy } = Checkers('bad_scope', ({ lit, vaultlabel, vault_tok, bankScope, vaultScope, boxscope }) => {
+  const vaultQuery = vaultScope.unwrap().extend({ vault_tok })
+  return {
+    vaultQuery,
+    boxQuery:   boxscope.unwrap().extend({ vault_tok }),
+    watchScope: bankScope.unwrap().extend({ vaultlabel: vaultlabel.optional() }),
+    vaultList:  bankScope.unwrap().extend({ op: lit('list') }),
+    boxList:    vaultQuery.extend({ op: lit('list') }),
+    boxTidy:    bankScope.unwrap().extend({ op: lit('tidy_gone') }),
+  }
+}, [CX])
 
 export type VaultQuery = Readonly<Z.infer<typeof vaultQuery>>
 export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
 export type WatchScope = Readonly<Z.input<typeof watchScope>>
+/** A `listVaults` ask: the bank's scope. */
+export type VaultListAsk = Readonly<Z.output<typeof vaultList>>
+/** A `listBoxes` ask: the vault's scope and the `vault_tok` of the life whose boxes are listed. */
+export type BoxListAsk   = Readonly<Z.output<typeof boxList>>
+/** A `tidyGone` ask: the bank's scope. */
+export type BoxTidyAsk   = Readonly<Z.output<typeof boxTidy>>
 // --
 
 // == [Wayins and gate]: passphraseWayinRecord, passkeyWayinRecord, gate, Gate
@@ -161,12 +174,22 @@ export const { passkeyAddRecord, passkeyRevokeRecord } = Checkers('bad_option', 
 })
 // --
 
-// == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsParsed, GateVerbOpts, DelOpts, ReqParams, AdapterVaultDBOpts, MemoryVaultDBOpts
+// == [Policies]: ifPresent, ifAbsent, putIfAbsent, anyIfAbsent
 
-/** The checks of the options a vaultDB verb accepts, of a write's record against its prior revision, and of the safe metadata an answer carries. */
-export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq } = Checkers('bad_option', ({ obj, oneof, orDefault, box_tok }) => {
-  const ifAbsentOpts = obj({ ifAbsent: orDefault(oneof(EX.ifAbsentVals), 'fail') })
-  const putOptsGiven = obj({ prior: revision, ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) })
+/** The checks of an ask's policies: `ifPresent`, a get's `ifAbsent`, a put's `ifAbsent`, and either `ifAbsent`, as an answer's ask may carry. */
+export const { ifPresent, ifAbsent, putIfAbsent, anyIfAbsent } = Checkers('bad_option', ({ oneof, union }) => {
+  const ifAbsent    = oneof(EX.ifAbsentVals)
+  const putIfAbsent = oneof(EX.putIfAbsentVals)
+  return { ifPresent: oneof(EX.ifPresentVals), ifAbsent, putIfAbsent, anyIfAbsent: union([ifAbsent, putIfAbsent]) }
+})
+// --
+
+// == [Options]: ifAbsentOpts, putOpts, gateVerbOpts, delOpts, nextSeq, adapterVaultDBOpts, memoryVaultDBOpts, IfAbsentOpts, PutOpts, PutOptsParsed, GateVerbOpts, DelOpts, AdapterVaultDBOpts, MemoryVaultDBOpts
+
+/** The checks of the options a vaultDB verb accepts, and of a write's record against its prior revision. */
+export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, nextSeq } = Checkers('bad_option', ({ obj, orDefault }) => {
+  const ifAbsentOpts = obj({ ifAbsent: orDefault(ifAbsent, 'fail') })
+  const putOptsGiven = obj({ prior: revision, ifAbsent: putIfAbsent, ifPresent })
   // The row a put or del expects to find is parsed here as a row's meta, and its other fields are kept for code that knows its kind.
   const expected = obj({ ...revision.shape, am, ...vaulted.shape }).loose()
   const putOpts = obj({ expected, ifAbsent: orDefault(putOptsGiven.shape.ifAbsent, 'add'), ifPresent: orDefault(putOptsGiven.shape.ifPresent, 'repl') })
@@ -174,9 +197,8 @@ export const { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqPa
   const gateVerbOpts = obj({ prior: revision }).strict()
   const delOpts = obj({ expected }).strict()
 
-  const reqParams = boxQuery.extend({ box_tok, ...revision.shape, expected: revision }).partial()
   const nextSeq = obj({ record: revision, prior: revision }).refine(({ record, prior }) => record.revision_seq === (prior.revision_seq + 1), Phrases.SeqNotNext)
-  return { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, nextSeq }
+  return { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, nextSeq }
 }, [CX])
 
 /** The check of an AdapterVaultDB's options, refusing 'bad_option'. */
@@ -199,7 +221,6 @@ export type PutOptsParsed = Readonly<Z.infer<typeof putOptsGiven>>
 /** What a gate verb is told beside its record: the revision the record replaces. */
 export type GateVerbOpts = Readonly<Z.input<typeof gateVerbOpts>>
 export type DelOpts = Readonly<Z.input<typeof delOpts>>
-export type ReqParams = Readonly<Z.infer<typeof reqParams>>
 /** What an AdapterVaultDB's constructor accepts. */
 export type AdapterVaultDBOpts = Readonly<Z.input<typeof adapterVaultDBOpts>>
 /** What a memory vaultDB's constructor accepts. */
@@ -225,20 +246,19 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
 export type Capacity = Z.infer<typeof capacity>
 // --
 
-// == [Row helpers]: rowMeta, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, shellVaultOf, shellBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
+// == [Row helpers]: rowMeta, revisionPins, revisionOf, nextRevisionOf, isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow, shellVaultOf, shellBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf
 
 /** The check that reads a row's revision and liveness without judging the rest. */
 export const rowMeta = objStrip(({ vault_tok }) => ({ ...revision.shape, am, vault_tok }), 'bad_option', [CX])
 
-// A request has its address inline. A put or del adds its record's revision and `box_tok`.
-/** Validator of a request's safe metadata: its address, and the revision and `box_tok` of its record. */
-export const requestParams = Checker(({ union }) => union([
-  reqParams.extend({ record: reqParams }).transform(({ record, ...asked }) => ({ ...record, ...asked })),
-  reqParams,
-]), 'bad_option')
-
-/** A request's safe metadata, for its answer to carry. Throws `bad_option` where any of it fails its check. */
-export function reqParamsOf(request: unknown): ReqParams { return requestParams.parse(request) }
+// Not an ask: what a caller pins when it names a row by a scope or a record of any form.
+/** The check of the revision and life tokens a scope or record carries, each one optional, every other field dropped. */
+export const revisionPins = objStrip(({ int, revision_tok, vault_tok, box_tok }) => ({
+  revision_tok: revision_tok.optional(),
+  revision_seq: int.optional(),
+  vault_tok:    vault_tok.optional(),
+  box_tok:      box_tok.optional(),
+}), 'bad_option', [CX])
 
 /** The {@link Revision} fields of a row. */
 export const revisionOf = ({ revision_tok, revision_seq }: Revision): Revision => ({ revision_tok, revision_seq })
@@ -331,7 +351,7 @@ export function boxTombstoneOf(raw: unknown, written_at: number): BoxTombstone |
 }
 // --
 
-// == [Asks]: boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk, BoxAsk, VaultAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk
+// == [Asks]: boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk, BoxAsk, VaultAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, gateVerbAskOf, loggableAsk, LoggableAsk
 
 type Expecting = { expected: Revision }
 type Cited     = Expecting & { record: Revision }
@@ -357,15 +377,14 @@ function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: E
   return (lifeTok !== expectedLifeTok) && (lifeTok !== VoidLifeTok)
 }
 
-// Every request has the same shape: its `op`, the address of the requested row, its policies, the row its caller expects
-// to find, and for a put or del the record to store. So code handed a request reads the address from the request itself,
+// Every ask has the same shape: its `op`, the address of the asked-for row, its policies, the row its caller expects
+// to find, and for a put or del the record to store. So code handed an ask reads the address from the ask itself,
 // whatever its op.
-/** Validators of a box or vault request: a get, put or del.
+/** Validators of a box or vault ask: a get, put or del.
  * `expected` is parsed as a row's meta and its other fields dropped, so a caller may pass the row it has, or the shell row for none.
  */
 export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vaultAsk } = Checkers('bad_record', ({ lit, oneof, discrim, box_tok }) => {
-  const ifAbsent    = oneof(EX.ifAbsentVals)
-  const putPolicies = { ifAbsent: oneof(EX.putIfAbsentVals), ifPresent: oneof(EX.ifPresentVals) }
+  const putPolicies = { ifAbsent: putIfAbsent, ifPresent }
   const boxExpected = rowMeta.extend({ box_tok })
   const vaultScope  = CX.vaultScope.unwrap()
 
@@ -418,23 +437,54 @@ export const { boxGet, boxPut, boxDel, vaultGet, vaultPut, vaultDel, boxAsk, vau
   }
 }, [CX])
 
-// A request has a single type, the checked one: a caller sends what the validator returns, `op` included.
-/** A box get, put or del request, as the vaultDB receives it and passes it to its adapter and the classifier. */
+// An ask has a single type, the checked one: a caller sends what the validator returns, `op` included.
+/** A box get, put or del ask, as the vaultDB receives it and passes it to its adapter and the classifier. */
 export type BoxAsk      = Readonly<Z.output<typeof boxAsk>>
-/** A vault get, put or del request, as the vaultDB receives it and passes it to its adapter and the classifier. */
+/** A vault get, put or del ask, as the vaultDB receives it and passes it to its adapter and the classifier. */
 export type VaultAsk    = Readonly<Z.output<typeof vaultAsk>>
-/** A `getBox` request: the box's address, the expected row (or shell), and the `ifAbsent` option (see `VaultDB.getBox`). */
+/** A `getBox` ask: the box's address, the expected row (or shell), and the `ifAbsent` option (see `VaultDB.getBox`). */
 export type BoxGetAsk   = Extract<BoxAsk,   { op: 'get' }>
-/** A `putBox` request: the box's address, the record to store, the expected row (or shell), and the `ifPresent` and `ifAbsent` options (see `VaultDB.putBox`). */
+/** A `putBox` ask: the box's address, the record to store, the expected row (or shell), and the `ifPresent` and `ifAbsent` options (see `VaultDB.putBox`). */
 export type BoxPutAsk   = Extract<BoxAsk,   { op: 'put' }>
-/** A `delBox` request: the box's address, the tombstone to store, and the expected row. */
+/** A `delBox` ask: the box's address, the tombstone to store, and the expected row. */
 export type BoxDelAsk   = Extract<BoxAsk,   { op: 'del' }>
-/** A `getVault` request: the vault's scope, the expected row (or shell), and the `ifAbsent` option (see `VaultDB.getVault`). */
+/** A `getVault` ask: the vault's scope, the expected row (or shell), and the `ifAbsent` option (see `VaultDB.getVault`). */
 export type VaultGetAsk = Extract<VaultAsk, { op: 'get' }>
-/** A `putVault` request: the vault's scope, the record to store, the expected row (or shell), the `ifPresent` and `ifAbsent` options (see `VaultDB.putVault`), and its gate verb, if any. */
+/** A `putVault` ask: the vault's scope, the record to store, the expected row (or shell), the `ifPresent` and `ifAbsent` options (see `VaultDB.putVault`), and its gate verb, if any. */
 export type VaultPutAsk = Extract<VaultAsk, { op: 'put' }>
-/** A `delVault` request: the vault's scope, the tombstone to store, and the expected row. */
+/** A `delVault` ask: the vault's scope, the tombstone to store, and the expected row. */
 export type VaultDelAsk = Extract<VaultAsk, { op: 'del' }>
+
+// A gate verb refused before its put ask is made, as when its record fails its check, names this in its refusal; cut to a
+// loggable ask, it keeps the verb and the record's meta.
+/** What a gate verb's refusal names as its ask: a put of `record`, tagged with `gateVerb`. */
+export function gateVerbAskOf(gateVerb: EX.GateVerb, record: VaultRecord): Readonly<VaultRecord & { op: 'put', gateVerb: EX.GateVerb, record: VaultRecord }> {
+  return { op: 'put', gateVerb, ...record, record }
+}
+
+// A record is a stored row, payload and all: an answer and a refusal carry only its meta, as they may reach a log.
+/** The check of what an answer and its refusal carry of an ask: any of its fields but a record's payload.
+ * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
+ */
+export const loggableAsk = objStrip(({ obj, oneof, applabel, user_id, vaultlabel, boxlabel, vault_tok, box_tok }) => {
+  const meta = obj({ ...revision.shape, am, vault_tok, box_tok }).partial()
+  return {
+    op:         oneof(EX.askOpVals).optional(),
+    applabel:   applabel.optional(),
+    user_id:    user_id.optional(),
+    vaultlabel: vaultlabel.optional(),
+    boxlabel:   boxlabel.optional(),
+    vault_tok:  vault_tok.optional(),
+    ifAbsent:   anyIfAbsent.optional(),
+    ifPresent:  ifPresent.optional(),
+    gateVerb:   oneof(EX.gateVerbVals).optional(),
+    expected:   meta.optional(),
+    record:     meta.optional(),
+  }
+}, 'bad_option', [CX])
+
+/** What an answer and its refusal carry of their ask: its `op`, address, policies, and the revisions of its rows. */
+export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
 // --
 
 // == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, bankRow, BankRow

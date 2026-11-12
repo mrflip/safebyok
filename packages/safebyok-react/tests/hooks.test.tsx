@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure, type LifecycleHandler } from 'safebyok'
-import { MemoryVaultDB, type VaultQuery } from 'safebyok/storage'
+import { MemoryVaultDB, type BoxListAsk } from 'safebyok/storage'
 import { BankProvider } from '../src/provider/bank-provider'
 import { useBank, useBankSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks/hooks'
 import * as TH from './test-helpers'
@@ -14,9 +14,9 @@ const shown = (testid: 'bank' | 'vault') => screen.getByTestId(testid).textConte
 /** A MemoryVaultDB whose listBoxes refuses once `refusing` is set. Its listVaults keeps working. */
 class BoxRefusingVaultDB extends MemoryVaultDB {
   refusing = false
-  protected override doListBoxes(asked: VaultQuery) {
+  protected override doListBoxes(ask: BoxListAsk) {
     if (this.refusing) { throw new VaultError('storage_unavailable', 'refused by the test') }
-    return super.doListBoxes(asked)
+    return super.doListBoxes(ask)
   }
 }
 
@@ -67,7 +67,7 @@ describe("useVault and useVaultSnapshot", () => {
   it("read waiting while the bank's hello is still on its way", async () => {
     const world = TH.makeBankWorld()
     const listing = TH.makePending<never>()
-    vi.spyOn(world.vaultDB, 'listVaults').mockReturnValue(listing.promise)
+    vi.spyOn(world.vaultDB, 'tryListVaults').mockReturnValue(listing.promise)
     render(<BankProvider {...TH.providerPropsOf(world)}><TH.ShowsVault /><ShowsMain /></BankProvider>)
     await waitFor(() => { expect(TH.seenBanks).to.have.lengthOf(1) })
     await act(async () => { await TH.wakeupAtNextTick() })

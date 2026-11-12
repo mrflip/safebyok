@@ -17,10 +17,11 @@
  * builders make, opens to a 'damaged_whisper', as under the real vault.
  */
 
+import type { GotAct } from '../../src/shapes/shapes-enums'
 import { afterEach, beforeEach, vi } from 'vitest'
 import { _cheat_clock } from '../../src/helpers/clock'
 import { brandGuarded } from '../../src/helpers/consts'
-import { VaultError } from '../../src/refusals/errors'
+import { VaultError, isVaultError } from '../../src/refusals/errors'
 import { Box } from '../../src/models/box'
 import { BoxListing } from '../../src/models/box-listing'
 import { guardRequestCleartext } from '../../src/models/bank'
@@ -30,7 +31,7 @@ import type { Boxscope } from '../../src/shapes/shapes-core'
 import * as SX from '../../src/shapes/shapes-storage'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { type BankAnnouncement, type BankFriend, type BoxDna, type BoxWorld, type Fetched, type BoxListingOpts, type ListingAnswer, type Tombstone } from '../../src/shapes/shapes-vaultish'
-import { type BoxDelAsk, type BoxGetAsk, type BoxPutAsk, type BoxRow, type BoxTombstone, type ReqParams, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
+import { type BoxDelAsk, type BoxGetAsk, type BoxPutAsk, type BoxRow, type BoxTombstone, type LoggableAsk, type Revision, type VaultRecord, type WatchScope, type BoxRecord, type BoxSparse, BoxFormat } from '../../src/shapes/shapes-storage'
 import { stableJsonify } from '../../src/helpers/stable-jsonify'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Notice } from '../../src/storage/vault-db'
@@ -282,8 +283,8 @@ export class TestableVaultDB extends MemoryVaultDB {
   }
 }
 
-function factsOf(scope: Boxscope) { return { req_params: scope as ReqParams } }
-function gotActOf(val: Fetched<BoxRecord, BoxSparse> | null): string {
+function factsOf(scope: Boxscope) { return { ask: { op: 'get', ...scope } as LoggableAsk } }
+function gotActOf(val: Fetched<BoxRecord, BoxSparse> | null): GotAct {
   if (val === null) { return 'gotvoid' }
   return VX.isTombstone(val) ? 'gotgone' : 'gotlive'
 }
@@ -297,7 +298,7 @@ const answerOf = (scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, wo
  *   afterEach(() => { mw.dispose() })
  *   mw.seedPut(mw.fullBoxRecord({ revision_seq: 2 }))
  *   const listing = boxListingOf(mw)
- *   const box = await listing.fetch(mw.boxscope('anthropic_api_key'))
+ *   const box = await listing.get(mw.boxscope('anthropic_api_key'))
  *   expect(mw.callsOf('get')).to.have.lengthOf(1)
  * @example mw.willPut((call) => mw.staleWriteOf(mw.boxscope(call.record.boxlabel), mw.fullBoxRecord({ revision_seq: 5 })))   // the next put loses a race
  */
@@ -322,7 +323,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   const stored = vaultDB._cheat_boxRowsOf(WorldVault.scope, WorldVault.vault_tok)
   const ensureTimelyScript = new Script<number | undefined>()
   const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
-  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.refusalkind, ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
+  const refusalOf = (scope: Boxscope, err: VaultError, world: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, world, act: err.meta?.act ?? 'unclassified_storing', ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
 
   // The fake seal: the text sealed, by the stamp it was sealed under.
   const sealedTexts = new Map<string, string>()
@@ -384,7 +385,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     bankFriend: {
       panic:       brandGuarded((refusal: VaultError) => { panics.push(refusal) }),
       announce:    brandGuarded((announcement: BankAnnouncement) => { announced.push(announcement) }),
-      tellBadNews: brandGuarded((told: readonly VaultError[]) => { badnews.push(...told) }),
+      tellBadNews: brandGuarded((told: readonly unknown[]) => { badnews.push(...told.map((news) => (isVaultError(news) ? news : Refuse.unexpectedError(news)))) }),
       askUser:     guardRequestCleartext(() => undefined),
     },
     callsOf:    (verb) => calls.filter((call): call is Extract<ModelsCall, { verb: typeof verb }> => call.verb === verb),
@@ -416,11 +417,11 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     refusalOf,
     staleWriteOf: (scope, storedNow, worldNow = null) => {
       const err = Refuse.staleWrite(worldVaultRow(), (storedNow ?? null) as BoxRow | null)
-      return refusalOf(scope, err, worldNow, storedNow)
+      return { ok: false, err, world: worldNow, act: 'stale', ...factsOf(scope), ...((storedNow !== undefined) && { dbhas: storedNow }) }
     },
 
     notify: async (record, worldNow = worldVaultRow()) => {
-      const notice = { act: VX.isTombstone(record) ? 'gone' : 'got', val: record, world: worldNow } as Notice
+      const notice = { act: VX.isTombstone(record) ? 'gotgone' : 'gotlive', val: record, world: worldNow } as Notice
       liveWatch().onNotice(notice)
       await settled()
     },
@@ -436,7 +437,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
  *
  * @example
  *   const world = useModelsWorld()
- *   it('fetches', async () => { world.mw.seedPut(fullBoxRecord()); await boxListingOf(world.mw).fetch(world.mw.boxscope('anthropic_api_key')) })
+ *   it('fetches', async () => { world.mw.seedPut(fullBoxRecord()); await boxListingOf(world.mw).get(world.mw.boxscope('anthropic_api_key')) })
  */
 export function useModelsWorld(opts: ModelsWorldOpts = {}): { readonly mw: ModelsWorld } {
   let current: ModelsWorld | null = null
@@ -462,14 +463,14 @@ export class TestableBox extends Box {
 
 }
 
-/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `build`, `create`, `fetch`, `put`, `del` and `at` give a `TestableBox`. */
+/** The {@link BoxListing} whose boxes are {@link TestableBox}es, typed so: `deliverRecord`, `create`, `get`, `put`, `del` and `at` give a `TestableBox`. */
 export class TestableBoxListing extends BoxListing {
   protected override makeThing(central: Fetched<BoxRecord, BoxSparse>): TestableBox {
     return new TestableBox(this.world, this, central)
   }
 
-  /** {@link BoxListing.build}, answering a {@link TestableBox}. */
-  override async build(...args: Parameters<BoxListing['build']>): Promise<TestableBox> { return testableOf(await super.build(...args)) }
+  /** {@link BoxListing.deliverRecord}, answering a {@link TestableBox}. */
+  override deliverRecord(...args: Parameters<BoxListing['deliverRecord']>): TestableBox { return testableOf(super.deliverRecord(...args)) }
 
   /** {@link BoxListing.puttable}, answering a {@link TestableBox}. */
   override puttable(...args: Parameters<BoxListing['puttable']>): TestableBox { return testableOf(super.puttable(...args)) }
@@ -477,8 +478,6 @@ export class TestableBoxListing extends BoxListing {
   /** {@link BoxListing.create}, answering a {@link TestableBox}. */
   override async create(...args: Parameters<BoxListing['create']>): Promise<TestableBox> { return testableOf(await super.create(...args)) }
 
-  /** {@link BoxListing.fetch}, answering a {@link TestableBox} or null. */
-  override async fetch(...args: Parameters<BoxListing['fetch']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.fetch(...args)) }
 
   /** {@link BoxListing.get}, answering a {@link TestableBox} or null. */
   override async get(...args: Parameters<BoxListing['get']>): Promise<TestableBox | null> { return nullOrTestableOf(await super.get(...args)) }

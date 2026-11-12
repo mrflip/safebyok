@@ -237,7 +237,7 @@ describe("vault.putBox over a live box", () => {
     const { next, box } = await nextUnlisted()
     const elsewhere = await next.getBox(boxlabel)
     await elsewhere?.del(elsewhere.scope)
-    await box.fetch({ ifAbsent: 'nil' })
+    await box.get({ maxMillisSinceRefresh: 0, ifAbsent: 'nil' })
     const reborn = await elsewhere?.put({ whisper: Whisper })
     expect(box.isPresent).to.eq(false)
     await TH.expectRefusal(box.put({ whisper: Whisper }, { ifAbsent: 'fail' }), 'stale_write')

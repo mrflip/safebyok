@@ -5,13 +5,13 @@
 export { AdapterVaultDB } from './adapter-vault-db'
 export type { Answer, BadAnswer, BankListed, BoxesListed, DelAct, GoodAnswer, GotAct, ListAct, Notice, PutAct, Tidied } from './vault-db'
 export type { BoxAnswer, OkAct, VaultAnswer, VaultDB } from './vault-db'
-export type { BoxesFetched, Heard, RowOfBox, RowOfVault } from './adapter-vault-db'
-export { boxActOf, boxVaultActOf, boxWorldOf, cappedActOf, classifyBox, classifyVault, isBirthAct, isOkAct, isWriteAct, presenceVals, vaultActOf } from './classifier'
-export type { BoxClassified, BoxFetched, Presence, VaultClassified, VaultFetched } from './classifier'
-export type { BoxAsk, BoxDelAsk, BoxGetAsk, BoxPutAsk, VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk } from '../shapes/shapes-storage'
-export { boxVaultActVals, foundActVals, gateVerbVals, refusedActVals, writeActVals } from '../shapes/shapes-enums'
-export { boxAsk, boxDel, boxGet, boxPut, vaultAsk, vaultDel, vaultGet, vaultPut } from '../shapes/shapes-storage'
-export type { BoxAct, GateVerb, VaultAct, WriteAct } from '../shapes/shapes-enums'
+export type { Heard } from './adapter-vault-db'
+export { boxActOf, cappedActOf, classifyStoredBox, classifyStoredVault, isBirthAct, isOkAct, isWriteAct, presenceVals, vaultActOf } from './classifier'
+export type { BoxesFetched, BoxesStored, BoxFetched, BoxStored, Presence, RowOfBox, RowOfVault, VaultFetched, VaultsStored, VaultStored } from './classifier'
+export type { BoxAsk, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, LoggableAsk, VaultAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk } from '../shapes/shapes-storage'
+export { askOpVals, badActVals, boxVaultActVals, gateActVals, goodActVals, foundActVals, gateVerbVals, ifAbsentVals, refusedActVals, writeActVals } from '../shapes/shapes-enums'
+export { boxAsk, boxDel, boxGet, boxList, boxPut, boxTidy, gateVerbAskOf, loggableAsk, vaultAsk, vaultDel, vaultGet, vaultList, vaultPut } from '../shapes/shapes-storage'
+export type { AskOp, BadAct, BoxAct, GateAct, GoodAct, GateVerb, VaultAct, WriteAct } from '../shapes/shapes-enums'
 export { VaultDBVerbnames, badAnswerOf } from './vault-db'
 export { IsAdapterVaultDB, IsVaultDB, isAdapterVaultDB, isVaultDB } from '../helpers/consts'
 export { DeviceDB } from './device-db'
@@ -45,9 +45,9 @@ export { boxSparse, boxRecord, boxTombstone, boxRow, storedBoxRowOrNull, storedB
 export type { BoxRecord, BoxRow, BoxSparse, BoxTombstone, DamagedBox } from '../shapes/shapes-storage'
 export type { Sidecar, WhisperJson } from '../shapes/shapes-core'
 export { passkeyAddRecord, passkeyRevokeRecord } from '../shapes/shapes-storage'
-export { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, reqParams, adapterVaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
-export type { AdapterVaultDBOpts, Capacity, DelOpts, GateVerbOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsParsed, ReqParams } from '../shapes/shapes-storage'
-export { rowMeta, reqParamsOf, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
+export { ifAbsentOpts, putOptsGiven, putOpts, gateVerbOpts, delOpts, adapterVaultDBOpts, memoryVaultDBOpts, capacity } from '../shapes/shapes-storage'
+export type { AdapterVaultDBOpts, Capacity, DelOpts, GateVerbOpts, IfAbsentOpts, MemoryVaultDBOpts, PutOpts, PutOptsParsed } from '../shapes/shapes-storage'
+export { rowMeta, revisionOf, nextRevisionOf } from '../shapes/shapes-storage'
 export { makeLifeTok } from '../helpers/crypto'
 export { isRowAt, isLiveRow, isLiveVaultRecord, isLiveBoxRecord, isVaultPutAllowed, isBoxPutAllowed, isLifeOver, isTombstoneRow } from '../shapes/shapes-storage'
 export { shellVaultOf, shellBoxOf, damagedVaultOf, damagedBoxOf, boxTombstoneOf } from '../shapes/shapes-storage'
@@ -56,10 +56,10 @@ export type { BankRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLeas
 // --
 
 // == [Answers over a wire]: the validators a vaultDB client parses each answer with, which read an absent field as null
-export { crossedErr, crossedReqParams, damagedVault, damagedBox, crossedNotice } from '../shapes/shapes-answers'
+export { crossedErr, crossedAsk, damagedVault, damagedBox, crossedNotice } from '../shapes/shapes-answers'
 export { listVaultsAnswer, getVaultAnswer, putVaultAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delVaultAnswer } from '../shapes/shapes-answers'
 export { listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer } from '../shapes/shapes-answers'
-export type { CrossedErr, CrossedReqParams } from '../shapes/shapes-answers'
+export type { CrossedAsk, CrossedErr } from '../shapes/shapes-answers'
 // --
 
 // == [Validators]: the makers an adapter checks its own options and rows with

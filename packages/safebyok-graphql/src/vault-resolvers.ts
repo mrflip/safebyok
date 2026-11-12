@@ -31,18 +31,18 @@ export type VaultFieldArgs = {
 /** A vaultDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
 export type CrossingAnswer = {
   ok:         boolean
-  act:        string
+  act:        DB.GoodAct | DB.BadAct
   val:        unknown
   world:      unknown
   dbhas:      unknown
-  req_params: DB.ReqParams
+  ask:        DB.LoggableAsk
   err:        DB.CrossedErr | null
 }
 
 /** A watch notice in wire form, or the refusal that ends the watch. */
 export type CrossingNotice = {
   ok:    boolean
-  act:   string
+  act:   'gotlive' | 'gotgone' | DB.BadAct
   val:   DB.VaultRow | DB.BoxRow | null
   world: DB.VaultRow | null
   err:   DB.CrossedErr | null
@@ -104,14 +104,14 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
   }
 
   /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form.
-   * Otherwise return a bad answer in wire form: the refusal from checking `asked` if it fails, else the sign-in refusal.
+   * Otherwise return a bad answer in wire form: the refusal from checking `ask` if it fails, else the sign-in refusal.
    */
-  async function serveSignedIn(context: ContextT, user_id: string, asked: object, verb: () => Promise<DB.Answer<unknown, string, unknown>>): Promise<CrossingAnswer> {
+  async function serveSignedIn(context: ContextT, user_id: string, ask: object, verb: () => Promise<DB.Answer<unknown, DB.GoodAct, unknown>>): Promise<CrossingAnswer> {
     const refusal = await signInRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
-    const checked = await DB.outcomeOf(() => DB.reqParamsOf(asked))
-    if (! checked.ok) { return crossingOf(DB.badAnswerOf(checked.err)) }
-    return crossingOf({ ok: false, err: refusal, act: refusal.refusalkind, world: null, req_params: checked.val })
+    const loggableAsk = await DB.outcomeOf(() => DB.loggableAsk.parse(ask))
+    if (! loggableAsk.ok) { return crossingOf(DB.badAnswerOf(loggableAsk.err)) }
+    return crossingOf({ ok: false, err: refusal, act: 'unclassified_storing', world: null, ask: loggableAsk.val })
   }
 
   /** Watch `scope` and yield its notices in wire form, for as long as the request stays signed in as that user. */
@@ -149,20 +149,29 @@ export function vaultResolvers<ContextT>(opts: VaultResolversOpts<ContextT>): Va
     SafebyokBoxRow:      { __resolveType: typenameOf },
     SafebyokRow:         { __resolveType: typenameOf },
     Query: {
-      safebyokListVaults: async (_parent, scope, context) => await serveSignedIn(context, scope.user_id, scope, async () => await vaultDB.tryListVaults(scope)),
+      safebyokListVaults: async (_parent, { applabel, user_id }, context) => {
+        const ask = { op: 'list', applabel, user_id } as const
+        return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryListVaults(ask))
+      },
       safebyokGetVault:   async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetVault(ask)),
-      safebyokListBoxes:  async (_parent, asked, context) => await serveSignedIn(context, asked.user_id, asked, async () => await vaultDB.tryListBoxes(asked)),
+      safebyokListBoxes:  async (_parent, { applabel, user_id, vaultlabel, vault_tok }, context) => {
+        const ask = { op: 'list', applabel, user_id, vaultlabel, vault_tok } as const
+        return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryListBoxes(ask))
+      },
       safebyokGetBox:     async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryGetBox(ask)),
     },
     Mutation: {
       safebyokPutVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutVault(ask)),
       safebyokPutBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryPutBox(ask)),
-      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryReplacePassphrase(record, opts)),
-      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryAddPasskey(record, opts)),
-      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, { ...record, ...opts }, async () => await vaultDB.tryRevokePasskey(record, opts)),
+      safebyokReplacePassphrase: async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('replacePassphrase', record), async () => await vaultDB.tryReplacePassphrase(record, opts)),
+      safebyokAddPasskey:        async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('addPasskey', record), async () => await vaultDB.tryAddPasskey(record, opts)),
+      safebyokRevokePasskey:     async (_parent, { record, opts }, context) => await serveSignedIn(context, record.user_id, DB.gateVerbAskOf('revokePasskey', record), async () => await vaultDB.tryRevokePasskey(record, opts)),
       safebyokDelBox:            async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelBox(ask)),
       safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await vaultDB.tryDelVault(ask)),
-      safebyokTidyGone:          async (_parent, scope, context) => await serveSignedIn(context, scope.user_id, scope, async () => await vaultDB.tryTidyGone(scope)),
+      safebyokTidyGone:          async (_parent, { applabel, user_id }, context) => {
+        const ask = { op: 'tidy_gone', applabel, user_id } as const
+        return await serveSignedIn(context, user_id, ask, async () => await vaultDB.tryTidyGone(ask))
+      },
     },
     Subscription: {
       safebyokWatch: {
@@ -203,14 +212,14 @@ const safebyokEpochMillis = new GraphQLScalarType<number, number>({
 // == [Helpers]: crossingOf, crossedErrOf, badNoticeOf, endingWith, openWatch, typenameOf
 
 /** Convert `answer` to wire form. */
-function crossingOf(answer: DB.Answer<unknown, string, unknown>): CrossingAnswer {
+function crossingOf(answer: DB.Answer<unknown, DB.GoodAct, unknown>): CrossingAnswer {
   return {
     ok:         answer.ok,
     act:        answer.act,
     val:        answer.ok ? answer.val : null,
     world:      answer.world,
     dbhas:      answer.dbhas ?? null,
-    req_params: answer.req_params,
+    ask:        answer.ask,
     err:        answer.ok ? null : crossedErrOf(answer.err),
   }
 }
@@ -225,13 +234,13 @@ function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): DB.Crossed
     meta: {
       capacity:   capacity.success ? capacity.data : null,
       fieldnames: (meta?.fieldnames === undefined) ? null : [...meta.fieldnames],
-      call:       meta?.call ?? null,
+      oplabel:    meta?.oplabel ?? null,
     },
   }
 }
 
 /** Make the notice that ends a watch, carrying `refusal`. */
-function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: refusal.refusalkind, val: null, world: null, err: crossedErrOf(refusal) } }
+function badNoticeOf(refusal: DB.VaultError): CrossingNotice { return { ok: false, act: 'unclassified_storing', val: null, world: null, err: crossedErrOf(refusal) } }
 
 /** Make the iterator for a watch refused before it started: it yields one notice carrying the refusal, then ends. */
 function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotice> {

@@ -24,7 +24,7 @@ async function grantedWorld(opts?: LeaseGrantOpts): Promise<{ friend: FakeLeaseF
   return { friend, lease }
 }
 
-/** A friend of {@link WorldStamp} whose slot has a record cached under `stamp`. */
+/** A friend of {@link WorldStamp} whose scopepath has a record cached under `stamp`. */
 async function friendWithRowOf(stamp: Partial<VaultStamp>): Promise<FakeLeaseFriend> {
   const elsewhere = fakeLeaseFriendOf(stamp)
   const lease = await makeGrantedLease(elsewhere)
@@ -235,7 +235,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
       expect(friend.tryForgetLease).toHaveBeenCalledTimes(1)
       expect(friend.cached).to.be.null
       expect(friend.tellBadNews).toHaveBeenCalledOnce()
-      expect(friend.tellBadNews.mock.calls[0]![0][0]!.refusalkind).to.eq('damaged_lease')
+      expect((friend.tellBadNews.mock.calls[0]![0][0] as VaultError).refusalkind).to.eq('damaged_lease')
     })
   }
 
@@ -278,7 +278,7 @@ describe("Lease.buildFromCache(friend, gate_epoch)", () => {
       friend.cached = tampered
       expect(await Lease.buildFromCache(friend, GrantedAs.gate_epoch)).to.be.null
       expect(friend.tellBadNews).toHaveBeenCalledOnce()
-      const err = friend.tellBadNews.mock.calls[0]![0][0]!
+      const err = friend.tellBadNews.mock.calls[0]![0][0] as VaultError
       expect(err.refusalkind).to.eq('damaged_lease')
       expect(TH.thrownText(err)).to.not.include(vault_key_lease_wrapped.ciphertext_b64)
       expect(friend.cached).to.equal(tampered)

@@ -164,7 +164,7 @@ describe("VaultSchemaSdl", () => {
   })
 
   it("fails the drift check when it sends an object where a check reads a scalar", () => {
-    const deepened = buildSchema(VaultSchemaSdl.replace('  refusalkind: SafebyokRefusalkind!\n', '  refusalkind: SafebyokRevision!\n'))
+    const deepened = buildSchema(VaultSchemaSdl.replace('  refusalkind: SafebyokRefusalkind!\n', '  refusalkind: SafebyokAskRow!\n'))
     expect(schemaDriftOf(deepened).join('\n')).to.include('refusalkind')
   })
 

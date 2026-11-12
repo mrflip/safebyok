@@ -41,7 +41,7 @@ const boxSparseFields = `
 const answerFields = `
   ok:         Boolean!
   act:        String!
-  req_params: SafebyokReqParams!
+  ask:        SafebyokAsk!
   err:        SafebyokErr`
 
 /** The GraphQL schema (SDL) for a vaultDB's verbs. Every name is prefixed `safebyok`, so it can be merged into your own schema. */
@@ -140,28 +140,33 @@ type SafebyokBankScope {
   user_id:  String!
 }
 
-"""A row's revision: its token and its sequence number."""
-type SafebyokRevision {
-  revision_tok: String!
-  revision_seq: Int!
-}
-
 # Answers
 
-"""The scope, tokens and revision of a request. A field is null when the request did not have it."""
-type SafebyokReqParams {
-  applabel:     String
-  user_id:      String
-  vaultlabel:   String
-  boxlabel:     String
-  vault_tok:    String
-  box_tok:      String
-  revision_tok: String
-  revision_seq: Int
-  expected:     SafebyokRevision
+"""What an answer carries of its ask: its op, address and policies, and the revisions of its rows, never a record's payload. A field is null when the ask did not have it."""
+type SafebyokAsk {
+  op:         String
+  applabel:   String
+  user_id:    String
+  vaultlabel: String
+  boxlabel:   String
+  vault_tok:  String
+  ifAbsent:   String
+  ifPresent:  SafebyokIfPresent
+  gateVerb:   SafebyokGateVerb
+  expected:   SafebyokAskRow
+  record:     SafebyokAskRow
 }
 
-"""A refusal: its kind and its message. Its meta may carry capacity, fieldnames and call."""
+"""The revision, liveness and life tokens of a row an ask names. A field is null when the ask did not have it."""
+type SafebyokAskRow {
+  revision_tok: String
+  revision_seq: Int
+  am:           String
+  vault_tok:    String
+  box_tok:      String
+}
+
+"""A refusal: its kind and its message. Its meta may carry capacity, fieldnames and oplabel."""
 type SafebyokErr {
   refusalkind: SafebyokRefusalkind!
   message:     String!

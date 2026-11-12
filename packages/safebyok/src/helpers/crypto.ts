@@ -52,7 +52,7 @@ export function fromB64OrNull(b64: string): Uint8Array | null {
 /** One record of a {@link cipherCtx}, a stamp or a header: a flat record of strings and numbers, encoded with its keys sorted, every field bound. */
 export type CipherCtxRecord = Readonly<Record<string, string | number>>
 
-/** The ctx an encryption is bound to, as AES-GCM additional data or HKDF info: the thing's stamp, the purpose its slot names, and its visible header.
+/** The ctx an encryption is bound to, as AES-GCM additional data or HKDF info: the thing's stamp, the purpose its fieldname names, and its visible header.
  * The stamp is one record, or a list of them where a thing binds the stamp of what it lies in
  * beside its own: each keeps its own field names. The ctx is the UTF-8 JSON of the parts in order,
  * each stamp, the purpose, then the header where there is one, each record's keys sorted. It is

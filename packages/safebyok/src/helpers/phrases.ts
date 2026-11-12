@@ -159,7 +159,7 @@ export const VaultLocked = "The vault locked mid-operation. Please unlock again 
 export const RecordForNewBox = "A create operation found a record already present."
 // --
 
-// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives, OtherVaultTok, ShapeUnreconciled
+// == [Storables]: PartialLoad, AlreadyListed, PatchNamesNeitherHalf, patchOfOtherScope, WhisperedIsNoWhisper, NotExposed, BoxExpected, PuttingVeiledFields, NoFieldsBound, OneRevisionTwoToks, OneRevisionTwoFates, OneRevisionTwoLives
 
 /** Why a record in hand that is not full cannot be opened. */
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
@@ -197,17 +197,15 @@ export const OneRevisionTwoFates = "Storage and this device disagree about a rec
 /** Why a record stored under the revision in hand, but of another life of the thing, is not adopted. */
 export const OneRevisionTwoLives = "Storage and this device disagree about a record's history (it has been deleted and recreated). This should not happen: report this as a bug."
 
-/** Why a record under another vault_tok than the instance has is not adopted. */
-export const OtherVaultTok = "Storage delivered a record from a deleted vault. This should not happen: report this as a bug."
-
 /** Why a record delivered under one scope that names another is not adopted. */
 export const RecordOfOtherScope = "Storage delivered a misnamed record. This should not happen: report this as a bug."
 
 /** Why a good answer whose record differs from what was sent in scope, life or revision is not adopted. */
+/** Storage answered that nothing is stored where this device holds a live record. */
+export const NothingStoredWhereLive = "Storage answered that nothing is stored where this device has a live record. This should not happen: report this as a bug."
+
 export const AnswerNotAsSent = "Storage answered with a record other than the one it was asked about. This should not happen: report this as a bug."
 
-/** Why a pair of shapes no row of the reconcile table names is refused: a bug. */
-export const ShapeUnreconciled = "An unexpected shape was reconciled: a bug in Storable."
 // --
 
 // == [Models: provings]: CleartextMissing, WrongPassphrase, WrongPasskey, NoPasskeyWayin, OtherPasskey, OtherPrfSalt, UnknownKeyDeriver, notKeyBytes, WayinNotMadeYet, WayinMadeAlready, ProvingOfOtherVault, LeaseOfOtherVault, StampOfOtherVault, KeyDeriverThrew
@@ -293,10 +291,10 @@ export const VaultDeleted = "This vault was deleted. Ask the bank for the vault 
 /** Why a passkey is not added to a gate that has one. */
 export const PasskeyAlreadyAdded = "This vault has a passkey already, and may have only one, so nothing was asked or changed: revoke it first (vault.revokePasskeyPrompt), then add the new one."
 
-/** Why a stale Vault's delete does not reach the vault made since in its slot. */
+/** Why a stale Vault's delete does not reach the vault made since at its scope. */
 export const DelOfOtherRevision = "This thing is not at the life or revision the delete names, so nothing was deleted. Read it again and ask again."
 
-export const DelOfOtherLife = "The vault listed in this slot is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
+export const DelOfOtherLife = "The vault listed under this name is under another vault_tok than this Vault, and a delete names one life of a vault, so nothing was deleted. Read the vault again and ask again."
 // --
 
 // == [Models: banks, gatings and derivers]: InsecureContext, PositiveMinutesShape, GatingDismissed, AlreadyAsking, AttemptInFlight, GateMadeElsewhere, GatingConcluded, RequestCleartextThrew, CleartextsThrew, StrengthCheckerThrew, SamePassphrase, reservedDeriverLabel, suppliedSpecChanged, TestDeriverNotice
@@ -440,8 +438,8 @@ export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, 
 /** Why a put or del is refused for its record: the record must be at the request's address. */
 export const RecordOfOtherAddress = "A put's or del's record is at the address its ask names."
 
-/** A device database's failure in `call`, `named` the sentence naming what it threw, or blank. */
-export function deviceDBFailed(call: string, named: string): string { return `This device's own storage failed in ${call}: try again.${named}` }
+/** A device database's failure in `oplabel`, `named` the sentence naming what it threw, or blank. */
+export function deviceDBFailed(oplabel: string, named: string): string { return `This device's own storage failed in ${oplabel}: try again.${named}` }
 
 /** The sentence naming what a datastore threw, by its `name` alone. */
 export function thrownNamed(thrownName: string): string { return ` It threw ${thrownName}.` }
@@ -449,8 +447,8 @@ export function thrownNamed(thrownName: string): string { return ` It threw ${th
 
 // == [Refusals: storage backends]: storageFailed, StorageIssue, IdentityRevoked, NoBrowserDatastore, TransactionAborted, DatabaseClosed, StorageWithheld, BrowserDatadeviceDBFailed, SchemaNotServed, fetchFailed, WatchEnded
 
-/** A vault's storage backend failing in `call`, `named` the sentence naming what it threw, or blank. */
-export function storageFailed(call: string, named: string): string { return `The vault's storage could not be reached, or failed, in ${call}: try again shortly.${named}` }
+/** A vault's storage backend failing in `oplabel`, `named` the sentence naming what it threw, or blank. */
+export function storageFailed(oplabel: string, named: string): string { return `The vault's storage could not be reached, or failed, in ${oplabel}: try again shortly.${named}` }
 
 /** A row out of storage that is not an object at all. */
 export const StorageIssue = "The vault's storage answered with a row that is not an object, which nothing safebyok writes could be. Trying again is unlikely to help: the database or its storage adapter needs someone to look at it."

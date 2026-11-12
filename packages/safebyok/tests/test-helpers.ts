@@ -21,7 +21,7 @@ export { describeVaultDBBattery } from './test-helpers/vault-db-battery'
 export type { VaultDBBatteryOpts, VaultDBRowCheats } from './test-helpers/vault-db-battery'
 export { describeDeviceDBBattery } from './test-helpers/device-db-battery'
 export type { DeviceDBBatteryOpts, DeviceDBRowCheats } from './test-helpers/device-db-battery'
-export { bankScope, vaultScope, boxscope, vaultQuery, boxQuery, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, gateMoveOf,
+export { bankScope, vaultScope, boxscope, vaultQuery, boxQuery, vaultListAsk, boxListAsk, boxTidyAsk, vaultScopeOf, boxscopeOf, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, gateMoveOf,
   FlawedVaultRows, FlawedBoxRows, vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf } from './test-helpers/storage-world'
 export type { FlawRefusal, FlawedRow } from './test-helpers/storage-world'
 export { makeBankWorld, makeBankWithVault, useBankWorlds, VaultScopeGiven } from './test-helpers/bank-world'

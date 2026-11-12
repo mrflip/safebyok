@@ -1,66 +1,74 @@
 # vaultdb_asks: the vaultDB buttonup, then the deliver/receive rat king
 
-Worktree `/workspace/byok-vaultdb_asks`, branch `20261111-vaultdb_asks`, cut from `20261111-names_ruled` (efe628691).
+Worktree `/workspace/byok-vaultdb_asks`, branch `20261111-vaultdb_asks`, on `main`.
+
+## Status
+
+* Part 1, the vaultDB buttonup: built and committed, with the Coach's rulings of 2026-11-11.
+* Part 2, delivery by a plan: built, both cuts, with the Coach's names of 2026-11-12, and the chute after the Coach's fingerpaint of 2026-11-12 (kept whole on branch `20261111-vaultdb_asks-fingerpaint`).
 
 ## Part 1: the vaultDB buttonup
+
+Every verb has `put`'s shape: the try form parses its ask, calls `do*`, and builds its answer inline from what the
+classifier returned; its `catch` makes the refusal (`answerForRefusal`). An adapter hands up `VaultStored`, `BoxStored`,
+`VaultsStored` or `BoxesStored`, made by the four `classifyStored*` functions.
 
 ### The ask, the length of the call stack
 
 | # | Where | Shape | Validator | Strict? | Shares a validator with |
 |---|---|---|---|---|---|
-| A1 | host -> listing (`put(record, opts)`, `get(scoped, opts)`, `del(sparse)`) | a record or scope, plus opts (`PutOpts`, `FetchOpts`) | `putOpts`, `fetchOpts`, `recordOf`, `scopeOf` | generous: defaults (`ifAbsent: 'add'`, `ifPresent: 'repl'`), extras stripped | none: not an ask, and stays so |
-| A2 | listing -> vaultDB verb | `VaultGetAsk` ... `BoxDelAsk`, plus the new `VaultListAsk` `{ op: 'list', applabel, user_id }` and `BoxListAsk` `{ op: 'list', ...vaultScope, vault_tok }` | `vaultGet` ... `boxDel`, `vaultList`, `boxList` | strict, no defaults, refinements across fields | A3, A4 (same object, parsed once) |
-| A3 | vaultDB -> adapter `do*` | the ask as A2 parsed it | none (trusted past the entrypoint) | | A2 |
-| A4 | adapter -> classifier | the same ask; the tables read slices of it (`ifAbsent`, `ifPresent`, `expected`, `record`'s revision) | none | | A2. `Asked`, `GetAsked`, `PutAsked`, `DelAsked` go: the tables take `VaultPutAsk \| BoxPutAsk` and so on |
-| A5 | Convex mutation, server side | the ask, re-parsed (anyone signed in can call it) | `vaultPut` etc. again | strict | A2 |
-| A6 | answer's `ask`, a refusal's `meta.ask` | `LoggableAsk`: `{ op?, applabel?, user_id?, vaultlabel?, boxlabel?, vault_tok?, ifAbsent?, ifPresent?, gateVerb?, expected?: RowMeta, record?: RowMeta }`, every field optional, a record cut to its meta | `loggableAsk` | generous: partial, strips the payload | none: A2 must refuse what this keeps |
-| A7 | an answer on the wire (GraphQL) | `CrossedAsk`: A6 with null for each absent field | `crossedAsk` | strict, nulls | none: nulls where A6 has absence |
-| A8 | GraphQL inputs | `SafebyokVaultGetAskInput` etc.; lists and `tidyGone` keep their separate arguments | the schema, then A2 in the vaultDB | schema-strict | A2, behind the schema |
-| A9 | models' pins (`Storable.del`, `Listing.#deliverGood`) | address plus revision of a record or scope | today `reqParams` / `reqParamsOf`, used as a picker | | none: not an ask. Part 1 swaps in `loggableAsk`-free picks; part 2 (deliver) owns it |
+| A1 | host -> listing (`put(record, opts)`, `get(scoped, opts)`, `del(sparse)`) | a record or scope, plus opts | `putOpts`, `fetchOpts`, `recordOf`, `scopeOf` | generous: defaults, extras stripped | none: not an ask |
+| A2 | listing -> vaultDB verb | `VaultGetAsk` ... `BoxDelAsk`, `VaultListAsk`, `BoxListAsk`, `BoxTidyAsk`, tagged by `op` | `vaultGet` ... `boxDel`, `vaultList`, `boxList`, `boxTidy` | strict, no defaults | A3, A4, A5 |
+| A3 | vaultDB -> adapter `do*` | the ask as A2 parsed it | none, trusted | | A2 |
+| A4 | adapter -> classifier | the same ask | none | | A2 |
+| A5 | Convex function, server side | the ask, parsed again: anyone signed in can call it | as A2 | strict | A2 |
+| A6 | an answer's `ask`, a refusal's `meta.ask` | `LoggableAsk`: every field optional, a record cut to its meta | `loggableAsk` | generous, strips the payload | none: A2 refuses what A6 keeps |
+| A7 | an answer on the GraphQL wire | `CrossedAsk`: A6, null for each absent field | `crossedAsk` | strict, nulls | none |
+| A8 | GraphQL inputs | `SafebyokVaultGetAskInput` etc.; lists and `tidyGone` take separate arguments | the schema, then A2 | schema-strict | A2, behind the schema |
+| A9 | a listing's pins (`Storable.del`, `Listing.#answerDeliveringOf`) | the revision and life tokens of a record | `revisionPins` | stripping | none: not an ask |
 
-Gone: `ReqParams`, `reqParams`, `requestParams`, `reqParamsOf`, `CrossedReqParams`, `crossedReqParams`, the answer's
-`req_params` (now `ask`), the classifier's `Asked` family, `VaultQuery` and `BankScope` as a list verb's argument.
+### Rulings (the Coach, 2026-11-11)
 
-### The type passed up from an adapter
+* `op: 'list'` on the list asks; four `classifyStored*` names; Convex functions take `{ ask }`; GraphQL lists keep their arguments.
+* `tidyGone` takes `{ op: 'tidy_gone', applabel, user_id }`.
+* A refusal names its verb as `oplabel` (was `call`), in `meta`, on the wire, and in the logger's story.
+* `RowAt` is gone. The Coach's objection was its name, wrong in shape (it holds a row) and in size (two fields): pass
+  the whole thing among friends rather than name a slice of it. The tables take the stored row, null for none, and read presence from it.
+* No public release yet: wire and signature changes need no shims.
 
-* `VaultClassified` / `BoxClassified` become `VaultStored` / `BoxStored`; lists gain `VaultsStored` / `BoxesStored`.
-* `classifyVault` / `classifyBox` become `classifyStoredVault` / `classifyStoredBox`; lists gain
-  `classifyStoredVaults` / `classifyStoredBoxes`, which take what `listedRowOf` and `listedBoxesOf` did in the base.
-* The classifier's private `Stored<RowT>` (`{ presence, row }`) becomes `RowAt<RowT>`, after `vaultRowAt` and `boxRowAt`
-  that make it, so `Stored` means one thing.
-* What the datastore hands back keeps its `*Fetched` names; `BoxesFetched.vault` becomes `world`, as `BoxFetched` has it.
+## Part 2: delivery by a plan (built)
 
-### The verbs
+| step | where | decides from |
+|---|---|---|
+| 1. the world | `deliverAnswer`: `this.world.receiveWorld(answer.world)` | the answer's `world`; a vault deleted or made anew remakes the Vault, which vacates its boxes |
+| 2. where the record is | `#answerDeliveringOf`, by `deliveryFieldingOf` (`as const satisfies` every act) | the act alone: `as_sent`, `as_got`, `as_db`, `void`, `none`; null for nothing to deliver |
+| 3. the receive table | `#recordDeliveringOf` | the record against the instance listed, read once: `making` (`listed`, `make`, `remake`) and `mod` (`older`, `same`, `adopt`), or a refusal |
+| 4. do it | `#doDeliverRecord({ making, mod, listed, record })` | the plan, every form with every field, null where none; the thing adopts (`receiveRecord`) or is marked refreshed (`markRefreshed`), and judges nothing |
 
-* Every verb has the `put` shape: the throwing form is `goodOrThrow(await this.tryX(ask))`; the try form parses, calls
-  `do*`, and makes the answer from what the classifier returned, its `catch` making the refusal. `answerOf(thunk)` goes.
-* `listVaults(ask: VaultListAsk)` and `listBoxes(ask: BoxListAsk)`; `tidyGone(scope)` keeps its scope, and its answer's
-  `ask` is the bank scope with no `op`.
-* No buried ledes: `const fetched = await this.#fetchVault(ask)` / `const stored = this.classifyStoredVault(ask, fetched)`.
-* A callee picks its own fields: `getVaultDoc(db, ask)`, never `getVaultDoc(db, DB.vaultScope.parse(ask))`.
+The entries into the chute:
 
-### Calls I made that you may overrule
+| entry | enters at | why there |
+|---|---|---|
+| `deliverAnswer(answer, sent)`: get, put, del | step 1 | an answer has a world, an act, a sent, and maybe a refusal to throw |
+| `#deliverListing(answer)`: list | step 1, then `deliverRecord` per row | a listing's world and damaged rows are its own; each row is a record |
+| `#onNotice(notice)`: watch | its world, then `deliverRecord` | a notice has no ask and no sent; its acts `got`/`gone` are not the classifier's |
+| `deliverRecord(record)`: `Vault.receiveWorld`, `BoxListing.#shellFor`, tests | step 3 | a bare record: no act, no sent, nothing to field |
 
-1. **`op: 'list'` on the list asks**, so they are asks like any other and the answer's `ask` has a tag.
-2. **`tidyGone` keeps a `BankScope`.** It is housekeeping, not a classified ask.
-3. **Four classify names, not one `classifyStored`.** One name for vault and box would need an overload that branches on
-   the ask's kind; one plain function per kind reads better when you debug.
-4. **Convex queries take `{ ask }`** and pick the scope server side, as the mutations already do.
-5. **GraphQL lists keep separate arguments**: the schema's header says so on purpose; the resolver builds the ask.
+* The Coach's names of 2026-11-12: `deliverAnswer`, `answerDeliveringOf`, `deliverRecord`, `recordDeliveringOf`, `doDeliverRecord`, `deliverListing`, in that order in the file.
+* The get chute: `thing.get` → `thing.hydrate` (its own record, if timely, answers: a swept thing too) | `vault.getBox` → `listing.get` → `tryGet` | `bank.tryProbe` (opts, world, the timely instance listed) → `#doTryGetJoined` (joined by scope: `doTryGet`, then `deliverAnswer`). A fetch is a get with `maxMillisSinceRefresh: 0`: `listing.fetch` and `thing.fetch` are gone. Each method's doc block carries its `Chute:` line. A chute takes many entries; once joined, nothing downstream knows which (the Coach, 2026-11-12).
+* The list chute matches: `tryList` → `#doTryListJoined` (joined) → `doTryList`, then `deliverListing`. `thing.get` goes to `listing.get`; `thing.hydrate` checks its own record, then calls `thing.get`. Notices act `gotlive`/`gotgone`. A null record (`gotvoid`, a refused `void`, an `ahead` over nothing) is storage's word that nothing is stored: `record_conflict` over a live instance. The fielding `void` is gone. `notes/receive-contract.md` is `notes/deliver-contract.md`, rewritten to the code (2026-11-12, after the Opus review).
+* Every refusal met is thrown first-come: a refusal's own err, then what delivering met, told as bad news; a list delivers every row, throws the first refusal and tells the rest.
+* A new instance is made at the void revision and handed its record by `receiveRecord`: a vault made from a tombstone forgets the lease cached on this device (pinned by a test).
+* `slotStepOf`, `SlotStep`, `reconcileCentral`, `receive`, `tombstoneFor`, `CentralPolicy`, `Reconciled`, `shapeUnreconciled`, `otherVaultTok`, `build`, `receiveRow`, `buildOrReceive` are gone.
+  A vault listing says `isOneLifePerInstance`; a box listing does not.
+* Acts are closed sets: `goodActVals`, `badActVals`; a refusal the classifier never saw is `unclassified_storing`, its refusalkind on `err`.
+* The policy validators (`ifPresent`, `ifAbsent`, `putIfAbsent`, `anyIfAbsent`) live once, in `shapes-storage`.
 
-### Built (uncommitted in the worktree, `pnpm justify` green)
+### Open with the Coach
 
-Departures from the plan above:
-* No `VaultsFetched`: `classifyStoredVaults(ask, vaults)` takes the bare `RowOfVault[]`.
-* A9 got `SX.revisionPins`, an `objStrip` of the optional `revision_tok`, `revision_seq`, `vault_tok`, `box_tok`: not an
-  ask, a picker for `Storable.del` and `Listing.#deliverGood`. Part 2 should make it unneeded.
-* `vaultAnswerOf` and `boxAnswerOf` are gone: each verb builds its answer inline (fatter, fewer methods).
-* `GraphQLVaultDB` lost its closure-taking `answerOf(call, checked, ask)`: each verb is the same blunt try/catch, its
-  refusals made by `answerForRefusal`, as `AdapterVaultDB`'s are. A client-side refusal now carries `call` and `ask`.
-* Convex `getBox` / `listBoxes` return `world`, not `vault`, so every fetched shape is "world and row".
-* Postgres's `ListBoxesWithVaultSql` aliases its vault column `world`.
-* React tests that spied on `listVaults` now stub `tryListVaults` with a resolved bad answer: the listing calls the try form.
+* Notices through `deliverAnswer`: not taken (cost above). "Slot" stays the word for the place at a scopepath (doc comments, the phrase `DelOfOtherLife`): not in VOCABULARY.md.
+* The refused `void` act fields `none`; a gotvoid fields `void`.
 
-## Part 2: deliver / receive / receiveWorld / fate
+## Leftovers
 
-Read `notes/receive-contract.md` before starting. Not begun.
+* `notes/gallant*.md` and `notes/old_vocabulary.md` keep names that are gone (`declined`, `#deliverGood`): reviewer and history material, left whole.

@@ -70,8 +70,8 @@ function watched(atOnce?: FakeResult) {
   return { streams, counts, heard, badnews, stop }
 }
 
-const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'got', val: { __typename: 'SafebyokVaultRecord', ...TH.vaultAt() }, world: null, err: null } }
-const revokedNotice = { safebyokWatch: { ok: false, act: 'identity_revoked', val: null, world: null, err: { refusalkind: 'identity_revoked', message: 'Signed out', meta: null } } }
+const gotNotice = { safebyokWatch: { __typename: 'SafebyokNotice', ok: true, act: 'gotlive', val: { __typename: 'SafebyokVaultRecord', ...TH.vaultAt() }, world: null, err: null } }
+const revokedNotice = { safebyokWatch: { ok: false, act: 'unclassified_storing', val: null, world: null, err: { refusalkind: 'identity_revoked', message: 'Signed out', meta: null } } }
 // --
 
 describe("GraphQLVaultDB's constructor", () => {
@@ -95,11 +95,11 @@ describe("GraphQLVaultDB's answers off the wire", () => {
     const combined = new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field "safebyokGetVault" on type "Query".')] })
     const { vaultDB } = fakeClient({ error: combined })
     const answer = await vaultDB.tryGetVault(TH.vaultGetAskOf())
-    expect(answer).to.deep.include({ ok: false, act: 'unexpected_error', world: null })
-    expect(answer.req_params).to.deep.include(TH.vaultScope)
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'unexpected_error')
+    expect(answer.ask).to.deep.include(TH.vaultScope)
     expect(DB.isVaultError(answer.err, 'unexpected_error')).to.be.true
     expect(answer.err?.cause).to.be.undefined
-    expect(answer.err?.meta).to.deep.include({ call: 'getVault' })
+    expect(answer.err?.meta).to.deep.include({ oplabel: 'getVault' })
     await TH.expectRefusal(vaultDB.getVault(TH.vaultGetAskOf()), 'unexpected_error')
   })
 
@@ -125,7 +125,7 @@ describe("GraphQLVaultDB's answers off the wire", () => {
 
   it("refuses a server serving some other schema", async () => {
     const { vaultDB } = fakeClient({ data: { somethingElse: 1 } })
-    await TH.expectRefusal(vaultDB.listVaults(TH.bankScope), 'unexpected_error')
+    await TH.expectRefusal(vaultDB.listVaults(TH.vaultListAsk), 'unexpected_error')
   })
 
   it("refuses a malformed ask before sending it", async () => {
@@ -142,7 +142,7 @@ describe("GraphQLVaultDB's watch", () => {
     const { streams, heard, stop } = watched()
     streams[0]?.({ data: gotNotice, hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: false })
-    expect(heard).to.deep.eq([{ act: 'got', val: TH.vaultAt(), world: null }])
+    expect(heard).to.deep.eq([{ act: 'gotlive', val: TH.vaultAt(), world: null }])
     stop()
   })
 
@@ -155,7 +155,7 @@ describe("GraphQLVaultDB's watch", () => {
     expect(streams).to.have.length(1)
     expect(badnews).to.have.length(1)
     expect(badnews[0]).to.include({ refusalkind: 'storage_unavailable', message: DB.WatchEnded })
-    expect(badnews[0]?.meta).to.deep.eq({ call: 'watch' })
+    expect(badnews[0]?.meta).to.deep.eq({ oplabel: 'watch' })
     expect(counts.unsubscribed).to.be.greaterThanOrEqual(1)
   })
 
@@ -190,7 +190,7 @@ describe("GraphQLVaultDB's watch", () => {
 
   it("passes on unchanged the refusal that ends a stream", () => {
     const { streams, badnews } = watched()
-    const scopeNotice = { safebyokWatch: { ok: false, act: 'bad_scope', val: null, world: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
+    const scopeNotice = { safebyokWatch: { ok: false, act: 'unclassified_storing', val: null, world: null, err: { refusalkind: 'bad_scope', message: 'No such scope', meta: null } } }
     streams[0]?.({ data: scopeNotice, hasNext: true })
     streams[0]?.({ data: scopeNotice, hasNext: false })
     expect(badnews).to.have.length(1)

@@ -2,8 +2,8 @@
 
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, Awaitable, BankScope, BoxAsk, BoxClassified, BoxDelAsk, BoxesFetched, BoxFetched, BoxGetAsk, BoxPutAsk, BoxQuery, Capacity, Heard,
-  RowOfVault, Tidied, VaultAsk, VaultClassified, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultPutAsk, VaultQuery, VaultScope, WatchScope,
+  AdapterVaultDBOpts, Awaitable, BoxAsk, BoxDelAsk, BoxesFetched, BoxesStored, BoxFetched, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxQuery, BoxStored, Capacity, Heard,
+  RowOfVault, Tidied, VaultAsk, VaultDelAsk, VaultError, VaultFetched, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultScope, VaultsStored, VaultStored, WatchScope,
 } from 'safebyok/storage'
 import {
   BirthBoxSql, BirthVaultSql, BoxLivesSql, DeleteBoxLifeSql, GetBoxWithVaultSql, GetVaultSql, ListBoxesWithVaultSql, ListVaultsSql, ReviseBoxSql, ReviseVaultSql,
@@ -179,37 +179,37 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   }
 
   /** Run a vault's write function `text` for the ask's record and the row it expects. */
-  async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string): Promise<VaultClassified> {
-    const [answer] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected)]) as [VaultAnswered]
-    const classified = this.classifyVault(ask, answer)
-    if ((! answer.ok) && DB.isWriteAct(classified.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-    return classified
+  async #writeVault(ask: VaultPutAsk | VaultDelAsk, text: string): Promise<VaultStored> {
+    const [answered] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected)]) as [VaultAnswered]
+    const stored = this.classifyStoredVault(ask, answered)
+    if ((! answered.ok) && DB.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
+    return stored
   }
 
   /** Run a box's write function `text` for the ask's record and the row it expects. */
-  async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string): Promise<BoxClassified> {
-    const [answer] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected), this.#maxBoxes]) as [BoxAnswered]
-    const classified = this.classifyBox(ask, answer)
-    if ((! answer.ok) && DB.isWriteAct(classified.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-    return classified
+  async #writeBox(ask: BoxPutAsk | BoxDelAsk, text: string): Promise<BoxStored> {
+    const [answered] = await this.#query(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected), this.#maxBoxes]) as [BoxAnswered]
+    const stored = this.classifyStoredBox(ask, answered)
+    if ((! answered.ok) && DB.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
+    return stored
   }
   // --
 
-  // == [Classifying]: classifyVault, classifyBox
+  // == [Classifying]: classifyStoredVault, classifyStoredBox
   // A write function checks an ask and stores its record in one call. When it stored the record, its result is checked and returned
   // without classifying. When it stored nothing, or the ask is a get, the core's classifier classifies the ask against the rows returned.
   // If the classifier finds a write when the function stored nothing, that is a fault, thrown by `#writeVault` or `#writeBox`.
 
-  protected override classifyVault(ask: VaultAsk, answered: VaultAnswered): VaultClassified {
-    if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyVault(ask, answered) }
+  protected override classifyStoredVault(ask: VaultAsk, answered: VaultAnswered): VaultStored {
+    if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyStoredVault(ask, answered) }
     const { act, presence } = storedVerdict.parse(answered)
     const vault = DB.storedVaultRow.parseConsistent(answered.vault, { ...DB.vaultScope.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
     return { ok: true, act, world: vault, vault, presence }
   }
 
-  protected override classifyBox(ask: BoxAsk, answered: BoxAnswered): BoxClassified {
+  protected override classifyStoredBox(ask: BoxAsk, answered: BoxAnswered): BoxStored {
     const capacity = (answered.boxcount === undefined) ? null : this.#roomAt(answered.boxcount)
-    if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyBox(ask, { world: answered.world, box: answered.box, capacity }) }
+    if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyStoredBox(ask, { world: answered.world, box: answered.box, capacity }) }
     const { act, presence } = storedVerdict.parse(answered)
     const world = worldRow.parseConsistent(answered.world, DB.vaultScope.parse(ask), RowOfOtherAddress)
     const box   = DB.storedBoxRow.parseConsistent(answered.box, { ...DB.boxQuery.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
@@ -219,27 +219,34 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
 
   // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
-  protected async doListVaults({ applabel, user_id }: BankScope): Promise<RowOfVault[]> {
-    return await this.#query(ListVaultsSql, [applabel, user_id]) as RowOfVault[]
+  protected async doListVaults(ask: VaultListAsk): Promise<VaultsStored> {
+    const vaults = await this.#query(ListVaultsSql, [ask.applabel, ask.user_id]) as RowOfVault[]
+    return this.classifyStoredVaults(ask, vaults)
   }
 
-  protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
-    return this.classifyVault(ask, await this.#fetchVault(ask))
+  protected async doGetVault(ask: VaultGetAsk): Promise<VaultStored> {
+    const fetched = await this.#fetchVault(ask)
+    return this.classifyStoredVault(ask, fetched)
   }
 
-  protected async doListBoxes({ applabel, user_id, vaultlabel, vault_tok }: VaultQuery): Promise<BoxesFetched> {
+  protected async doListBoxes(ask: BoxListAsk): Promise<BoxesStored> {
+    const { applabel, user_id, vaultlabel, vault_tok } = ask
     const [fetched] = await this.#query(ListBoxesWithVaultSql, [applabel, user_id, vaultlabel, vault_tok]) as BoxesFetched[]
-    return fetched ?? { vault: null, boxes: [] }
+    return this.classifyStoredBoxes(ask, fetched ?? { world: null, boxes: [] })
   }
 
-  protected async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
-    return this.classifyBox(ask, await this.#fetchBox(ask))
+  protected async doGetBox(ask: BoxGetAsk): Promise<BoxStored> {
+    const fetched = await this.#fetchBox(ask)
+    return this.classifyStoredBox(ask, fetched)
   }
 
   // A put or del calls the write function for the row it expects. A put whose options allow no write over that row is only
   // classified against the rows fetched: whatever is stored, the classifier finds no write for it.
-  protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
-    if (! mayReplace(ask)) { return this.classifyVault(ask, await this.#fetchVault(ask)) }
+  protected async doPutVault(ask: VaultPutAsk): Promise<VaultStored> {
+    if (! mayReplace(ask)) {
+      const fetched = await this.#fetchVault(ask)
+      return this.classifyStoredVault(ask, fetched)
+    }
     if (ask.gateVerb !== undefined) { return await this.#putGateVerb(ask) }
     return await this.#writeVault(ask, isBirth(ask) ? BirthVaultSql : ReviseVaultSql)
   }
@@ -247,28 +254,38 @@ export class PostgresVaultDB extends DB.AdapterVaultDB {
   // The classifier runs a gate verb's checks, which read the stored row's gate, so its put is classified first, against the
   // fetched row. If that finds a write, the function stores the record only over that same revision of the row. Either the
   // row checked is the row replaced, or nothing is stored and the ask is classified again against the row as it now stands.
-  async #putGateVerb(ask: VaultPutAsk): Promise<VaultClassified> {
-    const classified = this.classifyVault(ask, await this.#fetchVault(ask))
-    if (! DB.isWriteAct(classified.act)) { return classified }
+  async #putGateVerb(ask: VaultPutAsk): Promise<VaultStored> {
+    const fetched = await this.#fetchVault(ask)
+    const stored  = this.classifyStoredVault(ask, fetched)
+    if (! DB.isWriteAct(stored.act)) { return stored }
     return await this.#writeVault(ask, ReviseVaultSql)
   }
 
-  protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
-    if (! mayReplace(ask)) { return this.classifyBox(ask, await this.#fetchBox(ask)) }
+  protected async doPutBox(ask: BoxPutAsk): Promise<BoxStored> {
+    if (! mayReplace(ask)) {
+      const fetched = await this.#fetchBox(ask)
+      return this.classifyStoredBox(ask, fetched)
+    }
     return await this.#writeBox(ask, isBirth(ask) ? BirthBoxSql : ReviseBoxSql)
   }
 
-  protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
-    if (ask.expected.am !== 'a') { return this.classifyVault(ask, await this.#fetchVault(ask)) }
+  protected async doDelVault(ask: VaultDelAsk): Promise<VaultStored> {
+    if (ask.expected.am !== 'a') {
+      const fetched = await this.#fetchVault(ask)
+      return this.classifyStoredVault(ask, fetched)
+    }
     return await this.#writeVault(ask, ReviseVaultSql)
   }
 
-  protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
-    if (ask.expected.am !== 'a') { return this.classifyBox(ask, await this.#fetchBox(ask)) }
+  protected async doDelBox(ask: BoxDelAsk): Promise<BoxStored> {
+    if (ask.expected.am !== 'a') {
+      const fetched = await this.#fetchBox(ask)
+      return this.classifyStoredBox(ask, fetched)
+    }
     return await this.#writeBox(ask, ReviseBoxSql)
   }
 
-  protected async doTidyGone({ applabel, user_id }: BankScope): Promise<Tidied> {
+  protected async doTidyGone({ applabel, user_id }: BoxTidyAsk): Promise<Tidied> {
     return await this.#transact(async (tx) => {
       /** The number of box rows stored for one vault life. */
       type BoxLife = { vaultlabel: string, vault_tok: string, boxcount: number }

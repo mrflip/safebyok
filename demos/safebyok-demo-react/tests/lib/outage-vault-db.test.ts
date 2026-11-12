@@ -12,19 +12,19 @@ describe("OutageVaultDB", () => {
   it("passes a call through while online", async () => {
     const vaultDB = makeOutage()
     expect(vaultDB.isOnline).to.be.true
-    const listed = await vaultDB.tryListVaults(Scope)
+    const listed = await vaultDB.tryListVaults({ op: 'list', ...Scope })
     expect(listed.ok).to.be.true
   })
 
   it("refuses each verb while offline", async () => {
     const vaultDB = makeOutage()
     vaultDB.setOnline(false)
-    const listed = await vaultDB.tryListVaults(Scope)
+    const listed = await vaultDB.tryListVaults({ op: 'list', ...Scope })
     expect(listed.ok ? null : listed.err.refusalkind).to.eq('storage_unavailable')
-    const tidied = await vaultDB.tryTidyGone(Scope)
+    const tidied = await vaultDB.tryTidyGone({ op: 'tidy_gone', ...Scope })
     expect(tidied.ok ? null : tidied.err.message).to.match(/switched off/)
     vaultDB.setOnline(true)
-    const relisted = await vaultDB.tryListVaults(Scope)
+    const relisted = await vaultDB.tryListVaults({ op: 'list', ...Scope })
     expect(relisted.ok).to.be.true
   })
 

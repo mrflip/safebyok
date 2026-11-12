@@ -20,7 +20,7 @@ async function makeVaultWithBox(born: ReturnType<typeof makeBornVault> = makeBor
   const world = await born
   const box = await new TestableBoxListing(boxWorldOf(world.vault), { ...world.opts, scope: world.vault.scope }).create(BoxDna)
   const boxIn = async (vault: Vault) => {
-    const found = await new TestableBoxListing(boxWorldOf(vault), { ...world.opts, scope: vault.scope }).fetch(box.scope)
+    const found = await new TestableBoxListing(boxWorldOf(vault), { ...world.opts, scope: vault.scope }).get(box.scope, { maxMillisSinceRefresh: 0 })
     if (found === null) { throw new Error('no box stored') }
     return found
   }
@@ -31,7 +31,7 @@ async function makeVaultWithBox(born: ReturnType<typeof makeBornVault> = makeBor
   /** The next session on this device: a new listing over the same vaultDB and deviceDB, with the vault record stored, after its hello. */
   const openNextSession = async () => {
     const listing = world.anotherSession()
-    const vault = await listing.build(world.demandStored())
+    const vault = listing.deliverRecord(world.demandStored())
     await listing.hello()
     return { listing, vault }
   }
@@ -173,7 +173,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
 /** The vault as another device has it: its own deviceDB, caching no lease yet, over the record this device stored, after its hello. */
 async function openOtherDevice(stored: VaultRecord) {
   const other = makeVaultWorld(stored, { device_id: '00000000-0000-4000-8000-000000000002' })
-  const vault = await other.listing.build(other.demandStored())
+  const vault = other.listing.deliverRecord(other.demandStored())
   await other.listing.hello()
   return { ...other, vault }
 }

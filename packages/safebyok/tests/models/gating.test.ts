@@ -229,7 +229,7 @@ describe("a birth through a gating", () => {
     restoreRow(await storedVaultRecord(WinnersPassphrase))
     await TH.expectBad(gating.attempt({ passphraseClear }), 'gate_made_elsewhere')
     await launched
-    const vault = (await listing.fetch(Dna))!
+    const vault = (await listing.get(Dna, { maxMillisSinceRefresh: 0 }))!
     expect(vault.isLocked).to.be.true
     const unlocking = vault.ensureUnlocked()
     const asking = await gatingAt<'unlock_vault'>(1)
@@ -245,7 +245,7 @@ describe("a birth through a gating", () => {
     vi.spyOn(opts.vaultDB, 'tryPutVault').mockImplementationOnce(async (ask) => {
       const answer = await tryPutVault(ask)
       restoreRow({ ...theirs, revision_tok: 'rev-of-the-new-life', revision_seq: ask.record.revision_seq + 2 })
-      await listing.fetch(Dna)
+      await listing.get(Dna, { maxMillisSinceRefresh: 0 })
       return answer
     })
     const launched = TH.expectRefusal(listing.buildVault(Dna), 'gate_made_elsewhere')
@@ -255,7 +255,7 @@ describe("a birth through a gating", () => {
     expect(deviceDB.tryStow).not.toHaveBeenCalled()
   })
 
-  it("refuses a vault present in the slot, showing no dialog", async () => {
+  it("refuses a vault present at its scope, showing no dialog", async () => {
     const { listing, gatingAt } = birthWorld()
     const launched = listing.buildVault(Dna)
     const gating = await gatingAt<'build_vault'>()
@@ -451,7 +451,7 @@ describe("an unlock through a gating", () => {
     const world = await makeBornVault()
     const dialog = makeDialog()
     const session = makeVaultWorld(world.demandStored(), { requestCleartext: dialog.requestCleartext, deviceDB: world.fakeBank.deviceDB })
-    const again = await session.listing.build(world.demandStored())
+    const again = session.listing.deliverRecord(world.demandStored())
     await again.ensureUnlocked()
     expect(again.isUnlocked).to.be.true
     expect(session.listing.openGating).to.be.null

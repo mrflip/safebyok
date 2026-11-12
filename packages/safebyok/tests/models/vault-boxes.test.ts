@@ -37,7 +37,7 @@ describe("vault.hello", () => {
 
   it("lists the boxes of a vault that is still locked", async () => {
     const world = await makeWorldWithBox()
-    const next = await world.anotherSession().build(world.demandStored())
+    const next = world.anotherSession().deliverRecord(world.demandStored())
     expect(next.isLocked).to.be.true
     await next.hello()
     expect(next.boxListing.at({ ...next.scope, boxlabel })?.boxlabel).to.eq(boxlabel)

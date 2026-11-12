@@ -53,7 +53,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
 
   // == [Methods]: puttable, create, tryCreate, shellFor
 
-  /** The box a put of `scoped` goes through: the one listed, or a void one made for an empty slot. */
+  /** The box a put of `scoped` goes through: the one listed, or a void one made where none is listed. */
   puttable(scoped: unknown, opts: BoxPutOpts = {}): Box {
     const { ifAbsent } = VX.boxPutOpts.parse(opts)
     const scope = this.scopeOf(scoped)
@@ -62,7 +62,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
     return listed ?? this.#shellFor(scope)
   }
 
-  /** The box a delete of `scoped` goes through: the one listed, or a void one made for an empty slot. */
+  /** The box a delete of `scoped` goes through: the one listed, or a void one made where none is listed. */
   deletable(scoped: unknown): Box { return this.puttable(scoped) }
 
   /** Seals a new box and puts it where no live record stands, answering the box listed. */
@@ -76,12 +76,15 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   tryCreate(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.create(input, opts)) }
 
   /** A void box listed under `scope`. */
-  #shellFor(scope: Boxscope): Box { return this.buildOrReceive(SX.shellBoxOf(scope, this.world.vault_tok)) }
+  #shellFor(scope: Boxscope): Box { return this.deliverRecord(SX.shellBoxOf(scope, this.world.vault_tok)) }
   // --
 
-  // == [Defined by the box listing]: vaultTokOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the box listing]: vaultTokOfWorld, isOneLifePerInstance, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   protected vaultTokOfWorld(): string { return this.world.vault_tok }
+
+  // A Box object lives through its box's lives: a record of a new life is received into it.
+  protected get isOneLifePerInstance(): false { return false }
 
   protected scopepathOf(scope: Boxscope): string {
     return ['box', scope.applabel, scope.user_id, scope.vaultlabel, scope.boxlabel].join('^')
@@ -94,7 +97,7 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   protected nothingStoredError(scope: Boxscope): VaultError { return boxAbsent(scope) }
 
   protected async doTryList() {
-    const answer = await this.vaultDB.tryListBoxes({ ...this.scope, vault_tok: this.world.vault_tok })
+    const answer = await this.vaultDB.tryListBoxes({ op: 'list', ...this.scope, vault_tok: this.world.vault_tok })
     return answer.ok ? { ...answer, val: { listed: answer.val.boxes, damaged_rows: answer.val.damaged_rows } } : answer
   }
 
@@ -107,7 +110,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected doTryPut(record: BoxRecord, { expected, ifAbsent, ifPresent }: ListingPutOpts<BoxSparse>) {
-    return this.vaultDB.tryPutBox({ op: 'put', ...SX.boxQuery.parse(record), ifAbsent, ifPresent, expected, record })
+    const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = record
+    return this.vaultDB.tryPutBox({ op: 'put', applabel, user_id, vaultlabel, boxlabel, vault_tok, ifAbsent, ifPresent, expected, record })
   }
 
   protected tombstoneOver(expected: BoxSparse): DelTombstone<BoxSparse> {
@@ -115,7 +119,8 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   }
 
   protected doTryDel(tombstone: DelTombstone<BoxSparse>, { expected }: ListingDelOpts<BoxSparse>) {
-    return this.vaultDB.tryDelBox({ op: 'del', ...SX.boxQuery.parse(tombstone), expected, record: tombstone })
+    const { applabel, user_id, vaultlabel, boxlabel, vault_tok } = tombstone
+    return this.vaultDB.tryDelBox({ op: 'del', applabel, user_id, vaultlabel, boxlabel, vault_tok, expected, record: tombstone })
   }
 
   protected watchRows(onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void): () => void { return this.vaultDB.watch(this.scope, onNotice, onBadNews) }

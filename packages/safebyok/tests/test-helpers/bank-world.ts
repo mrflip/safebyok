@@ -6,8 +6,7 @@ import { VaultError, type Refusalkind } from '../../src/refusals/errors'
 import { Bank } from '../../src/models/bank'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { BankScope } from '../../src/shapes/shapes-core'
-import type { VaultGetAsk } from '../../src/shapes/shapes-storage'
+import type { VaultGetAsk, VaultListAsk } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import type { BankOpts, BankSnapshot } from '../../src/shapes/shapes-vaultish'
 import { anyStrengthChecker, testDeriver } from './builders'
@@ -36,9 +35,9 @@ export class RefusingVaultDB extends MemoryVaultDB {
   /** From here on, `listVaults` and `getVault` refuse this; null lets them through again. */
   _cheat_refuseGets(refusalkind: Refusalkind | null): void { this.#refusalkind = refusalkind } // eslint-disable-line unicorn/prefer-private-class-fields
 
-  protected override doListVaults(scope: BankScope) {
+  protected override doListVaults(ask: VaultListAsk) {
     this.#demandAnswering()
-    return super.doListVaults(scope)
+    return super.doListVaults(ask)
   }
 
   protected override doGetVault(ask: VaultGetAsk) {

@@ -122,7 +122,8 @@ runs before anything is read.
 ## What crosses the wire
 
 Every operation returns a typed object with the same fields as its verb's `try*` answer: `ok`, `act`,
-`val`, `world`, `dbhas`, `req_params` and `err`. Rows are typed: a live row and a tombstone are each a
+`val`, `world`, `dbhas`, `ask` and `err`. `ask` carries the call's address, policies and row
+revisions, never a record's payload. Rows are typed: a live row and a tombstone are each a
 member of a union. A box's sidecar, a damaged row and a refusal's meta are `SafebyokJson`, carried
 whole. Times are `SafebyokEpochMillis`, integer UTC epoch milliseconds beyond the range of GraphQL's
 32-bit `Int`. A get, put or del takes one argument, `ask`: an input whose fields are those of the core's
@@ -134,7 +135,7 @@ see whose bank each operation reaches. Every name the schema adds begins `safeby
 operations it knows.
 
 **A refusal is the answer's `err` field, never a GraphQL error.** It carries its `refusalkind`, its
-message, and in `meta` the `capacity` of a `vault_full`, the `fieldnames` it names and the `call` it
+message, and in `meta` the `capacity` of a `vault_full`, the `fieldnames` it names and the `oplabel` it
 refused. The browser rethrows it as a VaultError of that kind. The box cap is the `maxBoxes` of the
 vaultDB behind your resolvers, a best-effort limit: exact at moderate write rates, never a strict
 one. **Nothing else of a refusal is sent**, not even its cause, so a driver's message stays on your server.

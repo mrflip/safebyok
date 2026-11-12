@@ -135,7 +135,7 @@ describe("the README's Yoga recipe", () => {
     const intruder = browserFor(route, () => 'u2')
     const born = TH.vaultPutAskOf(TH.vaultAt())
     await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
-    await TH.expectRefusal(browserFor(route, () => null).listVaults(TH.bankScope), 'identity_revoked')
+    await TH.expectRefusal(browserFor(route, () => null).listVaults(TH.vaultListAsk), 'identity_revoked')
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
 

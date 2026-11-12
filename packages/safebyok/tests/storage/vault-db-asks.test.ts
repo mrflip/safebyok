@@ -146,7 +146,7 @@ describe("a vaultDB's get, put and del, each given one ask", () => {
 
     const [unkeyed, unkeyedOpts] = gateMoveOf(keyed, { passkey_wayin: null })
     expect(await vaultDB.revokePasskey(unkeyed, unkeyedOpts)).to.deep.include({ act: 'revoked', val: unkeyed })
-    expect(await vaultDB.revokePasskey(...gateMoveOf(unkeyed, { passkey_wayin: null }))).to.deep.include({ act: 'revoked', val: unkeyed, world: unkeyed })
+    expect(await vaultDB.revokePasskey(...gateMoveOf(unkeyed, { passkey_wayin: null }))).to.deep.include({ act: 'passed', val: unkeyed, world: unkeyed })
     expect(await vaultDB.getVault({ ...Get, ...vaultScope, ifAbsent: 'fail', expected: unkeyed })).to.deep.include({ val: unkeyed })
   })
 })

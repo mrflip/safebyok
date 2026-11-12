@@ -127,7 +127,7 @@ describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => 
 
   it("is refused when no one is signed in, or someone else is", async () => {
     await TH.expectBad(hostedVaultDB(null).vaultDB.tryGetVault(TH.vaultGetAskOf()), 'identity_revoked')
-    await TH.expectBad(hostedVaultDB('u2').vaultDB.tryListVaults(TH.bankScope), 'identity_revoked')
+    await TH.expectBad(hostedVaultDB('u2').vaultDB.tryListVaults(TH.vaultListAsk), 'identity_revoked')
   })
 
   it("is refused again for a query the client already has the refusal of", async () => {
@@ -144,8 +144,8 @@ describe("ConvexVaultDB over a ConvexReactClient, on a host's functions", () => 
     await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
     const unwatchSecond = vaultDB.watch(TH.bankScope, (notice) => { second.push(notice) })
     await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyok.putVault, TH.putVaultArgs(TH.vaultAt())))
-    await vi.waitFor(() => { expect(second.map(({ act }) => act)).to.include('got') })
-    expect(first.map(({ act }) => act)).to.include('got')
+    await vi.waitFor(() => { expect(second.map(({ act }) => act)).to.include('gotlive') })
+    expect(first.map(({ act }) => act)).to.include('gotlive')
     unwatchFirst()
     unwatchSecond()
     unwatchSecond()

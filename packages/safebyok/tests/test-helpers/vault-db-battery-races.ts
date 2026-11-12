@@ -6,7 +6,7 @@ import type { VaultRow, WatchScope } from '../../src/shapes/shapes-storage'
 import type { Notice, VaultDB } from '../../src/storage/vault-db'
 import type { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
 import {
-  bankScope, vaultScope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, vaultQuery, gateMoveOf,
+  bankScope, vaultScope, passphraseWayin, passkeyWayin, vaultAt, boxAt, vaultTombstoneOf, boxListAsk, gateMoveOf,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf,
 } from './storage-world'
 import { aWhile, beforeNextCall } from './timing'
@@ -80,7 +80,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const twin = await twinOf(vaultDB)
       const other = boxAt(0, 'life1', { boxlabel: 'other' })
       await Promise.all([vaultDB.putBox(boxPutAskOf(box)), twin.putBox(boxPutAskOf(other))])
-      const { val } = await vaultDB.listBoxes(vaultQuery)
+      const { val } = await vaultDB.listBoxes(boxListAsk)
       expect(val.boxes.map(({ boxlabel }) => boxlabel)).to.have.members(['openai', 'other'])
     })
 
@@ -89,7 +89,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const twin = await twinOf(vaultDB)
       await Promise.all([vaultDB.delVault(vaultDelAskOf(vault)), twin.tryPutBox(boxPutAskOf(box))])
       expect(await vaultDB.tryGetBox(boxGetAskOf())).to.deep.include({ ok: false, act: 'vault_gone', world: vaultTombstoneOf(vault) })
-      expect(await vaultDB.tryListBoxes(vaultQuery)).to.deep.include({ ok: false, act: 'vault_gone' })
+      expect(await vaultDB.tryListBoxes(boxListAsk)).to.deep.include({ ok: false, act: 'vault_gone' })
     })
 
     it("two gate verbs at one revision write one, and the other is refused with the winner", async () => {
@@ -157,7 +157,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const tombstone = vaultTombstoneOf(vault)
         await vaultDB.delVault(vaultDelAskOf(vault))
         await vi.waitFor(() => {
-          expect(notices).to.deep.include.members([{ act: 'got', val: box, world: boxWorld(vault) }, { act: 'gone', val: tombstone, world: tombstone }])
+          expect(notices).to.deep.include.members([{ act: 'gotlive', val: box, world: boxWorld(vault) }, { act: 'gotgone', val: tombstone, world: tombstone }])
         })
       })
 
@@ -166,7 +166,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const twin = await twinOf(vaultDB)
         const { notices } = watching(vaultDB, vaultScope)
         await twin.putBox(boxPutAskOf(box))
-        await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'got', val: box, world: boxWorld(vault) }) })
+        await vi.waitFor(() => { expect(notices).to.deep.include({ act: 'gotlive', val: box, world: boxWorld(vault) }) })
       })
 
       it("notifies of its own vault under a vault's scope, and of every vault of its bank under a bank's", async () => {
@@ -217,8 +217,8 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         const { vaultDB, vault } = await putWith()
         await failNextCall(vaultDB)
         const answer = await vaultDB.tryGetVault(vaultGetAskOf())
-        expect(answer).to.deep.include({ ok: false, act: 'storage_unavailable', world: null })
-        expect(answer.req_params).to.deep.include(vaultScope)
+        expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'storage_unavailable')
+        expect(answer.ask).to.deep.include(vaultScope)
         expect(isVaultError(answer.err, 'storage_unavailable')).to.be.true
         expect(await vaultDB.getVault(vaultGetAskOf())).to.deep.include({ val: vault })
       })

@@ -115,9 +115,9 @@ describe("vaultResolvers", () => {
     for (const user_id of ['u2', null]) {
       for (const [source, variableValues, answerCheck] of asked) {
         const answer = answerCheck.parse(await sent(schema, source, variableValues, user_id)) as DB.BadAnswer
-        expect(answer, source).to.deep.include({ ok: false, act: 'identity_revoked', world: null })
+        expect(answer, source).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'identity_revoked')
         expect(answer.err.refusalkind, source).to.eq('identity_revoked')
-        expect(answer.req_params, source).to.include(TH.bankScope)
+        expect(answer.ask, source).to.include(TH.bankScope)
       }
     }
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
@@ -126,7 +126,7 @@ describe("vaultResolvers", () => {
   it("refuses a malformed request signed in as another user for what is malformed", async () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const answer = DB.getBoxAnswer.parse(await sent(schema, VaultOperations.getBox, { ask: { ...askVarsOf(boxGetAsk).ask, vault_tok: '' } }, 'u2')) as DB.BadAnswer
-    expect(answer).to.deep.include({ ok: false, act: 'bad_option', world: null })
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'bad_option')
   })
 
   it("returns for each verb what the VaultDB's own try* verb returns", async () => {
@@ -137,13 +137,13 @@ describe("vaultResolvers", () => {
     const born = DB.putVaultAnswer.parse(await sentAsk(schema, VaultOperations.putVault, TH.vaultPutAskOf(record)))
     expect(born).to.deep.include({ ok: true, act: 'born', val: record })
     expect(DB.getVaultAnswer.parse(await sentAsk(schema, VaultOperations.getVault, vaultGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetVault(vaultGetAsk)))
-    expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await vaultDB.tryListVaults(TH.bankScope)))
+    expect(DB.listVaultsAnswer.parse(await sent(schema, VaultOperations.listVaults, TH.bankScope))).to.deep.eq(asCrossed(await vaultDB.tryListVaults(TH.vaultListAsk)))
 
     const box = TH.boxAt(0, 'life1', { sidecar: { note: 'work', 'nested key': [1, { deep: null }] } })
     const boxed = DB.putBoxAnswer.parse(await sentAsk(schema, VaultOperations.putBox, TH.boxPutAskOf(box)))
     expect(boxed).to.deep.include({ ok: true, act: 'born', val: box, world: record })
     expect(DB.getBoxAnswer.parse(await sentAsk(schema, VaultOperations.getBox, boxGetAsk))).to.deep.eq(asCrossed(await vaultDB.tryGetBox(boxGetAsk)))
-    expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.vaultQuery)))
+    expect(DB.listBoxesAnswer.parse(await sent(schema, VaultOperations.listBoxes, TH.vaultQuery))).to.deep.eq(asCrossed(await vaultDB.tryListBoxes(TH.boxListAsk)))
 
     const replaced = DB.replacePassphraseAnswer.parse(await sent(schema, VaultOperations.replacePassphrase, gateArgsOf(record, { passphrase_wayin: { ...TH.passphraseWayin, key_deriver_label: 'moved' } })))
     expect(replaced).to.deep.include({ ok: true, act: 'replaced' })
@@ -166,7 +166,7 @@ describe("vaultResolvers", () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const ask = DB.vaultPut.parse(vaultBorn)
     const elsewhere = DB.putVaultAnswer.parse(await sent(schema, VaultOperations.putVault, { ask: { ...ask, record: { ...ask.record, user_id: 'u2' } } })) as DB.BadAnswer
-    expect(elsewhere).to.deep.include({ ok: false, act: 'bad_record' })
+    expect(elsewhere).to.deep.include({ ok: false, act: 'unclassified_storing' }).and.to.have.nested.property('err.refusalkind', 'bad_record')
     expect(await TH.rowsOf().vaultRowOf({ ...TH.vaultScope, user_id: 'u2' })).to.be.null
     expect(await TH.rowsOf().vaultRowOf(TH.vaultScope)).to.be.null
   })
@@ -230,7 +230,7 @@ describe("vaultResolvers' watch", () => {
     const { listening, vaultDB, schema } = await watchedServer()
     const { stream, nextNotice } = await watching(schema, { user_id: 'u1' })
     await vaultDB.putVault(vaultBorn)
-    expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'got', val: TH.vaultAt(), world: TH.vaultAt() } })
+    expect(await nextNotice()).to.deep.eq({ ok: true, val: { act: 'gotlive', val: TH.vaultAt(), world: TH.vaultAt() } })
     await vaultDB.putBox(boxBorn)
     expect(await nextNotice()).to.have.nested.property('val.val.boxlabel', TH.boxAt().boxlabel)
     expect(listening.size).to.eq(1)

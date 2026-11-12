@@ -82,7 +82,7 @@ describe("BoxListing", () => {
       const { whisper: _whisper, sidecar: _sidecar, ...scope } = dna()
       const mary = { ...scope, vaultlabel: 'mary' }
       TH.expectSyncRefusal(() => listing.at(mary))
-      await TH.expectRefusal(listing.fetch(mary))
+      await TH.expectRefusal(listing.get(mary, { maxMillisSinceRefresh: 0 }))
       expect(world.mw.callsOf('get')).to.deep.equal([])
     })
 
@@ -249,9 +249,9 @@ describe("boxListing.create(dna): the box is sealed at birth", () => {
     expect(world.mw.calls.map(({ verb }) => verb)).to.deep.equal(['ensureTimely'])
   })
 
-  it("builds from a record while the vault is locked", async () => {
+  it("builds from a record while the vault is locked", () => {
     world.mw.setLocked(true)
-    const box = await boxListingOf(world.mw).build(fullBoxRecord())
+    const box = boxListingOf(world.mw).deliverRecord(fullBoxRecord())
     expect(box.revision_seq).to.eq(1)
   })
 

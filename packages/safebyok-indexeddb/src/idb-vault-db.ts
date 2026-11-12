@@ -3,8 +3,8 @@
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxGetAsk, BoxPutAsk, Capacity, Heard,
-  RowOfVault, Tidied, VaultClassified, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery, VaultScope, WatchScope,
+  AdapterVaultDBOpts, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxStored, Capacity, Heard,
+  Tidied, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultQuery, VaultScope, VaultsStored, VaultStored, WatchScope,
 } from 'safebyok/storage'
 import { bankBoxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './shelf'
 
@@ -57,90 +57,95 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
   /** The capacity of the vault life `asked` names: its box rows, live and deleted, counted in the caller's transaction, against the soft cap `maxBoxes`. */
-  async #roomIn(store: IDBObjectStore, asked: VaultQuery): Promise<Capacity> {
-    const used = await promisifyRequest(store.count(lifeRangeOf(asked)))
+  async #roomIn(store: IDBObjectStore, life: VaultQuery): Promise<Capacity> {
+    const used = await promisifyRequest(store.count(lifeRangeOf(life)))
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
   // --
 
   // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
-  protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
-    const filed = await DB.inOneStep(this.#shelf, 'readonly', (store) => filedIn(store, vaultsRangeOf(scope)))
-    return filed.map(({ scopepath, row }) => ({ vaultlabel: vaultlabelOf(scopepath), vault: row }))
+  protected async doListVaults(ask: VaultListAsk): Promise<VaultsStored> {
+    const filed = await DB.inOneStep(this.#shelf, 'readonly', (store) => filedIn(store, vaultsRangeOf(ask)))
+    const vaults = filed.map(({ scopepath, row }) => ({ vaultlabel: vaultlabelOf(scopepath), vault: row }))
+    return this.classifyStoredVaults(ask, vaults)
   }
 
-  // Each get, put or del is one IndexedDB transaction. It fetches the rows, classifies the ask against them, and, if the
+  // Each get, list, put or del is one IndexedDB transaction. It fetches the rows, classifies the ask against them, and, if the
   // classifier finds a write, stores the ask's record before the transaction ends.
-  protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
-    return await DB.inOneStep(this.#shelf, 'readonly', async (store) => (
-      this.classifyVault(ask, { vault: await DB.rowAt(store, vaultScopepathOf(ask)) })
-    ))
-  }
-
-  protected async doListBoxes(asked: VaultQuery): Promise<BoxesFetched> {
+  protected async doGetVault(ask: VaultGetAsk): Promise<VaultStored> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
-      const [vault, filed] = await Promise.all([DB.rowAt(store, vaultScopepathOf(asked)), filedIn(store, lifeRangeOf(asked))])
-      return { vault, boxes: filed.map(({ scopepath, row }) => ({ boxlabel: boxPlaceOf(scopepath).boxlabel, box: row })) }
+      const vault = await DB.rowAt(store, vaultScopepathOf(ask))
+      return this.classifyStoredVault(ask, { vault })
     })
   }
 
-  protected async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
+  protected async doListBoxes(ask: BoxListAsk): Promise<BoxesStored> {
+    return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
+      const [world, filed] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), filedIn(store, lifeRangeOf(ask))])
+      const boxes = filed.map(({ scopepath, row }) => ({ boxlabel: boxPlaceOf(scopepath).boxlabel, box: row }))
+      return this.classifyStoredBoxes(ask, { world, boxes })
+    })
+  }
+
+  protected async doGetBox(ask: BoxGetAsk): Promise<BoxStored> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
       const [world, box] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask))])
-      return this.classifyBox(ask, { world, box })
+      return this.classifyStoredBox(ask, { world, box })
     })
   }
 
-  protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
-    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const classified = this.classifyVault(ask, { vault: await DB.rowAt(store, vaultScopepathOf(ask)) })
-      if (DB.isWriteAct(classified.act)) { store.put(ask.record, vaultScopepathOf(ask)) }
-      return classified
+  protected async doPutVault(ask: VaultPutAsk): Promise<VaultStored> {
+    const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const vault  = await DB.rowAt(store, vaultScopepathOf(ask))
+      const stored = this.classifyStoredVault(ask, { vault })
+      if (DB.isWriteAct(stored.act)) { store.put(ask.record, vaultScopepathOf(ask)) }
+      return stored
     })
-    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: ask.record } }]) }
-    return classified
+    if (DB.isWriteAct(stored.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: ask.record } }]) }
+    return stored
   }
 
-  protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
-    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+  protected async doPutBox(ask: BoxPutAsk): Promise<BoxStored> {
+    const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [world, box, capacity] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask)), this.#roomIn(store, ask)])
-      const classified = this.classifyBox(ask, { world, box, capacity })
-      if (DB.isWriteAct(classified.act)) { store.put(ask.record, boxScopepathOf(ask)) }
-      return classified
+      const stored = this.classifyStoredBox(ask, { world, box, capacity })
+      if (DB.isWriteAct(stored.act)) { store.put(ask.record, boxScopepathOf(ask)) }
+      return stored
     })
-    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: classified.world, box: ask.record } }]) }
-    return classified
+    if (DB.isWriteAct(stored.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: stored.world, box: ask.record } }]) }
+    return stored
   }
 
-  protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
-    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const classified = this.classifyVault(ask, { vault: await DB.rowAt(store, vaultScopepathOf(ask)) })
-      if (! DB.isWriteAct(classified.act)) { return classified }
+  protected async doDelVault(ask: VaultDelAsk): Promise<VaultStored> {
+    const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+      const vault  = await DB.rowAt(store, vaultScopepathOf(ask))
+      const stored = this.classifyStoredVault(ask, { vault })
+      if (! DB.isWriteAct(stored.act)) { return stored }
       store.put(ask.record, vaultScopepathOf(ask))
       // A vault's boxes end with its life: nothing reads a box row of a life that is over.
       const boxes = await filedIn(store, lifeRangeOf({ ...scopeOf(ask), vault_tok: ask.expected.vault_tok }))
       for (const { scopepath } of boxes) { store.delete(scopepath) }
-      return classified
+      return stored
     })
-    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: ask.record } }]) }
-    return classified
+    if (DB.isWriteAct(stored.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: ask.record } }]) }
+    return stored
   }
 
-  protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
-    const classified = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
+  protected async doDelBox(ask: BoxDelAsk): Promise<BoxStored> {
+    const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [world, box] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask))])
-      const classified = this.classifyBox(ask, { world, box })
-      if (DB.isWriteAct(classified.act)) { store.put(ask.record, boxScopepathOf(ask)) }
-      return classified
+      const stored = this.classifyStoredBox(ask, { world, box })
+      if (DB.isWriteAct(stored.act)) { store.put(ask.record, boxScopepathOf(ask)) }
+      return stored
     })
-    if (DB.isWriteAct(classified.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: classified.world, box: ask.record } }]) }
-    return classified
+    if (DB.isWriteAct(stored.act)) { this.#ring([{ scope: scopeOf(ask), heard: { vault: stored.world, box: ask.record } }]) }
+    return stored
   }
 
-  protected async doTidyGone(scope: BankScope): Promise<Tidied> {
+  protected async doTidyGone(ask: BoxTidyAsk): Promise<Tidied> {
     return await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [vaults, boxes] = await Promise.all([filedIn(store, vaultsRangeOf(scope)), filedIn(store, bankBoxesRangeOf(scope))])
+      const [vaults, boxes] = await Promise.all([filedIn(store, vaultsRangeOf(ask)), filedIn(store, bankBoxesRangeOf(ask))])
       const vaultOfLabel = new Map(vaults.map(({ scopepath, row }) => [vaultlabelOf(scopepath), row]))
       let totalCount = 0
       for (const { scopepath } of boxes) {

@@ -524,7 +524,7 @@ describe("a bank past a vacate", () => {
     ['a plain vacate', [], async ({ bank }: Vacating) => { await bank.vacate() }],
     ['identity_revoked', ['error'], async ({ world, vault }: Vacating) => {
       world.vaultDB._cheat_refuseGets('identity_revoked')
-      await TH.expectRefusal(vault.fetch(), 'identity_revoked')
+      await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'identity_revoked')
       world.vaultDB._cheat_refuseGets(null)
     }],
   ] as const)("refuses ensureVault, vaultAt and hello after %s, and the next bank returns the stored vault without asking", async (_label, loggedLevels, vacating) => {

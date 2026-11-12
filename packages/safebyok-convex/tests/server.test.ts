@@ -13,6 +13,8 @@ const vault = TH.vaultAt()
 const box = TH.boxAt()
 const otherBox = TH.boxAt(0, vault.vault_tok, { boxlabel: 'other' })
 const vaultQuery = { ...TH.vaultScope, vault_tok: vault.vault_tok }
+const { ask: vaultGetAsk } = TH.getVaultArgs()
+const { ask: boxGetAsk } = TH.getBoxArgs({ ...vaultQuery, boxlabel: box.boxlabel })
 
 /** Make a backend where u1 has a vault with one box, both written as u1. */
 async function seeded(): Promise<Backend> {
@@ -25,15 +27,15 @@ async function seeded(): Promise<Backend> {
 
 /** One call to each of the host's functions, each naming u1. */
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
-  ['listVaults', (caller) => caller.query(api.safebyok.listVaults, { scope: TH.bankScope })],
-  ['getVault',   (caller) => caller.query(api.safebyok.getVault, { scope: TH.vaultScope })],
-  ['listBoxes',  (caller) => caller.query(api.safebyok.listBoxes, { asked: vaultQuery })],
-  ['getBox',     (caller) => caller.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })],
+  ['listVaults', (caller) => caller.query(api.safebyok.listVaults, { ask: TH.vaultListAsk })],
+  ['getVault',   (caller) => caller.query(api.safebyok.getVault, { ask: vaultGetAsk })],
+  ['listBoxes',  (caller) => caller.query(api.safebyok.listBoxes, { ask: { op: 'list', ...vaultQuery } })],
+  ['getBox',     (caller) => caller.query(api.safebyok.getBox, { ask: boxGetAsk })],
   ['putVault',   (caller) => caller.mutation(api.safebyok.putVault, TH.putVaultArgs(vault))],
   ['putBox',     (caller) => caller.mutation(api.safebyok.putBox, TH.putBoxArgs(otherBox))],
   ['delBox',     (caller) => caller.mutation(api.safebyok.delBox, TH.delBoxArgs(box))],
   ['delVault',   (caller) => caller.mutation(api.safebyok.delVault, TH.delVaultArgs(vault))],
-  ['tidyGone',   (caller) => caller.mutation(api.safebyok.tidyGone, { scope: TH.bankScope })],
+  ['tidyGone',   (caller) => caller.mutation(api.safebyok.tidyGone, { ask: TH.boxTidyAsk })],
   ['watchRows',  (caller) => caller.query(api.safebyok.watchRows, { scope: TH.bankScope })],
 ]
 
@@ -54,8 +56,8 @@ describe("SafebyokComponent.api, for the user a call names", () => {
   it("hands back the component's answers as they came", async () => {
     const backend = await seeded()
     const asOwner = backend.withIdentity({ subject: 'u1' })
-    expect(await asOwner.query(api.safebyok.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
-    expect(await asOwner.query(api.safebyok.getBox, { asked: { ...vaultQuery, boxlabel: box.boxlabel } })).to.deep.equal({ vault, box })
+    expect(await asOwner.query(api.safebyok.getVault, { ask: vaultGetAsk })).to.deep.equal(vault)
+    expect(await asOwner.query(api.safebyok.getBox, { ask: boxGetAsk })).to.deep.equal({ world: vault, box })
     const next = TH.vaultAt(1)
     expect(await asOwner.mutation(api.safebyok.putVault, TH.putVaultArgs(next, vault))).to.deep.equal({ ok: true, act: 'replaced', world: next, vault: next, presence: 'live' })
   })
@@ -121,7 +123,7 @@ describe("SafebyokComponent.api, for anyone else", () => {
 
   it("says nothing in a refusal but its kind, so it names no user", async () => {
     const backend = await seeded()
-    expect(await TH.convexRefusalOf(backend.withIdentity({ subject: 'u2' }).query(api.safebyok.getVault, { scope: TH.vaultScope }))).to.deep.equal({ kind: 'identity_revoked' })
+    expect(await TH.convexRefusalOf(backend.withIdentity({ subject: 'u2' }).query(api.safebyok.getVault, { ask: vaultGetAsk }))).to.deep.equal({ kind: 'identity_revoked' })
   })
 })
 
@@ -137,7 +139,7 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
     it(blurb, async () => {
       const host = TH.hostWith(getUserId)
       const caller = host.createTest().withIdentity({ subject: 'u1' })
-      expect(await TH.convexRefusalOf(caller.query(host.api.safebyok.getVault, { scope: TH.vaultScope }))).to.deep.equal({ kind: 'identity_revoked' })
+      expect(await TH.convexRefusalOf(caller.query(host.api.safebyok.getVault, { ask: vaultGetAsk }))).to.deep.equal({ kind: 'identity_revoked' })
     })
   }
 
@@ -147,14 +149,14 @@ describe("SafebyokComponent.api, with the host's getUserId", () => {
       return identity ? `user|${identity.subject}` : null
     })
     const caller = host.createTest().withIdentity({ subject: 'u1' })
-    expect(await caller.query(host.api.safebyok.getVault, { scope: { ...TH.vaultScope, user_id: 'user|u1' } })).to.be.null
-    expect(await TH.convexRefusalOf(caller.query(host.api.safebyok.getVault, { scope: TH.vaultScope }))).to.deep.equal({ kind: 'identity_revoked' })
+    expect(await caller.query(host.api.safebyok.getVault, { ask: { ...vaultGetAsk, user_id: 'user|u1' } })).to.be.null
+    expect(await TH.convexRefusalOf(caller.query(host.api.safebyok.getVault, { ask: vaultGetAsk }))).to.deep.equal({ kind: 'identity_revoked' })
   })
 
   it("calls getUserId as a method, keeping its this", async () => {
     const { app, component } = TH.installedComponent()
     const host = app.defineModules({ safebyok: component.api(new SignedInAs('u1')) })
-    expect(await host.createTest().query(host.api.safebyok.getVault, { scope: TH.vaultScope })).to.be.null
+    expect(await host.createTest().query(host.api.safebyok.getVault, { ask: vaultGetAsk })).to.be.null
   })
 })
 

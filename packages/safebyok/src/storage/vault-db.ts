@@ -5,20 +5,21 @@ import { IsVaultDB, UNANSWERED } from '../helpers/consts'
 import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors'
 import type { BadOutcome, GoodOutcome } from '../refusals/outcome'
 import type { BankScope } from '../shapes/shapes-core'
-import type { OkAct, ListAct } from '../shapes/shapes-enums'
+import type { BadAct, GoodAct, OkAct, ListAct } from '../shapes/shapes-enums'
 import type {
-  BoxDelAsk, BoxGetAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox, DamagedVault,
-  GateVerbOpts, ReqParams, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultQuery, VaultRecord, VaultRow, VaultTombstone, WatchScope,
+  BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxTidyAsk, BoxSparse, DamagedBox, DamagedVault,
+  GateVerbOpts, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, WatchScope,
 } from '../shapes/shapes-storage'
 import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, VaultAnswer, BoxAnswer, ListAct, OkAct, BankListed, BoxesListed, Tidied, Notice, answerWithVal, refusedAnswerOf, badAnswerOf
 
-/** A vaultDB verb's good answer: its `val`, the `act` that says what happened, and its `world` vault row. */
-export type GoodAnswer<ValT, ActT extends string, WorldT = VaultRow> = GoodOutcome<ValT> & { req_params: ReqParams, act: ActT, world: WorldT, dbhas?: unknown }
+/** A vaultDB verb's good answer: its `val`, the `act` that says what happened, its `world` vault row, and what it carries of its `ask`. */
+export type GoodAnswer<ValT, ActT extends string, WorldT = VaultRow> = GoodOutcome<ValT> & { ask: LoggableAsk, act: ActT, world: WorldT, dbhas?: unknown }
 
-/** A vaultDB verb's refused answer: its `err`, with the `act`, `world` and `dbhas` the refusal carries. */
-export type BadAnswer = BadOutcome & { req_params: ReqParams, act: string, world: unknown, dbhas?: unknown }
+// A refusal met while delivering a good answer keeps that answer's act: storage did what the act says (`refusedAnswerOf`).
+/** A vaultDB verb's refused answer: its `err`, with the `act`, `world` and `dbhas` the refusal carries, and what it carries of its `ask`. */
+export type BadAnswer = BadOutcome & { ask: LoggableAsk, act: BadAct | GoodAct, world: unknown, dbhas?: unknown }
 
 /** A `try*` verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. */
 export type Answer<ValT, ActT extends string, WorldT = VaultRow> = GoodAnswer<ValT, ActT, WorldT> | BadAnswer
@@ -38,28 +39,31 @@ export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
 export type Tidied      = { totalCount: number }
 
 /** A changed row reported by a watch, with its vault row if storage sent one. */
-export type Notice = { act: 'got' | 'gone', val: VaultRow | BoxRow, world: VaultRow | null }
+export type Notice = { act: 'gotlive' | 'gotgone', val: VaultRow | BoxRow, world: VaultRow | null }
 
-/** A good answer with `val`, keeping `answer`'s act, world and request metadata. */
-export function answerWithVal<ValT>(answer: Answer<unknown, string, unknown>, val: ValT): GoodAnswer<ValT, string, unknown> { return { ...carriedOf(answer), ok: true, val } }
+/** A good answer with `val`, keeping `answer`'s act, world and ask. Throws the refusal of a bad `answer`. */
+export function answerWithVal<ValT, ActT extends GoodAct>(answer: Answer<unknown, ActT, unknown>, val: ValT): GoodAnswer<ValT, ActT, unknown> {
+  if (! answer.ok) { throw answer.err }
+  return { ...carriedOf(answer), ok: true, val }
+}
 
 // A refusal thrown while delivering a good answer keeps that answer's act: storage did what the act says.
 /** Make a bad answer of `thrown`, keeping the act and world of `answer`.
  * Pass {@link UNANSWERED} when the throw came before storage returned an answer: the bad answer is then made from the refusal alone.
  */
-export function refusedAnswerOf(thrown: unknown, answer: Answer<unknown, string, unknown> | typeof UNANSWERED): BadAnswer {
+export function refusedAnswerOf(thrown: unknown, answer: Answer<unknown, GoodAct, unknown> | typeof UNANSWERED): BadAnswer {
   const err = isVaultError(thrown) ? thrown : Refuse.unexpectedError(thrown)
   return (answer === UNANSWERED) ? badAnswerOf(err) : { ...carriedOf(answer), ok: false, err }
 }
 
 /** The fields of an answer besides its val or err. */
-function carriedOf({ req_params, act, world, dbhas }: Answer<unknown, string, unknown>) { return { req_params, act, world, ...((dbhas !== undefined) && { dbhas }) } }
+function carriedOf<ActT extends string>({ ask, act, world, dbhas }: { ask: LoggableAsk, act: ActT, world: unknown, dbhas?: unknown }) { return { ask, act, world, ...((dbhas !== undefined) && { dbhas }) } }
 
-/** Make a bad answer of `err`, with the act, request metadata and rows it carries, if it has them. */
+/** Make a bad answer of `err`, with the act, ask and rows it carries, if it has them. */
 export function badAnswerOf(err: VaultError): BadAnswer {
-  const { act = err.refusalkind, req_params = {} } = err.meta ?? {}
+  const { act = 'unclassified_storing', ask = {} } = err.meta ?? {}
   const { world = null, dbhas } = rowsOfRefusal(err)
-  return { ok: false, err, act, world, req_params, ...((dbhas !== undefined) && { dbhas }) }
+  return { ok: false, err, act, world, ask, ...((dbhas !== undefined) && { dbhas }) }
 }
 // --
 
@@ -72,11 +76,11 @@ export interface VaultDB {
   /** List the bank's vaults and tombstones, without their boxes.
    * A row that fails its checks is listed in `damaged_rows`.
    */
-  listVaults(scope: BankScope): Promise<GoodAnswer<BankListed, ListAct, BankScope>>
+  listVaults(ask: VaultListAsk): Promise<GoodAnswer<BankListed, ListAct, BankScope>>
   /** Non-throwing form of {@link VaultDB.listVaults}. */
-  tryListVaults(scope: BankScope): Promise<Answer<BankListed, ListAct, BankScope>>
+  tryListVaults(ask: VaultListAsk): Promise<Answer<BankListed, ListAct, BankScope>>
   /** Get the vault row at a scope, whatever its life.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone; otherwise both refuse.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
    */
   getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.getVault}. */
@@ -84,11 +88,11 @@ export interface VaultDB {
   /** List a vault's boxes, sparse, with its vault row as `world`.
    * Refuses when the vault is not live under `vault_tok`.
    */
-  listBoxes(asked: VaultQuery): Promise<GoodAnswer<BoxesListed, ListAct>>
+  listBoxes(ask: BoxListAsk): Promise<GoodAnswer<BoxesListed, ListAct>>
   /** Non-throwing form of {@link VaultDB.listBoxes}. When the vault row refuses, `world` is that stored row. */
-  tryListBoxes(asked: VaultQuery): Promise<Answer<BoxesListed, ListAct>>
+  tryListBoxes(ask: BoxListAsk): Promise<Answer<BoxesListed, ListAct>>
   /** Get a box row, with its vault row as `world`. Refuses when the vault is not live under `vault_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone; otherwise both refuse.
+   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
    */
   getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.getBox}. */
@@ -118,9 +122,9 @@ export interface VaultDB {
   /** Put the properly revisioned `record`, demanding a new `gate_epoch` and that the passkey is absent.
    * @returns an answer with the stored row: @see {@link VaultDB.putVault}
    */
-  revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked'>>
+  revokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<GoodAnswer<VaultRecord, 'revoked' | 'passed'>>
   /** Non-throwing form of {@link VaultDB.revokePasskey}. */
-  tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked'>>
+  tryRevokePasskey(record: VaultRecord, opts: GateVerbOpts): Promise<Answer<VaultRecord, 'revoked' | 'passed'>>
   /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
   delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct>>
   /** Non-throwing form of {@link VaultDB.delBox}. */
@@ -130,9 +134,9 @@ export interface VaultDB {
   /** Non-throwing form of {@link VaultDB.delVault}. */
   tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer>
   /** Housekeeping for hosts: delete the box rows whose vault is missing, tombstoned or reborn, and count the box rows left. */
-  tidyGone(scope: BankScope): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
+  tidyGone(ask: BoxTidyAsk): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
   /** Non-throwing form of {@link VaultDB.tidyGone}. */
-  tryTidyGone(scope: BankScope): Promise<Answer<Tidied, 'tidied', BankScope>>
+  tryTidyGone(ask: BoxTidyAsk): Promise<Answer<Tidied, 'tidied', BankScope>>
   /** Watch a bank or a vault: call `onNotice` with each changed row, and `onBadNews` with trouble in the watch.
    * Returns a function that stops the watch. Notices are best effort: never count on one arriving.
    * After bad news, the watch may go on or may have ended.

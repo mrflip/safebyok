@@ -26,18 +26,18 @@ import * as CVX from './validators'
 export const listVaults = query({
   args:    CVX.listVaultsArgs,
   returns: v.array(CVX.rowOfVault),
-  handler: async (ctx, { scope }) => {
-    const vaultDocs = await listVaultDocs(ctx.db, scope)
+  handler: async (ctx, { ask }) => {
+    const vaultDocs = await listVaultDocs(ctx.db, ask)
     return vaultDocs.map(({ vaultlabel, vault }) => ({ vaultlabel, vault }))
   },
 })
 
-/** Get the vault row at `scope`, or null. */
+/** Get the vault row at the ask's scope, or null. */
 export const getVault = query({
   args:    CVX.getVaultArgs,
   returns: v.any(),
-  handler: async (ctx, { scope }) => {
-    const vaultDoc = await getVaultDoc(ctx.db, scope)
+  handler: async (ctx, { ask }) => {
+    const vaultDoc = await getVaultDoc(ctx.db, ask)
     return vaultDoc?.vault ?? null
   },
 })
@@ -46,11 +46,10 @@ export const getVault = query({
 export const listBoxes = query({
   args:    CVX.listBoxesArgs,
   returns: CVX.boxesFetched,
-  handler: async (ctx, { asked }) => {
-    const vaultDoc = await getVaultDoc(ctx.db, asked)
-    const vault = vaultDoc?.vault ?? null
-    const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, asked).collect()
-    return { vault, boxes: boxDocs.map(({ boxlabel, box }) => ({ boxlabel, box })) }
+  handler: async (ctx, { ask }) => {
+    const vaultDoc = await getVaultDoc(ctx.db, ask)
+    const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, ask).collect()
+    return { world: vaultDoc?.vault ?? null, boxes: boxDocs.map(({ boxlabel, box }) => ({ boxlabel, box })) }
   },
 })
 
@@ -58,12 +57,10 @@ export const listBoxes = query({
 export const getBox = query({
   args:    CVX.getBoxArgs,
   returns: CVX.boxFetched,
-  handler: async (ctx, { asked }) => {
-    const vaultDoc = await getVaultDoc(ctx.db, asked)
-    const vault = vaultDoc?.vault ?? null
-    const boxDoc = await getBoxDoc(ctx.db, asked, asked.boxlabel)
-    const box = boxDoc?.box ?? null
-    return { vault, box }
+  handler: async (ctx, { ask }) => {
+    const vaultDoc = await getVaultDoc(ctx.db, ask)
+    const boxDoc = await getBoxDoc(ctx.db, ask, ask.boxlabel)
+    return { world: vaultDoc?.vault ?? null, box: boxDoc?.box ?? null }
   },
 })
 // --
@@ -73,14 +70,14 @@ export const getBox = query({
 /** Classify a vault put against the stored row, and store its record if the outcome is a write. Returns the classifier's outcome. */
 export const putVault = mutation({
   args:    CVX.putVaultArgs,
-  returns: CVX.vaultClassified,
+  returns: CVX.vaultStored,
   handler: async (ctx, { ask: sent }) => {
     const ask = runForClient(() => DB.vaultPut.parse(sent))
     const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
-    const classified = runForClient(() => DB.classifyVault(ask, { vault }), vault)
-    if (DB.isWriteAct(classified.act)) { await writeVaultDoc(ctx.db, anteDoc, ask, ask.record) }
-    return classified
+    const stored = runForClient(() => DB.classifyStoredVault(ask, { vault }), vault)
+    if (DB.isWriteAct(stored.act)) { await writeVaultDoc(ctx.db, anteDoc, ask, ask.record) }
+    return stored
   },
 })
 
@@ -92,7 +89,7 @@ export const putVault = mutation({
  */
 export const putBox = mutation({
   args:    CVX.putBoxArgs,
-  returns: CVX.boxClassified,
+  returns: CVX.boxStored,
   handler: async (ctx, { ask: sent, maxBoxes = Tallies.MaxVaultBoxes }) => {
     const ask = runForClient(() => DB.boxPut.parse(sent))
     const life = lifeOf(ask)
@@ -102,15 +99,15 @@ export const putBox = mutation({
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const capacity = Tallies.capacityOf(reckoning.tally, cap)
-    const classified = runForClient(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
-    if (! DB.isWriteAct(classified.act)) { return classified }
+    const stored = runForClient(() => DB.classifyStoredBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity }))
+    if (! DB.isWriteAct(stored.act)) { return stored }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
     const growth = Tallies.growthOf(anteDoc, boxDoc)
-    if (Tallies.refuses(reckoning.tally, growth, cap)) { return roomlessOf(classified, anteDoc, capacity) }
+    if (Tallies.refuses(reckoning.tally, growth, cap)) { return roomlessOf(stored, anteDoc, capacity) }
     await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
-    return classified
+    return stored
   },
 })
 // --
@@ -122,38 +119,38 @@ export const putBox = mutation({
  */
 export const delVault = mutation({
   args:    CVX.delVaultArgs,
-  returns: CVX.vaultClassified,
+  returns: CVX.vaultStored,
   handler: async (ctx, { ask: sent }) => {
     const ask = runForClient(() => DB.vaultDel.parse(sent))
     const anteDoc = await getVaultDoc(ctx.db, ask)
     const vault = anteDoc?.vault ?? null
-    const classified = runForClient(() => DB.classifyVault(ask, { vault }), vault)
-    if (DB.isWriteAct(classified.act)) {
+    const stored = runForClient(() => DB.classifyStoredVault(ask, { vault }), vault)
+    if (DB.isWriteAct(stored.act)) {
       await writeVaultDoc(ctx.db, anteDoc, ask, ask.record)
       // A vault's boxes end with its life: nothing reads a box row of a life that is over.
       await deleteBoxes(ctx.db, lifeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
     }
-    return classified
+    return stored
   },
 })
 
 /** Classify a box del against the stored rows, and store its tombstone if the outcome is a write. Returns the classifier's outcome. */
 export const delBox = mutation({
   args:    CVX.delBoxArgs,
-  returns: CVX.boxClassified,
+  returns: CVX.boxStored,
   handler: async (ctx, { ask: sent }) => {
     const ask = runForClient(() => DB.boxDel.parse(sent))
     const life = lifeOf(ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
-    const classified = runForClient(() => DB.classifyBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
-    if (DB.isWriteAct(classified.act)) {
+    const stored = runForClient(() => DB.classifyStoredBox(ask, { world: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }))
+    if (DB.isWriteAct(stored.act)) {
       const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
       await writeBoxDoc(ctx.db, anteDoc, boxDoc)
       // The tombstone replaces the row and still counts as one box row: of the `all_*` figures, only the size changes.
       await Tallies.forget(ctx.db, life, Tallies.growthOf(anteDoc, boxDoc))
     }
-    return classified
+    return stored
   },
 })
 // --
@@ -164,12 +161,12 @@ export const delBox = mutation({
 export const tidyGone = mutation({
   args:    CVX.tidyGoneArgs,
   returns: CVX.tidied,
-  handler: async (ctx, { scope }) => {
-    const vaultDocs = await listVaultDocs(ctx.db, scope)
+  handler: async (ctx, { ask }) => {
+    const vaultDocs = await listVaultDocs(ctx.db, ask)
     const vaultsBylabel = new Map(vaultDocs.map(({ vaultlabel, vault }) => [vaultlabel, vault]))
     function isOver({ vaultlabel, vault_tok }: Life) { return DB.isLifeOver(vaultsBylabel.get(vaultlabel) ?? null, vault_tok) }
-    const boxDocs = await listBoxDocs(ctx.db, scope)
-    const tallyDocs = await listTallyDocs(ctx.db, scope)
+    const boxDocs = await listBoxDocs(ctx.db, ask)
+    const tallyDocs = await listTallyDocs(ctx.db, ask)
     const overBoxDocs = boxDocs.filter((boxDoc) => isOver(boxDoc))
     const overTallyDocs = tallyDocs.filter((tallyDoc) => isOver(tallyDoc))
     await Promise.all(overBoxDocs.map(({ _id }) => ctx.db.delete('safebyok_boxes', _id)))
@@ -224,9 +221,9 @@ function crossingOf(thrown: unknown, world: unknown): unknown {
 }
 
 /** The `vault_full` refusal, with the stored box row, for a box put classified as a write that the life has no room for. */
-function roomlessOf(classified: DB.BoxClassified, anteDoc: BoxDoc | null, capacity: DB.Capacity): DB.BoxClassified {
+function roomlessOf(stored: DB.BoxStored, anteDoc: BoxDoc | null, capacity: DB.Capacity): DB.BoxStored {
   const box = DB.storedBoxRowOrNull.parse(anteDoc?.box ?? null)
-  return { ok: false, act: 'vault_full', world: classified.world, box, presence: classified.presence, capacity }
+  return { ok: false, act: 'vault_full', world: stored.world, box, presence: stored.presence, capacity }
 }
 // --
 

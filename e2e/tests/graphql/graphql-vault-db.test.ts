@@ -62,7 +62,7 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     await writer.putBox(TH.boxPutAskOf(box))
 
     await vi.waitFor(() => { expect(notices).to.have.lengthOf(2) })
-    expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['got', vault], ['got', box]])
+    expect(notices.map(({ act, val }) => [act, val])).to.deep.equal([['gotlive', vault], ['gotlive', box]])
   })
 
   it("stops the server's watch once the browser stops watching", async () => {
@@ -81,7 +81,7 @@ TH.describeOnPostgres('graphql', "GraphQLVaultDB over the network to a real Post
     const intruder = TH.browserAt(server, () => 'u2')
     const born = TH.vaultPutAskOf(TH.vaultAt())
     await TH.expectRefusal(intruder.putVault(born), 'identity_revoked')
-    await TH.expectRefusal(TH.browserAt(server, () => null).listVaults(TH.bankScope), 'identity_revoked')
+    await TH.expectRefusal(TH.browserAt(server, () => null).listVaults(TH.vaultListAsk), 'identity_revoked')
     expect(await TH.rowsOf(getDb()).vaultRowOf(TH.vaultScope)).to.be.null
   })
 })

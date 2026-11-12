@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest'
 import * as SX from '../../src/shapes/shapes-storage'
 import {
-  bankScope, vaultScope, boxscope, vaultScopeOf, boxscopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, vaultQuery, boxQuery,
+  bankScope, vaultScope, boxscope, vaultScopeOf, boxscopeOf, vaultAt, boxAt, vaultTombstoneOf, boxTombstoneOf, vaultListAsk, boxListAsk, boxQuery,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './storage-world'
 import type { BatteryWorld } from './vault-db-battery'
@@ -23,7 +23,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
   describe("listVaults", () => {
     it("returns act 'gotvoid' for a bank with no vaults", async () => {
       const vaultDB = await fresh()
-      const answer = await vaultDB.listVaults(bankScope)
+      const answer = await vaultDB.listVaults(vaultListAsk)
       expect(answer).to.deep.include({ ok: true, act: 'gotvoid', world: bankScope })
       expect(answer.val).to.deep.equal({ vaults: [], damaged_rows: [] })
     })
@@ -34,7 +34,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       await vaultDB.putVault(vaultPutAskOf(deleted))
       await vaultDB.delVault(vaultDelAskOf(deleted))
       await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('newer'), { ...vaultAt(9, 'life9', { vaultlabel: 'newer' }), fmt: SX.VaultFormat + 1 })
-      const { act, val } = await vaultDB.listVaults(bankScope)
+      const { act, val } = await vaultDB.listVaults(vaultListAsk)
       expect(act).to.eq('got')
       expect(val.vaults).to.have.deep.members([vault, vaultTombstoneOf(deleted)])
       expect(val.damaged_rows).to.deep.equal([{ ...vaultScopeOf('newer'), am: 'd' }])
@@ -43,7 +43,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
     it("lists a row under a label failing its check among the damaged, and the rest as ever", async () => {
       const { vaultDB, vault } = await putWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScopeOf('Not A Label'), { ...vault, vaultlabel: 'Not A Label' })
-      const { val } = await vaultDB.listVaults(bankScope)
+      const { val } = await vaultDB.listVaults(vaultListAsk)
       expect(val.vaults).to.deep.equal([vault])
       expect(val.damaged_rows.map(({ vaultlabel, am }) => ({ vaultlabel, am }))).to.deep.equal([{ vaultlabel: 'Not A Label', am: 'd' }])
     })
@@ -92,8 +92,8 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const { vaultDB, vault } = await putWith()
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, fmt: SX.VaultFormat + 1 })
       const answer = await vaultDB.tryGetVault(vaultGetAskOf(vaultScope, 'nil'))
-      expect(answer).to.deep.include({ ok: false, act: 'damaged_row', world: null })
-      expect(answer.req_params).to.deep.include(vaultScope)
+      expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', world: null }).and.to.have.nested.property('err.refusalkind', 'damaged_row')
+      expect(answer.ask).to.deep.include(vaultScope)
       expect(answer.err?.meta?.fieldnames).to.deep.equal(['fmt'])
     })
   })
@@ -105,7 +105,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       await vaultDB.putBox(boxPutAskOf(other))
       await vaultDB.delBox(boxDelAskOf(other))
       await rowsOf(vaultDB).plantBoxRow(boxscopeOf('newer'), 'life1', { ...boxAt(9, 'life1', { boxlabel: 'newer' }), fmt: SX.BoxFormat + 1 })
-      const { act, val, world } = await vaultDB.listBoxes(vaultQuery)
+      const { act, val, world } = await vaultDB.listBoxes(boxListAsk)
       expect(act).to.eq('got')
       expect(world).to.deep.equal(vault)
       expect(val.boxes).to.have.deep.members([SX.boxSparse.parse(box), SX.boxSparse.parse(boxTombstoneOf(other))])
@@ -114,7 +114,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
 
     it("returns act 'gotvoid' for a vault with no boxes", async () => {
       const { vaultDB, vault } = await putWith()
-      const answer = await vaultDB.listBoxes(vaultQuery)
+      const answer = await vaultDB.listBoxes(boxListAsk)
       expect(answer).to.deep.include({ ok: true, act: 'gotvoid', world: vault })
       expect(answer.val).to.deep.equal({ boxes: [], damaged_rows: [] })
     })
@@ -122,22 +122,22 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
     it("lists a box under a label failing its check among the damaged", async () => {
       const { vaultDB, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscopeOf('Not A Label'), 'life1', { ...box, boxlabel: 'Not A Label' })
-      const { val } = await vaultDB.listBoxes(vaultQuery)
+      const { val } = await vaultDB.listBoxes(boxListAsk)
       expect(val.boxes.map(({ boxlabel }) => boxlabel)).to.deep.equal(['openai'])
       expect(val.damaged_rows.map(({ boxlabel, am }) => ({ boxlabel, am }))).to.deep.equal([{ boxlabel: 'Not A Label', am: 'd' }])
     })
 
     it("refuses under a vault_tok that is not the live vault's, under a vault's tombstone and under no vault, with the vault row as its world", async () => {
       const { vaultDB, vault } = await putWith({ box: true })
-      const reborn = await vaultDB.tryListBoxes({ ...vaultScope, vault_tok: 'oldlife' })
+      const reborn = await vaultDB.tryListBoxes({ op: 'list', ...vaultScope, vault_tok: 'oldlife' })
       expect(reborn).to.deep.include({ ok: false, act: 'vault_reborn', world: vault })
       expect(reborn.err?.refusalkind).to.eq('vault_reborn')
       const { val: tombstone } = await vaultDB.delVault(vaultDelAskOf(vault))
-      const gone = await vaultDB.tryListBoxes(vaultQuery)
+      const gone = await vaultDB.tryListBoxes(boxListAsk)
       expect(gone).to.deep.include({ ok: false, act: 'vault_gone', world: tombstone })
       expect(gone.err?.refusalkind).to.eq('absent_vault')
       const nowhere = vaultScopeOf('nowhere')
-      const overVoid = await vaultDB.tryListBoxes({ ...nowhere, vault_tok: 'life1' })
+      const overVoid = await vaultDB.tryListBoxes({ op: 'list', ...nowhere, vault_tok: 'life1' })
       expect(overVoid).to.deep.include({ ok: false, act: 'vault_void', world: SX.shellVaultOf(nowhere) })
       expect(overVoid.err?.refusalkind).to.eq('absent_vault')
     })
@@ -146,7 +146,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const { vaultDB } = await putWith()
       const boxlabels = Array.from({ length: 25 }, (_unused, ii) => `box${String(ii)}`)
       await Promise.all(boxlabels.map(async (boxlabel) => await vaultDB.putBox(boxPutAskOf(boxAt(0, 'life1', { boxlabel })))))
-      const { val } = await vaultDB.listBoxes(vaultQuery)
+      const { val } = await vaultDB.listBoxes(boxListAsk)
       expect(val.boxes.map(({ boxlabel }) => boxlabel)).to.have.members(boxlabels)
     })
   })
@@ -207,7 +207,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const { vaultDB, box } = await putWith({ box: true })
       await rowsOf(vaultDB).plantBoxRow(boxscope, 'life1', { ...box, fmt: SX.BoxFormat + 1 })
       const answer = await vaultDB.tryGetBox(boxGetAskOf(boxQuery, 'nil'))
-      expect(answer).to.deep.include({ ok: false, act: 'damaged_row' })
+      expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' }).and.to.have.nested.property('err.refusalkind', 'damaged_row')
       expect(answer.err?.meta?.fieldnames).to.deep.equal(['fmt'])
     })
 
@@ -216,7 +216,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       await rowsOf(vaultDB).plantVaultRow(vaultScope, { ...vault, fmt: SX.VaultFormat + 1 })
       for (const boxlabel of ['openai', 'never_put']) {
         const answer = await vaultDB.tryGetBox(boxGetAskOf({ ...boxQuery, boxlabel }, 'nil'))
-        expect(answer).to.deep.include({ ok: false, act: 'damaged_vault' })
+        expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' }).and.to.have.nested.property('err.refusalkind', 'damaged_vault')
         expect(answer.err?.meta?.fieldnames).to.deep.equal(['fmt'])
       }
     })
@@ -235,7 +235,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const vaults = NearUserIds.map((user_id, ii) => vaultAt(0, `life${String(ii)}`, { user_id }))
       await Promise.all(vaults.map(async (vault) => await vaultDB.putVault(vaultPutAskOf(vault))))
       for (const vault of vaults) {
-        const { val } = await vaultDB.listVaults({ applabel: vault.applabel, user_id: vault.user_id })
+        const { val } = await vaultDB.listVaults({ op: 'list', applabel: vault.applabel, user_id: vault.user_id })
         expect(val.vaults).to.deep.equal([vault])
       }
     })
@@ -245,10 +245,10 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       const neighbours = [vaultAt(0, 'life2', { vaultlabel: 'main_2' }), vaultAt(0, 'life1', { applabel: 'acme_2' })]
       await Promise.all(neighbours.map(async (vault) => await vaultDB.putVault(vaultPutAskOf(vault))))
       for (const { applabel, vaultlabel, vault_tok } of neighbours) {
-        const { val } = await vaultDB.listBoxes({ ...vaultScope, applabel, vaultlabel, vault_tok })
+        const { val } = await vaultDB.listBoxes({ op: 'list', ...vaultScope, applabel, vaultlabel, vault_tok })
         expect(val.boxes).to.deep.equal([])
       }
-      const { val } = await vaultDB.listBoxes(vaultQuery)
+      const { val } = await vaultDB.listBoxes(boxListAsk)
       expect(val.boxes).to.deep.equal([SX.boxSparse.parse(box)])
     })
 

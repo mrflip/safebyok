@@ -87,9 +87,9 @@ function plantVault(backend: Backend, vault: DB.VaultRecord) {
   })
 }
 
-/** List the boxlabels of the box rows in `asked`. */
-async function listedBoxlabels(backend: Backend, asked: Life = life1) {
-  const { boxes } = await backend.query(api.listBoxes, { asked })
+/** List the boxlabels of the box rows of `life`. */
+async function listedBoxlabels(backend: Backend, life: Life = life1) {
+  const { boxes } = await backend.query(api.listBoxes, { ask: { op: 'list', ...life } })
   return boxes.map(({ boxlabel }) => boxlabel)
 }
 
@@ -98,10 +98,10 @@ describe("the component's gets", () => {
     const backend = await withVault()
     const box = boxOf('openai')
     await putBoxIn(backend, box)
-    expect(await backend.query(api.getVault, { scope: TH.vaultScope })).to.deep.equal(vault)
-    expect(await backend.query(api.listVaults, { scope: TH.bankScope })).to.deep.equal([{ vaultlabel: 'main', vault }])
-    expect(await backend.query(api.getBox, { asked: { ...life1, boxlabel: 'openai' } })).to.deep.equal({ vault, box })
-    expect(await backend.query(api.listBoxes, { asked: life1 })).to.deep.equal({ vault, boxes: [{ boxlabel: 'openai', box }] })
+    expect(await backend.query(api.getVault, TH.getVaultArgs())).to.deep.equal(vault)
+    expect(await backend.query(api.listVaults, { ask: TH.vaultListAsk })).to.deep.equal([{ vaultlabel: 'main', vault }])
+    expect(await backend.query(api.getBox, TH.getBoxArgs({ ...life1, boxlabel: 'openai' }))).to.deep.equal({ world: vault, box })
+    expect(await backend.query(api.listBoxes, { ask: { op: 'list', ...life1 } })).to.deep.equal({ world: vault, boxes: [{ boxlabel: 'openai', box }] })
   })
 })
 
@@ -136,7 +136,7 @@ describe("tidyGone", () => {
     await plantVault(backend, TH.vaultAt(1, 'life2', { user_id: 'u2' }))
     expect(await talliedLives(backend)).to.have.members(['u1/life1', 'u1/life2', 'u2/life1'])
     //
-    expect(await backend.mutation(api.tidyGone, { scope: TH.bankScope })).to.deep.equal({ totalCount: 1 })
+    expect(await backend.mutation(api.tidyGone, { ask: TH.boxTidyAsk })).to.deep.equal({ totalCount: 1 })
     expect(await listedBoxlabels(backend)).to.deep.equal([])
     expect(await listedBoxlabels(backend, { ...life1, vault_tok: 'life2' })).to.deep.equal(['github'])
     expect(await listedBoxlabels(backend, { ...life1, user_id: 'u2' })).to.deep.equal(['gemini'])
@@ -302,7 +302,7 @@ describe("putBox's count cap", () => {
     await backend.mutation(api.delVault, TH.delVaultArgs(vault))
     await backend.mutation(api.putVault, TH.putVaultArgs(TH.vaultAt(2, 'life2'), tombstone))
     expect(await putBoxIn(backend, boxOf('openai', { vault_tok: 'life2' }), null, 1)).to.deep.include({ act: 'born' })
-    expect(await backend.mutation(api.tidyGone, { scope: TH.bankScope })).to.deep.equal({ totalCount: 1 })
+    expect(await backend.mutation(api.tidyGone, { ask: TH.boxTidyAsk })).to.deep.equal({ totalCount: 1 })
   })
 })
 
@@ -339,7 +339,7 @@ describe("putBox's weight limit", () => {
     // Twenty boxes of 900,000 bytes are more than one transaction may read, so they are planted in four batches, each within the limits.
     const heavies = Array.from({ length: 20 }, (_slot, ii) => boxOf(`heavy_${String(ii).padStart(2, '0')}`, { cipherBytes: 900_000 }))
     for (let batch = 0; batch < 4; batch++) { await plantBoxes(backend, heavies.slice(batch * 5, (batch + 1) * 5)) }
-    await expect(backend.query(api.listBoxes, { asked: life1 })).rejects.toThrow(/read/i)
+    await expect(backend.query(api.listBoxes, { ask: { op: 'list', ...life1 } })).rejects.toThrow(/read/i)
     expect(await putBoxIn(backend, boxOf('anthropic'))).to.deep.include({ act: 'vault_full', capacity: capacityOf(null, MaxVaultBoxes) })
     for (const heavy of heavies) {
       expect(await delBoxIn(backend, heavy)).to.deep.include({ act: 'deleted' })
@@ -357,9 +357,9 @@ describe("putBox's weight limit", () => {
 async function listWatchDel(backend: Backend) {
   const listed = await listedBoxlabels(backend)
   const { boxes } = await backend.query(api.watchRows, { scope: TH.vaultScope })
-  const vaultRow = await backend.query(api.getVault, { scope: TH.vaultScope })
+  const vaultRow = await backend.query(api.getVault, TH.getVaultArgs())
   const { act } = await backend.mutation(api.delVault, TH.delVaultArgs(vaultRow as DB.VaultRecord))
-  const { boxes: afterDel } = await backend.query(api.listBoxes, { asked: life1 })
+  const { boxes: afterDel } = await backend.query(api.listBoxes, { ask: { op: 'list', ...life1 } })
   const liveCount = afterDel.filter(({ box }) => DB.isLiveRow(box)).length
   return { listedCount: listed.length, watchedCount: boxes.length, act, liveCount }
 }

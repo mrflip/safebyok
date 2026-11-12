@@ -5,8 +5,8 @@ import type { FunctionArgs, FunctionReference, FunctionReturnType } from 'convex
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok/storage'
 import type {
-  AdapterVaultDBOpts, BankScope, BoxClassified, BoxDelAsk, BoxesFetched, BoxGetAsk, BoxPutAsk, Heard, RowOfVault, Tidied,
-  VaultClassified, VaultDelAsk, VaultError, VaultGetAsk, VaultPutAsk, VaultQuery, WatchScope,
+  AdapterVaultDBOpts, BoxDelAsk, BoxesStored, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxTidyAsk, BoxStored, Heard, Tidied,
+  VaultDelAsk, VaultError, VaultGetAsk, VaultListAsk, VaultPutAsk, VaultsStored, VaultStored, WatchScope,
 } from 'safebyok/storage'
 import * as Phrases from './phrases'
 import { isSafebyokErrorData, safebyokErrorData } from './refusals'
@@ -87,45 +87,51 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 
   // == [Protected, the generic calls of AdapterVaultDB]: doListVaults, doGetVault, doListBoxes, doGetBox, doPutVault, doPutBox, doDelVault, doDelBox, doTidyGone, doWatch
 
-  protected async doListVaults(scope: BankScope): Promise<RowOfVault[]> {
-    return await runOrRefuse('doListVaults', () => this.#client.query(this.#api.listVaults, { scope }))
+  protected async doListVaults(ask: VaultListAsk): Promise<VaultsStored> {
+    const vaults = await runOrRefuse('doListVaults', () => this.#client.query(this.#api.listVaults, { ask }))
+    return this.classifyStoredVaults(ask, vaults)
   }
 
-  // A get reads its rows in one query, from one snapshot, and the client classifies them: a get stores nothing, so it needs no mutation.
-  protected async doGetVault(ask: VaultGetAsk): Promise<VaultClassified> {
-    const vault: unknown = await runOrRefuse('doGetVault', () => this.#client.query(this.#api.getVault, { scope: DB.vaultScope.parse(ask) }))
-    return this.classifyVault(ask, { vault })
+  // A get or list reads its rows in one query, from one snapshot, and the client classifies them: it stores nothing, so it needs no mutation.
+  protected async doGetVault(ask: VaultGetAsk): Promise<VaultStored> {
+    const vault: unknown = await runOrRefuse('doGetVault', () => this.#client.query(this.#api.getVault, { ask }))
+    return this.classifyStoredVault(ask, { vault })
   }
 
-  protected async doListBoxes(asked: VaultQuery): Promise<BoxesFetched> {
-    return await runOrRefuse('doListBoxes', () => this.#client.query(this.#api.listBoxes, { asked }))
+  protected async doListBoxes(ask: BoxListAsk): Promise<BoxesStored> {
+    const fetched = await runOrRefuse('doListBoxes', () => this.#client.query(this.#api.listBoxes, { ask }))
+    return this.classifyStoredBoxes(ask, fetched)
   }
 
-  protected async doGetBox(ask: BoxGetAsk): Promise<BoxClassified> {
-    const { vault, box } = await runOrRefuse('doGetBox', () => this.#client.query(this.#api.getBox, { asked: DB.boxQuery.parse(ask) }))
-    return this.classifyBox(ask, { world: vault, box })
+  protected async doGetBox(ask: BoxGetAsk): Promise<BoxStored> {
+    const fetched = await runOrRefuse('doGetBox', () => this.#client.query(this.#api.getBox, { ask }))
+    return this.classifyStoredBox(ask, fetched)
   }
 
   // A put or del is one mutation, so one transaction: the component checks the ask, fetches the rows, classifies the ask,
   // and stores the record if the act is a write. It returns the classifier's outcome, which is checked here.
-  protected async doPutVault(ask: VaultPutAsk): Promise<VaultClassified> {
-    return vaultClassified.parse(await runOrRefuse('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask })))
+  protected async doPutVault(ask: VaultPutAsk): Promise<VaultStored> {
+    const stored = await runOrRefuse('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask }))
+    return vaultStored.parse(stored)
   }
 
-  protected async doPutBox(ask: BoxPutAsk): Promise<BoxClassified> {
-    return boxClassified.parse(await runOrRefuse('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes })))
+  protected async doPutBox(ask: BoxPutAsk): Promise<BoxStored> {
+    const stored = await runOrRefuse('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes }))
+    return boxStored.parse(stored)
   }
 
-  protected async doDelVault(ask: VaultDelAsk): Promise<VaultClassified> {
-    return vaultClassified.parse(await runOrRefuse('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask })))
+  protected async doDelVault(ask: VaultDelAsk): Promise<VaultStored> {
+    const stored = await runOrRefuse('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask }))
+    return vaultStored.parse(stored)
   }
 
-  protected async doDelBox(ask: BoxDelAsk): Promise<BoxClassified> {
-    return boxClassified.parse(await runOrRefuse('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask })))
+  protected async doDelBox(ask: BoxDelAsk): Promise<BoxStored> {
+    const stored = await runOrRefuse('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask }))
+    return boxStored.parse(stored)
   }
 
-  protected async doTidyGone(scope: BankScope): Promise<Tidied> {
-    return await runOrRefuse('doTidyGone', () => this.#client.mutation(this.#api.tidyGone, { scope }))
+  protected async doTidyGone(ask: BoxTidyAsk): Promise<Tidied> {
+    return await runOrRefuse('doTidyGone', () => this.#client.mutation(this.#api.tidyGone, { ask }))
   }
 
   // Convex re-sends a watched query's whole result each time it changes, so `hear` gets only the
@@ -176,27 +182,27 @@ export class ConvexVaultDB extends DB.AdapterVaultDB {
 }
 // --
 
-// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts, vaultClassified, boxClassified
+// == [Helpers]: runOrRefuse, refusalOf, refusalOfCrossed, changesOf, latestOf, isConvexClient, isSafebyokApi, convexVaultDBOpts, vaultStored, boxStored
 
 /** Convex's size limit for one document, in bytes. */
 const ConvexDocumentSize = 1_048_576
 
 // Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
-/** Run `call`, converting anything it throws into a safebyok refusal. */
-async function runOrRefuse<ValT>(callname: string, call: () => Promise<ValT>): Promise<ValT> {
+/** Run `thunk`, converting anything it throws into a safebyok refusal. */
+async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): Promise<ValT> {
   try {
-    return await call()
+    return await thunk()
   } catch (err) {
-    throw refusalOf(callname, err)
+    throw refusalOf(oplabel, err)
   }
 }
 
 // On a dev deployment Convex's error text may quote the call's arguments, so its message is never
 // passed on. A refusal from the host's safebyok functions is recognized by its `data`, which only they make.
-/** The refusal for `thrown`: one sent by the host's safebyok functions is rebuilt as itself, and anything else becomes `storage_unavailable`, naming `callname`. */
-function refusalOf(callname: string, thrown: unknown): VaultError {
+/** The refusal for `thrown`: one sent by the host's safebyok functions is rebuilt as itself, and anything else becomes `storage_unavailable`, naming `oplabel`. */
+function refusalOf(oplabel: string, thrown: unknown): VaultError {
   if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return refusalOfCrossed(thrown.data) }
-  return DB.storageFailed(callname, thrown)
+  return DB.storageFailed(oplabel, thrown)
 }
 
 /** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message and, for a `gate_issue`, the stored vault row. */
@@ -272,16 +278,16 @@ const OkActVals = [...DB.writeActVals, ...DB.foundActVals] as const
 
 // A failed check here is a component out of step with this copy of safebyok, never a damaged row: the classifier checked the rows.
 /** Validators for the result of a put or del mutation: the classifier's outcome for a vault ask, and for a box ask. */
-const { vaultClassified, boxClassified } = DB.Checkers('unexpected_error', ({ obj, union, lit, oneof }) => {
+const { vaultStored, boxStored } = DB.Checkers('unexpected_error', ({ obj, union, lit, oneof }) => {
   const presence = oneof(DB.presenceVals)
   const vaultParts = { world: DB.vaultRow, vault: DB.vaultRow.nullable(), presence }
   const boxParts   = { world: DB.vaultRow, box: DB.boxRow.nullable(), presence: presence.nullable(), capacity: DB.capacity.nullable() }
   return {
-    vaultClassified: union([
+    vaultStored: union([
       obj({ ok: lit(true), act: oneof(OkActVals), ...vaultParts }),
       obj({ ok: lit(false), act: oneof(DB.refusedActVals), ...vaultParts }),
     ]),
-    boxClassified: union([
+    boxStored: union([
       obj({ ok: lit(true), act: oneof(OkActVals), ...boxParts }),
       obj({ ok: lit(false), act: oneof([...DB.refusedActVals, ...DB.boxVaultActVals]), ...boxParts }),
     ]),

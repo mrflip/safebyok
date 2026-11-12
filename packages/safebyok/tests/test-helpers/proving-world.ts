@@ -45,7 +45,7 @@ export const WorldStamp: VaultStamp = Object.freeze({ applabel: 'acme', user_id:
 /** The autolock duration of a {@link fakeLeaseFriendOf}: a day. */
 export const FriendLeaseMillis = 24 * 60 * 60_000
 
-/** A fake of a vault as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one slot. */
+/** A fake of a vault as a lease hears it: a {@link LeaseFriend} with a spy for `lock` and each deviceDB verb, over one scopepath. */
 export type FakeLeaseFriend = LeaseFriend & {
   lock:            Mock<() => void>
   peekLease:       Mock<LeaseFriend['peekLease']>
@@ -53,7 +53,7 @@ export type FakeLeaseFriend = LeaseFriend & {
   forgetLease:     Mock<LeaseFriend['forgetLease']>
   tryForgetLease:  Mock<LeaseFriend['tryForgetLease']>
   tellBadNews:     Mock<LeaseFriend['tellBadNews']>
-  /** The record the slot has, null for none. Set it to seed one, whatever it is. */
+  /** The record cached at that scopepath, null for none. Set it to seed one, whatever it is. */
   cached:          unknown
   /** Every call the logger heard, oldest first. */
   logged:          LoggedCall[]
