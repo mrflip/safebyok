@@ -1,5 +1,4 @@
-/**
- * Writes safebyok's package.json version into the `PackageVersion` constant the deviceDB stamps on each device row.
+/** Writes safebyok's package.json version into the `PackageVersion` constant the deviceDB stamps on each device row.
  * `pnpm release:version` runs it after `changeset version`, so the Version PR carries both.
  *
  *   node scripts/sync-package-version.ts
@@ -10,8 +9,7 @@ import fs from 'node:fs'
 const ConstsPath = 'packages/safebyok/src/helpers/consts.ts'
 const ManifestPath = 'packages/safebyok/package.json'
 
-/**
- * `source` with its `PackageVersion` line set to `version`.
+/** `source` with its `PackageVersion` line set to `version`.
  *
  * @param source - The text of `helpers/consts.ts`.
  * @param version - The version to write.
