@@ -224,6 +224,15 @@ gets no review: the review follows the resume that finishes it.
    where its reader will look, and spin an outgrown block into a file of its own, with a line on
    who should read it. Mark what you add with `*Orchestrator:*`; never edit a worker's thread
    file. Commit (`plan:`) and push to the sprint PR at milestones.
+
+   **Then sync the base checkout**, where the Coach reads and fingerpaints: spawn `base-sync`
+   (`.claude/agents/base-sync.md`, on its `opus` pin) in the foreground with the stack, the
+   line's filed and ready branches bottom first as `origin/<branch>`, and the sprint branch and
+   directory. It puts the base branch on main, the line and the plan squashed into one commit,
+   replays the Coach's own commits above, and restores only the uncommitted changes nothing has
+   superseded, after snapshotting everything. It pushes nothing. Relay its report's *Shape*, any
+   dropped hunks or conflicts, and its *Ready for a PR* groups to the Coach in a few lines, with
+   the put-back command; a stack it says wants a restack goes to the `restacker` skill.
 4. **Carry each ruling back** as turbochat says (*Carrying a ruling back*): the row moves to
    *Resolved*, and the ruling goes beside its question in the PR. A live worker gets a ruling it
    needs as a directive when you resume it.
