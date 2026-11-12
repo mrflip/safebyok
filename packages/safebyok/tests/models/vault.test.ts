@@ -156,7 +156,7 @@ describe("vault.ensureTimely(maxMillis)", () => {
 })
 
 
-// Thread 12 deletes the Vault's scaffold calls of its bank's lock and gate, and this describe with them.
+// These cases go with the Vault's scaffold calls of its bank's lock and gate.
 describe("a vault's scaffold calls of its bank's lock and gate", () => {
   type Born = Awaited<ReturnType<typeof makeBornVault>>
   const Calls = [
