@@ -254,6 +254,15 @@ progress document. **Size**: M-L each.
 `thread-worker-400k`, with 13 as its template (the Coach's text: "after thread 4, whenever there
 is room"). 15 waits on 13's filing: graphql's e2e runs over the Postgres functions.
 
+### BP `bank_parent` (added 2026-11-12)
+
+The Coach: "have bank's parent be 'main', just to be type uniform". *Orchestrator:* where a bank-level
+answer or notice carries `parent: null` (delBank's answer, a bank or gate row's notice), it carries
+`'main'`; core shapes, MemoryBankDB, the four adapters, GraphQL's delBank answer gains `parent`, the
+battery. A refusal's null parent (no row fetched) stays. **Levels**: worker `sonnet`
+(`thread-worker`); review `medium`. **After**: 14, on top of the storage line. Models pick it up in 8b/8c.
+**Size**: S.
+
 ### 16 `vaultdb_out`
 
 **Levels**: worker `sonnet`; review `low`. **After**: 12 to 15, restacked into one line.
