@@ -459,22 +459,18 @@ describe("vault.del()", () => {
     await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel }, { maxMillisSinceRefresh: 0 }), 'disabled')
   })
 
-  it("unlocks a locked bank first, asking the user, then deletes", async () => {
+  it("refuses 'bank_locked' in a locked bank, asking nobody and storing nothing", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
-    const { gatingAt } = dialogOf(born)
+    const ante = storedNow()
+    const { shown } = dialogOf(born)
     vault.bank.lock()
-    const deleting = vault.del(vault)
-    const gating = await gatingAt<'unlock_bank'>()
-    expect(gating.gatingkind).to.eq('unlock_bank')
-    expect(storedNow()).to.include({ am: 'a' })
-    await gating.attempt(byPassphrase(Passphrase))
-    expect(await deleting).to.equal(vault)
-    expect(storedNow()).to.include({ am: 'x' })
-    expect(vault.bank.isUnlocked).to.be.true
+    await TH.expectRefusal(vault.del(vault), 'bank_locked')
+    expect(shown).to.have.lengthOf(0)
+    expect(storedNow()).to.equal(ante)
   })
 
-  it("the vault listing's own del deletes in a locked bank, asking nobody", async () => {
+  it("the vault listing's own del deletes in a locked bank", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const { shown } = dialogOf(born)
@@ -482,20 +478,6 @@ describe("vault.del()", () => {
     expect(await vault.listing.del(vault.sparse)).to.equal(vault)
     expect(shown).to.have.lengthOf(0)
     expect(storedNow()).to.include({ am: 'x' })
-    expect(vault.bank.isLocked).to.be.true
-  })
-
-  it("refuses where the user dismisses the unlock, storing nothing", async () => {
-    const born = await makeBornVault()
-    const { vault, storedNow } = born
-    const ante = storedNow()
-    const { gatingAt } = dialogOf(born)
-    vault.bank.lock()
-    const deleting = vault.del(vault)
-    const gating = await gatingAt<'unlock_bank'>()
-    gating.dismiss()
-    await TH.expectRefusal(deleting)
-    expect(storedNow()).to.equal(ante)
   })
 
   it("refuses 'stale_write' a row moved since the del read it", async () => {

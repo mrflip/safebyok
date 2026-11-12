@@ -196,7 +196,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // == [Putting]: put, tryPut, putExposed, tryPutExposed, edit, keptWhisper
 
   /** Seal `patch` over the record as its next revision, and store it, resolving this box.
-   * A locked bank is unlocked first, asking the user if need be.
    *
    * A patch that leaves out the whisper or the sidecar keeps the stored one, but may fetch the box first to get it.
    * A lock does not interrupt or reverse a put once its write has begun.
@@ -220,7 +219,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     try {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
       await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxWorldMillis })
-      await this.ensureUnlocked()
       const given = this.demandPuttable(patch, { ifPresent })
       const { record, expected } = await this.#editAndSeal(given)
       this.demandPuttable(patch, { ifPresent })
@@ -254,7 +252,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   #storedWhisper(): Promise<Whisper> { return this.#unseal(this.demandFullProps()) }
   // --
 
-  // == [Guards]: demandUnsealable, demandPuttable, #givenOf, demandExposable, demandPresent, ensureUnlocked, ensureUnsealable, ensurePuttable
+  // == [Guards]: demandUnsealable, demandPuttable, #givenOf, demandExposable, demandPresent, ensureUnsealable, ensurePuttable
 
   /** Throw unless `isEnabled`, unlocked, `isPresent` and `isFull`. */
   demandUnsealable(): this { return this.demandEnabled().demandUnlocked().demandPresent().demandFull() }
@@ -281,13 +279,6 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** Demand that this box is present. */
   demandPresent(): this {
     if (! this.isPresent) { throw boxAbsent(this) }
-    return this
-  }
-
-  // An unlocked bank is left as it is: the gate fetch the bank's own ensureUnlocked makes first is too dear to pay on every put and del.
-  /** Unlock this box's bank if it is locked: see {@link Bank.ensureUnlocked}. */
-  async ensureUnlocked(): Promise<this> {
-    if (this.isLocked) { await this.bank.ensureUnlocked() }
     return this
   }
 

@@ -36,7 +36,7 @@ describe("bank.ensureVault", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("stores a vault not yet stored in a locked bank, asking nobody, the bank left locked", async () => {
+  it("stores a vault not yet stored in a locked bank", async () => {
     const requestCleartext = vi.fn<RequestCleartext>(async (gating) => { await gating.attempt(byPassphrase(Passphrase)) })
     const { world, bank } = await makeBankWithVault(makeBankWorld(), { requestCleartext })
     requestCleartext.mockClear()
@@ -49,7 +49,7 @@ describe("bank.ensureVault", () => {
     expect(world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.size).to.eq(2)
   })
 
-  it("stores a vault while an unlock's gating is open, the unlock going on", async () => {
+  it("stores a vault while an unlock's gating is open", async () => {
     const world = makeBankWorld()
     let closeDialog = nothing
     let showDialog = nothing

@@ -145,7 +145,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   pickle(): GateRecord { return Object.freeze({ ...this.demandFullProps(), wayins: this.wayins }) }
   // --
 
-  // == [Guards]: isLocked, demandPasskeyAddable, demandPresent, ensureUnlocked, ensureTimely
+  // == [Guards]: isLocked, demandPasskeyAddable, demandPresent, ensureTimely
 
   /** True while this gate's bank is locked. */
   get isLocked(): boolean { return this.bank.isLocked }
@@ -159,13 +159,6 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   /** Demand that this gate is present. */
   demandPresent(): this {
     if (! this.isPresent) { throw mainGateMissing(this.bank.sparse) }
-    return this
-  }
-
-  // An unlocked bank is left as it is: the gate fetch the bank's own ensureUnlocked makes first is too dear to pay on every put and del.
-  /** Unlock this gate's bank if it is locked: see {@link Bank.ensureUnlocked}. */
-  async ensureUnlocked(): Promise<this> {
-    if (this.isLocked) { await this.bank.ensureUnlocked() }
     return this
   }
 

@@ -147,7 +147,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   receiveParent(parent: unknown): void { this.listing.deliverRecord(BX.bankRow.refusingAs('record_conflict').parse(parent)) }
   // --
 
-  // == [Prompting]: prompt, ensureUnlocked, unlock, del, delPrompt, each with its try form
+  // == [Prompting]: prompt, ensureUnlocked, unlock, delPrompt, each with its try form
 
   /** Ask the user through a gating of `gatingkind`, resolving this bank once the change it names is made. */
   async prompt(gatingkind: BankGatingkind): Promise<this> {
@@ -175,10 +175,6 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
-
-  // A bank's delete needs the user's passphrase: the bank listing's del is called only by the del_bank gating.
-  /** Refuses: delete a bank with {@link delPrompt}. */
-  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
 
   /** Delete this bank, its gate, its vaults and their boxes, once the user proves it through a `del_bank` gating.
    * This Bank is then disabled for good, and the device has no bank until the next `device.ensureBank()`.
@@ -379,6 +375,13 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     if (! this.isPresent) { throw actRefused('vault', 'bank_gone') }
     return this
   }
+  // --
+
+  // == [Overriding Storable's]: del
+
+  // A bank's delete needs the user's passphrase: the bank listing's del is called only by the del_bank gating.
+  /** Refuses: delete a bank with {@link delPrompt}. */
+  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
   // --
 
   // == [Protected, overriding Storable's]: adopt, children, isFullRecord, lifeTokPathOf, makeSnapshot

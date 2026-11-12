@@ -172,15 +172,14 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** Non-throwing form of {@link hydrate}. */
   tryHydrate(opts: TimelyOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.hydrate(opts)) }
 
-  /** Delete this thing, as `asked` names it, and resolve it. A locked bank is unlocked first, asking the user if need be.
+  /** Delete this thing, as `asked` names it, and resolve it.
    * `asked` is a scope, or a record whose revision must be the one stored: otherwise it refuses `stale_write`.
    */
   async del(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<this> {
     const scope = this.listing.scopeOf(asked)
     const pins = { ...SX.revisionPins.parse(asked), ...scope }
     const { maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
-    await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis })
-    await this.ensureUnlocked(); this.demandDeletable()
+    await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis }); this.demandDeletable()
     checkedConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })
     await this.listing.del(this.sparse)
     return this
@@ -330,7 +329,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
   // --
 
-  // == [Protected, for a subclass to override]: adopt, children, demandPresent, ensureUnlocked, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, for a subclass to override]: adopt, children, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
 
   // Every adopt is followed by an align, which the snapshot is made from: an adopt left unaligned would leave it behind.
   /** Make `central` the record in hand, frozen, and set the props from it. The snapshot waits for {@link align}. */
@@ -344,9 +343,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   /** Throw unless `isPresent`. */
   abstract demandPresent(): this
-
-  /** Unlock this thing's bank if it is locked, asking the user if no lease is cached. */
-  abstract ensureUnlocked(): Promise<this>
 
   /** Whether `fetched` is a full, live record. */
   protected abstract isFullRecord(fetched: SparseT): fetched is RecordT

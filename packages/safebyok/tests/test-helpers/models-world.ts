@@ -153,8 +153,6 @@ export type FakeBank = {
   readonly device:    FakeDevice
   /** Refuse 'disabled' once {@link ModelsWorld.disable} has run. */
   demandEnabled(): FakeBank
-  /** Resolve at once, asking nobody: a locked world stays locked, for the caller's own demand to refuse. */
-  ensureUnlocked(): Promise<FakeBank>
 }
 
 /** The vault, as far as a box listing and its boxes reach into it. */
@@ -404,7 +402,6 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     get isEnabled() { return isEnabled },
     device,
     demandEnabled() { demandFakeEnabled(); return bank },
-    ensureUnlocked: () => Promise.resolve(bank),
   }
 
   const world: FakeVault = {

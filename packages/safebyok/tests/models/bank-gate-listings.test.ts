@@ -19,7 +19,7 @@ async function refusalMessageOf(operation: Promise<unknown>): Promise<string> {
 }
 
 describe("BankListing's entrypoints", () => {
-  it("refuses the generic put, as only build writes a live bank row, calling no bankDB verb", async () => {
+  it("refuses the generic put", async () => {
     const { bank, bankDB, storedBankNow } = await makeBornVault()
     const building = vi.spyOn(bankDB, 'tryBuildBank')
     const putting = bank.listing.put(storedBankNow() as never, { expected: bank.sparse })
@@ -28,7 +28,7 @@ describe("BankListing's entrypoints", () => {
     expect(bank.isPresent).to.be.true
   })
 
-  it("refuses the bank's and the gate's own del, which go only through bank.delPrompt(), asking nobody and calling no bankDB verb", async () => {
+  it("refuses the bank's and the gate's own del", async () => {
     const { bank, bankDB } = await makeBornVault()
     const deleting = vi.spyOn(bankDB, 'tryDelBank')
     bank.lock()
@@ -39,7 +39,7 @@ describe("BankListing's entrypoints", () => {
     expect(bank.device.openGating).to.be.null
   })
 
-  it("refuses a del over an ante that is no bank row, calling no bankDB verb", async () => {
+  it("refuses a del over an ante that is no bank row", async () => {
     const { bank, bankDB } = await makeBornVault()
     const deleting = vi.spyOn(bankDB, 'tryDelBank')
     await TH.expectRefusal(bank.listing.del({ ...BankScope } as never))
