@@ -299,7 +299,8 @@ export class Device {
     this.#remakeSnapshot()
   }
 
-  /** Dismiss the open gating if it is for `bank`, whatever its kind; the snapshot then shows the bank is no longer this device's. */
+  // A bank of another life replacing the bank listed leaves the bank listing's membership as it was, so the remake is made here.
+  /** Dismiss the open gating if it is for `bank`, whatever its kind. */
   dismissGatingAtDiscard(bank: Bank): void {
     if (this.#openGating?.bank === bank) { this.#openGating.dismiss() }
     this.#remakeSnapshot()
