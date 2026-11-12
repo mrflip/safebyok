@@ -26,19 +26,27 @@
 #   what the tip holds, a .DS_Store, or what git ignores. Otherwise it stops and leaves the
 #   directory for a person.
 #
+# With --catch-up it only catches the branch up and pushes it: no proof, and the worktree stays. A
+# thread-worker runs it when it expects green, before taking its PR out of draft and running its
+# last `pnpm justify` while CI runs (.claude/agents/thread-worker.md, *The thread*).
+#
 # Environment: FILE_THREAD_RETRY_PAUSE, the seconds to wait between tries at deleting a leftover
 # directory (default 1).
 #
-# Usage: scripts/file-thread [--prove <command>] <worktree root>
-# Exits 0 when filed; 1 on a failure; 2 on arguments it does not understand; 3 on a rebase
+# Usage: scripts/file-thread [--catch-up | --prove <command>] <worktree root>
+# Exits 0 when filed (or caught up and pushed); 1 on a failure; 2 on arguments it does not understand; 3 on a rebase
 # conflict; 4 when the proof is red. On 3 or 4 nothing is pushed and the worktree stays.
 set -euo pipefail
 
-usage="Usage: scripts/file-thread [--prove <command>] <worktree root>"
+usage="Usage: scripts/file-thread [--catch-up | --prove <command>] <worktree root>"
 prove="pnpm justify"
+catch_up=""
 if [[ "${1:-}" == "--prove" && $# -ge 2 ]]; then
   prove="$2"
   shift 2
+elif [[ "${1:-}" == "--catch-up" ]]; then
+  catch_up=1
+  shift
 fi
 if [[ $# -ne 1 ]]; then
   echo "$usage" >&2
@@ -82,6 +90,21 @@ if [[ -n "$onto" ]]; then
   caught="rebased onto $onto at $(git -C "$root" rev-parse --short "$onto")"
 fi
 
+# Pushes the branch to origin's branch of the same name, with a lease on the SHA origin had.
+push_branch() {
+  local pushed lease=()
+  pushed="$(git -C "$root" rev-parse --verify --quiet "refs/remotes/origin/${branch}" || true)"
+  if [[ -n "$pushed" ]]; then lease=("--force-with-lease=${branch}:${pushed}"); fi
+  git -C "$root" -c credential.helper= -c credential.helper='!gh auth git-credential' \
+    push --quiet ${lease[@]+"${lease[@]}"} origin "${branch}:${branch}"
+}
+
+if [[ -n "$catch_up" ]]; then
+  push_branch
+  echo "file-thread: $branch caught up: $caught, pushed at $(git -C "$root" rev-parse --short HEAD); not proved, its worktree kept."
+  exit 0
+fi
+
 log="$(mktemp -t file-thread.XXXXXX)"
 if ! (cd "$root" && bash -c "$prove") > "$log" 2>&1; then
   tail -n 40 "$log" >&2
@@ -90,11 +113,7 @@ if ! (cd "$root" && bash -c "$prove") > "$log" 2>&1; then
 fi
 rm -f "$log"
 
-pushed="$(git -C "$root" rev-parse --verify --quiet "refs/remotes/origin/${branch}" || true)"
-lease=()
-if [[ -n "$pushed" ]]; then lease=("--force-with-lease=${branch}:${pushed}"); fi
-git -C "$root" -c credential.helper= -c credential.helper='!gh auth git-credential' \
-  push --quiet ${lease[@]+"${lease[@]}"} origin "${branch}:${branch}"
+push_branch
 
 # Prints the files in directory $1 that are none of: in the tree of commit $2, a .DS_Store, the
 # stub of a .git file, or ignored by the main checkout's rules. node_modules is not entered.

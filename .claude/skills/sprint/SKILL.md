@@ -127,6 +127,10 @@ Look-ahead: <what later threads need from this one, if anything>.
 Read: <what this handoff does not already carry, by section>.
 ```
 
+The worker's PR stays a draft through the build, and CI holds a draft, so it pushes freely; when it
+expects green it catches up onto its base (`scripts/file-thread --catch-up`), takes the PR out of
+draft, which starts CI, and runs its last `pnpm justify` while CI runs.
+
 Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each
 compaction with its best guess at the agent, by that `description`. To see where each agent
 stands, read the tail of the log every worktree shares,

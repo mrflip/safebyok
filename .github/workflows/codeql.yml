@@ -6,13 +6,15 @@ name: CodeQL
 # setup": leave that switched off in the repository's settings, or the two will collide.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
   schedule:
     - cron: '23 6 * * 1'
 
-# As in ci.yml: a new push to a pull request cancels its run in progress, and pushes to main run
-# one at a time, a waiting one replaced by a newer push.
+# As in ci.yml: a draft pull request is held until it is marked ready, but for Mergify's batches;
+# a new push to a pull request cancels its run in progress; and pushes to main run one at a time,
+# a waiting one replaced by a newer push.
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -22,6 +24,7 @@ permissions:
 
 jobs:
   analyze:
+    if: ${{ !github.event.pull_request.draft || startsWith(github.head_ref, 'mergify/merge-queue/') }}
     runs-on: ubuntu-latest
     permissions:
       security-events: write

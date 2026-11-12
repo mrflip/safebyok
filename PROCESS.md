@@ -114,9 +114,11 @@ File against `main`, as a draft while you work. *Significant* questions -- ones 
 would change the code in the PR -- are asked in chat, and lead the PR's body until answered.
 
 * **Draft while you work.** Open the PR as a draft (`gh pr create --draft`) when you first push
-  the branch, and push to it as the work goes. Before you report back -- to the Coach, or in a
-  sprint to the orchestrator -- take it out of draft (`gh pr ready`), whatever the report says.
-  It stays out of draft from then on: later fixes are pushed to it as it stands.
+  the branch, and push to it as the work goes: CI holds a draft's jobs (`notes/ci.md`). When you
+  expect it green, catch it up onto its base's current tip, push, and take it out of draft (`gh
+  pr ready`), which starts CI; then run your last `pnpm justify` while CI runs. Before you report
+  back -- to the Coach, or in a sprint to the orchestrator -- it is out of draft, whatever the
+  report says. It stays out of draft from then on: later fixes are pushed to it as it stands.
 * **Title**: plain language, saying what changed.
 * **Link each PR, branch or commit on first mention**, in chat, a PR body or a note:
   `[#12](https://github.com/mrflip/safebyok/pull/12)`.
