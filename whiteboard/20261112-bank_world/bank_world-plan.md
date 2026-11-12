@@ -8,9 +8,10 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-12, 20:00Z): 8a to 10 merged. Filed: 8d #679 (on main, draft until judged
-  ready). In review: 12 #681. G #678 (draft, living guarantees note, top at wrapup). T (tooling, on #676).
-  Next: 16, then 17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
+* **Status** (2026-11-12, 20:30Z): 8a to 10 merged. Ready to merge, out of draft: 8d #679 → 12 #681
+  (12 restacked onto 8d, green at 21e9cf444, core 3395; #681 the top). Building: 16 (from 12's old
+  ready tip; its filing rebases it). G #678 (draft, to the top at wrapup). T (tooling, on #676). Then
+  17. Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
