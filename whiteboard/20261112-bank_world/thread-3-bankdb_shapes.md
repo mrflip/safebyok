@@ -1,6 +1,6 @@
 # Thread 3: bankdb_shapes (2026-11-12)
 
-Branch `20261112-bankdb_shapes`, PR #TBD, stacked on #658. Justify: green, all packages (safebyok 3129, convex 318, postgres 237, graphql 376, react 259, indexeddb 180, fastkey 43, root scripts 278, demo 97, e2e 504).
+Branch `20261112-bankdb_shapes`, PR #660, stacked on #658. Justify: green, all packages (safebyok 3129, convex 318, postgres 237, graphql 376, react 259, indexeddb 180, fastkey 43, root scripts 278, demo 97, e2e 504).
 
 * **Built**: the bankDB's contract shapes and classifier in the core, unexported; only tests call them.
   * `src/shapes/shapes-bankdb.ts` (BX, new): `BankFormat` 3001, `GateFormat` 4001, `VaultFormat` 6003. Rows `bankRecord`/`bankTombstone`/`bankRow`; `passphraseWayin`, `passkeyWayin`, `wayins` (`main` plus optional `passkey0`, each wayin's `wayinlabel` its ckey), `gateRecord` (`gatelabel: 'main'`, `bank_tok`, `gate_tok`, `wayins`, empty `auth`/`sigs`/`meta`; live only, no tombstone); `vaultRecord`/`vaultTombstone`/`vaultRow` (`bank_tok` and `vault_tok`, no gate). `storedBankRow`/`storedGateRow`/`storedVaultRow` refuse `damaged_row`. Shells `shellBankOf`, `shellVaultOf`. Asks: `bankEnsure` (`gates: ['main']`), `bankBuild` (record + gate, over expected), `gatePut` (with `gateVerb`), `bankDel`, `vaultGet`/`vaultPut`/`vaultDel`/`vaultAsk` (each with `bank_tok`). Box asks are SX's, reused. `loggableAsk`.
