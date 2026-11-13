@@ -28,11 +28,12 @@ import { argon2idWasmWebV1Deriver } from 'safebyok-fastkey'
 
 const device = Device.make({ user_id: session.user_id, banklabel: 'acme', gates: ['main'], bankDB, deviceDB, strengthChecker, requestCleartext, keyDeriver: argon2idWasmWebV1Deriver })
 const bank = await device.ensureBank()
+await bank.ensureUnlocked()  // asks the user for the passphrase, and derives the key through WebAssembly
 const vault = await bank.ensureVault({ vaultlabel: 'main' })
 ```
 
-A vault records only its deriver's label, and this deriver derives exactly what the core's does
-under the same label. So a vault made through WebAssembly on one device unlocks through
+A bank's passphrase wayin records only its deriver's label, and this deriver derives exactly what the core's does
+under the same label. So a bank made through WebAssembly on one device unlocks through
 `@noble/hashes` on another, and back: each device may run whichever suits it. The tests compare the two
 to each other byte for byte, and both to Argon2id's reference test vector.
 
@@ -59,7 +60,7 @@ change.
 
 The derivation runs as one synchronous WebAssembly call: it blocks the thread for those 130 ms,
 while the core's deriver takes longer but yields to the event loop as it runs. For a spec heavier than the
-supplied one, consider running the vault's unlock where a pause does not show.
+supplied one, consider running the bank's unlock where a pause does not show.
 
 ## Where it runs, and where it does not
 
@@ -72,8 +73,8 @@ supplied one, consider running the vault's unlock where a pause does not show.
   fetched.
 
 Where WebAssembly is missing or will not compile, `deriveKeyBytes` refuses with `bad_option` (the
-host's to fix), and its message says which. The vault keeps nothing of what a deriver throws,
-because a throw may quote the passphrase: unlocking the vault (`ensureVault`, `ensureUnlocked`)
+host's to fix), and its message says which. The core keeps nothing of what a deriver throws,
+because a throw may quote the passphrase: unlocking the bank (`bank.ensureUnlocked`, `bank.unlock`)
 refuses `unexpected_error`, carrying neither the deriver's message nor its kind. Calling
 `deriveKeyBytes` directly shows which. This package never falls back to the core's deriver on its
 own: choose one per platform yourself, as `keyDeriver`.
@@ -83,9 +84,9 @@ own: choose one per platform yourself, as `keyDeriver`.
 * `bad_option` -- from `makeArgon2idWasmDeriver(spec)`, for a spec it cannot run (the message names the
   field). From `deriveKeyBytes` called directly, when the platform has no WebAssembly, or when a
   Content-Security-Policy lacks `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
-  Through the vault, this arrives as `unexpected_error`, with no `cause`.
+  Through the bank, this arrives as `unexpected_error`, with no `cause`.
 * `wrong_passphrase` -- from `deriveKeyBytes` called directly with an empty passphrase. Through the
-  vault, this too arrives as `unexpected_error`.
+  bank, this too arrives as `unexpected_error`.
 
 Any other failure (a device without the memory a spec asks for, say) is thrown as the platform threw
-it. Through the vault, it too arrives as `unexpected_error`, and what was thrown is kept nowhere.
+it. Through the bank, it too arrives as `unexpected_error`, and what was thrown is kept nowhere.

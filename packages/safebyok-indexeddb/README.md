@@ -41,7 +41,8 @@ Hand it to the core wherever a `BankDB` is asked for.
 * **Each call is one IndexedDB transaction.** A put or a del fetches the rows it depends on and
   writes in the same transaction, so it is written only over the row it expected. IndexedDB runs
   readwrite transactions one after another, across every tab of the origin. Deleting a vault
-  deletes every box row of its life in the same transaction, or none of them.
+  deletes every box row of its life in the same transaction, or none of them; deleting a bank
+  deletes its gate rows, vault rows and box rows in the same transaction.
 * **A watch hears every tab's writes**, over a BroadcastChannel named for the database, once the
   write has committed.
 * **Refusals say what IndexedDB did**, and carry IndexedDB's own error as their `cause`:
@@ -55,8 +56,9 @@ Hand it to the core wherever a `BankDB` is asked for.
 One object store, `rows`, keyed by array. A bank row is filed at `['bank', user_id, banklabel]`, a gate row at
 `['gate', user_id, banklabel, gatelabel]`, a vault row at `['vault', user_id, banklabel, vaultlabel]`, and a box row under
 its vault's life at `['box', user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel]`, so one key range fetches a
-bank's vaults or a vault life's boxes. A deleted bank, vault or box stays as a tombstone. `tidyGone` deletes the box rows of
-any vault life that is over.
+bank's vaults or a vault life's boxes. A deleted bank, and a vault or box deleted on its own, stays as a tombstone; deleting
+a bank removes its gate, vault and box rows outright. `tidyGone` deletes the vault rows left from an earlier life of the bank
+and the box rows of any vault life that is over.
 
 ## Writing an adapter of your own
 
