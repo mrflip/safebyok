@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import type { Gate, Outcome } from 'safebyok'
-import { passkeysAvailable, useBank, useBankSnapshot } from 'safebyok-react'
+import { passkeysAvailable, useBank } from 'safebyok-react'
 import { isQuietRefusal } from '../lib/refusals'
+
+function unsubscribeFromNothing(): void { /* nothing to unsubscribe from */ }
+function subscribeToNothing(): () => void { return unsubscribeFromNothing }
+function getNothing(): null { return null }
 
 /** The bank's ways in (its passphrase, and its passkey if it has one), with buttons to change them. */
 export const WaysIn = () => {
   const bank = useBank()
   // The ways in are the bank's: its main gate holds the passphrase, and the passkey where there is one.
-  const maingate = useBankSnapshot()?.maingate ?? null
+  const gate = bank?.gateListing.at({ ...bank.scope, gatelabel: 'main' }) ?? null
+  const maingate = useSyncExternalStore(gate?.subscribe ?? subscribeToNothing, gate?.getSnapshot ?? getNothing)
   const [gripe, setGripe] = useState<string | null>(null)
 
   if ((bank === null) || (maingate === null)) { return null }

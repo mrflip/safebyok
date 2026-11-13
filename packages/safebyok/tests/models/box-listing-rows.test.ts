@@ -1,6 +1,6 @@
 /** What a BoxListing makes of the rows storage answers, an absent box above all, and the snapshot its boxes show. */
 
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { Box } from '../../src/models/box'
 import * as TH from '../test-helpers'
 import { boxDnaOf, boxListingOf, fullBoxRecord, shellBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld } from '../test-helpers/models-world'
@@ -234,54 +234,40 @@ describe("BoxListing: an absent box", () => {
   })
 })
 
-describe("BoxListing: its snapshot is what its boxes show", () => {
-  it("shows the same sidecar as `box.sidecar`", () => {
+describe("BoxListing: its snapshot is the boxlabels of its present boxes", () => {
+  it("lists a box delivered full or sparse, and one created from a dna", async () => {
     const listing = boxListingOf(world.mw)
-    const box = listing.deliverRecord(fullBoxRecord({ boxlabel: 'robert', sidecar: { uncle: 'Bob' } }))
-    const robert = listing.at(world.mw.boxscope('robert'))
-    expect(robert?.sidecar).to.deep.equal({ uncle: 'Bob' })
-    expect(robert?.snapshot.sidecar).to.deep.equal({ uncle: 'Bob' })
-    expect(listing.snapshot[0]?.sidecar).to.deep.equal({ uncle: 'Bob' })
-    expect(listing.snapshot[0]).to.eq(box.snapshot)
-    expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
+    listing.deliverRecord(fullBoxRecord({ boxlabel: 'robert', sidecar: { uncle: 'Bob' } }))
+    listing.deliverRecord(sparseBoxRecord({ boxlabel: 'roberta' }))
+    await listing.create(boxDnaOf(scope()))
+    expect(listing.snapshot).to.deep.equal(['robert', 'roberta', 'anthropic_api_key'])
+    expect(listing.getSnapshot()).to.eq(listing.snapshot)
+    expect(Object.isFrozen(listing.snapshot)).to.be.true
   })
 
-  it("shows a box created from a dna as the record it put", async () => {
-    const listing = boxListingOf(world.mw)
-    const box = await listing.create(boxDnaOf(scope()))
-    const [shown] = listing.snapshot
-    expect(shown).to.eq(box.snapshot)
-    expect(shown).to.include({ boxlabel: 'anthropic_api_key', revision_seq: 0, isPresent: true, isFull: true })
-  })
-
-  it("shows a sparse box as present, not full, with no sidecar", () => {
-    const listing = boxListingOf(world.mw)
-    listing.deliverRecord(sparseBoxRecord())
-    expect(listing.snapshot[0]).to.include({ isPresent: true, isFull: false, sidecar: null })
-  })
-
-  it("shows the box's new sidecar after a put", async () => {
+  it("stays the same array, telling no listener, through a box's own put", async () => {
     const listing = boxListingOf(world.mw)
     const record = fullBoxRecord({ sidecar: { uncle: 'Bob' } })
     world.mw.seedPut(record)
     const box = listing.deliverRecord(record)
+    const before = listing.snapshot
+    const told = vi.fn()
+    listing.subscribe(told)
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { uncle: 'Robert' } })
-    expect(box.sidecar).to.deep.equal({ uncle: 'Robert' })
-    expect(listing.snapshot[0]?.sidecar).to.deep.equal({ uncle: 'Robert' })
+    expect(box.snapshot.sidecar).to.deep.equal({ uncle: 'Robert' })
+    expect(listing.snapshot).to.eq(before)
+    expect(told).not.toHaveBeenCalled()
   })
 
-  it("remakes its rows at a lock and an unlock, each the box's own new snapshot", () => {
+  it("stays the same array, telling no listener, through a lock and an unlock", () => {
     const { listing, box } = listedBox()
-    const before = listing.getSnapshot()
-    expect(before[0]?.isLocked).to.be.false
+    const before = listing.snapshot
+    const told = vi.fn()
+    listing.subscribe(told)
     world.mw.setLocked(true)
-    const locked = listing.getSnapshot()
-    expect(locked).to.not.eq(before)
-    expect(locked[0]).to.eq(box.getSnapshot())
-    expect(locked[0]?.isLocked).to.be.true
+    expect(box.snapshot.isLocked).to.be.true
     world.mw.setLocked(false)
-    expect(listing.getSnapshot()).to.not.eq(locked)
-    expect(listing.getSnapshot()[0]).to.eq(box.getSnapshot())
-    expect(listing.getSnapshot()[0]?.isLocked).to.be.false
+    expect(listing.snapshot).to.eq(before)
+    expect(told).not.toHaveBeenCalled()
   })
 })

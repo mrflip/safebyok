@@ -11,7 +11,7 @@ import { good } from '../../src/refusals/outcome'
 import type { LeaseRow } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
-import { AutolockMinutes, BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
+import { AutolockMinutes, BankScopeGiven, OtherScopeGiven, VaultScopeGiven, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
 
 useBankWorlds()
@@ -261,7 +261,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     expect(() => vault.demandEnabled()).to.throw(VaultError)
     expect(device.snapshot.stage).to.eq('disabled')
     expect(device.snapshot.err).to.include({ refusalkind: 'disabled' })
-    expect(device.snapshot.bank).to.be.null
+    expect(device.snapshot.bank_tok).to.be.null
     expect(device.bank).to.be.null
     expect(bank.isEnabled).to.be.false
     expect(seen).toHaveBeenCalled()
@@ -484,7 +484,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     await TH.expectRefusal(bank.ensureVault(VaultScopeGiven), 'disabled')
     await TH.expectRefusal(bank.device.ensureBank(), 'disabled')
     const next = await world.bankOn()
-    expect(labelsOf(next.snapshot)).to.deep.equal([Dna.vaultlabel])
+    expect(next.vaultListing.snapshot).to.deep.equal([Dna.vaultlabel])
     await next.ensureVault(VaultScopeGiven)
     await next.ensureUnlocked()
     expect(next.isUnlocked).to.be.true

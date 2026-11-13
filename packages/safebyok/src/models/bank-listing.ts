@@ -81,7 +81,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   }
   // --
 
-  // == [Defined by the bank listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the bank listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its device does. */
   get isEnabled(): boolean { return this.device.isEnabled }
@@ -93,6 +93,8 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   protected scopepathOf(scope: BankScope): string {
     return ['bank', scope.user_id, scope.banklabel].join('^')
   }
+
+  protected labelOf({ banklabel }: BankScope): string { return banklabel }
 
   protected makeThing(central: Fetched<BankRecord, BankSparse>): Bank {
     return new Bank(this, central, { bankDB: this.bankDB, maxMillisSinceRefresh: this.maxMillisSinceRefresh, askUser: this.#askUser })

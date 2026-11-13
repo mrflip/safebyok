@@ -197,6 +197,20 @@ describe("gate.replacePassphrasePrompt()", () => {
     expect(device.bank).to.be.null
   })
 
+  it("tells the device's listeners once a bank of another life replaces the bank listed, with no gating open", async () => {
+    const { device, bank, anotherDevice, storedBankNow } = deafened(await makeBornVault())
+    bank.lock()
+    const other = anotherDevice()
+    await delTyping(await other.ensureBank(), Passphrase)
+    await bankTyping(other, byPassphrase(NewPassphrase))
+    const listener = vi.fn()
+    device.subscribe(listener)
+    bank.receiveParent(storedBankNow())
+    expect(device.bank).to.be.null
+    expect(device.snapshot.bank_tok).to.be.null
+    expect(listener).toHaveBeenCalledOnce()
+  })
+
   it("refuses a bank of another life stored since the last fetch, that life replacing the bank listed", async () => {
     const { device, bank, anotherDevice, storedBankNow } = deafened(await makeBornVault())
     const other = anotherDevice()
@@ -207,6 +221,7 @@ describe("gate.replacePassphrasePrompt()", () => {
     expect(bank.sparse.bank_tok).to.eq(storedBankNow()?.bank_tok)
     expect(bank.bank_tok).to.not.eq(storedBankNow()?.bank_tok)
     expect(device.bank).to.be.null
+    expect(device.snapshot.bank_tok).to.be.null
     expect(await device.ensureBank()).to.include({ bank_tok: storedBankNow()?.bank_tok, isLocked: true })
   })
 
@@ -377,7 +392,7 @@ describe("bank.delPrompt()", () => {
     expect(bank.sparse).to.include({ am: 'x', bank_tok: storedBankNow()?.bank_tok })
     expect(vault.isEnabled).to.be.false
     expect(device.bank).to.be.null
-    expect(device.snapshot.bank).to.be.null
+    expect(device.snapshot.bank_tok).to.be.null
     await TH.eventually(() => deviceDB.cachedNow() === null)
   })
 

@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
-import { BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
+import { BankScopeGiven, OtherScopeGiven, VaultScopeGiven, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
 
 useBankWorlds()
@@ -25,7 +25,7 @@ describe("bank.ensureVault", () => {
     const { bank, vault } = await makeBankWithVault()
     expect(vault).to.include({ ...BankScopeGiven, ...VaultScopeGiven })
     expect(bank.isUnlocked).to.be.true
-    expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
+    expect(bank.vaultListing.snapshot).to.deep.equal([Dna.vaultlabel])
     expect(bank.snapshot.isLocked).to.be.false
     const seen = vi.fn()
     bank.subscribe(seen)
@@ -45,7 +45,7 @@ describe("bank.ensureVault", () => {
     expect(vault.isPresent).to.be.true
     expect(requestCleartext).not.toHaveBeenCalled()
     expect(bank.isLocked).to.be.true
-    expect(labelsOf(bank.snapshot)).to.have.members([Dna.vaultlabel, vault.vaultlabel])
+    expect(bank.vaultListing.snapshot).to.have.members([Dna.vaultlabel, vault.vaultlabel])
     expect(world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.size).to.eq(2)
   })
 

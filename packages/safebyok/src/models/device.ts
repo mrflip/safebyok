@@ -134,7 +134,7 @@ export class Device {
     Object.freeze(this)
   }
 
-  /** Make a bank listing whose changes remake this device's snapshot. */
+  /** Make a bank listing whose comings and goings remake this device's snapshot. */
   #makeBankListing(): BankListing {
     const listing = new BankListing(this, { bankDB: this.#bankDB, maxMillisSinceRefresh: this.#vaultRefreshMillis, askUser: this.#askUser })
     listing.subscribe(this.#remakeSnapshot)
@@ -299,9 +299,11 @@ export class Device {
     this.#remakeSnapshot()
   }
 
+  // A bank of another life replacing the bank listed leaves the bank listing's membership as it was, so the remake is made here.
   /** Dismiss the open gating if it is for `bank`, whatever its kind. */
   dismissGatingAtDiscard(bank: Bank): void {
     if (this.#openGating?.bank === bank) { this.#openGating.dismiss() }
+    this.#remakeSnapshot()
   }
   // --
 
@@ -312,7 +314,7 @@ export class Device {
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
     const prior = this.#snapshot
-    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.openGating === prior.openGating) && (next.bank === prior.bank)) { return }
+    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.openGating === prior.openGating) && (next.bank_tok === prior.bank_tok)) { return }
     this.#snapshot = next
     for (const listener of this.#listeners) {
       try {
@@ -325,7 +327,7 @@ export class Device {
 
   #makeSnapshot(): DeviceSnapshot {
     const stage: DeviceStage = this.#isReady ? 'ready' : 'made'
-    return Object.freeze({ ...this.scope, stage: this.#endCause ? 'disabled' : stage, err: this.#endCause, openGating: this.#openGating, bank: this.bank?.snapshot ?? null })
+    return Object.freeze({ ...this.scope, stage: this.#endCause ? 'disabled' : stage, err: this.#endCause, openGating: this.#openGating, bank_tok: this.bank?.bank_tok ?? null })
   }
   // --
 

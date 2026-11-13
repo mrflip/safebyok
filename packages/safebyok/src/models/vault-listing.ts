@@ -99,7 +99,7 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [Defined by the vault listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the vault listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
@@ -113,6 +113,8 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   protected scopepathOf(scope: VaultScope): string {
     return ['vault', scope.user_id, scope.banklabel, scope.vaultlabel].join('^')
   }
+
+  protected labelOf({ vaultlabel }: VaultScope): string { return vaultlabel }
 
   protected makeThing(central: Fetched<VaultRecord, VaultSparse>): Vault {
     return new Vault(this, central)

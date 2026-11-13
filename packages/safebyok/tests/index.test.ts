@@ -27,7 +27,7 @@ describe("safebyok", () => {
     expectTypeOf<Front.Box['scope']>().toEqualTypeOf<Front.Boxscope>()
     expectTypeOf<Front.Bank['scope']>().toEqualTypeOf<Front.BankScope>()
     expectTypeOf<Front.Device['bank']>().toEqualTypeOf<Front.Bank | null>()
-    expectTypeOf<Front.DeviceSnapshot['bank']>().toEqualTypeOf<Front.BankSnapshot | null>()
+    expectTypeOf<Front.DeviceSnapshot['bank_tok']>().toEqualTypeOf<string | null>()
     expectTypeOf<Front.VaultError['meta']>().toEqualTypeOf<Front.RefusalMeta | undefined>()
     expectTypeOf<Parameters<Front.Device['announce']>[0]>().toEqualTypeOf<Front.DeviceAnnouncement>()
     expectTypeOf<Parameters<Front.Device['tellBadNews']>[0]>().toEqualTypeOf<readonly unknown[]>()

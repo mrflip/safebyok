@@ -13,7 +13,7 @@ import type { AnyGating } from '../../src/shapes/shapes-gateish'
 import { VaultError } from '../../src/refusals/errors'
 import type { Outcome } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
-import { BankScopeGiven, OtherScopeGiven, VaultScopeGiven, labelsOf, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
+import { BankScopeGiven, OtherScopeGiven, VaultScopeGiven, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { Dna, Passphrase, byPassphrase } from '../test-helpers/vault-world'
 import { anyStrengthChecker, testDeriver } from '../test-helpers/builders'
 
@@ -101,9 +101,9 @@ describe("device.ensureBank", () => {
     expect(seen.at(-1)).to.eq('ready')
     expect(device.bank).to.equal(bank)
     const snapshot = device.getSnapshot()
-    expect(snapshot).to.include({ ...BankScopeGiven, stage: 'ready', err: null, bank: bank.snapshot })
+    expect(snapshot).to.include({ ...BankScopeGiven, stage: 'ready', err: null, bank_tok: bank.bank_tok })
     expect(bank.snapshot).to.include({ ...BankScopeGiven, device_tok: bank.device_tok })
-    expect(bank.snapshot.vaults).to.deep.equal([])
+    expect(bank.vaultListing.snapshot).to.deep.equal([])
   })
 
   it("answers the same bank on a second call, without listing again", async () => {
@@ -158,7 +158,7 @@ describe("device.ensureBank", () => {
     const requestCleartext = vi.fn()
     const bank = await world.bankOnAnotherDevice({ requestCleartext })
     expect(requestCleartext).not.toHaveBeenCalled()
-    expect(labelsOf(bank.snapshot)).to.deep.equal([OtherScopeGiven.vaultlabel])
+    expect(bank.vaultListing.snapshot).to.deep.equal([OtherScopeGiven.vaultlabel])
     expect(bank.isLocked).to.be.true
     expect(bank.vaultAt(VaultScopeGiven)?.isPresent).to.be.false
   })
@@ -171,11 +171,11 @@ describe("device.ensureBank", () => {
     const refusal = await TH.expectRefusal(device.ensureBank(), 'storage_unavailable')
     expect(refusal.refusalkind).to.eq('storage_unavailable')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['warn'])
-    expect(device.snapshot).to.include({ stage: 'made', err: null, bank: null })
+    expect(device.snapshot).to.include({ stage: 'made', err: null, bank_tok: null })
     expect(device.bank).to.be.null
     world.bankDB._cheat_refuseGets(null)
     const bank = await device.ensureBank()
-    expect(device.snapshot).to.include({ stage: 'ready', err: null, bank: bank.snapshot })
+    expect(device.snapshot).to.include({ stage: 'ready', err: null, bank_tok: bank.bank_tok })
   })
 
   it("refuses when the strength checker fails to load, with its error as the cause", async () => {
@@ -244,9 +244,9 @@ describe("device.ensureBank", () => {
     const world = makeBankWorld()
     const bank = await world.bankOnAnotherDevice()
     const listener = vi.fn()
-    bank.subscribe(listener)
+    bank.vaultListing.subscribe(listener)
     await makeBankWithVault(world)
-    await TH.eventually(() => bank.snapshot.vaults.length === 1)
+    await TH.eventually(() => bank.vaultListing.snapshot.length === 1)
     expect(listener).toHaveBeenCalled()
   })
 
@@ -260,13 +260,13 @@ describe("device.ensureBank", () => {
     await TH.eventually(() => listed?.isPresent === false)
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(listed)
     expect(listed?.vault_tok).to.not.eq(lived)
-    expect(bank.snapshot.vaults).to.deep.equal([])
+    expect(bank.vaultListing.snapshot).to.deep.equal([])
     await bank.ensureUnlocked()
     const reborn = await bank.ensureVault(VaultScopeGiven)
     expect(reborn).to.equal(listed)
     expect(reborn.isPresent).to.be.true
     expect(bank.isUnlocked).to.be.true
-    expect(labelsOf(bank.snapshot)).to.deep.equal([Dna.vaultlabel])
+    expect(bank.vaultListing.snapshot).to.deep.equal([Dna.vaultlabel])
   })
 })
 
@@ -378,7 +378,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     world.bankDB._cheat_refuseGets('identity_revoked')
     const refusal = await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'identity_revoked')
     expect(vault.isEnabled).to.be.false
-    expect(bank.device.snapshot.bank).to.be.null
+    expect(bank.device.snapshot.bank_tok).to.be.null
     await TH.eventually(() => world.leaseRows().length === 0)
     await TH.eventually(() => spy.calls.length > 0)
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])

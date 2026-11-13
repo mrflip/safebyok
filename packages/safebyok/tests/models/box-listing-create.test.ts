@@ -41,8 +41,7 @@ describe("BoxListing", () => {
       const box = await listing.create(dna())
       expect(box.isPresent).to.be.true
       expect(box.am).to.eq('a')
-      expect(listing.snapshot).to.have.lengthOf(1)
-      expect(listing.snapshot[0]).to.include({ boxlabel: 'anthropic_api_key' })
+      expect(listing.snapshot).to.deep.equal(['anthropic_api_key'])
     })
 
     it("goes straight through: ensureTimely, put, receiveParent, and no get", async () => {
@@ -121,7 +120,7 @@ describe("BoxListing", () => {
       const one = await listing.create(dna('one'))
       const two = await listing.create(dna('two'))
       expect(listing.things).to.deep.equal([one, two])
-      expect(listing.snapshot.map(({ boxlabel }) => boxlabel)).to.have.members(['one', 'two'])
+      expect(listing.snapshot).to.have.members(['one', 'two'])
     })
   })
 

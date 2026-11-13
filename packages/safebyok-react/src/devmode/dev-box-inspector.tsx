@@ -1,8 +1,8 @@
-import { useId, useRef, useState } from 'react'
+import { useId, useRef, useState, useSyncExternalStore } from 'react'
 import type { BoxPutOpts, BoxSnapshot, Whisper } from 'safebyok'
 import { WhisperField } from '../components/whisper-field'
 import { Messages } from '../helpers/messages'
-import { useBank, useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useWhisper } from '../hooks/hooks'
+import { subscribeToNothing, useBank, useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useWhisper } from '../hooks/hooks'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { DevBoxInspectorProps } from '../shapes'
 import { LastCallLine, isLabel, jsonOf, useLastCall } from './last-call'
@@ -35,16 +35,20 @@ export const DevBoxInspector = ({ defaultVaultlabel = 'main', defaultBoxlabel = 
   )
 }
 
-// == [Pickers]: VaultlabelOptions, BoxlabelOptions
+// == [Pickers]: NoLabels, getNoLabels, VaultlabelOptions, BoxlabelOptions
+
+const NoLabels: readonly string[] = Object.freeze([])
+const getNoLabels = () => NoLabels
 
 const VaultlabelOptions = ({ listId }: { listId: string }) => {
-  const vaults = useBankSnapshot()?.vaults ?? []
-  return <datalist id={listId}>{vaults.map(({ vaultlabel }) => <option key={vaultlabel} value={vaultlabel} />)}</datalist>
+  const listing = useBank()?.vaultListing ?? null
+  const vaultlabels = useSyncExternalStore(listing?.subscribe ?? subscribeToNothing, listing?.getSnapshot ?? getNoLabels, getNoLabels)
+  return <datalist id={listId}>{vaultlabels.map((vaultlabel) => <option key={vaultlabel} value={vaultlabel} />)}</datalist>
 }
 
 const BoxlabelOptions = ({ listId, vaultlabel }: { listId: string, vaultlabel: string }) => {
-  const boxes = useBoxes(vaultlabel) ?? []
-  return <datalist id={listId}>{boxes.map(({ boxlabel }) => <option key={boxlabel} value={boxlabel} />)}</datalist>
+  const boxlabels = useBoxes(vaultlabel) ?? NoLabels
+  return <datalist id={listId}>{boxlabels.map((boxlabel) => <option key={boxlabel} value={boxlabel} />)}</datalist>
 }
 // --
 
