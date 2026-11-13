@@ -134,6 +134,8 @@ export class Device {
     Object.freeze(this)
   }
 
+  // The device is the bank listing's parent: the listing tells it once its list changes, after the bank and everything
+  // below it have aligned, and only then is the device's snapshot remade.
   /** Make a bank listing whose comings and goings remake this device's snapshot. */
   #makeBankListing(): BankListing {
     const listing = new BankListing(this, { bankDB: this.#bankDB, maxMillisSinceRefresh: this.#vaultRefreshMillis, askUser: this.#askUser })
@@ -299,11 +301,9 @@ export class Device {
     this.#remakeSnapshot()
   }
 
-  // A bank of another life replacing the bank listed leaves the bank listing's membership as it was, so the remake is made here.
   /** Dismiss the open gating if it is for `bank`, whatever its kind. */
   dismissGatingAtDiscard(bank: Bank): void {
     if (this.#openGating?.bank === bank) { this.#openGating.dismiss() }
-    this.#remakeSnapshot()
   }
   // --
 
