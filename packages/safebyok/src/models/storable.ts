@@ -221,20 +221,15 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Aligning]: align, alignChildren, becomeNotifiable, replaceSnapshot, tellListeners
+  // == [Aligning]: align, becomeNotifiable, replaceSnapshot, tellListeners
 
   // The listings below first, this thing's snapshot last: a listener hears of a change once everything below shows it.
   /** Bring this thing and everything below it into line with the bank's lock and their lives, telling the subscribers of any change.
    * Never throws. A thing that no longer answers drops what it holds of secrets when aligned.
    */
   align(): void {
-    this.alignChildren()
-    this.#replaceSnapshot()
-  }
-
-  /** Align each of `children`. */
-  protected alignChildren(): void {
     for (const child of this.children) { child.align() }
+    this.#replaceSnapshot()
   }
 
   /** Make the snapshot now, so that every later change tells the subscribers. */

@@ -1,3 +1,4 @@
+import { isEqual } from 'es-toolkit'
 import { ForeverMillis, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
 import { Checkers } from '../helpers/validator'
 import { isTestDeriver } from '../deriver/basederiver'
@@ -313,8 +314,7 @@ export class Device {
   /** Remake the snapshot, telling every listener if it changed. */
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
-    const prior = this.#snapshot
-    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.openGating === prior.openGating) && (next.bank_tok === prior.bank_tok)) { return }
+    if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = next
     for (const listener of this.#listeners) {
       try {
