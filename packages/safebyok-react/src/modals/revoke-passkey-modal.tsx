@@ -3,7 +3,7 @@ import { Messages } from '../helpers/messages'
 import type { RevokePasskeyModalProps } from '../shapes'
 import { DialogBoundary, ModalForm, PassphraseField, UsernameField, textOf, useAttemptAction } from './modal-kit'
 
-/** Render the dialog for a `revoke_passkey` gating: the user enters the vault's passphrase to remove its passkey. */
+/** Render the dialog for a `revoke_passkey` gating: the user enters the bank's passphrase to remove its passkey. */
 export const RevokePasskeyModal = (props: RevokePasskeyModalProps) => (
   <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
     <RevokePasskeyForm {...props} />

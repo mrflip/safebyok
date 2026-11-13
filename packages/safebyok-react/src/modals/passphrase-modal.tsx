@@ -5,7 +5,7 @@ import { Messages } from '../helpers/messages'
 import type { PassphraseModalProps } from '../shapes'
 import { ChosenPassphraseFields, DialogBoundary, ModalForm, PassphraseField, UsernameField, containsFocus, textOf, unlockedFor, useAttemptAction, useChosenPassphrase } from './modal-kit'
 
-/** Render the passphrase dialog for a `build_vault` or an `unlock_vault` gating. */
+/** Render the passphrase dialog for a `build_bank` or an `unlock_bank` gating. */
 export const PassphraseModal = (props: PassphraseModalProps) => (
   <DialogBoundary key={props.gating.gatingTok} gating={props.gating}>
     {props.gating.gatingkind === 'build_bank' ? <BuildForm {...props} gating={props.gating} /> : <UnlockForm {...props} gating={props.gating} />}

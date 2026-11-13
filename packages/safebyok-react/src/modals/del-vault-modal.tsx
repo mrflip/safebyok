@@ -20,6 +20,7 @@ export const DelVaultModal = ({ vault, onDone }: DelVaultModalProps) => {
       blurb={Messages.delVaultBlurb}
       submitWord={Messages.delVaultButton}
       pendingWord={Messages.deletingButton}
+      cancelTakesFocus
       gripeText={gripe}
       gripeId={gripeId}
       action={action}

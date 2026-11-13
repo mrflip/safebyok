@@ -282,7 +282,9 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // A lock only hides the whisper exposed, so that edits survive to the unlock (notes/expose_improves_security.md). A
   // box that no longer answers will never show it again.
-  /** Tell the listeners the bank's lock has moved; once this box no longer answers, its whisper exposed goes, and its veil. Never throws. */
+  /** Tell the listeners the bank's lock has moved; once this box no longer answers, its whisper exposed goes, and its veil. Never throws.
+   * @internal
+   */
   override alignLock(): this {
     if (! this.isEnabled) { this.#doUnexpose() }
     return super.alignLock()

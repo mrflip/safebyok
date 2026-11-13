@@ -7,7 +7,7 @@ import { askPasskey, attemptThenZero, passkeysAvailable } from '../helpers/passk
 import { Boundary } from '../provider/boundary'
 import type { PasskeyUnlockButtonProps } from '../shapes'
 
-/** Render a button that unlocks the vault with its passkey. It renders nothing where a passkey cannot be used.
+/** Render a button that unlocks the bank with its passkey. It renders nothing where a passkey cannot be used.
  * @example <PasskeyUnlockButton gating={gating} onGripe={setGripe} />
  */
 export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
@@ -16,7 +16,7 @@ export const PasskeyUnlockButton = (props: PasskeyUnlockButtonProps) => (
   </Boundary>
 )
 
-/** True when this browser supports passkeys and `gating`'s vault has one. */
+/** True when this browser supports passkeys and `gating`'s bank has one. */
 export const offersPasskey = (gating: AnyGating): boolean => (
   passkeysAvailable() && gating.passkeyHeader?.wayinkind === 'passkey'
 )

@@ -143,9 +143,9 @@ is named for the act.
 cleaned value. An `ensure` that returns nothing is misnamed.
 
 **A condition gets up to three members**: a synchronous yes/no query named for it
-(`vault.isUnlocked`); a synchronous `demandFoo` that throws when it does not hold
-(`vault.demandUnlocked()`); and, only where a caller needs it, an async `ensureFoo` that makes it
-so (`vault.ensureUnlocked()`). The query is the non-throwing form, so there is no `tryDemandFoo`.
+(`bank.isUnlocked`); a synchronous `demandFoo` that throws when it does not hold
+(`bank.demandUnlocked()`); and, only where a caller needs it, an async `ensureFoo` that makes it
+so (`bank.ensureUnlocked()`). The query is the non-throwing form, so there is no `tryDemandFoo`.
 
 **A guard that asks several things is named for what it asks, with `-able` where that reads
 well**: `demandDeletable`, `demandUnsealable`, not `demandReadyToDelete`; a plain phrase where

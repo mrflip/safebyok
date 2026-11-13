@@ -2,12 +2,12 @@ import { useId, useRef, useState } from 'react'
 import type { BoxPutOpts, BoxSnapshot, Whisper } from 'safebyok'
 import { WhisperField } from '../components/whisper-field'
 import { Messages } from '../helpers/messages'
-import { useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useVaultSnapshot, useWhisper } from '../hooks/hooks'
+import { useBank, useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useWhisper } from '../hooks/hooks'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { DevBoxInspectorProps } from '../shapes'
 import { LastCallLine, isLabel, jsonOf, useLastCall } from './last-call'
 
-/** Render a dev panel: pick a vaultlabel and a boxlabel, then press a button for each verb of that Box and its Vault. */
+/** Render a dev panel: pick a vaultlabel and a boxlabel, then press a button for each verb of that Box, its Vault and the bank's lock. */
 export const DevBoxInspector = ({ defaultVaultlabel = 'main', defaultBoxlabel = '' }: DevBoxInspectorProps) => {
   const [vaultlabel, setVaultlabel] = useState(defaultVaultlabel)
   const [boxlabel, setBoxlabel] = useState(defaultBoxlabel)
@@ -51,8 +51,8 @@ const BoxlabelOptions = ({ listId, vaultlabel }: { listId: string, vaultlabel: s
 // == [Verbs]: BoxVerbs, boxWordsOf, WhisperShown
 
 const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: string }) => {
+  const bank = useBank()
   const { stage, vault } = useVault(vaultlabel)
-  const vaultSnapshot = useVaultSnapshot(vaultlabel)
   const box = useBox(vaultlabel, boxlabel)
   const boxSnapshot = useBoxSnapshot(box)
   const whisper = useWhisper(box)
@@ -63,7 +63,7 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   // Held in a ref, not in React state, so the typed text is never part of a render.
   const whisperText = useRef('')
   const [extracted, setExtracted] = useState<Whisper | null>(null)
-  const isLocked = vaultSnapshot?.isLocked ?? true
+  const isLocked = useBankSnapshot()?.isLocked ?? true
   if ((extracted !== null) && isLocked) { setExtracted(null) }
 
   const putting = async (whisper: Whisper, opts: BoxPutOpts = {}) => {
@@ -77,11 +77,11 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   return (
     <div className="dev-box-verbs">
       <p className="dev-status" data-testid="dev-box-status">
-        {`vault ${stage}, ${isLocked ? 'locked' : 'unlocked'}; box ${boxWordsOf(boxSnapshot)}; ${isShowing ? 'showing' : 'not showing'}`}
+        {`bank ${isLocked ? 'locked' : 'unlocked'}; vault ${stage}; box ${boxWordsOf(boxSnapshot)}; ${isShowing ? 'showing' : 'not showing'}`}
       </p>
       <div className="row">
-        <button type="button" disabled={vault === null} onClick={() => { void call('ensureUnlocked', async () => { await vault?.ensureUnlocked(); return 'unlocked' }) }}>ensureUnlocked</button>
-        <button type="button" disabled={vault === null} onClick={() => { void call('lock', () => { vault?.lock(); return 'locked' }) }}>lock</button>
+        <button type="button" disabled={bank === null} onClick={() => { void call('ensureUnlocked', async () => { await bank?.ensureUnlocked(); return 'unlocked' }) }}>ensureUnlocked</button>
+        <button type="button" disabled={bank === null} onClick={() => { void call('lock', () => { bank?.lock(); return 'locked' }) }}>lock</button>
         <button type="button" disabled={vault === null} onClick={() => { void call('putBox', () => putting({}, { ifPresent: 'get', ifAbsent: 'add' })) }}>putBox (empty)</button>
         <button type="button" disabled={vault === null} onClick={() => { void call('delBox', deleting) }}>delBox</button>
       </div>

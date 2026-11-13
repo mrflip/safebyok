@@ -40,9 +40,14 @@ describe("DelVaultModal", () => {
     })
   }
 
-  it("shows the refusal of a locked vault in place, deleting nothing", async () => {
-    const { bank, vault, onDone } = await shownFor()
-    act(() => { vault.lock() })
+  it("focuses Cancel as it opens, so a stray Enter deletes nothing", async () => {
+    await shownFor()
+    expect(document.activeElement).to.have.property('textContent', Messages.cancelButton)
+  })
+
+  it("shows the refusal of a vault under a locked bank in place, deleting nothing", async () => {
+    const { bank, onDone } = await shownFor()
+    act(() => { bank.lock() })
     fireEvent.click(screen.getByText(Messages.delVaultButton))
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(onDone).not.toHaveBeenCalled()

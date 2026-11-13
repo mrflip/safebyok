@@ -25,7 +25,7 @@ const renderOverBox = async (boxlabel = 'anthropic') => {
   )
   // The status says `vault present` before the vault's own hello has listed its boxes, and `box not listed` until then.
   // So wait for the boxlabel suggestions: they include a box once it is listed, whichever boxlabel is selected.
-  await waitFor(() => { expect(status()).to.match(/^vault present/) })
+  await waitFor(() => { expect(status()).to.include('vault present;') })
   await waitFor(() => { expect(document.querySelector('datalist option[value="anthropic"]')).not.to.eq(null) })
   return { world, vault }
 }
@@ -35,16 +35,16 @@ const click = (buttonname: string) => { fireEvent.click(screen.getByRole('button
 /** Return queries scoped to the block that shows the whisper under `caption`. */
 const whisperBlock = (caption: string) => within(screen.getByText(caption).parentElement!)
 const lastCall = () => screen.getByRole('status').textContent
-/** Click ensureUnlocked, and wait until the status says the vault is unlocked. */
+/** Click ensureUnlocked, and wait until the status says the bank is unlocked. */
 const unlocking = async () => {
   click('ensureUnlocked')
-  await waitFor(() => { expect(status()).to.include(', unlocked;') })
+  await waitFor(() => { expect(status()).to.include('bank unlocked;') })
 }
 
 describe("DevBoxInspector", () => {
   it("asks for nothing and shows nothing of the whisper until a button is clicked", async () => {
     await renderOverBox()
-    expect(status()).to.eq('vault present, locked; box revision 0, not exposed; not showing')
+    expect(status()).to.eq('bank locked; vault present; box revision 0, not exposed; not showing')
     expect(whisperBlock('box.whisper').getByText('unexposed')).to.exist
     expect(document.body.textContent).not.to.include(StoredKey)
   })
@@ -53,7 +53,7 @@ describe("DevBoxInspector", () => {
     await renderOverBox()
     await unlocking()
     click('expose')
-    await waitFor(() => { expect(status()).to.eq('vault present, unlocked; box revision 0, exposed; showing') })
+    await waitFor(() => { expect(status()).to.eq('bank unlocked; vault present; box revision 0, exposed; showing') })
     expect(document.body.textContent).not.to.include(StoredKey)
     fireEvent.click(whisperBlock('box.whisper').getByRole('button', { name: 'Show' }))
     expect(whisperBlock('box.whisper').getByText(/sk-ant-fake-stored/)).to.exist
@@ -62,7 +62,7 @@ describe("DevBoxInspector", () => {
     expect(document.body.textContent).not.to.include(StoredKey)
   })
 
-  it("forgets the whisper it extracted when the vault locks", async () => {
+  it("forgets the whisper it extracted when the bank locks", async () => {
     await renderOverBox()
     await unlocking()
     click('extractWhisper')
@@ -88,7 +88,7 @@ describe("DevBoxInspector", () => {
     fireEvent.change(screen.getByLabelText('Whisper text'), { target: { value: 'sk-typed' } })
     click('putBox (typed)')
     await waitFor(() => { expect(status()).to.include('box revision 0') })
-    await vault.ensureUnlocked()
+    await vault.bank.ensureUnlocked()
     const box = await vault.fetchBox('typed')
     expect(await box?.extractWhisper()).to.deep.equal({ apiKey: 'sk-typed' })
   })

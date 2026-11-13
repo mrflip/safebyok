@@ -21,11 +21,10 @@ const shownFor = async (opts: { bankOpts?: Partial<DeviceOpts> } = {}) => {
   return { ...opened, world }
 }
 
-/** True when `passphrase` unlocks the world's vault from a device that has no lease for it. */
+/** True when `passphrase` unlocks the world's bank from a device that has no lease for it. */
 const unlocksWith = async (world: TH.BankWorld, passphrase: string): Promise<boolean> => {
   const bank = await world.bankOnAnotherDevice({ requestCleartext: async (gating) => { await gating.attempt({ passphraseClear: passphrase }) } })
-  const vault = await bank.ensureVault(TH.VaultScopeGiven)
-  const unlocked = await vault.tryEnsureUnlocked()
+  const unlocked = await bank.tryEnsureUnlocked()
   return unlocked.ok
 }
 

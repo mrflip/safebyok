@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from 'react'
-import { useBank, useBox, useVault, useWhisper } from 'safebyok-react'
+import { useBox, useDevice, useVault, useWhisper } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
@@ -9,7 +9,7 @@ import { KnockForm } from './KnockForm'
  * Its API key is an exposed whisper: safebyok holds the working copy, and the form only displays it.
  */
 export const KnockKnockToolkit = () => {
-  const bank = useBank()
+  const device = useDevice()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
   const box = useBox(ApiKeyVaultlabel, ToolkitApiKeyBoxlabel)
   const { apiKey } = useWhisper(box)
@@ -17,7 +17,8 @@ export const KnockKnockToolkit = () => {
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
   const [isSaved, setIsSaved] = useState(false)
-  const isReady = (bank !== null) && (stage !== 'waiting')
+  // A key is read once the bank is up; the Edit button brings the bank up itself, building it where none is.
+  const isReady = (stage === 'absent') || (stage === 'present')
 
   // Unexpose the box when the form unmounts, which drops the working copy. Clicking Edit exposes it again.
   useEffect(() => () => { box?.unexpose() }, [box])
@@ -33,7 +34,7 @@ export const KnockKnockToolkit = () => {
     }
   }
 
-  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank, ToolkitApiKeyBoxlabel) } })
+  const edit = () => perform(async () => { if (device !== null) { await ensureApiKeyBoxExposed(device, ToolkitApiKeyBoxlabel) } })
   const save = () => perform(async () => { await box?.putExposed(); setIsSaved(true) })
   const done = () => perform(() => box?.unexpose())
 
@@ -61,7 +62,7 @@ export const KnockKnockToolkit = () => {
               <button type="button" onClick={() => { void done() }}>Done</button>
             </>
           )
-          : <button type="button" disabled={! isReady} onClick={() => { void edit() }}>{box === null ? 'Add key' : 'Edit key'}</button>}
+          : <button type="button" disabled={device === null} onClick={() => { void edit() }}>{box === null ? 'Add key' : 'Edit key'}</button>}
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}

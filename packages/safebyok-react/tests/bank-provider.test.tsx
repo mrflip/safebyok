@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Device, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler, type Bank, type LifecycleHandler } from 'safebyok'
 import { BX } from 'safebyok/storage'
 import { BankProvider } from '../src/provider/bank-provider'
+import { useBank, useBankSnapshot } from '../src/hooks/hooks'
 import { Messages } from '../src/helpers/messages'
 import { createPasskey } from '../src/helpers/passkey'
 import type { BankProviderProps } from '../src/shapes'
@@ -57,7 +58,7 @@ describe("BankProvider's bank", () => {
     await provided({ user_id: null })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(shown('bank')).to.eq('none')
-    expect(shown('vault')).to.eq('waiting none')
+    expect(shown('vault')).to.eq('bankless none')
   })
 
   it("makes the signed-in user's device, brings up its bank, and ends it when the user changes", async () => {
@@ -120,7 +121,7 @@ describe("BankProvider's bank", () => {
     await provided({ deviceDB })
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(shown('bank')).to.eq('u1 made')
-    expect(shown('vault')).to.eq('waiting none')
+    expect(shown('vault')).to.eq('bankless none')
     expect(TH.seenBanks).to.have.lengthOf(0)
     answer()
     await waitFor(() => { expect(shown('bank')).to.eq('u1 ready') })
@@ -428,11 +429,11 @@ const onlyBank = (): Bank => {
 const passphraseFieldOf = (): HTMLInputElement => screen.getByLabelText(Messages.passphraseField)
 
 describe("BankProvider's dialog", () => {
-  it("builds the bank from its dialog, then the vault from a click: unborn, then present and unlocked", async () => {
+  it("builds the bank from its dialog, then the vault from a click: absent, then present and unlocked", async () => {
     await provided({}, TH.makeBankWorld())
     await waitFor(() => { expect(screen.queryByText(Messages.chooseTitle)).to.not.be.null })
     await TH.submitNewPassphrase(TH.Passphrase)
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     expect(dialogShown()).to.be.false
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
@@ -453,7 +454,7 @@ describe("BankProvider's dialog", () => {
 
   it("opens the dialog for the gating the device has", async () => {
     await provided()
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(screen.queryByText(Messages.unlockTitle)).to.not.be.null })
     expect(onlyBank().device.openGating).to.not.be.null
@@ -461,7 +462,7 @@ describe("BankProvider's dialog", () => {
 
   it("shows the dialog when the user's gesture is already used up", async () => {
     await provided()
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     TH.withoutGesture()
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(screen.queryByText(Messages.unlockTitle)).to.not.be.null })
@@ -485,7 +486,7 @@ describe("BankProvider's dialog", () => {
 
   it("closes the dialog on Cancel, dismissing its gating", async () => {
     await provided()
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
     const gating = onlyBank().device.openGating
@@ -493,12 +494,12 @@ describe("BankProvider's dialog", () => {
     await waitFor(() => { expect(dialogShown()).to.be.false })
     expect(gating?.isOpen).to.be.false
     expect(onlyBank().device.openGating).to.be.null
-    expect(shown('vault')).to.eq('unborn none')
+    expect(shown('vault')).to.eq('absent none')
   })
 
   it("closes the dialog at a sweep of the device", async () => {
     await provided()
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
     act(() => { onlyBank().device.sweep() })
@@ -507,7 +508,7 @@ describe("BankProvider's dialog", () => {
 
   it("closes the dialog at a vacate of the device", async () => {
     await provided()
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
     await act(async () => { await onlyBank().device.vacate() })
@@ -524,10 +525,9 @@ describe("BankProvider's dialog", () => {
     const bank = onlyBank()
     const first = bank.device.openGating
     fireEvent.change(passphraseFieldOf(), { target: { value: 'half typed' } })
-    const vault = bank.vaultAt({ vaultlabel: 'main' })!
     await act(async () => {
       first?.dismiss()
-      void vault.tryEnsureUnlocked()
+      void bank.tryEnsureUnlocked()
       await vi.waitFor(() => { expect(bank.device.openGating).to.not.equal(first); expect(bank.device.openGating).to.not.be.null })
     })
     await waitFor(() => { expect(dialogShown()).to.be.true })
@@ -552,7 +552,7 @@ describe("BankProvider's dialog", () => {
 
   it("closes the dialog when the user signs out", async () => {
     const { props, rerender } = await provided()
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
     rerender({ ...props, user_id: null })
@@ -576,7 +576,7 @@ describe("BankProvider's dialog", () => {
   it("hands each gating to the host's requestCleartext in place of its own dialog", async () => {
     const handed: AnyGating[] = []
     await provided({ requestCleartext: async (gating) => { handed.push(gating); await gating.attempt(TH.byPassphrase(TH.Passphrase)) } })
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
     expect(handed.map(({ gatingkind }) => gatingkind)).to.deep.equal(['unlock_bank'])
@@ -587,7 +587,7 @@ describe("BankProvider's dialog", () => {
     const first = vi.fn()
     const handed: AnyGating[] = []
     const { props, rerender } = await provided({ requestCleartext: first })
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     rerender({ ...props, requestCleartext: async (gating) => { handed.push(gating); await gating.attempt(TH.byPassphrase(TH.Passphrase)) } })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(shown('vault')).to.eq('present unlocked') })
@@ -598,7 +598,7 @@ describe("BankProvider's dialog", () => {
   it("keeps to its own dialog when requestCleartext arrives after the first render", async () => {
     const requestCleartext = vi.fn()
     const { props, rerender } = await provided()
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     rerender({ ...props, requestCleartext })
     fireEvent.click(screen.getByText('Open'))
     await waitFor(() => { expect(dialogShown()).to.be.true })
@@ -607,20 +607,70 @@ describe("BankProvider's dialog", () => {
 
   it("keeps to the host's dialog when requestCleartext is dropped after the first render", async () => {
     const { props, rerender } = await provided({ requestCleartext: () => undefined })
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     rerender({ ...props, requestCleartext: undefined })
     fireEvent.click(screen.getByText('Open'))
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(dialogShown()).to.be.false
-    expect(shown('vault')).to.eq('unborn none')
+    expect(shown('vault')).to.eq('absent none')
   })
 
   it("shows no dialog when requestCleartext returns nothing", async () => {
     await provided({ requestCleartext: () => undefined })
-    await waitFor(() => { expect(shown('vault')).to.eq('unborn none') })
+    await waitFor(() => { expect(shown('vault')).to.eq('absent none') })
     fireEvent.click(screen.getByText('Open'))
     await act(async () => { await TH.wakeupAtNextTick() })
     expect(dialogShown()).to.be.false
-    expect(shown('vault')).to.eq('unborn none')
+    expect(shown('vault')).to.eq('absent none')
+  })
+})
+
+// == [Two providers]: UnlocksNearest, dialogOfBank
+
+/** The nearest provider's bank, by its banklabel and lock, under the test id `testid`, with a button that unlocks it. */
+function UnlocksNearest({ testid }: Readonly<{ testid: string }>) {
+  const bank = useBank()
+  const snapshot = useBankSnapshot()
+  const lockword = snapshot?.isLocked === false ? 'unlocked' : 'locked'
+  return (
+    <p>
+      <span data-testid={testid}>{`${snapshot?.banklabel ?? '-'} ${lockword}`}</span>
+      <button type="button" disabled={bank === null} onClick={() => { void bank?.tryEnsureUnlocked() }}>{`Unlock ${testid}`}</button>
+    </p>
+  )
+}
+
+/** The dialog open for the bank named `banklabel`, found by the username its passphrase is saved under. */
+function dialogOfBank(banklabel: string): HTMLElement {
+  const dialog = screen.getAllByRole('dialog').find((shown) => within(shown).queryByDisplayValue(`u1 (${banklabel} vault)`) !== null)
+  if (dialog === undefined) { throw new Error(`no dialog open for ${banklabel}`) }
+  return dialog
+}
+// --
+
+describe("two BankProviders, one inside the other, for two banks", () => {
+  it("hand each hook the nearest provider's bank, and each show its own gating's dialog, both open at once", async () => {
+    const world = await builtWorld()
+    render(
+      <BankProvider {...TH.providerPropsOf(world)}>
+        <UnlocksNearest testid="outer" />
+        <BankProvider {...TH.providerPropsOf(world, { banklabel: 'globex' })}>
+          <UnlocksNearest testid="inner" />
+        </BankProvider>
+      </BankProvider>,
+    )
+    await waitFor(() => { expect([screen.getByTestId('outer').textContent, screen.getByTestId('inner').textContent]).to.deep.equal(['acme locked', 'globex locked']) })
+    fireEvent.click(screen.getByText('Unlock outer'))
+    fireEvent.click(screen.getByText('Unlock inner'))
+    await waitFor(() => { expect(screen.getAllByRole('dialog')).to.have.lengthOf(2) })
+    fireEvent.change(within(dialogOfBank('globex')).getByPlaceholderText(Messages.passphraseField), { target: { value: TH.Passphrase } })
+    fireEvent.click(within(dialogOfBank('globex')).getByText(Messages.unlockButton))
+    await waitFor(() => { expect(screen.getByTestId('inner').textContent).to.eq('globex unlocked') })
+    expect(screen.getAllByRole('dialog')).to.have.lengthOf(1)
+    expect(screen.getByTestId('outer').textContent).to.eq('acme locked')
+    fireEvent.change(within(dialogOfBank('acme')).getByPlaceholderText(Messages.passphraseField), { target: { value: TH.Passphrase } })
+    fireEvent.click(within(dialogOfBank('acme')).getByText(Messages.unlockButton))
+    await waitFor(() => { expect(screen.getByTestId('outer').textContent).to.eq('acme unlocked') })
+    expect(dialogShown()).to.be.false
   })
 })

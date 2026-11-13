@@ -1,6 +1,7 @@
 import { useEffect, type ComponentType } from 'react'
 import type { AnyGating, Gating, Gatingkind } from 'safebyok'
 import { AddPasskeyModal } from '../modals/add-passkey-modal'
+import { DelBankModal } from '../modals/del-bank-modal'
 import { PassphraseModal } from '../modals/passphrase-modal'
 import { ReplacePassphraseModal } from '../modals/replace-passphrase-modal'
 import { RevokePasskeyModal } from '../modals/revoke-passkey-modal'
@@ -8,15 +9,16 @@ import type { GatingModalProps } from '../shapes'
 
 type KindModalProps<KindT extends Gatingkind> = Omit<GatingModalProps, 'gating'> & { gating: Gating<KindT> }
 
-// A del_bank gating has no built-in dialog yet: a host asks for it through its own requestCleartext, and here it is dismissed.
-const DialogForGatingkind: { [KindT in Gatingkind]?: ComponentType<KindModalProps<KindT>> } = {
+const DialogForGatingkind: { [KindT in Gatingkind]: ComponentType<KindModalProps<KindT>> } = {
   build_bank:         PassphraseModal,
   unlock_bank:        PassphraseModal,
   replace_passphrase: ReplacePassphraseModal,
   add_passkey:        AddPasskeyModal,
   revoke_passkey:     RevokePasskeyModal,
+  del_bank:           DelBankModal,
 }
 
+// A core newer than this package may open a gating of a kind it has no dialog for: dismissed, it leaves room for the next.
 const NoDialog = ({ gating }: { gating: AnyGating }) => {
   useEffect(() => { gating.dismiss() }, [gating])
   return null

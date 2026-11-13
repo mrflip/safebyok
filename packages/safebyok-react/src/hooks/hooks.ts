@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type Device, type DeviceSnapshot, type BoxSnapshot, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
+import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type Device, type DeviceSnapshot, type BoxSnapshot, type Vault, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok'
 import { useProvided } from '../provider/bank-provider'
 import type { VaultLifecycle } from '../shapes'
 
@@ -12,15 +12,15 @@ const getNothing = () => null
 /** Return the signed-in user's device from the nearest BankProvider, or null while nobody is signed in.
  * Its `vacate()` is sign-out, whether or not its bank is up.
  */
-export function useDevice(): Device | null { return useProvided('useDevice').device }
+export function useDevice(): Device | null { return useProvided('useDevice') }
 
-/** Return the signed-in user's bank from the nearest BankProvider, or null until it is up and once it has ended. */
+/** Return the signed-in user's bank from the nearest BankProvider; null until it is up, once it is deleted or built anew elsewhere, and once its device has ended. */
 export function useBank(): Bank | null {
-  const { device } = useProvided('useBank')
+  const device = useProvided('useBank')
   return useSyncExternalStore(device?.subscribe ?? subscribeToNothing, () => device?.bank ?? null, getNothing)
 }
 
-/** Return the live snapshot of the signed-in user's bank, or null while {@link useBank} answers null. */
+/** Return the live snapshot of the signed-in user's bank, whose `isLocked` is the one lock its vaults and boxes share; null while {@link useBank} answers null. */
 export function useBankSnapshot(): BankSnapshot | null { return useDeviceSnapshotFor('useBankSnapshot')?.bank ?? null }
 
 /** Return the live snapshot of the signed-in user's device: its stage, why it ended, its open gating and its bank's snapshot. Null while nobody is signed in. */
@@ -28,39 +28,45 @@ export function useDeviceSnapshot(): DeviceSnapshot | null { return useDeviceSna
 
 /** Same as {@link useDeviceSnapshot}. `hookname` is the hook named in the error when there is no provider. */
 function useDeviceSnapshotFor(hookname: string): DeviceSnapshot | null {
-  const { device } = useProvided(hookname)
+  const device = useProvided(hookname)
   return useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
 }
 // --
 
-// == [Vault hooks]: VaultStage, VaultLifecycle, useVault, useVaultFor, useVaultSnapshot, WaitingLifecycle, UnbornLifecycle
+// == [Vault hooks]: VaultStage, VaultLifecycle, useVault, useVaultFor, useVaultSnapshot, BanklessLifecycle, AbsentLifecycle, watchedLives
 
-const WaitingLifecycle: VaultLifecycle = Object.freeze({ stage: 'waiting', vault: null })
-const UnbornLifecycle: VaultLifecycle = Object.freeze({ stage: 'unborn', vault: null })
+const BanklessLifecycle: VaultLifecycle = Object.freeze({ stage: 'bankless', vault: null })
+const AbsentLifecycle: VaultLifecycle = Object.freeze({ stage: 'absent', vault: null })
+
+// A Vault stands for its scope through its lives, and the watch on its boxes is of one life: a vault deleted and put
+// again, here or elsewhere, needs its watch begun again.
+/** The `vault_tok` of the life whose box watch a hook has begun, for each Vault. */
+const watchedLives = new WeakMap<Vault, string>()
 
 /** Return the signed-in user's vault named `vaultlabel`, with its lifecycle stage. */
 export const useVault = (vaultlabel: string): VaultLifecycle => useVaultFor('useVault', vaultlabel)
 
 /** Same as {@link useVault}. `hookname` is the hook named in the error when there is no provider. */
 const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
-  const { device, watchedVaults } = useProvided(hookname)
+  const device = useProvided(hookname)
   const snapshot = useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
+  // The device's snapshot changes with its bank's, and so with each vault's life, lock and presence.
   const lifecycle = useMemo((): VaultLifecycle => {
-    if (device === null || snapshot === null) { return WaitingLifecycle }
-    // A sweep or a vacate publishes a new snapshot whose `err` is the reason the device ended, so this memo runs again then.
-    if ((! device.isEnabled) && (snapshot.err !== null)) { return { stage: 'spent', vault: null, cause: snapshot.err } }
-    const { bank } = device
-    if (bank === null) { return WaitingLifecycle }
+    if (snapshot === null) { return BanklessLifecycle }
+    if (snapshot.err !== null) { return { stage: 'spent', vault: null, cause: snapshot.err } }
+    const bank = device?.bank ?? null
+    if (bank === null) { return BanklessLifecycle }
     const vault = bank.vaultAt({ vaultlabel })
-    return vault?.isPresent === true ? { stage: 'present' as const, vault } : UnbornLifecycle
+    return vault?.isPresent === true ? { stage: 'present', vault } : AbsentLifecycle
   }, [device, snapshot, vaultlabel])
   const { vault } = lifecycle
+  const vaultTok = vault?.vault_tok ?? null
   useEffect(() => {
-    if (vault === null || watchedVaults.has(vault)) { return }
-    watchedVaults.add(vault)
+    if ((vault === null) || (vaultTok === null) || (watchedLives.get(vault) === vaultTok)) { return }
+    watchedLives.set(vault, vaultTok)
     // Not awaited: the device reports the watch begun, or refused, to onLifecycle.
     void vault.tryBeginWatch()
-  }, [vault, watchedVaults])
+  }, [vault, vaultTok])
   return lifecycle
 }
 

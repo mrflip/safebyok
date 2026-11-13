@@ -157,7 +157,7 @@ describe("KnockKnockToolkit", () => {
     await knock()
     await screen.findByText('Save your Anthropic API key first.')
     expect(anthropic.seen).to.have.lengthOf(0)
-    await TH.expectProbe('unborn none')
+    await TH.expectProbe('absent none')
   })
 
   it("stays quiet when the user cancels the dialog", async () => {
@@ -168,7 +168,7 @@ describe("KnockKnockToolkit", () => {
     await waitFor(() => { expect(ensureUnlockedSpy).toHaveBeenCalled() })
     await act(async () => { await Promise.allSettled(ensureUnlockedSpy.mock.results.map((result): unknown => result.value)) })
     expect(document.querySelector('.knock-knock .gripe')).to.be.null
-    await TH.expectProbe('unborn none')
+    await TH.expectProbe('absent none')
   })
 
   it("keeps a separate key in each flow", async () => {

@@ -9,7 +9,7 @@ import type { BoxWhisperFieldProps } from '../shapes'
 /** Render an input bound to the text at dotted `path` in `box`'s whisper. It is blank and read-only while the whisper is hidden.
  * @example
  *   <BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />
- *   <button onClick={async () => { await vault.ensureUnlocked(); await box.expose() }}>Edit</button>
+ *   <button onClick={async () => { await bank.ensureUnlocked(); await box.expose() }}>Edit</button>
  *   <button onClick={() => BoxFields.of(box).put()}>Save</button>
  */
 export const BoxWhisperField = ({ box, path, readOnly, ...passed }: BoxWhisperFieldProps) => {

@@ -152,7 +152,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   `passphraseUntilText` ("in 2 days"); `askPassphraseAt`'s doc block already hints at them.
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
-  (`vault.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
+  (`bank.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
   vaultDB: `vault.del()` needs the passphrase.
 
 * **After the restyle (#273 to #283): two later changes.** Each changes a signature or a
@@ -279,6 +279,13 @@ so a lock that lands during an unlock's proof leaves the vault unlocked. Still o
   [#312](https://github.com/mrflip/safebyok/pull/312)): the call then finds no lease and prompts
   the user, whereas a lock that lands one step later makes the call refuse with 'vault_locked'.
   Decide whether the opening hello is a step at which a lock makes the call refuse.
+
+### Should there be a notification for vacate, delete, sweep and lock events?
+
+The Coach (2026-11-12), not for the bank_world sprint. Thread 10 left the device's flag as the only
+enabled flag, so a thing learns of its end only by asking (`isEnabled`, or a call that refuses); a
+host or a listener hears no event at a vacate, a delete, a sweep or a lock beyond the device's one
+tell. Decide whether each of these is announced, to whom, and whether a listener can tell which.
 
 ### Must the passphrase be asked again once a vault has a passkey?
 

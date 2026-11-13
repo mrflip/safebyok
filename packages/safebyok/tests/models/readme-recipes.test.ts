@@ -50,10 +50,10 @@ describe("the README's script", () => {
     expect(await box.extractWhisper()).to.deep.equal({ ...Stored, org: 'acme' })
 
     const kept = box.whisper
-    vault.lock()
+    bank.lock()
     expect(box.whisper['apiKey']).to.eq(undefined)
     expect(kept['apiKey']).to.eq(Stored.apiKey) // the README's warning
-    await vault.ensureUnlocked()
+    await bank.ensureUnlocked()
     expect(doppler.get).toHaveBeenCalledTimes(2)
     expect(box.whisper).to.deep.equal({ ...Stored, org: 'acme' })
   })
@@ -73,10 +73,10 @@ describe("safebyok-react's README's raw field", () => {
     expect(input.value).to.eq(Stored.apiKey)
 
     input.value = 'sk-test-edited'
-    vault.lock()
+    vault.bank.lock()
     expect(input.value).to.eq('')
-    expect(vault.getSnapshot().isLocked).to.be.true
-    await vault.ensureUnlocked()
+    expect(vault.bank.getSnapshot().isLocked).to.be.true
+    await vault.bank.ensureUnlocked()
     expect(input.value).to.eq('sk-test-edited')
     expect(await box.extractWhisper()).to.deep.equal(Stored)
 
@@ -102,12 +102,12 @@ describe("the README's React form", () => {
     expect(hook.current()).to.deep.equal({ apiKey: 'sk-test-typed' })
     expect(hook.painted).to.have.length(2)
 
-    vault.lock()
+    vault.bank.lock()
     expect(box.exposure).to.eq('locked')
     expect(isWhisperedBag(hook.current())).to.be.true
     expect(hook.current()['apiKey']).to.eq(undefined)
     expect(box.isShowing).to.be.false
-    await vault.ensureUnlocked()
+    await vault.bank.ensureUnlocked()
     expect(hook.current()).to.deep.equal({ apiKey: 'sk-test-typed' })
     expect(box.isShowing).to.be.true
 

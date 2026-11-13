@@ -289,7 +289,7 @@ export const VaultDeleted = "This vault was deleted. Ask the bank for the vault 
 // == [Models: gates]: PasskeyAlreadyAdded, DelOfOtherRevision, DelOfOtherLife
 
 /** Why a passkey is not added to a gate that has one. */
-export const PasskeyAlreadyAdded = "This vault has a passkey already, and may have only one, so nothing was asked or changed: revoke it first (vault.revokePasskeyPrompt), then add the new one."
+export const PasskeyAlreadyAdded = "This vault has a passkey already, and may have only one, so nothing was asked or changed: revoke it first (bank.maingate.revokePasskeyPrompt), then add the new one."
 
 /** Why a stale Vault's delete does not reach the vault made since at its scope. */
 export const DelOfOtherRevision = "This thing is not at the life or revision the delete names, so nothing was deleted. Read it again and ask again."

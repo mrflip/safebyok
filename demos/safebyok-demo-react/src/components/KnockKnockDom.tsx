@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { BoxFields } from 'safebyok/dom'
-import { BoxWhisperField, useBank, useBox, useVault } from 'safebyok-react'
+import { BoxWhisperField, useBox, useDevice, useVault } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
 import { ApiKeyVaultlabel, DomApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
@@ -8,14 +8,15 @@ import { KnockForm } from './KnockForm'
 
 /** The DOM form: a knock-knock machine whose API key field is filled and read by safebyok itself, so the key never passes through React. */
 export const KnockKnockDom = () => {
-  const bank = useBank()
+  const device = useDevice()
   const { stage, vault } = useVault(ApiKeyVaultlabel)
   const box = useBox(ApiKeyVaultlabel, DomApiKeyBoxlabel)
   const isShowing = useIsShowing(box)
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
   const [isSaved, setIsSaved] = useState(false)
-  const isReady = (bank !== null) && (stage !== 'waiting')
+  // A key is read once the bank is up; the Edit button brings the bank up itself, building it where none is.
+  const isReady = (stage === 'absent') || (stage === 'present')
 
   /** Run a button's action, and show the error message unless the user cancelled. */
   const perform = async (work: () => unknown) => {
@@ -29,7 +30,7 @@ export const KnockKnockDom = () => {
   }
 
   // The dialogs that build or unlock the vault open from this click.
-  const edit = () => perform(async () => { if (bank !== null) { await ensureApiKeyBoxExposed(bank, DomApiKeyBoxlabel) } })
+  const edit = () => perform(async () => { if (device !== null) { await ensureApiKeyBoxExposed(device, DomApiKeyBoxlabel) } })
 
   const save = () => perform(async () => {
     if (box === null) { return }
@@ -57,7 +58,7 @@ export const KnockKnockDom = () => {
               <button type="button" onClick={() => { void done() }}>Done</button>
             </>
           )
-          : <button type="button" disabled={! isReady} onClick={() => { void edit() }}>{box === null ? 'Add key' : 'Edit key'}</button>}
+          : <button type="button" disabled={device === null} onClick={() => { void edit() }}>{box === null ? 'Add key' : 'Edit key'}</button>}
         {isSaved && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}

@@ -235,7 +235,7 @@ describe("a vault shared between the two derivers", () => {
   it("is accepted by Device.make under the supplied label", async () => {
     const bank = await TH.makeBankWorld().deviceOn({ keyDeriver: argon2idWasmWebV1Deriver }).ensureBank()
     const vault = await bank.ensureVault(TH.VaultScopeGiven)
-    expect(vault.isUnlocked).to.be.true
+    expect(vault.bank.isUnlocked).to.be.true
   })
 
   it("made through WebAssembly opens through the core's deriver", { timeout: 60_000 }, async () => {

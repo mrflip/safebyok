@@ -14,7 +14,6 @@ import type { BoxPut, BoxPutOpts, Fetched, FetchOpts, TimelyOpts, VaultSnapshot 
 import { deletedVault } from '../refusals/throwers'
 import type { Bank } from './bank'
 import type { Box } from './box'
-import type { Gate } from './gate'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
@@ -62,12 +61,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  // == [The bank's lock]: lock, alignLock, letBoxesGo, ensureUnlocked, unlock, each with its try form
+  // == [The bank's lock]: alignLock, letBoxesGo
 
-  /** Lock the bank this vault is of: {@link Bank.lock}. */
-  lock(): this { this.bank.lock(); return this }
-
-  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved; once this vault no longer answers, its boxes go. Never throws. */
+  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved; once this vault no longer answers, its boxes go. Never throws.
+   * @internal
+   */
   override alignLock(): this {
     super.alignLock()
     if (this.isEnabled) { this.#boxListing?.lock() } else { this.#letBoxesGo() }
@@ -82,39 +80,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     boxListing?.goodbye()
     boxListing?.lock()
   }
-
-  /** The bank this vault is of unlocked: {@link Bank.ensureUnlocked}. */
-  async ensureUnlocked(): Promise<this> { await this.bank.ensureUnlocked(); return this }
-
-  /** Non-throwing form of {@link ensureUnlocked}. */
-  tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
-
-  /** Unlock the bank this vault is of: {@link Bank.unlock}. */
-  async unlock(): Promise<this> { await this.bank.unlock(); return this }
-
-  /** Non-throwing form of {@link unlock}. */
-  tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
-  // --
-
-  // == [Changing the gate]: replacePassphrasePrompt, addPasskeyPrompt, revokePasskeyPrompt, each with its try form
-
-  /** Replace the bank's passphrase: {@link Gate.replacePassphrasePrompt}. */
-  async replacePassphrasePrompt(): Promise<this> { await this.bank.maingate.replacePassphrasePrompt(); return this }
-
-  /** Non-throwing form of {@link replacePassphrasePrompt}. */
-  tryReplacePassphrasePrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.replacePassphrasePrompt()) }
-
-  /** Add a passkey to the bank's gate: {@link Gate.addPasskeyPrompt}. */
-  async addPasskeyPrompt(): Promise<this> { await this.bank.maingate.addPasskeyPrompt(); return this }
-
-  /** Non-throwing form of {@link addPasskeyPrompt}. */
-  tryAddPasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.addPasskeyPrompt()) }
-
-  /** Revoke the passkey of the bank's gate: {@link Gate.revokePasskeyPrompt}. */
-  async revokePasskeyPrompt(): Promise<this> { await this.bank.maingate.revokePasskeyPrompt(); return this }
-
-  /** Non-throwing form of {@link revokePasskeyPrompt}. */
-  tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
   // == [Above the boxes]: sealStampedString, unsealStampedString, stampsOf, receiveParent
@@ -201,13 +166,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isLocked, isUnlocked, demandWatchable, demandPresent, ensureTimely
+  // == [Guards]: isLocked, demandWatchable, demandPresent, ensureTimely
 
-  /** Whether the bank is locked, read live: a vault has no lock of its own. */
-  get isLocked(): boolean { return this.bank.isLocked }
-
-  /** Whether the bank is unlocked, read live. */
-  get isUnlocked(): boolean { return this.bank.isUnlocked }
+  /** Whether the bank is locked, read live: a vault has no lock of its own, and a host asks the bank. */
+  protected get isLocked(): boolean { return this.bank.isLocked }
 
   /** A watch needs the vault enabled and present. */
   demandWatchable(): this { return this.demandEnabled().demandPresent() }
@@ -246,7 +208,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
       registered_at: this.registered_at,
       written_at:    this.written_at,
       isPresent:     this.isPresent,
-      isLocked:      this.isLocked,
     })
   }
   // --
