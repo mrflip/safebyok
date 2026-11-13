@@ -172,8 +172,7 @@ connect can LISTEN on any user's channel and hear the rows each write changes.
 connect and LISTEN: this package grants nothing and creates no role or policy.
 
 Each write is one conditional `INSERT` or `UPDATE`, which takes effect only if the stored row still
-has the revision the write expects at that moment. A gate verb's policy is part of that condition:
-the function stores a gate row only where the verb may change it. A vault write reads its bank row,
+has the revision the write expects at that moment. A vault write reads its bank row,
 and a box write its vault row, without a lock, so writers under one bank do not wait for each other.
 A new row's foreign key takes a share lock on its bank row, which waits only on a `DELETE` of that
 row. Two things follow:

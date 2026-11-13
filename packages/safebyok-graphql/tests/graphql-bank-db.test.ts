@@ -41,7 +41,7 @@ describe("GraphQLBankDB over the typed schema", () => {
     const { val: built } = await bankDB.buildBank(TH.BW.bankBuildAskOf())
     expect(built).to.deep.eq(TH.BW.gateAt())
     const wayins = { main: TH.BW.mainWayin, passkey0: TH.BW.passkey0Wayin }
-    const { val: added } = await bankDB.addPasskey(TH.BW.gatePutAskOf('addPasskey', built, wayins))
+    const { val: added } = await bankDB.addPasskey(TH.BW.gatePutAskOf(built, wayins))
     expect(added.wayins).to.deep.eq(wayins)
     const { val: ensured } = await bankDB.ensureBank(TH.BW.bankEnsureAsk)
     expect(ensured?.gates.main).to.deep.eq(added)

@@ -111,8 +111,8 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
     it("two gate verbs at one revision write one, and the other is refused with the winner", async () => {
       const { bankDB, gate } = await putWith()
       const twin = await twinOf(bankDB)
-      const ours = gatePutAskOf('addPasskey', gate, { main: mainWayin, passkey0: passkey0Wayin })
-      const theirs = gatePutAskOf('replacePassphrase', gate, { main: otherMainWayin })
+      const ours = gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin })
+      const theirs = gatePutAskOf(gate, { main: otherMainWayin })
       const { written, refused } = splitOf(await Promise.all([bankDB.tryAddPasskey(ours), twin.tryReplacePassphrase(theirs)]))
       expect([written.length, refused.length]).to.deep.equal([1, 1])
       expect(refused[0]).to.deep.include({ act: 'stale', dbhas: written[0]?.val })
@@ -144,7 +144,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       const twin = await twinOf(bankDB)
       const tombstone = bankTombstoneOf(bank)
       slipInFront(adapterOf(bankDB), async () => await twin.delBank(bankDelAskOf(bank)))
-      const answer = await bankDB.tryAddPasskey(gatePutAskOf('addPasskey', gate, { main: mainWayin, passkey0: passkey0Wayin }))
+      const answer = await bankDB.tryAddPasskey(gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin }))
       expect(answer).to.deep.include({ ok: false, act: 'bank_gone', parent: tombstone })
       expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(tombstone)
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.be.null
@@ -159,7 +159,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
         await twin.delBank(bankDelAskOf(bank))
         await twin.buildBank(bankBuildAskOf(reborn, rebornGate, bankTombstoneOf(bank)))
       })
-      const answer = await bankDB.tryAddPasskey(gatePutAskOf('addPasskey', gate, { main: mainWayin, passkey0: passkey0Wayin }))
+      const answer = await bankDB.tryAddPasskey(gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin }))
       expect(answer).to.deep.include({ ok: false, act: 'bank_reborn', parent: reborn })
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(rebornGate)
     })
@@ -181,7 +181,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       it("notifies a bank's watch of its gate replaced and of the bank deleted, each as stored, the bank's parent being main", async () => {
         const { bankDB, bank, gate } = await putWith()
         const { notices } = watching(bankDB, bankScope)
-        const { val: replaced } = await bankDB.replacePassphrase(gatePutAskOf('replacePassphrase', gate, { main: otherMainWayin }))
+        const { val: replaced } = await bankDB.replacePassphrase(gatePutAskOf(gate, { main: otherMainWayin }))
         const tombstone = bankTombstoneOf(bank)
         await bankDB.delBank(bankDelAskOf(bank))
         await vi.waitFor(() => {

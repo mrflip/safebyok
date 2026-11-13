@@ -218,10 +218,10 @@ export const storableArgs = objCheck(({ custom }) => ({
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a bankDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
-export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, EX.OkAct | EX.GateAct, unknown>
+export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, EX.OkAct, unknown>
 
 /** A put's {@link ListingAnswer}, whose good form always carries a record. */
-export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, EX.OkAct | EX.GateAct, unknown>
+export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, EX.OkAct, unknown>
 
 /** A listing put's options besides its record: the row it expects to find, in sparse form, and `ifPresent` and `ifAbsent`, for a live row or none. */
 export type ListingPutOpts<SparseT> = Readonly<{ expected: SparseT, ifAbsent: EX.PutIfAbsent, ifPresent: EX.IfPresent }>

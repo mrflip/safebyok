@@ -42,11 +42,8 @@ async function sent(schema: GraphQLSchema, source: string, variableValues: objec
 /** An ask's variables: the ask as `check` hands it on, the form GraphQLBankDB sends. */
 function askVarsOf(check: { parse: (ask: unknown) => object }, ask: object) { return { ask: check.parse(ask) } }
 
-/** A gate verb's variables: its ask as GraphQLBankDB sends it, checked and without its `gateVerb`. */
-function gateVarsOf(ask: BX.GatePutAsk) {
-  const { gateVerb: _gateVerb, ...checked } = BX.gatePut.parse(ask)
-  return { ask: checked }
-}
+/** A gate verb's variables: its ask as GraphQLBankDB sends it, checked. */
+function gateVarsOf(ask: BX.GatePutAsk) { return { ask: BX.gatePut.parse(ask) } }
 
 /** Send `ask`, checked by `check` as GraphQLBankDB sends it, as the verb `source` is, and return its answer as {@link sent} does. */
 async function sentAsk(schema: GraphQLSchema, source: string, check: { parse: (ask: unknown) => object }, ask: object): Promise<unknown> {
@@ -116,9 +113,9 @@ describe("bankResolvers", () => {
       [BankOperations.listBoxes, boxListed, BX.listBoxesAnswer],
       [BankOperations.getBox, askVarsOf(BX.boxGet, boxGetAsk), BX.getBoxAnswer],
       [BankOperations.buildBank, askVarsOf(BX.bankBuild, bankBuilt), BX.buildBankAnswer],
-      [BankOperations.replacePassphrase, gateVarsOf(BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin })), BX.replacePassphraseAnswer],
-      [BankOperations.addPasskey, gateVarsOf(BW.gatePutAskOf('addPasskey', gate, withPasskey)), BX.addPasskeyAnswer],
-      [BankOperations.revokePasskey, gateVarsOf(BW.gatePutAskOf('revokePasskey', gate, BW.MainOnly)), BX.revokePasskeyAnswer],
+      [BankOperations.replacePassphrase, gateVarsOf(BW.gatePutAskOf(gate, { main: BW.otherMainWayin })), BX.replacePassphraseAnswer],
+      [BankOperations.addPasskey, gateVarsOf(BW.gatePutAskOf(gate, withPasskey)), BX.addPasskeyAnswer],
+      [BankOperations.revokePasskey, gateVarsOf(BW.gatePutAskOf(gate, BW.MainOnly)), BX.revokePasskeyAnswer],
       [BankOperations.delBank, askVarsOf(BX.bankDel, BW.bankDelAskOf(BW.bankAt())), BX.delBankAnswer],
       [BankOperations.putVault, askVarsOf(BX.vaultPut, BW.vaultPutAskOf(vault)), BX.putVaultAnswer],
       [BankOperations.delVault, askVarsOf(BX.vaultDel, BW.vaultDelAskOf(vault)), BX.delVaultAnswer],
@@ -137,11 +134,11 @@ describe("bankResolvers", () => {
     expect(await TH.rowsOf().bankRowOf(BW.bankScope)).to.be.null
   })
 
-  it("carries a gate verb's verb in the ask of its sign-in refusal", async () => {
+  it("carries a gate verb's scope in the ask of its sign-in refusal", async () => {
     const schema = TH.schemaOver(await TH.serverOver())
-    const variables = gateVarsOf(BW.gatePutAskOf('addPasskey', BW.gateAt(), withPasskey))
+    const variables = gateVarsOf(BW.gatePutAskOf(BW.gateAt(), withPasskey))
     const answer = BX.addPasskeyAnswer.parse(await sent(schema, BankOperations.addPasskey, variables, 'u2'))
-    expect(answer.ask).to.include({ gatelabel: 'main', gateVerb: 'addPasskey' })
+    expect(answer.ask).to.include({ op: 'put', gatelabel: 'main' })
   })
 
   it("refuses a malformed request signed in as another user for what is malformed", async () => {
@@ -171,11 +168,11 @@ describe("bankResolvers", () => {
     const { op: _op, ...boxListed } = BW.boxListAsk
     expect(BX.listBoxesAnswer.parse(await sent(schema, BankOperations.listBoxes, boxListed))).to.deep.eq(asCrossed(await bankDB.tryListBoxes(BW.boxListAsk)))
 
-    const replaced = BX.replacePassphraseAnswer.parse(await sentGateAsk(schema, BankOperations.replacePassphrase, BW.gatePutAskOf('replacePassphrase', built.val as BX.GateRecord, { main: BW.otherMainWayin })))
+    const replaced = BX.replacePassphraseAnswer.parse(await sentGateAsk(schema, BankOperations.replacePassphrase, BW.gatePutAskOf(built.val as BX.GateRecord, { main: BW.otherMainWayin })))
     expect(replaced).to.deep.include({ ok: true, act: 'replaced', parent: bank })
-    const added = BX.addPasskeyAnswer.parse(await sentGateAsk(schema, BankOperations.addPasskey, BW.gatePutAskOf('addPasskey', replaced.val as BX.GateRecord, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin })))
+    const added = BX.addPasskeyAnswer.parse(await sentGateAsk(schema, BankOperations.addPasskey, BW.gatePutAskOf(replaced.val as BX.GateRecord, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin })))
     expect(added.val).to.have.nested.property('wayins.passkey0.credential_id', BW.passkey0Wayin.credential_id)
-    const revoked = BX.revokePasskeyAnswer.parse(await sentGateAsk(schema, BankOperations.revokePasskey, BW.gatePutAskOf('revokePasskey', added.val as BX.GateRecord, { main: BW.otherMainWayin })))
+    const revoked = BX.revokePasskeyAnswer.parse(await sentGateAsk(schema, BankOperations.revokePasskey, BW.gatePutAskOf(added.val as BX.GateRecord, { main: BW.otherMainWayin })))
     expect(revoked).to.deep.include({ ok: true, act: 'replaced' })
     expect(revoked.val).not.to.have.nested.property('wayins.passkey0')
 
@@ -232,9 +229,9 @@ describe("bankResolvers", () => {
     const misnamed = BX.getVaultAnswer.parse(await sent(schema, BankOperations.getVault, { ask: { ...BX.vaultGet.parse(vaultGetAsk), op: 'put' } })) as BX.BadAnswer
     expect(misnamed.err.refusalkind).to.eq('bad_record')
     const gate = BW.gateAt()
-    const sneaky = gateVarsOf(BW.gatePutAskOf('replacePassphrase', gate, withPasskey))
-    const smuggled = BX.replacePassphraseAnswer.parse(await sent(schema, BankOperations.replacePassphrase, sneaky)) as BX.BadAnswer
-    expect(smuggled.err.refusalkind).to.eq('gate_issue')
+    const sneaky = gateVarsOf(BW.gatePutAskOf(gate, withPasskey))
+    const skipped = BX.replacePassphraseAnswer.parse(await sent(schema, BankOperations.replacePassphrase, { ask: { ...sneaky.ask, record: { ...sneaky.ask.record, revision_seq: 3 } } })) as BX.BadAnswer
+    expect(skipped.err.refusalkind).to.eq('bad_record')
     expect(await TH.rowsOf().vaultRowOf(BW.vaultScope)).to.deep.equal(BW.vaultAt())
     expect(await TH.rowsOf().gateRowOf(BW.gateScope)).to.deep.equal(gate)
   })

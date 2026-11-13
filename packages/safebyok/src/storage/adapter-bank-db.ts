@@ -6,10 +6,9 @@ import type { VaultError } from '../refusals/errors'
 import { storageRefusalOf } from '../refusals/outcome'
 import * as BX from '../shapes/shapes-bankdb'
 import * as SX from '../shapes/shapes-storage'
-import type { GateVerb } from '../shapes/shapes-enums'
 import type { BoxTidyAsk, WatchScope } from '../shapes/shapes-storage'
 import type {
-  AdapterBankDBOpts, BankBuildAsk, BankDelAsk, BankEnsureAsk, BoxAsk, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, GatePutAsk, GateVerbAsk,
+  AdapterBankDBOpts, BankBuildAsk, BankDelAsk, BankEnsureAsk, BoxAsk, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, GatePutAsk,
   VaultAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk,
 } from '../shapes/shapes-bankdb'
 import {
@@ -65,7 +64,7 @@ export abstract class AdapterBankDB implements BankDB {
   /** Classify a `buildBank` ask against the bank and gate rows stored. */
   protected classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): BankBuildStored { return classifyBuildBank(ask, fetched) }
 
-  /** Classify a gate verb's ask against the bank and gate rows stored, by its verb's policy. */
+  /** Classify a gate verb's ask against the bank and gate rows stored. */
   protected classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateStored { return classifyStoredGate(ask, fetched) }
 
   /** Classify a `delBank` ask against the bank row stored. */
@@ -137,39 +136,52 @@ export abstract class AdapterBankDB implements BankDB {
   }
   // --
 
-  // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, #tryPutGate
-  // A gate verb is a put of the gate record over its row, tagged with the verb. The classifier runs that verb's policy
-  // against the stored gate, in the same step that stores it. Nothing is fetched here beforehand.
+  // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
+  // Each stores `ask.record` over the gate row `ask.expected`. A good answer has a gate row: the one stored.
 
   /** Store the gate record with its passphrase wayin replaced ({@link BankDB.replacePassphrase}). */
-  async replacePassphrase(ask: GateVerbAsk) { return goodOrThrow(await this.tryReplacePassphrase(ask)) }
+  async replacePassphrase(ask: GatePutAsk) { return goodOrThrow(await this.tryReplacePassphrase(ask)) }
 
   /** Non-throwing form of {@link replacePassphrase}. */
-  async tryReplacePassphrase(ask: GateVerbAsk): Promise<GateAnswer> { return this.#tryPutGate('replacePassphrase', ask) }
-
-  /** Store the gate record with a passkey wayin added ({@link BankDB.addPasskey}). */
-  async addPasskey(ask: GateVerbAsk) { return goodOrThrow(await this.tryAddPasskey(ask)) }
-
-  /** Non-throwing form of {@link addPasskey}. */
-  async tryAddPasskey(ask: GateVerbAsk): Promise<GateAnswer> { return this.#tryPutGate('addPasskey', ask) }
-
-  /** Store the gate record with its passkey wayin removed ({@link BankDB.revokePasskey}). */
-  async revokePasskey(ask: GateVerbAsk) { return goodOrThrow(await this.tryRevokePasskey(ask)) }
-
-  /** Non-throwing form of {@link revokePasskey}. */
-  async tryRevokePasskey(ask: GateVerbAsk): Promise<GateAnswer> { return this.#tryPutGate('revokePasskey', ask) }
-
-  /** The answer to the gate verb `gateVerb`'s ask. */
-  async #tryPutGate(gateVerb: GateVerb, ask: GateVerbAsk): Promise<GateAnswer> {
+  async tryReplacePassphrase(ask: GatePutAsk): Promise<GateAnswer> {
     try {
-      const checked     = BX.gatePut.parse({ ...ask, gateVerb })
+      const checked     = BX.gatePut.parse(ask)
       const loggableAsk = BX.loggableAsk.parse(checked)
       const stored      = await this.doPutGate(checked)
-      // A good answer has a gate row: the one stored, or under `passed` the one found.
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.gate!, parent: stored.parent } }
-      const refusal = Refuse.actRefused('vault', stored.act, { oplabel: gateVerb, ask: loggableAsk })
+      const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'replacePassphrase', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.gate, err: refusal }
-    } catch (err) { return this.answerForRefusal(err, gateVerb, ask) }
+    } catch (err) { return this.answerForRefusal(err, 'replacePassphrase', ask) }
+  }
+
+  /** Store the gate record with a passkey wayin added ({@link BankDB.addPasskey}). */
+  async addPasskey(ask: GatePutAsk) { return goodOrThrow(await this.tryAddPasskey(ask)) }
+
+  /** Non-throwing form of {@link addPasskey}. */
+  async tryAddPasskey(ask: GatePutAsk): Promise<GateAnswer> {
+    try {
+      const checked     = BX.gatePut.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(checked)
+      const stored      = await this.doPutGate(checked)
+      if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.gate!, parent: stored.parent } }
+      const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'addPasskey', ask: loggableAsk })
+      return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.gate, err: refusal }
+    } catch (err) { return this.answerForRefusal(err, 'addPasskey', ask) }
+  }
+
+  /** Store the gate record with its passkey wayin removed ({@link BankDB.revokePasskey}). */
+  async revokePasskey(ask: GatePutAsk) { return goodOrThrow(await this.tryRevokePasskey(ask)) }
+
+  /** Non-throwing form of {@link revokePasskey}. */
+  async tryRevokePasskey(ask: GatePutAsk): Promise<GateAnswer> {
+    try {
+      const checked     = BX.gatePut.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(checked)
+      const stored      = await this.doPutGate(checked)
+      if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.gate!, parent: stored.parent } }
+      const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'revokePasskey', ask: loggableAsk })
+      return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.gate, err: refusal }
+    } catch (err) { return this.answerForRefusal(err, 'revokePasskey', ask) }
   }
   // --
 
@@ -329,15 +341,13 @@ export abstract class AdapterBankDB implements BankDB {
 
   // == [Protected, for a subclass to write]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
   // Each is one atomic step: fetch the rows the classifier needs, classify them, and when `isWriteAct(act)` is true, store
-  // what the ask stores. A store that can run code of its own may take the whole step there, policy included.
+  // what the ask stores. A store that can run code of its own may take the whole step there.
 
   /** In one step: fetch the bank row, its `main` gate row and every vault row of the bank, and return `this.classifyEnsureBank(ask, fetched)`. */
   protected abstract doEnsureBank(ask: BankEnsureAsk): Awaitable<BankEnsureStored>
   /** In one step: fetch the bank row and its `main` gate row, classify, and store `ask.record` and `ask.gate` if the act is a write. */
   protected abstract doBuildBank(ask: BankBuildAsk): Awaitable<BankBuildStored>
-  /** In one step: fetch the bank row and the gate row, classify, and store `ask.record` if the act is a write.
-   * One call serves every gate verb, named by `ask.gateVerb`.
-   */
+  /** In one step: fetch the bank row and the gate row, classify, and store `ask.record` if the act is a write. Every gate verb calls it. */
   protected abstract doPutGate(ask: GatePutAsk): Awaitable<GateStored>
   /** In one step: fetch the bank row, classify, and if the act is a write, store `ask.record` and delete every gate, vault and box row under the bank. */
   protected abstract doDelBank(ask: BankDelAsk): Awaitable<BankDelStored>

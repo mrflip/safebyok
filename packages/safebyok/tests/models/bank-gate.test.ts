@@ -315,6 +315,20 @@ describe("gate.addPasskeyPrompt()", () => {
     expect(isZeroed(new Uint8Array(buffer))).to.be.true
   })
 
+  it("refuses a passkey added elsewhere while its dialog was open, leaving that passkey stored", async () => {
+    const withPasskey = await makeBornVaultWithPasskey()
+    const elsewhere = withPasskey.demandStoredGate().wayins.passkey0!
+    const born = await makeBornVault()
+    const { gatingAt } = dialogOf(born)
+    const adding = TH.expectRefusal(born.bank.maingate.addPasskeyPrompt(), 'bad_option')
+    const gating = await gatingAt<'add_passkey'>()
+    const moved = born.putGateBehindOurBack({ ...born.demandStoredGate(), wayins: { main: born.demandStoredGate().wayins.main, passkey0: elsewhere } })
+    born.advance(Promptly + 1)
+    await gating.attempt({ passphraseClear: Passphrase, passkeyClear: await TH.passkeyOf('laptop') })
+    await adding
+    expect(born.demandStoredGate()).to.deep.equal(moved)
+  })
+
   it("refuses 'stale_write' a row moved since the attempt read it", async () => {
     const born = await makeBornVault()
     movedBeforeCommit(born, 'tryAddPasskey')
@@ -765,13 +779,6 @@ describe("the gate listing's gate verbs", () => {
     const [ask] = revoking.mock.calls[0]!
     expect(ask.record).to.deep.include({ revision_seq: ante.revision_seq + 1, written_at: nowMillis(), gate_tok: ante.gate_tok, wayins: { main: ante.wayins.main } })
     expect(stored).to.deep.equal(ask.record)
-  })
-
-  it("revokePasskey with no passkey stored returns the stored record", async () => {
-    const { bank } = await makeBornVault()
-    const ante = bank.maingate.pickle()
-    expect(await bank.gateListing.revokePasskey(ante)).to.deep.equal(ante)
-    expect(bank.maingate.revision_seq).to.eq(ante.revision_seq)
   })
 
   it("refuses an answer that is not the record it sent", async () => {

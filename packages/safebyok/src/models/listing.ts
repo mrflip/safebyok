@@ -491,11 +491,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
 // == [Helpers]: deliveryFieldingOf, Delivering, Joined, putAnswerOf
 
-// The acts are the classifier's and the gate verbs': `notes/answer-contract.md`. A box's `vault_*` act, a bankDB's `bank_*` act, an unclassified_storing
+// The acts are the classifier's: `notes/answer-contract.md`. A box's `vault_*` act, a bankDB's `bank_*` act, an unclassified_storing
 // refusal, and the acts of a list or a housekeeping verb carry no record of this listing.
 /** Where an answer's record is, by its act: see {@link DeliveryFielding}. */
 const deliveryFieldingOf = {
-  born:    'as_sent', reborn:  'as_sent', replaced: 'as_sent', deleted: 'as_sent', added: 'as_sent', revoked: 'as_sent',
+  born:    'as_sent', reborn:  'as_sent', replaced: 'as_sent', deleted: 'as_sent',
   gotlive: 'as_got',  gotgone: 'as_got',  passed:   'as_got',  gotvoid: 'as_got',
   stale:   'as_db',   camped:  'as_db',   gone:     'as_db',   dubdel:  'as_db',   retcon: 'as_db', clash: 'as_db', forked: 'as_db', ahead: 'as_db',
   void:    'as_db',   vault_void: 'none', vault_gone: 'none',  vault_reborn: 'none', vault_full: 'none', unclassified_storing: 'none',

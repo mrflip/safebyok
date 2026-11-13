@@ -98,9 +98,6 @@ enum SafebyokPutIfAbsent { add fail }
 """A put's policy for a live row: replace it, fail, or return the existing row."""
 enum SafebyokIfPresent { repl fail get }
 
-"""The gate verb a gate's put is for. The server's bankDB applies that verb's checks to the gate row it replaces."""
-enum SafebyokGateVerb { replacePassphrase addPasskey revokePasskey }
-
 # Rows
 
 """A wrapped key or a ciphered whisper: its IV and its ciphertext, each as base64url text."""
@@ -189,7 +186,6 @@ type SafebyokAsk {
   vault_tok:  String
   ifAbsent:   String
   ifPresent:  SafebyokIfPresent
-  gateVerb:   SafebyokGateVerb
   expected:   SafebyokAskRow
   record:     SafebyokAskRow
   gate:       SafebyokAskRow

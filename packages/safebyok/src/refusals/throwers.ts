@@ -296,12 +296,7 @@ export function storageFull(cause: Thrown): VaultError {
 
 // --
 
-// == [BankDB Throwers]: bankGateIssue, mainGateMissing
-
-/** A `gate_issue` refusal from a bankDB: a gate verb's record changes the gate row `gate` in a way the verb does not, for the reason `why`. */
-export function bankGateIssue(parent: BX.BankRow, gate: BX.GateRecord, why: string): VaultError {
-  return new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { parent, dbhas: gate } })
-}
+// == [BankDB Throwers]: mainGateMissing
 
 /** A `damaged_row` refusal from a bankDB: the live bank `parent` is stored without its `main` gate row. */
 export function mainGateMissing(parent: BX.BankSparse): VaultError {

@@ -392,19 +392,10 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: bankDB and deviceDB]: rowOfOtherAddress, gateIssue, RegisteredAtNotStored, OtherWayinMoved, boxTooLarge, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVaultLife, GateVerbRecordMismatch, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
+// == [Refusals: bankDB and deviceDB]: rowOfOtherAddress, boxTooLarge, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVaultLife, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
 
 /** A well-formed row from storage whose `fieldnames` name another address than the one asked for. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
-
-/** A change of the gate refused, `why` saying which check it failed. */
-export function gateIssue(why: string): string { return `This change of the gate was refused: ${why}` }
-
-/** Why a gate verb naming a registered_at the stored gate does not have is refused, as {@link gateIssue}'s `why`. */
-export const RegisteredAtNotStored = "its registered_at is not the stored one."
-
-/** Why a gate verb whose record moves a wayin the verb leaves alone is refused, as {@link gateIssue}'s `why`. */
-export const OtherWayinMoved = "it moves a wayin this verb does not."
 
 /** A box record over the bytes its storage allows in one record. */
 export function boxTooLarge(recordSizeEst: number, maxRecordSizeEst: number): string { return `That box weighs ${String(recordSizeEst)} bytes, over the ${String(maxRecordSizeEst)} its storage allows in one record.` }
@@ -426,9 +417,6 @@ export const LifeTokMisplaced = "A record keeps the life tok of the live row it 
 
 /** Why a bankDB's box request is refused for the row it expects: both must be in the same life of the vault and of its bank. */
 export const ExpectedOfOtherVaultLife = "A box's ask and the row it expects name the same bank_tok and vault_tok."
-
-/** Why a gate verb's put is refused for its record: `addPasskey` adds a passkey wayin, and `revokePasskey` removes it. */
-export const GateVerbRecordMismatch = "addPasskey's record has a passkey wayin, and revokePasskey's has none."
 
 /** Why a put or del is refused for its record: the record must be at the request's address. */
 export const RecordOfOtherAddress = "A put's or del's record is at the address its ask names."

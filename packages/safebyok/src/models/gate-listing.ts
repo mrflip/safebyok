@@ -47,7 +47,8 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   recordOf(gateish: unknown): GateRecord { return BX.gateRecord.parseConsistent(gateish, this.bank.scope, { message: Phrases.otherScope }) }
   // --
 
-  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateMoveOf
+  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form
+  // Each puts the next revision of the gate at `ante`, under the same gate_tok and bank_tok, with `ante` as the row it expects.
   // The val is the record the verb wrote: the gate listed may have a newer one by the time the answer is delivered.
 
   /** Replace the passphrase wayin of the gate at `ante` with `main`, and return the stored record.
@@ -61,7 +62,9 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   async tryReplacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<ThingAnswer<GateRecord>> {
     let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
     try {
-      const { record, expected } = this.#gateMoveOf(ante, (wayins) => ({ ...wayins, main }))
+      const expected = this.recordOf(ante)
+      this.demandEnabled()
+      const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: { ...expected.wayins, main } }
       answer = await this.bankDB.tryReplacePassphrase({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
       this.deliverAnswer(answer, record)
       return answerWithVal(answer, valOf(answer))
@@ -77,16 +80,16 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   async tryAddPasskey(ante: GateRecord, passkey0: NonNullable<Wayins['passkey0']>): Promise<ThingAnswer<GateRecord>> {
     let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
     try {
-      const { record, expected } = this.#gateMoveOf(ante, (wayins) => ({ ...wayins, passkey0 }))
+      const expected = this.recordOf(ante)
+      this.demandEnabled()
+      const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: { ...expected.wayins, passkey0 } }
       answer = await this.bankDB.tryAddPasskey({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
       this.deliverAnswer(answer, record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
-  /** Remove the passkey wayin of the gate at `ante`, and return the stored record.
-   * Where the stored gate has no passkey wayin, nothing is put, and that row is returned.
-   */
+  /** Remove the passkey wayin of the gate at `ante`, and return the stored record. */
   async revokePasskey(ante: GateRecord): Promise<GateRecord> { return valOf(await this.tryRevokePasskey(ante)) }
 
   /** Non-throwing form of {@link revokePasskey}: the bankDB's answer.
@@ -95,20 +98,13 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   async tryRevokePasskey(ante: GateRecord): Promise<ThingAnswer<GateRecord>> {
     let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
     try {
-      const { record, expected } = this.#gateMoveOf(ante, ({ main }) => ({ main }))
+      const expected = this.recordOf(ante)
+      this.demandEnabled()
+      const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: { main: expected.wayins.main } }
       answer = await this.bankDB.tryRevokePasskey({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
       this.deliverAnswer(answer, record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }
-  }
-
-  // A gate verb moves only the gate row's revision: its gate_tok, and the bank's, stay as they are.
-  /** The next record of the gate at `ante`, its wayins changed by `move`, with `ante` as the row it expects. */
-  #gateMoveOf(ante: GateRecord, move: (wayins: Wayins) => Wayins): { record: GateRecord, expected: GateRecord } {
-    const expected = this.recordOf(ante)
-    this.demandEnabled()
-    const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: move(expected.wayins) }
-    return { record, expected }
   }
   // --
 

@@ -6,12 +6,12 @@ export const BankFunctionsSql = `-- safebyok-postgres: the functions PostgresBan
 -- stores nothing. It returns one row, which says whether it stored the record (ok), and when it did, what happened
 -- (act: born, replaced, deleted or reborn), the rows as they are now, and what was stored before (presence: void, live
 -- or gone). When it stores nothing, it returns the rows as they stand, and PostgresBankDB works out the answer from them.
--- PostgresBankDB calls a vault or box function only when the record may replace the row it expects. A gate function
--- holds the gate verbs' policy itself, as the conditions of the one statement that stores the record.
+-- PostgresBankDB calls a vault or box function only when the record may replace the row it expects, and the gate
+-- function for every gate verb.
 -- A function never overwrites a row whose fmt differs from the record's, and never stores a row under a row above
 -- whose fmt is not this version's. A row in a later format is one this version of safebyok cannot read.
 -- Each write function takes the record to store and the row the caller expects, both as JSON. The bank functions
--- also take the bank's main gate record, the gate function the gate verb, and the box functions the cap on box rows.
+-- also take the bank's main gate record, and the box functions the cap on box rows.
 --
 -- A gate, vault or box write reads the row above it without a lock. This is on purpose: a lock on the row above would
 -- make every writer under one bank or vault wait its turn, to guard against a rare race. Three things follow.
@@ -144,19 +144,15 @@ BEGIN
   RETURN NEXT;
 END $$;
 
--- Store a gate verb's record over the expected gate row, by the gate verbs' policy.
+-- Store a gate verb's record over the expected gate row.
 -- The record is stored only if the bank is live in the record's bank_tok, the stored gate row has that bank_tok and
--- the expected revision_tok, am and gate_tok, the record's revision_seq is one past the row's, and the verb's policy
--- holds: the record keeps the row's registered_at and every wayin but the verb's own, main for replacePassphrase and
--- passkey0 for the passkey verbs; addPasskey stores only where the row has no passkey0, and revokePasskey only where
--- it has one.
-CREATE OR REPLACE FUNCTION safebyok_put_gate(new_record jsonb, expected_row jsonb, gate_verb text)
+-- the expected revision_tok, am and gate_tok, and the record's revision_seq is one past the row's.
+CREATE OR REPLACE FUNCTION safebyok_put_gate(new_record jsonb, expected_row jsonb)
 RETURNS TABLE (ok boolean, act text, bank jsonb, gate jsonb, presence text)
 LANGUAGE plpgsql AS $$
 DECLARE
   new_gate   safebyok_gates := jsonb_populate_record(NULL::safebyok_gates, new_record);
   expected   safebyok_gates := jsonb_populate_record(NULL::safebyok_gates, expected_row);
-  wayinlabel text           := CASE WHEN gate_verb = 'replacePassphrase' THEN 'main' ELSE 'passkey0' END;
   its_bank   safebyok_banks;
 BEGIN
   SELECT b.* INTO its_bank FROM safebyok_banks AS b
@@ -174,11 +170,7 @@ BEGIN
       AND  g.am = expected.am
       AND  g.gate_tok = expected.gate_tok
       AND  g.fmt = new_gate.fmt
-      AND  g.revision_seq = new_gate.revision_seq - 1
-      AND  g.registered_at = new_gate.registered_at
-      AND  (g.wayins - wayinlabel) = (new_gate.wayins - wayinlabel)
-      AND  (gate_verb <> 'addPasskey'    OR NOT (g.wayins ? 'passkey0'))
-      AND  (gate_verb <> 'revokePasskey' OR g.wayins ? 'passkey0');
+      AND  g.revision_seq = new_gate.revision_seq - 1;
     ok := FOUND;
   END IF;
 
@@ -390,7 +382,7 @@ REVOKE ALL ON FUNCTION safebyok_record(jsonb)                              FROM 
 REVOKE ALL ON FUNCTION safebyok_tell(jsonb, jsonb)                         FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_birth_bank(jsonb, jsonb, jsonb)            FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_revise_bank(jsonb, jsonb, jsonb)           FROM PUBLIC;
-REVOKE ALL ON FUNCTION safebyok_put_gate(jsonb, jsonb, text)               FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_put_gate(jsonb, jsonb)                     FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_birth_vault(jsonb, jsonb)                  FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_revise_vault(jsonb, jsonb)                 FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_birth_box(jsonb, jsonb, integer)           FROM PUBLIC;

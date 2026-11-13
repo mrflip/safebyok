@@ -379,11 +379,9 @@ bank does not already have:
 ```text
 each gate change's act, past its provings
 ├─ written = await gateListing.<gate verb>(ante, wayin)    ← the commit; ante, the gate record the attempt read
-│  ├─ { record, expected } = #gateMoveOf(ante, move)   record is ante at nextRevisionOf(expected), the moved wayin laid on its wayins
-│  ├─ the bankDB's verb, called with { expected, record }    expected is ante; moved → 'stale_write', nothing stored
-│  │    the bankDB checks registered_at unchanged, only its own wayin moved, then puts the record whole
-│  │    and refuses what its row rules out, such as an addPasskey over a passkey already stored ('camped')
-│  └─ the answer delivered                           checked against what it sent; a revokePasskey with no passkey answers 'passed', matched against its scope only
+│  ├─ expected = ante; record = ante at nextRevisionOf(expected), the moved wayin laid on its wayins
+│  ├─ the bankDB's verb, called with { expected, record }    a put of the gate row; moved → 'stale_write', nothing stored
+│  └─ the answer delivered                           checked against what it sent
 │     no lock: adopt never locks on a gate's next revision
 └─ unlockByProving(bank, proved, written)            a fresh lease of full term citing written; a lock() crossing the change does not stay in effect
 ```
@@ -401,9 +399,9 @@ each gate change's act, past its provings
   the verb again.
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, citing the older gate revision, is forgotten at its next session (Decided).
-* **The bankDB checks what it can see, and no more.** It refuses a record whose `registered_at` moved, or that moves the
-  other wayin (`gate_issue`), and an `addPasskey` over a passkey already stored (`camped`).
-  It cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
+* **The bankDB stores a gate verb's record as it stores any put.** The record is built from `ante`, so it changes only
+  its verb's wayin. `add_passkey` refuses before proving when the gate the attempt read has a passkey (`bad_option`).
+  The bankDB cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
 
 Each prompt is the gate's, and starts the same way:
 
@@ -452,7 +450,7 @@ gating.attempt({ passphraseClear, passkeyClear })
    ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the bankKey; wrap; dropped
    └─ gateListing.<gate verb>, then unlockByProving(bank, proved, written)
       commit: gateListing.addPasskey(ante, passkey0)                  ← the commit; passkey0 is passkeyWayin.pickle()
-           one added before the enter key → 'camped'; after the attempt read ante → 'stale_write'
+           one added before the attempt read ante → 'bad_option', nothing proved; after it → 'stale_write'
 ```
 
 ### `revoke_passkey`
@@ -469,7 +467,7 @@ gating.attempt({ passphraseClear })
 └─ then the change, from { ante, proved }                             ── no cleartext is used past here ──
    └─ gateListing.<gate verb>, then unlockByProving(bank, proved, written)
       commit: gateListing.revokePasskey(ante)                              ← the commit
-           revoked before the attempt read ante → 'passed', nothing moved; after it → 'stale_write'
+           revoked before the attempt read ante → the next revision stored, with no passkey still; after it → 'stale_write'
 ```
 
 ## `del_bank`

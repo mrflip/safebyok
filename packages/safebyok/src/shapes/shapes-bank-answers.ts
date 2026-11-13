@@ -48,7 +48,6 @@ export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('un
     vault_tok:  vault_tok.nullable().default(null),
     ifAbsent:   SX.anyIfAbsent.nullable().default(null),
     ifPresent:  SX.ifPresent.nullable().default(null),
-    gateVerb:   oneof(EX.gateVerbVals).nullable().default(null),
     expected:   crossedMeta.nullable().default(null),
     record:     crossedMeta.nullable().default(null),
     gate:       crossedMeta.nullable().default(null),

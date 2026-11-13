@@ -261,13 +261,7 @@ Coverage check: a vault get's expected revision is not compared, so 3 vault stat
 
 ### Vault put
 
-A gate verb (replacePassphrase, addPasskey, revokePasskey) is a vault put with `ifAbsent: fail` and `ifPresent: repl` that names its verb. Where the table below gives `replaced`, the classifier also checks the record against the stored row's gate, in the atomic unit that stores the record:
-
-- addPasskey refuses `camped` when a passkey wayin is already stored.
-- revokePasskey returns `passed` when no passkey wayin is stored.
-- Every gate verb throws `gate_issue` for a record that changes more than its verb allows.
-
-Every other row is the same as for any put.
+A gate verb (replacePassphrase, addPasskey, revokePasskey) is a put of the gate row with `ifAbsent: fail` and `ifPresent: repl`, read by the table below like any put (*Gate ops*).
 
 | #     | `v_tok` | `v_seq` | flags | vault  | act        | returning  | result |
 | ----- | :-----: | ------- | :---: | ------ | ---------- | ---------- | :----: |
@@ -392,26 +386,15 @@ its live bank's is of an ended life: it counts as no row, and the op tables read
 ### Gate ops
 
 A gate verb is a put of the gate row, with `ifAbsent: fail` and `ifPresent: repl`, read by the put
-table. Where the table answers `replaced`, the verb's policy runs on the gate row fetched in that
-step (design.md, *The gate verbs' policy*):
-
-| #   | verb                | gate row                                           | act          | returning | result |
-| --- | ------------------- | -------------------------------------------------- | ------------ | :-------: | :----: |
-| GV1 | @                   | `registered_at` differs from the record's          | `gate_issue` |  thrown   |   🌀    |
-| GV2 | addPasskey          | has a `passkey0`                                   | `camped`     |   dbhas   |   🧨    |
-| GV3 | revokePasskey       | has no `passkey0`                                  | `passed`     | **same**  |   🟰    |
-| GV4 | replacePassphrase   | a wayin but `main` differs from the record's       | `gate_issue` |  thrown   |   🌀    |
-| GV5 | add-, revokePasskey | a wayin but `passkey0` differs from the record's   | `gate_issue` |  thrown   |   🌀    |
-| GV6 | @                   | anything else                                      | `replaced`   | **reqval** |  👍    |
-
-The other cells of the policy are held before the table is read. The ask's check (V2) holds every
-cell of `buildBank` and `delBank`, the empty `auth`, `sigs` and `meta`, and `revokePasskey`'s record
-having no `passkey0`. P4 and the revision rules hold `bank_tok` and `gate_tok` being the row's.
+table, and nothing more: the three verbs differ only in their name. A good answer is `replaced`, with
+the record stored (**reqval**); a replay of the stored record is `retcon`. The ask's check (V2)
+holds the empty `auth`, `sigs` and `meta`; P4 and the revision rules hold `bank_tok` and `gate_tok`
+being the row's.
 
 ### The bank adapter
 
 `AdapterBankDB` carries each verb to one `do*` call, which fetches, classifies and stores the whole
-verb in one atomic unit, so that a datastore can run the classifier and a gate verb's policy
+verb in one atomic unit, so that a datastore can run the classifier
 inside itself (a Postgres function, a Convex mutation). Each call is handed the parsed ask, runs
 the classifier (the `classify*` methods, which a datastore judging for itself overrides), and
 returns what the classifier returned:

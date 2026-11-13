@@ -1,6 +1,5 @@
 /** Classify a bankDB ask against the stored rows, per the tables in `notes/answer-contract.md`. */
 
-import { isEqual, omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import { checkedConsistent } from '../helpers/validator'
 import * as Phrases from '../helpers/phrases'
@@ -237,47 +236,11 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 }
 // --
 
-// == [The gate verbs' policy]: BuildPolicies, GatePolicies, replacePassphraseActOf, addPasskeyActOf, revokePasskeyActOf, GateActOfForVerb
-// The rows of the policy table in design.md, *The gate verbs' policy*, that need the stored gate row: one function per
-// verb, and one line per cell. A gate verb is a put of the gate record over its live row, and these run on the row the
-// adapter fetched in the same step that stores the record, never on a row a caller fetched earlier. Each returns
-// `replaced` when the record may be stored, or the act that answers without putting, and throws `gate_issue` when the
-// record changes more than its verb allows.
-//
-// The other cells are held before these run. The ask's check holds every cell of `buildBank` and `delBank`, each gate
-// verb's empty `auth`, `sigs` and `meta`, and `revokePasskey`'s record having no `passkey0`. The row above and the
-// revision rules hold a gate verb's `bank_tok` and `gate_tok` being the row's: a gate row under another `bank_tok` counts
-// as none, and one under another `gate_tok` refuses as `clash` or `stale`.
+// == [Policies]: BuildPolicies, GatePolicies
 
 // `buildBank` puts over a tombstone or nothing, and answers the live bank it finds; a gate verb replaces a live gate row.
 const BuildPolicies = { ifAbsent: 'add',  ifPresent: 'get'  } as const
 const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const
-
-function replacePassphraseActOf(parent: BankRow, record: GateRecord, stored: GateRecord): VaultAct {
-  if (stored.registered_at !== record.registered_at)                                       { throw Refuse.bankGateIssue(parent, stored, Phrases.RegisteredAtNotStored) }
-  if (! isEqual(omit(record.wayins, ['main']), omit(stored.wayins, ['main'])))             { throw Refuse.bankGateIssue(parent, stored, Phrases.OtherWayinMoved) }
-  return 'replaced'
-}
-
-// `camped`: a passkey wayin is already stored.
-function addPasskeyActOf(parent: BankRow, record: GateRecord, stored: GateRecord): VaultAct {
-  if (stored.registered_at !== record.registered_at)                                       { throw Refuse.bankGateIssue(parent, stored, Phrases.RegisteredAtNotStored) }
-  if (stored.wayins.passkey0 !== undefined)                                                { return 'camped' }
-  if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0'])))     { throw Refuse.bankGateIssue(parent, stored, Phrases.OtherWayinMoved) }
-  return 'replaced'
-}
-
-// `passed`: no passkey wayin is stored, so the stored row is returned unchanged.
-function revokePasskeyActOf(parent: BankRow, record: GateRecord, stored: GateRecord): VaultAct {
-  if (stored.registered_at !== record.registered_at)                                       { throw Refuse.bankGateIssue(parent, stored, Phrases.RegisteredAtNotStored) }
-  if (stored.wayins.passkey0 === undefined)                                                { return 'passed' }
-  if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0'])))     { throw Refuse.bankGateIssue(parent, stored, Phrases.OtherWayinMoved) }
-  return 'replaced'
-}
-
-const GateActOfForVerb = {
-  replacePassphrase: replacePassphraseActOf, addPasskey: addPasskeyActOf, revokePasskey: revokePasskeyActOf,
-} as const satisfies Record<EX.GateVerb, (parent: BankRow, record: GateRecord, stored: GateRecord) => VaultAct>
 // --
 
 // == [Classifying]: RowOfVault, RowOfBox, BankEnsureFetched, GateFetched, BankFetched, VaultFetched, BoxFetched, BoxesFetched, BankEnsureStored, BankBuildStored, GateStored, BankDelStored, VaultStored, BoxStored, BoxesStored, classifyEnsureBank, classifyBuildBank, classifyStoredGate, classifyDelBank, classifyStoredVault, classifyStoredBox, classifyStoredBoxes
@@ -425,9 +388,9 @@ export function classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): Bank
   return isOkAct(act) ? { ok: true, act, parent, gate, presence } : { ok: false, act, parent, gate, presence }
 }
 
-/** Classify a gate verb's ask against the rows an adapter fetched for it, by the put table and then the verb's policy.
+/** Classify a gate verb's ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
  * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows.
- * Throws for a damaged row, and for a record that changes more than its verb allows.
+ * Throws for a damaged row.
  */
 export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateStored {
   const parent    = bankRowOf(ask, fetched.bank) ?? BX.shellBankOf(ask)
@@ -436,8 +399,7 @@ export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateS
 
   const gate     = gateRowOf(ask, fetched.gate, parent)
   const presence = presenceOf(gate)
-  const tabled   = putActOf({ ...ask, ...GatePolicies }, gate)
-  const act      = ((tabled === 'replaced') && (gate !== null)) ? GateActOfForVerb[ask.gateVerb](parent, ask.record, gate) : tabled
+  const act      = putActOf({ ...ask, ...GatePolicies }, gate)
   if (isWriteAct(act)) { return { ok: true, act, parent, gate: ask.record, presence } }
   return isOkAct(act) ? { ok: true, act, parent, gate, presence } : { ok: false, act, parent, gate, presence }
 }

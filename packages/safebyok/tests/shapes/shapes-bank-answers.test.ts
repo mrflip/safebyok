@@ -38,8 +38,8 @@ describe("WX's answer checks", () => {
   it("parse each serialized good answer back to what its verb returned", async () => {
     const bankDB   = await bankDBWithBox()
     const keyed    = { main: mainWayin, passkey0: passkey0Wayin }
-    const added    = await bankDB.tryAddPasskey(gatePutAskOf('addPasskey', gateAt(), keyed))
-    const revoked  = await bankDB.tryRevokePasskey(gatePutAskOf('revokePasskey', added.val ?? gateAt(), { main: mainWayin }))
+    const added    = await bankDB.tryAddPasskey(gatePutAskOf(gateAt(), keyed))
+    const revoked  = await bankDB.tryRevokePasskey(gatePutAskOf(added.val ?? gateAt(), { main: mainWayin }))
     const putBox   = await bankDB.tryPutBox(boxPutAskOf(boxAt(1), boxAt()))
     const putVault = await bankDB.tryPutVault(vaultPutAskOf(vaultAt(1), vaultAt()))
     const answers  = [
@@ -48,7 +48,7 @@ describe("WX's answer checks", () => {
       [WX.buildBankAnswer,         await new MemoryBankDB().tryBuildBank(bankBuildAskOf())],
       [WX.addPasskeyAnswer,        added],
       [WX.revokePasskeyAnswer,     revoked],
-      [WX.replacePassphraseAnswer, await bankDB.tryReplacePassphrase(gatePutAskOf('replacePassphrase', revoked.val ?? gateAt(), { main: otherMainWayin }))],
+      [WX.replacePassphraseAnswer, await bankDB.tryReplacePassphrase(gatePutAskOf(revoked.val ?? gateAt(), { main: otherMainWayin }))],
       [WX.listBoxesAnswer,         await bankDB.tryListBoxes(boxListAsk)],
       [WX.getBoxAnswer,            await bankDB.tryGetBox(boxGetAskOf())],
       [WX.putBoxAnswer,            putBox],
