@@ -49,13 +49,13 @@ describe("The checks of options", () => {
       [{ maxMillisSinceRefresh: 0, maxParentMillis: Infinity }, true, 'passes both horizons'],
       [{ maxMillisSinceRefresh: undefined },        true,  'passes a horizon left undefined'],
       [{ maxMillisSinceRefresh: -1 },               false, 'refuses a negative record horizon'],
-      [{ maxParentMillis: '5' },                     false, 'refuses a world horizon that is text'],
-      [{ maxParentMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
+      [{ maxParentMillis: '5' },                    false, 'refuses a world horizon that is text'],
+      [{ maxParentMillis: NaN },                    false, 'refuses a world horizon that is NaN'],
     ])
     expectCases(VX.boxPutOpts, [
-      [{ maxParentMillis: 5 },                       true,  'passes the horizons'],
+      [{ maxParentMillis: 5 },                      true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
-      [{ maxParentMillis: -1 },                      false, 'refuses a negative horizon'],
+      [{ maxParentMillis: -1 },                     false, 'refuses a negative horizon'],
     ])
 
     it("take their fields from the bag given and strip the rest", () => {
@@ -123,7 +123,7 @@ describe("SX.ifPresent and VX.boxPutOpts", () => {
   expectCases(VX.boxPutOpts, [
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
-    [{ ifPresent: 'repl', maxParentMillis: 5 },          true,  'passes ifPresent beside the timely options'],
+    [{ ifPresent: 'repl', maxParentMillis: 5 },         true,  'passes ifPresent beside the timely options'],
     [{ ifPresent: 'replace' },                          false, 'refuses an ifPresent it does not offer'],
     [{ maxMillisSinceRefresh: -1, ifPresent: 'repl' },  false, 'refuses a negative horizon'],
   ])

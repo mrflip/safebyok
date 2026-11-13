@@ -296,7 +296,7 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, device)", () => {
   const ArgsCases = [
     [() => ({ gate: null }),                  'no gate'],
     [() => ({ passphraseClear: 42 }),         'a passphrase that is not a string'],
-    [() => ({ device: {} }),                   'a malformed device'],
+    [() => ({ device: {} }),                  'a malformed device'],
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {

@@ -80,7 +80,7 @@ export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxC
     /** How long ago, at most, the record in hand was refreshed from the bankDB; Infinity for no limit. */
     maxMillisSinceRefresh: maxMillis,
     /** How long ago, at most, the parent of the record was refreshed from the bankDB; Infinity for no limit. */
-    maxParentMillis:        maxMillis,
+    maxParentMillis:       maxMillis,
   })
   const fetchOpts     = timelyOpts.extend({
     /** Where nothing live is stored:
