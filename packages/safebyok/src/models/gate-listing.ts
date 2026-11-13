@@ -112,16 +112,10 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   }
   // --
 
-  // == [Defined by the gate listing]: isEnabled, demandEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the gate listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
-
-  /** Throw unless {@link isEnabled}. */
-  demandEnabled(): this {
-    this.bank.demandEnabled()
-    return this
-  }
 
   protected receiveParent(parent: unknown): void { this.bank.receiveParent(parent) }
 

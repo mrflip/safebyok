@@ -10,9 +10,9 @@ import { type AskUser, type BankStamp, type GateStamp, bankStamp, gateStamp } fr
 import * as SX from '../shapes/shapes-storage'
 import { type BankScope, bankScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
-import type { BankRecord, BankRow, BankSparse, BankTombstone, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
+import type { BankRecord, BankRow, BankSparse, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
 import * as VX from '../shapes/shapes-vaultish'
-import type { BankListingOpts, BankSnapshot, Fetched } from '../shapes/shapes-vaultish'
+import type { BankListingOpts, BankSnapshot, DelTombstone, Fetched, ListingDelOpts } from '../shapes/shapes-vaultish'
 import { Bank } from './bank'
 import type { Device } from './device'
 import { Listing } from './listing'
@@ -48,7 +48,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   recordOf(bankish: unknown): BankRecord { return BX.bankRecord.parseConsistent(bankish, this.device.scope, { message: Phrases.otherScope }) }
   // --
 
-  // == [A birth and a death]: stampsOfBirth, recordOfBirth, build, delBank
+  // == [A birth]: stampsOfBirth, recordOfBirth, build
 
   /** Fresh stamps for a new bank and its main gate. Make one pair per attempt to build a bank. */
   stampsOfBirth(): { bank: BankStamp, gate: GateStamp } {
@@ -79,27 +79,12 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
     bank.gateListing.deliverRecord(answer.val)
     return bank
   }
-
-  /** Delete the live bank at `ante`'s revision, with its gate, vaults and boxes, and return the listed bank, now tombstoned. */
-  async delBank(ante: BankSparse): Promise<Bank | null> {
-    const expected = this.sparseOf(ante)
-    this.demandEnabled()
-    const record: BankTombstone = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), am: 'x', bank_tok: makeLifeTok() }
-    const answer = await this.bankDB.tryDelBank({ op: 'del', ...this.device.scope, expected, record })
-    return this.deliverAnswer(answer, record)
-  }
   // --
 
-  // == [Defined by the bank listing]: isEnabled, demandEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the bank listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its device does. */
   get isEnabled(): boolean { return this.device.isEnabled }
-
-  /** Throw unless {@link isEnabled}. */
-  demandEnabled(): this {
-    this.device.demandEnabled()
-    return this
-  }
 
   protected receiveParent(): void { /* no row sits above a bank */ }
 
@@ -127,9 +112,14 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
 
   protected doTryPut(): never { throw writtenByOwnVerbs() }
 
-  protected tombstoneOver(): never { throw writtenByOwnVerbs() }
+  // A bank's del takes its gates, vaults and boxes with it.
+  protected tombstoneOver(expected: BankSparse): DelTombstone<BankSparse> {
+    return { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), am: 'x', bank_tok: makeLifeTok() }
+  }
 
-  protected doTryDel(): never { throw writtenByOwnVerbs() }
+  protected doTryDel(tombstone: DelTombstone<BankSparse>, { expected }: ListingDelOpts<BankSparse>) {
+    return this.bankDB.tryDelBank({ op: 'del', ...this.device.scope, expected, record: tombstone })
+  }
 
   // The bank's watch is its vault listing's: no listing of its own starts one.
   protected watchRows(): () => void { return stopNoWatch }

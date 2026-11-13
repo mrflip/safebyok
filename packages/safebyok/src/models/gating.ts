@@ -269,7 +269,7 @@ async function delBank(bank: Bank, cleartexts: unknown): Promise<Bank> {
   // The lock first: no box unseals under a lease while the tombstone goes out. The delete goes over the bank row the
   // proving's gate came with, and the tombstone delivered vacates the gate and the vaults.
   bank.lock()
-  await bank.listing.delBank(ante)
+  await bank.listing.del(ante)
   return bank
 }
 

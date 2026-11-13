@@ -27,6 +27,9 @@ export function cmpRevisions(ante: Revision, post: Revision): Age {
 }
 // --
 
+/** A listing below a thing, as {@link Storable.align} reaches it. */
+export type Alignable = Readonly<{ align: () => void }>
+
 /** A bank, gate, vault or box in this tab, kept in step with its row in the bankDB. */
 export abstract class Storable<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT> {
   // == [Props]: scope, listing, revision_tok, revision_seq, registered_at, written_at, #central, #snapshot, #refreshedAt, #listeners, #getSnapshot, #subscribe
@@ -114,7 +117,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.#scope = Object.freeze(listing.scopeOf(central))
     this.#central = Object.freeze(central)
     this.assignInitialProps(central)
-    this.align()
     Object.seal(this)
   }
 
@@ -222,10 +224,21 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   }
   // --
 
-  // == [Aligning]: align, becomeNotifiable, replaceSnapshot, tellListeners
+  // == [Aligning]: align, alignChildren, becomeNotifiable, replaceSnapshot, tellListeners
 
-  /** Remake the snapshot, if one was made, and tell the subscribers if it changed. */
-  align(): void { this.#replaceSnapshot() }
+  // The listings below first, this thing's snapshot last: a listener hears of a change once everything below shows it.
+  /** Bring this thing and everything below it into line with the bank's lock and their lives, telling the subscribers of any change.
+   * Never throws. A thing that no longer answers drops what it holds of secrets when aligned.
+   */
+  align(): void {
+    this.alignChildren()
+    this.#replaceSnapshot()
+  }
+
+  /** Align each of `children`. */
+  protected alignChildren(): void {
+    for (const child of this.children) { child.align() }
+  }
 
   /** Make the snapshot now, so that every later change tells the subscribers. */
   becomeNotifiable(): this {
@@ -251,19 +264,6 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
         reportToPlatform(err)
       }
     })
-  }
-  // --
-
-  // == [The lock]: alignLock
-
-  // A thing's one duty at a lock and at its end: tell its listeners, and, once it no longer answers, drop what it has
-  // of secrets. The base has none.
-  /** Realign with the bank's lock. Never throws, and locks nothing: a host calls `bank.lock()`.
-   * @internal
-   */
-  alignLock(): this {
-    this.align()
-    return this
   }
   // --
 
@@ -311,11 +311,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   demandUnlocked(): this { if (this.isLocked)    { throw needUnlocked() }                               return this }
 
   /** Throw unless {@link isEnabled}. */
-  demandEnabled():  this {
-    this.listing.demandEnabled()
-    if (! this.listing.isListed(this)) { throw instanceDisabled() }
-    return this
-  }
+  demandEnabled():  this { if (! this.isEnabled) { throw instanceDisabled() }                     return this }
 
   /** Demand that the record in hand is full. */
   demandFull():     this { if (! this.isFull)    { throw partialLoad() }                          return this }
@@ -333,7 +329,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   ensureDeletable(opts: TimelyOpts = {}): Promise<this> { return this.hydrate(opts) }
   // --
 
-  // == [Protected, for a subclass to override]: adopt, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, for a subclass to override]: adopt, children, demandPresent, isFullRecord, lifeTokPathOf, makeSnapshot
 
   // Every adopt is followed by an align, which the snapshot is made from: an adopt left unaligned would leave it behind.
   /** Make `central` the record in hand, frozen, and set the props from it. The snapshot waits for {@link align}. */
@@ -341,6 +337,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
     this.assign(central)
     this.#central = Object.freeze(central)
   }
+
+  /** The listings below this thing, which `align` aligns too. */
+  protected abstract get children(): readonly Alignable[]
 
   /** Throw unless `isPresent`. */
   abstract demandPresent(): this

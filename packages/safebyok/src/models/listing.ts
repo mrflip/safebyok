@@ -13,7 +13,7 @@ import * as BX from '../shapes/shapes-bankdb'
 import type { BankRow, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
 import * as VX from '../shapes/shapes-vaultish'
 import type { DelTombstone, Fetched, FetchOpts, ListingAnswer, ListingDelOpts, ListingListAnswer, ListingPutAnswer, ListingPutOpts, ListingOpts, ListingGetAnswer, SparseBase, Thing, ThingAnswer } from '../shapes/shapes-vaultish'
-import { deliveredNotAsSent, nothingStoredWhereLive, oneRevisionTwoFates, oneRevisionTwoLives, refusalOfDelivering, storageIssue } from '../refusals/throwers'
+import { deliveredNotAsSent, instanceDisabled, nothingStoredWhereLive, oneRevisionTwoFates, oneRevisionTwoLives, refusalOfDelivering, storageIssue } from '../refusals/throwers'
 import { valOf } from '../refusals/outcome'
 import { reportToPlatform } from '../refusals/report-error'
 import type { Device } from './device'
@@ -117,7 +117,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Starting and ending]: hello, goodbye, lock
+  // == [Starting and ending]: hello, goodbye, align
 
   /** Start watching storage for this listing's rows, if not started. */
   async hello(): Promise<void> { // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
@@ -131,12 +131,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#unwatch = null
   }
 
-  /** Realign each listed thing with the bank's lock: see {@link Storable.alignLock}.
-   * Locks nothing, and never throws.
+  // A listing whose thing above has ended, or moved to another life, answers nothing more: its watch ends here.
+  /** Align each listed thing (see {@link Storable.align}), and end the watch once this listing no longer answers.
+   * Never throws.
    */
-  lock(): this {
-    for (const thing of this.things) { thing.alignLock() }
-    return this
+  align(): void {
+    if (! this.isEnabled) { this.goodbye() }
+    for (const thing of this.things) { thing.align() }
   }
   // --
 
@@ -403,11 +404,11 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return things
   }
 
-  /** Delist `thing`, if any, and realign it, which drops its secrets. */
+  /** Delist `thing`, if any, and align it, which drops its secrets. */
   #takeDown(thing: ThingT | null): void {
     if (thing === null) { return }
     this.delist(thing)
-    thing.alignLock()
+    thing.align()
   }
   // --
 
@@ -451,6 +452,12 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
+  // == [Guards]: demandEnabled
+
+  /** Throw unless `isEnabled`. */
+  demandEnabled(): this { if (! this.isEnabled) { throw instanceDisabled() } return this }
+  // --
+
   // == [Panic]: panicIfRevoked
 
   // Not awaited: the caller hears the refusal as the device's vacate begins, and the vacate disables before it awaits.
@@ -460,12 +467,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: isEnabled, demandEnabled, receiveParent, demandOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the concrete listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers, which it does only while the thing above it does. */
   abstract get isEnabled(): boolean
-  /** Throw unless {@link Listing.isEnabled}. */
-  abstract demandEnabled(): this
   /** Deliver the parent row an answer or a notice carries to the thing above this listing. */
   protected abstract receiveParent(parent: unknown): void
   /** Throw unless `record` belongs to the life of the thing above that this listing was made under. */

@@ -68,7 +68,7 @@ export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'Add
 
 /** The lifecycle stage of the vault a hook asked for.
  * - `'bankless'` -- no bank is up: nobody is signed in, the bank is still coming up, none is built, or it was deleted or built anew elsewhere
- * - `'absent'`   -- the bank is up but has no vault by that vaultlabel. Call `bank.ensureVault` on the unlocked bank to create one
+ * - `'absent'`   -- the bank is up but has no vault by that vaultlabel. Call `bank.ensureVault` to create one, locked or not
  * - `'present'`  -- the vault exists
  * - `'spent'`    -- the device was swept or vacated
  */

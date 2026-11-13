@@ -22,6 +22,7 @@ export type { BoxSparse, DamagedBox, LeaseDated, LeaseQuery, LeaseRow, LeaseScop
 export type { KeyDeriver } from './deriver/basederiver'
 export type { GuardedStrengthChecker, StrengthChecker } from './helpers/passphrase-strength'
 export type { GuardedKeyDeriver } from './models/proving'
+export type { Alignable } from './models/storable'
 export { DefaultLogger, setDefaultLogger, type VaultLogger } from './helpers/logger'
 export type { BankDB } from './storage/bank-db'
 export type { AdapterBankDB } from './storage/adapter-bank-db'

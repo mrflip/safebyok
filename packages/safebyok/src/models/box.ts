@@ -144,7 +144,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this
   }
 
-  // called internally by adopt, alignLock and unexpose itself
+  // called internally by adopt, align and unexpose itself
   /** Drop the whisper exposed and its veil, without aligning. */
   #doUnexpose(): void {
     this.#exposed = null
@@ -295,26 +295,27 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   }
   // --
 
-  // == [The lock]: alignLock
+  // == [Aligning]: align
 
   // A lock only hides the whisper exposed, so that edits survive to the unlock (notes/expose_improves_security.md). A
   // box that no longer answers will never show it again.
-  /** Realign with the bank's lock, and drop the whisper exposed and its veil once this box is not `isEnabled`. Never throws.
-   * @internal
-   */
-  override alignLock(): this {
+  /** Align (see {@link Storable.align}), dropping the whisper exposed and its veil once this box is not `isEnabled`. Never throws. */
+  override align(): void {
     if (! this.isEnabled) { this.#doUnexpose() }
-    return super.alignLock()
+    super.align()
   }
   // --
 
-  // == [Protected, overriding Storable's]: adopt, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, overriding Storable's]: adopt, children, isFullRecord, lifeTokPathOf, makeSnapshot
 
   /** Adopt `central`, dropping the whisper exposed and its veil where it is a tombstone. */
   protected override adopt(central: Fetched<BoxRecord, BoxSparse>): void {
     super.adopt(central)
     if (this.isTombstoneRecord(central)) { this.#doUnexpose() }
   }
+
+  /** None: a box has nothing listed below it. */
+  protected get children(): readonly [] { return [] }
 
   /** Whether `fetched` is alive and has its sealed whisper. */
   protected isFullRecord(fetched: BoxSparse): fetched is BoxRecord {

@@ -5,7 +5,7 @@ import type { Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
-import { boxAbsent, boxStoredDamaged, boxNotListed, instanceDisabled, rowOfOtherWorld } from '../refusals/throwers'
+import { boxAbsent, boxStoredDamaged, boxNotListed, rowOfOtherWorld } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -104,17 +104,10 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   override async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.vault.ensureTimely(VX.maxMillis.parse(maxMillis)) }
   // --
 
-  // == [Defined by the box listing]: isEnabled, demandEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the box listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its vault does, and is still of the life this listing was made under. */
   get isEnabled(): boolean { return this.vault.isEnabled && (this.vault.vault_tok === this.vault_tok) }
-
-  /** Throw unless {@link isEnabled}. */
-  demandEnabled(): this {
-    this.vault.demandEnabled()
-    if (this.vault.vault_tok !== this.vault_tok) { throw instanceDisabled() }
-    return this
-  }
 
   protected receiveParent(parent: unknown): void { this.vault.receiveParent(parent) }
 

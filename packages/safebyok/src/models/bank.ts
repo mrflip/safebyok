@@ -7,7 +7,7 @@ import type { VaultLogger } from '../helpers/logger'
 import type { GuardedStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, demandGood, good, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import { actRefused, instanceDisabled, mainGateMissing, needUnlocked } from '../refusals/throwers'
+import { actRefused, mainGateMissing, needUnlocked, writtenByOwnVerbs } from '../refusals/throwers'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
@@ -188,7 +188,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   tryDelPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.delPrompt()) }
   // --
 
-  // == [The lease]: lock, autolock, revokeLease, unlockByProving, attachLease, alignAll
+  // == [The lease]: lock, autolock, revokeLease, unlockByProving, attachLease
 
   // At the bank's end, a lock is its one duty: the lease and every exposed whisper are dropped, and the watches end. The
   // row cached is left: a sweep leaves it for the next page, a vacate forgets every lease of the bank scope itself.
@@ -199,12 +199,11 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   lock(): this {
     if (this.isEnabled) {
       void this.#revokeLease('lock')
-      return this
+    } else {
+      this.#lease?.evict()
+      this.#lease = null
     }
-    this.#lease?.evict()
-    this.#lease = null
-    this.#vaultListing.goodbye()
-    this.#alignAll()
+    this.align()
     return this
   }
 
@@ -224,7 +223,6 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     const granted = this.#lease
     this.#lease = null
     const revoking = granted?.tryRevoke() ?? Lease.tryForget(this.#leaseFriendOf())
-    this.#alignAll()
     const revoked = await revoking
     if (! revoked.ok) { this.device.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, bank: this, where }) }
   }
@@ -243,13 +241,6 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     this.demandAttachable()
     this.#lease = lease
     await lease.cacheAsCacheCan()
-    this.#alignAll()
-  }
-
-  // The vaults first, the bank's own align last: the device is told once, every vault's lock and the bank's together.
-  /** Realign each listed vault and its boxes, then this bank, to the bank's lock. */
-  #alignAll(): void {
-    for (const vault of this.#vaultListing.things) { vault.alignLock() }
     this.align()
   }
   // --
@@ -314,15 +305,12 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     return this.#vaultListing.at(this.vaultScopeOf(scope))
   }
 
-  /** The vault at `scope`, as listed or stored, creating it if absent (void or tombstoned).
-   * Unless the vault is already listed, this needs the bank unlocked: precede with `await bank.ensureUnlocked()`.
-   */
+  /** The vault at `scope`, as listed or stored, creating it if absent (void or tombstoned). A locked bank will do. */
   async ensureVault(scope: BankedVaultScope): Promise<Vault> {
     const asked = this.vaultScopeOf(scope)
     this.demandEnabled()
     const listed = this.#vaultListing.at(asked)
     if (listed?.isPresent === true) { return listed }
-    this.demandUnlocked()
     const expected = listed?.sparse ?? BX.shellVaultOf(asked)
     return this.#vaultListing.put(this.#vaultListing.recordOfBirth(asked, expected), { expected, ifAbsent: 'add', ifPresent: 'get' })
   }
@@ -355,17 +343,10 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
   // --
 
-  // == [Guards]: isEnabled, demandEnabled, isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandPresent
+  // == [Guards]: isEnabled, isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandPresent
 
   /** True while this bank is usable: its device is enabled, and it is listed with a live row of its own life. */
   override get isEnabled(): boolean { return super.isEnabled && this.#isLiveOfLife }
-
-  /** Throw unless {@link isEnabled}. */
-  override demandEnabled(): this {
-    super.demandEnabled()
-    if (! this.#isLiveOfLife) { throw instanceDisabled() }
-    return this
-  }
 
   // A tombstone carries a life token of its own, and a bank built again elsewhere another.
   /** True when the record in hand is a live row of this Bank's life. */
@@ -396,19 +377,28 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
   // --
 
-  // == [Protected, overriding Storable's]: adopt, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Overriding Storable's]: del
+
+  // A bank's delete needs the user's passphrase: the bank listing's del is called only by the del_bank gating.
+  /** Refuses: delete a bank with {@link delPrompt}. */
+  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
+  // --
+
+  // == [Protected, overriding Storable's]: adopt, children, isFullRecord, lifeTokPathOf, makeSnapshot
 
   /** Adopt `central`. A tombstone, or a row of another life, disables this bank for good, though it stays listed.
-   * Its lease is then dropped and the cached row forgotten, its watch ends, and a gating open for it is dismissed.
+   * Its lease is then dropped and the cached row forgotten, and a gating open for it is dismissed.
    * A failed forget is announced as `lease_revoke_failed`.
    */
   protected override adopt(central: Fetched<BankRecord, BankSparse>): void {
     super.adopt(central)
     if (this.#isLiveOfLife) { return }
     void this.#revokeLease('tombstone')
-    this.#vaultListing.goodbye()
     this.device.dismissGatingAtDiscard(this)
   }
+
+  /** The bank's gate listing and vault listing. */
+  protected get children(): readonly [GateListing, VaultListing] { return [this.#gateListing, this.#vaultListing] }
 
   /** True for a live row: a bank row has no encrypted part, so a live one is always full. */
   protected isFullRecord(fetched: BankSparse): fetched is BankRecord { return fetched.am === 'a' }

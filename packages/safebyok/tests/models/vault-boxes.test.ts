@@ -1,6 +1,7 @@
 /** A vault's box verbs from the host's side, on real seals: hello, getBox, delBox, and a damaged record set aside. */
 
 import { describe, expect, it, vi } from 'vitest'
+import { ENCRYPTED } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
 import * as TH from '../test-helpers'
 import { Dna, Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
@@ -115,6 +116,32 @@ describe("the box methods refuse a locked or deleted vault", () => {
     const err = await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'bank_locked')
     expect(JSON.stringify(err.meta ?? {})).not.to.include(Whisper)
     expect(err.message).not.to.include(Whisper)
+  })
+})
+
+describe("the boxes of a vault deleted", () => {
+  it("drop their whispers exposed at a delete here", async () => {
+    const { vault, box } = await makeWorldWithBox()
+    const { boxListing } = vault
+    await box.expose()
+    await vault.del(vault)
+    expect(box.isEnabled).to.be.false
+    expect(box.whisper).to.eq(ENCRYPTED)
+    expect(box.getSnapshot()).to.deep.include({ isExposed: false, isVeiled: false })
+    expect(vault.boxListing).not.to.eq(boxListing)
+    expect(vault.boxListing.vault_tok).to.eq(vault.vault_tok)
+  })
+
+  it("drop their whispers exposed at a tombstone the bank's watch delivers from elsewhere", async () => {
+    const { openNextSession, vault } = await makeWorldWithBox()
+    const next = await openNextSession()
+    const box = (await next.getBox(boxlabel))!
+    await box.expose()
+    await vault.del(vault)
+    await TH.eventually(() => ! next.isPresent)
+    expect(box.isEnabled).to.be.false
+    expect(box.whisper).to.eq(ENCRYPTED)
+    expect(box.getSnapshot().isExposed).to.be.false
   })
 })
 

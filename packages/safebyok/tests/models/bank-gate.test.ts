@@ -459,7 +459,7 @@ describe("vault.del()", () => {
     await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel }, { maxMillisSinceRefresh: 0 }), 'disabled')
   })
 
-  it("refuses 'bank_locked' in a locked bank, asking nobody and storing nothing", async () => {
+  it("refuses 'bank_locked' in a locked bank", async () => {
     const born = await makeBornVault()
     const { vault, storedNow } = born
     const ante = storedNow()
@@ -468,6 +468,16 @@ describe("vault.del()", () => {
     await TH.expectRefusal(vault.del(vault), 'bank_locked')
     expect(shown).to.have.lengthOf(0)
     expect(storedNow()).to.equal(ante)
+  })
+
+  it("the vault listing's own del deletes in a locked bank", async () => {
+    const born = await makeBornVault()
+    const { vault, storedNow } = born
+    const { shown } = dialogOf(born)
+    vault.bank.lock()
+    expect(await vault.listing.del(vault.sparse)).to.equal(vault)
+    expect(shown).to.have.lengthOf(0)
+    expect(storedNow()).to.include({ am: 'x' })
   })
 
   it("refuses 'stale_write' a row moved since the del read it", async () => {

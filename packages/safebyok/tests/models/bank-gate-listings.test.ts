@@ -19,20 +19,30 @@ async function refusalMessageOf(operation: Promise<unknown>): Promise<string> {
 }
 
 describe("BankListing's entrypoints", () => {
-  it("refuses the generic put and del, as only its own verbs write a bank row, calling no bankDB verb", async () => {
+  it("refuses the generic put", async () => {
     const { bank, bankDB, storedBankNow } = await makeBornVault()
-    const deleting = vi.spyOn(bankDB, 'tryDelBank')
+    const building = vi.spyOn(bankDB, 'tryBuildBank')
     const putting = bank.listing.put(storedBankNow() as never, { expected: bank.sparse })
     expect(await refusalMessageOf(putting)).to.eq(writtenByOwnVerbs().message)
-    expect(await refusalMessageOf(bank.listing.del(bank.sparse))).to.eq(writtenByOwnVerbs().message)
-    expect(deleting).not.toHaveBeenCalled()
+    expect(building).not.toHaveBeenCalled()
     expect(bank.isPresent).to.be.true
   })
 
-  it("refuses a delBank over an ante that is no bank row, calling no bankDB verb", async () => {
+  it("refuses the bank's and the gate's own del", async () => {
     const { bank, bankDB } = await makeBornVault()
     const deleting = vi.spyOn(bankDB, 'tryDelBank')
-    await TH.expectRefusal(bank.listing.delBank({ ...BankScope } as never))
+    bank.lock()
+    expect(await refusalMessageOf(bank.del())).to.eq(writtenByOwnVerbs().message)
+    expect(await refusalMessageOf(bank.maingate.del())).to.eq(writtenByOwnVerbs().message)
+    expect(deleting).not.toHaveBeenCalled()
+    expect(bank.isPresent).to.be.true
+    expect(bank.device.openGating).to.be.null
+  })
+
+  it("refuses a del over an ante that is no bank row", async () => {
+    const { bank, bankDB } = await makeBornVault()
+    const deleting = vi.spyOn(bankDB, 'tryDelBank')
+    await TH.expectRefusal(bank.listing.del({ ...BankScope } as never))
     expect(deleting).not.toHaveBeenCalled()
     expect(bank.isPresent).to.be.true
   })

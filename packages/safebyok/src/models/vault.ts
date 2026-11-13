@@ -32,7 +32,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   declare readonly bank_tok:   string
   declare readonly listing:    VaultListing
 
-  /** The box listing for the life in hand, or null until asked for. */
+  /** The box listing last asked for, of this life or one before it, or null until asked for. */
   #boxListing: BoxListing | null = null
   // --
 
@@ -51,7 +51,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
    * Another life of the vault gets a new listing, so ask for it here each time.
    */
   get boxListing(): BoxListing {
-    this.#boxListing ??= this.listing.boxListingOf(this)
+    if (this.#boxListing?.vault_tok !== this.vault_tok) { this.#boxListing = this.listing.boxListingOf(this) }
     return this.#boxListing
   }
   // --
@@ -62,27 +62,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   protected override assignInitialProps(central: Fetched<VaultRecord, VaultSparse>): void {
     tattoo(this, { bank_tok: central.bank_tok }, { configurable: false })
     super.assignInitialProps(central)
-  }
-  // --
-
-  // == [The bank's lock]: alignLock, letBoxesGo
-
-  /** Realign this vault and its boxes with the bank's lock, and let the boxes go once this vault is not `isEnabled`. Never throws.
-   * @internal
-   */
-  override alignLock(): this {
-    super.alignLock()
-    if (this.isEnabled) { this.#boxListing?.lock() } else { this.#letBoxesGo() }
-    return this
-  }
-
-  // The box listing answers only under the life it was made under, so its boxes no longer answer, and drop their whispers.
-  /** Let go of the box listing and end its watch. Its boxes drop their whispers exposed. */
-  #letBoxesGo(): void {
-    const boxListing = this.#boxListing
-    this.#boxListing = null
-    boxListing?.goodbye()
-    boxListing?.lock()
   }
   // --
 
@@ -196,14 +175,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   ensureTimely(maxMillis?: number): Promise<this> { return this.hydrate({ maxMillisSinceRefresh: maxMillis }) }
   // --
 
-  // == [Protected, overriding Storable's]: adopt, isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, overriding Storable's]: children, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Adopt `central`, letting the boxes go where it is of another life, a tombstone included. */
-  protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
-    const isOtherLife = ! this.isOfLife(central)
-    super.adopt(central)
-    if (isOtherLife) { this.#letBoxesGo() }
-  }
+  // The listing in hand may be of a life before this one: aligned, it ends its watch and its boxes drop their whispers.
+  /** The box listing in hand, if any. */
+  protected get children(): readonly BoxListing[] { return this.#boxListing === null ? [] : [this.#boxListing] }
 
   /** Whether `fetched` is alive: a vault row has nothing more to fetch. */
   protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord { return fetched.am === 'a' }

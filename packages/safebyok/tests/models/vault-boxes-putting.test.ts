@@ -361,7 +361,7 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-0001' })
   })
 
-  it("refuses 'bank_locked' while locked, putting nothing", async () => {
+  it("refuses 'bank_locked' while locked", async () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     vault.bank.lock()
     tryPutBox.mockClear()

@@ -3,7 +3,7 @@ import { nowMillis } from '../helpers/clock'
 import { Checkers } from '../helpers/validator'
 import { tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { mainGateMissing, passkeyAlreadyAdded } from '../refusals/throwers'
+import { mainGateMissing, passkeyAlreadyAdded, writtenByOwnVerbs } from '../refusals/throwers'
 import type { GateScope } from '../shapes/shapes-core'
 import { type GateRecord, type GateSparse, type Wayins, GateFormat, gateRecord } from '../shapes/shapes-bankdb'
 import { type BankStamp, type GateStamp, bankStamp, gateStamp } from '../shapes/shapes-gateish'
@@ -136,7 +136,10 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
-  // == [Methods]: pickle
+  // == [Methods]: del, pickle
+
+  /** Refuses: a gate is deleted only with its bank, by `bank.delPrompt()`. */
+  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
 
   /** This gate's current row, as a frozen plain {@link GateRecord}. */
   pickle(): GateRecord { return Object.freeze({ ...this.demandFullProps(), wayins: this.wayins }) }
@@ -165,7 +168,10 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   ensureTimely(maxMillis?: number): Promise<this> { return this.hydrate({ maxMillisSinceRefresh: maxMillis }) }
   // --
 
-  // == [Protected, overriding Storable's]: isFullRecord, lifeTokPathOf, makeSnapshot
+  // == [Protected, overriding Storable's]: children, isFullRecord, lifeTokPathOf, makeSnapshot
+
+  /** None: a gate has nothing listed below it. */
+  protected get children(): readonly [] { return [] }
 
   /** True for a live gate record that has its `wayins`. */
   protected isFullRecord(fetched: GateSparse): fetched is GateRecord {

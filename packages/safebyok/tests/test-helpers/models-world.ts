@@ -470,11 +470,11 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
       if (next === isLocked) { return }
       isLocked = next
       for (const listener of worldListeners) { listener() }
-      for (const listing of listings) { listing.lock() }
+      for (const listing of listings) { listing.align() }
     },
     disable: () => {
       isEnabled = false
-      for (const listing of listings) { listing.lock() }
+      for (const listing of listings) { listing.align() }
     },
     dispose,
 
