@@ -21,7 +21,6 @@ import * as CX from './shapes-core'
 import { type Sidecar, sidecar, type Whisper, whisper, type BankScope, type Boxscope, type VaultScope } from './shapes-core'
 import * as SX from './shapes-storage'
 import * as BX from './shapes-bankdb'
-import * as GX from './shapes-gateish'
 import type { AnyGating, AskUser, RequestCleartext } from './shapes-gateish'
 import type { StrengthChecker } from '../helpers/passphrase-strength'
 
@@ -218,10 +217,10 @@ export const storableArgs = objCheck(({ custom }) => ({
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a bankDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
-export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, EX.OkAct | EX.GateAct, unknown>
+export type ListingAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT> | null, EX.OkAct, unknown>
 
 /** A put's {@link ListingAnswer}, whose good form always carries a record. */
-export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, EX.OkAct | EX.GateAct, unknown>
+export type ListingPutAnswer<RecordT, SparseT> = Answer<Fetched<RecordT, SparseT>, EX.OkAct, unknown>
 
 /** A listing put's options besides its record: the row it expects to find, in sparse form, and `ifPresent` and `ifAbsent`, for a live row or none. */
 export type ListingPutOpts<SparseT> = Readonly<{ expected: SparseT, ifAbsent: EX.PutIfAbsent, ifPresent: EX.IfPresent }>
@@ -325,9 +324,12 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 
 // --
 
-// == [The gate's forms]: GateSnapshot
+// == [The gate's forms]: WayinSnapshot, GateSnapshot
 
-/** A gate as a dialog renders it: its scope, its life and revision, and each wayin's header, by `wayinlabel`. */
+/** A wayin as a gate's snapshot shows it: when it was registered. */
+export type WayinSnapshot = Readonly<{ registered_at: number }>
+
+/** A gate as a dialog renders it: its scope, its life and revision, and which wayins it has, by `wayinlabel`. */
 export interface GateSnapshot extends CX.GateScope {
   /** The life of the bank the gate is of. */
   readonly bank_tok:      string
@@ -341,8 +343,8 @@ export interface GateSnapshot extends CX.GateScope {
   readonly registered_at: number
   /** When the revision in hand was written. */
   readonly written_at:    number
-  /** Each wayin's header, with no wrapped bankKey: `main`, and `passkey0` where the gate has one. */
-  readonly wayins:        Readonly<{ main: GX.WayinHeader, passkey0?: GX.WayinHeader }>
+  /** Each wayin the gate has: `main`, and `passkey0` where it has one. */
+  readonly wayins:        Readonly<{ main: WayinSnapshot, passkey0?: WayinSnapshot }>
 }
 
 // --

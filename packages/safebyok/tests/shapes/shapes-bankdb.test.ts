@@ -91,16 +91,14 @@ describe("BX.bankBuild", () => {
 describe("BX.gatePut", () => {
   const keyed = gateAt(3, 'bank1', { main: mainWayin, passkey0: passkey0Wayin })
   expectCases(BX.gatePut, [
-    [gatePutAskOf('replacePassphrase', gate, { main: otherMainWayin }),                 true,  'passes a replacePassphrase'],
-    [gatePutAskOf('addPasskey', gate, { main: mainWayin, passkey0: passkey0Wayin }),    true,  'passes an addPasskey whose record has a passkey wayin'],
-    [gatePutAskOf('addPasskey', gate, { main: mainWayin }),                             false, 'refuses an addPasskey whose record has none'],
-    [gatePutAskOf('revokePasskey', keyed, { main: mainWayin }),                         true,  'passes a revokePasskey whose record has no passkey wayin'],
-    [gatePutAskOf('revokePasskey', keyed, keyed.wayins),                                false, 'refuses a revokePasskey whose record has one'],
-    [{ ...gatePutAskOf('replacePassphrase', gate, { main: otherMainWayin }), gatelabel: 'side' }, false, 'refuses a gate other than main'],
+    [gatePutAskOf(gate, { main: otherMainWayin }),                          true,  'passes a record with its main wayin replaced'],
+    [gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin }),      true,  'passes a record with a passkey wayin added'],
+    [gatePutAskOf(keyed, { main: mainWayin }),                              true,  'passes a record with its passkey wayin removed'],
+    [{ ...gatePutAskOf(gate, { main: otherMainWayin }), gatelabel: 'side' }, false, 'refuses a gate other than main'],
   ])
 
   it("refuses a record under another gate_tok than the live row it replaces", () => {
-    const ask = gatePutAskOf('replacePassphrase', gate, { main: otherMainWayin })
+    const ask = gatePutAskOf(gate, { main: otherMainWayin })
     expect(() => BX.gatePut.parse({ ...ask, record: { ...ask.record, gate_tok: 'gate2' } })).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 })

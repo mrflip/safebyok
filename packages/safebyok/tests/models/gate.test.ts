@@ -84,9 +84,9 @@ describe("gate.pickle() and gate.toJSON()", () => {
     expect(JSON.stringify(gate)).to.not.include('ciphertext_b64')
   })
 
-  it("its snapshot shows each wayin's header, and no passkey0 for a gate with no passkey", async () => {
+  it("its snapshot shows each wayin's registered_at alone, and no passkey0 for a gate with no passkey", async () => {
     const { gate: both } = await builtGate({ passkey: true })
-    expect(both.snapshot.wayins).to.deep.equal({ main: both.main.toJSON(), passkey0: both.passkey0!.toJSON() })
+    expect(both.snapshot.wayins).to.deep.equal({ main: { registered_at: both.main.registered_at }, passkey0: { registered_at: both.passkey0!.registered_at } })
     const { gate } = await builtGate()
     expect(gate.snapshot.wayins).to.not.have.property('passkey0')
   })

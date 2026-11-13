@@ -28,7 +28,7 @@ const row = `fragment SafebyokRowFields on SafebyokRow {
 }`
 
 const ask = `fragment SafebyokAskFields on SafebyokAsk {
-  op user_id banklabel gatelabel vaultlabel boxlabel bank_tok vault_tok ifAbsent ifPresent gateVerb
+  op user_id banklabel gatelabel vaultlabel boxlabel bank_tok vault_tok ifAbsent ifPresent
   expected { revision_tok revision_seq am bank_tok gate_tok vault_tok box_tok }
   record { revision_tok revision_seq am bank_tok gate_tok vault_tok box_tok }
   gate { revision_tok revision_seq am bank_tok gate_tok vault_tok box_tok }

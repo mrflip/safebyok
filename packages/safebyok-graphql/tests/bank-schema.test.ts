@@ -110,7 +110,7 @@ function schemaDriftOf(schema: GraphQLSchema): string[] {
 }
 // --
 
-// == [The checks]: AnswerChecks, InputChecks, gateVerbAsk
+// == [The checks]: AnswerChecks, InputChecks
 
 // The check GraphQLBankDB parses each root field's answer with.
 const AnswerChecks = [
@@ -131,18 +131,14 @@ const AnswerChecks = [
   ['safebyokWatch',             BX.crossedNotice],
 ] as const
 
-// A gate verb's mutation names its verb, so its ask is the gate's put without `gateVerb`: the walk reads only a check's definition.
-const { gateVerb: _gateVerb, ...gateVerbShape } = defOf(BX.gatePut).shape!
-const gateVerbAsk = { _zod: { def: { type: 'object', shape: gateVerbShape } } } as unknown as Check
-
 // The check GraphQLBankDB parses each input object with before sending it, and the server's bankDB parses it with again.
 const InputChecks = [
   ['safebyokGetVault',          'ask', BX.vaultGet],
   ['safebyokGetBox',            'ask', BX.boxGet],
   ['safebyokBuildBank',         'ask', BX.bankBuild],
-  ['safebyokReplacePassphrase', 'ask', gateVerbAsk],
-  ['safebyokAddPasskey',        'ask', gateVerbAsk],
-  ['safebyokRevokePasskey',     'ask', gateVerbAsk],
+  ['safebyokReplacePassphrase', 'ask', BX.gatePut],
+  ['safebyokAddPasskey',        'ask', BX.gatePut],
+  ['safebyokRevokePasskey',     'ask', BX.gatePut],
   ['safebyokDelBank',           'ask', BX.bankDel],
   ['safebyokPutVault',          'ask', BX.vaultPut],
   ['safebyokDelVault',          'ask', BX.vaultDel],

@@ -10,8 +10,8 @@ export { ckeyOf } from '../helpers/helpers'
 // --
 
 // == [The acts]: what an answer and its ask say of what happened
-export { askOpVals, badActVals, boxVaultActVals, gateActVals, goodActVals, foundActVals, gateVerbVals, ifAbsentVals, refusedActVals, writeActVals } from '../shapes/shapes-enums'
-export type { AskOp, BadAct, DelAct, GotAct, ListAct, OkAct, PutAct, BoxAct, GateAct, GoodAct, GateVerb, ParentBankAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
+export { askOpVals, badActVals, boxVaultActVals, goodActVals, foundActVals, ifAbsentVals, refusedActVals, writeActVals } from '../shapes/shapes-enums'
+export type { AskOp, BadAct, DelAct, GotAct, ListAct, OkAct, PutAct, BoxAct, GoodAct, ParentBankAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
 // --
 
 // == [The bankDB]: AdapterBankDB, BankDB, their brands, the one in memory, and the rest of its contract as BX

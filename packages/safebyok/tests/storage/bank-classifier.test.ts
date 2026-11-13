@@ -4,7 +4,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { type VaultError, rowsOfRefusal } from '../../src/refusals/errors'
 import { classifyBuildBank, classifyDelBank, classifyEnsureBank, classifyStoredBox, classifyStoredBoxes, classifyStoredGate, classifyStoredVault } from '../../src/storage/bank-classifier'
 import {
-  Now, bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, boxAt, boxGetAskOf, boxListAsk, boxQuery, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
+  bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, boxAt, boxGetAskOf, boxListAsk, boxQuery, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
   vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultTombstoneOf,
 } from '../test-helpers/bankdb-world'
 
@@ -24,7 +24,7 @@ function refusalOf(classify: () => unknown): VaultError {
 }
 
 describe("classifyStoredGate and classifyStoredVault, the row above", () => {
-  const replace = gatePutAskOf('replacePassphrase', liveGate, { main: otherMainWayin })
+  const replace = gatePutAskOf(liveGate, { main: otherMainWayin })
   const vaultGet = vaultGetAskOf()
   const BankCases = [
     [null,       "bank_void",   'no bank row'],
@@ -86,66 +86,29 @@ describe("classifyStoredVault, the vault tables under a live bank", () => {
 
 function fetchedOver(gate: unknown) { return { bank: liveBank, gate } }
 
-describe("classifyStoredGate, the gate verbs' policy", () => {
-  describe("replacePassphrase", () => {
-    it("replaces the gate row when only the main wayin moves", () => {
-      const ask = gatePutAskOf('replacePassphrase', keyedGate, { main: otherMainWayin, passkey0: passkey0Wayin })
-      expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: ask.record, presence: 'live' })
-    })
-    it("refuses gate_issue when the record moves another wayin", () => {
-      const ask = gatePutAskOf('replacePassphrase', keyedGate, { main: otherMainWayin })
-      expect(refusalOf(() => classifyStoredGate(ask, fetchedOver(keyedGate))).refusalkind).to.eq('gate_issue')
-    })
-    it("refuses gate_issue when the record changes registered_at", () => {
-      const ask = gatePutAskOf('replacePassphrase', liveGate, { main: otherMainWayin })
-      const err = refusalOf(() => classifyStoredGate({ ...ask, record: { ...ask.record, registered_at: Now + 1 } }, fetchedOver(liveGate)))
-      expect(err.refusalkind).to.eq('gate_issue')
-      expect(rowsOfRefusal(err)).to.deep.include({ parent: liveBank, dbhas: liveGate })
-    })
+describe("classifyStoredGate, the put table over a live bank's gate", () => {
+  it("replaces the gate row it cites, answering the record it stores", () => {
+    const ask = gatePutAskOf(keyedGate, { main: otherMainWayin, passkey0: passkey0Wayin })
+    expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: ask.record, presence: 'live' })
   })
 
-  describe("addPasskey", () => {
-    it("replaces the gate row when only a passkey wayin is added", () => {
-      const ask = gatePutAskOf('addPasskey', liveGate, { main: mainWayin, passkey0: passkey0Wayin })
-      expect(classifyStoredGate(ask, fetchedOver(liveGate))).to.deep.include({ ok: true, act: 'replaced', gate: ask.record })
-    })
-    it("refuses camped where the gate row has a passkey wayin", () => {
-      const ask = gatePutAskOf('addPasskey', keyedGate, { main: mainWayin, passkey0: passkey0Wayin })
-      expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: false, act: 'camped', gate: keyedGate })
-    })
-    it("refuses gate_issue when the record moves the main wayin", () => {
-      const ask = gatePutAskOf('addPasskey', liveGate, { main: otherMainWayin, passkey0: passkey0Wayin })
-      expect(refusalOf(() => classifyStoredGate(ask, fetchedOver(liveGate))).refusalkind).to.eq('gate_issue')
-    })
+  it("answers a replay of the stored record as retcon, storing nothing", () => {
+    const ask = gatePutAskOf(liveGate, { main: mainWayin, passkey0: passkey0Wayin })
+    expect(classifyStoredGate(ask, fetchedOver(ask.record))).to.deep.include({ ok: false, act: 'retcon', gate: ask.record })
   })
 
-  describe("revokePasskey", () => {
-    it("replaces the gate row when only the passkey wayin is removed", () => {
-      const ask = gatePutAskOf('revokePasskey', keyedGate, { main: mainWayin })
-      expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: ask.record })
-    })
-    it("passes where the gate row has no passkey wayin, storing nothing", () => {
-      const ask = gatePutAskOf('revokePasskey', liveGate, { main: mainWayin })
-      expect(classifyStoredGate(ask, fetchedOver(liveGate))).to.deep.include({ ok: true, act: 'passed', gate: liveGate })
-    })
-    it("refuses gate_issue when the record moves the main wayin", () => {
-      const ask = gatePutAskOf('revokePasskey', keyedGate, { main: otherMainWayin })
-      expect(refusalOf(() => classifyStoredGate(ask, fetchedOver(keyedGate))).refusalkind).to.eq('gate_issue')
-    })
-  })
-
-  it("runs no policy over a gate row the revision rules refuse", () => {
-    const ask = gatePutAskOf('replacePassphrase', gateAt(Seq - 1), { main: mainWayin, passkey0: passkey0Wayin })
+  it("refuses a gate row the revision rules refuse", () => {
+    const ask = gatePutAskOf(gateAt(Seq - 1), { main: mainWayin, passkey0: passkey0Wayin })
     expect(classifyStoredGate(ask, fetchedOver(liveGate))).to.deep.include({ ok: false, act: 'stale', gate: liveGate })
   })
 
   it("puts no gate row where the live bank stores none", () => {
-    const ask = gatePutAskOf('replacePassphrase', liveGate, { main: otherMainWayin })
+    const ask = gatePutAskOf(liveGate, { main: otherMainWayin })
     expect(classifyStoredGate(ask, fetchedOver(null))).to.deep.include({ ok: false, act: 'ahead', gate: null, presence: 'void' })
   })
 
   it("refuses damaged_row for a gate row that fails its checks", () => {
-    const ask = gatePutAskOf('replacePassphrase', liveGate, { main: otherMainWayin })
+    const ask = gatePutAskOf(liveGate, { main: otherMainWayin })
     expect(refusalOf(() => classifyStoredGate(ask, fetchedOver({ ...liveGate, auth: { smuggled: 'field' } }))).refusalkind).to.eq('damaged_row')
   })
 })

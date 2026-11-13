@@ -136,30 +136,17 @@ describe("MemoryBankDB's gate verbs", () => {
 
   it("adds a passkey wayin, changing only the gate row", async () => {
     const bankDB = await builtBankDB()
-    const answer = await bankDB.addPasskey(gatePutAskOf('addPasskey', gateAt(), keyed))
+    const answer = await bankDB.addPasskey(gatePutAskOf(gateAt(), keyed))
     expect(answer.act).to.eq('replaced')
     expect(answer.val.wayins).to.deep.equal(keyed)
     expect(answer.parent).to.deep.equal(bankAt())
     expect(bankDB._cheat_shelfOf(bankScope).bank).to.deep.equal(bankAt())
   })
 
-  it("answers a revoke with no passkey wayin stored as passed", async () => {
-    const bankDB = await builtBankDB()
-    const answer = await bankDB.revokePasskey(gatePutAskOf('revokePasskey', gateAt(), { main: mainWayin }))
-    expect(answer.act).to.eq('passed')
-    expect(answer.val).to.deep.equal(gateAt())
-  })
-
-  it("refuses a passphrase replacement that also adds a passkey wayin", async () => {
-    const bankDB = await builtBankDB()
-    const ask = gatePutAskOf('replacePassphrase', gateAt(), { main: otherMainWayin, passkey0: passkey0Wayin })
-    await TH.expectRefusal(bankDB.replacePassphrase(ask), 'gate_issue')
-  })
-
   it("refuses a gate verb under an ended bank life as vault_reborn", async () => {
     const bankDB = await builtBankDB()
     bankDB._cheat_shelfOf(bankScope).bank = bankAt(0, 'bank2')
-    const answer = await bankDB.tryReplacePassphrase(gatePutAskOf('replacePassphrase', gateAt(), { main: otherMainWayin }))
+    const answer = await bankDB.tryReplacePassphrase(gatePutAskOf(gateAt(), { main: otherMainWayin }))
     expect(answer.ok).to.eq(false)
     expect(answer.act).to.eq('bank_reborn')
     expect(answer.err?.refusalkind).to.eq('vault_reborn')

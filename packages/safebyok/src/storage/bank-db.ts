@@ -9,7 +9,7 @@ import type { BadAct, GoodAct, GotAct, ListAct, OkAct } from '../shapes/shapes-e
 import type { BoxTidyAsk, DamagedVault, WatchScope } from '../shapes/shapes-storage'
 import type {
   BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRow, BankTop, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox,
-  GateRecord, GateVerbAsk, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRow,
+  GateRecord, GatePutAsk, LoggableAsk, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRow,
 } from '../shapes/shapes-bankdb'
 import * as Refuse from '../refusals/throwers'
 
@@ -98,22 +98,18 @@ export interface BankDB {
   buildBank(ask: BankBuildAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.buildBank}. */
   tryBuildBank(ask: BankBuildAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, whose only change is to replace the passphrase wayin. */
-  replacePassphrase(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  /** Store the gate record `ask.record`, its passphrase wayin replaced, over the gate row `ask.expected`. */
+  replacePassphrase(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.replacePassphrase}. */
-  tryReplacePassphrase(ask: GateVerbAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, whose only change is to add a passkey wayin.
-   * Refuses `camped` when a passkey wayin is already stored.
-   */
-  addPasskey(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  tryReplacePassphrase(ask: GatePutAsk): Promise<GateAnswer>
+  /** Store the gate record `ask.record`, a passkey wayin added, over the gate row `ask.expected`. */
+  addPasskey(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.addPasskey}. */
-  tryAddPasskey(ask: GateVerbAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, whose only change is to remove the passkey wayin.
-   * Under the `passed` act, nothing is stored: the gate row has no passkey wayin, and `val` is that row.
-   */
-  revokePasskey(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  tryAddPasskey(ask: GatePutAsk): Promise<GateAnswer>
+  /** Store the gate record `ask.record`, its passkey wayin removed, over the gate row `ask.expected`. */
+  revokePasskey(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.revokePasskey}. */
-  tryRevokePasskey(ask: GateVerbAsk): Promise<GateAnswer>
+  tryRevokePasskey(ask: GatePutAsk): Promise<GateAnswer>
   /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
   delBank(ask: BankDelAsk): Promise<GoodAnswer<BankRow | null, OkAct, typeof BankTop>>
   /** Non-throwing form of {@link BankDB.delBank}. */

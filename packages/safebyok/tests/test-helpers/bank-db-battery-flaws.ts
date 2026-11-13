@@ -33,9 +33,9 @@ function bankReadersOf(bankDB: BankDB): [string, () => Promise<Answered>][] {
 function gateReadersOf(bankDB: BankDB): [string, () => Promise<Answered>][] {
   return [
     ['buildBank',         () => bankDB.tryBuildBank(bankBuildAskOf(bankAt(0, 'bank2'), gateAt(0, 'bank2')))],
-    ['replacePassphrase', () => bankDB.tryReplacePassphrase(gatePutAskOf('replacePassphrase', gate, { main: otherMainWayin }))],
-    ['addPasskey',        () => bankDB.tryAddPasskey(gatePutAskOf('addPasskey', gate, { main: mainWayin, passkey0: passkey0Wayin }))],
-    ['revokePasskey',     () => bankDB.tryRevokePasskey(gatePutAskOf('revokePasskey', gate, MainOnly))],
+    ['replacePassphrase', () => bankDB.tryReplacePassphrase(gatePutAskOf(gate, { main: otherMainWayin }))],
+    ['addPasskey',        () => bankDB.tryAddPasskey(gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin }))],
+    ['revokePasskey',     () => bankDB.tryRevokePasskey(gatePutAskOf(gate, MainOnly))],
   ]
 }
 

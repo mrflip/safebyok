@@ -86,7 +86,7 @@ export type Gatingkind = typeof gatingkindVals[number]
 export const correctablekindVals = ['wrong_passphrase', 'wrong_passkey', 'passkey_unavailable', 'weak_passphrase', 'same_passphrase'] as const
 // --
 
-// == [Acts]: listActVals, ListAct, gotActVals, GotAct, putActVals, PutAct, delActVals, DelAct, gateVerbVals, GateVerb
+// == [Acts]: listActVals, ListAct, gotActVals, GotAct, putActVals, PutAct, delActVals, DelAct
 
 /** A listing verb's act: `got` for rows found, or `gotvoid` for none. */
 export const listActVals = ['got', 'gotvoid'] as const
@@ -112,13 +112,9 @@ export type PutAct = typeof putActVals[number]
 /** A del's act: `deleted`, the tombstone stored over the live row. */
 export const delActVals = ['deleted'] as const
 export type DelAct = typeof delActVals[number]
-
-/** The verbs that change a vault's gate. Each is a put of the vault record with checks of its own, and the put request names its verb. */
-export const gateVerbVals = ['replacePassphrase', 'addPasskey', 'revokePasskey'] as const
-export type GateVerb = typeof gateVerbVals[number]
 // --
 
-// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, parentBankActVals, ParentBankAct, VaultAct, BoxAct, gateActVals, GateAct, goodActVals, GoodAct, badActVals, BadAct
+// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, parentBankActVals, ParentBankAct, VaultAct, BoxAct, goodActVals, GoodAct, badActVals, BadAct
 
 /** The acts of a put or del that stored its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
 export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
@@ -149,12 +145,8 @@ export type VaultAct = WriteAct | FoundAct | RefusedAct
 /** Every act a box's get, put or del is classified as: those of its own row, and those of its vault. */
 export type BoxAct   = VaultAct | BoxVaultAct
 
-/** The acts only a gate verb answers: `added` for `addPasskey`, `revoked` for `revokePasskey`. Its others are a put's. */
-export const gateActVals = ['added', 'revoked'] as const
-export type GateAct = typeof gateActVals[number]
-
 /** Every act a good answer carries, a listing's `timely` among them: the instance listed served a get, and storage was not asked. */
-export const goodActVals = [...writeActVals, ...foundActVals, ...gateActVals, 'got', 'tidied', 'timely'] as const
+export const goodActVals = [...writeActVals, ...foundActVals, 'got', 'tidied', 'timely'] as const
 export type GoodAct = typeof goodActVals[number]
 
 /** Every act a refused answer carries; `unclassified_storing` for a refusal the classifier never saw: a bad ask, storage out of reach, a revoked identity. */

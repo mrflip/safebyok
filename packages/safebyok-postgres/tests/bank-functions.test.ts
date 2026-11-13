@@ -38,45 +38,36 @@ async function hearing(): Promise<unknown[]> {
 }
 
 describe("safebyok_put_gate", () => {
-  it("stores a gate verb's record only where the verb's policy allows it, and tells of it with the bank row above", async () => {
+  it("stores a gate verb's record over the expected gate row, and tells of it with the bank row above", async () => {
     await builtBankDB()
     const told = await hearing()
-    const { record, expected } = BW.gatePutAskOf('addPasskey', BW.gateAt(), WithPasskey)
-    expect(await answerOf(PutGateSql, [record, expected, 'addPasskey'])).to.deep.include({ ok: true, act: 'replaced', presence: 'live', bank: BW.bankAt(), gate: record })
+    const { record, expected } = BW.gatePutAskOf(BW.gateAt(), WithPasskey)
+    expect(await answerOf(PutGateSql, [record, expected])).to.deep.include({ ok: true, act: 'replaced', presence: 'live', bank: BW.bankAt(), gate: record })
     expect(await BH.rowsOf().gateRowOf(BW.gateScope)).to.deep.equal(record)
     await vi.waitFor(() => { expect(told).to.deep.equal([{ at: BW.gateScope, parent: BW.bankAt(), row: record }]) })
   })
 
-  it("stores nothing, and answers the rows it found, for each breach of the policy", async () => {
+  it("stores nothing, and answers the rows it found, for a record over another row or of another life", async () => {
     await builtBankDB()
     const gate = BW.gateAt()
     const withPasskey = BW.gateAt(0, 'bank1', WithPasskey)
-    const breaches: [string, Record<string, unknown>, unknown, string][] = [
-      ['a moved registered_at',              { ...BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin }).record, registered_at: 1 }, gate, 'replacePassphrase'],
-      ['a passkey wayin added by replace',   BW.gatePutAskOf('replacePassphrase', gate, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin }).record, gate, 'replacePassphrase'],
-      ['the main wayin moved by addPasskey', BW.gatePutAskOf('addPasskey', gate, { main: BW.otherMainWayin, passkey0: BW.passkey0Wayin }).record, gate, 'addPasskey'],
-      ['a revokePasskey with none stored',   BW.gatePutAskOf('revokePasskey', gate, BW.MainOnly).record, gate, 'revokePasskey'],
-      ['a stale revision',                   BW.gatePutAskOf('replacePassphrase', withPasskey, { main: BW.otherMainWayin }).record, { ...gate, revision_tok: 'gone' }, 'replacePassphrase'],
-      ['another bank life',                  { ...BW.gatePutAskOf('addPasskey', gate, WithPasskey).record, bank_tok: 'bank0' }, gate, 'addPasskey'],
+    const unfit: [string, Record<string, unknown>, unknown][] = [
+      ['a stale revision',          BW.gatePutAskOf(withPasskey, { main: BW.otherMainWayin }).record, { ...gate, revision_tok: 'gone' }],
+      ['a revision_seq not next',   { ...BW.gatePutAskOf(gate, WithPasskey).record, revision_seq: 3 }, gate],
+      ['another gate life',         BW.gatePutAskOf(gate, WithPasskey).record, { ...gate, gate_tok: 'gate2' }],
+      ['another bank life',         { ...BW.gatePutAskOf(gate, WithPasskey).record, bank_tok: 'bank0' }, gate],
     ]
-    for (const [breach, record, expected, gateVerb] of breaches) {
-      expect(await answerOf(PutGateSql, [record, expected, gateVerb]), breach).to.deep.include({ ok: false, act: null, presence: null, bank: BW.bankAt(), gate })
+    for (const [blurb, record, expected] of unfit) {
+      expect(await answerOf(PutGateSql, [record, expected]), blurb).to.deep.include({ ok: false, act: null, presence: null, bank: BW.bankAt(), gate })
     }
     expect(await BH.rowsOf().gateRowOf(BW.gateScope)).to.deep.equal(gate)
-  })
-
-  it("stores nothing for an addPasskey over a stored passkey wayin", async () => {
-    const bankDB = await builtBankDB()
-    const { val: withPasskey } = await bankDB.addPasskey(BW.gatePutAskOf('addPasskey', BW.gateAt(), WithPasskey))
-    const { record } = BW.gatePutAskOf('addPasskey', withPasskey, { main: BW.mainWayin, passkey0: { ...BW.passkey0Wayin, credential_id: 'cred2' } })
-    expect(await answerOf(PutGateSql, [record, withPasskey, 'addPasskey'])).to.deep.include({ ok: false, gate: withPasskey })
   })
 
   it("stores nothing under a deleted bank", async () => {
     const bankDB = await builtBankDB()
     await bankDB.delBank(BW.bankDelAskOf(BW.bankAt()))
-    const { record, expected } = BW.gatePutAskOf('addPasskey', BW.gateAt(), WithPasskey)
-    expect(await answerOf(PutGateSql, [record, expected, 'addPasskey'])).to.deep.include({ ok: false, bank: BW.bankTombstoneOf(BW.bankAt()), gate: null })
+    const { record, expected } = BW.gatePutAskOf(BW.gateAt(), WithPasskey)
+    expect(await answerOf(PutGateSql, [record, expected])).to.deep.include({ ok: false, bank: BW.bankTombstoneOf(BW.bankAt()), gate: null })
   })
 })
 

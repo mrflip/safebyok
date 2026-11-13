@@ -241,6 +241,7 @@ async function replacePassphrase(bank: Bank, cleartexts: unknown, unlockByProvin
 async function addPasskey(bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.passkeyAddCleartexts, cleartexts)
   const { ante, gate } = await timelyAnte(bank)
+  gate.demandPasskeyAddable()
   const proved         = await PassphraseProving.buildStored(gate, passphraseClear, bank)
   const passkeyProving = await PasskeyProving.buildNovel(bank.stamp, gate.stamp, passkeyClear, bank)
 

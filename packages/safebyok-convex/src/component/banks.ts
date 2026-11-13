@@ -55,8 +55,7 @@ export const buildBank = mutation({
   },
 })
 
-// The classifier runs each gate verb's policy, so the policy runs here, on the gate row this mutation fetched.
-/** Classify a gate verb's ask against the bank row and the gate row, under the verb's policy, and store its gate record if the act is a write. */
+/** Classify a gate verb's ask against the bank row and the gate row, and store its gate record if the act is a write. */
 export const putGate = mutation({
   args:    CVX.askArgs,
   returns: CVX.gateWritten,

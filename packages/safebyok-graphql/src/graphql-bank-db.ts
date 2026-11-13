@@ -2,7 +2,7 @@ import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql
 import type * as Z from 'zod'
 import * as DB from 'safebyok/storage'
 import { BX } from 'safebyok/storage'
-import type { BankScope, BoxTidyAsk, GateVerb, GoodAct, GotAct, ListAct, OkAct, Tidied, WatchScope } from 'safebyok/storage'
+import type { BankScope, BoxTidyAsk, GoodAct, GotAct, ListAct, OkAct, Tidied, WatchScope } from 'safebyok/storage'
 import { BankOperations } from './bank-operations'
 
 // == [Options]: GraphQLBankClient, GraphQLBankDBOpts, graphQLBankDBOpts
@@ -96,37 +96,40 @@ export class GraphQLBankDB implements BX.BankDB {
 
   // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
 
-  /** Store a gate record whose only change is a new passphrase wayin ({@link BX.BankDB.replacePassphrase}). */
-  async replacePassphrase(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryReplacePassphrase(ask)) }
+  /** Store the gate record with its passphrase wayin replaced ({@link BX.BankDB.replacePassphrase}). */
+  async replacePassphrase(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryReplacePassphrase(ask)) }
 
   /** Non-throwing form of {@link replacePassphrase}. */
-  async tryReplacePassphrase(ask: BX.GateVerbAsk): Promise<BX.GateAnswer> {
+  async tryReplacePassphrase(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
     try {
-      const crossed = await this.#runMutation(BankOperations.replacePassphrase, 'safebyokReplacePassphrase', { ask: gateVerbAskOf('replacePassphrase', ask) })
+      const checked = BX.gatePut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.replacePassphrase, 'safebyokReplacePassphrase', { ask: checked })
       return BX.replacePassphraseAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'replacePassphrase', { ...ask, gateVerb: 'replacePassphrase' }) }
+    } catch (err) { return answerForRefusal(err, 'replacePassphrase', ask) }
   }
 
-  /** Store a gate record whose only change is an added passkey wayin ({@link BX.BankDB.addPasskey}). */
-  async addPasskey(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryAddPasskey(ask)) }
+  /** Store the gate record with a passkey wayin added ({@link BX.BankDB.addPasskey}). */
+  async addPasskey(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryAddPasskey(ask)) }
 
   /** Non-throwing form of {@link addPasskey}. */
-  async tryAddPasskey(ask: BX.GateVerbAsk): Promise<BX.GateAnswer> {
+  async tryAddPasskey(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
     try {
-      const crossed = await this.#runMutation(BankOperations.addPasskey, 'safebyokAddPasskey', { ask: gateVerbAskOf('addPasskey', ask) })
+      const checked = BX.gatePut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.addPasskey, 'safebyokAddPasskey', { ask: checked })
       return BX.addPasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'addPasskey', { ...ask, gateVerb: 'addPasskey' }) }
+    } catch (err) { return answerForRefusal(err, 'addPasskey', ask) }
   }
 
-  /** Store a gate record whose only change is a removed passkey wayin ({@link BX.BankDB.revokePasskey}). */
-  async revokePasskey(ask: BX.GateVerbAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryRevokePasskey(ask)) }
+  /** Store the gate record with its passkey wayin removed ({@link BX.BankDB.revokePasskey}). */
+  async revokePasskey(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryRevokePasskey(ask)) }
 
   /** Non-throwing form of {@link revokePasskey}. */
-  async tryRevokePasskey(ask: BX.GateVerbAsk): Promise<BX.GateAnswer> {
+  async tryRevokePasskey(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
     try {
-      const crossed = await this.#runMutation(BankOperations.revokePasskey, 'safebyokRevokePasskey', { ask: gateVerbAskOf('revokePasskey', ask) })
+      const checked = BX.gatePut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.revokePasskey, 'safebyokRevokePasskey', { ask: checked })
       return BX.revokePasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'revokePasskey', { ...ask, gateVerb: 'revokePasskey' }) }
+    } catch (err) { return answerForRefusal(err, 'revokePasskey', ask) }
   }
   // --
 
@@ -288,14 +291,7 @@ export class GraphQLBankDB implements BX.BankDB {
 }
 // --
 
-// == [Asks and answers]: gateVerbAskOf, answerForRefusal, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
-
-// The mutation names the verb, so the ask sent leaves it out.
-/** Check `ask` as a `gateVerb` ask, and return it without `gateVerb`. */
-function gateVerbAskOf(gateVerb: GateVerb, ask: BX.GateVerbAsk): BX.GateVerbAsk {
-  const { gateVerb: _gateVerb, ...sent } = BX.gatePut.parse({ ...ask, gateVerb })
-  return sent
-}
+// == [Asks and answers]: answerForRefusal, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
 
 // Every throw in a verb ends up here: an ask that fails its check, a server out of reach, or an answer that fails its own.
 /** The bad answer for a verb that threw: its refusal, or `unexpected_error` for anything else.

@@ -287,10 +287,10 @@ export class PostgresBankDB extends DB.AdapterBankDB {
     return stored
   }
 
-  // The function holds the verb's policy, so a gate verb always calls it: when the policy refuses, the classifier
-  // answers from the rows it returns, with the same act the policy table gives.
+  // The function checks the bank row as it stores, so a gate verb always calls it: when nothing is stored, the
+  // classifier answers from the rows it returns.
   protected async doPutGate(ask: BX.GatePutAsk): Promise<BX.GateStored> {
-    const answered = await this.#firstRow<GateAnswered>(PutGateSql, [JSON.stringify(ask.record), JSON.stringify(ask.expected), ask.gateVerb])
+    const answered = await this.#firstRow<GateAnswered>(PutGateSql, [JSON.stringify(ask.record), JSON.stringify(ask.expected)])
     const stored   = this.classifyStoredGate(ask, answered)
     if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
     return stored

@@ -44,14 +44,14 @@ export const GetGateWithBankSql = `
 // Each calls a function in `bank-functions.ts`, which checks the record against the stored rows and stores it.
 // It returns one row: `ok`, `act`, `bank`, `gate` and `presence`. When it stores the record, it also sends the notices.
 // The bank functions take the bank record, its main gate record (null for a delBank), then the row the ask expects,
-// each as JSON text. The gate function takes the gate record, the row the ask expects, then the gate verb.
+// each as JSON text. The gate function takes the gate record, then the row the ask expects.
 
 /** Store a bank's first record and its main gate, if no row is stored. */
 export const BirthBankSql = 'SELECT * FROM safebyok_birth_bank($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)'
 /** Store a bank's next record over the row expected, replacing every row under the bank with its new main gate, if any. */
 export const ReviseBankSql = 'SELECT * FROM safebyok_revise_bank($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)'
-/** Store a gate verb's record over the gate row expected, if the verb's policy allows it. */
-export const PutGateSql = 'SELECT * FROM safebyok_put_gate($1::text::jsonb, $2::text::jsonb, $3)'
+/** Store a gate verb's record over the gate row expected. */
+export const PutGateSql = 'SELECT * FROM safebyok_put_gate($1::text::jsonb, $2::text::jsonb)'
 // --
 
 // == [Vault rows]: GetVaultWithBankSql

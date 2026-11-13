@@ -182,7 +182,7 @@ export function noticeParentOf({ fmt }: { fmt: number }, parent: BankRow | Vault
 }
 // --
 
-// == [Asks]: bankEnsure, bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk, BankEnsureAsk, BankBuildAsk, GatePutAsk, BankDelAsk, VaultAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, GateVerbAsk, boxQuery, boxList, BoxQuery, BoxListAsk, boxGet, boxPut, boxDel, boxAsk, BoxAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, loggableAsk, LoggableAsk
+// == [Asks]: bankEnsure, bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk, BankEnsureAsk, BankBuildAsk, GatePutAsk, BankDelAsk, VaultAsk, VaultGetAsk, VaultPutAsk, VaultDelAsk, boxQuery, boxList, BoxQuery, BoxListAsk, boxGet, boxPut, boxDel, boxAsk, BoxAsk, BoxGetAsk, BoxPutAsk, BoxDelAsk, loggableAsk, LoggableAsk
 
 type Expecting = { expected: SX.Revision }
 type Cited     = Expecting & { record: SX.Revision }
@@ -198,13 +198,6 @@ const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => 
 function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am, recordAm: EX.Am): boolean {
   if ((expectedAm === 'a') && (recordAm === 'a')) { return lifeTok === expectedLifeTok }
   return (lifeTok !== expectedLifeTok) && (lifeTok !== SX.VoidLifeTok)
-}
-
-// `addPasskey` adds a passkey wayin and `revokePasskey` removes it, so the record each stores has one or none.
-function isGateVerbRecord({ gateVerb, record }: { gateVerb: EX.GateVerb, record: { wayins: { passkey0?: unknown } } }): boolean {
-  if (gateVerb === 'addPasskey')    { return record.wayins.passkey0 !== undefined }
-  if (gateVerb === 'revokePasskey') { return record.wayins.passkey0 === undefined }
-  return true
 }
 
 // A bank's gate is built with it, under its bank record's scope and `bank_tok`, as the first revision of a life of its own.
@@ -225,7 +218,7 @@ export type BankEnsureAsk = Readonly<Z.output<typeof bankEnsure>>
 /** The checks of a bankDB ask that stores a row, or gets a vault row.
  * Only the revision and life fields of `expected` are read, so pass the row in hand, or the shell for none.
  */
-export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk } = Checkers('bad_record', ({ lit, oneof, discrim, bank_tok, gate_tok, bankScope, gateScope, vaultScope }) => {
+export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk } = Checkers('bad_record', ({ lit, discrim, bank_tok, gate_tok, bankScope, gateScope, vaultScope }) => {
   const bankExpected  = SX.rowMeta.omit({ vault_tok: true }).extend({ bank_tok })
   const gateExpected  = SX.rowMeta.omit({ vault_tok: true }).extend({ gate_tok })
   const vaultExpected = SX.rowMeta
@@ -244,13 +237,10 @@ export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultA
     .refine(isGateBorn,       Phrases.GateNotBorn)
   const gatePut = gateScope.unwrap().extend({
     op: lit('put'), bank_tok, expected: gateExpected, record: gateRecord,
-    /** The gate verb this put is for. The classifier runs that verb's checks against the gate row it replaces. */
-    gateVerb: oneof(EX.gateVerbVals),
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
     .refine(isRecordAtAsk,    Phrases.RecordOfOtherAddress)
-    .refine(isGateVerbRecord, Phrases.GateVerbRecordMismatch)
     .refine(({ record, expected }) => isLifeTokPlaced(record.gate_tok, expected.gate_tok, expected.am, record.am),   Phrases.LifeTokMisplaced)
   const bankDel = bankScope.unwrap().extend({
     op: lit('del'), expected: bankExpected, record: bankTombstone,
@@ -286,7 +276,7 @@ export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultA
 
 /** A `buildBank` ask: the bank's scope, the bank record to store over the expected tombstone or shell, and its `main` gate's record. */
 export type BankBuildAsk = Readonly<Z.output<typeof bankBuild>>
-/** A gate verb's ask: the gate's scope, its bank's `bank_tok`, the gate record to store over the expected gate row, and the verb. */
+/** A gate verb's ask, as `replacePassphrase`, `addPasskey` and `revokePasskey` take it: the gate's scope, its bank's `bank_tok`, and the gate record to store over the expected gate row. */
 export type GatePutAsk   = Readonly<Z.output<typeof gatePut>>
 /** A `delBank` ask: the bank's scope, the tombstone to store, and the expected bank row. */
 export type BankDelAsk   = Readonly<Z.output<typeof bankDel>>
@@ -298,9 +288,6 @@ export type VaultGetAsk  = Extract<VaultAsk, { op: 'get' }>
 export type VaultPutAsk  = Extract<VaultAsk, { op: 'put' }>
 /** A `delVault` ask: the vault's scope, its bank's `bank_tok`, the tombstone to store, and the expected row. */
 export type VaultDelAsk  = Extract<VaultAsk, { op: 'del' }>
-
-/** A gate verb's ask, as `replacePassphrase`, `addPasskey` and `revokePasskey` take it: a {@link GatePutAsk} without its `gateVerb`, which the verb supplies. */
-export type GateVerbAsk  = Omit<GatePutAsk, 'gateVerb'>
 
 /** The checks of a box's scope under the life of its vault, and of a `listBoxes` ask. */
 export const { boxQuery, boxList } = Checkers('bad_scope', ({ lit, bank_tok, vault_tok, vaultScope, boxscope }) => ({
@@ -372,7 +359,6 @@ export const loggableAsk = objStrip(({ obj, oneof, lit, user_id, banklabel, vaul
     vault_tok:  vault_tok.optional(),
     ifAbsent:   SX.anyIfAbsent.optional(),
     ifPresent:  SX.ifPresent.optional(),
-    gateVerb:   oneof(EX.gateVerbVals).optional(),
     expected:   meta.optional(),
     record:     meta.optional(),
     gate:       meta.optional(),

@@ -7,7 +7,7 @@ import type { VaultLogger } from '../helpers/logger'
 import type { GuardedStrengthChecker } from '../helpers/passphrase-strength'
 import { type Outcome, demandGood, good, outcomeOf } from '../refusals/outcome'
 import * as Phrases from '../helpers/phrases'
-import { actRefused, mainGateMissing, needUnlocked, writtenByOwnVerbs } from '../refusals/throwers'
+import { actRefused, mainGateMissing, needUnlocked } from '../refusals/throwers'
 import { type BankScope, type BankedVaultScope, type VaultScope, bankedVaultScope } from '../shapes/shapes-core'
 import type { LeaseDated } from '../shapes/shapes-storage'
 import * as BX from '../shapes/shapes-bankdb'
@@ -373,13 +373,6 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     if (! this.isPresent) { throw actRefused('vault', 'bank_gone') }
     return this
   }
-  // --
-
-  // == [Overriding Storable's]: del
-
-  // A bank's delete needs the user's passphrase: the bank listing's del is called only by the del_bank gating.
-  /** Refuses: delete a bank with {@link delPrompt}. */
-  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
   // --
 
   // == [Aligning]: align
