@@ -179,9 +179,11 @@ A new row's foreign key takes a share lock on its bank row, which waits only on 
 row. Two things follow:
 
 * A vault or box written while its bank or vault is deleted or built anew may land in the life that
-  has ended. No read returns it, and `tidyGone`, or the bank built anew, deletes it. If you write
-  boxes heavily under vaults that get deleted and are not written again, call `tidyGone` now and
-  then.
+  has ended. No read returns it, and `tidyGone`, or the bank built anew, deletes it. Until then the
+  row stays, and it keeps a `DELETE` of its bank row refused. This is accepted: safebyok may later
+  offer advice, or functions, that take locks for tighter atomicity under the same contract. If you
+  write boxes heavily under vaults that get deleted and are not written again, call `tidyGone` now
+  and then.
 * The box cap is soft. Writers racing to add their first box can pass it together, and `tidyGone`
   does not trim the rows they add.
 

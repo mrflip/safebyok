@@ -39,14 +39,14 @@ own box, and knocks with that key through [src/lib/anthropic.ts](src/lib/anthrop
 
 * **Widget form** ([src/components/KnockKnockWidget.tsx](src/components/KnockKnockWidget.tsx)):
   the key is never exposed. The user types it into an uncontrolled `WhisperField`. *Save* calls
-  `vault.putBox`, building and unlocking the vault as needed, and clears the field. Only a knock
+  `vault.putBox`, building or unlocking the bank as needed, and clears the field. Only a knock
   gets the key back, with `box.extractWhisper`.
 * **Toolkit form** ([src/components/KnockKnockToolkit.tsx](src/components/KnockKnockToolkit.tsx)):
   an ordinary controlled field over `useWhisper(box)`. Typing calls `box.patchWhisper`, *Save*
   calls `box.putExposed`, and leaving the page calls `box.unexpose`.
 * **DOM form** ([src/components/KnockKnockDom.tsx](src/components/KnockKnockDom.tsx)):
   the key is in a field that `safebyok/dom` fills and puts, so it never passes through React.
-  *Add key* builds and unlocks the vault as needed and shows the field, *Save* puts the key, and
+  *Add key* builds or unlocks the bank as needed and shows the field, *Save* puts the key, and
   *Done* hides the field again.
 
 The labs page's aside, *Behind the scenes*, is for developers: its *Backend online* switch
