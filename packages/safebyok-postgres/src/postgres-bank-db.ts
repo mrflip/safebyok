@@ -227,38 +227,33 @@ export class PostgresBankDB extends DB.AdapterBankDB {
 
   // == [Classifying]: classifyBuildBank, classifyStoredGate, classifyDelBank, classifyStoredVault, classifyStoredBox
   // A write function checks an ask and stores its record in one call. When it stored the record, its result is checked and returned
-  // without classifying. When it stored nothing, or the ask is a get, the core's classifier classifies the ask against the rows returned.
+  // without classifying, with the row written as the database returned it. When it stored nothing, or the ask is a get, the core's classifier classifies the ask against the rows returned.
   // If the classifier finds a write when the function stored nothing, that is a fault, thrown where the function was called.
 
   protected override classifyBuildBank(ask: BX.BankBuildAsk, answered: GateAnswered): BX.BankBuildStored {
     if (answered.ok !== true) { return super.classifyBuildBank(ask, answered) }
     const { act, presence } = storedVerdict.parse(answered)
-    const parent = BX.storedBankRow.parseConsistent(answered.bank, { ...DB.bankScope.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
-    const gate   = BX.storedGateRow.parseConsistent(answered.gate, { ...DB.bankScope.parse(ask), revision_tok: ask.gate.revision_tok }, RowOfOtherAddress)
-    return { ok: true, act, parent, gate, presence }
+    return { ok: true, act, parent: BX.writtenBankOf(ask, answered.bank), gate: BX.writtenGateOf(ask.gate, answered.gate), presence }
   }
 
   protected override classifyStoredGate(ask: BX.GatePutAsk, answered: GateAnswered): BX.GateStored {
     if (answered.ok !== true) { return super.classifyStoredGate(ask, answered) }
     const { act, presence } = storedVerdict.parse(answered)
     const parent = BX.storedBankRow.parseConsistent(answered.bank, { ...DB.bankScope.parse(ask), bank_tok: ask.bank_tok }, RowOfOtherAddress)
-    const gate   = BX.storedGateRow.parseConsistent(answered.gate, { ...DB.bankScope.parse(ask), gatelabel: ask.gatelabel, revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
-    return { ok: true, act, parent, gate, presence }
+    return { ok: true, act, parent, gate: BX.writtenGateOf(ask, answered.gate), presence }
   }
 
   protected override classifyDelBank(ask: BX.BankDelAsk, answered: BankAnswered): BX.BankDelStored {
     if (answered.ok !== true) { return super.classifyDelBank(ask, answered) }
     const { act, presence } = storedVerdict.parse(answered)
-    const bank = BX.storedBankRow.parseConsistent(answered.bank, { ...DB.bankScope.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
-    return { ok: true, act, bank, presence }
+    return { ok: true, act, bank: BX.writtenBankOf(ask, answered.bank), presence }
   }
 
   protected override classifyStoredVault(ask: BX.VaultAsk, answered: VaultAnswered): BX.VaultStored {
     if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyStoredVault(ask, answered) }
     const { act, presence } = storedVerdict.parse(answered)
     const parent = BX.storedBankRow.parseConsistent(answered.bank, { ...DB.bankScope.parse(ask), bank_tok: ask.bank_tok }, RowOfOtherAddress)
-    const vault  = BX.storedVaultRow.parseConsistent(answered.vault, { ...DB.vaultScope.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
-    return { ok: true, act, parent, vault, presence }
+    return { ok: true, act, parent, vault: BX.writtenVaultOf(ask, answered.vault), presence }
   }
 
   protected override classifyStoredBox(ask: BX.BoxAsk, answered: BoxAnswered): BX.BoxStored {
@@ -266,8 +261,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
     if ((answered.ok !== true) || (ask.op === 'get')) { return super.classifyStoredBox(ask, { parent: answered.parent, box: answered.box, capacity }) }
     const { act, presence } = storedVerdict.parse(answered)
     const parent = parentVaultRow.parseConsistent(answered.parent, DB.vaultScope.parse(ask), RowOfOtherAddress)
-    const box    = BX.storedBoxRow.parseConsistent(answered.box, { ...BX.boxQuery.parse(ask), revision_tok: ask.record.revision_tok }, RowOfOtherAddress)
-    return { ok: true, act, parent, box, presence, capacity }
+    return { ok: true, act, parent, box: BX.writtenBoxOf(ask, answered.box), presence, capacity }
   }
   // --
 

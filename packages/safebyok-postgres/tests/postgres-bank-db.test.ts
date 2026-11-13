@@ -42,11 +42,12 @@ async function bankDBWithVault(opts?: Parameters<typeof BH.makeBankDB>[0]) {
 }
 
 TH.describeBankDBBattery("PostgresBankDB's battery", {
-  makeBankDB:          async (opts) => await BH.makeBankDB(opts),
-  makeCappedBankDB:    async (maxBoxes) => await BH.makeBankDB({ maxBoxes }),
-  makeTwin:            BH.makeTwin,
-  _cheat_rowsOf:       () => BH.rowsOf(),
-  _cheat_failNextCall: BH.failNextCall,
+  makeBankDB:            async (opts) => await BH.makeBankDB(opts),
+  makeCappedBankDB:      async (maxBoxes) => await BH.makeBankDB({ maxBoxes }),
+  makeTwin:              BH.makeTwin,
+  _cheat_rowsOf:         () => BH.rowsOf(),
+  _cheat_failNextCall:   BH.failNextCall,
+  _cheat_storeOtherwise: BH.storeOtherwise,
 })
 
 describe("PostgresBankDB's constructor", () => {

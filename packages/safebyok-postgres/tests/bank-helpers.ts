@@ -1,6 +1,6 @@
 /** Bank test helpers: one PGlite per test file holding the bankDB's tables, PostgresBankDBs on it, and direct row access for the bankDB battery. */
 
-import { afterAll, beforeAll } from 'vitest'
+import { afterAll, beforeAll, onTestFinished } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import type { BankScope, Boxscope, BX, VaultScope } from 'safebyok/storage'
 import * as TH from 'safebyok/testing'
@@ -37,7 +37,7 @@ export function bootDatabaseFirst(): void {
 }
 // --
 
-// == [BankDBs]: listen, bankDBOver, makeBankDB, emptyTables, makeTwin, failNextCall
+// == [BankDBs]: listen, bankDBOver, makeBankDB, emptyTables, makeTwin, failNextCall, storeOtherwise
 
 const listenersOf = new Map<string, Set<(text: string) => void>>()
 
@@ -87,6 +87,24 @@ export async function emptyTables(): Promise<void> {
 export async function makeTwin(bankDB: PostgresBankDB): Promise<PostgresBankDB> { return await bankDBOver(optsOf.get(bankDB)) }
 
 export function failNextCall(bankDB: PostgresBankDB): void { clientsOf.get(bankDB)?.failNext() }
+
+const BankTables = ['safebyok_banks', 'safebyok_gates', 'safebyok_vaults', 'safebyok_boxes']
+
+/** Until the test ends, have every table store a row other than the one each write sends, as a database that alters what it stores would. */
+export async function storeOtherwise(): Promise<void> {
+  const db = await database()
+  const triggers = BankTables.map((table) => `CREATE TRIGGER store_otherwise BEFORE INSERT OR UPDATE ON ${table} FOR EACH ROW EXECUTE FUNCTION store_otherwise();`)
+  const drops = BankTables.map((table) => `DROP TRIGGER store_otherwise ON ${table};`)
+  await db.exec(`
+    CREATE FUNCTION store_otherwise() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      NEW.revision_tok := NEW.revision_tok || '${TH.StoredOtherwiseSuffix}';
+      RETURN NEW;
+    END $$;
+    ${triggers.join('\n')}
+  `)
+  onTestFinished(async () => { await db.exec(`${drops.join('\n')} DROP FUNCTION store_otherwise();`) })
+}
 // --
 
 // == [Rows]: sql, planting, recordOf, rowsOf

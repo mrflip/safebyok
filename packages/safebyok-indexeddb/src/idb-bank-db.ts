@@ -17,7 +17,7 @@ export type IdbBankDBOpts = BX.AdapterBankDBOpts & { dbName?: string | undefined
 const idbBankDBOpts = DB.objCheck(({ str, uint }) => ({ ...BX.adapterBankDBOpts.shape, dbName: str.min(1).optional(), maxBoxes: uint.optional() }), 'bad_option')
 // --
 
-// == [Helpers]: Rung, isHeardBy, bankScopeOf, vaultScopeOf
+// == [Helpers]: Rung, isHeardBy, bankScopeOf, vaultScopeOf, storeAt
 
 /** A notice of one write, broadcast to every watch on the database: the scope written under, and the row written. A bank or gate row has no vaultlabel. */
 type Rung = { scope: BankScope & { vaultlabel?: string }, heard: BX.Heard }
@@ -32,6 +32,12 @@ function bankScopeOf({ user_id, banklabel }: BankScope): BankScope { return { us
 
 /** The vault scope of an ask or a row, without its other fields. */
 function vaultScopeOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultScope { return { user_id, banklabel, vaultlabel } }
+
+/** Store `record` at `scopepath` in `store`'s transaction, and answer the row the store then holds there. */
+async function storeAt(store: IDBObjectStore, record: unknown, scopepath: IDBValidKey): Promise<unknown> {
+  store.put(record, scopepath)
+  return await DB.rowAt(store, scopepath)
+}
 // --
 
 /** A bankDB stored in this browser's IndexedDB. Its watch reports writes from every tab. */
@@ -67,7 +73,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
   // == [Protected, the generic calls of AdapterBankDB]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
 
   // Each call is one IndexedDB transaction. It fetches the rows, classifies the ask against them, and, if the classifier finds a
-  // write, stores the ask's record before the transaction ends.
+  // write, stores the ask's record and reads back the row stored before the transaction ends.
   protected async doEnsureBank(ask: BX.BankEnsureAsk): Promise<BX.BankEnsureStored> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
       const [bank, gate, filed] = await Promise.all([
@@ -82,14 +88,12 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [bank, gate] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), DB.rowAt(store, gateScopepathOf({ ...ask, gatelabel: 'main' }))])
       const stored = this.classifyBuildBank(ask, { bank, gate })
-      if (BX.isWriteAct(stored.act)) {
-        store.put(ask.record, bankScopepathOf(ask))
-        store.put(ask.gate, gateScopepathOf(ask.gate))
-      }
-      return stored
+      if (! BX.isWriteAct(stored.act)) { return stored }
+      const parent = BX.writtenBankOf(ask, await storeAt(store, ask.record, bankScopepathOf(ask)))
+      return { ...stored, parent, gate: BX.writtenGateOf(ask.gate, await storeAt(store, ask.gate, gateScopepathOf(ask.gate))) }
     })
     if (BX.isWriteAct(stored.act)) {
-      this.#ring([{ scope: bankScopeOf(ask), heard: { row: ask.record } }, { scope: bankScopeOf(ask), heard: { row: ask.gate, parent: ask.record } }])
+      this.#ring([{ scope: bankScopeOf(ask), heard: { row: stored.parent } }, { scope: bankScopeOf(ask), heard: { row: stored.gate, parent: stored.parent } }])
     }
     return stored
   }
@@ -98,10 +102,10 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [bank, gate] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), DB.rowAt(store, gateScopepathOf(ask))])
       const stored = this.classifyStoredGate(ask, { bank, gate })
-      if (BX.isWriteAct(stored.act)) { store.put(ask.record, gateScopepathOf(ask)) }
-      return stored
+      if (! BX.isWriteAct(stored.act)) { return stored }
+      return { ...stored, gate: BX.writtenGateOf(ask, await storeAt(store, ask.record, gateScopepathOf(ask))) }
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: bankScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: bankScopeOf(ask), heard: { row: stored.gate, parent: stored.parent } }]) }
     return stored
   }
 
@@ -109,14 +113,12 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const bank   = await DB.rowAt(store, bankScopepathOf(ask))
       const stored = this.classifyDelBank(ask, { bank })
-      if (BX.isWriteAct(stored.act)) {
-        store.put(ask.record, bankScopepathOf(ask))
-        // A bank's gates, vaults and boxes end with its life: nothing under it outlives the bank row.
-        for (const range of [gatesRangeOf(ask), vaultsRangeOf(ask), boxesRangeOf(ask)]) { store.delete(range) }
-      }
-      return stored
+      if (! BX.isWriteAct(stored.act)) { return stored }
+      // A bank's gates, vaults and boxes end with its life: nothing under it outlives the bank row.
+      for (const range of [gatesRangeOf(ask), vaultsRangeOf(ask), boxesRangeOf(ask)]) { store.delete(range) }
+      return { ...stored, bank: BX.writtenBankOf(ask, await storeAt(store, ask.record, bankScopepathOf(ask))) }
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: bankScopeOf(ask), heard: { row: ask.record } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: bankScopeOf(ask), heard: { row: stored.bank } }]) }
     return stored
   }
 
@@ -131,10 +133,10 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [bank, vault] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), DB.rowAt(store, vaultScopepathOf(ask))])
       const stored = this.classifyStoredVault(ask, { bank, vault })
-      if (BX.isWriteAct(stored.act)) { store.put(ask.record, vaultScopepathOf(ask)) }
-      return stored
+      if (! BX.isWriteAct(stored.act)) { return stored }
+      return { ...stored, vault: BX.writtenVaultOf(ask, await storeAt(store, ask.record, vaultScopepathOf(ask))) }
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: stored.vault, parent: stored.parent } }]) }
     return stored
   }
 
@@ -142,14 +144,12 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [bank, vault] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), DB.rowAt(store, vaultScopepathOf(ask))])
       const stored = this.classifyStoredVault(ask, { bank, vault })
-      if (BX.isWriteAct(stored.act)) {
-        store.put(ask.record, vaultScopepathOf(ask))
-        // A vault's boxes end with its life: no call fetches a box row from a life that is over.
-        store.delete(lifeRangeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
-      }
-      return stored
+      if (! BX.isWriteAct(stored.act)) { return stored }
+      // A vault's boxes end with its life: no call fetches a box row from a life that is over.
+      store.delete(lifeRangeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
+      return { ...stored, vault: BX.writtenVaultOf(ask, await storeAt(store, ask.record, vaultScopepathOf(ask))) }
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: stored.vault, parent: stored.parent } }]) }
     return stored
   }
 
@@ -172,10 +172,10 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [parent, box, capacity] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask)), this.#roomIn(store, ask)])
       const stored = this.classifyStoredBox(ask, { parent, box, capacity })
-      if (BX.isWriteAct(stored.act)) { store.put(ask.record, boxScopepathOf(ask)) }
-      return stored
+      if (! BX.isWriteAct(stored.act)) { return stored }
+      return { ...stored, box: BX.writtenBoxOf(ask, await storeAt(store, ask.record, boxScopepathOf(ask))) }
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: stored.box, parent: stored.parent } }]) }
     return stored
   }
 
@@ -183,10 +183,10 @@ export class IdbBankDB extends DB.AdapterBankDB {
     const stored = await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
       const [parent, box] = await Promise.all([DB.rowAt(store, vaultScopepathOf(ask)), DB.rowAt(store, boxScopepathOf(ask))])
       const stored = this.classifyStoredBox(ask, { parent, box })
-      if (BX.isWriteAct(stored.act)) { store.put(ask.record, boxScopepathOf(ask)) }
-      return stored
+      if (! BX.isWriteAct(stored.act)) { return stored }
+      return { ...stored, box: BX.writtenBoxOf(ask, await storeAt(store, ask.record, boxScopepathOf(ask))) }
     })
-    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: ask.record, parent: stored.parent } }]) }
+    if (BX.isWriteAct(stored.act)) { this.#ring([{ scope: vaultScopeOf(ask), heard: { row: stored.box, parent: stored.parent } }]) }
     return stored
   }
 
