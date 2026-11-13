@@ -354,9 +354,9 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     [(box: TestableBox) => box.put({ whisper, sidecar: {} }, { maxMillisSinceRefresh: -1 }),     'put with opts out of range'],
     [(box: TestableBox) => box.get({ maxMillisSinceRefresh: 0, ifAbsent: 'shrug' as never }),                             'get with an ifAbsent it does not accept'],
     [(box: TestableBox) => box.hydrate({ maxMillisSinceRefresh: -1 }),                            'hydrate with opts out of range'],
-    [(box: TestableBox) => box.del(box.scope, { maxWorldMillis: -1 }),                                       'del with opts out of range'],
-    [(box: TestableBox) => box.extractWhisper({ maxWorldMillis: -1 }),                             'extractWhisper with opts out of range'],
-    [(box: TestableBox) => box.expose({ maxWorldMillis: -1 }),                                    'expose with opts out of range'],
+    [(box: TestableBox) => box.del(box.scope, { maxParentMillis: -1 }),                                       'del with opts out of range'],
+    [(box: TestableBox) => box.extractWhisper({ maxParentMillis: -1 }),                             'extractWhisper with opts out of range'],
+    [(box: TestableBox) => box.expose({ maxParentMillis: -1 }),                                    'expose with opts out of range'],
   ] as const
 
   for (const [call, blurb] of BadArgCases) {
@@ -426,7 +426,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     world.mw.seedPut(record)
     const box = builtOf(record)
     world.mw.clearCalls()
-    await expect(box.put(roundTripOf(record), { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity })).resolves.to.eq(box)
+    await expect(box.put(roundTripOf(record), { maxMillisSinceRefresh: Infinity, maxParentMillis: Infinity })).resolves.to.eq(box)
     const [put] = world.mw.callsOf('put')
     expect(put?.expectedRevisionTok).to.eq('rev-a1')
     expect(put?.record).to.deep.include({ am: 'a', revision_seq: 2, registered_at: T0, sidecar: { note: 'round trip' } })

@@ -5,7 +5,7 @@ import type { Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import { tattoo } from '../helpers/helpers'
-import { boxAbsent, boxStoredDamaged, boxNotListed, rowOfOtherWorld } from '../refusals/throwers'
+import { boxAbsent, boxStoredDamaged, boxNotListed, rowOfOtherLife } from '../refusals/throwers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { type Boxscope, type VaultScope, boxscope } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
@@ -83,9 +83,9 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
    * - `ifPresent: 'get'`: put nothing, and return the live box
    */
   async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box> {
-    const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxCreateOpts.parse(opts)
+    const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxParentMillis } = VX.boxCreateOpts.parse(opts)
     const dna = boxDna.parse(input)
-    return this.puttable(input, { ifAbsent }).put(dna, { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis })
+    return this.puttable(input, { ifAbsent }).put(dna, { ifAbsent, ifPresent, maxMillisSinceRefresh, maxParentMillis })
   }
 
   /** Non-throwing form of {@link create}. */
@@ -98,22 +98,22 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   #queryOf(scope: Boxscope): BoxQuery { return { ...scope, bank_tok: this.bank_tok, vault_tok: this.vault_tok } }
   // --
 
-  // == [Above it]: ensureTimelyWorld
+  // == [Above it]: ensureParentTimely
 
   /** Refresh the vault, unless it was refreshed within `maxMillis` (default: the vault's own horizon). */
-  override async ensureTimelyWorld(maxMillis?: number): Promise<void> { await this.vault.ensureTimely(VX.maxMillis.parse(maxMillis)) }
+  override async ensureParentTimely(maxMillis?: number): Promise<void> { await this.vault.ensureTimely(VX.maxMillis.parse(maxMillis)) }
   // --
 
-  // == [Defined by the box listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the box listing]: isEnabled, receiveParent, demandOfLife, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its vault does, and is still of the life this listing was made under. */
   get isEnabled(): boolean { return this.vault.isEnabled && (this.vault.vault_tok === this.vault_tok) }
 
   protected receiveParent(parent: unknown): void { this.vault.receiveParent(parent) }
 
-  protected demandOfWorld(record: Fetched<BoxRecord, BoxSparse>): void {
-    if (record.bank_tok !== this.bank_tok)   { throw rowOfOtherWorld(record, 'bank_tok') }
-    if (record.vault_tok !== this.vault_tok) { throw rowOfOtherWorld(record, 'vault_tok') }
+  protected demandOfLife(record: Fetched<BoxRecord, BoxSparse>): void {
+    if (record.bank_tok !== this.bank_tok)   { throw rowOfOtherLife(record, 'bank_tok') }
+    if (record.vault_tok !== this.vault_tok) { throw rowOfOtherLife(record, 'vault_tok') }
   }
 
   protected scopepathOf(scope: Boxscope): string {

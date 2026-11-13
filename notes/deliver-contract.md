@@ -59,7 +59,7 @@ Each test compares the record received (`rcvd`) with the record of the instance 
 | L4  | An instance's record is a row storage answered, or the void stand-in. Nothing made on this device is merged into it.                        | every `adopt` adopts `rcvd` whole |
 | L5  | At one `revision_seq` there is one row: one `revision_tok`, one life token, live or gone.                                                   | F4 to F6                          |
 | L6  | An instance whose record is gone leaves the listing's list (its snapshot), and is kept at its scope only to judge later rows against and to receive a new life. It drops what it holds: a box its exposed whisper; a vault its box listing, and it is disabled until a new life is received; a bank its lease, and it is disabled for good and no longer the device's. | `receiveRecord` of a tombstone    |
-| L7  | Each change to the listing is followed by one new snapshot, and the listeners are told once.                                                | `doDeliverRecord`                 |
+| L7  | A change to the listing's list is followed by one new snapshot, and its listeners are told once; a delivery that leaves the list as it was tells none. | `doDeliverRecord`                 |
 | L8  | Nothing is received under a bank that is not enabled (the device is disabled, or the bank is no longer the device's), nor at a box listing whose vault has taken another life. | F1 |
 | L9  | An instance is marked refreshed only when storage answered a record not older than its own, and its record is then *whole*.                 | every `mod` but `older`           |
 
@@ -100,7 +100,7 @@ First match wins. F and N2 rows refuse; every other row is a plan of `making` an
 | N2  | `rcvd` is `null`, `held` is *live*                                                          |          |         | throws `record_conflict` (`nothingStoredWhereLive`)                                    |
 | N3  | `rcvd` is `null`, `held` is `gone`                                                          | `listed` | `same`  | as it was, marked refreshed                                                            |
 | F2  | `rcvd` fails its check (*What an answer carries*)                                           |          |         | throws `storage_issue` (`deliveredNotAsSent`)                                          |
-| F3  | at a gate's or vault listing, `rcvd` is under another `bank_tok` than its bank's; at a box listing, under another `vault_tok` than its own |  |  | throws `storage_issue` (`rowOfOtherWorld`, naming the tok)                     |
+| F3  | at a gate's or vault listing, `rcvd` is under another `bank_tok` than its bank's; at a box listing, under another `vault_tok` than its own |  |  | throws `storage_issue` (`rowOfOtherLife`, naming the tok)                     |
 | S1  | `held` is `none`                                                                            | `make`   | `adopt` | a new instance has `rcvd`, and is listed                                               |
 | F4  | `rev` is `forked`                                                                           |          |         | throws `record_conflict` (`oneRevisionTwoToks`)                                        |
 | F5  | `rev` is `same`, `life` is `other`                                                          |          |         | throws `record_conflict` (`oneRevisionTwoLives`)                                       |

@@ -141,13 +141,13 @@ describe("a box answer carrying a vault row of a later life as its parent", () =
 })
 
 describe("a box method over a vault deleted elsewhere", () => {
-  const WorldNow = { maxWorldMillis: 0 }
+  const ParentNow = { maxParentMillis: 0 }
   const Verbs = [
-    ['box.extractWhisper', ({ box }) => box.extractWhisper(WorldNow)],
-    ['box.put',           ({ box }) => box.put({ whisper: { apiKey: 'sk-new' }, sidecar: {} }, WorldNow)],
-    ['box.del',            ({ box }) => box.del(box.scope, WorldNow)],
-    ['vault.getBox',       ({ vault, box }) => vault.getBox(box.boxlabel, { ...WorldNow, maxMillisSinceRefresh: 0 })],
-    ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, WorldNow)],
+    ['box.extractWhisper', ({ box }) => box.extractWhisper(ParentNow)],
+    ['box.put',           ({ box }) => box.put({ whisper: { apiKey: 'sk-new' }, sidecar: {} }, ParentNow)],
+    ['box.del',            ({ box }) => box.del(box.scope, ParentNow)],
+    ['vault.getBox',       ({ vault, box }) => vault.getBox(box.boxlabel, { ...ParentNow, maxMillisSinceRefresh: 0 })],
+    ['vault.delBox',       ({ vault, box }) => vault.delBox(box.boxlabel, ParentNow)],
   ] as const satisfies readonly (readonly [string, (world: { vault: Vault, box: Box }) => Promise<unknown>])[]
 
   it.each(Verbs)("%s refuses", async (_verb, call) => {

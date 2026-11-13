@@ -1,5 +1,6 @@
 /** The bank listing: a stub listing of the device's one bank, whose row comes with every answer about its gate and vaults. */
 
+import { noop } from 'es-toolkit'
 import type { Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
@@ -81,14 +82,14 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   }
   // --
 
-  // == [Defined by the bank listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the bank listing]: isEnabled, receiveParent, demandOfLife, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its device does. */
   get isEnabled(): boolean { return this.device.isEnabled }
 
   protected receiveParent(): void { /* no row sits above a bank */ }
 
-  protected demandOfWorld(): void { /* a device takes a bank of any life */ }
+  protected demandOfLife(): void { /* a device takes a bank of any life */ }
 
   protected scopepathOf(scope: BankScope): string {
     return ['bank', scope.user_id, scope.banklabel].join('^')
@@ -124,7 +125,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   }
 
   // The bank's watch is its vault listing's: no listing of its own starts one.
-  protected watchRows(): () => void { return stopNoWatch }
+  protected watchRows(): () => void { return noop }
 
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is BankRow { return ! (('gatelabel' in row) || ('vaultlabel' in row)) }
   // --
@@ -142,9 +143,3 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   /** Always `'bank_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'bank_listing' { return 'bank_listing' satisfies Modelkind }
 }
-
-// == [Helpers]: stopNoWatch
-
-/** Stops nothing: a stub listing starts no watch. */
-function stopNoWatch(): void { /* no watch to stop */ }
-// --

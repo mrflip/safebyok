@@ -9,7 +9,7 @@ import type { BankScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankSparse, GateRecord } from '../shapes/shapes-bankdb'
 import * as GX from '../shapes/shapes-gateish'
-import type { AnyGating, AskUser, BankForGatingkind, BankGatingkind, CleartextsForGatingkind, GatingSnapshot, ProvingWorld, UnlockByProving, WayinHeader } from '../shapes/shapes-gateish'
+import type { AnyGating, AskUser, BankForGatingkind, BankGatingkind, CleartextsForGatingkind, GatingSnapshot, ProvingDevice, UnlockByProving, WayinHeader } from '../shapes/shapes-gateish'
 import * as VX from '../shapes/shapes-vaultish'
 import { attemptInFlight, cleartextsThrew, gateMadeElsewhere, gatingDismissed, gatingConcluded, requestCleartextThrew, samePassphrase } from '../refusals/throwers'
 import type { Bank } from './bank'
@@ -41,7 +41,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
    */
   declare readonly passkeyHeader: WayinHeader | null
 
-  /** The device this gating is open on, and the world `judgeStrength` asks */
+  /** The device this gating is open on, whose strength checker `judgeStrength` asks. */
   readonly #device:     Device
   readonly #act:        Act
   readonly #concluded:  Promise<Outcome<Bank>>
@@ -99,8 +99,8 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
    */
   static async launchBirth(listing: BankListing, expected: BankSparse, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
     const checked = GX.gatingLaunchBirthArgs.parse({ listing, expected, unlockByProving, askUser })
-    const world = GX.provingWorld.parse(checked.listing.device)
-    const act: Act = (cleartexts) => buildBank(checked.listing, world, checked.expected, cleartexts, checked.unlockByProving)
+    const provingDevice = GX.provingDevice.parse(checked.listing.device)
+    const act: Act = (cleartexts) => buildBank(checked.listing, provingDevice, checked.expected, cleartexts, checked.unlockByProving)
     const gating = new Gating('build_bank', checked.listing.device, null, act)
     return gating.#launch(checked.askUser)
   }
@@ -124,7 +124,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   /** The strength checker's verdict on `passphraseClear`, for a dialog to show as the user types. */
   async judgeStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
-    return Proving.judgeStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, GX.provingWorld.parse(this.#device))
+    return Proving.judgeStrength(GX.passphraseCleartext.parse(passphraseClear), this.#scope, GX.provingDevice.parse(this.#device))
   }
 
   /** Try what the user typed, resolving the outcome rather than throwing. Await one attempt before the next.
@@ -194,12 +194,12 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // change hears provings, and comes to the bank's private unlock by unlockByProving (G9).
 
 /** Build a bank over `expected` from the user's passphrase and optional passkey, and unlock it. */
-async function buildBank(listing: BankListing, world: ProvingWorld, expected: BankSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
+async function buildBank(listing: BankListing, provingDevice: ProvingDevice, expected: BankSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
   // A birth's stamps are minted here, one pair per attempt.
   const { bank, gate }    = listing.stampsOfBirth()
-  const passphraseProving = await PassphraseProving.buildNovel(bank, gate, passphraseClear, world)
-  const passkeyProving    = passkeyClear ? await PasskeyProving.buildNovel(bank, gate, passkeyClear, world) : null
+  const passphraseProving = await PassphraseProving.buildNovel(bank, gate, passphraseClear, provingDevice)
+  const passkeyProving    = passkeyClear ? await PasskeyProving.buildNovel(bank, gate, passkeyClear, provingDevice) : null
 
   const passphraseWayin = await passphraseProving.buildWayin(NOVEL)
   const passkeyWayin    = await passkeyProving?.buildWayin(passphraseProving) ?? null
@@ -287,7 +287,7 @@ const ActOnBank: Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlock
 
 /** The main gate of `bank`, refreshed promptly. Throws unless the bank is enabled and present. */
 async function timelyGate(bank: Bank): Promise<Gate> {
-  const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandPromptable()
+  const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandEnabled()
   return gate
 }
 

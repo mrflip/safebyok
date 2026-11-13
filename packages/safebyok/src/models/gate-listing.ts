@@ -1,12 +1,13 @@
 /** The gate listing: a stub listing of a bank's one gate, whose row comes with the bank's. */
 
+import { noop } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
 import { valOf } from '../refusals/outcome'
-import { mainGateMissing, rowOfOtherWorld, writtenByOwnVerbs } from '../refusals/throwers'
+import { mainGateMissing, rowOfOtherLife, writtenByOwnVerbs } from '../refusals/throwers'
 import { type GateScope, gateScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRow, BoxRow, GateRecord, GateSparse, VaultRow, Wayins } from '../shapes/shapes-bankdb'
@@ -109,15 +110,15 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   }
   // --
 
-  // == [Defined by the gate listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the gate listing]: isEnabled, receiveParent, demandOfLife, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
 
   protected receiveParent(parent: unknown): void { this.bank.receiveParent(parent) }
 
-  protected demandOfWorld(record: Fetched<GateRecord, GateSparse>): void {
-    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherWorld(record, 'bank_tok') }
+  protected demandOfLife(record: Fetched<GateRecord, GateSparse>): void {
+    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherLife(record, 'bank_tok') }
   }
 
   protected scopepathOf(scope: GateScope): string {
@@ -156,7 +157,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   protected doTryDel(): never { throw writtenByOwnVerbs() }
 
   // The bank's watch hears the gate row: no listing of its own starts one.
-  protected watchRows(): () => void { return stopNoWatch }
+  protected watchRows(): () => void { return noop }
 
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is GateRecord { return 'gatelabel' in row }
   // --
@@ -164,9 +165,3 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   /** Always `'gate_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'gate_listing' { return 'gate_listing' satisfies Modelkind }
 }
-
-// == [Helpers]: stopNoWatch
-
-/** Stops nothing: a stub listing starts no watch. */
-function stopNoWatch(): void { /* no watch to stop */ }
-// --

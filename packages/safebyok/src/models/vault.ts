@@ -32,7 +32,9 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   declare readonly bank_tok:   string
   declare readonly listing:    VaultListing
 
-  /** The box listing last asked for, of this life or one before it; null until asked for, and once the vault is deleted. */
+  /** The box listing last asked for, of this life or one before it.
+   * Null until asked for, and once the vault is deleted.
+   */
   #boxListing: BoxListing | null = null
   // --
 
@@ -47,7 +49,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
 
-  /** The listing of this vault's boxes in the life in hand. A deleted vault has none, and refuses `vault_gone`.
+  /** The listing of this vault's boxes in the life in hand. Asking a deleted vault for it refuses.
    * Another life of the vault gets a new listing, so ask for it here each time.
    */
   get boxListing(): BoxListing {
@@ -163,7 +165,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Whether this vault answers: its listing does and lists it, and it is not deleted. */
   override get isEnabled(): boolean { return super.isEnabled && this.isPresent }
 
-  /** Throw unless {@link isEnabled}: a deleted vault refuses `vault_gone`. */
+  /** Throw unless {@link isEnabled}, telling a deleted vault from a disabled one. */
   override demandEnabled(): this {
     this.demandPresent()
     return super.demandEnabled()

@@ -76,14 +76,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Above it]: ensureTimelyWorld
+  // == [Above it]: ensureParentTimely
 
   // Only a box listing's vault has a row to refresh: a bank's row comes with every answer about its gate and its vaults.
   /** Refresh the thing above this listing, unless it was refreshed within `maxMillis` (default: its own horizon). */
-  async ensureTimelyWorld(maxMillis?: number): Promise<void> { VX.maxMillis.parse(maxMillis) } // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
+  async ensureParentTimely(maxMillis?: number): Promise<void> { VX.maxMillis.parse(maxMillis) } // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
   // --
 
-  // == [The things kept]: at, isListed, enlist
+  // == [The things kept]: at, isKept, enlist
 
   /** The instance kept at `recordish`'s scope, **present or deleted**, or null if none. */
   at(recordish: unknown): ThingT | null {
@@ -91,9 +91,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** Whether `thing` is the instance kept at its scope, present or deleted. */
-  isListed(thing: Thing<ScopeT, RecordT, SparseT>): boolean {
-    const listed: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(this.scopepathOf(thing.scope))
-    return listed === thing
+  isKept(thing: Thing<ScopeT, RecordT, SparseT>): boolean {
+    const kept: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(this.scopepathOf(thing.scope))
+    return kept === thing
   }
 
   /** Enlist a new `thing` at its scope. */
@@ -165,7 +165,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   /** The instance at `scoped`, refreshed by a storage get unless the one listed is whole and recent enough.
    * - `maxMillisSinceRefresh`: how recent is enough (default: the listing's horizon)
-   * - `maxWorldMillis`: how recent the thing above must be; it is refreshed first if not
+   * - `maxParentMillis`: how recent the thing above must be; it is refreshed first if not
    * - `ifAbsent`: for an absent or tombstoned thing, `'fail'` (default) refuses, and `'nil'` returns null
    * Chute: listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
@@ -176,9 +176,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    */
   async tryGet(scoped: ScopeT, opts: FetchOpts = {}): Promise<ListingGetAnswer<ThingT | null>> {
     try {
-      const { ifAbsent, maxMillisSinceRefresh = this.maxMillisSinceRefresh, maxWorldMillis } = VX.fetchOpts.parse(opts)
+      const { ifAbsent, maxMillisSinceRefresh = this.maxMillisSinceRefresh, maxParentMillis } = VX.fetchOpts.parse(opts)
       const scope = this.scopeOf(scoped)
-      await this.ensureTimelyWorld(maxWorldMillis)
+      await this.ensureParentTimely(maxParentMillis)
       const listed = this.at(scope)
       if (listed?.isHydratedWithin(maxMillisSinceRefresh) === true) {
         return { ok: true, act: 'timely', val: this.handleIfAbsent(listed, scope, ifAbsent), parent: null, ask: BX.loggableAsk.parse({ op: 'get', ...scope }) }
@@ -327,7 +327,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
    * Chute: recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   #recordDeliveringOf(record: Fetched<RecordT, SparseT>): Delivering<Fetched<RecordT, SparseT>, ThingT> {
-    this.demandOfWorld(record)
+    this.demandOfLife(record)
     const listed     = this.at(this.scopeOf(record))
     if (listed === null) { return { making: 'make', mod: 'adopt', listed: null, record } }
     const age        = cmpRevisions(listed, record)
@@ -450,14 +450,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Defined by the concrete listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the concrete listing]: isEnabled, receiveParent, demandOfLife, scopepathOf, labelOf, scopeOf, sparseOf, recordOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers, which it does only while the thing above it does. */
   abstract get isEnabled(): boolean
   /** Deliver the parent row an answer or a notice carries to the thing above this listing. */
   protected abstract receiveParent(parent: unknown): void
   /** Throw unless `record` belongs to the life of the thing above that this listing was made under. */
-  protected abstract demandOfWorld(record: Fetched<RecordT, SparseT>): void
+  protected abstract demandOfLife(record: Fetched<RecordT, SparseT>): void
   protected abstract scopepathOf(scope: ScopeT): string
   /** The label that names `scope` within the thing above: a vault's `vaultlabel`, a box's `boxlabel`. */
   protected abstract labelOf(scope: ScopeT): string

@@ -59,9 +59,9 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.calls).to.deep.equal([])
     })
 
-    it("hands the world its maxWorldMillis", async () => {
+    it("hands the parent its maxParentMillis", async () => {
       world.mw.seedPut(fullBoxRecord())
-      await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0, maxWorldMillis: 5, ifAbsent: 'nil' })
+      await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0, maxParentMillis: 5, ifAbsent: 'nil' })
       expect(world.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
     })
   })

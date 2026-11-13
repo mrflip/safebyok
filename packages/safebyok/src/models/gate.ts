@@ -100,7 +100,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
    * The passkey stays, and the bankKey does not change.
    */
   async replacePassphrasePrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.bank.demandPromptable()
+    await this.ensureTimely(VX.Promptly); this.bank.demandEnabled()
     await this.bank.prompt('replace_passphrase')
     return this
   }
@@ -112,7 +112,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
    * A gate has one passkey at most: revoke the one it has before adding another.
    */
   async addPasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.bank.demandPromptable()
+    await this.ensureTimely(VX.Promptly); this.bank.demandEnabled()
     this.demandPasskeyAddable()
     await this.bank.prompt('add_passkey')
     return this
@@ -126,7 +126,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
    * The bankKey does not change: a device already unlocked stays unlocked until it locks.
    */
   async revokePasskeyPrompt(): Promise<this> {
-    await this.ensureTimely(VX.Promptly); this.bank.demandPromptable()
+    await this.ensureTimely(VX.Promptly); this.bank.demandEnabled()
     if (this.passkey0 === null) { return this }
     await this.bank.prompt('revoke_passkey')
     return this

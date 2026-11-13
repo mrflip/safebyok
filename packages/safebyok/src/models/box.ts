@@ -217,8 +217,8 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** {@link put}, resolving the bankDB's answer instead of throwing, with this box as its `val`. */
   async tryPut(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<ThingAnswer<Box>> {
     try {
-      const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxWorldMillis } = VX.boxPutOpts.parse(opts)
-      await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxWorldMillis })
+      const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxParentMillis } = VX.boxPutOpts.parse(opts)
+      await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxParentMillis })
       const given = this.demandPuttable(patch, { ifPresent })
       const { record, expected } = await this.#editAndSeal(given)
       this.demandPuttable(patch, { ifPresent })
@@ -290,7 +290,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   async ensurePuttable(patch: BoxPatch, opts: TimelyOpts = {}): Promise<this> {
     const given = this.#givenOf(patch)
     if (this.isWholeRecord(this.central) || ! isOfBothHalves(given)) { return this.hydrate(opts) }
-    await this.listing.ensureTimelyWorld(VX.timelyOpts.parse(opts).maxWorldMillis)
+    await this.listing.ensureParentTimely(VX.timelyOpts.parse(opts).maxParentMillis)
     return this
   }
   // --

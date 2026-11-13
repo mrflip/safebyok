@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { BankListing } from '../../src/models/bank-listing'
 import { GateListing } from '../../src/models/gate-listing'
-import { actRefused, mainGateMissing, rowOfOtherWorld, writtenByOwnVerbs } from '../../src/refusals/throwers'
+import { actRefused, mainGateMissing, rowOfOtherLife, writtenByOwnVerbs } from '../../src/refusals/throwers'
 import * as TH from '../test-helpers'
 import { Dna, listingOptsOf, makeBornVault, makeVaultWorld, useVaultWorlds } from '../test-helpers/vault-world'
 
@@ -104,7 +104,7 @@ describe("GateListing's entrypoints", () => {
     const { bank } = await makeBornVault()
     const ante = bank.maingate.pickle()
     const other = { ...ante, bank_tok: 'bank-tok-of-another-life' }
-    expect(() => bank.gateListing.deliverRecord(other)).to.throw(rowOfOtherWorld(other, 'bank_tok').message)
+    expect(() => bank.gateListing.deliverRecord(other)).to.throw(rowOfOtherLife(other, 'bank_tok').message)
     expect(bank.maingate.pickle()).to.deep.equal(ante)
   })
 

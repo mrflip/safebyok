@@ -1,5 +1,6 @@
 /** `AdapterBankDB`, the base class a storage adapter extends by writing its `do*` calls, and the rows those calls return. */
 
+import { noop } from 'es-toolkit'
 import { DefaultMaxRecordSizeEst, IsAdapterBankDB, IsBankDB } from '../helpers/consts'
 import type { Awaitable } from '../helpers/helpers'
 import type { VaultError } from '../refusals/errors'
@@ -28,7 +29,6 @@ import * as Refuse from '../refusals/throwers'
 export type Heard = { row: unknown, parent?: unknown }
 // --
 
-const noUnwatching = (): void => undefined
 const noBadNews = (_news: VaultError): void => undefined
 
 /** The base class of a bankDB that keeps its rows in a datastore: a subclass writes the `do*` calls, each one atomic step.
@@ -370,7 +370,7 @@ export abstract class AdapterBankDB implements BankDB {
   /** Start a watch: call `hear` with each changed row, and `onBadNews` with trouble, whether or not it ends the watch.
    * Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    */
-  protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void, _onBadNews: (news: VaultError) => void): () => void { return noUnwatching }
+  protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void, _onBadNews: (news: VaultError) => void): () => void { return noop }
   // --
 }
 

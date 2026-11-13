@@ -1,3 +1,4 @@
+import { isEqual } from 'es-toolkit'
 import { ForeverMillis, MinuteMillis, brandGuarded, type Modelkind } from '../helpers/consts'
 import { Checkers } from '../helpers/validator'
 import { isTestDeriver } from '../deriver/basederiver'
@@ -160,7 +161,7 @@ export class Device {
   /** Non-throwing form of {@link ensureBank}. */
   tryEnsureBank(): Promise<Outcome<Bank>> { return outcomeOf(() => this.ensureBank()) }
 
-  // Two calls under way share the one bank, its listing's, and each brings it up.
+  // Two calls under way with a bank stored both get the one bank of the listing; with none stored, the second refuses `already_asking`, the first's gating being open.
   /** Bring up the bank, refusing if a sweep or a vacate lands meanwhile. */
   async #bringUp(): Promise<Bank> {
     const { device_tok } = await this.deviceDB.ensureCachedDevice(this.scope)
@@ -313,8 +314,7 @@ export class Device {
   /** Remake the snapshot, telling every listener if it changed. */
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
-    const prior = this.#snapshot
-    if ((next.stage === prior.stage) && (next.err === prior.err) && (next.openGating === prior.openGating) && (next.bank_tok === prior.bank_tok)) { return }
+    if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = next
     for (const listener of this.#listeners) {
       try {
