@@ -338,4 +338,3 @@ async function builtWithLimits() {
   await bankDB.putVault(BW.vaultPutAskOf(vault))
   return { deployment, bankDB, bank, vault }
 }
-
