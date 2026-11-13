@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Box } from '../../src/models/box'
 import { LOCKED } from '../../src/helpers/consts'
-import * as SX from '../../src/shapes/shapes-storage'
 import * as BX from '../../src/shapes/shapes-bankdb'
 import * as VX from '../../src/shapes/shapes-vaultish'
 import { boxListingOf, fullBoxRecord, makeModelsWorld, sparseBoxRecord, tombstoneBoxRecord, T0 } from '../test-helpers/models-world'
@@ -234,25 +233,5 @@ describe("VX.boxDna and VX.boxPatch", () => {
         expect(JSON.stringify(err.meta)).to.not.include('SECRET')
       }
     })
-  })
-})
-
-describe("SX.vaultRecord and SX.vaultSparse", () => {
-  const { boxlabel: _boxlabel, ...vaultscope } = scope
-  const sparseVault = { ...vaultscope, fmt: SX.VaultFormat, ...baseProps }
-
-  const gate = { gate_epoch: 1, passphrase_wayin: TH.wayinOf('passphrase'), passkey_wayin: null }
-
-  expectCases(SX.vaultRecord, [
-    [{ ...sparseVault, gate },       true,  'passes a record with its gate, a passphrase wayin and no passkey'],
-    [{ ...sparseVault, gate: null }, false, 'refuses a record whose gate is null: a vault record is never without one'],
-    [sparseVault,                    false, 'refuses a record without its gate'],
-    [{ ...sparseVault, gate: { ...gate, gate_epoch: undefined } }, false, 'refuses a gate without its gate_epoch'],
-    [{ ...sparseVault, gate: { ...gate, gate_epoch: 0 } },         false, 'refuses gate_epoch 0: the first is 1'],
-    [{ ...sparseVault, gate: {} },   false, 'refuses a gate without its wayins'],
-  ])
-
-  it("strips the gate from the sparse form", () => {
-    expect(SX.vaultSparse.parse({ ...sparseVault, gate })).to.deep.equal(sparseVault)
   })
 })

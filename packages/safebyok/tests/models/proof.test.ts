@@ -103,7 +103,7 @@ async function buildHost(logger?: VaultLogger) {
 
 const AutolockMillis = AutolockMinutes * 60_000
 
-/** Longer than a vault waits before it asks the vaultDB again. */
+/** Longer than a vault waits before it asks the bankDB again. */
 const StaleMillis = 10 * 60_000
 
 const ApiKey = Object.freeze({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-not-a-real-key' }, sidecar: { nickname: 'work' } })
@@ -315,7 +315,7 @@ describe("the proof", () => {
     expectNoBadNews()
   })
 
-  it("the VaultDB goes out of reach: an unlocked vault keeps its lease, a page's refused ensureBank changes nothing on its screen, and its next one recovers", async () => {
+  it("the BankDB goes out of reach: an unlocked vault keeps its lease, a page's refused ensureBank changes nothing on its screen, and its next one recovers", async () => {
     const spy = TH.spyLogger()
     const { world, device, bank, vault, dialog } = await buildHost(spy.logger)
     const deviceUi = mountComponent(device, deviceStatus)

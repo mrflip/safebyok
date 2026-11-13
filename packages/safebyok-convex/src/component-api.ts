@@ -1,10 +1,9 @@
 import type { ApiFromModules, FunctionReference } from 'convex/server'
 import type * as Banks from './component/banks'
-import type * as Vaults from './component/vaults'
 
 /** The safebyok component's functions as a host references them: the type of `components.safebyok`. */
 export type ComponentApi<ComponentPath extends string | undefined = string | undefined> =
-  ForComponent<ApiFromModules<{ banks: typeof Banks, vaults: typeof Vaults }>, ComponentPath>
+  ForComponent<ApiFromModules<{ banks: typeof Banks }>, ComponentPath>
 
 /** Retype every function reference in `Api` as a component's: internal, and addressed under `ComponentPath`. */
 type ForComponent<Api, ComponentPath extends string | undefined> =

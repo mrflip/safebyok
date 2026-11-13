@@ -39,9 +39,6 @@ export const DeviceDBVersion = '002-001-001'
 /** The layout version in the name of the device row database, `safebyok:devicerow-v002-001-001`. */
 export const DeviceRowDBVersion = '002-001-001'
 
-/** The layout version in the name of the IndexedDB vault database, `${dbName}:vaults-v001-001-001`. */
-export const VaultsDBVersion = '001-001-001'
-
 // RFC 9106's recommendation for Argon2id. One length for every deriver, until a host asks for another.
 /** How many random bytes a passphraseSalt has: the `salt_size` of every key deriver. */
 export const PassphraseSaltSize = 16
@@ -52,11 +49,11 @@ export const PassphraseKeySize = 32
 /** How many random bytes a passkey wayin's `prf_salt_b64` has: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
 export const PasskeySaltSize = 32
 
-/** The default cap on a vault life's box rows, live and deleted together, for a vaultDB made without `maxBoxes`. */
+/** The default cap on a vault life's box rows, live and deleted together, for a bankDB made without `maxBoxes`. */
 export const DefaultMaxBoxes = 100
 
 // About 95% of Postgres's 8,000-byte NOTIFY payload, less the 1,944 bytes of the Larger vault row in notes/reference-sizes.md, rounded down.
-/** How many bytes one stored box record may weigh, unless its vaultDB was made with another `maxRecordSizeEst`. */
+/** How many bytes one stored box record may weigh, unless its bankDB was made with another `maxRecordSizeEst`. */
 export const DefaultMaxRecordSizeEst = 5600
 
 // A brand is a `Symbol.for` key, so a second copy of safebyok (our ESM and CJS builds side by side, or one an adapter
@@ -110,18 +107,6 @@ export type Modelkind = keyof ClassForModelkind
 export function hasModelkind<MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ClassForModelkind[MKT] {
   return (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 }
-
-/** The tag a VaultDB answers true to, so a model can tell one from a duck. */
-export const IsVaultDB: unique symbol = Symbol.for('@safebyok/vaultdb')
-
-/** True for a VaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsVaultDB}. */
-export function isVaultDB(val: unknown): val is { [IsVaultDB]: true } { return brandOf(val, IsVaultDB) === true }
-
-/** The tag an AdapterVaultDB answers true to, and no client of one, as a GraphQLVaultDB is. */
-export const IsAdapterVaultDB: unique symbol = Symbol.for('@safebyok/adaptervaultdb')
-
-/** True for an AdapterVaultDB, made by whichever copy of safebyok: an object that answers true to {@link IsAdapterVaultDB}. */
-export const isAdapterVaultDB = (val: unknown): val is { [IsAdapterVaultDB]: true } => brandOf(val, IsAdapterVaultDB) === true
 
 /** The tag a BankDB answers true to, so a model can tell one from a duck. */
 export const IsBankDB: unique symbol = Symbol.for('@safebyok/bankdb')

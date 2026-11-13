@@ -5,8 +5,8 @@ import type { WithoutSystemFields } from 'convex/server'
 import type { Doc } from './_generated/dataModel'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 
-// The component enforces its own limits on a vault, whatever cap the client sends, so that one
-// transaction can always delete the whole vault. `delVault` reads every box row of the life and
+// The component enforces its own limits on a vault life, whatever cap the client sends, so that one
+// transaction can always delete the whole life, and one query list it. `delVault` reads every box row of the life and
 // deletes each, and a Convex transaction may read 16 MiB and write 16,000 documents. The limits are
 // half of each, which leaves room for the vault row and the tally. They are enforced here because a
 // modified client cannot be trusted to keep its vault small. `delVault` has to read and delete a
@@ -34,10 +34,30 @@ export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 export const MaxVaultBoxSize = (ConvexTransactionReadSize / 2) - ConvexDocumentSize - TallyReserveSize
 // --
 
-// == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, weigh, tallyOf, growthOf, capacityOf, reckon, refuses, record, forget, drop
+// == [Budgets]: Budget, cascadeBudget, isSpent, spend
+// A cascade deletes the rows under a bank, or the rows of its ended lives, which may be more than one transaction can hold. It
+// draws on a budget of half of each limit it meets, which leaves room for the rest of its mutation, and stops once that is spent.
 
-/** The labels and token that name one life of one vault. */
-export type Life = { user_id: string, banklabel: string, vaultlabel: string, vault_tok: string }
+/** What a cascade may still delete in its transaction: `count` documents, and `size` bytes read. */
+export type Budget = { count: number, size: number }
+
+/** A cascade's whole budget, for one mutation. */
+export function cascadeBudget(): Budget { return { count: ConvexTransactionWrittenDocuments / 2, size: ConvexTransactionReadSize / 2 } }
+
+/** True once `budget` is spent. */
+export function isSpent({ count, size }: Budget): boolean { return (count <= 0) || (size <= 0) }
+
+/** Take one document of `size` bytes from `budget`. */
+export function spend(budget: Budget, size: number): void {
+  budget.count -= 1
+  budget.size -= size
+}
+// --
+
+// == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, weigh, tallyOf, growthOf, capacityOf, reckon, refuses, record, forget, countBoxes, drop
+
+/** The labels and tokens that name one life of one vault: its own `vault_tok`, under its bank's `bank_tok`. */
+export type Life = { user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string }
 
 /** A life's box rows counted and weighed: `all_*` of every row, tombstones included, and `live_*` of the live rows alone. */
 export type Tally = { all_count: number, live_count: number, all_size: number, live_size: number }
@@ -51,9 +71,9 @@ export type BoxDocGiven = Omit<WithoutSystemFields<Doc<'safebyok_boxes'>>, 'box'
 /** Return the bytes `boxDoc` counts toward its life's limit, by Convex's `getDocumentSize` with its allowance for system fields. Null counts 0. */
 export function weigh(boxDoc: BoxDocGiven | null): number {
   if (boxDoc === null) { return 0 }
-  const { user_id, banklabel, vaultlabel, vault_tok, boxlabel, box } = boxDoc
+  const { user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, box } = boxDoc
   // The box row came through a Convex validator or out of the table, so it is a Convex value.
-  return getDocumentSize({ user_id, banklabel, vaultlabel, vault_tok, boxlabel, box: box as Value })
+  return getDocumentSize({ user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, box: box as Value })
 }
 
 /** The tally of `boxDoc` alone, or an empty tally for null. */
@@ -107,6 +127,14 @@ export async function forget(db: DatabaseWriter, life: Life, growth: Tally): Pro
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(kept, growth)) }
 }
 
+/** How many box rows `life` has, tombstones included: its tally's count, or else a count of its rows. */
+export async function countBoxes(db: DatabaseReader, life: Life): Promise<number> {
+  const kept = await getTallyRow(db, life)
+  if (kept) { return kept.all_count }
+  const boxDocs = await lifeBoxQuery(db, life).collect()
+  return boxDocs.length
+}
+
 /** Delete the life's tally row, if it has one. */
 export async function drop(db: DatabaseWriter, life: Life): Promise<void> {
   const kept = await getTallyRow(db, life)
@@ -128,19 +156,19 @@ function negated({ all_count, live_count, all_size, live_size }: Tally): Tally {
 
 // `.unique()` throws if it finds two rows. A tally is inserted only when none was found in the same
 // transaction, so two would mean damage, and that should fail loudly.
-function getTallyRow(db: DatabaseReader, { user_id, banklabel, vaultlabel, vault_tok }: Life) {
+function getTallyRow(db: DatabaseReader, { user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life) {
   return (
     db.query('safebyok_tallies')
-      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .withIndex('by_life', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok))
       .unique()
   )
 }
 
 /** Query the box rows of one life, in boxlabel order. */
-export function lifeBoxQuery(db: DatabaseReader, { user_id, banklabel, vaultlabel, vault_tok }: Life) {
+export function lifeBoxQuery(db: DatabaseReader, { user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life) {
   return (
     db.query('safebyok_boxes')
-      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('vault_tok', vault_tok))
+      .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok))
   )
 }
 // --

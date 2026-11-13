@@ -5,9 +5,8 @@ import * as BX from '../../src/shapes/shapes-bankdb'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { BankDB } from '../../src/storage/bank-db'
 import { omitting } from './refusals'
-import { Now } from './storage-world'
 import {
-  bankScope, gateScope, vaultScope, boxQuery, MainOnly, mainWayin, passkey0Wayin, otherMainWayin, bankAt, gateAt, vaultAt, boxAt,
+  Now, bankScope, gateScope, vaultScope, boxQuery, MainOnly, mainWayin, passkey0Wayin, otherMainWayin, bankAt, gateAt, vaultAt, boxAt,
   bankTombstoneOf, vaultTombstoneOf, boxTombstoneOf, bankEnsureAsk, bankBuildAskOf, gatePutAskOf, bankDelAskOf,
   vaultGetAskOf, boxGetAskOf, vaultPutAskOf, boxPutAskOf, vaultDelAskOf, boxDelAskOf,
 } from './bankdb-world'

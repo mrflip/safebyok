@@ -43,15 +43,11 @@ export const deliveryModificationVals = ['older', 'same', 'adopt'] as const
 export type DeliveryModification = typeof deliveryModificationVals[number]
 // --
 
-// == [Policies]: askOpVals, AskOp, bankAskOpVals, BankAskOp, ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
+// == [Policies]: askOpVals, AskOp, ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
 
-/** What a vaultDB ask asks for, the tag every ask carries as its `op`. */
-export const askOpVals = ['get', 'put', 'del', 'list', 'tidy_gone'] as const
+/** What a bankDB ask asks for, the tag every ask carries as its `op`: `ensure` for `ensureBank` and `build` for `buildBank`. */
+export const askOpVals = ['get', 'put', 'del', 'list', 'tidy_gone', 'ensure', 'build'] as const
 export type AskOp = typeof askOpVals[number]
-
-/** What a bankDB ask asks for: a vaultDB's ops, `ensure` for `ensureBank` and `build` for `buildBank`. */
-export const bankAskOpVals = [...askOpVals, 'ensure', 'build'] as const
-export type BankAskOp = typeof bankAskOpVals[number]
 
 /** The policies for a put over a live record: `repl`, the default, replaces it; `fail` refuses `camped`; `get` answers it. */
 export const ifPresentVals = ['repl', 'fail', 'get'] as const
@@ -122,7 +118,7 @@ export const gateVerbVals = ['replacePassphrase', 'addPasskey', 'revokePasskey']
 export type GateVerb = typeof gateVerbVals[number]
 // --
 
-// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, parentBankActVals, ParentBankAct, VaultAct, BoxAct, gateActVals, GateAct, goodActVals, GoodAct, badActVals, BadAct, bankBadActVals, BankBadAct
+// == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, parentBankActVals, ParentBankAct, VaultAct, BoxAct, gateActVals, GateAct, goodActVals, GoodAct, badActVals, BadAct
 
 /** The acts of a put or del that stored its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
 export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
@@ -162,10 +158,7 @@ export const goodActVals = [...writeActVals, ...foundActVals, ...gateActVals, 'g
 export type GoodAct = typeof goodActVals[number]
 
 /** Every act a refused answer carries; `unclassified_storing` for a refusal the classifier never saw: a bad ask, storage out of reach, a revoked identity. */
-export const badActVals = [...refusedActVals, ...boxVaultActVals, 'unclassified_storing'] as const
+export const badActVals = [...refusedActVals, ...boxVaultActVals, ...parentBankActVals, 'unclassified_storing'] as const
 export type BadAct = typeof badActVals[number]
 
-/** Every act a bankDB's refused answer carries: a vaultDB's, and those of a parent bank row. */
-export const bankBadActVals = [...badActVals, ...parentBankActVals] as const
-export type BankBadAct = typeof bankBadActVals[number]
 // --

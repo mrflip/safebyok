@@ -67,7 +67,7 @@ govern how code is changed:
   1.0.0, neither binds backward**: no compatibility shims, no migrations, no reading of older
   stored shapes. An old record that fails today's validation fails safe (it reads as absent or
   corrupt), and the changeset says what a host will see.
-* **The vaultDB is the ground truth; what the local instance keeps is a cache.** A
+* **The bankDB is the ground truth; what the local instance keeps is a cache.** A
   data-integrity failure met in a consistent state is reported by throwing. Insert no
   retry logic, abort controllers or other whizbangs into the critical path of a primitive
   operation: the customer, or orchestration code we provide, can add them as warranted.

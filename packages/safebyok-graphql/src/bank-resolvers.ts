@@ -34,21 +34,21 @@ export type BankFieldArgs = {
 /** A bankDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
 export type CrossingAnswer = {
   ok:     boolean
-  act:    DB.GoodAct | DB.BankBadAct
+  act:    DB.GoodAct | DB.BadAct
   val:    unknown
   parent: unknown
   dbhas:  unknown
   ask:    BX.LoggableAsk
-  err:    DB.CrossedErr | null
+  err:    BX.CrossedErr | null
 }
 
 /** A watch notice in wire form, or the refusal that ends the watch. */
 export type CrossingNotice = {
   ok:     boolean
-  act:    'gotlive' | 'gotgone' | DB.BankBadAct
+  act:    'gotlive' | 'gotgone' | DB.BadAct
   val:    BX.BankRow | BX.GateRecord | BX.VaultRow | BX.BoxRow | null
   parent: BX.BankRow | BX.VaultRow | null
-  err:    DB.CrossedErr | null
+  err:    BX.CrossedErr | null
 }
 
 /** The resolver for one query or mutation field, taking the standard GraphQL resolver arguments. */
@@ -237,7 +237,7 @@ function crossingOf(answer: BX.Answer<unknown, DB.GoodAct, unknown>): CrossingAn
 }
 
 /** Convert a refusal to wire form. Its `cause` is never sent. */
-function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): DB.CrossedErr {
+function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): BX.CrossedErr {
   // Parse the capacity before sending it: JSON cannot carry Infinity, so the check turns an infinite limit into the largest safe integer.
   const capacity = DB.capacity.safeParse(meta?.capacity)
   return {

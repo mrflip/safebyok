@@ -10,7 +10,7 @@ control flow simple (STYLE.md, *Control flow and refusals*), with the argument f
 
 What is the difference between refusals and errors
 
-Assess the vaultDB integrity checks contract for gate verbs
+Assess the bankDB integrity checks contract for gate verbs
 
 change logger.log to logger.info, add logger.debug and logger.notice
 
@@ -22,29 +22,24 @@ Items every adapter author and reviewer should keep in front of them, so they ar
 
 DeviceDB intelligently handles versioning of cached objects on LWW among records with same version
 
-* **The vaultDB closest to the database owns validation and consistency.** The Coach, 2026-10-22
-  (the primitives sprint, on keeping both a checked and an unchecked form of each get): "the vaultdb closest to the database should
+* **The bankDB closest to the database owns validation and consistency.** The Coach, 2026-10-22
+  (the primitives sprint, on keeping both a checked and an unchecked form of each get): "the [bankDB] closest to the database should
   handle validation and consistency checks. I don't mind if graphql does checks as well. But
-  every vaultDB relies on the consistency guarantees of its backing storage -- in the case that
-  you're a facade on another vaultDB this is particularly easy." Today the base class checks every
-  record that each verb returns, in whichever layer it runs: a facade (`GraphQLVaultDB`, the demo's
-  outage adapter) checks again what the vaultDB behind it already checked; the GraphQL server calls
-  the hosted vaultDB's `try*` verbs, and its client checks the answers again in the browser. Decide
+  every [bankDB] relies on the consistency guarantees of its backing storage -- in the case that
+  you're a facade on another [bankDB] this is particularly easy." Today the base class checks every
+  record that each verb returns, in whichever layer it runs: a facade (`GraphQLBankDB`, the demo's
+  outage adapter) checks again what the bankDB behind it already checked; the GraphQL server calls
+  the hosted bankDB's `try*` verbs, and its client checks the answers again in the browser. Decide
   where the single check belongs (in the adapter next to the storage, with the other layers trusting
-  it), and remove the rest, once the VaultDBs' verbs have settled.
+  it), and remove the rest, once the BankDBs' verbs have settled.
 
 ## Sand in the sandals
 
 Small irritants, each a few lines, picked up by whoever is nearby.
 
-* **Postgres `InsertBoxOutcome` typed loosely.** From the reform2 sprint
-  ([#177](https://github.com/mrflip/safebyok/pull/177)'s review; the Coach: "add as todo"):
-  `insertBox` in `safebyok-postgres/src/postgres-vault-db.ts` casts its row to a type that names
-  only the four flags and leaves the box columns untyped. Type them, or return the box as
-  one `row_to_json` column, the next time the Postgres adapter is changed.
 * **`postgres` a required check, once it has run a while.** Ruled 2026-10-16
   ([#131](https://github.com/mrflip/safebyok/pull/131), the Postgres container): CI's `postgres`
-  job runs the VaultDB battery, its races and the `23503` case against a real server, and is not
+  job runs the BankDB battery, its races and the `23503` case against a real server, and is not
   required by the main ruleset until it has a track record. The ruleset is the Coach's to change.
 * **`node-compat (22)` a required check.** Ruled 2026-10-16
   ([#130](https://github.com/mrflip/safebyok/pull/130)): the job blocks a merge on Node 22, the platform
@@ -56,15 +51,15 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   for it (`wasm-deriver.ts`, whose comment says a vault never passes one), but the vault turns any
   throw from a deriver into `keyDeriverThrew`'s `unexpected_error`. Either refuse an empty passphrase
   before the deriver, or let a deriver's `wrong_passphrase` through. Confirm with a test first.
-* **The vaultDB throwers' banner names the wrong field.** Found 2026-11-11
+* **The bankDB throwers' banner names the wrong field.** Found 2026-11-11
   ([#645](https://github.com/mrflip/safebyok/pull/645), the storage prose pass): the
-  `/* The refusals of a vaultDB ... */` comment under `[VaultDB Throwers]` in
-  `packages/safebyok/src/refusals/throwers.ts` says `meta` carries the `world` and `dbhas` the
+  `/* The refusals of a bankDB ... */` comment under `[Refusal throwers]` in
+  `packages/safebyok/src/refusals/throwers.ts` says `meta` carries the `parent` and `dbhas` the
   answer carries. The throwers put those rows in the error's `rows` option (`RefusalRows` in
   `refusals/errors.ts`), which `rowsOfRefusal` reads, and `actRefused` carries none. Reword it.
 * **A `fooOf` that does more than derive.** Found 2026-11-11 (the names-that-jar report, ruled
   for TODO): STYLE.md has a `fooOf` pure, yet these mint, construct, mutate or call out.
-  `refusalOf` (`storage/adapter-vault-db.ts`) sets the thrown error's `meta`; `versionedShelfOf`
+  `refusalOf` (`storage/adapter-bank-db.ts`) sets the thrown error's `meta`; `versionedShelfOf`
   (`storage/idb-shelf.ts`) opens and caches, an ensure; `nextRevisionOf` and `boxTombstoneOf`
   mint toks; `sealedRecordOf` encrypts; `boxListingOf` calls `new`; `stampOfBirth` mints a
   token; `tombstoneOver` mints; `passphraseKeyOf` derives a key; GraphQL's `answerOf` sends a
@@ -123,10 +118,10 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   "bump `format`" when a schema changes under the same literal, so a loosened check (`.min(1)`
   to `.min(0)`) cannot ship unmarked.
 
-* **`ShelfVaultDB`, a base for key-value databases.** Declined for the store-base sprint, ruled
+* **`ShelfBankDB`, a base for key-value databases.** Declined for the store-base sprint, ruled
   2026-10-16 ("agree, add as a TODO"; thread 5b, [#137](https://github.com/mrflip/safebyok/pull/137)).
   A connector for a list/get/put shelf implements one atomic step, and the base implements every
-  verb on top of that step, which would fold `localVaultDB` and `idbVaultDB` into it. It needs a
+  verb on top of that step, which would fold `IdbBankDB` and a localStorage adapter into it. It needs a
   short promise chain that we would have to hand-roll, so it waits for a later design. The store
   base's shared expectation checks are built, and this builds on them
   (`winboard/20261016-push_to_100_a/store-base-design.md`, while that file lasts).
@@ -139,7 +134,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   instead of one, point to (a) the GraphQL client (`safebyok-graphql`) and (b) an AI
   prompt that builds a route for the host's own framework.
 * **An agent skill set** for integrating safebyok (the Coach, 2026-10-22): skills a host's coding
-  agent loads to wire a bank, a VaultDB and the dialogs into an app.
+  agent loads to wire a bank, a BankDB and the dialogs into an app.
 * **`device.ensureBank()` checks that the DeviceDB responds**, not only that the strength checker
   loads (the Coach, on #258: "scheduling is up to you").
 * **The demo triggers the bank when Auth.js gets an identity** (the Coach, on #259): show the
@@ -153,7 +148,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
   (`bank.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
-  vaultDB: `vault.del()` needs the passphrase.
+  bankDB: `vault.del()` needs the passphrase.
 
 * **After the restyle (#273 to #283): two later changes.** Each changes a signature or a
   refusal, so each waited for its own PR. `Box.seal` still accepts the two epochs from its caller
@@ -213,7 +208,7 @@ damaged_rows". Today `listVaults` and `listBoxes` put a row that fails validatio
 returned there whole, as plain JSON. The question to settle first is whether meeting a damaged row
 is still a refusal (`damaged_row`, with the row in `damaged_rows`), as CLAUDE.md's "a data-integrity
 failure met in a consistent state is reported by throwing" asks, or an ok answer that carries the
-row. The orchestrator recommends keeping the refusal. The GraphQL schema (vaultdb_cleanup thread 8)
+row. The orchestrator recommends keeping the refusal. The GraphQL schema (the 20261107 cleanup sprint, thread 8)
 is shaped around it.
 
 ### Which wayins a rotation keeps
@@ -263,7 +258,7 @@ changed either.
 
 ### Lock timing vs. work in flight: what is left of the policy
 
-`packages/safebyok/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a VaultDB write
+`packages/safebyok/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
 that has been sent completes or is refused as storage decides; a call still at a step before its write refuses with
 `vault_locked`; a read that would return a whisper refuses; and a lock and an unlock each do their own work, in order,
 so a lock that lands during an unlock's proof leaves the vault unlocked. Still open, from the scenarios that
@@ -428,9 +423,9 @@ have the Vault object adopt storage's capacity when a write is refused with `vau
 refusal's `meta.capacity`), so that the next check in this tab counts the way storage does. Decide
 how an adopted capacity ages, since a hello's listing recounts it.
 
-### The stamp, not the scope, as a VaultDB request's parameter
+### The stamp, not the scope, as a BankDB request's parameter
 
-The Coach (2026-10-22): each VaultDB verb takes the scope and an expectation beside it; a verb
+The Coach (2026-10-22): each BankDB verb takes the scope and an expectation beside it; a verb
 could instead take the whole stamp (`{ ...scope, vault_tok, vault_epoch, gate_epoch }`). Also send
 the authenticated immutable fields with puts and reads, so that a server can refuse early what the
 ctx would refuse late. Decide with the wire shapes (`safebyok-graphql`, the Postgres route), since
@@ -528,17 +523,17 @@ The old design's `vault.getWhisper` and `vault.useWhisper` returned a whisper in
 The old design's `ensureUnlocked({ renewMinutes })` let a call say how much of the lease must remain. Today a host has `autolockMinutes` and
 `boxRefreshMinutes` for the whole bank, and nothing per call.
 
-### Other stores: `localVaultDB`, `domStore`, `memoryStore`
+### Other stores: `localBankDB`, `domStore`, `memoryStore`
 
-The old design ran a vaultDB over any `StringStore`. The new one has `MemoryVaultDB` and `safebyok-indexeddb`. Decide whether to bring
-back a key-value vaultDB, likely with the `ShelfVaultDB` side quest above, for a host that has only `localStorage` or a test that wants one.
+The old design ran its database over any `StringStore`. The new one has `MemoryBankDB` and `safebyok-indexeddb`. Decide whether to bring
+back a key-value bankDB, likely with the `ShelfBankDB` side quest above, for a host that has only `localStorage` or a test that wants one.
 
 ### The adapter contract, published
 
 The old design's [`VAULTDB.md`](https://github.com/mrflip/safebyok/blob/100256bb79797b80de9e7a9affd92073b49671f3/packages/safebyok-old/VAULTDB.md) (removed with `safebyok-old`; the link is to the last commit that had it) is the only adapter
-contract written for readers outside the project, and it describes the old verbs. Write its successor for `AdapterVaultDB` (what each verb promises,
-and `describeVaultDBBattery` as its test);
-`notes/design-vaultdb.md` is internal, and `safebyok-indexeddb`'s README is a template rather than a contract. The [old README](https://github.com/mrflip/safebyok/blob/100256bb79797b80de9e7a9affd92073b49671f3/packages/safebyok-old/README.md)'s guides on errors, locking,
+contract written for readers outside the project, and it describes the old verbs. Write its successor for `AdapterBankDB` (what each verb promises,
+and `describeBankDBBattery` as its test);
+`safebyok-indexeddb`'s README is a template rather than a contract. The [old README](https://github.com/mrflip/safebyok/blob/100256bb79797b80de9e7a9affd92073b49671f3/packages/safebyok-old/README.md)'s guides on errors, locking,
 logging, key derivation and passkey recipes have no new home either, and describe old behaviour, so each needs rewriting, not moving.
 
 ### A size budget, when we want one
@@ -571,13 +566,13 @@ after it, find no vault, and drop the new vault's key as if the vault were gone;
 refused with `vault_locked`, though the vault it made is stored, and the next read of the vault
 props finds it. The Coach (2026-10-21):
 
-> So: hello, in parallel, asks for props from VaultDB and DeviceDB; this makes sense, as a lot of
+> So: hello, in parallel, asks for props from [bankDB] and DeviceDB; this makes sense, as a lot of
 > normal conditions have both. There's a known situation -- very common, important and expected --
 > where this will go badly. Namely, if the vault is new, one can conjecture that the chance of a
-> race successfully completing a healthy vault in both deviceDB and vaultDB is more than
+> race successfully completing a healthy vault in both deviceDB and [bankDB] is more than
 > theoretical, and that it would likely manifest by successfully retrieving the slower ground-truth
-> VaultDB record but no DeviceDB record. We can, with certainty, (1) identify this situation; (2)
-> guarantee that a re-fetched DeviceDB corresponds beyond doubt to the VaultDB record.
+> [bankDB] record but no DeviceDB record. We can, with certainty, (1) identify this situation; (2)
+> guarantee that a re-fetched DeviceDB corresponds beyond doubt to the [bankDB] record.
 
 For now: "apologize for bad UX, keep control flow clean". The core's order stays hello, then
 unlock, then the operation, with no re-fetch; the refusal says what happened and tells the user to

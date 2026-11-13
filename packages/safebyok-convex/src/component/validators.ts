@@ -1,156 +1,87 @@
-/** Convex validators for the component's arguments and return values, converted from the core's checkers. */
+/** Convex validators for the arguments and return values of the bankDB's functions in the component. */
 
 import { zodOutputToConvex, zodToConvex } from 'convex-helpers/server/zod4'
 import { v } from 'convex/values'
-import type { Validator } from 'convex/values'
 import * as DB from 'safebyok/storage'
 
-// Convex accepts only its own validators for a function's arguments and return values. Where Convex
-// has no equivalent check (a label's pattern, a time's range), the conversion falls back to the
-// looser check it does have. That is safe because the component checks each ask in full with the
-// core's own checker before it reads a row, and the core checks each row again when it reads it back.
+// An ask is any value here. Each function parses its ask with the core's own checker before it reads a row, and the client
+// classifies every row it gets back with the core's classifier: what Convex's validators could check of either, the core does.
 
-// == [Scopes]: bankScope, vaultScope, vaultQuery, boxQuery, watchScope
-
-/** One user's vaults in one app. */
-export const bankScope = zodToConvex(DB.bankScope)
-
-/** One vault, named by its labels. */
-export const vaultScope = zodToConvex(DB.vaultScope)
-
-/** One life of one vault. */
-export const vaultQuery = zodToConvex(DB.vaultQuery)
-
-/** One box of one life of one vault. */
-export const boxQuery = zodToConvex(DB.boxQuery)
+// == [Shapes]: watchScope, capacity
 
 /** The scope of a watch: a bank, or one of its vaults. */
 export const watchScope = zodToConvex(DB.watchScope)
-// --
-
-// == [Records]: vaultRecord, vaultTombstone, boxRecord, boxTombstone, capacity
-
-// The two live-record validators are annotated with the core's own types. The type Convex infers
-// carries the core's zod brands, which a declaration file cannot name, and for a box it recurses
-// into the sidecar past TypeScript's depth limit.
-
-/** A live vault row as the core writes it. */
-export const vaultRecord: Validator<DB.VaultRecord, 'required', string> = zodToConvex(DB.vaultRecord)
-
-/** A vault's tombstone as the core writes it. */
-export const vaultTombstone = zodToConvex(DB.vaultTombstone)
-
-/** A live box row as the core writes it. */
-export const boxRecord = zodToConvex(DB.boxRecord) as unknown as Validator<DB.BoxRecord, 'required', string>
-
-/** A box's tombstone as the core writes it. */
-export const boxTombstone = zodToConvex(DB.boxTombstone)
 
 /** How full a vault is, in boxes and in bytes. */
 export const capacity = zodOutputToConvex(DB.capacity)
 // --
 
-// == [Asks]: vaultListAsk, boxListAsk, boxTidyAsk, vaultGetAsk, boxGetAsk, vaultPutAsk, boxPutAsk, vaultDelAsk, boxDelAsk
-// These check an ask's structure only. The component checks each ask in full with the core's own checker before it reads a row.
+// == [Arguments]: askArgs, putBoxArgs, watchRowsArgs
 
-// The metadata of the stored row that a put or del expects to find.
-const vaultExpected = zodToConvex(DB.rowMeta)
-const boxExpected   = v.object({ ...vaultExpected.fields, box_tok: v.string() })
-const putPolicies   = { ifAbsent: zodToConvex(DB.putOptsGiven.shape.ifAbsent), ifPresent: zodToConvex(DB.putOptsGiven.shape.ifPresent) }
-const gateVerb      = v.union(...DB.gateVerbVals.map((verb) => v.literal(verb)))
-const ifAbsent      = v.union(...DB.ifAbsentVals.map((val) => v.literal(val)))
+/** A function of the bankDB takes its ask, as the client's verb checked it. */
+export const askArgs = { ask: v.any() }
 
-/** What `listVaults` is asked. */
-export const vaultListAsk = v.object({ ...bankScope.fields, op: v.literal('list') }) as unknown as Validator<DB.VaultListAsk, 'required', string>
+/** `putBox` takes a box's put ask, and an optional soft cap on the box rows of the vault life, tombstones included. */
+export const putBoxArgs = { ask: v.any(), maxBoxes: v.optional(v.number()) }
 
-/** What `listBoxes` is asked. */
-export const boxListAsk = v.object({ ...vaultQuery.fields, op: v.literal('list') }) as unknown as Validator<DB.BoxListAsk, 'required', string>
-
-/** What `tidyGone` is asked. */
-export const boxTidyAsk = v.object({ ...bankScope.fields, op: v.literal('tidy_gone') }) as unknown as Validator<DB.BoxTidyAsk, 'required', string>
-
-/** What `getVault` is asked. */
-export const vaultGetAsk = v.object({
-  ...vaultScope.fields, op: v.literal('get'), ifAbsent, expected: vaultExpected,
-}) as unknown as Validator<DB.VaultGetAsk, 'required', string>
-
-/** What `getBox` is asked. */
-export const boxGetAsk = v.object({
-  ...boxQuery.fields, op: v.literal('get'), ifAbsent, expected: boxExpected,
-}) as unknown as Validator<DB.BoxGetAsk, 'required', string>
-
-/** What `putVault` is asked. */
-export const vaultPutAsk = v.object({
-  ...vaultScope.fields, op: v.literal('put'), ...putPolicies, expected: vaultExpected, record: vaultRecord,
-  gateVerb: v.optional(gateVerb),
-}) as unknown as Validator<DB.VaultPutAsk, 'required', string>
-
-/** What `putBox` is asked. */
-export const boxPutAsk = v.object({
-  ...boxQuery.fields, op: v.literal('put'), ...putPolicies, expected: boxExpected, record: boxRecord,
-}) as unknown as Validator<DB.BoxPutAsk, 'required', string>
-
-/** What `delVault` is asked. */
-export const vaultDelAsk = v.object({
-  ...vaultScope.fields, op: v.literal('del'), expected: vaultExpected, record: vaultTombstone,
-}) as unknown as Validator<DB.VaultDelAsk, 'required', string>
-
-/** What `delBox` is asked. */
-export const boxDelAsk = v.object({
-  ...boxQuery.fields, op: v.literal('del'), expected: boxExpected, record: boxTombstone,
-}) as unknown as Validator<DB.BoxDelAsk, 'required', string>
+/** `watchRows` takes a watch's scope. */
+export const watchRowsArgs = { scope: watchScope }
 // --
 
-// == [Answers]: rowOfVault, rowOfBox, boxesFetched, boxFetched, vaultStored, boxStored, tidied, rowsWatched
+// == [Fetched]: rowOfGate, rowOfVault, rowOfBox, rowOfWatchedBox, bankEnsureFetched, vaultFetched, boxesFetched, boxFetched
+// The rows a get fetched, in one snapshot, each null for none.
+
+/** A gate row as stored, with its gatelabel. */
+const rowOfGate = v.object({ gatelabel: v.string(), gate: v.any() })
 
 /** A vault row as stored, with its vaultlabel. */
-export const rowOfVault = v.object({ vaultlabel: v.string(), vault: v.any() })
+const rowOfVault = v.object({ vaultlabel: v.string(), vault: v.any() })
 
 /** A box row as stored, with its boxlabel. */
-export const rowOfBox = v.object({ boxlabel: v.string(), box: v.any() })
+const rowOfBox = v.object({ boxlabel: v.string(), box: v.any() })
 
-/** One life's box rows, and the vault row read in the same snapshot as `world`. */
-export const boxesFetched = v.object({ world: v.any(), boxes: v.array(rowOfBox) })
+/** A box row as stored, with its vaultlabel and boxlabel. */
+const rowOfWatchedBox = v.object({ vaultlabel: v.string(), boxlabel: v.string(), box: v.any() })
 
-/** One box row, and the vault row read in the same snapshot as `world`. */
-export const boxFetched = v.object({ world: v.any(), box: v.any() })
+/** The bank row, its `main` gate row, and every vault row of the bank with its vaultlabel. */
+export const bankEnsureFetched = v.object({ bank: v.any(), gate: v.any(), vaults: v.array(rowOfVault) })
 
-/** The core classifier's outcome for a vault's put or del. The client checks it in full. */
-export const vaultStored = v.object({ ok: v.boolean(), act: v.string(), world: v.any(), vault: v.any(), presence: v.string() })
+/** The bank row and the vault row. */
+export const vaultFetched = v.object({ bank: v.any(), vault: v.any() })
 
-/** The core classifier's outcome for a box's put or del. The client checks it in full. */
-export const boxStored = v.object({ ok: v.boolean(), act: v.string(), world: v.any(), box: v.any(), presence: v.union(v.string(), v.null()), capacity: v.union(capacity, v.null()) })
+/** One life's box rows, each with its boxlabel, and the vault row as `parent`. */
+export const boxesFetched = v.object({ parent: v.any(), boxes: v.array(rowOfBox) })
 
-/** How many box rows a bank has left after a tidy. */
-export const tidied = v.object({ totalCount: v.number() })
-
-/** A box row as stored, with its vaultlabel, `vault_tok` and boxlabel. */
-export const rowOfWatchedBox = v.object({ vaultlabel: v.string(), vault_tok: v.string(), boxlabel: v.string(), box: v.any() })
-
-/** Every vault row and box row in a watch's scope. */
-export const rowsWatched = v.object({ vaults: v.array(rowOfVault), boxes: v.array(rowOfWatchedBox) })
+/** One box row, and the vault row as `parent`. */
+export const boxFetched = v.object({ parent: v.any(), box: v.any() })
 // --
 
-// == [Arguments]: the args of each function, shared by the component and the host's wrapper
+// == [Written]: gateWritten, bankWritten, vaultWritten, boxWritten, boxPutWritten, tidied, rowsWatched
+// The rows a write fetched, as they stood before it, and whether it stored the ask's record.
 
-/** `listVaults` takes a bank's list ask. */
-export const listVaultsArgs = { ask: vaultListAsk }
-/** `getVault` takes a vault's get ask. */
-export const getVaultArgs   = { ask: vaultGetAsk }
-/** `listBoxes` takes the list ask of one life of a vault. */
-export const listBoxesArgs  = { ask: boxListAsk }
-/** `getBox` takes a box's get ask. */
-export const getBoxArgs     = { ask: boxGetAsk }
-/** `putVault` takes a vault's put ask. */
-export const putVaultArgs   = { ask: vaultPutAsk }
-/** `putBox` takes a box's put ask, and an optional soft cap on the box rows of the vault life, tombstones included. */
-export const putBoxArgs     = { ask: boxPutAsk, maxBoxes: v.optional(v.number()) }
-/** `delVault` takes a vault's del ask. */
-export const delVaultArgs   = { ask: vaultDelAsk }
-/** `delBox` takes a box's del ask. */
-export const delBoxArgs     = { ask: boxDelAsk }
-/** `tidyGone` takes a tidy ask. */
-export const tidyGoneArgs   = { ask: boxTidyAsk }
-/** `watchRows` takes a watch's scope. */
-export const watchRowsArgs  = { scope: watchScope }
+/** The bank row and the gate row, and whether the gate record was stored. */
+export const gateWritten = v.object({ bank: v.any(), gate: v.any(), wrote: v.boolean() })
+
+/** The bank row, and whether its tombstone was stored. */
+export const bankWritten = v.object({ bank: v.any(), wrote: v.boolean() })
+
+/** The bank row and the vault row, and whether the vault record was stored. */
+export const vaultWritten = v.object({ bank: v.any(), vault: v.any(), wrote: v.boolean() })
+
+/** The vault row as `parent` and the box row, and whether the box record was stored. */
+export const boxWritten = v.object({ parent: v.any(), box: v.any(), wrote: v.boolean() })
+
+/** As {@link boxWritten}, with the life's capacity, and whether a write was refused for a limit the life would pass (`roomless`). */
+export const boxPutWritten = v.object({ parent: v.any(), box: v.any(), capacity, wrote: v.boolean(), roomless: v.boolean() })
+
+/** How many box rows a bank's live vaults hold after a tidy. */
+export const tidied = v.object({ totalCount: v.number() })
+
+/** The bank row, and every gate row, vault row and box row of a live vault in a watch's scope. */
+export const rowsWatched = v.object({
+  bank:   v.any(),
+  gates:  v.array(rowOfGate),
+  vaults: v.array(rowOfVault),
+  boxes:  v.array(rowOfWatchedBox),
+})
 // --

@@ -2,7 +2,7 @@
   "name": "safebyok-convex",
   "private": false,
   "version": "0.5.0",
-  "description": "Convex storage for safebyok: a Convex component holding vault records and boxes as ciphertext, and the VaultDB adapter that speaks to it.",
+  "description": "Convex storage for safebyok: a Convex component holding bank, vault and box rows as ciphertext, and the BankDB adapter that speaks to it.",
   "keywords": [
     "safebyok",
     "convex",

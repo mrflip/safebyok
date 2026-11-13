@@ -122,7 +122,7 @@ describe("The checks of a record's base fields", () => {
       expect(VX.isTombstone(full)).to.be.false
     })
 
-    it("marks a central never stored with a seq below any a VaultDB puts", () => {
+    it("marks a central never stored with a seq below any a BankDB puts", () => {
       expect(SX.VoidRevisionSeq).to.be.lessThan(0)
     })
   })

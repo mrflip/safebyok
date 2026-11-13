@@ -179,6 +179,7 @@ To be deleted at 1.0.0.
 | `vault.hello()`, `vault.tryHello()`                    | `vault.beginWatch()`, `vault.tryBeginWatch()`; `helloedVaults` (`safebyok-react`'s context) is `watchedVaults` (2026-11-12, plain_del) |
 | `vault.delVaultPrompt()`, `tryDelVaultPrompt()`; the `del_vault` gatingkind, its act and `vaultDelCleartexts` | `vault.del(vault)`, asking nobody, under an unlocked vault (2026-11-12, plain_del) |
 | `DelVaultModal`'s `gating` prop (`safebyok-react`)    | `vault` and `onDone(deleted)`: a plain confirm the host mounts (2026-11-12, plain_del) |
+| `VaultDB`, `AdapterVaultDB`, `MemoryVaultDB`, `IdbVaultDB`, `PostgresVaultDB`, `ConvexVaultDB`, `GraphQLVaultDB`, `describeVaultDBBattery`, `DevVaultDBInspector`, `SafebyokComponent`; a verb's answer `world`; the vault-world tables and their classifier | `BankDB`, `AdapterBankDB`, `MemoryBankDB`, `IdbBankDB`, `PostgresBankDB`, `ConvexBankDB`, `GraphQLBankDB`, `describeBankDBBattery`, none for the inspector, `SafebyokBankComponent`; `parent`; the bank-world tables (2026-11-12, bank_world thread 16) |
 
 ## The old design's names the new core does not have
 

@@ -19,10 +19,10 @@ devices through a storage layer the host plugs in.
   `subscribe` and `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore`
   takes them. A snapshot is the same object until something changes, and never contains a whisper.
   It is plain data, except for the device's `openGating`, which is the live gating your dialog calls.
-* **The core speaks only to interfaces**: a `VaultDB` for what syncs, a `DeviceDB` for what stays
+* **The core speaks only to interfaces**: a `BankDB` for what syncs, a `DeviceDB` for what stays
   on this device, and a `KeyDeriver`. Each adapter is its own package. The core uses no Node
   built-ins, so it runs wherever the host does.
-* **The vaultDB is the ground truth, what this instance has is a cache, and a failed call throws.**
+* **The bankDB is the ground truth, what this instance has is a cache, and a failed call throws.**
   A refusal is a `VaultError` with a `refusalkind`. Primitive calls have no retries or abort
   controllers: add them where you need them. Most calls have a `try` form (`tryEnsureVault`)
   that returns `{ ok, val, err }` instead of throwing.
@@ -74,7 +74,7 @@ const device = Device.make({
   ...browserOpts({ dbName: 'acme' }), // keyDeriver, deviceDB and strengthChecker; a field after it wins
   user_id: session.user_id, banklabel: 'acme',
   gates: ['main'], // the only gates accepted for now
-  vaultDB, // see below
+  bankDB, // see below
   requestCleartext: async (gating) => {
     if (gating.gatingkind !== 'build_bank' && gating.gatingkind !== 'unlock_bank') { return }
     while (gating.isOpen) { // a wrong passphrase leaves it open
@@ -117,7 +117,7 @@ Easy to get wrong:
   `vault.boxListing` is empty and nothing is watched, so a change made on another device does not
   arrive until the next `vault.beginWatch()`.
 * `device.vacate()` is sign-out. It disables the device and its bank, then removes this bank's
-  cached leases and its device row from the deviceDB. It does not touch the vaultDB, and it resolves
+  cached leases and its device row from the deviceDB. It does not touch the bankDB, and it resolves
   once each removal has been tried. The next device's `ensureBank` for that user gets a new
   `device_tok`. Await it before the page unloads: a lease it could not remove is reported to your
   `onLifecycle` as `lease_revoke_failed`, and a `vacated` event follows once the removals have
@@ -242,7 +242,7 @@ The `safebyok` entry point exports `Device`, `Bank`,
 `Box`, `Vault`, the `Gating` type, their snapshot types and `VaultError`, `safebyok/dom` exports `BoxFields`, and
 `safebyok/testing` adds a cheap `testDeriver` and an `anyStrengthChecker`. `safebyok/browser` exports the Argon2id derivers,
 `idbDeviceDB`, the device database in IndexedDB, `zxcvbnStrengthChecker`, and `browserOpts`, which returns all three as one options object.
-`safebyok/storage` is what a storage adapter is written against: `AdapterVaultDB` and `MemoryVaultDB`. `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-convex`
+`safebyok/storage` is what a storage adapter is written against: `AdapterBankDB` and `MemoryBankDB`. `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-convex`
 and `safebyok-graphql` are the adapters.
 
 ## Next

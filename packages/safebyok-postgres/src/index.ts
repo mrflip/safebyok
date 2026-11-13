@@ -5,8 +5,3 @@ export { BankFunctionsSql } from './bank-functions'
 export { BankTablesSql } from './bank-tables'
 export { pgClientOf } from './pg-client'
 export type { PgPool, PgPoolClient } from './pg-client'
-// The vaultDB stays until the core's vault adapters go.
-export { PostgresVaultDB, vaultChannelOf } from './postgres-vault-db'
-export type { PostgresVaultDBOpts } from './postgres-vault-db'
-export { VaultFunctionsSql } from './vault-functions'
-export { VaultTablesSql } from './vault-tables'

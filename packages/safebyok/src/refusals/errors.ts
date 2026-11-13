@@ -4,7 +4,7 @@
  */
 
 import { IsVaultError, brandOf } from '../helpers/consts'
-import type { BankBadAct } from '../shapes/shapes-enums'
+import type { BadAct } from '../shapes/shapes-enums'
 import type { Capacity } from '../shapes/shapes-storage'
 
 // == [Kinds and families]: refusalkindVals, Refusalkind, refusalFamilyVals, RefusalFamily, RefusalFamilyForKind
@@ -29,10 +29,10 @@ import type { Capacity } from '../shapes/shapes-storage'
  *
  * A record that fails its checks is named for its direction. One read from storage that fails them
  * is `damaged_row`, on the way out. A damaged row never indicates format drift: it is thrown by the
- * vaultDB tied to the datastore. One handed in is `bad_option`, on the way in; `bad_record` where one
+ * bankDB tied to the datastore. One handed in is `bad_option`, on the way in; `bad_record` where one
  * check serves both ways. A whisper that will not decipher under the lease in hand, or deciphers to no
  * whisper, is `damaged_whisper`, Zod's own error its `cause` where a check failed. A storage
- * adapter's answer that cannot be, one revision under two toks or a world row failing its checks
+ * adapter's answer that cannot be, one revision under two toks or a parent row failing its checks
  * say, is `record_conflict`.
  *
  * `wrong_passphrase` and `wrong_passkey` are all a vault can tell even when the stored vault was
@@ -50,14 +50,14 @@ export const refusalkindVals = [
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage allows in one record
   'vault_full',          // a new box in a vault already at its maxBoxes (a best-effort cap), or a write storage has no room for
-  'bad_option',          // an option, argument or record handed in that fails its check: Device.make's, makeArgon2idDeriver's, a vaultDB verb's, a putBox()'s sidecar
+  'bad_option',          // an option, argument or record handed in that fails its check: Device.make's, makeArgon2idDeriver's, a bankDB verb's, a putBox()'s sidecar
   'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
   'damaged_whisper',     // a box's whisper would not decipher under the vault's lease, or deciphered to no whisper this package knows
   'newer_format',        // a stored wayin naming a key deriver this handle was not built with: update safebyok
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
-  'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another vault_tok than this device has, a world row failing its checks, a put that answered nothing; a fetch again is worth one try, and if it remains the system is fundamentally not working
+  'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another vault_tok than this device has, a parent row failing its checks, a put that answered nothing; a fetch again is worth one try, and if it remains the system is fundamentally not working
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
   'storage_blocked',     // the browser withholds its storage from this page -- site data blocked, a private window, IndexedDB switched off: a retry will not mend it
@@ -71,11 +71,11 @@ export const refusalkindVals = [
   'dismissed',           // the dialog was dismissed with no attempt under way, so nothing was done
   'gate_made_elsewhere', // another device or tab made this vault first, so the passphrase just typed was not set and nothing was changed
   'same_passphrase',     // a new passphrase that is the one the vault already has
-  'camped',              // a vaultDB put told not to replace a live row found one there
-  'vault_empty',         // a vaultDB call named a vault_tok no row has, and no live row stands there: nothing of this life
+  'camped',              // a bankDB put told not to replace a live row found one there
+  'vault_empty',         // a bankDB call named a vault_tok no row has, and no live row stands there: nothing of this life
   'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
   'damaged_vault',       // the vault row stored above a box asked for failed its checks, as the classifier of notes/answer-contract.md found it
-  'gate_issue',          // a vaultDB gate verb whose params disagree with the stored row: its registered_at
+  'gate_issue',          // a bankDB gate verb whose params disagree with the stored row: its registered_at
   'disabled',            // a call on a bank, a listing or a thing of theirs no longer enabled, since a sweep, a vacate or a delete: it answers nothing more
 ] as const
 export type Refusalkind = typeof refusalkindVals[number]
@@ -140,22 +140,22 @@ export type RefusalMeta = {
   capacity?:     Capacity
   /** A refusal by a validator: the path of each failing field it names, so a form can mark each one. A step that may be the caller's data is not repeated. */
   fieldnames?:   readonly string[]
-  /** A vaultDB's refusal: the verb that refused. */
+  /** A bankDB's refusal: the verb that refused. */
   oplabel?:      string
-  /** A vaultDB's refusal: what happened, when it is not said by the refusalkind alone. */
-  act?:          BankBadAct
-  /** A vaultDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a record's payload. */
+  /** A bankDB's refusal: what happened, when it is not said by the refusalkind alone. */
+  act?:          BadAct
+  /** A bankDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a record's payload. */
   ask?:          Readonly<Record<string, unknown>>
 }
 
-/** The rows `err` hands a vaultDB's answer, empty where it has none. */
+/** The rows `err` hands a bankDB's answer, empty where it has none. */
 export function rowsOfRefusal(err: VaultError): RefusalRows { return (err as unknown as Record<symbol, RefusalRows | undefined>)[RowsOfRefusal] ?? {} }
 
 /** The options of a VaultError beside its refusalkind and message: the `cause` behind it, and its `meta`. */
 export type VaultErrorOpts = ErrorOptions & { meta?: RefusalMeta, rows?: RefusalRows }
 
-/** The rows a vaultDB's or bankDB's refusal hands its answer: the vaultDB's vault row, or the bankDB's row above the one asked for, as read in the step that refused, and the row stored where the write was aimed, or null for none. */
-export type RefusalRows = { world?: unknown, parent?: unknown, dbhas?: unknown }
+/** The rows a bankDB's refusal hands its answer, as read in the step that refused: the row above the one asked for, as `parent`, and the row stored where the write was aimed, as `dbhas`, or null for none. */
+export type RefusalRows = { parent?: unknown, dbhas?: unknown }
 
 // A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they hold wrapped keys.
 const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
@@ -165,7 +165,7 @@ const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
  * `cause`, the `meta`, or any other property.
  *
  * @example
- *   const { ok, val, err } = await vaultDB.tryGetVault(scope)
+ *   const { ok, val, err } = await bankDB.tryGetVault(scope)
  *   if (! ok && err.family === 'misuse') { throw err }
  */
 export class VaultError extends Error {

@@ -3,7 +3,7 @@
 How many bytes each stored record, notice and bank takes, against the limits of the transports and datastores we
 may meet, to judge where data volume is an issue.
 
-**Lead.** A typical notice fits easily. The Postgres adapter's notice for a box write (box row, vault row as `world`,
+**Lead.** A typical notice fits easily. The Postgres adapter's notice for a box write (box row, vault row as `parent`,
 scope) is 1.6 KB for a mini box and 2.1 to 2.5 KB for a medium one, against pg_notify's 8,000 bytes (the adapter caps
 it at 7,999). It stops fitting once the box row, which includes the whisper and sidecar, passes about 6.6 KB. An
 RSA-2048 keypair with a 1 KB sidecar fits (6.2 KB). An RSA-4096 keypair with one does not (8.4 KB), and neither does
@@ -78,7 +78,7 @@ up a `limits` string) padded through a `notes` string to exactly that length, al
   16-byte tag, each base64url without padding: 56 + ceil((W + 16) × 4 / 3) bytes for a whisper of W. Computed from the
   measured rule above. The box's other ciphered field, `box_key_wrapped`, adds 136 bytes whatever the whisper.
 * **The core's measure** is the size `box_too_large` compares against `maxRecordSizeEst`, from `jsonSize` in
-  `adapter-vault-db.ts`: `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the
+  `adapter-bank-db.ts`: `new TextEncoder().encode(JSON.stringify(boxRecord)).length`. It equals the JSON length whenever the
   sidecar is ASCII. **Convex weighs** is safebyok-convex's `weigh`: Convex's `getDocumentSize` of the stored document
   with its label columns. That is what counts toward `MaxVaultBoxSize`.
 * **Reading "minimum validatable size".** The labels and user_id are at their minimum: 2 characters, and 1 for the

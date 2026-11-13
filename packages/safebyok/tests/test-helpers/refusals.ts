@@ -51,14 +51,14 @@ export type ExpectingGood<DbT> = {
   [CkeyT in keyof DbT]: DbT[CkeyT] extends (...args: infer ArgsT) => Promise<Outcome<infer ValT>> ? (...args: ArgsT) => Promise<ValT> : DbT[CkeyT]
 }
 
-/** `db` -- a VaultDB, or anything whose verbs resolve Outcomes -- with each such verb resolving its
+/** `db` -- a BankDB, or anything whose verbs resolve Outcomes -- with each such verb resolving its
  * good Outcome's `val`, once {@link expectGood} has checked it is one: the test fails, naming the
  * refusal, on a bad one. Every other member is `db`'s own.
  *
- * @param db - The VaultDB whose answers the test reads.
+ * @param db - The BankDB whose answers the test reads.
  * @returns `db`, its verbs answering with their `val`s.
  *
- * @example expect(await TH.expectingGood(vaultDB).tryGetBox(scope, 'anthropic', TH.inThisVault)).to.be.null
+ * @example expect(await TH.expectingGood(bankDB).tryGetBox(scope, 'anthropic', TH.inThisVault)).to.be.null
  */
 export function expectingGood<DbT extends object>(db: DbT): ExpectingGood<DbT> {
   return new Proxy(db, {
@@ -92,7 +92,7 @@ function isOutcome(settled: unknown): settled is Outcome<unknown> {
  * @param refusalkind - The refusal's expected `refusalkind`; left out, any VaultError passes.
  * @returns The refusal, for a closer look at its message, cause or meta.
  *
- * @example await TH.expectBad(vaultDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_reborn')
+ * @example await TH.expectBad(bankDB.tryPutBox(scope, TH.noBoxYet, box), 'vault_reborn')
  */
 export async function expectBad(operation: Outcome<unknown> | Promise<Outcome<unknown>>, refusalkind?: Refusalkind): Promise<VaultError> {
   const outcome = await operation

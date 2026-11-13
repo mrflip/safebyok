@@ -1,4 +1,4 @@
-/** A Listing's storage verbs: fetch, put and del, the versioned replace, and what the vaultDB decides over a live record. */
+/** A Listing's storage verbs: fetch, put and del, the versioned replace, and what the bankDB decides over a live record. */
 
 import { describe, expect, it } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
@@ -138,7 +138,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(box.isPresent).to.be.false
     })
 
-    it("sends a del expecting the sparse record's own revision for a box not listed, which the vaultDB refuses over nothing stored", async () => {
+    it("sends a del expecting the sparse record's own revision for a box not listed, which the bankDB refuses over nothing stored", async () => {
       const listing = boxListingOf(world.mw)
       await TH.expectRefusal(listing.del(sparseBoxRecord()), 'record_conflict')
       expect(world.mw.callsOf('del')[0]?.expectedRevisionTok).to.equal('rev-a1')
@@ -228,7 +228,7 @@ describe("listing: an answer is for the scope the call asked about", () => {
   })
 })
 
-// == [ifPresent]: what the vaultDB decides over a live record, as the listing delivers it
+// == [ifPresent]: what the bankDB decides over a live record, as the listing delivers it
 
 describe("listing.put(record, { expected, ifPresent }): over a live record", () => {
   const birth = fullBoxRecord({ revision_tok: 'rev-mine', revision_seq: 0 })
@@ -304,7 +304,7 @@ describe("listing.put and listing.del: the row they say they expect", () => {
     expect(box.revision_tok).to.eq('rev-a1')
   })
 
-  it("sends a record past central's seq + 1, which the vaultDB refuses, changing nothing", async () => {
+  it("sends a record past central's seq + 1, which the bankDB refuses, changing nothing", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(aliveRow)
     const box = listing.deliverRecord(aliveRow)
@@ -345,7 +345,7 @@ describe("listing.put and listing.del: the row they say they expect", () => {
 })
 // --
 
-describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () => {
+describe("listing.tryPut and listing.tryFetch return the bankDB's answer", () => {
   it("carries the put's act, ask and parent, with the instance listed as its val", async () => {
     const listing = boxListingOf(world.mw)
     const box = listing.deliverRecord(fullBoxRecord())
@@ -364,7 +364,7 @@ describe("listing.tryPut and listing.tryFetch return the vaultDB's answer", () =
     expect(answer.act).to.eq('unclassified_storing')
   })
 
-  it("returns a fetch's instance as val, with the vaultDB's act", async () => {
+  it("returns a fetch's instance as val, with the bankDB's act", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.seedPut(fullBoxRecord())
     const answer = await listing.tryGet(scopeOf(), { maxMillisSinceRefresh: 0 })

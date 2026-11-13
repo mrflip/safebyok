@@ -1,4 +1,4 @@
-/** The device of `src/models/` end to end, over a real vaultDB and deviceDB: its options, ensureBank, its host's functions, bad news, the snapshot and the open gating. */
+/** The device of `src/models/` end to end, over a real bankDB and deviceDB: its options, ensureBank, its host's functions, bad news, the snapshot and the open gating. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DefaultLogger, setDefaultLogger } from '../../src/helpers/logger'

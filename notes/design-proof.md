@@ -11,7 +11,7 @@ their shapes are not settled.
 bank.hello()                                         a forced reset; a host may call it again, on its own timer
 └─ bank.#bringUp(vaultListing)                       refused → hello refuses, and the bank is not ready
    ├─ keyDeriver.load, strengthChecker.load
-   ├─ vaultListing.fetchBank()                       vaultDB.tryGetBank: full vaults, no boxes, gone_vault tombstones (does not fetch or sync with DeviceDB)
+   ├─ vaultListing.fetchBank()                       bankDB.tryGetBank: full vaults, no boxes, gone_vault tombstones (does not fetch or sync with DeviceDB)
    │  │    refused → tellIfRevoked, then thrown;  damaged_records → bad news
    │  └─ each vault or gone_vault, by scope: vaultListing.deliverRecord(record) → #recordDeliveringOf → #doDeliverRecord
    │       none listed                               → build, enlisted
@@ -20,7 +20,7 @@ bank.hello()                                         a forced reset; a host may 
    │       same life                                 → vault.receive(record)
    │       a tombstone of its own vault_tok          → the vault stays listed at its scope and adopts it (locked, row forgotten, boxes vacated)
    ├─ bank.#cacheDeviceRecord                        a damaged record written over → bad news
-   ├─ vaultListing.hello()                           subscribe to VaultDB
+   ├─ vaultListing.hello()                           subscribe to BankDB
    └─ vaultListing.demandEnabled()                   a sweep crossing hello refuses here
                                                      no autolock here: the host calls bank.autolock() after hello, and on its own timer
 ```
@@ -154,7 +154,7 @@ own verbs (*Changing the gate*). The patch hooks belong to `Box`.
 * A crossing unlikely enough may just throw, and the host deals with it
 * Each update, as it comes in, transactionally establishes its invariants. Where those invariants don't commute, it takes a
   higher-level coordinator, resolution by the host, or most likely advice to the host on making the ordering predictable
-* `vaultDB.tidyGone` is for hosts: nothing in the package calls it
+* `bankDB.tidyGone` is for hosts: nothing in the package calls it
 * No guarantee of the ordering of simultaneous gets, puts and dels of a box, or even of how many will succeed
 * Only Proving, Gating and Vault touch a lease. A box seals and unseals through `vault.sealStampedString` and
   `vault.unsealStampedString`, and `ensureUnlocked` returns no lease
@@ -289,7 +289,7 @@ gating.attempt({ passphraseClear, passkeyClear? })           a second while one 
    ├─ gate = Gate.make(stamp, passphraseWayin, passkeyWayin | null)
    ├─ record = listing.recordOfBirth(gate, prior)    sync pojo at the revision after prior; its gate is gate.pickle()
    ├─ vault = vaultListing.put(record, { prior, ifAbsent: 'add', ifPresent: 'get' })
-   │    ├─ vaultDB.tryPutVault(record, { prior, ifAbsent, ifPresent })    ← the commit
+   │    ├─ bankDB.tryPutVault(record, { prior, ifAbsent, ifPresent })    ← the commit
    │    │    a live row → 'passed', the stored record its answer: another won
    │    │    a newer tombstone → 'stale_write', delivered, then thrown
    │    └─ deliverAnswer(answer, record) → new Vault(what is stored), listed, locked    a 'passed' put is matched against its scope only
@@ -341,18 +341,18 @@ the act returns → gating concludes ok → ensureUnlocked resolves
 
 ## Changing the gate
 
-The gate is the only part of a vault record that changes, so each change has its own vaultDB verb, named for what
+The gate is the only part of a vault record that changes, so each change has its own bankDB verb, named for what
 it does: `replacePassphrase`, `addPasskey` or `revokePasskey`. No `Gate` is made for the next gate: a `Gate` is a read-only
 view of a record's gate, and adopt makes a new one from each record. The vault listing mints the whole next record, and each
-verb lets the vaultDB check it against the row (`notes/design-vaultdb.md`, VG1 to VG3). Each change ends the same way, and
+verb lets the bankDB check it against the row (`notes/answer-contract.md`). Each change ends the same way, and
 needs nothing that the vault does not already have:
 
 ```text
 each gate change's act, past its provings
 ├─ stored = await vaultListing.<gate verb>(ante, wayin)    ← the commit; ante, the record the attempt read
 │  ├─ { record, prior } = #gateMoveOf(ante, moved)    record is ante at nextRevisionOf(prior), gate_epoch one up, the moved wayin laid on its gate
-│  ├─ the vaultDB's verb, called with (record, { prior })    prior is ante's revision; moved → 'stale_write', nothing stored
-│  │    the vaultDB checks registered_at unchanged, gate_epoch one up, only its own wayin moved, then puts the record whole
+│  ├─ the bankDB's verb, called with (record, { prior })    prior is ante's revision; moved → 'stale_write', nothing stored
+│  │    the bankDB checks registered_at unchanged, gate_epoch one up, only its own wayin moved, then puts the record whole
 │  │    and refuses what its row rules out, such as an addPasskey over a passkey already stored ('camped')
 │  └─ deliverAnswer(answer, record)                      checked against what it sent; a revokePasskey with no passkey answers 'passed', matched against its scope only
 │     no lock: adopt never locks on a move
@@ -372,7 +372,7 @@ each gate change's act, past its provings
   the verb again.
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, of the older `gate_epoch`, is forgotten at its next session (Decided).
-* **The vaultDB checks what it can see, and no more.** It refuses a record whose `registered_at` moved, whose `gate_epoch`
+* **The bankDB checks what it can see, and no more.** It refuses a record whose `registered_at` moved, whose `gate_epoch`
   is not one up, or that moves the other wayin (`gate_issue`), and an `addPasskey` over a passkey already stored (`camped`).
   It cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
 
@@ -453,7 +453,7 @@ vault.del(vault)                                     Storable's, under an unlock
 └─ vaultListing.del(vault.sparse) → tryDel
    ├─ a vault listed of another vault_tok            → 'vault_reborn', nothing sent
    └─ Listing.tryDel: the tombstone at nextRevisionOf(the sparse record's revision)
-      ├─ vaultDB.tryDelVault(tombstone, { prior })    ← the commit: a tombstone, its boxes cascading
+      ├─ bankDB.tryDelVault(tombstone, { prior })    ← the commit: a tombstone, its boxes cascading
       │    moved → 'stale_write', nothing stored
       └─ deliverAnswer(answer, tombstone) → receiveRecord → adopt(tombstone)
          ├─ vault.#revokeLease('tombstone')          refused → announced 'lease_revoke_failed'; the tombstone stays
@@ -464,12 +464,12 @@ Nothing locks first, so a box may be unsealed under the lease until the tombston
 refused delete leaves the vault as it was. The box listing's vacate comes last, because it cannot be undone. Another
 device receives the tombstone, and its Vault ends the same way. A rebirth is a new Vault.
 
-The vaultDB owns the cascade: removing a vault tombstones its box rows by scope and `vault_tok`, so no
+The bankDB owns the cascade: removing a vault tombstones its box rows by scope and `vault_tok`, so no
 client has to walk them. The `vault_tok` keeps a late or repeated cascade away from a rebirth's boxes, which have the
 same scope but a different token. The tombstone and the cascade share a transaction in every adapter we implement. A repeated delete, step by step:
 
 ```text
-vaultDB.delVault(tombstone, { prior })
+bankDB.delVault(tombstone, { prior })
 stored is live, this vault_tok, at prior         the tombstone written, revision_tok and revision_seq moved; cascade; 'deleted'
 stored is live, this vault_tok, revision moved   'stale_write'; no cascade
 stored is the tombstone of this vault_tok        nothing written, whatever the revision; cascade; 'gone', `val` the old tombstone
@@ -507,7 +507,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 
 ## To fix
 
-* **`identity_revoked`** vacates: any call into the VaultDB that is answered with it runs `bank.vacate`, then passes the
+* **`identity_revoked`** vacates: any call into the BankDB that is answered with it runs `bank.vacate`, then passes the
   refusal on to its caller. Built. `notes/security.md` says the old code locked there, and has to be brought into agreement.
 
 ## Areas of Concern

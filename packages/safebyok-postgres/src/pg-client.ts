@@ -30,7 +30,7 @@ async function rollBack(conn: PgPoolClient): Promise<boolean> {
   }
 }
 
-/** Wrap a pg Pool as a {@link PostgresClient}: `new PostgresVaultDB({ client: pgClientOf(pool) })`. */
+/** Wrap a pg Pool as a {@link PostgresClient}: `new PostgresBankDB({ client: pgClientOf(pool) })`. */
 export function pgClientOf(given: PgPool): PostgresClient {
   const pool = pgPool.parse(given)
   return {

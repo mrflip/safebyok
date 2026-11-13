@@ -31,7 +31,7 @@ export async function eventually(check: () => boolean): Promise<void> {
   throw new Error('it never came to pass')
 }
 
-/** A listener for a VaultDB's `subscribe`, and a count of how often it was called, kept for a test
+/** A listener for a BankDB's `subscribe`, and a count of how often it was called, kept for a test
  * to look at.
  *
  * @returns `onChange`, to subscribe with; `heard`, whose `count` it raises.
@@ -78,7 +78,7 @@ export type AsyncVerbOf<Target> = {
  * @param meanwhile - What to run first, and wait for.
  *
  * @example
- *   TH.beforeNextCall(vaultDB, 'tryPutBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs'))
+ *   TH.beforeNextCall(bankDB, 'tryPutBox', () => there.putBox('anthropic', 'sk-ant-fake-theirs'))
  */
 export function beforeNextCall<Target extends object>(target: Target, verb: AsyncVerbOf<Target> & string, meanwhile: () => Promise<unknown>): void {
   const method = (target as unknown as Record<string, AsyncFn | undefined>)[verb]

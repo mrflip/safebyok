@@ -30,7 +30,7 @@ In CI, the core's browser paths run in jsdom against a fake IndexedDB. This is w
 real thing: a current release of Chrome, Firefox and Safari on a desktop, and Safari on an iPhone.
 
 * [ ] Create a vault, put a box, and reload: the vault is locked, unlocks with the passphrase, and the
-  box reads back (IndexedDB DeviceDB and VaultDB, `argon2idWebV1Deriver`).
+  box reads back (IndexedDB DeviceDB and BankDB, `argon2idWebV1Deriver`).
 * [ ] The device remembers the unlock for its window and forgets it after: lock it, reload.
 * [ ] A second tab: unlock in one, and the other follows; sign out in one, and both lock (the device
   shelf's cross-tab forget).
@@ -47,7 +47,7 @@ the packages installed from the Version PR's packed tarballs (`pnpm pack`), not 
 
 * [ ] *Install the component* and *Serve its functions*: `convex.config.ts`, the functions and the
   auth setup, each as the README gives it. `npx convex dev` accepts them.
-* [ ] *Use*: `ConvexVaultDB` with `ConvexReactClient` and with `ConvexClient`. Create a vault, put a
+* [ ] *Use*: `ConvexBankDB` with `ConvexReactClient` and with `ConvexClient`. Create a vault, put a
   box, read it from another browser signed in as the same user, and check that another user is
   refused.
 * [ ] A write refused by the deployment's validators shows no record text in what the browser sees

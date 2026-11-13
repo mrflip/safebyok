@@ -182,7 +182,7 @@ describe("listing.deliverRecord(rcvd): the receive table, through a box listing"
   })
 })
 
-/** Fetch `central`'s box, the vaultDB answering that nothing is stored. */
+/** Fetch `central`'s box, the bankDB answering that nothing is stored. */
 async function fetchVoid(central: Rec) {
   const { listing, box } = listedBoxOf(central)
   const before = stateOf(box)

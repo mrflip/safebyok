@@ -2,7 +2,7 @@
   "name": "safebyok-indexeddb",
   "private": false,
   "version": "0.5.0",
-  "description": "IndexedDB storage for safebyok: a VaultDB that keeps a vault's rows as ciphertext in this browser, each generic call one IndexedDB transaction.",
+  "description": "IndexedDB storage for safebyok: a bankDB that keeps a bank's rows as ciphertext in this browser, each call one IndexedDB transaction.",
   "keywords": [
     "safebyok",
     "indexeddb",

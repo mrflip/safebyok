@@ -1,18 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { refusalkindVals } from 'safebyok/storage'
-import { vaultAt } from 'safebyok/testing'
 import { safebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
-
-const vault = vaultAt()
 
 const ErrorDataCases = [
   [{ kind: "identity_revoked" },                     true,   'an identity_revoked refusal'],
   [{ kind: "identity_revoked", message: "Sign in" }, true,   'an identity_revoked refusal carrying more than its kind'],
   [{ kind: "bad_record", message: "Not next." },     true,   "a refusal of the core's checks, with its sentence"],
   [{ kind: "damaged_row" },                          false,  "a refusal of the core's checks without its sentence"],
-  [{ kind: "gate_issue", message: "Moved.", world: vault }, true, 'a gate_issue with the vault row it tested'],
-  [{ kind: "gate_issue", message: "Moved." },        false,  'a gate_issue without its vault row'],
-  [{ kind: "gate_issue", message: "Moved.", world: { vault_tok: 'life1' } }, false, 'a gate_issue whose row is no vault row'],
+  [{ kind: "gate_issue", message: "Moved." },        false,  'a gate_issue, which the client throws itself'],
   [{ kind: "stale_write" },                          false,  'a VaultError kind the wrapper never throws'],
   [{ kind: "not_permitted" },                        false,  "a kind of the host's own"],
   [{ message: "Sign in, then try again." },          false,  'a message without a kind'],

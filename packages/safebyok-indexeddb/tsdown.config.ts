@@ -4,7 +4,7 @@ import { defineConfig } from 'tsdown'
 // `exports` writes package.json's entry points from what was built, and adds the `@safebyok/source`
 // condition that the workspace's tsconfigs resolve. publint and attw check the package as a consumer
 // would see it, and fail the build on any finding. `safebyok` is a peer dependency, so it stays
-// external: this adapter must extend the AdapterVaultDB and VaultError of the host's own copy.
+// external: this adapter must extend the AdapterBankDB and VaultError of the host's own copy.
 export default defineConfig({
   entry:      ['src/index.ts'],
   format:     ['esm', 'cjs'],

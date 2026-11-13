@@ -95,7 +95,7 @@ const FamilyCases = [
   // misuse: the host developer's code is wrong, and no user action fixes it
   ["bad_scope",           "misuse",    'a label the app chose that breaks the rules is a bug'],
   ["bad_option",          "misuse",    'a Device.make option out of range is a bug'],
-  ["bad_record",          "misuse",    'handing a VaultDB a record this package does not build is a bug'],
+  ["bad_record",          "misuse",    'handing a BankDB a record this package does not build is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug

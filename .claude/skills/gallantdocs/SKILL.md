@@ -23,7 +23,7 @@ by how precise they are* and *Words safebyok does not use*.
 
 Two word rules are not written down there yet:
 
-* "answers" only where a call returns an `Answer` (a vaultDB verb). Elsewhere, "returns".
+* "answers" only where a call returns an `Answer` (a bankDB verb). Elsewhere, "returns".
 * "gate" only for `Gate`, `vault.gate` and the gate verbs. A sign-in check is a sign-in check.
 
 ## 2. Size and split

@@ -18,7 +18,7 @@ callers in disguise.
 **Goofus:**
 
 ```ts
-/** A forced reset a host may repeat: lists what the vaultDB holds, tidies old leases, and starts the watch.
+/** A forced reset a host may repeat: lists what the bankDB holds, tidies old leases, and starts the watch.
  * Refused, the bank is not ready; one a sweep crossed refuses only its own caller.
  */
 async hello(): Promise<void>
@@ -207,7 +207,7 @@ for you, so attend to that first: explain only what remains.
 ```
 
 From the signature: You get a lease; matching your scope; but sometimes null.
-Left for the doc block to clarify: the source of the lease (cache, not vaultdb
+Left for the doc block to clarify: the source of the lease (cache, not bankdb
 or elsewhere) and the paths to each return (null when not found -- don't get
 that wrong!)
 
@@ -432,7 +432,7 @@ The first pairs (`create`, `demandUnsealable`) are in `notes/gallant.md`.
  * of range, every one it finds named in one refusal led by "In Bank.make's options"; then
  * 'bad_scope' for a `user_id` that fails its check or a `banklabel` that is not a label; then
  * 'bad_option' for a key deriver a vault does not keep, or a clock that throws or reads out of
- * bounds. The limits are held to the default `vaultDB`'s here, and to a vault's own at its birth.
+ * bounds. The limits are held to the default `bankDB`'s here, and to a vault's own at its birth.
  */
 export function parseMakeBankOpts(opts: MakeBankOpts): ParsedBankOpts {
 ```
@@ -453,10 +453,10 @@ A doc block may run long if it serves a purpose: a cap a host tunes calls for th
 
 ```ts
 // shapes/bank-opts.ts
-  /** The most boxes the vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the vaultDB's own `maxBoxes`.
+  /** The most boxes the vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the bankDB's own `maxBoxes`.
    * `putBox()` refuses a new box past it as 'vault_full'. Replacing a box already there is always
-   * allowed, and lowering it strands nothing stored. It may not exceed the vaultDB's `maxBoxes`, and
-   * with `maxWhisperBytes` it must fit the vaultDB's `maxVaultBytes`.
+   * allowed, and lowering it strands nothing stored. It may not exceed the bankDB's `maxBoxes`, and
+   * with `maxWhisperBytes` it must fit the bankDB's `maxVaultBytes`.
    */
   maxBoxes?: number | undefined
 ```
@@ -467,7 +467,7 @@ States the 'vault_full' a caller meets in normal use, and gives no recipe for it
 
 ```ts
 // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-/** A soft cap on the boxes a vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the `maxBoxes` the vaultDB adapter advises.
+/** A soft cap on the boxes a vault holds. Default: the smaller of {@link MaxBoxes}, 100, and the `maxBoxes` the bankDB adapter advises.
  * A box past it refuses `'vault_full'`: delete one first, or relaunch with a larger value. Replacing or reading a box is
  * always allowed, even over the limit. Lowering it against a live datastore is unspecified behavior.
  */
@@ -500,7 +500,7 @@ Two options and their values gapped into one sentence, with the default in paren
 **Goofus:**
 
 ```ts
-// storage/vault-db-shapes.ts
+// storage/shapes-bankdb.ts
 /** A vault row is replaced only by a gate verb: `putVault` births one, or finds one in the way. */
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 ```
@@ -770,7 +770,7 @@ function isSafelyAllZero(bytes: Uint8Array): boolean {
 **Goofus:**
 
 ```ts
-// storage/vault-db-shapes.ts
+// storage/shapes-bankdb.ts
 /** The tombstone of a vault row nothing holds. A damaged listing's label comes from storage, and is not checked here: it is part of what is reported. */
 export function sentinelVaultOf({ user_id, banklabel, vaultlabel }: VaultScope, vault_tok: string = VoidLifeTok): VaultTombstone {
 ```
@@ -829,11 +829,11 @@ Gallant:
     // The policy that applies: `ifPresent` over a live row, `ifAbsent` over a tombstone or void row.
 
 Goofus: "the vault's room", "gauged": a private figure for a type that has a name (`Capacity`)
-/** The rows an adapter fetched for a box's ask, as stored and unchecked: its vault row as `world` and the box row, each null for none, and the vault's room where the adapter gauged it. */
+/** The rows an adapter fetched for a box's ask, as stored and unchecked: its vault row as `parent` and the box row, each null for none, and the vault's room where the adapter gauged it. */
 Gallant:
     /** The rows an adapter fetched for a box request, unchecked:
      * - `box`      -- the stored box row, as fetched before any write (null for none)
-     * - `world`    -- the vault row, fetched in the same step (null for none)
+     * - `parent`   -- the vault row, fetched in the same step (null for none)
      * - `capacity` -- the vault's {@link Capacity} stats, for adapters that return it
      */
 
@@ -889,21 +889,21 @@ Gallant: only the essentials go on the first line.
      * Throws `damaged_vault` for a row that fails its checks.
      */
 
-Goofus: "for the vaultDB's handler to tell of": which handler, telling whom? name the class and what it does
-    // A row that fails its checks is thrown, for the vaultDB's handler to tell of.
+Goofus: "for the bankDB's handler to tell of": which handler, telling whom? name the class and what it does
+    // A row that fails its checks is thrown, for the bankDB's handler to tell of.
 Gallant:
-    // A row that fails its checks throws, and `AdapterVaultDB` turns the throw into a refused answer.
+    // A row that fails its checks throws, and `AdapterBankDB` turns the throw into a refused answer.
 
 Goofus: "Damaged is a judgment of the row taken alone", "the words of the check that found it": define the term plainly
     // Both faults of a row are thrown, each with the words of the check that found it. Damaged is a judgment of the row taken alone: it fails its own checks.
 Gallant:
     // A faulty row throws, with the message of the check that failed. A row is damaged when it fails its own checks.
 
-Goofus: "the brand a model knows a vaultDB by": say what the value is for
-    /** True: the brand a model knows a vaultDB by, from whichever copy of safebyok. */
+Goofus: "the brand a model knows a bankDB by": say what the value is for
+    /** True: the brand a model knows a bankDB by, from whichever copy of safebyok. */
 Gallant:
     // Brands are implemented this way to avoid various flaws that branding by string props, private symbols, weak maps, or instanceof present
-    /** Always true: marks a vaultDB for safe branding. */
+    /** Always true: marks a bankDB for safe branding. */
 
 Goofus: "rides along in a spread": a spread copies. (Also: don't document what the declaration already says)
     // A getter on the class, never an own field, so the brand neither serializes nor rides along in a spread.
@@ -918,7 +918,7 @@ Gallant:
 Goofus: "a gate moved elsewhere arrives with it", "takes it": a gate is changed, on another device; a listing receives
     // The vault listing takes it as it takes any vault row: a gate moved elsewhere arrives with it, and a newer row of another life replaces this Vault there.
 Gallant:
-    // The vault listing receives the `world` as it would a row from any vault request:
+    // The vault listing receives the `parent` as it would a row from any vault request:
     // a gate changed on another device comes with it, and a newer row from another life
     // replaces this Vault in the listing.
 
@@ -940,7 +940,7 @@ Gallant:
 Goofus: "what to answer over none": name the option, and the case it covers
     /** What `getBox` is asked: the box's address, the row its caller holds or the sentinel for none, and what to answer over none. */
 Gallant:
-    /** A `getBox` request: the box's address, the expected row (or sentinel), and the `ifAbsent` option (see `VaultDB.getBox`). */
+    /** A `getBox` request: the box's address, the expected row (or sentinel), and the `ifAbsent` option (see `BankDB.getBox`). */
 
 Goofus: "`passed` for the live row taken up": taken up by whom? say what is stored and what is returned
     /** What a put's answer says happened: `born` over nothing, `reborn` over a tombstone, `replaced` a live row, or `passed` for the live row taken up. */

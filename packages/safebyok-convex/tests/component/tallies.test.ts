@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
 import * as TH from '../test-helpers'
-import { MaxVaultBoxSize, MaxVaultBoxes, capacityOf, growthOf, refuses, tallyOf, weigh } from '../../src/component/tallies'
+import { MaxVaultBoxSize, MaxVaultBoxes, capacityOf, cascadeBudget, growthOf, isSpent, refuses, spend, tallyOf, weigh } from '../../src/component/tallies'
+
+const { BW } = TH
 
 const MiB = 1024 * 1024
 
@@ -17,8 +19,8 @@ describe("the limits every vault is bound by", () => {
 
 /** Make a box document whose ciphertext is `ciphertext_b64`. */
 function boxDocOf(ciphertext_b64: string) {
-  const box = TH.boxAt(0, 'life1', { whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64 } })
-  return { ...TH.vaultScope, vault_tok: box.vault_tok, boxlabel: box.boxlabel, box }
+  const box = BW.boxAt(0, 'bank1', 'life1', { whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64 } })
+  return { ...BW.vaultScope, bank_tok: box.bank_tok, vault_tok: box.vault_tok, boxlabel: box.boxlabel, box }
 }
 
 describe("weigh", () => {
@@ -47,7 +49,7 @@ function allOf(all_count: number, all_size: number) { return { all_count, live_c
 describe("tallyOf and growthOf", () => {
   const live = boxDocOf('Y3Q')
   const replaced = boxDocOf('c'.repeat(1000))
-  const tombstone = { ...live, box: TH.boxTombstoneOf(live.box) }
+  const tombstone = { ...live, box: BW.boxTombstoneOf(live.box) }
 
   it("tally a live box row in both its live and all figures, a tombstone in its all figures alone, and no row as nothing", () => {
     expect(tallyOf(live)).to.deep.equal({ all_count: 1, live_count: 1, all_size: weigh(live), live_size: weigh(live) })
@@ -104,5 +106,19 @@ describe("capacityOf", () => {
   it("reports an uncounted vault past a limit as full in both boxes and bytes", () => {
     expect(capacityOf(null, MaxVaultBoxes)).to.deep.equal({ boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxSize, max: MaxVaultBoxSize } })
     expect(refuses(null, allOf(1, 0), MaxVaultBoxes)).to.be.true
+  })
+})
+
+describe("a cascade's budget", () => {
+  it("is spent once its documents or its bytes run out, and not before", () => {
+    const budget = cascadeBudget()
+    expect(isSpent(budget)).to.be.false
+    spend(budget, budget.size - 1)
+    expect(isSpent(budget)).to.be.false
+    spend(budget, 1)
+    expect(isSpent(budget)).to.be.true
+    const crowded = { ...cascadeBudget(), count: 1 }
+    spend(crowded, 1)
+    expect(isSpent(crowded)).to.be.true
   })
 })

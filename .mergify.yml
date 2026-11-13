@@ -44,7 +44,7 @@ queue_rules:
 #       core:
 #         include:
 #           - packages/safebyok/**
-#       safebyok-vaultdb:
+#       safebyok-adapters:
 #         include:
 #           - packages/safebyok-{convex,postgres,graphql,indexeddb}/**
 #       safebyok-client:

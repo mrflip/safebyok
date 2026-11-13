@@ -44,10 +44,9 @@ await pglite.exec(BankTablesSql)
 await pglite.exec(BankFunctionsSql)
 ```
 
-**Coming from `PostgresVaultDB`**: drop its tables and functions first (`DROP TABLE safebyok_boxes,
-safebyok_vaults` and `DROP FUNCTION` each `safebyok_` function), then run both files. The rows it
-stored are not read by `PostgresBankDB`: each user's bank starts empty. Its functions share names
-with these, so one database holds one set.
+**A database with older safebyok tables**: drop `safebyok_boxes` and `safebyok_vaults`, and each `safebyok_` function,
+before you run these files. They create only what is missing, so an older table of the same name stays as it is. The
+rows it held are not read: each user's bank starts empty.
 
 ## Use
 
@@ -205,9 +204,3 @@ tests run against [PGlite](https://pglite.dev), a real Postgres compiled to WebA
 in-process, through the battery every bankDB runs (`describeBankDBBattery`, from
 `safebyok/testing`), with a second PostgresBankDB over the same database as another device. The
 same battery runs over a real Postgres in `e2e/tests/postgres/`, when `SAFEBYOK_PG_URL` reaches one.
-
-## The vaultDB
-
-`PostgresVaultDB`, `VaultTablesSql`, `VaultFunctionsSql` and `vaultChannelOf` are kept, unchanged,
-for hosts that still run safebyok's vaultDB, until the core retires it. They are documented in this
-package's 0.5 README.
