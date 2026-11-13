@@ -58,10 +58,10 @@ describe("tallyOf and growthOf", () => {
   })
 
   const GrowthCases = [
-    [null,      live,      { all_count: 1, live_count: 1,  all_size: sizeOf(live),                      live_size: sizeOf(live) },                      'a born adds a row to both counts'],
-    [live,      replaced,  { all_count: 0, live_count: 0,  all_size: sizeOf(replaced) - sizeOf(live),    live_size: sizeOf(replaced) - sizeOf(live) },    'a replace changes only the sizes'],
-    [replaced,  tombstone, { all_count: 0, live_count: -1, all_size: sizeOf(tombstone) - sizeOf(replaced), live_size: -sizeOf(replaced) },            'a del takes a row from the live count alone'],
-    [tombstone, live,      { all_count: 0, live_count: 1,  all_size: sizeOf(live) - sizeOf(tombstone),   live_size: sizeOf(live) },                      'a put over a tombstone adds a row to the live count alone'],
+    [null,      live,      { all_count: 1, live_count: 1,  all_size: sizeOf(live),                         live_size: sizeOf(live) },                    'a born adds a row to both counts'],
+    [live,      replaced,  { all_count: 0, live_count: 0,  all_size: sizeOf(replaced) - sizeOf(live),      live_size: sizeOf(replaced) - sizeOf(live) }, 'a replace changes only the sizes'],
+    [replaced,  tombstone, { all_count: 0, live_count: -1, all_size: sizeOf(tombstone) - sizeOf(replaced), live_size: -sizeOf(replaced) },               'a del takes a row from the live count alone'],
+    [tombstone, live,      { all_count: 0, live_count: 1,  all_size: sizeOf(live) - sizeOf(tombstone),     live_size: sizeOf(live) },                    'a put over a tombstone adds a row to the live count alone'],
   ] as const
 
   for (const [anteDoc, boxDoc, expected, blurb] of GrowthCases) {
