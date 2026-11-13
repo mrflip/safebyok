@@ -579,14 +579,14 @@ describe("a bank past a vacate", () => {
 describe("the end of a bank, a vault and a device, as their listeners and the bankDB's watches see it", () => {
   const Endings = [
     // the bank deleted on another device, its row delivered here:
-    [false, false, 'shows a device listener the bank locked and its box let go, at a tombstone'],
-    [true,  false, 'shows a device listener the bank locked and its box let go, at a bank of another life'],
+    [false, false, 'at a tombstone'],
+    [true,  false, 'at a bank of another life'],
     // the delivery dismisses the unlock gating open, which tells the device's listeners:
-    [false, true,  'shows a device listener the bank locked and its box let go, at a tombstone that dismisses a gating'],
+    [false, true,  'at a tombstone that dismisses a gating'],
   ] as const
 
   for (const [isBuiltAgain, isAsking, blurb] of Endings) {
-    it(blurb, async () => {
+    it(`shows a device listener the bank locked and its box let go ${blurb}`, async () => {
       const { device, bank, box, dialog, anotherDevice, storedBankNow } = await makeWorldWithBox()
       bank.vaultListing.goodbye()
       await box.expose()
@@ -603,7 +603,7 @@ describe("the end of a bank, a vault and a device, as their listeners and the ba
     })
   }
 
-  it("ends a vault's box watch at its tombstone and every watch at a sweep, each once, and a disabled lock ends nothing more", async () => {
+  it("ends a vault's box watch at its tombstone and every watch at a sweep", async () => {
     const world = await makeWorldWithBox()
     const watches = spyWatches(world.bankDB)
     const next = await world.openNextSession()
@@ -643,7 +643,7 @@ describe("the end of a bank, a vault and a device, as their listeners and the ba
     expect(watches.stoppedTwice()).to.deep.equal([])
   })
 
-  it("logs an unwatch that throws at a sweep as bad news, never throwing, and aligns every snapshot all the same", async () => {
+  it("logs an unwatch that throws at a sweep as bad news", async () => {
     const spy = TH.spyLogger()
     const world = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
     const watches = spyWatches(world.bankDB, Dna.banklabel)
@@ -660,7 +660,7 @@ describe("the end of a bank, a vault and a device, as their listeners and the ba
     expect(spy.calls.map(({ level, story }) => ({ level, refusalkind: story?.['refusalkind'] }))).to.deep.include({ level: 'warn', refusalkind: 'unexpected_error' })
   })
 
-  it("tells the host of an unwatch that throws at a vault's tombstone, and lets the boxes go all the same", async () => {
+  it("tells the host of an unwatch that throws at a vault's tombstone", async () => {
     const world = await makeWorldWithBox()
     const watches = spyWatches(world.bankDB, `${Dna.banklabel}/${Dna.vaultlabel}`)
     const next = await world.openNextSession()
@@ -691,7 +691,7 @@ function readEnding(device: Device, bank: Bank, box: Box) {
   return { bank_tok: device.snapshot.bank_tok, openGating: device.snapshot.openGating, isLocked: bank.snapshot.isLocked, box: { isExposed, isLocked } }
 }
 
-/** Spy on `bankDB`'s watch from here on, telling each watch by the scope it watches; the unwatch of the watch of `throwsAt` throws once it has stopped. */
+/** Spy on `bankDB`'s watches, each told by its scope; the unwatch of `throwsAt` throws. */
 function spyWatches(bankDB: MemoryBankDB, throwsAt: string | null = null) {
   const watches: { watched: string, stops: number }[] = []
   const watch = bankDB.watch.bind(bankDB)
