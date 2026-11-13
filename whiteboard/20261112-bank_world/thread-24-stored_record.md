@@ -1,6 +1,6 @@
 # Thread 24: stored_record (2026-11-13)
 
-Branch `20261113-stored_record`, PR #694 (draft, by instruction), stacked on #692. Justify: green; scripts 287, core 2968, IndexedDB 200, Postgres 215, fastkey 43, react 262, Convex 306, demo 99, GraphQL 415, e2e 537.
+Branch `20261113-stored_record`, PR #694 (draft, by instruction), stacked on #693. Justify: green; scripts 287, core 2970, IndexedDB 200, Postgres 215, fastkey 43, react 262, Convex 306, demo 99, GraphQL 417, e2e 540.
 
 The Coach (2026-11-13): the classifier's write branch answered `box: ask.record`, the record sent, where it should answer the stored record, the row the datastore reports holding. Repair it in every bankDB; reword the contracts so "the stored record" (what the datastore contains, as fetched or written) and "the record sent" (what the caller asked to store) are never confused.
 
