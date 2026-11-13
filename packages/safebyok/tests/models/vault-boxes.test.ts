@@ -64,7 +64,7 @@ describe("vault.beginWatch", () => {
     await vault.del(vault)
     await TH.eventually(() => ! next.isPresent)
     await TH.expectRefusal(next.beginWatch(), 'vault_gone')
-    TH.expectSyncRefusal(() => next.boxListing, 'vault_gone')
+    expect(next.boxListing.things).to.deep.equal([])
     expect(next.listing.at(next.scope)).to.eq(next)
   })
 
@@ -131,7 +131,8 @@ describe("the boxes of a vault deleted", () => {
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.getSnapshot()).to.deep.include({ isExposed: false, isVeiled: false })
     expect(boxListing.isEnabled).to.be.false
-    TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
+    expect(vault.boxListing).not.to.eq(boxListing)
+    expect(vault.boxListing.vault_tok).to.eq(vault.vault_tok)
   })
 
   it("drop their whispers exposed at a tombstone the bank's watch delivers from elsewhere", async () => {
@@ -144,6 +145,25 @@ describe("the boxes of a vault deleted", () => {
     expect(box.isEnabled).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.getSnapshot().isExposed).to.be.false
+  })
+
+  it("are listed, fetched and deleted through storage, which refuses them under the tombstone", async () => {
+    const { vault } = await makeWorldWithBox()
+    await vault.del(vault)
+    const listed = await TH.expectRefusal(vault.boxListing.list(), 'absent_vault')
+    const fetched = await TH.expectRefusal(vault.fetchBox(boxlabel), 'absent_vault')
+    const deleted = await TH.expectRefusal(vault.delBox(boxlabel), 'absent_vault')
+    expect([listed, fetched, deleted].map((err) => err.meta?.act)).to.deep.equal(['vault_gone', 'vault_gone', 'vault_gone'])
+    expect(await vault.get({ ifAbsent: 'nil', maxMillisSinceRefresh: 0 })).to.include({ isPresent: false })
+    expect(vault).to.include({ isPresent: false, isEnabled: true })
+  })
+
+  it("refuse a put, which seals only under a vault present", async () => {
+    const { vault, tryPutBox } = await makeWorldWithBox()
+    await vault.del(vault)
+    tryPutBox.mockClear()
+    await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper, sidecar: {} }), 'vault_gone')
+    expect(tryPutBox).not.toHaveBeenCalled()
   })
 })
 

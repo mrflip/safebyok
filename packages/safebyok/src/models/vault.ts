@@ -32,9 +32,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   declare readonly bank_tok:   string
   declare readonly listing:    VaultListing
 
-  /** The box listing last asked for, of this life or one before it.
-   * Null until asked for, and once the vault is deleted.
-   */
+  /** The box listing last asked for, of the life in hand; null until asked for. */
   #boxListing: BoxListing | null = null
   // --
 
@@ -49,11 +47,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
 
-  /** The listing of this vault's boxes in the life in hand. Asking a deleted vault for it refuses.
-   * Another life of the vault gets a new listing, so ask for it here each time.
+  /** The listing of this vault's boxes in the life in hand.
+   * Another life of the vault gets a new listing, so ask for it here each time. A deleted vault's has no boxes, and
+   * storage refuses its calls as `absent_vault`.
    */
   get boxListing(): BoxListing {
-    this.demandPresent()
     if (this.#boxListing?.vault_tok !== this.vault_tok) { this.#boxListing = this.listing.boxListingOf(this) }
     return this.#boxListing
   }
@@ -159,17 +157,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
-  // == [Guards]: isEnabled, demandEnabled, isLocked, demandWatchable, demandPresent, ensureTimely
-
-  // A deleted vault stays at its scope in the vault listing, out of its list, so that a new life is received into it.
-  /** Whether this vault answers: its listing does and lists it, and it is not deleted. */
-  override get isEnabled(): boolean { return super.isEnabled && this.isPresent }
-
-  /** Throw unless {@link isEnabled}, telling a deleted vault from a disabled one. */
-  override demandEnabled(): this {
-    this.demandPresent()
-    return super.demandEnabled()
-  }
+  // == [Guards]: isLocked, demandWatchable, demandPresent, ensureTimely
 
   // A vault has no lock of its own: a host asks the bank.
   /** Whether this vault's bank is locked. */
@@ -190,12 +178,12 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Aligning]: align
 
-  // The listing in hand is aligned first, as a child: of a life before this one, or of a vault deleted, it ends its watch
-  // and its boxes drop their whispers. A deleted vault then lets it go.
-  /** Align (see {@link Storable.align}), discarding the box listing once this vault is deleted. Never throws. */
+  // The listing in hand is aligned first, as a child: of a life before this one, it ends its watch and its boxes drop
+  // their whispers. A tombstone is a life of its own, so a vault deleted lets go of the listing it had while live.
+  /** Align (see {@link Storable.align}), discarding a box listing of a life before this one. Never throws. */
   override align(): void {
     super.align()
-    if (! this.isPresent) { this.#boxListing = null }
+    if (this.#boxListing?.vault_tok !== this.vault_tok) { this.#boxListing = null }
   }
   // --
 
