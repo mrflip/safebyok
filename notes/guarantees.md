@@ -18,13 +18,24 @@ Rewritten for the published core (`packages/safebyok`) on 2026-11-06, against `m
 core's, and its paths are under `packages/safebyok/` unless they say otherwise. The old core
 (`packages/safebyok-old`, removed 2026-11-10) is no longer described here; where the core has no counterpart to one
 of its sites, the note says so. A claim the code no longer supports is listed in #528's open questions.
+Restated for one gate per bank on 2026-11-12, against the bank_world line at 876bb2330 (thread 9, #674), for the
+guarantees_bank thread: the bankKey, the bank's lease, the gate row's wayins and the `Device`. Brought up to date on
+2026-11-12 with the bank_world line at 89437bc0c (thread 10, [#677](https://github.com/mrflip/safebyok/pull/677)), which removed
+`BankFriend`, the listings' `world` and the things' own enabled flags: the device's flag is read live. Brought up to the
+line's top on 2026-11-13, at 94c6b57e0 (thread 17t, [#689](https://github.com/mrflip/safebyok/pull/689)): `bank.autolock`
+asks the Lease for the cached lease's expiry and has no lease row (the Coach's ruling, which closes the old *Open
+items* 2); a lock, a tombstone, another life, a sweep and a vacate reach every thing below the bank through one `align`;
+`bank.del()` and `gate.del()` refuse; the gate's snapshot shows each wayin's header; and every *Checked by* names a test at
+that commit.
 
 ## Where the guarantees are kept
 
-Eleven files contain every line of the core that touches a secret: `crypto.ts`; the two shapes files that define what a
+Thirteen files contain every line of the core that touches a secret: `crypto.ts`; the two shapes files that define what a
 stored leaseKey and a whisper are; the five files in `models/` that build the constructions; `models/vault.ts`, which
-passes the whisper's text to the lease and keeps the lease; and the two files that are given the passphrase, the default
-deriver and the strength checker's wrapper. A change to one of them is a change to these guarantees until shown otherwise.
+passes the whisper's text on to the bank; `models/bank.ts`, which passes it to the lease and keeps the lease;
+`models/device.ts`, which wraps the host's functions and forgets the lease rows at a vacate; and the two files that are
+given the passphrase, the default deriver and the strength checker's wrapper. A change to one of them is a change to these
+guarantees until shown otherwise.
 
 | File | What it keeps |
 |---|---|
@@ -32,34 +43,45 @@ deriver and the strength checker's wrapper. A change to one of them is a change 
 | `packages/safebyok/src/shapes/shapes-gateish.ts`, `shapes-core.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
 | `packages/safebyok/src/models/proving.ts` | the wayinKey; the bankKey, which is unwrapped per call, passed from one proving to another inside `buildWayin(source)`, and handed only to `Lease.buildGranted`; the PRF bytes, which it reads to derive the passkeyKey and leaves for the gating to zero |
 | `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedCleartexts`; `spendCleartexts`, the only place the PRF bytes are zeroed; each kind's act, which proves the cleartexts and then makes its change, passing them only to `checkedCleartexts` and a `Proving` builder |
-| `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the bankKey wrapped under it, unwrapped per call in `#bankKey`; every seal and unseal of a box's whisper; `evict` and `vacate` |
-| `packages/safebyok/src/models/gate.ts` | has no key: it has wayin pickles and the vault's stamp; the passphrase proving made by a gating that builds a new vault is dropped once the `buildVault` act has built its lease |
+| `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the bankKey wrapped under it, unwrapped per call in `#bankKey`; every seal and unseal of a box's whisper; `evict`, `revoke` and `forget`; `expiresAt`, which peeks the cached row and answers only its expiry (G4) |
+| `packages/safebyok/src/models/gate.ts` | has no key: it has wayin pickles, by `wayinlabel`, and its bank's stamp and its own; `Gate.recordOfBirth` is handed wayins, never a proving: the passphrase proving of a `build_bank` gating stays in the `buildBank` act (`models/gating.ts`), which drops it once it has built the bank's lease |
 | `packages/safebyok/src/models/box.ts` | has no key: it hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
-| `packages/safebyok/src/models/vault.ts` | the whisper's JSON text, passed through `sealStampedString` and `unsealStampedString` to `Lease.sealWith` and `unsealWith` and back (G6); the `Lease`, kept private in `#lease`, which no method hands out (G9) |
+| `packages/safebyok/src/models/vault.ts` | the whisper's JSON text, passed through `sealStampedString` and `unsealStampedString` to the Bank's `sealWith` and `unsealWith` and back (G6); it has no lease and no key |
+| `packages/safebyok/src/models/bank.ts` | the whisper's JSON text, passed through `sealWith` and `unsealWith` to `Lease.sealWith` and `unsealWith` and back (G6); the bank's one `Lease`, kept private in `#lease`, which no method hands out (G9); `autolock`, which asks `Lease.tryExpiresAt` for the cached lease's expiry, a number, and locks once it has passed (G4); `listOwnLeases`, which lists the leases cached for a bank scope, without their leaseKeys |
+| `packages/safebyok/src/models/device.ts` | the wrappers of the host's functions, made in its constructor, among them `guardRequestCleartext`; `vacate`, which lists the leases cached for its bank scope (`listOwnLeases`), forgets each, and forgets the device row (G4) |
 | `packages/safebyok/src/deriver/argon2id-webv1.ts` | `deriveKeyBytes`, which takes the passphrase as an argument and returns the passphraseKey bytes in a buffer of its own, which `passphraseKeyOf` imports and zeroes (G1, G2) |
 | `packages/safebyok/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrapper takes the new passphrase as an argument, parses the host checker's verdict inside the wrapper, and passes anything the checker throws to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
 Besides these files, three host functions handle the passphrase. Each is wrapped once, in `Device`'s constructor, and from
-there on the core has the wrapper and never the host's own function. A proving's world, a bank's friend and a gating's
-launch (`GX.gatingLaunchOnArgs`, `gatingLaunchBirthArgs`) each refuse a function that lacks the wrapper's brand (`isGuarded`, `helpers/consts.ts`). The brand is a
+there on the core has the wrapper and never the host's own function. A proving's world (`GX.provingWorld`: its
+`keyDeriver` and `strengthChecker`), the `askUser` that a bank listing and a bank are made with (`VX.bankListingOpts`) and a
+gating's launch (`GX.gatingLaunchOnArgs`, `gatingLaunchBirthArgs`) each refuse a function that lacks the wrapper's brand (`isGuarded`, `helpers/consts.ts`). The brand is a
 `Symbol.for`, which any code can set, so it catches mistakes in the core's own wiring and is not a security barrier:
 `Device`'s constructor wraps every host function regardless. `keyDeriver` is wrapped by `guardKeyDeriver`
 (`models/proving.ts`), whose `deriveKeyBytes` replaces anything thrown with `keyDeriverThrew`. `strengthChecker` is
 wrapped by `guardStrengthChecker` (`helpers/passphrase-strength.ts`), which passes anything thrown to
-`HostErrorSanitizer.refusalFor` (`refusals/host-error-sanitizer.ts`); that is the only function that substitutes a
-refusal for a foreign throw, and it reads nothing from the throw. `requestCleartext` is wrapped by
+`HostErrorSanitizer.refusalFor` (`refusals/host-error-sanitizer.ts`), which makes a refusal of a foreign throw
+and reads nothing from it. `requestCleartext` is wrapped by
 `guardRequestCleartext` (`models/device.ts`), which discards anything thrown and returns false, so that `Gating.#askHost`
-refuses with `requestCleartextThrew`. A host may leave `requestCleartext` out: the friend's
+refuses with `requestCleartextThrew`. A host may leave `requestCleartext` out: the gating's
 `askUser` is then null, no host function is called, and the gating waits, open, for its `attempt` or `dismiss`. Either
 way the device's snapshot has the live gating as `openGating`, so that a dialog can respond to it. A gating keeps no
 cleartext between attempts (G1), and its `toJSON` shows only its scope, kind and random `gatingTok`. The
-`requestCleartext` wrapper is passed along in the `BankFriend` that the device gives its bank's vault listing. The vault listing
-keeps it in a protected member and gives it to each vault, which keeps it private, and it reaches a gating only as an
-argument of `Gating.launchOn` or `launchBirth`. No public member of a device, a bank or a vault returns it. A disabled device never asks the user: every
-`Gating.launchOn` and `launchBirth` comes after a check, in the same tick, that its vault or vault listing is enabled, and a sweep or a
-vacate disables both before it returns. `onLifecycle` is wrapped in `Device`'s constructor too, by `guardOnLifecycle`. It
+`requestCleartext` wrapper, as the `askUser` the Device keeps in a private member, is handed to its bank listing, which keeps it
+private and hands it to each `Bank` it makes; the Bank keeps it in a private `#askUser` and gives it to neither its gate listing
+nor its vault listing, so no Vault has it. It reaches a gating only as an argument of `Gating.launchOn` or `launchBirth`: the
+Bank's `prompt` passes it, and the Device's `#fetchBank` passes it to `Bank.launchBirth`. No public member of a device, a bank, a
+gate or a vault returns it. A disabled device never asks the user: every `Gating.launchOn` comes after a check, in the same
+tick, that its bank is enabled (the `Gating` constructor reads `bank.maingate`, which demands it), and every
+`Gating.launchBirth` after the same of the device (`Device.#fetchBank`). The device's is the one flag: a bank, a vault and a box
+read it live, so a sweep or a vacate of the device, which sets it before either returns, disables them all at once. The
+disable then calls the bank's `lock()`, whose `align` reaches every thing below the bank: a Bank aligns its gate listing and
+vault listing, a listing each thing it lists, and a Vault the box listing in hand, which a vault of another life finds
+disabled. The bank's `lock()` drops its lease before it aligns, and a Box that is no longer enabled drops its exposed
+whisper as it is aligned (G4, *Open items* 1). A lock, a bank tombstone, and a vault's or a bank's other life reach the
+things below through the same `align`. `onLifecycle` is wrapped in `Device`'s constructor too, by `guardOnLifecycle`. It
 is given a `DeviceEvent`: a bag with what happened (a refusal, an outcome or a count), the live `Device`, and the live
-`Vault` the event concerns, if there is one. It is given no secret material: neither instance hands out a key (G9). A
+`Bank` or `Vault` the event concerns, if there is one. It is given no secret material: no instance hands out a key (G9). A
 revoked identity vacates the device in the core, whatever that handler does. The `DeviceDB` (`storage/device-db.ts`,
 `storage/memory-device-db.ts`) stows the leaseKey as an opaque handle, and anything a device database throws is replaced
 by `deviceDBFailed` (`refusals/throwers.ts`, called from the catch in each `DeviceDB` verb), which keeps nothing of it
@@ -70,30 +92,38 @@ by `deviceDBFailed` (`refusals/throwers.ts`, called from the catch in each `Devi
 safebyok is a **key-wrapping hierarchy** (envelope encryption): two tiers of key-encryption keys
 over a per-box data-encryption key. It is not a ratchet of any kind. Nothing in it evolves a key
 forward, derives the next key from the last, or offers forward secrecy: the bankKey is static for
-the vault's life, and a wayin removed stops opening the vault from now on but revokes nothing
+the bank's life, and a wayin removed stops opening the bank from now on but revokes nothing
 already copied (README, *Removal is not revocation*). A whisper is ciphered under a fresh boxKey
 at every write, and that boxKey is wrapped under the bankKey. This is envelope encryption, not a
-ratchet, and that is the right design: a vault reads its own secrets back and has no counterparty to
+ratchet, and that is the right design: a bank reads its own secrets back and has no counterparty to
 keep chain state with. Post-compromise security would come from rotation, which is not built
 (VOCABULARY, *rotation*).
 
+A bank has one bankKey, one gate and one lease, so unlocking the bank on a device opens every vault of the bank. Deleting a
+vault deletes its boxes, and with them every boxKey wrapped under the bankKey for it; it deletes no wrapped bankKey.
+Only `BankDB.tryDelBank`, which the `del_bank` gating's act reaches through the bank listing, deletes the gate row, and with it
+every wayin: `bank.del()` and `gate.del()` refuse, and a host deletes a bank with `bank.delPrompt()`.
+
 ```
 passphrase + salt_b64      ──Argon2id──────>  passphraseKey  ─┐
-passkey PRF answer + ctx   ──HKDF-SHA256───>  passkeyKey     ─┤ wayinKey   wraps  bankKey  → bank_key_wayin_wrapped   (synced)
+passkey PRF answer + ctx   ──HKDF-SHA256───>  passkeyKey     ─┤ wayinKey   wraps  bankKey   → bank_key_wayin_wrapped    (synced, on the gate row)
                                                                │
-leaseKey (this browser, non-extractable)   ───────────────────┘            wraps  bankKey  → bank_key_lease_wrapped   (this device)
+leaseKey (this browser, non-extractable)   ───────────────────┘            wraps  bankKey   → bank_key_lease_wrapped    (this device)
 bankKey   wraps    boxKey   → box_key_wrapped
 boxKey    ciphers  whisper  → whisper_ciphered
 ```
 
 Every cipher is AES-256-GCM through WebCrypto, under a fresh random 96-bit IV, with the ciphertext
-bound to a `ctx` as additional data (`crypto.ts`, `cipherCtx`). The ctx names the vault's stamp
-(scope, `vault_tok`, `registered_at`), a purpose string unique to
-the kind of field, and the record's own visible header or stamp. So a wrap or a ciphertext moved
-to another vault, slot, box, lease or purpose does not open, and a visible field altered in
-storage (a box's time or revision, a salt, a deadline) makes its record refuse to open. A box's
-sidecar is the one unencrypted field that no ctx binds, so that the server may change it: a sidecar
-altered in storage leaves the whisper opening. The box's stamp is its sparse fields alone
+bound to a `ctx` as additional data (`crypto.ts`, `cipherCtx`). The ctx names the stamp of the thing and of whatever
+contains it: the bank's stamp (scope, `bank_tok`, `registered_at`) in every ctx; beside it the gate's (`gatelabel`,
+`gate_tok`, `registered_at`) for a wayin, the lease's own for a lease, and the vault's (`vaultlabel`, `vault_tok`,
+`registered_at`) and the box's for a box's two ciphertexts. It names a purpose string unique to
+the kind of field, and the record's own visible header or stamp, a wayin's header with its `wayinlabel`. So a wrap or a
+ciphertext moved to another bank, gate, wayin, vault, box, lease or purpose does not open, and a visible field altered in
+storage (a box's time or revision, a salt, a lease's `proved_at`) makes its record refuse to open. A box's
+sidecar is the one unencrypted field of a box that no ctx binds, so that the server may change it: a sidecar
+altered in storage leaves the whisper opening. The gate row's `auth`, `sigs` and `meta` are bound by no ctx either: each
+is checked as an empty bag, and nothing reads them. The box's stamp is its sparse fields alone
 (`boxStampOf`, `models/box.ts`). A field a host wants readable in storage and authenticated is kept
 in both the whisper and the sidecar, and the host compares the two once the box is unsealed:
 
@@ -114,14 +144,14 @@ Three layers have key material, and the words for each matter.
   lives inside the browser's crypto implementation. Code with a handle can *use* it, for the
   usages it carries, and can read its bytes only if it was made `extractable`. A non-extractable
   key's bytes are never observable from JavaScript, by anyone, including the code that made it.
-  `crypto.ts` is the only module that calls `crypto.subtle`.
+  `crypto.ts` is the only module that calls `crypto.subtle` with a key or a secret. `mash` (`utils.ts`) calls `subtle.digest` on a host's id text, which is no secret.
 * **IndexedDB** keeps a `CryptoKey` by structured clone: the handle survives a page load, its
   material still inside the browser, never as bytes JavaScript sees. The only key safebyok writes
-  this way is the leaseKey (`lease.cacheAsCacheCan`, through a `DeviceDB`'s `stow`). The core's `IdbDeviceDB`
+  this way is the leaseKey (`lease.cacheAsCacheCan`, through a `DeviceDB`'s `tryStow`). The core's `IdbDeviceDB`
   (`storage/idb-device-db.ts`, on `safebyok/browser`) stores the lease row, including its `lease_key` handle, in
   the database `safebyok:device-v002-001-001` (`safebyok-<dbName>:…` with a `dbName`) by IndexedDB's structured clone, never as bytes; its `MemoryDeviceDB`
   (`storage/memory-device-db.ts`) keeps the row by `structuredClone` in a Map for the page's life. No other key is ever written anywhere: not to
-  IndexedDB, not to the host's VaultDB, which receives only ciphertext and visible fields. The
+  IndexedDB, not to the host's BankDB, which receives only ciphertext and visible fields. The
   wayinKey (the strong key) in particular lives only as a handle in a `Proving`, for one gating,
   and is never persisted.
 
@@ -149,15 +179,22 @@ sidecar is public and unauthenticated.
 | wayinKey | `CryptoKey`, non-extractable, `wrapKey`/`unwrapKey` | `Proving.#wayinKey` | the proving, which lives for its gating's chain | `Proving` |
 | bankKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
 | boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
-| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record`, through the `DeviceDB` as a `LeaseRow`, and at rest in the device database | the lease | `Lease`, `Proving.buildLease`; the `DeviceDB` stows it opaque |
-| whisper | the host's JSON object; then its JSON text, which passes from box to lease; and the UTF-8 bytes, which only the lease makes | the host's value, going in and coming out; the text, as a string in arguments and locals, which cannot be zeroed (G6); the bytes, as locals in the `Lease`, zeroed; the value, on a `Box` from `expose` until `unexpose`, a sweep, a vacate or a delete (a lock or a veil keeps it; *Open items*, 1) | one seal or open, except for that exposed value | `Box`, the Vault's seal verbs, `Lease` |
+| leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record`, through the `DeviceDB` as a `LeaseRow`, and at rest in the device database, one row per bank | the lease | `Lease`, `Proving.buildLease`; the `DeviceDB` stows it opaque |
+| whisper | the host's JSON object; then its JSON text, which passes from box to lease; and the UTF-8 bytes, which only the lease makes | the host's value, going in and coming out; the text, as a string in arguments and locals, which cannot be zeroed (G6); the bytes, as locals in the `Lease`, zeroed; the value, on a `Box` from `expose` until `unexpose`, the device's sweep or vacate, the box's delete, or its vault or bank taking another life (a lock or a veil keeps it; *Open items*, 1) | one seal or open, except for that exposed value | `Box`, the Bank's seal verbs, `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
 `device_tok`, `key_deriver_label`, every label and `user_id` (a scope name; a host that treats its
-user ids as sensitive digests them before they reach safebyok), `vault_tok`, every epoch,
-`registered_at` and `ask_passphrase_at`, a box's sidecar (unencrypted and unauthenticated, as
-*The construction* says), and every wrap and ciphertext. The snapshot shows no salt and no wrap, so an offline
-guess has nothing to start from (README, *The passphrase and the passkey*).
+user ids as sensitive digests them before they reach safebyok), `bank_tok`, `gate_tok`, `vault_tok`, a lease's
+`gate_revision_tok`, `registered_at`, the gate row's `auth`, `sigs` and `meta`, a box's sidecar
+(unencrypted and unauthenticated, as *The construction* says), and every wrap and ciphertext.
+
+No snapshot shows a wrap or a secret, and each is made from its own thing alone, embedding no other's. The gate's snapshot
+shows each wayin's header (`Wayin.toJSON`: its salt, `key_deriver_label`, a passkey's `credential_id` and `prf_salt_b64`)
+without its `bank_key_wayin_wrapped`, so an offline guess has no wrap to test against. The bank's shows its scope,
+`device_tok` and `isLocked`; a vault's its scope, life, revision and `isPresent`; a box's its scope, revision, sidecar and the booleans
+`isFull`, `isPresent`, `isExposed`, `isVeiled` and `isLocked`, never the whisper; a listing's the labels it lists. The
+device's shows its scope, stage, `err`, `bank_tok` and the live gating as `openGating`, whose `toJSON` shows only its scope,
+kind and `gatingTok`.
 
 ## Access points, value by value
 
@@ -167,11 +204,12 @@ bytes. Everything not listed never sees the value. Private methods are named wit
 
 **Passphrase.** Naked: the host's dialog (`safebyok-react`'s `modals/passphrase-modal.tsx` and
 `provider/gating-modal.tsx`, on the old core until the package moves, keep what was typed in component state) →
-`gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's act (`buildVault`, `unlockVault`,
-`replacePassphrase`, `addPasskey`, `revokePasskey`, `models/gating.ts`) → `checkedCleartexts` (`GX.vaultBuildCleartexts`, `vaultUnlockCleartexts`, `passphraseReplaceCleartexts`,
-`passkeyAddCleartexts`, `passkeyRevokeCleartexts`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
-`buildNovel` → `Proving.judgeStrength` → the world's `strengthChecker`, as `guardStrengthChecker`
-(`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
+`gating.attempt` → `#attemptOnce`, inside the gating's `outcomeOf` → its kind's act (`buildBank`, `unlockBank`,
+`replacePassphrase`, `addPasskey`, `revokePasskey`, `delBank`, `models/gating.ts`) → `checkedCleartexts` (`GX.bankBuildCleartexts`, `bankUnlockCleartexts`, `passphraseReplaceCleartexts`,
+`passkeyAddCleartexts`, `passkeyRevokeCleartexts`, `bankDelCleartexts`: shape only, `passphraseCleartext`) → `PassphraseProving.buildNovel`, `buildStored` (`models/proving.ts`);
+`buildNovel` → `Proving.judgeStrength`, handed the bank's scope and its world, the `Bank` or, in a `build_bank` gating, the `Device`,
+of which `GX.provingWorld` keeps only `keyDeriver`, `strengthChecker` and `device_tok` → the world's `strengthChecker`, as
+`guardStrengthChecker` (`helpers/passphrase-strength.ts`) wraps it → the host's `strengthChecker`; both → `passphraseKeyOf` → the world's
 `keyDeriver.deriveKeyBytes`, as `guardKeyDeriver` wraps it → `deriveKeyBytes` → the host's `keyDeriver.deriveKeyBytes`
 (`makeArgon2idDeriver`'s, from `deriver/argon2id-webv1.ts`, or the host's own). As the user types, before any attempt:
 `gating.judgeStrength` → `Proving.judgeStrength`, as above.
@@ -203,7 +241,7 @@ Activity has hidden them, and `attemptThenZero` zeroes it after its attempt.
 non-extractable one-usage handle in a local: `checkUnwraps` (`unwrapKeyUnder`, `CheckUsage`);
 `Lease.#bankKey` in `sealWith` (`wrapKey`) and `unsealWith` (`unwrapKey`), handed to
 `#decipherSealed`.
-Stored only as `bank_key_wayin_wrapped` (VaultDB) and `bank_key_lease_wrapped` (DeviceDB).
+Stored only as `bank_key_wayin_wrapped` (BankDB, in each wayin of the gate row) and `bank_key_lease_wrapped` (DeviceDB).
 
 **boxKey.** Naked, extractable in a local: `makeBoxKey` in `Lease.sealWith`, wrapped by
 `wrapKeyUnder` and used by `cipherBytes`. Operates, non-extractable `decrypt` only:
@@ -211,30 +249,34 @@ Stored only as `bank_key_wayin_wrapped` (VaultDB) and `bank_key_lease_wrapped` (
 only as `box_key_wrapped`.
 
 **leaseKey.** Never naked, never bytes. Made: `makeLeaseKey` in `Lease.buildGranted`, called by
-`Proving.buildLease`, from the vault's `#unlockByProving` and `#renewLease`. Carried, as the `lease_key` of a
-`LeaseRecord`: `Lease.#record`, the Lease the vault has in `#lease` (`#attachLease`) → `lease.cacheAsCacheCan` →
-the `LeaseFriend`'s `tryCacheLease` (made in `Vault.#makeFriend`) → `DeviceDB.stow`
+`Proving.buildLease`, from the bank's `#unlockByProving`. Carried, as the `lease_key` of a
+`LeaseRecord`: `Lease.#record`, the one Lease the bank has in `#lease` (`#attachLease`) → `lease.cacheAsCacheCan` →
+the `LeaseFriend`'s `tryCacheLease` (made in `Bank.#makeLeaseFriend`) → `DeviceDB.tryStow`
 (`storage/device-db.ts`; `IdbDeviceDB`'s structured clone into IndexedDB, or `MemoryDeviceDB`'s
-`structuredClone` into a Map); read back, from
-`vault.ensureUnlocked`, by `Lease.buildFromCache` (`peekLease` → `DeviceDB.peek`), which checks the row with
-`leaseRecord` and builds a Lease around it. Dropped from memory by `lease.evict`: in `lease.revoke`, at a sweep
-(`sweepContents`), and when the lease is found to be damaged (`Lease.#bankKey`). Forgotten
-from the device database by `DeviceDB.forget`: through `lease.revoke` or `Lease.forget` (`forgetLease`) from the
-vault's `#revokeLease`, at `vault.lock()`, at a vacate and at a tombstone; through `tryForgetLease`, in
-`Lease.buildFromCache`, for a row of another epoch or stamp; and row by row from `device.vacate`
-(`#revokeOwnLeases`). `bank.autolock` forgets a row by calling `vault.lock()`. The scan the Bank and the Device make,
-`DeviceDB.listLeases`, returns rows without a `lease_key`. Only `peek` and `listRawLeases`, which no Vault, Bank or
-Device calls, return a `lease_key`, to whoever has the deviceDB (G9). No Vault, Bank or Device has a record.
+`structuredClone` into a Map), in the one row keyed by the bank's scope; read back by the friend's `peekLease`
+(`DeviceDB.peek`) in two places: `Lease.buildFromCache`, from `bank.ensureUnlocked`, which checks the row with
+`leaseRecord` and builds a Lease around it; and `Lease.expiresAt`, from `bank.autolock` through `tryExpiresAt`, which checks
+the row with `leaseRecord` and returns only its expiry, a number (G4). Dropped from memory by `lease.evict`: in
+`lease.revoke`, at the device's sweep or vacate (whose `bank.lock()` meets a disabled bank and evicts without forgetting),
+and when the lease is found to be damaged (`Lease.#bankKey`, which also calls the bank's `lock()` through the friend).
+Forgotten from the device database by `DeviceDB.forget`: through `lease.tryRevoke` or `Lease.tryForget` (`forgetLease`)
+from the bank's `#revokeLease`, at `bank.lock()` of a bank still enabled (and so at a damaged lease and at `bank.autolock`)
+and at a bank tombstone or a bank row of another life delivered; through `tryForgetLease`, in `Lease.buildFromCache`, for a
+row of another `gate_tok`, `gate_revision_tok` or bank stamp; and from `device.vacate`, with the device row. The Device lists
+this bank scope's rows at a vacate (`listOwnLeases`, `DeviceDB.tryListLeases`, whose rows have no `lease_key`) and forgets each
+by `tryForget` with the row it listed; the core never calls `forgetRawLease`. Only `peek`, which only the friend's
+`peekLease` calls, and `listRawLeases`, which nothing in the core calls, return a `lease_key`, to whoever has the deviceDB
+(G9). No Device, Bank or Vault has a record.
 Operates: `Lease.#bankKey` (`unwrapKeyUnder`) alone.
 
-**whisper.** Naked: the host → `vault.putBox`, `box.put`, `box.putExposed`, `vault.boxListing.create`, and
-their `try*` forms → `box.put` → `demandPuttable` (`VX.boxPatch` or `VX.boxPatchNew`, whose whisper is `CX.whisper`, a
-`structuredClone`) → `Box.#edit` → `sealedRecordOf` → `stableJsonify`, the text → `vault.sealStampedString`
-(`GX.leaseSealArgs`) → `Lease.sealWith` → `TextEncoder`, `cipherBytes`, the bytes zeroed in a `finally`.
-Out: `box.extractWhisper`, `tryExtractWhisper`, `box.expose`, and `#keptWhisper` for a put that leaves the
-whisper out → `Box.#unseal` → `vault.unsealStampedString` → `Lease.unsealWith` → `#decipherSealed` (`decipherBytes`) →
+**whisper.** Naked: the host → `vault.putBox`, `box.put`, `box.putExposed`, `vault.boxListing.create`, `bank.tryProbe`'s `whisper` (a trial box,
+which the report shows none of), and their `try*` forms → `box.put` → `demandPuttable` (`VX.boxPatch` or `VX.boxPatchNew`, whose whisper is `CX.whisper`, a
+`structuredClone`) → `Box.#editAndSeal` → `sealedRecordOf` → `stableJsonify`, the text → `vault.sealStampedString` →
+`bank.sealWith` (`GX.leaseSealArgs`) → `Lease.sealWith` → `TextEncoder`, `cipherBytes`, the bytes zeroed in a `finally`.
+Out: `box.extractWhisper`, `tryExtractWhisper`, `box.expose`, and `#storedWhisper` for a put that leaves the
+whisper out → `Box.#unseal` → `vault.unsealStampedString` → `bank.unsealWith` → `Lease.unsealWith` → `#decipherSealed` (`decipherBytes`) →
 `TextDecoder`, the bytes zeroed in a `finally` → `deserializeWhisper` (`CX.whisper`) → the host, or `Box.#exposed`
-(*Open items*, 1). The core has no `mask` to show an outline of one.
+(*Open items*, 1). No `Box` method shows an outline of one: `mask` (`safebyok/utils`) is a pure function of a text the host hands it, which no model calls.
 
 ## The guarantees
 
@@ -245,7 +287,7 @@ passphrase to `PassphraseProving.buildNovel` or `buildStored`; `buildNovel` pass
 each of the two passes it to `passphraseKeyOf`, which passes it, through the `guardKeyDeriver` wrapper and
 `deriveKeyBytes`, to the host's `keyDeriver.deriveKeyBytes` (`models/proving.ts`).
 `gating.judgeStrength` passes a passphrase to `Proving.judgeStrength` as the user types. No class, record, snapshot or
-closure that outlives the call keeps it: no gate or vault is ever given a passphrase, and
+closure that outlives the call keeps it: no device, bank, gate or vault is ever given a passphrase, and
 past its `Proving` builders an act uses only the provings. The only comparison of two
 passphrases is `antePassphraseClear === nextPassphraseClear` in the `replacePassphrase` act, both
 typed by the same user (`samePassphrase`). Three host functions handle it: the dialog that collects it (either
@@ -253,8 +295,8 @@ typed by the same user (`samePassphrase`). Three host functions handle it: the d
 *Caveat:* a JavaScript string cannot be zeroed, so copies
 live until garbage-collected, and `safebyok-react`'s dialog, on the old core until the package moves, keeps what was
 typed in component state until it closes. Kept by: `models/gating.ts` (chains), `models/proving.ts`. Checked by: a
-search with `rg` for a field or record that has a passphrase finds none; `tests/models/vault-gate.test.ts`, *leaves the
-dialog open on a wrong ante, a weak next or the same passphrase, storing nothing, and the next attempt lands*, finds the
+search with `rg` for a field or record that has a passphrase finds none; `tests/models/bank-gate.test.ts`, *leaves the
+dialog open on a wrong ante, a weak next or the same passphrase, putting nothing, and the next attempt lands*, finds the
 passphrase in no `same_passphrase` refusal.
 
 **G2. The strong key's bytes are locals, zeroed; its handle is non-extractable.** The deriver's
@@ -273,38 +315,44 @@ wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's 
 method returns it or a bankKey (`models/proving.ts`). Bytes refused before import: anything but
 32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/models/proving.test.ts` (among them *the ctx a wayin is
 wrapped under* and *a passkey proving's key*), `tests/helpers/crypto.test.ts` (*deriveWrappingKey*),
-`tests/models/gating.test.ts` (*gating.attempt*, among them *refuses a second while one runs 'attempt_in_flight',
-spending what it was handed, and the first goes on*, *concludes a malformed attempt, spends what came with it, and the
-refusal has no passphrase* and *spends an answer from another realm, whose bytes are no instance of this realm's
-Uint8Array*).
+`tests/models/gating.test.ts` (*gating.attempt*, among them *refuses a second attempt while one runs*, *concludes on a
+malformed attempt, with no passphrase in the refusal* and *zeroes a passkey answer from another realm*).
 
-**G3. The bankKey is never stored naked, and never persisted as a handle.** It exists (a) as an
+**G3. The bankKey is never stored naked, and never persisted as a handle.** One bankKey serves every vault of its bank.
+It exists (a) as an
 *extractable* local, which WebCrypto requires for it to be wrapped: fresh in `buildWayin`
 (`makeBankKey`), and unwrapped with `RewrapUsage` in `buildWayin` and `buildLease` (`#unwrapBankKey`). An extractable
 handle yields its bytes to anyone who has it, so each is dropped at the end of its method and
 crosses no boundary: those methods return a `Wayin`, a `Lease` or a wrap. (b) As a
 *non-extractable* local with one usage: `checkUnwraps` (`CheckUsage`), and `Lease.#bankKey`
-for each cipher or decipher, which keeps nothing between calls. The pantry has the bankKey
-only as `bank_key_lease_wrapped`, ciphertext bytes under the leaseKey; there is no handle to a
-naked bankKey anywhere at rest, and no cache of one in memory. Kept by: `models/proving.ts`,
+for each cipher or decipher, which keeps nothing between calls. The bankDB has the bankKey only as each wayin's
+`bank_key_wayin_wrapped`, stored on the bank's gate row, and the device database only as `bank_key_lease_wrapped`, ciphertext bytes under the
+leaseKey; there is no handle to a naked bankKey anywhere at rest, and no cache of one in memory. Kept by: `models/proving.ts`,
 `models/lease.ts`. Checked by: `tests/models/lease.test.ts`, `tests/models/proving.test.ts`.
 
 **G4. The leaseKey never has bytes.** It is generated non-extractable (`makeLeaseKey`) and exists
 only as a `CryptoKey` handle: a local in `Lease.buildGranted`; `Lease.#record` in memory, for the lease's life;
-and the `lease_key` of a `LeaseRow` cached by `lease.cacheAsCacheCan` through a `DeviceDB`'s `stow` (the core's
+the `lease_key` of a `LeaseRow` cached by `lease.cacheAsCacheCan` through a `DeviceDB`'s `tryStow` (the core's
 `IdbDeviceDB` keeps it by IndexedDB's structured clone, its `MemoryDeviceDB` by `structuredClone`) and read back by
-`Lease.buildFromCache` (`DeviceDB.peek`). A lease is dropped from memory at `lock()`, at a sweep, at a vacate, at a
-tombstone, and when it is found to be damaged (`Lease.#bankKey`). Its row is forgotten at `lock()`, at a vacate and at
-a tombstone, which are among the sites the leaseKey's access chain names, **with one exception**: a lease row that fails
+`Lease.buildFromCache` and `Lease.expiresAt` (`DeviceDB.peek`), each having it in a local. A bank has one lease, and the device one row for it, filed under the bank's
+scope and read or forgotten only by a query that names its `bank_tok`; the row cites the gate's `gate_tok` and the gate row's `revision_tok` (`gate_revision_tok`), so a gate verb on
+any device leaves it to be forgotten at the next `buildFromCache`. A lease is dropped from memory at `bank.lock()`, at
+the device's sweep or vacate, at a bank tombstone or a bank row of another life delivered, and when it is found to be
+damaged (`Lease.#bankKey`). Its row is forgotten at `bank.lock()` of a bank that is still enabled, at a vacate and at a
+bank tombstone or a bank row of another life delivered, which are among the sites the
+leaseKey's access chain names (a sweep leaves the row for the next page), **with one exception**: a lease row that fails
 its check is neither listed by `listLeases` nor forgotten by `forget`. It stays until a later `stow` over its scope, or
 until a host calls `forgetRawLease` with the scopepath that `listRawLeases` returns beside the row; `forgetRawLease`
 reaches a row filed under labels that today's checks refuse (notes/wontfix.md). No lease is dropped by the passage of
 time alone, and **autolock is a best-effort reminder process, not a guarantee**: a lease granted in a page stays granted
-until something locks it. Two things enforce the autolock duration, each against a row cached on this device that was
-proved longer ago than that duration. `bank.autolock`, which only the host calls, locks each listed vault that has such
-a row, and `lock()` forgets the row. `Lease.buildFromCache`, when `ensureUnlocked` reads the cache, declines to load
-such a row: it leaves the row in place and throws nothing, so `ensureUnlocked` proceeds as it does with no row, and asks
-for a proof. **An expired row stays on disk**, with the leaseKey handle and the wrapped bankKey in it, until the next
+until something locks it. A lease's expiry is stored nowhere: it is the cached row's `proved_at` plus the autolock
+duration, the device's `leaseMillis` (from the host's `autolockMinutes`), which the bank hands the Lease in its
+`LeaseFriend`, and `expiryOf` (`models/lease.ts`) reckons it each time it is asked. Two things enforce it, each against
+a row cached on this device whose expiry has passed. `bank.autolock`, which only the host calls, asks `Lease.tryExpiresAt`
+for the expiry and locks the bank once it has passed, and `bank.lock()` forgets the row; a refused peek or a damaged row
+is told as bad news, and nothing locks. `Lease.buildFromCache`, when `bank.ensureUnlocked` reads the cache, declines to
+load such a row (`isPastAutolock`): it leaves the row in place and throws nothing, so `ensureUnlocked` proceeds as it does
+with no row, and asks for a proof. **An expired row stays on disk**, with the leaseKey handle and the wrapped bankKey in it, until the next
 proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it
 until then. `Lease.buildFromCache` never reaches a lease that is already attached, and `bank.autolock` reaches one only
 through its row, so it misses a lease that the deviceDB refused to cache, or whose row another page has forgotten or
@@ -312,12 +360,15 @@ written over. Both go by the device's clock, as `Date.now()` reads it: setting t
 expired row that is still on disk usable again. A record read back whose key is extractable, of another
 algorithm, or for another use is treated as `damaged_lease` (`isLeaseKey`, `shapes-gateish.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever has the handle in this page can unwrap the
-bankKey as an extractable key. So the `DeviceDB`, which is host-pluggable and is handed every lease
+bankKey as an extractable key, and with it unseal every box of every vault of the bank. So the `DeviceDB`, which is host-pluggable and is handed every lease
 record, is inside the trust boundary, as the host already is (SECURITY.md, *What is outside
-safebyok's protection*). Kept by: `models/lease.ts`, `storage/device-db.ts`, `shapes/shapes-gateish.ts`. Checked by:
-`tests/models/lease.test.ts` (*makes its leaseKey non-extractable, usable only to wrap and unwrap*, and
-*Lease.buildFromCache*'s *tells a cached record whose leaseKey is extractable as 'damaged_lease' bad news, quoting
-none of it, answers null and leaves it in place*, one of a list of cases under one title).
+safebyok's protection*). Kept by: `models/lease.ts`, `models/bank.ts`, `storage/device-db.ts`, `shapes/shapes-gateish.ts`. Checked by:
+`tests/models/lease.test.ts` (*makes its leaseKey non-extractable, usable only to wrap and unwrap*;
+*Lease.buildFromCache(friend, gate)*'s *reports a cached record whose leaseKey is extractable as bad news without quoting
+it*, one of a list of cases under one title, and *returns null past autolock and leaves the row untouched*; *Lease.expiresAt(friend)
+and tryExpiresAt(friend)*), `tests/models/bank-ending.test.ts` (*bank.autolock*, among them *locks by the expiry its cached
+lease reports*; *bank.lock, device.vacate, device.sweep*), `tests/models/bank-lease.test.ts` (*the device's sweep keeps the
+cached lease row, locks the bank, and ends the vault and its boxes, dropping an exposed whisper*).
 
 **G5. A boxKey is a local.** It is made fresh in `Lease.sealWith`, extractable only so that it can be wrapped. It is
 unwrapped in `#decipherSealed`, for `unsealWith`, as a non-extractable key with the `decrypt` usage only. Each is dropped at the
@@ -327,18 +378,18 @@ end of its method.
 `vault.boxListing.create`) validates the host's value and takes a `structuredClone` (`CX.whisper`, in
 `VX.boxPatch`), and `sealedRecordOf` (`models/box.ts`) serializes it with `stableJsonify` into its JSON text, a
 string, which passes from `Box` to `Lease` through the Vault's seal verbs (`vault.sealStampedString`,
-`unsealStampedString`). `Lease.sealWith` encodes the text and zeroes the bytes afterwards, whether the seal succeeded or
+`unsealStampedString`) and the Bank's (`bank.sealWith`, `unsealWith`). `Lease.sealWith` encodes the text and zeroes the bytes afterwards, whether the seal succeeded or
 was refused; `Lease.unsealWith` decodes the deciphered bytes and zeroes them; `Box.#unseal` parses the text
 (`deserializeWhisper`), checks it against `CX.whisper`, and hands the value to the host (`extractWhisper`) or keeps it
 (`expose`). `Box` makes no bytes of its own. So the whisper's bytes are zeroed, and the copies of its text live
 until garbage-collected, as a passphrase's do (G1). The core does not measure a whisper's size, so it has no copy made
 for measuring to zero. A `Box`'s
 record has ciphertext, never a whisper; the `Box` itself can keep the value, after `expose` (*Open items*, 1).
-*Caveat:* the JSON value itself cannot be zeroed, and the core has no `mask` to show an outline of one. Kept by: `models/box.ts`,
-`models/lease.ts`. Checked by: `tests/models/box-seal.test.ts` (*opens the whisper create sealed, and the one a
-later put sealed: the sealed parts carry none of it*), `tests/models/lease.test.ts` (*round-trips a whisper's text
-under the same stamp*, *refuses tampered ciphertext as 'damaged_whisper', quoting none of it*). No test checks that the
-bytes are zeroed.
+*Caveat:* the JSON value itself cannot be zeroed, and no `Box` method shows an outline of one (`mask`, in `safebyok/utils`, is the host's to call on a text it has). Kept by: `models/box.ts`,
+`models/lease.ts`. Checked by: `tests/models/box-seal.test.ts` (*opens the whispers sealed by create and by a
+later put*, which finds none of the whisper in the record), `tests/models/lease.test.ts` (*round-trips a whisper's text
+under the same stamps*, *refuses tampered ciphertext as 'damaged_whisper', quoting none of it*). *zeroes the whisper's bytes once each has sealed or opened them*, which spies on `TextEncoder` and `TextDecoder`
+and finds the bytes zero after a seal and after an unseal that succeed. No test checks a seal that is refused.
 
 **G7. The set of secrets is closed.** The eight values above are the secrets. A new one, or a new
 form of one (a cache, a copy in a snapshot, a key kept between calls), is a design change that
@@ -350,8 +401,8 @@ message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates 
 kind, a limit, a field name, or the `name` of an error it replaces (`thrownNameOf`, `errors.ts`: a
 DOMException's or an Error's class name such as `QuotaExceededError`, or whatever name a host's own
 device database gave its error, kept by the device-database conditions until redaction is built; the Coach, 2026-10-28). No validator's refusal quotes an input value. It names a failing field by its
-path, so a key a host chose, which is no secret, may be named (`tests/helpers/validator.test.ts`, *repeats the keys of
-a schema keyed by its input in the refusal*). The test *every checker a shapes module exports*
+path, so a key a host chose, which is no secret, may be named (`tests/helpers/validator.test.ts`, *names the input's keys in
+the refusal for a record schema*). The test *every checker a shapes module exports*
 (`tests/helpers/validator.test.ts`) takes each checker the shapes modules export, and each field under it at any depth
 parsed alone, and gives each a marked value: whole, in a list and in an object. It finds the marker in no refusal's
 message, stack, meta or cause. A check over a whole object runs only once its fields pass, so that test does not reach
@@ -378,20 +429,20 @@ a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), grant
 (`Proving.buildWayin`, `Proving.buildLease`: `makeBankKey`, and the unwrap and wrap of a bankKey
 already proved). A proving's key, a grant or a wayin is made inside the gating's `outcomeOf`, which turns the error into
 an `unexpected_error` with the DOMException as its `cause`. An error from a seal reaches the host as a throw
-from `putBox`, `box.put`, `putExposed`, `vault.boxListing.create` or the public `vault.sealStampedString`. From the
+from `putBox`, `box.put`, `putExposed`, `vault.boxListing.create` or the public `vault.sealStampedString` or `bank.sealWith`. From the
 `try*` forms of the first four, `outcomeOf` turns it into an `unexpected_error` with the DOMException as its `cause`.
 Either way it contains no secret: a WebCrypto
 error carries a name and a message, never key material. The cause of a device-database failure never reaches the host:
-`storeFailed`
+`deviceDBFailed`
 (`refusals/throwers.ts`, from the catch in each `DeviceDB` verb) keeps neither what the device database threw nor its message,
 only its `name`, because a `DeviceDB` is handed every lease record and the logger hands a whole condition to the
-host (`tests/storage/device-db.test.ts`, *a deviceDB whose store throws*). `unexpectedError` keeps a foreign throw
+host (`tests/storage/device-db.test.ts`, *a deviceDB whose generic call throws*). `unexpectedError` keeps a foreign throw
 as `cause` only where the code that threw was given no secret. Each Lease and Box `try*` form ends in a single catch
 (`outcomeOf`, `outcome.ts`), and the invariant at that catch can be checked by reading what can reach it: a
-refusal (passed through as itself), the vault's demand, or a throw from a bug in this package's own lines. A throw from
+refusal (passed through as itself), the bank's demand, or a throw from a bug in this package's own lines. A throw from
 a host function or the device database never reaches it, as each is replaced first, and a
 WebCrypto error reaches it only from the seal, key, grant and wayin paths named above. The `try*` forms of the Vault,
-the Device, the Bank and the box listing are likewise each a single `outcomeOf` over the throwing form, and the throwing forms end
+the Bank and the box listing are likewise each a single `outcomeOf` over the throwing form, and the throwing forms end
 in no such catch. The logger is given messages, a story bag of kinds and calls, and `VaultError`s;
 `Proving.toJSON`, `Lease.toJSON` and `Wayin.toJSON` show no key material, and a lease that cannot be read is reported
 without its record (`Lease.buildFromCache` reports a `damagedLease()` to the friend as bad news, built from nothing of
@@ -403,35 +454,39 @@ the row, and returns null). *Host obligation, documented:* a `strengthChecker`'s
 Besides them a passphrase passes through the host functions of G1, through their wrappers, and through
 `Proving.judgeStrength` on its way to one. `src/models/proving.ts` and `src/models/lease.ts` are the only modules
 that import `wrapKeyUnder`, `unwrapKeyUnder`, `cipherBytes`, `decipherBytes` or a key maker. The wayinKey lives only
-in `Proving.#wayinKey`; the leaseKey only in `Lease.#record` and the row cached on the device. The Vault keeps its
-`Lease` private, in `#lease`, and no Vault, Bank or Device has a lease record: `Proving.buildLease` makes the
-Lease the vault has, and `Lease.buildFromCache` checks what `DeviceDB.peek` hands back and builds a Lease around
-it. A `Box` reaches the Lease only through the public `vault.sealStampedString` and `unsealStampedString`, which hand
-the lease a whisper's text and a stamp and hand back a sealed whisper or text, never a key. The `LeaseFriend` whose
-`peekLease` returns the cached row with its leaseKey handle is kept in `Lease.#friend` and made
-in `Vault.#leaseFriend`. No public `Vault` method takes a proving: a gating's act reaches `#unlockByProving`
-through `Vault.#unlockVaultByProving`, which is private, and which the vault passes to `Gating.launchOn` or `launchBirth`.
+in `Proving.#wayinKey`; the leaseKey only in `Lease.#record`, the row cached on the device, and the locals of the Lease's
+statics that read that row back. The Bank keeps its one `Lease` private, in `#lease`, and no Device, Bank or Vault has a
+lease record: `Proving.buildLease` makes the Lease the bank has, `Lease.buildFromCache` checks what `DeviceDB.peek` hands
+back and builds a Lease around it, and `bank.autolock` gets only an expiry from `Lease.tryExpiresAt`. A `Box` reaches the Lease only through the Vault's public
+`sealStampedString` and `unsealStampedString` and the Bank's `sealWith` and `unsealWith` behind them, which hand the
+lease a whisper's text and its stamps and hand back a sealed whisper or text, never a key. A `Vault` has no lease and
+no key. The `LeaseFriend` whose
+`peekLease` returns the cached row with its leaseKey handle is kept in `Lease.#bankFriend` and made
+in `Bank.#makeLeaseFriend`. No public `Device`, `Bank` or `Gate` method takes a proving: a gating's act reaches the bank's `#unlockByProving`
+through `Bank.#unlockBankByProving`, which is private, and which only the Bank's own `prompt` and `launchBirth` pass to
+`Gating.launchOn` and `Gating.launchBirth`; the Device calls `Bank.launchBirth`, and passes no unlock.
 The entry points export `Gating` as a type only, so the published surface has no launcher a host could hand an unlock
 of its own. A live gating's `constructor` still reaches the statics: that goes around the published types, and the host
 is inside the trust boundary (SECURITY.md). Nothing public on a
-`Vault` or a `Lease` hands the friend out, and a test captures it with a spy on `Proving.prototype.buildLease`.
+`Bank` or a `Lease` hands the friend out, and a test captures it with a spy on `Proving.prototype.buildLease`.
 Neither class has a getter, field, spread, JSON or Symbol that yields a key. The row itself is also within reach of
-whoever has the deviceDB (G4). The entry points export neither `Lease` nor `Proving`, so the published surface
+whoever has the deviceDB (G4), and `device.deviceDB` and `bank.deviceDB` hand back the one the host gave, whose `peek` returns
+the row with its leaseKey handle: the `DeviceDB` is inside the trust boundary, as G4 says. The entry points export neither `Lease` nor `Proving`, so the published surface
 has no route by which a host hands a friend of its own to `proving.buildLease`. Checked by:
-`tests/models/lease.test.ts` (*what a lease shows*), `tests/models/vault-lease.test.ts` (*a vault and a
-lease show neither the lease friend nor the lease key handle, one level deep, by identity*), `rg` for
-the crypto imports.
+`tests/models/lease.test.ts` (*what a lease shows*), `tests/models/bank-lease.test.ts` (*a bank, a vault and a lease never
+reveal the lease friend or the lease key handle*, among them *a bank, its vault and its lease reveal neither through a
+field, a getter, Object.keys or JSON.stringify*), `rg` for the crypto imports.
 
 **G10. Foundations the construction rests on.**
 
 * *Authenticated encryption everywhere, bound by ctx.* AES-256-GCM only; a fresh 96-bit IV from
   `crypto.getRandomValues` per call; the ctx as additional data (above). Per key the number of
-  ciphers is small (a bankKey wraps once per box write, wayin and lease grant), far under the
-  2^32 guidance for random IVs.
+  ciphers is small (a bankKey wraps once per box write in any vault of its bank, and once per wayin and lease grant),
+  far under the 2^32 guidance for random IVs.
 * *Key separation by usage and purpose.* Wrapping keys carry `wrapKey`/`unwrapKey` only; a boxKey
   `encrypt`/`decrypt` only; an unwrapped key gets a single usage, the one its call needs, and WebCrypto
-  enforces it. Each kind of field has its own purpose string (`PurposeForWayinkind`,
-  `bank_key_lease_wrapped`, `box_key_wrapped`, `whisper_ciphered`), and the passkeyKey's HKDF
+  enforces it. Each kind of field has its own purpose string (`PurposeForWayinkind`: `bank_key_passphrase_wrapped`,
+  `bank_key_passkey_wrapped`; `bank_key_lease_wrapped`, `box_key_wrapped`, `whisper_ciphered`), and the passkeyKey's HKDF
   `info` is its wayin's ctx, so the same bytes under another purpose make another key.
 * *A memory-hard, labelled, salted derivation.* Argon2id under a stored `key_deriver_label` whose spec is fixed
   (`Argon2idWebV1`, `deriver/shapes.ts`: 64 MiB, 3 passes, 1 lane, 16-byte salt, 32-byte key), made by
@@ -455,17 +510,18 @@ the crypto imports.
   verify in `unwrapKey`, never by comparing key bytes.
 * *Strict validation on read.* A stored record that fails its schema reads as damaged or absent and
   is never partly used; before 1.0.0 no older shape is read (CLAUDE.md).
-* *A static bankKey.* No rotation yet: removal is not revocation; a vault made anew has a new
-  `vault_tok`, which voids every box (README, VOCABULARY *rotation*).
+* *A static bankKey.* No rotation yet: removal is not revocation; a bank made anew has a new
+  `bank_tok` and a new bankKey, which voids every wayin, lease and box of the bank; a vault made anew has a new
+  `vault_tok`, which voids its boxes, under the same bankKey (README, VOCABULARY *rotation*).
 
 ## Open items
 
-Each is a Coach's call; none breaks a guarantee above. The old core's `vaultRecordHeldBy`, a test-only export once
+Each is a Coach's call, and none breaks a guarantee above. The old core's `vaultRecordHeldBy`, a test-only export once
 listed here, has no counterpart in the core.
 
 1. **The exposed whisper** (`src/models/box.ts`, `Box.expose` and `box.whisper`) is a whisper
    kept on the instance. That is a new form of a secret, which G7 says this note names first. The core's `Box` has
-   it, as a plain object the host may edit, from `expose` until the host calls `box.unexpose()` or the box is swept, deleted or vacated.
+   it, as a plain object the host may edit, from `expose` until the host calls `box.unexpose()`, the device is swept or vacated, the box is deleted, or its vault or bank takes another life.
    A lock and `box.veil()` keep it; while the box is locked or veiled, a frozen bag marked `Whispered` is returned in its place (`'locked'`, `'veiled'`), so neither takes it out of
    memory. `unexpose` is the call that removes it. A bag, or a copy of one, is refused at a put, so it can never replace the secret. Forging the mark
    only gets a put refused. `BoxFields` (`src/dom/box-fields.ts`, the `safebyok/dom` entry) writes a leaf of it to an element's `value`, through
