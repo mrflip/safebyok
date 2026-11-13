@@ -167,6 +167,13 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   without checking them; reading them from the vault's own record would remove the argument. A
   `damaged_wayin` refusal's meta and a Wayin's JSON still carry the older wayin summary with
   `vault_tok`, whereas the snapshot shows each wayin as its sparse shape.
+* **The GraphQL client strips `__typename` by hand, a third copy of every row's shape.** The Coach
+  (2026-11-13): urql's `cacheExchange` adds `__typename` to every selection, and the core's shapes are
+  `.strict()`, so `packages/safebyok-graphql/src/graphql-bank-db.ts` keeps a drop map per shape (`type Drop`,
+  `dropTypename`, `answerDrop`) beside the SDL and the zod shapes. "yeah, yuck. TODO do we hate the third copy
+  enough that it's ok to make our custom parse() remove `__typename` before passing it up. For now: live with
+  the third copy." The custom parse is where the client parses each answer, as in
+  `BX.getVaultAnswer.parse(rowAnswerOf(crossed))`.
 * **The names' byte-size refusals are unreachable.** Since the restyle (#273) names are short
   labels, so their share of the vault's byte check and of `box_too_large` cannot be reached from
   a vault. The code stays until the box-limit code is next changed; drop it then.
