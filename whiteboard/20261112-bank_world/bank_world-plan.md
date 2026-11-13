@@ -8,19 +8,9 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-13): line #682 → … → #689 → G #678 ready (restacked after #680, #681).
-  Threads from the Coach's answers: 22 #690 and 20 #691 filed (on #689); 21 #692 filed (on #691);
-  23 #693 filed (on #692); 24 #694 filed (on #693); 25 #695 filed; #682–#689 merged by the Coach.
-  Restacking 25, 22, G above 24. Then a restack lines up 20, 21, 23, 24, 25, 22, G on top rechecked; then
-  the resolutions sweep, done note and sprint PR.
-
-The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
-not copied again here. What follows is the gloss.
-
-## Read first
-
-Beyond CLAUDE.md, and only what a thread's kind needs (the handoff quotes what it can):
-
+* **Status** (2026-11-13): done. The line main → #691 → #692 → #693 → #694 → #695 → #690 → #678 → #656 is
+  restacked, justify green at the top; #656 (this sprint PR, squashed) is the top. Rulings swept into
+  bank_world-resolutions.md; the done note is human/20261113-sprint_bank_world_done.md.
 * `design.md`: every thread *Names* and *Scopes*; storage threads (3, 4, 5, 13, 14, 15) *Stored
   rows* and *BankDB*; model threads (6, 8, 8b, 10) *The models*; a thread touching a lease, stamp
   or ctx (8, 8b, 9) *Keys, stamps and each ctx*.

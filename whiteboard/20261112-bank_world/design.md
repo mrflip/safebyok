@@ -359,6 +359,10 @@ await bank.maingate.addPasskeyPrompt()                // asks: add_passkey
   it, which then wants a second general name, and a join reads better as
   `boxes.vault_tok = vaults.vault_tok` than under two general names. Each thread of this line
   reports what it met of either.
+* **A box drops its exposed whisper only because each event that disables it also calls
+  `alignLock()`** (device end, bank tombstone, takedown, a vault's new life); `box.whisper` never
+  checks `isEnabled`. Probed 2026-11-12 (a vault deleted from this device, from another, deleted
+  then put): no gap. A redesign of what disables a box (Closer Look E3) must keep that call.
 
 ## Put off by the Coach
 
