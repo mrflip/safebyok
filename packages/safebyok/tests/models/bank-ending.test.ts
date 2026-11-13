@@ -629,6 +629,20 @@ describe("the end of a bank, a vault and a device, as their listeners and the ba
     expect(watches.stoppedTwice()).to.deep.equal([])
   })
 
+  it("ends the watches of a bank's vaults and boxes at a bank of another life, and keeps the bank's own", async () => {
+    const world = await makeWorldWithBox()
+    const watches = spyWatches(world.bankDB)
+    const next = await world.openNextSession()
+    await next.beginWatch()
+    expect(watches.live()).to.deep.equal([Dna.banklabel, `${Dna.banklabel}/${Dna.vaultlabel}`])
+    const other = world.anotherDevice()
+    await delTyping(await other.ensureBank(), Passphrase)
+    await bankTyping(other, byPassphrase(NewPassphrase))
+    next.bank.receiveParent(world.storedBankNow())
+    expect(watches.live()).to.deep.equal([Dna.banklabel])
+    expect(watches.stoppedTwice()).to.deep.equal([])
+  })
+
   it("logs an unwatch that throws at a sweep as bad news, never throwing, and aligns every snapshot all the same", async () => {
     const spy = TH.spyLogger()
     const world = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
