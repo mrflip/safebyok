@@ -3,7 +3,7 @@ import { nowMillis } from '../helpers/clock'
 import { Checkers } from '../helpers/validator'
 import { tattoo } from '../helpers/helpers'
 import { type Outcome, outcomeOf } from '../refusals/outcome'
-import { mainGateMissing, passkeyAlreadyAdded, writtenByOwnVerbs } from '../refusals/throwers'
+import { mainGateMissing, passkeyAlreadyAdded } from '../refusals/throwers'
 import type { GateScope } from '../shapes/shapes-core'
 import { type GateRecord, type GateSparse, type Wayins, GateFormat, gateRecord } from '../shapes/shapes-bankdb'
 import { type BankStamp, type GateStamp, bankStamp, gateStamp } from '../shapes/shapes-gateish'
@@ -136,10 +136,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   tryRevokePasskeyPrompt(): Promise<Outcome<this>> { return outcomeOf(() => this.revokePasskeyPrompt()) }
   // --
 
-  // == [Methods]: del, pickle
-
-  /** Refuses: a gate is deleted only with its bank, by `bank.delPrompt()`. */
-  override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
+  // == [Methods]: pickle
 
   /** This gate's current row, as a frozen plain {@link GateRecord}. */
   pickle(): GateRecord { return Object.freeze({ ...this.demandFullProps(), wayins: this.wayins }) }

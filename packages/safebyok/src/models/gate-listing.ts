@@ -1,6 +1,7 @@
 /** The gate listing: a stub listing of a bank's one gate, whose row comes with the bank's. */
 
 import { nowMillis } from '../helpers/clock'
+import { makeLifeTok } from '../helpers/crypto'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
@@ -11,7 +12,7 @@ import * as BX from '../shapes/shapes-bankdb'
 import type { BankRow, BoxRow, GateRecord, GateSparse, VaultRow, Wayins } from '../shapes/shapes-bankdb'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
-import type { Fetched, GateSnapshot, ListingOpts, ThingAnswer } from '../shapes/shapes-vaultish'
+import type { DelTombstone, Fetched, GateSnapshot, ListingOpts, ThingAnswer } from '../shapes/shapes-vaultish'
 import { type GateAnswer, answerWithVal, refusedAnswerOf } from '../storage/bank-db'
 import type { Bank } from './bank'
 import { Gate } from './gate'
@@ -147,8 +148,11 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
 
   protected doTryPut(): never { throw writtenByOwnVerbs() }
 
-  protected tombstoneOver(): never { throw writtenByOwnVerbs() }
+  protected tombstoneOver(expected: GateSparse): DelTombstone<GateSparse> {
+    return { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), am: 'x', gate_tok: makeLifeTok() }
+  }
 
+  // No bankDB verb deletes a gate alone: it goes with its bank.
   protected doTryDel(): never { throw writtenByOwnVerbs() }
 
   // The bank's watch hears the gate row: no listing of its own starts one.

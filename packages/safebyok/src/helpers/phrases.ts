@@ -172,7 +172,7 @@ export const RecordForNewBox = "A create operation found a record already presen
 export const PartialLoad = "The record in hand is not full, so it cannot be opened: hydrate it, and call again."
 
 /** Why a bank or a gate is never put or deleted as a vault or a box is. */
-export const WrittenByOwnVerbs = "A bank's row and its gate's are written only by the bank's own verbs, so nothing was stored: build or change the bank through its prompts, and delete it with bank.delPrompt()."
+export const WrittenByOwnVerbs = "A bank's row and its gate's are written only by the bank's own verbs, so nothing was stored: build or change the bank through its prompts, and delete it, gate and all, with bank.del() or bank.delPrompt()."
 
 /** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
 export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."
