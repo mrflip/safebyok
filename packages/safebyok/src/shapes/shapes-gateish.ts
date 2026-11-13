@@ -171,10 +171,10 @@ export type VaultStamp = Z.infer<typeof vaultStamp>
 export type CitedGate = Z.infer<typeof citedGate>
 // --
 
-// == [What a proving is handed]: provingWorld, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingWorld, StampedGate, Novel
+// == [What a proving is handed]: provingDevice, stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs, ProvingDevice, StampedGate, Novel
 
 /** The check of what a proving is given of its bank. */
-export const provingWorld = objStrip(({ custom, device_tok }) => ({
+export const provingDevice = objStrip(({ custom, device_tok }) => ({
   /** The key deriver, as the core wraps it: it turns a passphrase into key bytes. */
   keyDeriver:      custom<GuardedKeyDeriver>(isGuarded, Phrases.GuardedExpected),
   /** The strength checker, as the core wraps it: it judges a new passphrase. */
@@ -184,7 +184,7 @@ export const provingWorld = objStrip(({ custom, device_tok }) => ({
 }), 'bad_option', [CX])
 
 /** What a proving is given of its bank: two wrapped host functions and this device's token. */
-export type ProvingWorld = Z.infer<typeof provingWorld>
+export type ProvingDevice = Z.infer<typeof provingDevice>
 
 /** The checks of the arguments of the provings' static builders.
  * A `bank`, or a new wayin's `gate`, is anything carrying its stamp. A stored wayin's `gate` is anything carrying a
@@ -194,11 +194,11 @@ export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseSto
   const stampedGate = obj({ bankStamp, stamp: gateStamp, wayins: BX.wayins })
   return {
     stampedGate,
-    passphraseNovelArgs:   obj({ bank: bankStamp, gate: gateStamp, passphraseClear: passphraseCleartext, world: provingWorld }),
-    passkeyNovelArgs:      obj({ bank: bankStamp, gate: gateStamp, passkeyClear: freshPasskeyAnswer, world: provingWorld }),
-    passphraseStoredArgs:  obj({ gate: stampedGate, passphraseClear: passphraseCleartext, world: provingWorld }),
+    passphraseNovelArgs:   obj({ bank: bankStamp, gate: gateStamp, passphraseClear: passphraseCleartext, device: provingDevice }),
+    passkeyNovelArgs:      obj({ bank: bankStamp, gate: gateStamp, passkeyClear: freshPasskeyAnswer, device: provingDevice }),
+    passphraseStoredArgs:  obj({ gate: stampedGate, passphraseClear: passphraseCleartext, device: provingDevice }),
     passkeyStoredArgs:     obj({ gate: stampedGate, passkeyClear: passkeyAnswer }),
-    strengthArgs:          obj({ passphraseClear: passphraseCleartext, scope: bankScope, world: provingWorld }),
+    strengthArgs:          obj({ passphraseClear: passphraseCleartext, scope: bankScope, device: provingDevice }),
   }
 })
 

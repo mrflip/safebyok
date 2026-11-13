@@ -3,7 +3,7 @@ import { Gate } from '../../src/models/gate'
 import { type GateRecord, GateFormat, gateSparse } from '../../src/shapes/shapes-bankdb'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
-import { builtGateOf, listedGateOf, passkeyAnswerOf, provingWorldOf, TestPassphrase, useFakeClock, WorldBankStamp, WorldGateStamp } from '../test-helpers/proving-world'
+import { builtGateOf, listedGateOf, passkeyAnswerOf, provingDeviceOf, TestPassphrase, useFakeClock, WorldBankStamp, WorldGateStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -13,7 +13,7 @@ const GateFields = ['user_id', 'banklabel', 'gatelabel', 'fmt', 'revision_tok', 
 
 describe("Gate.recordOfBirth(bank, gate, main, passkey0)", () => {
   it("is a gate row at its first revision, of the stamps, with the wayins handed", async () => {
-    const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, provingWorldOf())
+    const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, provingDeviceOf())
     const wayin = await proving.buildWayin(NOVEL)
     const record = Gate.recordOfBirth(WorldBankStamp, WorldGateStamp, wayin, null)
     expect(record).to.include({ ...WorldGateStamp, fmt: GateFormat, revision_seq: 0, am: 'a', bank_tok: WorldBankStamp.bank_tok })

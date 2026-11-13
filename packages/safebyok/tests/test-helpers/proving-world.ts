@@ -1,4 +1,4 @@
-/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a fake lease friend with a spy on each verb, a proving world over a fast key deriver, passkey answers, a gate listed in a bank, and the loudly named backdoor that opens a wayin from outside.
+/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a fake lease friend with a spy on each verb, a proving device over a fast key deriver, passkey answers, a gate listed in a bank, and the loudly named backdoor that opens a wayin from outside.
  * Import it directly, not through `TH`, as `models-world.ts` is: `src/models/` is not exported.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving or a lease
@@ -19,7 +19,7 @@ import type { GateRecord } from '../../src/shapes/shapes-bankdb'
 import * as GX from '../../src/shapes/shapes-gateish'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
-import { type BankStamp, type CitedGate, type GateStamp, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingWorld, type VaultStamp } from '../../src/shapes/shapes-gateish'
+import { type BankStamp, type CitedGate, type GateStamp, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type ProvingDevice, type VaultStamp } from '../../src/shapes/shapes-gateish'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { good } from '../../src/refusals/outcome'
 import type { KeyDeriver } from '../../src/deriver/basederiver'
@@ -120,19 +120,19 @@ export function sealStampOf(boxlabel: string, overrides: Readonly<Record<string,
 export function sealStampsOf(boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord[] { return [WorldVaultStamp, sealStampOf(boxlabel, overrides)] }
 // --
 
-// == [Provings]: TestPassphrase, DeviceTok, provingWorldOf, passkeyAnswerOf, builtGateOf
+// == [Provings]: TestPassphrase, DeviceTok, provingDeviceOf, passkeyAnswerOf, builtGateOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
-/** The `device_tok` a {@link provingWorldOf} world carries. */
+/** The `device_tok` a {@link provingDeviceOf} carries. */
 export const DeviceTok = '00000000-0000-4000-8000-00000000000a'
 
-/** What a test may say of a {@link provingWorldOf} world: the host's own deriver and checker, which it wraps as a bank does. */
-export type ProvingWorldGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_tok?: string | undefined }
+/** What a test may say of a {@link provingDeviceOf} device: the host's own deriver and checker, which it wraps as a bank does. */
+export type ProvingDeviceGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_tok?: string | undefined }
 
-/** A proving's world: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceTok}, each wrapped as a bank wraps it. */
-export function provingWorldOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingWorldGiven = {}): ProvingWorld {
+/** A proving device: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceTok}, each wrapped as a bank wraps it. */
+export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingDeviceGiven = {}): ProvingDevice {
   return {
     keyDeriver:      guardKeyDeriver(keyDeriver),
     strengthChecker: guardStrengthChecker(strengthChecker),
@@ -152,9 +152,9 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
 
 /** A gate of {@link WorldGateStamp}, made as a birth makes it, of {@link TestPassphrase} and any passkey `answer`, which it leaves unspent, beside the passphrase's proving: listed in a bank's gate listing, as a device's ensureBank lists it. */
 export async function builtGateOf(answer?: GX.PasskeyAnswer): Promise<{ gate: Gate, proving: PassphraseProving }> {
-  const world = provingWorldOf()
-  const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, GX.passphraseCleartext.parse(TestPassphrase), world)
-  const passkeyProving = answer && await PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, answer, world)
+  const provingDevice = provingDeviceOf()
+  const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, GX.passphraseCleartext.parse(TestPassphrase), provingDevice)
+  const passkeyProving = answer && await PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, answer, provingDevice)
   const passphraseWayin = await proving.buildWayin(NOVEL)
   const passkeyWayin = await passkeyProving?.buildWayin(proving) ?? null
   return { gate: await listedGateOf(Gate.recordOfBirth(WorldBankStamp, WorldGateStamp, passphraseWayin, passkeyWayin)), proving }

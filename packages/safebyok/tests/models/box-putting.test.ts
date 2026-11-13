@@ -78,7 +78,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
     const box = builtOf(sparseBoxRecord())
     world.mw.seedPut(fullBoxRecord())
     const ensuringWorld = vi.spyOn(world.mw.world, 'ensureTimely')
-    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }, { maxWorldMillis: 5 })
+    await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }, { maxParentMillis: 5 })
     expect(world.mw.callsOf('get')).to.deep.equal([])
     expect(world.mw.callsOf('put')).to.have.lengthOf(1)
     expect(ensuringWorld).toHaveBeenCalledWith(5)
@@ -119,7 +119,7 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
 // --
 
 /** Options that leave the box as built: a fetch of storage's box first would show the box built is not the first. */
-const asBuilt = { maxMillisSinceRefresh: Infinity, maxWorldMillis: Infinity } as const
+const asBuilt = { maxMillisSinceRefresh: Infinity, maxParentMillis: Infinity } as const
 
 describe("box.put: the versioned replace, with or without ifPresent 'repl'", () => {
   for (const opts of [{}, { ifPresent: 'repl' }] as const) {
@@ -173,9 +173,9 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-a1', revision_seq: 1 })
   })
 
-  it("passes maxWorldMillis to the world when given beside ifPresent", async () => {
+  it("passes maxParentMillis to the parent when given beside ifPresent", async () => {
     const box = builtOf(fullBoxRecord())
-    await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'repl', maxMillisSinceRefresh: Infinity, maxWorldMillis: 5 })).resolves.to.eq(box)
+    await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'repl', maxMillisSinceRefresh: Infinity, maxParentMillis: 5 })).resolves.to.eq(box)
     expect(world.mw.callsOf('ensureTimely')[0]?.maxMillis).to.eq(5)
   })
 

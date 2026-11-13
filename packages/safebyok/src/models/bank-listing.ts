@@ -82,14 +82,14 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   }
   // --
 
-  // == [Defined by the bank listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the bank listing]: isEnabled, receiveParent, demandOfLife, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its device does. */
   get isEnabled(): boolean { return this.device.isEnabled }
 
   protected receiveParent(): void { /* no row sits above a bank */ }
 
-  protected demandOfWorld(): void { /* a device takes a bank of any life */ }
+  protected demandOfLife(): void { /* a device takes a bank of any life */ }
 
   protected scopepathOf(scope: BankScope): string {
     return ['bank', scope.user_id, scope.banklabel].join('^')

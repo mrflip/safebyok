@@ -27,10 +27,10 @@ function seededListing() {
 }
 // --
 
-describe("listing.ensureTimelyWorld(maxMillis)", () => {
+describe("listing.ensureParentTimely(maxMillis)", () => {
   it("refuses a span out of range, asking the world nothing", async () => {
     const listing = boxListingOf(world.mw)
-    await TH.expectRefusal(listing.ensureTimelyWorld(-1))
+    await TH.expectRefusal(listing.ensureParentTimely(-1))
     expect(world.mw.callsOf('ensureTimely')).to.deep.equal([])
   })
 })

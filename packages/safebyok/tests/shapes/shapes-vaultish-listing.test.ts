@@ -29,7 +29,7 @@ describe("The checks of options", () => {
 
     it("turns Infinity into ForeverMillis", () => {
       expect(VX.horizonMillis.parse(Infinity)).to.eq(ForeverMillis)
-      expect(VX.timelyOpts.parse({ maxWorldMillis: Infinity })).to.deep.equal({ maxWorldMillis: ForeverMillis })
+      expect(VX.timelyOpts.parse({ maxParentMillis: Infinity })).to.deep.equal({ maxParentMillis: ForeverMillis })
     })
   })
 
@@ -46,21 +46,21 @@ describe("The checks of options", () => {
   describe("VX.timelyOpts and VX.boxPutOpts", () => {
     expectCases(VX.timelyOpts, [
       [{},                                          true,  'passes no options'],
-      [{ maxMillisSinceRefresh: 0, maxWorldMillis: Infinity }, true, 'passes both horizons'],
+      [{ maxMillisSinceRefresh: 0, maxParentMillis: Infinity }, true, 'passes both horizons'],
       [{ maxMillisSinceRefresh: undefined },        true,  'passes a horizon left undefined'],
       [{ maxMillisSinceRefresh: -1 },               false, 'refuses a negative record horizon'],
-      [{ maxWorldMillis: '5' },                     false, 'refuses a world horizon that is text'],
-      [{ maxWorldMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
+      [{ maxParentMillis: '5' },                     false, 'refuses a world horizon that is text'],
+      [{ maxParentMillis: NaN },                     false, 'refuses a world horizon that is NaN'],
     ])
     expectCases(VX.boxPutOpts, [
-      [{ maxWorldMillis: 5 },                       true,  'passes the horizons'],
+      [{ maxParentMillis: 5 },                       true,  'passes the horizons'],
       [{},                                          true,  'passes no options'],
-      [{ maxWorldMillis: -1 },                      false, 'refuses a negative horizon'],
+      [{ maxParentMillis: -1 },                      false, 'refuses a negative horizon'],
     ])
 
     it("take their fields from the bag given and strip the rest", () => {
-      expect(VX.timelyOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5 })
-      expect(VX.boxPutOpts.parse({ maxWorldMillis: 5, reseal: true })).to.deep.equal({ maxWorldMillis: 5, ifAbsent: 'add', ifPresent: 'repl' })
+      expect(VX.timelyOpts.parse({ maxParentMillis: 5, reseal: true })).to.deep.equal({ maxParentMillis: 5 })
+      expect(VX.boxPutOpts.parse({ maxParentMillis: 5, reseal: true })).to.deep.equal({ maxParentMillis: 5, ifAbsent: 'add', ifPresent: 'repl' })
     })
 
     it("name the failing field", () => {
@@ -88,7 +88,7 @@ describe("SX.ifAbsent and VX.fetchOpts", () => {
   ])
 
   it("keeps ifAbsent and the timely options and strips the rest", () => {
-    expect(VX.fetchOpts.parse({ ifAbsent: 'nil', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxWorldMillis: 5 })
+    expect(VX.fetchOpts.parse({ ifAbsent: 'nil', maxParentMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'nil', maxParentMillis: 5 })
   })
 
   it("fills a fetch's default: ifAbsent 'fail'", () => {
@@ -102,7 +102,7 @@ describe("VX.boxCreateOpts", () => {
   })
 
   it("takes a caller's ifPresent and the timely options, stripping the rest", () => {
-    expect(VX.boxCreateOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxWorldMillis: 5 })
+    expect(VX.boxCreateOpts.parse({ ifPresent: 'repl', maxParentMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxParentMillis: 5 })
   })
 
   it("refuses an ifAbsent other than 'add'", () => {
@@ -123,13 +123,13 @@ describe("SX.ifPresent and VX.boxPutOpts", () => {
   expectCases(VX.boxPutOpts, [
     [{ ifPresent: 'repl' },                             true,  'passes ifPresent repl'],
     [{ ifPresent: undefined },                          true,  'passes ifPresent undefined'],
-    [{ ifPresent: 'repl', maxWorldMillis: 5 },          true,  'passes ifPresent beside the timely options'],
+    [{ ifPresent: 'repl', maxParentMillis: 5 },          true,  'passes ifPresent beside the timely options'],
     [{ ifPresent: 'replace' },                          false, 'refuses an ifPresent it does not offer'],
     [{ maxMillisSinceRefresh: -1, ifPresent: 'repl' },  false, 'refuses a negative horizon'],
   ])
 
   it("keeps ifPresent, ifAbsent and the timely options and strips the rest", () => {
-    expect(VX.boxPutOpts.parse({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxWorldMillis: 5, ifAbsent: 'add' })
+    expect(VX.boxPutOpts.parse({ ifPresent: 'repl', maxParentMillis: 5, ifAbsent: 'add', reseal: true })).to.deep.equal({ ifPresent: 'repl', maxParentMillis: 5, ifAbsent: 'add' })
   })
 
   it("fills a put's defaults: ifAbsent 'add', ifPresent 'repl'", () => {

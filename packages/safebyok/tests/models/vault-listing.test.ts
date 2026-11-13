@@ -141,7 +141,7 @@ describe("a box answer carrying a vault row of a later life as its parent", () =
 })
 
 describe("a box method over a vault deleted elsewhere", () => {
-  const WorldNow = { maxWorldMillis: 0 }
+  const WorldNow = { maxParentMillis: 0 }
   const Verbs = [
     ['box.extractWhisper', ({ box }) => box.extractWhisper(WorldNow)],
     ['box.put',           ({ box }) => box.put({ whisper: { apiKey: 'sk-new' }, sidecar: {} }, WorldNow)],

@@ -79,8 +79,8 @@ export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxC
   const timelyOpts    = obj({
     /** How long ago, at most, the record in hand was refreshed from the bankDB; Infinity for no limit. */
     maxMillisSinceRefresh: maxMillis,
-    /** How long ago, at most, the world the verb runs in was refreshed; Infinity for no limit. */
-    maxWorldMillis:        maxMillis,
+    /** How long ago, at most, the parent of the record was refreshed from the bankDB; Infinity for no limit. */
+    maxParentMillis:        maxMillis,
   })
   const fetchOpts     = timelyOpts.extend({
     /** Where nothing live is stored:
@@ -144,7 +144,7 @@ export type ProbeReport = Readonly<{
   unseal: Readonly<{ ok: true, timestamp: number }>
 }>
 
-/** How fresh the record in hand and the world must be before a verb goes on. */
+/** How fresh the record in hand and its parent must be before a verb goes on. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
 
 /** The options of a get (`listing.get`, `vault.getBox`), as a caller hands them in, defaults unapplied. */

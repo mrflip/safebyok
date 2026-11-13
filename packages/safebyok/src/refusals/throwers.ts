@@ -90,10 +90,10 @@ export function delOfOtherLife(): VaultError { return new VaultError('vault_rebo
 export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError { return new VaultError('damaged_row', Phrases.vaultStoredDamaged(vaultlabel)) }
 // --
 
-// == [Listing Throwers]: rowOfOtherWorld, writtenByOwnVerbs
+// == [Listing Throwers]: rowOfOtherLife, writtenByOwnVerbs
 
 /** A `storage_issue` refusal: storage answered a row whose `tokname` is not that of the thing above it, such as a box of another vault life. */
-export function rowOfOtherWorld(received: unknown, tokname: 'bank_tok' | 'vault_tok'): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress([tokname]), { rows: { dbhas: received } }) }
+export function rowOfOtherLife(received: unknown, tokname: 'bank_tok' | 'vault_tok'): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress([tokname]), { rows: { dbhas: received } }) }
 
 /** A `bad_option` refusal: a bank's row or its gate's is written only by the bank's own verbs, never put or deleted through its listing. */
 export function writtenByOwnVerbs(): VaultError { return new VaultError('bad_option', Phrases.WrittenByOwnVerbs) }

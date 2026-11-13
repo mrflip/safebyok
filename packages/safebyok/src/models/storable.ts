@@ -143,9 +143,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * Chute: thing.get → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async get(opts: FetchOpts = {}): Promise<this> {
-    const { ifAbsent, maxMillisSinceRefresh, maxWorldMillis } = VX.fetchOpts.parse(opts)
+    const { ifAbsent, maxMillisSinceRefresh, maxParentMillis } = VX.fetchOpts.parse(opts)
     this.demandEnabled()
-    await this.listing.get(this.scope, { ifAbsent: 'nil', maxMillisSinceRefresh, maxWorldMillis })
+    await this.listing.get(this.scope, { ifAbsent: 'nil', maxMillisSinceRefresh, maxParentMillis })
     this.demandEnabled()
     if (ifAbsent === 'fail') { this.demandPresent() }
     return this
@@ -160,9 +160,9 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
    * Chute: thing.hydrate → thing.get → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async hydrate(opts: TimelyOpts = {}): Promise<this> {
-    const { maxMillisSinceRefresh = this.listing.maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
-    if (! this.isHydratedWithin(maxMillisSinceRefresh)) { return this.get({ ifAbsent: 'nil', maxMillisSinceRefresh: 0, maxWorldMillis }) }
-    await this.listing.ensureTimelyWorld(maxWorldMillis)
+    const { maxMillisSinceRefresh = this.listing.maxMillisSinceRefresh, maxParentMillis } = VX.timelyOpts.parse(opts)
+    if (! this.isHydratedWithin(maxMillisSinceRefresh)) { return this.get({ ifAbsent: 'nil', maxMillisSinceRefresh: 0, maxParentMillis }) }
+    await this.listing.ensureParentTimely(maxParentMillis)
     return this
   }
 
@@ -175,8 +175,8 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   async del(asked: ScopeT | SparseT, opts: TimelyOpts = {}): Promise<this> {
     const scope = this.listing.scopeOf(asked)
     const pins = { ...SX.revisionPins.parse(asked), ...scope }
-    const { maxMillisSinceRefresh, maxWorldMillis } = VX.timelyOpts.parse(opts)
-    await this.ensureDeletable({ maxMillisSinceRefresh, maxWorldMillis }); this.demandDeletable()
+    const { maxMillisSinceRefresh, maxParentMillis } = VX.timelyOpts.parse(opts)
+    await this.ensureDeletable({ maxMillisSinceRefresh, maxParentMillis }); this.demandDeletable()
     checkedConsistent(this.sparse, pins, { kind: 'stale_write', message: Phrases.DelOfOtherRevision })
     await this.listing.del(this.sparse)
     return this

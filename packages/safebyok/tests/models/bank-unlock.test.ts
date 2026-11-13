@@ -9,7 +9,7 @@ import type { Bank } from '../../src/models/bank'
 import type { Vault } from '../../src/models/vault'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
-import { provingWorldOf } from '../test-helpers/proving-world'
+import { provingDeviceOf } from '../test-helpers/proving-world'
 import { Dna, LeaseMillis, Passphrase, byPassphrase, makeBornVault, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping } from '../test-helpers/vault-world'
 
 useVaultWorlds()
@@ -28,11 +28,11 @@ describe("proving.buildWayin", () => {
   it("refuses a second wayin of a proving that has one, and a source proving of another gate", async () => {
     const { bank } = await makeBornVault()
     const { maingate } = bank
-    const world = provingWorldOf()
-    const mine = await PassphraseProving.buildStored(maingate, passphraseCleartext.parse(Passphrase), world)
+    const provingDevice = provingDeviceOf()
+    const mine = await PassphraseProving.buildStored(maingate, passphraseCleartext.parse(Passphrase), provingDevice)
     await TH.expectRefusal(mine.buildWayin(NOVEL))
-    const novel = await PassphraseProving.buildNovel(bank.stamp, maingate.stamp, passphraseCleartext.parse('a new passphrase'), world)
-    const other = await PassphraseProving.buildNovel(bank.stamp, { ...maingate.stamp, gate_tok: 'gate-tok-other' }, passphraseCleartext.parse(Passphrase), world)
+    const novel = await PassphraseProving.buildNovel(bank.stamp, maingate.stamp, passphraseCleartext.parse('a new passphrase'), provingDevice)
+    const other = await PassphraseProving.buildNovel(bank.stamp, { ...maingate.stamp, gate_tok: 'gate-tok-other' }, passphraseCleartext.parse(Passphrase), provingDevice)
     await other.buildWayin(NOVEL)
     await TH.expectRefusal(novel.buildWayin(other))
     const wayin = await novel.buildWayin(mine)

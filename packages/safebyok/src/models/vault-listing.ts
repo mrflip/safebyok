@@ -12,7 +12,7 @@ import type { BankRow, BoxRow, GateRecord, VaultRecord, VaultRow, VaultSparse } 
 import * as VX from '../shapes/shapes-vaultish'
 import type { DelTombstone, Fetched, ListingDelOpts, ListingListAnswer, ListingOpts, ListingPutOpts, ThingAnswer, VaultSnapshot } from '../shapes/shapes-vaultish'
 import { type EnsureBankAnswer, type Notice, refusedAnswerOf } from '../storage/bank-db'
-import { vaultAbsent, delOfOtherLife, rowOfOtherWorld, vaultStoredDamaged } from '../refusals/throwers'
+import { vaultAbsent, delOfOtherLife, rowOfOtherLife, vaultStoredDamaged } from '../refusals/throwers'
 import type { Bank } from './bank'
 import { BoxListing } from './box-listing'
 import { Listing } from './listing'
@@ -99,15 +99,15 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
   }
   // --
 
-  // == [Defined by the vault listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the vault listing]: isEnabled, receiveParent, demandOfLife, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
 
   protected receiveParent(parent: unknown): void { this.bank.receiveParent(parent) }
 
-  protected demandOfWorld(record: Fetched<VaultRecord, VaultSparse>): void {
-    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherWorld(record, 'bank_tok') }
+  protected demandOfLife(record: Fetched<VaultRecord, VaultSparse>): void {
+    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherLife(record, 'bank_tok') }
   }
 
   protected scopepathOf(scope: VaultScope): string {

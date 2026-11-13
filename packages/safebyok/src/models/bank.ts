@@ -325,7 +325,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     const { maxMillisSinceRefresh, maxMillisAtGetBack } = VX.probeOpts.parse(opts)
     await this.ensureUnlocked()
     const vault = await this.ensureVault({ vaultlabel })
-    const horizons = { maxMillisSinceRefresh, maxWorldMillis: maxMillisSinceRefresh }
+    const horizons = { maxMillisSinceRefresh, maxParentMillis: maxMillisSinceRefresh }
     await vault.hydrate(horizons)
     // A device that has not listed the box would otherwise put over it as if none stood there.
     const found = await vault.getBox(boxlabel, { ...horizons, ifAbsent: 'nil' })

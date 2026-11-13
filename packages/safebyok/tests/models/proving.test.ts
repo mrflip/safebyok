@@ -5,12 +5,12 @@ import { cipherCtx, deriveWrappingKey, fromB64, randomBytes, toB64, unwrapKeyUnd
 import type { KeyDeriver } from '../../src/deriver/basederiver'
 import { Gate } from '../../src/models/gate'
 import { bankScope } from '../../src/shapes/shapes-core'
-import { type ProvingWorld, type PasskeyAnswer, type StampedGate, passphraseCleartext } from '../../src/shapes/shapes-gateish'
+import { type ProvingDevice, type PasskeyAnswer, type StampedGate, passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import { VaultError } from '../../src/refusals/errors'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_bankKeyBytesOf, builtGateOf, listedGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingWorldOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
+import { _cheat_bankKeyBytesOf, builtGateOf, listedGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingDeviceOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -25,11 +25,11 @@ function deriverHanding(handBack: () => unknown): KeyDeriver {
   }
 }
 
-function novelPassphrase(world: ProvingWorld = provingWorldOf()): Promise<PassphraseProving> {
-  return PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, world)
+function novelPassphrase(device: ProvingDevice = provingDeviceOf()): Promise<PassphraseProving> {
+  return PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, device)
 }
 
-function novelOverHanded(handBack: () => unknown): Promise<PassphraseProving> { return novelPassphrase(provingWorldOf({ keyDeriver: deriverHanding(handBack) })) }
+function novelOverHanded(handBack: () => unknown): Promise<PassphraseProving> { return novelPassphrase(provingDeviceOf({ keyDeriver: deriverHanding(handBack) })) }
 
 /** A passphrase proving that has a wayin under a new bankKey, beside that wayin. */
 async function novelWithWayin(): Promise<{ proving: PassphraseProving, wayin: Wayin }> {
@@ -37,8 +37,8 @@ async function novelWithWayin(): Promise<{ proving: PassphraseProving, wayin: Wa
   return { proving, wayin: await proving.buildWayin(NOVEL) }
 }
 
-function novelPasskey(answer = passkeyAnswerOf(), world: ProvingWorld = provingWorldOf()): Promise<PasskeyProving> {
-  return PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, answer, world)
+function novelPasskey(answer = passkeyAnswerOf(), device: ProvingDevice = provingDeviceOf()): Promise<PasskeyProving> {
+  return PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, answer, device)
 }
 
 /** A gate with both wayins, beside a fresh copy of the answer that opens its passkey's: the gate's build spent the one it was handed. */
@@ -76,58 +76,58 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
 /** A checker whose answer throws the passphrase it heard, when its verdict is read. */
 const answersThrowingGetter = (passphrase: string) => ({ get strong(): true { throw new Error(passphrase) } })
 
-describe("Proving.judgeStrength(passphraseClear, scope, world)", () => {
+describe("Proving.judgeStrength(passphraseClear, scope, device)", () => {
   it("returns the strengthChecker's verdict for the passphrase and scope", async () => {
     const strengthChecker = vi.fn(() => ({ strong: false as const, reason: 'too short' }))
-    const verdict = await Proving.judgeStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker }))
+    const verdict = await Proving.judgeStrength(TestPassphrase, WorldScope, provingDeviceOf({ strengthChecker }))
     expect(verdict).to.deep.equal({ strong: false, reason: 'too short' })
     expect(strengthChecker).toHaveBeenCalledWith(TestPassphrase, WorldScope)
   })
 
   it("awaits a checker that returns a promise", async () => {
-    expect(await Proving.judgeStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker: findsStrongAsync }))).to.deep.equal({ strong: true })
+    expect(await Proving.judgeStrength(TestPassphrase, WorldScope, provingDeviceOf({ strengthChecker: findsStrongAsync }))).to.deep.equal({ strong: true })
   })
 
   it("keeps a passphrase out of the refusal when a getter on the verdict throws it", async () => {
-    const err = await TH.expectRefusal(Proving.judgeStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker: answersThrowingGetter })))
+    const err = await TH.expectRefusal(Proving.judgeStrength(TestPassphrase, WorldScope, provingDeviceOf({ strengthChecker: answersThrowingGetter })))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
 
   it("replaces what a throwing checker threw with a sanitized refusal, quoting none of it and keeping no cause", async () => {
     const strengthChecker = () => { throw new Error(`weak: ${TestPassphrase}`) }
-    const err = await TH.expectRefusal(Proving.judgeStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker })))
+    const err = await TH.expectRefusal(Proving.judgeStrength(TestPassphrase, WorldScope, provingDeviceOf({ strengthChecker })))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
 
   it("refuses a checker result that is not a verdict", async () => {
     const strengthChecker = (() => 'looks fine') as never
-    await TH.expectRefusal(Proving.judgeStrength(TestPassphrase, WorldScope, provingWorldOf({ strengthChecker })))
+    await TH.expectRefusal(Proving.judgeStrength(TestPassphrase, WorldScope, provingDeviceOf({ strengthChecker })))
   })
 
   it("finds a blank passphrase weak without calling the checker", async () => {
     const strengthChecker = vi.fn(() => ({ strong: true as const }))
-    const verdict = await Proving.judgeStrength(passphraseCleartext.parse(' '.repeat(3)), WorldScope, provingWorldOf({ strengthChecker }))
+    const verdict = await Proving.judgeStrength(passphraseCleartext.parse(' '.repeat(3)), WorldScope, provingDeviceOf({ strengthChecker }))
     expect(verdict).to.have.property('strong', false)
     expect(strengthChecker).not.toHaveBeenCalled()
   })
 
   it("refuses a passphrase that is not a string, without calling the checker", async () => {
     const strengthChecker = vi.fn(() => ({ strong: true as const }))
-    await TH.expectRefusal(Proving.judgeStrength(42 as never, WorldScope, provingWorldOf({ strengthChecker })))
+    await TH.expectRefusal(Proving.judgeStrength(42 as never, WorldScope, provingDeviceOf({ strengthChecker })))
     expect(strengthChecker).not.toHaveBeenCalled()
   })
 })
 
-describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, world)", () => {
+describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", () => {
   const ArgsCases = [
-    [() => ({ world: TH.omitting(provingWorldOf(), 'keyDeriver') }),      'a world with no keyDeriver'],
-    [() => ({ world: TH.omitting(provingWorldOf(), 'device_tok') }),      'a world with no device_tok'],
-    [() => ({ world: TH.omitting(provingWorldOf(), 'strengthChecker') }), 'a world with no strengthChecker'],
-    [() => ({ world: provingWorldOf({ device_tok: '' }) }),               'a world with an empty device_tok'],
-    [() => ({ world: { ...provingWorldOf(), keyDeriver: TH.testDeriver } }), "a world with the host's bare keyDeriver"],
-    [() => ({ world: { ...provingWorldOf(), strengthChecker: TH.anyStrengthChecker } }), "a world with the host's bare strengthChecker"],
+    [() => ({ device: TH.omitting(provingDeviceOf(), 'keyDeriver') }),      'a device with no keyDeriver'],
+    [() => ({ device: TH.omitting(provingDeviceOf(), 'device_tok') }),      'a device with no device_tok'],
+    [() => ({ device: TH.omitting(provingDeviceOf(), 'strengthChecker') }), 'a device with no strengthChecker'],
+    [() => ({ device: provingDeviceOf({ device_tok: '' }) }),               'a device with an empty device_tok'],
+    [() => ({ device: { ...provingDeviceOf(), keyDeriver: TH.testDeriver } }), "a device with the host's bare keyDeriver"],
+    [() => ({ device: { ...provingDeviceOf(), strengthChecker: TH.anyStrengthChecker } }), "a device with the host's bare strengthChecker"],
     [() => ({ bank: { ...WorldBankStamp, bank_tok: undefined } }),        'a bank stamp with no bank_tok'],
     [() => ({ bank: { ...WorldBankStamp, registered_at: 'yesterday' } }), 'a bank stamp whose registered_at is not epoch millis'],
     [() => ({ bank: null }),                                              'no bank stamp at all'],
@@ -139,14 +139,14 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, world)", () 
 
   for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb}`, async () => {
-      const { bank = WorldBankStamp, gate = WorldGateStamp, passphraseClear = TestPassphrase, world = provingWorldOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildNovel(bank as never, gate as never, passphraseClear as never, world as ProvingWorld))
+      const { bank = WorldBankStamp, gate = WorldGateStamp, passphraseClear = TestPassphrase, device = provingDeviceOf() } = argsOf() as Record<string, unknown>
+      await TH.expectRefusal(PassphraseProving.buildNovel(bank as never, gate as never, passphraseClear as never, device as ProvingDevice))
     })
   }
 
   it("refuses 'weak_passphrase' before deriving a key", async () => {
     const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
-    const err = await TH.expectRefusal(novelPassphrase(provingWorldOf({ strengthChecker: findsWeak, keyDeriver: { ...TH.testDeriver, deriveKeyBytes } })), 'weak_passphrase')
+    const err = await TH.expectRefusal(novelPassphrase(provingDeviceOf({ strengthChecker: findsWeak, keyDeriver: { ...TH.testDeriver, deriveKeyBytes } })), 'weak_passphrase')
     expect(err.message).to.include('too short')
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
@@ -159,7 +159,7 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, world)", () 
 
   it("hands the keyDeriver the passphrase and a fresh salt of its salt_size, the salt the header carries", async () => {
     const deriveKeyBytes: Mock<KeyDeriver['deriveKeyBytes']> = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
-    const proving = await novelPassphrase(provingWorldOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }))
+    const proving = await novelPassphrase(provingDeviceOf({ keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }))
     expect(deriveKeyBytes).toHaveBeenCalledTimes(1)
     const [passphrase, saltBytes] = deriveKeyBytes.mock.calls[0]!
     expect(passphrase).to.eq(TestPassphrase)
@@ -175,7 +175,7 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, world)", () 
 
   it("replaces what a throwing keyDeriver threw with a sanitized refusal, quoting none of it and keeping no cause", async () => {
     const keyDeriver = deriverHanding(() => { throw new Error(`cannot derive ${TestPassphrase}`) })
-    const err = await TH.expectRefusal(novelPassphrase(provingWorldOf({ keyDeriver })))
+    const err = await TH.expectRefusal(novelPassphrase(provingDeviceOf({ keyDeriver })))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TestPassphrase)
   })
@@ -213,7 +213,7 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, world)", () 
   })
 })
 
-describe("PasskeyProving.buildNovel(bank, gate, passkeyClear, world)", () => {
+describe("PasskeyProving.buildNovel(bank, gate, passkeyClear, device)", () => {
   it("has the stamps given, and does not zero the answer", async () => {
     const answer = passkeyAnswerOf()
     const proving = await novelPasskey(answer)
@@ -234,18 +234,18 @@ describe("PasskeyProving.buildNovel(bank, gate, passkeyClear, world)", () => {
     })
   }
 
-  it("refuses a malformed world, and does not zero the answer", async () => {
+  it("refuses a malformed device, and does not zero the answer", async () => {
     const answer = passkeyAnswerOf()
-    const world = TH.omitting(provingWorldOf(), 'device_tok')
-    await TH.expectRefusal(novelPasskey(answer, world))
+    const device = TH.omitting(provingDeviceOf(), 'device_tok')
+    await TH.expectRefusal(novelPasskey(answer, device))
     expect(isZeroed(answer.prfBytes)).to.be.false
   })
 })
 
-describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
+describe("PassphraseProving.buildStored(gate, passphraseClear, device)", () => {
   it("proves the gate's passphrase wayin, with the gate's stamps and bankKey", async () => {
     const { gate, answerOf } = await gateWithBoth()
-    const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
+    const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingDeviceOf())
     expect(proving.bankStamp).to.deep.equal(WorldBankStamp)
     expect(proving.gateStamp).to.deep.equal(WorldGateStamp)
     expect(proving.header).to.deep.equal(gate.main.toJSON())
@@ -254,22 +254,22 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
 
   it("accepts a gate record as well as a Gate", async () => {
     const { gate } = await gateWithBoth()
-    const proving = await PassphraseProving.buildStored({ bankStamp: WorldBankStamp, stamp: WorldGateStamp, ...gate.pickle() }, TestPassphrase, provingWorldOf())
+    const proving = await PassphraseProving.buildStored({ bankStamp: WorldBankStamp, stamp: WorldGateStamp, ...gate.pickle() }, TestPassphrase, provingDeviceOf())
     expect(proving).to.be.instanceOf(PassphraseProving)
   })
 
   it("refuses a passphrase that does not open it as 'wrong_passphrase', quoting none of it", async () => {
     const { gate } = await gateWithBoth()
     const misremembered = passphraseCleartext.parse(`${TestPassphrase}, misremembered`)
-    const err = await TH.expectRefusal(PassphraseProving.buildStored(gate, misremembered, provingWorldOf()), 'wrong_passphrase')
+    const err = await TH.expectRefusal(PassphraseProving.buildStored(gate, misremembered, provingDeviceOf()), 'wrong_passphrase')
     expect(TH.thrownText(err)).to.not.include(misremembered)
   })
 
-  it("refuses a wayin made under another key deriver as 'newer_format', before the world's is asked", async () => {
+  it("refuses a wayin made under another key deriver as 'newer_format', before the device's is asked", async () => {
     const { gate } = await gateWithBoth()
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
     const keyDeriver: KeyDeriver = { key_deriver_label: 'test_other_v0', salt_size: 16, deriveKeyBytes }
-    await TH.expectRefusal(PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf({ keyDeriver })), 'newer_format')
+    await TH.expectRefusal(PassphraseProving.buildStored(gate, TestPassphrase, provingDeviceOf({ keyDeriver })), 'newer_format')
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 
@@ -281,7 +281,7 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
     const deriveKeyBytes = vi.fn(() => Promise.resolve(randomBytes(32)))
     const keyDeriver: KeyDeriver = { key_deriver_label: main.key_deriver_label, salt_size: 16, deriveKeyBytes }
     const damaged = { bankStamp: WorldBankStamp, stamp: WorldGateStamp, wayins: { ...gate.wayins, main: { ...main, salt_b64: salt as never } } }
-    const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingWorldOf({ keyDeriver })), 'bad_option')
+    const err = await TH.expectRefusal(PassphraseProving.buildStored(damaged, TestPassphrase, provingDeviceOf({ keyDeriver })), 'bad_option')
     expect(TH.thrownText(err)).to.not.include(salt)
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
@@ -289,21 +289,21 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, world)", () => {
   it("does not ask the strengthChecker", async () => {
     const { gate } = await gateWithBoth()
     const strengthChecker = vi.fn(() => ({ strong: false as const, reason: 'too short' }))
-    await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf({ strengthChecker }))
+    await PassphraseProving.buildStored(gate, TestPassphrase, provingDeviceOf({ strengthChecker }))
     expect(strengthChecker).not.toHaveBeenCalled()
   })
 
   const ArgsCases = [
     [() => ({ gate: null }),                  'no gate'],
     [() => ({ passphraseClear: 42 }),         'a passphrase that is not a string'],
-    [() => ({ world: {} }),                   'a malformed world'],
+    [() => ({ device: {} }),                   'a malformed device'],
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb}`, async () => {
       const { gate } = await gateWithBoth()
-      const { gate: handed = gate, passphraseClear = TestPassphrase, world = provingWorldOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildStored(handed as never, passphraseClear as never, world as never))
+      const { gate: handed = gate, passphraseClear = TestPassphrase, device = provingDeviceOf() } = argsOf() as Record<string, unknown>
+      await TH.expectRefusal(PassphraseProving.buildStored(handed as never, passphraseClear as never, device as never))
     })
   }
 })
@@ -357,7 +357,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
 
   it("takes any label a host chooses that fits the interface", async () => {
     const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf' })
-    const proving = await novelPassphrase({ ...provingWorldOf(), keyDeriver: guarded })
+    const proving = await novelPassphrase({ ...provingDeviceOf(), keyDeriver: guarded })
     const wayin = await proving.buildWayin(NOVEL)
     expect(wayin.toJSON()).to.include({ key_deriver_label: 'my_own_kdf' })
   })
@@ -410,16 +410,16 @@ describe("guardKeyDeriver(hostDeriver)", () => {
 })
 
 describe("a proving's header", () => {
-  it("of a passphrase proving: the deriver's label, a fresh salt, the world's device_tok, and registered_at from the time now", async () => {
+  it("of a passphrase proving: the deriver's label, a fresh salt, the device's device_tok, and registered_at from the time now", async () => {
     vi.setSystemTime(T0 + 5)
-    const { header } = await novelPassphrase(provingWorldOf())
+    const { header } = await novelPassphrase(provingDeviceOf())
     expect(header).to.deep.include({ wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label: 'test_digest_v0', device_tok: DeviceTok, registered_at: T0 + 5 })
     expect(Object.keys(header)).to.have.members(['wayinkind', 'wayinlabel', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'])
     expect(fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_size)
     expect(Object.isFrozen(header)).to.be.true
   })
 
-  it("of a passkey proving: the answer's credential_id and salt, the world's device_tok, and registered_at", async () => {
+  it("of a passkey proving: the answer's credential_id and salt, the device's device_tok, and registered_at", async () => {
     const answer = passkeyAnswerOf()
     const { credential_id, prf_salt_b64 } = answer
     const { header } = await novelPasskey(answer)
@@ -463,7 +463,7 @@ describe("proving.buildWayin(source)", () => {
     const { gate } = await gateWithBoth()
     const answer = passkeyAnswerOf()
     const novel = await novelPasskey(answer)
-    const wayin = await novel.buildWayin(await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf()))
+    const wayin = await novel.buildWayin(await PassphraseProving.buildStored(gate, TestPassphrase, provingDeviceOf()))
     const viaStored = await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, gate.main, { passphrase: TestPassphrase })
     expect(await _cheat_bankKeyBytesOf(WorldBankStamp, WorldGateStamp, wayin, { prfBytes: answer.prfBytes })).to.deep.equal(viaStored)
   })
@@ -509,7 +509,7 @@ describe("proving.buildWayin(source)", () => {
   for (const [moves, blurb] of OtherSourceCases) {
     it(`refuses a source proving of ${blurb}`, async () => {
       const { bank = {}, gate = {} } = moves as { bank?: object, gate?: object }
-      const theirs = await PassphraseProving.buildNovel({ ...WorldBankStamp, ...bank }, { ...WorldGateStamp, ...gate }, TestPassphrase, provingWorldOf())
+      const theirs = await PassphraseProving.buildNovel({ ...WorldBankStamp, ...bank }, { ...WorldGateStamp, ...gate }, TestPassphrase, provingDeviceOf())
       await theirs.buildWayin(NOVEL)
       const mine = await novelPassphrase()
       const err = await TH.expectRefusal(mine.buildWayin(theirs))
@@ -526,7 +526,7 @@ describe("proving.buildWayin(source)", () => {
 
   it("refuses buildWayin on a stored proving", async () => {
     const { gate } = await gateWithBoth()
-    const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingWorldOf())
+    const proving = await PassphraseProving.buildStored(gate, TestPassphrase, provingDeviceOf())
     await TH.expectRefusal(proving.buildWayin(NOVEL))
   })
 })
@@ -550,7 +550,7 @@ describe("the ctx a wayin is wrapped under", () => {
     it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
       const { gate } = await builtGateOf()
       const moved = movedGate(gate, altered)
-      await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingWorldOf()), 'wrong_passphrase')
+      await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingDeviceOf()), 'wrong_passphrase')
     })
 
     it(`keeps a passkey wayin shut under ${blurb}`, async () => {
@@ -564,7 +564,7 @@ describe("the ctx a wayin is wrapped under", () => {
     it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
       const { gate } = await builtGateOf()
       const moved = await listedGateOf({ ...gate.pickle(), wayins: { main: { ...gate.wayins.main, ...altered } } })
-      await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingWorldOf()), 'wrong_passphrase')
+      await TH.expectRefusal(PassphraseProving.buildStored(moved, TestPassphrase, provingDeviceOf()), 'wrong_passphrase')
     })
 
     it(`keeps a passkey wayin shut under ${blurb}`, async () => {

@@ -7,7 +7,7 @@ import { type Modelkind, UNANSWERED } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
 import { valOf } from '../refusals/outcome'
-import { mainGateMissing, rowOfOtherWorld, writtenByOwnVerbs } from '../refusals/throwers'
+import { mainGateMissing, rowOfOtherLife, writtenByOwnVerbs } from '../refusals/throwers'
 import { type GateScope, gateScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRow, BoxRow, GateRecord, GateSparse, VaultRow, Wayins } from '../shapes/shapes-bankdb'
@@ -110,15 +110,15 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   }
   // --
 
-  // == [Defined by the gate listing]: isEnabled, receiveParent, demandOfWorld, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
+  // == [Defined by the gate listing]: isEnabled, receiveParent, demandOfLife, scopepathOf, labelOf, makeThing, nothingStoredError, doTryList, damagedStoredError, doTryGet, doTryPut, tombstoneOver, doTryDel, watchRows, isOwnRow
 
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
 
   protected receiveParent(parent: unknown): void { this.bank.receiveParent(parent) }
 
-  protected demandOfWorld(record: Fetched<GateRecord, GateSparse>): void {
-    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherWorld(record, 'bank_tok') }
+  protected demandOfLife(record: Fetched<GateRecord, GateSparse>): void {
+    if (record.bank_tok !== this.bank.bank_tok) { throw rowOfOtherLife(record, 'bank_tok') }
   }
 
   protected scopepathOf(scope: GateScope): string {

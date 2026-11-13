@@ -148,8 +148,8 @@ not as a settled ruling, and check it against the current design before relying 
   passkey keeps that access until the passkey is revoked, which is a separate gate change. Recorded as a decision in `notes/security.md`.
 * 2026-11-09 (the Coach, closing out the old design): **a vault uses its bank's storage.** `ensureVault` takes no `bankDB` or `deviceDB` of its own, as it did in
   the old design. A host wanting a vault in other storage makes a second `Bank` over it.
-* 2026-11-10 (the Coach, on the review of #618: "If you set maxWorldMillis to zero you get what you asked for"): **a get with `maxWorldMillis: 0`
-  may fetch the vault twice.** When a listing's `get` falls through to its `fetch`, each of the two makes sure its world is timely, so a horizon of
+* 2026-11-10 (the Coach, on the review of #618: "If you set maxWorldMillis to zero you get what you asked for"): **a get with `maxParentMillis: 0`
+  may fetch the vault twice.** When a listing's `get` falls through to its `fetch`, each of the two makes sure its parent is timely, so a horizon of
   zero fetches the vault row once for each, before the box's own get.
 * 2026-11-10 (the Coach, on the review of #618: "an eventual gc mechanism"): **a listing's joined fetches are never collected.** For each slot a listing
   has fetched, absent slots included, it keeps a small entry that joins its fetches, for the listing's life. Collecting them waits on a gc mechanism.
