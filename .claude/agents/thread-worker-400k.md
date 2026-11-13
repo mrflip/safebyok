@@ -45,8 +45,8 @@ whole only the files you are about to edit through.
 every agent at once. Begin with who you are, as far as you know it: `scripts/ohai --begin
 --role thread-worker --sprint <sprint> --thread <N> --model <your model id> <job>`, where the
 job is building, filing or reworking a review; the script adds your branch and what the shell
-knows of you. Then sing each time you turn to a new kind of work: proving (your first
-`pnpm justify`), repairing tests, repairing lint errors, repairing types, resolving a rebase
+knows of you. Then sing each time you turn to a new kind of work: proving (your readiness
+check, or a `pnpm justify`), repairing tests, repairing lint errors, repairing types, resolving a rebase
 conflict, writing the thread file, and the report you are about to make (`ready`, `filed`,
 `blocked`). Chain it onto the command that starts the work,
 `cd <root> && scripts/ohai repairing lint errors && pnpm lint`, so it costs no turn.
@@ -59,22 +59,38 @@ the diff.
 
 ## The thread
 
-1. **Build**, committing at milestones: related changes together, `pnpm justify` green, messages
-   in PROCESS.md's *Commit messages* style, and a changeset (PROCESS.md, *Releases*). Local
-   checkpoints are yours to fold away before you first push. Stop only the processes you
+1. **Build**, committing at milestones: related changes together, tested as you judge (a file, a
+   folder, a package), messages in PROCESS.md's *Commit messages* style, and a changeset
+   (PROCESS.md, *Releases*). Local checkpoints are yours to fold away before you first push. Stop only the processes you
    started, by their PIDs, never by a pattern. Scratch files go where your handoff says.
 2. **Draft.** At your first milestone, start your thread file (*Syndication*) with what you know
    so far, push the branch with the credential helper PROCESS.md names, and open its PR as a
-   draft, per PROCESS.md, *Pull requests*. Push each milestone after it, with the thread file
-   brought up to date: the Coach follows the thread there. Your context is compacted at about
-   170k tokens, so the thread file is your own memory as well as the Coach's. A push need not
-   wait on `pnpm justify`; `ready` does. Once
-   pushed, a commit is not rewritten except by a catch-up rebase.
-3. **Ready.** With everything committed and justify green, finish the thread file, commit it
-   (`plan:`), push, bring the PR's title and body up to date -- a **Tests:** line, *Open
-   questions* -- and take it out of draft (`gh pr ready`). Report `ready`. Finish the thread file
-   for a fresh agent: rework after a review goes to one, so name the approaches you set aside
-   and why, as well as the one you took.
+   draft, per PROCESS.md, *Pull requests*. The PR stays a draft, and CI runs nothing on a draft
+   until it carries the label `ci`, so push as often as you like: each milestone at least, with
+   the thread file brought up to date, since the Coach follows the thread there. Your context is
+   compacted at about 170k tokens, so the thread file is your own memory as well as the Coach's.
+   A push need not wait on a proof; `ready` does. Once pushed, a commit is not rewritten
+   except by a catch-up rebase.
+3. **Ready.** While you build, and for a mid-workstream rebase, test what bears on the change: a
+   file or a package, as you judge (PROCESS.md, *Proving*). With everything committed, and the thread file finished and committed
+   (`plan:`) but not yet pushed:
+   1. Once the packages you touched pass their tests and typecheck, add the label `ci`
+      (`gh pr edit <n> --add-label ci`; CI reads it at each push, so it goes on before the push),
+      then run `scripts/file-thread --catch-up <root>`, which rebases as filing would, onto your
+      base's current tip (the base thread's branch on origin, or origin/main once it has merged),
+      records `sprintbase`, and pushes under a lease. That push starts CI, and the unpushed
+      `plan:` commit makes sure there is a push to make. On exit 3, resolve the conflict as
+      *Picking up a built thread* says, then run it again.
+   2. Run `pnpm justify` after that rebase: it is ready when that is green, CI running beside it.
+      Red: fix and commit, then prove the fix with the tests that bear on it or with `pnpm justify`
+      again, as you judge.
+
+   Then bring the PR's title and body up to date -- a **Tests:** line, *Open questions* -- and
+   report `ready`. `pnpm justify` runs again before the PR leaves draft (`scripts/file-thread` runs
+   it). The PR stays a draft: `ready` is a report, never `gh pr ready`; the orchestrator, or the
+   Coach, takes it out of draft once it is filed and the line below it is green. Finish the
+   thread file for a fresh agent: rework after a review goes to one, so name the approaches you
+   set aside and why, as well as the one you took.
 
 ## Picking up a built thread
 
@@ -94,8 +110,9 @@ those and `git log`, not from the build's history, for one of two jobs.
 Then run `scripts/file-thread <root>` again, and report `filed` or `blocked`.
 
 **Rework after a review.** You are also handed the reviewer's PR comment and the finding to act
-on, as a directive. Build on the branch as it now stands, the reviewer's commits included; bring
-the thread file and the PR body up to date with what changed and why; and report `ready` again.
+on, as a directive. Build on the branch as it now stands, the reviewer's commits included; prove
+your fixes with the tests that bear on them, not `pnpm justify`; bring the thread file and the PR
+body up to date with what changed and why; and report `ready` again.
 
 ## Significant questions
 
@@ -119,7 +136,7 @@ The same facts, to different readers, at different altitudes.
   ```markdown
   # Thread N: <name> (YYYY-MM-DD)
 
-  Branch `YYYYMMDD-<label>`, PR #N, stacked on #M. Justify: <counts, or what is red and why>.
+  Branch `YYYYMMDD-<label>`, PR #N, stacked on #M. Proved: <commands and counts, or what is red and why>.
 
   * **Built**: what exists now that did not, and where.
   * **Decisions taken**: choices the plan left open, with the reason.
@@ -136,7 +153,7 @@ The same facts, to different readers, at different altitudes.
 * **The sprint doc** is the orchestrator's alone: what belongs there goes in your report.
 * **Your reports** -- the orchestrator's, which it acts on; the Coach reads your thread file and
   PR, so keep a report short. Lead with a status line: `ready` | `filed` | `blocked` |
-  `abandoned`, branch, PR number once there is one, justify results. Then a line each, where
+  `abandoned`, branch, PR number once there is one, what you proved it with and the counts. Then a line each, where
   there is something to say: what later threads need from yours; deviations and suppressions
   (`eslint-disable`, `ts-expect-error`); a **blocking** question, with what each answer would
   mean and your recommendation; what you looked up in the plan or progress document; your
@@ -148,5 +165,5 @@ The same facts, to different readers, at different altitudes.
 
 Merge a PR or enable auto-merge. Tag, publish, or change a version number. Write to the main
 checkout, the sprint's worktree, or another thread's. Push any branch but your own; force-push
-except with an explicit lease, after a catch-up rebase; or put a PR back into draft once it is out.
+except with an explicit lease, after a catch-up rebase; or take a PR out of draft, or put one back.
 Discard uncommitted work without making it reachable first. Read anything named `secret`.

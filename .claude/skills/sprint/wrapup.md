@@ -31,7 +31,7 @@ into the done note.
    one commit on top of the line, push it with a lease, and take the PR out of draft
    (`gh pr ready`). It is the line's top: merging it merges everything. It carries only the
    sprint's whiteboard directory and `human/` entry: anything else is a PR of its own.
-4. **Finish.** Bring *Progress* up to date a last time, `git worktree remove` your worktrees, and
-   give the Coach the closing summary in chat, leading with what shipped, what the reviews fixed
-   and left, and what needs their word, with the PRs in merge order and the top named. Never
-   merge anything.
+4. **Finish.** Check that *Progress* links every thread file and the plan's status lines are
+   final, `git worktree remove` your worktrees, and give the Coach the closing summary in chat,
+   leading with what shipped, what the reviews fixed and left, and what needs their word, with
+   the PRs in merge order and the top named. Never merge anything.

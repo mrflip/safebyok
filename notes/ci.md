@@ -6,18 +6,26 @@ or wants to know why a check failed. A thread needs none of it: what a PR must c
 
 ## On every pull request
 
-CI runs on every PR, over the root and every workspace package. Two jobs must pass:
+CI runs on every PR that is not a draft, or is a draft carrying the label `ci`, over the root and
+every workspace package. Any other draft is held: its jobs are skipped, so it can be pushed as
+often as its author likes without filling the queue. The label is read when a push, opening,
+reopening or marking ready runs CI, and adding it starts nothing: add `ci` before the push you
+expect green, and leave it on. A skipped job's check reads as passed, so a run that skips on a
+commit beside a real run would mask its result; that is why no label starts a run. Mergify's
+batch PRs are drafts too, and always run, since the queue waits on their checks. The ruleset
+requires every job:
 
 * `lint-typecheck` runs lint and typecheck, requires a changeset, checks that the Postgres image
   digest in `ci.yml` matches `e2e/compose.yaml`, and runs `actionlint` over the workflows through
   `scripts/actionlint.sh`. `pnpm justify` runs `actionlint` too, as `pnpm lint:workflows`.
 * `test-build` runs the tests with coverage, which first builds every package and runs its package
   checks.
+* `node-compat` runs the tests on Node 22, the platform floor, and on the newest Node. The ruleset
+  requires both; `ci.yml` lets the newest-Node run fail without failing the workflow
+  (`continue-on-error`).
+* `postgres` runs the bankDB battery over a real Postgres.
 
-`node-compat` runs the tests on Node 22, the platform floor, and on the newest Node. The Node 22 run
-must pass too; the newest-Node run only reports. The `postgres` job runs the VaultDB battery over a
-real Postgres, and the ruleset does not require it yet. CodeQL scans the code and the workflows, and
-shows a finding on the PR.
+CodeQL scans the code and the workflows, shows a finding on the PR, and its result is required too.
 
 CI and CodeQL both run again on each push to main, one push at a time. A run in progress finishes,
 and a run still waiting is replaced by a newer push, so a series of merges never uses more runners

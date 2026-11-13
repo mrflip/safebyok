@@ -28,6 +28,10 @@ Name the operation. `read` and `write` mean a generic storage read or mutation, 
 when any of them is meant; otherwise say which call: `ensureVault`, `vault.refresh`, `putBox`,
 `lock()`. In chat, plans, doc blocks and names alike: "a read in flight" hides which read, and whose.
 
+Size every subagent. Each Agent call names its `model`, and its `effort` where that should differ
+from the agent's own, by your best estimate of the task: `sonnet` for the mechanical, `opus` for
+judgment.
+
 ## Values
 
 **Empathy, safety and readability.** Empathy has three audiences: the end user typing a
@@ -72,7 +76,7 @@ govern how code is changed:
 ## Commands
 
 ```sh
-pnpm justify                       # lint, typecheck, test, build, every package: green before every commit
+pnpm justify                       # lint, typecheck, test, build, every package: the gate for ready, and before a PR leaves draft; about a minute (PROCESS.md, *Proving*)
 pnpm --filter safebyok <task>      # lint, typecheck, test, build in one package, its dependencies built first
 pnpm --filter safebyok add <dep>   # a package's dependency; `pnpm add -w` is for root tooling only
 pnpm changeset                     # a PR's release note; `--empty` when it needs none (PROCESS.md)

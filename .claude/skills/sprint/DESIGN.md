@@ -106,6 +106,28 @@ sprinting or not, which is why those are one sentence of when to use it.
 * **The reviewer re-checks only what `/code-review` did not verify.** Reviewers ran a median of
   32 turns, up to 97, most of them `grep` and `sed` re-checking findings that `/code-review`'s
   verify pass had already confirmed.
+* **The thread is proven once, at filing.** The reviewer ran a full `pnpm justify` and then
+  `scripts/file-thread` ran another before pushing, minutes apart on the same tree but for the
+  reviewer's fixes. The Coach agreed on 2026-11-12 that the reviewer proves only the suites its
+  fixes touch, and `file-thread`'s justify is the gate: a dependent package a fix breaks comes back
+  from it as exit 4, to a worker.
+* **A worker tests as it judges while building, and is ready on a green `pnpm justify`** (the
+  Coach, 2026-11-12: "the tests are a tool for you to write good code"). CLAUDE.md asked for
+  `pnpm justify` green before every commit, many runs a thread. Now a worker runs the tests that
+  bear on a change (a file or a package) as it builds, pushes to the draft and adds `ci` once the
+  packages it touched pass their tests and typecheck, and asks for review on one `pnpm justify`
+  green, while CI runs beside it; `file-thread`'s justify stays the gate. pnpm's
+  `...[<sprintbase>]` filter, tried for readiness, measured slower than justify (it selects the
+  root, whose `test` is every package, and runs the selected packages one at a time, each
+  rebuilding its dependencies), so it is not used. The threshold is stated once, in the worker's *Ready* step and a line of CLAUDE.md, so a
+  revision is a small edit.
+* **CI holds a draft until it carries `ci`, and reads the label only at a push.** Workers push
+  drafts often, and a run on each filled the queue. A `labeled` trigger started CI the moment a
+  worker labelled its PR, but it fired on every label (the Coach's `queue`, Dependabot's), and a
+  run whose jobs all skip reports them as passing on the PR's head, where it could mask a red or
+  running real run. So the worker labels before the push it expects green, and a draft labelled
+  after its last push runs at its next push or when taken out of draft. A dispatching workflow
+  could start CI on the label alone; it was not worth the machinery.
 * **Rulings live in turbochat's *Resolved* tab and the PR**, swept into the resolutions file at
   the end. They used to be written in five places as they came, with lines owed to filed threads'
   files until the restack.

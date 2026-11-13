@@ -123,8 +123,10 @@ settled -- to the session that keeps it, rather than writing it themselves.
    re-read to check what you wrote, and never re-send the whole table. To reset a chip,
    `replace` its paragraph `"as":"markdown"`, content `<?claude block st?>`, with the chip in the
    `blocks` map (`{"st":{"type":"dropdown","enum":"<State enum id>","index":0}}`): an
-   `"as":"blocks"` replace keeps the old chip beside the new. *Resolved* takes an insert at its
-   end, with no read.
+   `"as":"blocks"` replace keeps the old chip beside the new. A replace of a whole table row is
+   refused: to change a row as a whole, insert the new row after it and delete the old one, with
+   its guards, as two operations of one `batch` call. *Resolved* takes an insert at its end, with
+   no read.
 4. **Add new matters** as they surface, `drafting`, at the bottom of the matters table. Every open
    question an agent of the session reports (a worker's or reviewer's *Open matters*, a
    subagent's leftover) reaches the tab, put there by the session that keeps it. Leaving one out

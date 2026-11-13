@@ -41,13 +41,13 @@ sprint directory on in full, since workers read it from theirs.
   likely touches; its **levels**, where they differ from the defaults; **what it depends on**;
   your **look-ahead**; and its **size**. Set a thread's levels as the Coach suggests or directs,
   or as you judge: `sonnet` and a `low` review for a small, mechanical thread, a `high` review
-  for one that touches what `notes/guarantees.md` covers; a lower effort for a mechanical change,
-  a higher one where the work turns on judgment or on finding a cause; an `opus` style pass where
-  the thread is mostly naming or vocabulary. Revise a later thread's levels as the earlier ones
+  on `opus` (the reviewer's pin is `sonnet`) for one that touches what `notes/guarantees.md`
+  covers; a lower effort for a mechanical change, a higher one where the work turns on judgment
+  or on finding a cause; an `opus` style pass where the thread is mostly naming or vocabulary. Revise a later thread's levels as the earlier ones
   teach, and say so in its gloss. Read the whole request before writing any of this, because
   later threads bend earlier ones: a capability built in thread 3 and reused in thread 5 is
   designed once, for both. A worker's context only grows, and is compacted at about 170k tokens,
-  so size a thread to reach its first `pnpm justify` in one context: a thread that would build
+  so size a thread to reach its readiness check in one context: a thread that would build
   two features, carries more than about four items that touch different code, or plainly runs
   long, is two threads or more.
 * *For the Coach*: anything already visible that needs a human.
@@ -82,10 +82,11 @@ a thread, and its commits never force a restack. It joins the line last, on top.
 
 **The sprint doc** is where the Coach watches, from any device. With the Claude Docs tools in the
 session, birth one doc named for the sprint, with four tabs: *Open Matters* and *Resolved*, which
-`/turbochat` sets up; *Progress*: a lead linking the plan and the progress document on GitHub
-(`https://github.com/mrflip/safebyok/blob/<branch>/<path>`), then one table row per thread,
-`Thread | Status | PR | Thread file | Review`, the thread file linked on the thread's branch; and
-*Cleanup*, second in the tray: a one-line lead, then *Your calls*, a table `Matter | My call |
+`/turbochat` sets up; *Progress*: a one-line lead, then a list of GitHub links, since only those
+open on a phone (`https://github.com/mrflip/safebyok/blob/<branch>/<path>`) -- the plan, the
+progress document, the design, the threads and the rulings on the sprint branch, then one line
+per thread, added as it is cut, linking its thread file on its own branch -- with no status
+table: statuses live in the plan; and *Cleanup*, second in the tray: a one-line lead, then *Your calls*, a table `Matter | My call |
 Lands in`, and *Finally*, a checklist of what the sprint owes before it closes (§3).
 Give the Coach its link once in chat. Load the docs skill and guides and edit it cell by cell,
 as turbochat says; never copy a
@@ -103,7 +104,8 @@ lowest number first, while fewer than the cap are underway; refill as threads fi
 runs three steps.
 
 **Build.** `scripts/cut-thread <label> <base>` cuts its worktree from the base §1 gives it, and
-records that base for its reviewer and its filing. (Run the scripts as `<sprint root>/scripts/...`
+records that base for its reviewer and its filing; add the thread's line to *Progress*, its
+thread file linked on its branch. (Run the scripts as `<sprint root>/scripts/...`
 once the sprint has its worktree: the main checkout may be on a branch that lacks them.) Spawn
 one `thread-worker` with `run_in_background: true`, the thread's worker model and effort where
 they differ from the agent's, and a `description` naming the thread (`Thread 3: vault_record`),
@@ -127,6 +129,13 @@ Look-ahead: <what later threads need from this one, if anything>.
 Read: <what this handoff does not already carry, by section>.
 ```
 
+The worker's PR stays a draft, and CI holds a draft until it carries the label `ci`, so the worker
+pushes freely. It tests as it judges while it builds, and is ready by its *Ready* step's
+threshold (`thread-worker.md`, where it is stated once): it labels and pushes once its touched
+packages pass, and asks for review on a green `pnpm justify`. The label and the catch-up push
+(`scripts/file-thread --catch-up`) start CI on the whole suite. CI reads the label at a
+push and never on its own (`notes/ci.md`): a label added after the last push runs nothing. It never takes the PR out of draft: that is yours (*File*, below).
+
 Every worker and reviewer sings out what it has turned to (`scripts/ohai`), and a hook logs each
 compaction with its best guess at the agent, by that `description`. To see where each agent
 stands, read the tail of the log every worktree shares,
@@ -147,7 +156,7 @@ harness keeps apart from the main checkout.
 Review of thread <N> of sprint <sprint_name>. Thread worktree: <root>, branch <branch>, PR #<n>.
 Range: <base-sha>...<tip-sha>. Review level: <level>. Style pass: <model, if not the default>.
 The plan's gloss: <the thread's gloss, verbatim>.
-Compactions: <none | when, and before or after the worker's first justify>.
+Compactions: <none | when, and before or after the worker's readiness check>.
 ```
 
 The tip is `git -C <root> rev-parse HEAD`; the base is `git config branch.<branch>.sprintbase`
@@ -155,11 +164,19 @@ The tip is `git -C <root> rev-parse HEAD`; the base is `git config branch.<branc
 branch to its fixes, or gives you the SHA to do it with (`git -C <root> merge --ff-only <sha>`).
 Then remove the reviewer's worktree and branch, which its result names (`git worktree remove
 <path>`, `git branch -D <branch>`), and post its PR comment (`gh pr comment <n>`).
+The reviewer proves its fixes with the suites of the packages they touch, not a full `pnpm
+justify`: filing runs that, and is the gate.
 
 **File.** Run `scripts/file-thread <root>` in the background: it catches the branch up (a stacked
 one is rebased onto its base thread's new tip, or onto main once the base has merged, so never
-rebase it by hand), proves it, pushes it, and removes the worktree. When it exits 3 (a conflict with main, or with its base thread's new tip) or 4 (red), spawn
-a fresh `thread-worker`:
+rebase it by hand), proves it, pushes it, and removes the worktree. When it exits 3 (a conflict
+with main, or with its base thread's new tip) or 4 (red), spawn a fresh `thread-worker`.
+
+A filed PR stays a draft until you judge it ready for the Coach to merge: filed, with everything
+below it in the line filed and green. Then take it out of draft (`gh pr ready <n>`), and say so
+in the thread's line in chat. Never put one back.
+
+The worker's handoff for a stopped filing:
 
 ```
 File thread <N> of sprint <sprint_name>. Worktree: <root>, branch <branch>, PR #<n>.
@@ -181,10 +198,13 @@ gets no review: the review follows the resume that finishes it.
 ## 3. As each report comes in
 
 1. **Verify, cheaply.** For `ready`: the worker's commits are in its worktree
-   (`git -C <root> log --oneline -5`), its tree is clean, and its PR is out of draft
-   (`gh pr view <branch> --json isDraft`). Trust the reports for the rest.
-2. **Tell the Coach.** A line in chat -- thread, verdict, PR link -- and the thread's row in
-   *Progress*. Each item of the report's *Open matters*, and each YOLO decision, becomes a
+   (`git -C <root> log --oneline -5`), its tree is clean, its PR carries `ci` and is pushed
+   (`gh pr view <branch> --json labels,headRefOid` against the worktree's HEAD), and CI ran on
+   that head (`gh pr checks <branch>` shows its jobs, not skipping). Where the label came after
+   the last push, the head's jobs skipped: its run comes with its next push (the reviewer's fix,
+   or filing's rebase), or when you take it out of draft. Trust the reports for the rest.
+2. **Tell the Coach.** A line in chat -- thread, verdict, PR link -- and the thread's status
+   line in the plan. Each item of the report's *Open matters*, and each YOLO decision, becomes a
    `drafting` row of its own in *Open Matters* in the same pass -- one item, one row, never
    rolled up -- tagged with where it was asked (`#N`, thread N); say in chat why you left any
    out. Start the row with **TOP** when the matter blocks other work, changes a contract or a
@@ -210,6 +230,15 @@ gets no review: the review follows the resume that finishes it.
    where its reader will look, and spin an outgrown block into a file of its own, with a line on
    who should read it. Mark what you add with `*Orchestrator:*`; never edit a worker's thread
    file. Commit (`plan:`) and push to the sprint PR at milestones.
+
+   **Then sync the base checkout**, where the Coach reads and fingerpaints: spawn `base-sync`
+   (`.claude/agents/base-sync.md`, on its `opus` pin) in the foreground with the stack, the
+   line's filed and ready branches bottom first as `origin/<branch>`, and the sprint branch and
+   directory. It puts the base branch on main, the line and the plan squashed into one commit,
+   replays the Coach's own commits above, and restores only the uncommitted changes nothing has
+   superseded, after snapshotting everything. It pushes nothing. Relay its report's *Shape*, any
+   dropped hunks or conflicts, and its *Ready for a PR* groups to the Coach in a few lines, with
+   the put-back command; a stack it says wants a restack goes to the `restacker` skill.
 4. **Carry each ruling back** as turbochat says (*Carrying a ruling back*): the row moves to
    *Resolved*, and the ruling goes beside its question in the PR. A live worker gets a ruling it
    needs as a directive when you resume it.
@@ -235,7 +264,7 @@ Default rules, absent other guidance:
   rebase conflict that takes judgment about which behaviour wins is the Coach's.
 * **A worker that compacts** is doing what its cap asks, until compaction starts to cost more
   than it saves. On the first compaction, tell the worker nothing. Note it on the thread's
-  *Progress* row and in its review handoff, so the reviewer looks harder at the work that spans
+  status line in the plan and in its review handoff, so the reviewer looks harder at the work that spans
   it. A second compaction means the thread outgrew one context, which is a planning lesson for
   the progress document: check later threads' glosses for the same shape, and split any that
   have it. A third, or a second soon after the first, means the worker is thrashing. Resume it with a directive to commit what is sound, bring its thread
@@ -249,7 +278,7 @@ Default rules, absent other guidance:
   or, while the other thread's PR is filed but unmerged, amend it there. It needs no thread of
   its own, and no row.
 * **Pause the sprint** -- start no new threads, let those underway reach their next report and
-  keep them there, update the status lines and *Progress*, write
+  keep them there, update the status lines, write
   `human/YYYYMMDD-sprint_<name>_paused.md` in the sprint worktree saying exactly where things
   stand (which threads filed, which wait in which worktree, and why), commit and push, say so in
   chat, and end your turn -- when:

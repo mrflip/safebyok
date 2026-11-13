@@ -12,8 +12,31 @@ Work goes in **threads**: one line of work, one branch, one PR. A branch is name
 and progress for a thread that takes more than a sitting go in `whiteboard/YYYYMMDD-<label>/`.
 
 Within a thread you have standing permission to commit, push its branch, and open its PR without
-asking. Commit at natural milestones: a set of related changes, with `pnpm justify` green. Do not
-commit mid-refactor or on a timer.
+asking. Commit at natural milestones: a set of related changes, tested as you judge (*Proving*).
+Do not commit mid-refactor or on a timer.
+
+### Proving
+
+The tests are a tool for writing good code: while you build, run the ones that bear on the
+change, as you judge. A file: `pnpm --filter <pkg> exec vitest run <path>`, the path relative to
+the package. A package: `pnpm --filter <pkg> test` (a package that depends on
+another rebuilds it first). `pnpm justify:root` proves the root's files (`scripts/`,
+`tests/scripts/`, root config) and `pnpm lint:workflows` a workflow.
+
+Push to the draft and add the label `ci` once the packages you touched pass their tests and
+typecheck (`pnpm --filter <pkg> typecheck`): CI's run then goes alongside your last justify.
+**Ready**, the ask for review, is `pnpm justify` green (the first run in a
+fresh worktree adds the eslint cold start). It is stated in the thread-worker's *Ready* step
+(`.claude/agents/thread-worker.md`) and in a line of CLAUDE.md's *Commands*; a session outside a
+sprint holds itself to the same. The selective tests, not `pnpm justify`, serve a mid-workstream
+rebase and a reviewer's fixes (a reviewer proves what its fixes touch). Run `pnpm justify` after
+the rebase that prepares filing; if that turns up trouble, go back to the selective tests or to
+`pnpm justify`, as you judge the odds. Run it before a PR leaves draft: `scripts/file-thread`
+runs it as the gate.
+
+Do not select by change with pnpm's `...[<base>]` filter: it selects the root when a root file
+changed, whose `test` runs every package again, and its packages run one at a time, each
+rebuilding its dependencies. It is slower than `pnpm justify`.
 
 ### A worktree per thread
 
@@ -62,9 +85,10 @@ Comments, doc blocks and READMEs across a whole target are brought to plain Engl
 * **A PR's page shows the commits between it and its base.** In a stack every PR has base `main`
   (the "Stacked on #N" line carries the order), so it lists the PRs below it until they merge,
   then only its own commits.
-* **Every commit reaches main individually**, so each should pass `pnpm justify`. An
-  intermediate red commit is allowed only when it isolates something, say a large mechanical
-  change from the thoughtful repairs after it, and the PR says so.
+* **Every commit reaches main individually**, so each should pass `pnpm justify`, though only the
+  tip is proven (*Proving*). An intermediate red commit is allowed only when it isolates
+  something, say a large mechanical change from the thoughtful repairs after it, and the PR says
+  so.
 * **Force-push only with an explicit lease**: `--force-with-lease=<branch>:<sha you rebased from>`,
   the branch's tip when you started from it, never one fetched since. A lease read off a fresh
   fetch always matches, so it guards nothing. Never plain `--force`, and never a branch that isn't your
@@ -114,9 +138,15 @@ File against `main`, as a draft while you work. *Significant* questions -- ones 
 would change the code in the PR -- are asked in chat, and lead the PR's body until answered.
 
 * **Draft while you work.** Open the PR as a draft (`gh pr create --draft`) when you first push
-  the branch, and push to it as the work goes. Before you report back -- to the Coach, or in a
-  sprint to the orchestrator -- take it out of draft (`gh pr ready`), whatever the report says.
-  It stays out of draft from then on: later fixes are pushed to it as it stands.
+  the branch, and push to it as the work goes: CI holds a draft's jobs until it carries the label
+  `ci` (`notes/ci.md`). Once it is proven ready (*Proving*), add the label (`gh pr edit <n>
+  --add-label ci`), then catch it up onto its base's current tip and push: CI reads the label at
+  each push, and adding it starts nothing. Before you
+  report back -- to the Coach, or in a sprint to the orchestrator -- it carries `ci` and its head
+  was pushed after the label, whatever the report says. It stays a draft until it is ready to
+  merge: in a sprint the orchestrator takes it out of draft, once it is filed and the line below
+  it is green; a session closing out its own work does it at the end (`/closeout`). It is never
+  put back.
 * **Title**: plain language, saying what changed.
 * **Link each PR, branch or commit on first mention**, in chat, a PR body or a note:
   `[#12](https://github.com/mrflip/safebyok/pull/12)`.

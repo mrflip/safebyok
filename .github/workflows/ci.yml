@@ -1,7 +1,16 @@
 name: CI
 
+# A draft pull request is held, its jobs skipped, until it carries the label `ci` or is taken out
+# of draft (PROCESS.md, Pull requests), so a draft can be pushed often without filling the queue.
+# The label is read at each push, and no label event starts a run: a worker adds it before the push
+# it expects green, and it stays on. Add no `labeled` trigger: a run that skips on a commit would
+# mask that commit's real run (.claude/skills/sprint/DESIGN.md). Mergify's batch pull requests
+# (.mergify.yml) are drafts on `mergify/merge-queue/` branches, and its merge conditions wait on
+# their checks, so they always run. A held draft cannot merge; its skipped matrix job reports a
+# bare `node-compat`, so the ruleset shows `node-compat (22)` as expected.
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
 
@@ -19,8 +28,8 @@ permissions:
   contents: read
 
 # Within a job every check runs whatever an earlier one found, so one failure never hides another,
-# and the job fails if any did. `lint-typecheck` and `test-build` are the two the main ruleset
-# requires, and `node-compat (22)` is the third it should (the platform floor: engines `>=22`).
+# and the job fails if any did. The main ruleset requires every job here, both `node-compat` runs
+# among them, and CodeQL's result.
 # Each step is a root script: the root's own check, then every workspace package's (`pnpm -r`),
 # so a package added under packages/, demos/ or e2e/ is covered with no edit here. A new job
 # stands beside these, with its own checkout and setup.
@@ -30,6 +39,10 @@ jobs:
   # request's branch is not refused here: a stack's pull requests land in order, each as one merge
   # commit with its SHAs unchanged (.mergify.yml), which keeps main's history semi-linear (PROCESS.md).
   lint-typecheck:
+    if: >-
+      ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -102,6 +115,10 @@ jobs:
   # warning, and checks each package as a consumer would see it (publint, arethetypeswrong: each
   # tsdown.config.ts), and a failed build fails this step before any test runs.
   test-build:
+    if: >-
+      ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -116,8 +133,12 @@ jobs:
 
   # The unit tests on the Node majors a consumer may run, beside the one we develop on. Node 22 is
   # the platform floor (`engines`), and a failure there is a gate; the newest Node reports, and a
-  # failure there is news. The floor's check, `node-compat (22)`, is the one for the main ruleset.
+  # failure there is news.
   node-compat:
+    if: >-
+      ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/') }}
     runs-on: ubuntu-latest
     continue-on-error: ${{ matrix.node != 22 }}
     strategy:
@@ -139,8 +160,11 @@ jobs:
   # race (the old design's VAULTDB.md, Proving the races, at 100256bb7). The role is a superuser with no
   # password, the container reachable on this runner alone, and each test file makes a database
   # of its own. Which suites run here is the one list in e2e/tests/postgres/test-helpers.ts.
-  # Not required by the ruleset until it has run a while.
   postgres:
+    if: >-
+      ${{ github.event_name != 'pull_request' || !github.event.pull_request.draft
+      || contains(github.event.pull_request.labels.*.name, 'ci')
+      || startsWith(github.head_ref, 'mergify/merge-queue/') }}
     runs-on: ubuntu-latest
     services:
       postgres:

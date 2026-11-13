@@ -45,8 +45,8 @@ report what you found and stop.
      (the `documentarian` rewrites blocks; you do not);
    - a test missing its `@example` twin, or an entrypoint tested only with clean input;
    - taste that neither the linter nor STYLE.md settles. Say nothing about it.
-5. **Prove it.** `pnpm lint` and `pnpm typecheck` in each package you touched; `pnpm justify`
-   when you touched a test. A fix that turns either red is undone, not repaired: note it. Never
+5. **Prove it.** `pnpm lint` and `pnpm typecheck` in each package you touched, and its `pnpm
+   test` when you touched a test; the full `pnpm justify` is `scripts/file-thread`'s, at filing. A fix that turns either red is undone, not repaired: note it. Never
    commit red.
 6. **Commit** one commit per rule family, in PROCESS.md's *Commit messages* style, prefix
    `style`. Push nothing: your caller merges or pushes.
