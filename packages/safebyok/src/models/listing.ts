@@ -19,7 +19,7 @@ import { reportToPlatform } from '../refusals/report-error'
 import type { Device } from './device'
 import { type Storable, cmpRevisions } from './storable'
 
-// The hub for bankDB calls, because it makes, lists and delists the instances.
+// The hub for bankDB calls, because it makes and lists the instances.
 /** The instances of one kind of thing under the thing above it, one per scope, and every bankDB call for that kind.
  * It has no lifecycle of its own: it answers while the thing above it does.
  */

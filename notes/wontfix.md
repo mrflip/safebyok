@@ -137,7 +137,7 @@ not as a settled ruling, and check it against the current design before relying 
   passphrase change unlocks with the replaced passphrase.
 * 2026-11-09 (the Coach, after designing it in `whiteboard/20261108-del_damaged/del_damaged-spec.md`: "I predict too many bug reports about
   non-bugs"; replaces the 2026-11-03 row that a damaged row stays until the customer names it): **the library does not delete a row that
-  fails its check.** A damaged box row stays listed in `damaged_rows`, reads as `damaged_row`, and still counts toward `maxBoxes`. A damaged vault
+  fails its check.** A damaged box row is told as bad news and left out of the box listing's list, reads as `damaged_row`, and still counts toward `maxBoxes`. A damaged vault
   row is reported as bad news and stops a `delVault` that meets it. The customer clears either with their own datastore's tools. If that changes,
   start from the spec.
 
