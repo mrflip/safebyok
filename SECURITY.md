@@ -23,6 +23,22 @@ understand it. We will credit you in the advisory unless you would rather we did
 
 Until 1.0, only the latest published version receives security fixes.
 
+## Two properties a reviewer should not have to find
+
+Since keys moved from each vault to its bank (one bank per user and `banklabel`), two things hold
+that did not before:
+
+* **One unlock on a device opens every vault of the bank.** A bank has one gate: one passphrase,
+  and at most one passkey, which unwrap the bankKey, and the bankKey wraps the boxKey of every box
+  in every vault. Once a device unlocks the bank, by the user's answer or by its lease, it can
+  unseal any box of any of its vaults until the bank locks. There is no per-vault secret.
+  Secrets that must be unlocked separately belong in separate banks, under separate `banklabel`s.
+* **Deleting a vault no longer removes a wrapped key from storage.** A vault row holds nothing
+  encrypted, and each box's boxKey is wrapped by the bankKey. Deleting a vault deletes its boxes,
+  but a copy of them kept elsewhere (a backup, a replica) still unseals for whoever can unlock the
+  bank. Only deleting the bank (`bank.delPrompt()`) removes the stored copies of the bankKey;
+  even then a copy of its gate row still opens to its old passphrase or passkey.
+
 ## What we consider in scope
 
 safebyok's promise is that **whoever holds the application's database, server code and environment
@@ -31,7 +47,7 @@ that breaks that promise is in scope, for example:
 
 * recovering a whisper, a bankKey or a passphraseKey from what is stored (VOCABULARY.md names
   each);
-* tampering with stored records in a way that goes undetected, or that rolls a vault back to an
+* tampering with stored records in a way that goes undetected, or that rolls a bank back to an
   older passphrase or a weaker keyDeriverSpec;
 * secret material escaping into an error, a log, a thrown value or anything else that leaves the
   library;
@@ -48,7 +64,7 @@ These are real risks, but no library running inside the page can defend against 
 
 * **Code running in the same page or app as safebyok** -- a cross-site scripting hole in the host
   application, a malicious browser extension, a compromised dependency of the host app -- can
-  read secrets once a vault is unlocked.
+  read secrets once the bank is unlocked.
 * **A compromised device** (malware, a keylogger capturing the passphrase).
 * **A weak passphrase.** Argon2id makes guessing expensive, not impossible.
 * **A host application that sends a decrypted secret to its own server.**
