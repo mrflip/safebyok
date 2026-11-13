@@ -314,7 +314,7 @@ export const PositiveMinutesShape = "Expected a number of minutes above zero, fr
 export const GatingDismissed = "The prompt was dismissed before an attempt succeeded, so nothing was unlocked or changed: ask again when the user wants the vault."
 
 /** Why a prompt is not opened while another is open on the bank. */
-export const AlreadyAsking = "A prompt is already open on this bank, so this one was not shown: the host owns the one dialog, and disables what opens it meanwhile."
+export const AlreadyAsking = "A prompt is already open on this device, so this one was not shown: the host owns the one dialog, and disables what opens it meanwhile."
 
 /** Why an attempt is not tried while another runs on the same prompt. */
 export const AttemptInFlight = "An attempt is already under way on this prompt, so this one was not tried: disable the submit button until it answers."

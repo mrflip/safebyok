@@ -20,8 +20,8 @@ export const VoidRevisionSeq = -1
 export const VoidLifeTok = '00000000-0000-0000-0000-000000000000'
 /** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, easy to spot. */
 export const VoidTime = 1_218_182_888_777
-/** The `fmt` of the base box form, which a bank's box row replaces with its own. */
-export const BoxFormat = 5002
+/** The `fmt` every box row carries. */
+export const BoxFormat = 5003
 /** The revision of a void row, and of a birth's prior. */
 export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
 

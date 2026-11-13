@@ -175,7 +175,7 @@ export function leaseNotInForce(): VaultError { return new VaultError('bank_lock
 
 // == [Gating Throwers]: alreadyAsking, requestCleartextThrew, cleartextsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight
 
-/** An `already_asking` refusal: a prompt is already open on this bank. */
+/** An `already_asking` refusal: a prompt is already open on this device. */
 export function alreadyAsking(): VaultError { return new VaultError('already_asking', Phrases.AlreadyAsking) }
 
 /** An `unexpected_error` refusal that keeps nothing of what the host's `requestCleartext` threw. */
