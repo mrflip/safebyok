@@ -8,9 +8,12 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-13, early): #679 and #676 merged. Ready, one line: #681 → #682 → #684 →
-  #683 → 18 #685 → 19 #686 → 17r #687 → 17 #688 → 17t #689 (#689 the top, filed at 9d0495ecc; it merges clean onto today's main, so no restack). T #680 ready, on
-  main. The second Closer Look is in its tab (https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB#39e7c475-c34f), awaiting the Coach's replies. Wrapup: G #678 rebased onto #689 and in its update (opus, revised from sonnet: checking every guarantee against the code is judgment); then squashed above #689, the sprint PR squashed on top.
+* **Status** (2026-11-13): #679, #676, #680 and #681 merged. Ready, one line restacked onto main
+  (092cb3bf7) after #680 and #682 both edited notes/ci.md (main's text kept; #682's rename was in it):
+  16 #682 → #684 → #683 → 18 #685 → 19 #686 → 17r #687 → 17 #688 → 17t #689 (#689 the top, at
+  94c6b57e0; justify green there; rollback tags `*-prerestack-20261113042250`). Closer Look 2 in its
+  tab, its items now rows on *Open Matters*. Wrapup: G #678 in its update (opus), rebasing onto the
+  new tip; then squashed above #689, the sprint PR squashed on top.
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
