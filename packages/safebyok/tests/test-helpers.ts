@@ -19,6 +19,7 @@ export { expectRefusal, expectSyncRefusal, expectGood, expectingGood, expectBad,
 export type { ExpectingGood } from './test-helpers/refusals'
 export { describeBankDBBattery } from './test-helpers/bank-db-battery'
 export type { BankDBBatteryOpts, BankDBRowCheats } from './test-helpers/bank-db-battery'
+export { storedOtherwiseOf, StoredOtherwiseSuffix } from './test-helpers/bank-db-battery-stored'
 // The scopes, records and asks the bankDB battery is built from, as one namespace: many share a name with the plain scopes below.
 export * as BW from './test-helpers/bankdb-world'
 export { describeDeviceDBBattery } from './test-helpers/device-db-battery'
