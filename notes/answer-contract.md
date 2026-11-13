@@ -103,7 +103,7 @@ The soft cap is such a case: a put that would be `born` may refuse `vault_full` 
 
 Returning:
 
-- An ok result returns the actual stored value in `val`
+- An ok result returns the actual stored value in `val`. For a write, that is the stored record, the row the datastore reports writing; it must agree with the record sent, which the tables call **reqval**.
 - Many refusals return the actual stored value in a separate `dbhas` field, which the caller can use to try again. `void` returns dbnil.
 - A row that fails its checks gets no act: it is thrown, as `damaged_row` for the row asked for and `damaged_vault` for a box op's vault. The refusal names the fields that failed, and quotes nothing of the row.
 - Every response, ok or refused, carries its `parent` back: the whole vault row, or the shell row where the vault is void.
@@ -387,7 +387,7 @@ its live bank's is of an ended life: it counts as no row, and the op tables read
 
 A gate verb is a put of the gate row, with `ifAbsent: fail` and `ifPresent: repl`, read by the put
 table, and nothing more: the three verbs differ only in their name. A good answer is `replaced`, with
-the record stored (**reqval**); a replay of the stored record is `retcon`. The ask's check (V2)
+the stored record (**reqval**); a replay of the stored record is `retcon`. The ask's check (V2)
 holds the empty `auth`, `sigs` and `meta`; P4 and the revision rules hold `bank_tok` and `gate_tok`
 being the row's.
 
@@ -420,7 +420,7 @@ overwrites one.
 Three roles take part in every call, and each rule below names the one it binds.
 
 - **bankDB**: the core's `BankDB`, the interface a model calls. It checks the request's shape before anything is fetched (`bad_record`), and it answers: `act`, `val`, `parent`, `dbhas`. It owns the **classifier**, the shared pure function that takes the request and the rows fetched, returns the `act`, and says what to write, if anything. Every judgment in the tables above is the classifier's.
-- **adapter**: the package that carries a bankDB call to one kind of datastore. It opens the atomic unit, fetches the rows, passes them to the classifier, writes what the classifier says to write, and returns the rows. It judges nothing.
+- **adapter**: the package that carries a bankDB call to one kind of datastore. It opens the atomic unit, fetches the rows, passes them to the classifier, writes what the classifier says to write, and returns the rows: as fetched, and each row it wrote as the datastore reports storing it. It judges nothing.
 - **datastore**: the engine that stores the vault and box rows: Postgres, IndexedDB, a host's backend. It must offer a unique key per scope, and an atomic unit that spans a fetch and a write. It may also enforce these same invariants and checks a second time, with constraints, foreign keys or stored procedures. That is allowed but never required. It decides no outcome in the tables, and its details are outside this note.
 
 ## Scope and consistency checks
@@ -493,7 +493,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 ### Responding
 
 - Every response carries its `parent` back: the whole vault row as the atomic unit leaves it, which is as fetched, or as written by a vault op.
-- An ok write answers the request's own record (`reqval`); nothing is fetched after the write.
+- An ok write answers the stored record: the row the datastore reports writing, in the same atomic unit, as the statement that wrote it returns it or as read back. It must agree with the record sent (`reqval`), and the delivery refuses `storage_issue` where it does not.
 - A refusal returns dbhas with the row as fetched in the deciding atomic unit, or dbnil when there is no row.
 
 ### What the datastore offers

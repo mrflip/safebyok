@@ -17,9 +17,10 @@ import * as CVX from './validators'
 // * check its ask with the core's checker,
 // * fetch the row asked for and the row above it,
 // * classify the ask with the core's classifier, then
-// * store the ask's record if the classifier instructs it to write.
-// It returns the rows it fetched, as they stood before any write, and whether it wrote. The client classifies those rows with
-// the same classifier, so it reaches the same act, outcome or refusal, and checks that the act agrees with what was written.
+// * store the ask's record if the classifier instructs it to write, and read back the row stored.
+// It returns the rows it fetched, as they stood before any write, and as `written` the rows read back, or null if it wrote
+// nothing. The client classifies the fetched rows with the same classifier, so it reaches the same act, outcome or refusal,
+// checks that the act agrees with whether anything was written, and answers the rows read back.
 // A get only reads, from one snapshot, and returns its rows for the client to classify.
 
 // == [Bank verbs]: ensureBank, buildBank, putGate, delBank
@@ -40,18 +41,16 @@ export const ensureBank = query({
 /** Classify a `buildBank` ask against the bank row and its `main` gate row, and store its bank and gate records if the act is a write. */
 export const buildBank = mutation({
   args:    CVX.askArgs,
-  returns: CVX.gateWritten,
+  returns: CVX.bankBuilt,
   handler: async (ctx, { ask: sent }) => {
     const ask = askFor(() => BX.bankBuild.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, ask)
     const gateDoc = await getGateDoc(ctx.db, ask, 'main')
     const fetched = { bank: bankDoc?.bank ?? null, gate: gateDoc?.gate ?? null }
-    const wrote = isWrite(storedOrNull(() => BX.classifyBuildBank(ask, fetched)))
-    if (wrote) {
-      await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
-      await writeGateDoc(ctx.db, gateDoc, ask.gate)
-    }
-    return { ...fetched, wrote }
+    if (! isWrite(storedOrNull(() => BX.classifyBuildBank(ask, fetched)))) { return { ...fetched, written: null } }
+    const bank = await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
+    const gate = await writeGateDoc(ctx.db, gateDoc, ask.gate)
+    return { ...fetched, written: { bank, gate } }
   },
 })
 
@@ -64,9 +63,8 @@ export const putGate = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const gateDoc = await getGateDoc(ctx.db, ask, ask.gatelabel)
     const fetched = { bank: bankDoc?.bank ?? null, gate: gateDoc?.gate ?? null }
-    const wrote = isWrite(storedOrNull(() => BX.classifyStoredGate(ask, fetched)))
-    if (wrote) { await writeGateDoc(ctx.db, gateDoc, ask.record) }
-    return { ...fetched, wrote }
+    if (! isWrite(storedOrNull(() => BX.classifyStoredGate(ask, fetched)))) { return { ...fetched, written: null } }
+    return { ...fetched, written: { gate: await writeGateDoc(ctx.db, gateDoc, ask.record) } }
   },
 })
 
@@ -82,12 +80,10 @@ export const delBank = mutation({
     const ask = askFor(() => BX.bankDel.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null }
-    const wrote = isWrite(storedOrNull(() => BX.classifyDelBank(ask, fetched)))
-    if (wrote) {
-      await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
-      await deleteBank(ctx.db, ask)
-    }
-    return { ...fetched, wrote }
+    if (! isWrite(storedOrNull(() => BX.classifyDelBank(ask, fetched)))) { return { ...fetched, written: null } }
+    const bank = await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
+    await deleteBank(ctx.db, ask)
+    return { ...fetched, written: { bank } }
   },
 })
 // --
@@ -115,9 +111,8 @@ export const putVault = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null, vault: vaultDoc?.vault ?? null }
-    const wrote = isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))
-    if (wrote) { await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record) }
-    return { ...fetched, wrote }
+    if (! isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))) { return { ...fetched, written: null } }
+    return { ...fetched, written: { vault: await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record) } }
   },
 })
 
@@ -130,13 +125,11 @@ export const delVault = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null, vault: vaultDoc?.vault ?? null }
-    const wrote = isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))
-    if (wrote) {
-      await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record)
-      // A vault's boxes end with its life, and the component's limits keep a life small enough to delete in this transaction.
-      await deleteBoxes(ctx.db, lifeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
-    }
-    return { ...fetched, wrote }
+    if (! isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))) { return { ...fetched, written: null } }
+    const vault = await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record)
+    // A vault's boxes end with its life, and the component's limits keep a life small enough to delete in this transaction.
+    await deleteBoxes(ctx.db, lifeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
+    return { ...fetched, written: { vault } }
   },
 })
 // --
@@ -186,14 +179,14 @@ export const putBox = mutation({
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
     const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity: Tallies.capacityOf(reckoning.tally, cap) }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))) { return { ...fetched, wrote: false, roomless: false } }
+    if (! isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))) { return { ...fetched, written: null, roomless: false } }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
     const growth = Tallies.growthOf(anteDoc, boxDoc)
-    if (Tallies.wouldPassLimit(reckoning.tally, growth, cap)) { return { ...fetched, wrote: false, roomless: true } }
-    await writeBoxDoc(ctx.db, anteDoc, boxDoc)
+    if (Tallies.wouldPassLimit(reckoning.tally, growth, cap)) { return { ...fetched, written: null, roomless: true } }
+    const box = await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
-    return { ...fetched, wrote: true, roomless: false }
+    return { ...fetched, written: { box }, roomless: false }
   },
 })
 
@@ -207,14 +200,12 @@ export const delBox = mutation({
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
     const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }
-    const wrote = isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))
-    if (wrote) {
-      const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
-      await writeBoxDoc(ctx.db, anteDoc, boxDoc)
-      // The tombstone replaces the row and still counts as one box row: of the `all_*` figures, only the size changes.
-      await Tallies.forget(ctx.db, life, Tallies.growthOf(anteDoc, boxDoc))
-    }
-    return { ...fetched, wrote }
+    if (! isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))) { return { ...fetched, written: null } }
+    const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
+    const box = await writeBoxDoc(ctx.db, anteDoc, boxDoc)
+    // The tombstone replaces the row and still counts as one box row: of the `all_*` figures, only the size changes.
+    await Tallies.forget(ctx.db, life, Tallies.growthOf(anteDoc, boxDoc))
+    return { ...fetched, written: { box } }
   },
 })
 // --
@@ -424,25 +415,40 @@ async function getBoxDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel, b
     .unique()
 }
 
-/** Write `bank` at `scope`, in place of `anteDoc`, or as a new document. */
-async function writeBankDoc(db: DatabaseWriter, anteDoc: BankDoc | null, { user_id, banklabel }: BankScope, bank: BX.BankRow): Promise<void> {
-  if (anteDoc) { await db.replace('safebyok_banks', anteDoc._id, { user_id, banklabel, bank }) } else { await db.insert('safebyok_banks', { user_id, banklabel, bank }) }
+/** Write `bank` at `scope`, in place of `anteDoc` or as a new document, and return the bank row then stored. */
+async function writeBankDoc(db: DatabaseWriter, anteDoc: BankDoc | null, { user_id, banklabel }: BankScope, bank: BX.BankRow): Promise<unknown> {
+  const doc = { user_id, banklabel, bank }
+  let id = anteDoc?._id
+  if (id === undefined) { id = await db.insert('safebyok_banks', doc) } else { await db.replace('safebyok_banks', id, doc) }
+  const stored = await db.get('safebyok_banks', id)
+  return stored?.bank ?? null
 }
 
-/** Write `gate` at its own scope, in place of `anteDoc`, or as a new document. */
-async function writeGateDoc(db: DatabaseWriter, anteDoc: GateDoc | null, gate: BX.GateRecord): Promise<void> {
+/** Write `gate` at its own scope, in place of `anteDoc` or as a new document, and return the gate row then stored. */
+async function writeGateDoc(db: DatabaseWriter, anteDoc: GateDoc | null, gate: BX.GateRecord): Promise<unknown> {
   const { user_id, banklabel, gatelabel } = gate
-  if (anteDoc) { await db.replace('safebyok_gates', anteDoc._id, { user_id, banklabel, gatelabel, gate }) } else { await db.insert('safebyok_gates', { user_id, banklabel, gatelabel, gate }) }
+  const doc = { user_id, banklabel, gatelabel, gate }
+  let id = anteDoc?._id
+  if (id === undefined) { id = await db.insert('safebyok_gates', doc) } else { await db.replace('safebyok_gates', id, doc) }
+  const stored = await db.get('safebyok_gates', id)
+  return stored?.gate ?? null
 }
 
-/** Write `vault` at `scope`, in place of `anteDoc`, or as a new document. */
-async function writeVaultDoc(db: DatabaseWriter, anteDoc: VaultDoc | null, { user_id, banklabel, vaultlabel }: VaultScope, vault: BX.VaultRow): Promise<void> {
-  if (anteDoc) { await db.replace('safebyok_vaults', anteDoc._id, { user_id, banklabel, vaultlabel, vault }) } else { await db.insert('safebyok_vaults', { user_id, banklabel, vaultlabel, vault }) }
+/** Write `vault` at `scope`, in place of `anteDoc` or as a new document, and return the vault row then stored. */
+async function writeVaultDoc(db: DatabaseWriter, anteDoc: VaultDoc | null, { user_id, banklabel, vaultlabel }: VaultScope, vault: BX.VaultRow): Promise<unknown> {
+  const doc = { user_id, banklabel, vaultlabel, vault }
+  let id = anteDoc?._id
+  if (id === undefined) { id = await db.insert('safebyok_vaults', doc) } else { await db.replace('safebyok_vaults', id, doc) }
+  const stored = await db.get('safebyok_vaults', id)
+  return stored?.vault ?? null
 }
 
-/** Write `boxDoc` in place of `anteDoc`, or as a new document. */
-async function writeBoxDoc(db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<void> {
-  if (anteDoc) { await db.replace('safebyok_boxes', anteDoc._id, boxDoc) } else { await db.insert('safebyok_boxes', boxDoc) }
+/** Write `boxDoc` in place of `anteDoc` or as a new document, and return the box row then stored. */
+async function writeBoxDoc(db: DatabaseWriter, anteDoc: BoxDoc | null, boxDoc: BoxDocGiven): Promise<unknown> {
+  let id = anteDoc?._id
+  if (id === undefined) { id = await db.insert('safebyok_boxes', boxDoc) } else { await db.replace('safebyok_boxes', id, boxDoc) }
+  const stored = await db.get('safebyok_boxes', id)
+  return stored?.box ?? null
 }
 
 /** Query the gate documents of a bank. */

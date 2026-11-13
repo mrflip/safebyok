@@ -66,11 +66,12 @@ Each test compares the record received (`rcvd`) with the record of the instance 
 ## What an answer carries
 
 The acts are the classifier's and the gate verbs' (`notes/answer-contract.md`). Each act says by itself where the record
-is (`deliveryFieldingOf`), so nothing here looks at the request again: a validated answer is trusted.
+is (`deliveryFieldingOf`), so nothing here looks at the request again: a validated answer is trusted. "The stored record"
+is what the datastore contains, as it reported fetching or writing it; "the record sent" is what the caller asked to store.
 
 | fielding  | acts                                                                                                                 | the record       | checked against                                            |
 | --------- | -------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------- |
-| `as_sent` | `born` · `reborn` · `replaced` · `deleted` · `added` · `revoked`                                                     | `val`            | the scope sent, and its revision and life tokens (`revisionPins`) |
+| `as_sent` | `born` · `reborn` · `replaced` · `deleted` · `added` · `revoked`                                                     | `val`, the stored record | the record sent: its scope, and its revision and life tokens (`revisionPins`) |
 | `as_got`  | `gotlive` · `gotgone` · `passed` · `gotvoid`                                                                         | `val`, or null   | the scope sent                                             |
 | `as_db`   | `stale` · `camped` · `gone` · `dubdel` · `retcon` · `clash` · `forked` · `ahead` · `void`                            | `dbhas`, or null | the scope sent                                             |
 | `none`    | `bank_void` · `bank_gone` · `bank_reborn` · `vault_void` · `vault_gone` · `vault_reborn` · `vault_full` · `unclassified_storing` · `got` · `tidied` · `timely` | nothing: delivering stops after the parent |               |
@@ -99,7 +100,7 @@ First match wins. F and N2 rows refuse; every other row is a plan of `making` an
 | N1  | `rcvd` is `null`, `held` is `none`                                                          |          |         | nothing to deliver                                                                     |
 | N2  | `rcvd` is `null`, `held` is *live*                                                          |          |         | throws `record_conflict` (`nothingStoredWhereLive`)                                    |
 | N3  | `rcvd` is `null`, `held` is `gone`                                                          | `listed` | `same`  | as it was, marked refreshed                                                            |
-| F2  | `rcvd` fails its check (*What an answer carries*)                                           |          |         | throws `storage_issue` (`deliveredNotAsSent`)                                          |
+| F2  | `rcvd` fails its check (*What an answer carries*): of another scope, or under `as_sent` disagreeing with the record sent |  |  | throws `storage_issue` (`deliveredNotAsSent`)                         |
 | F3  | at a gate's or vault listing, `rcvd` is under another `bank_tok` than its bank's; at a box listing, under another `vault_tok` than its own |  |  | throws `storage_issue` (`rowOfOtherLife`, naming the tok)                     |
 | S1  | `held` is `none`                                                                            | `make`   | `adopt` | a new instance has `rcvd`, and is listed                                               |
 | F4  | `rev` is `forked`                                                                           |          |         | throws `record_conflict` (`oneRevisionTwoToks`)                                        |
@@ -162,8 +163,8 @@ vault's ended life refuses `disabled` from then on, since its listing's `vault_t
    has one.
 2. **A live record over a tombstone of the same life** (`newer`) is adopted at a vault or a box listing. A life made
    again gets a new life token, so this should not happen; it could refuse `record_conflict` instead.
-3. **A stored record is checked by its tokens** (F2): scope, revision and life. The answer contract says it is the
-   record sent, field for field.
+3. **The stored record is checked against the record sent by its tokens alone** (F2): scope, revision and life. The
+   answer contract asks that the two agree, so a datastore that stored another value under the same tokens would pass.
 4. **A gate row of another `gate_tok` under the bank's `bank_tok`** is damage by the design, as only `delBank` deletes
    the main gate. It is adopted (R2), the Gate standing for its scope through its lives as a Vault does; it could refuse
    `record_conflict` instead.

@@ -43,11 +43,36 @@ function failNextCall(bankDB: MemoryBankDB): void {
   for (const spy of spies) { spy.mockImplementationOnce(fail) }
 }
 
+// Each shelf and life of box rows the bankDB reaches from now on stores its rows as storedOtherwiseOf makes them.
+function storeOtherwise(bankDB: MemoryBankDB): void {
+  const shelfOf = bankDB._cheat_shelfOf.bind(bankDB)
+  const boxRowsOf = bankDB._cheat_boxRowsOf.bind(bankDB)
+  const altered = new WeakSet<object>()
+  const alterMap = (map: Map<string, unknown>): Map<string, unknown> => {
+    if (altered.has(map)) { return map }
+    altered.add(map)
+    map.set = (label, row) => Map.prototype.set.call(map, label, TH.storedOtherwiseOf(row)) as Map<string, unknown>
+    return map
+  }
+  vi.spyOn(bankDB, '_cheat_shelfOf').mockImplementation((scope) => {
+    const shelf = shelfOf(scope)
+    if (altered.has(shelf)) { return shelf }
+    altered.add(shelf)
+    let { bank } = shelf
+    Object.defineProperty(shelf, 'bank', { get: () => bank, set: (row: unknown) => { bank = TH.storedOtherwiseOf(row) }, enumerable: true })
+    alterMap(shelf.gaterows)
+    alterMap(shelf.vaultrows)
+    return shelf
+  })
+  vi.spyOn(bankDB, '_cheat_boxRowsOf').mockImplementation((scope, bank_tok, vault_tok) => alterMap(boxRowsOf(scope, bank_tok, vault_tok)))
+}
+
 TH.describeBankDBBattery("MemoryBankDB's battery", {
-  makeBankDB:          (opts) => new MemoryBankDB(opts),
-  makeCappedBankDB:    (maxBoxes) => new MemoryBankDB({ maxBoxes }),
-  _cheat_rowsOf:       memoryRowsOf,
-  _cheat_failNextCall: failNextCall,
+  makeBankDB:            (opts) => new MemoryBankDB(opts),
+  makeCappedBankDB:      (maxBoxes) => new MemoryBankDB({ maxBoxes }),
+  _cheat_rowsOf:         memoryRowsOf,
+  _cheat_failNextCall:   failNextCall,
+  _cheat_storeOtherwise: storeOtherwise,
 })
 
 describe("describeBankDBBattery", () => {

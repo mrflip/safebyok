@@ -305,8 +305,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
         if (listed.isPresent) { throw nothingStoredWhereLive() }
         return { making: 'listed', mod: 'same', listed, record: null }
       }
-      const pins   = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
-      if (! isConsistent(record, pins)) { throw deliveredNotAsSent(fielding, record, pins) }
+      demandDeliveredAs(fielding, record, scope, sent)
       return this.#recordDeliveringOf(record)
     } catch (err) { throw refusalOfDelivering(err, answer) }
   }
@@ -489,7 +488,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // --
 }
 
-// == [Helpers]: deliveryFieldingOf, Delivering, Joined, putAnswerOf
+// == [Helpers]: deliveryFieldingOf, demandDeliveredAs, Delivering, Joined, putAnswerOf
 
 // The acts are the classifier's: `notes/answer-contract.md`. A box's `vault_*` act, a bankDB's `bank_*` act, an unclassified_storing
 // refusal, and the acts of a list or a housekeeping verb carry no record of this listing.
@@ -502,6 +501,12 @@ const deliveryFieldingOf = {
   bank_void: 'none',  bank_gone: 'none',  bank_reborn: 'none',
   got:     'none',    tidied:  'none',    timely:   'none',
 } as const satisfies Record<GoodAct | BadAct, DeliveryFielding>
+
+/** Throw unless the delivered `record` is of `scope`, and, for a record stored (`as_sent`), carries the revision and life tokens of `sent`. */
+export function demandDeliveredAs(fielding: 'as_sent' | 'as_got' | 'as_db', record: object, scope: object, sent: object): void {
+  const pins = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
+  if (! isConsistent(record, pins)) { throw deliveredNotAsSent(fielding, record, pins) }
+}
 
 // Every form has every field, null where it has none, so the plan destructures and narrows on its tags.
 /** A delivery plan: which instance receives the record (`making`), and what becomes of its record (`mod`).

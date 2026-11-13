@@ -216,6 +216,35 @@ function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
 }
 // --
 
+// == [Rows written]: writtenBankOf, writtenGateOf, writtenVaultOf, writtenBoxOf
+// An adapter answers a write with the row the datastore reports storing, checked here as a fetched row is, and against
+// the address it was stored at. Whether it agrees with the record sent is the delivery's to judge.
+
+/** The bank row the datastore reports storing at `bankScope`, checked. */
+export function writtenBankOf(bankScope: BankScope, bankRaw: unknown): BankRow {
+  if (! CX.isPlainBag(bankRaw)) { throw Refuse.storageIssue() }
+  return BX.storedBankRow.parseConsistent(bankRaw, CX.bankScope.parse(bankScope), RowOfOtherAddress)
+}
+
+/** The gate row the datastore reports storing at `gateScope`, checked. */
+export function writtenGateOf(gateScope: GateScope, gateRaw: unknown): GateRecord {
+  if (! CX.isPlainBag(gateRaw)) { throw Refuse.storageIssue() }
+  return BX.storedGateRow.parseConsistent(gateRaw, CX.gateScope.parse(gateScope), RowOfOtherAddress)
+}
+
+/** The vault row the datastore reports storing at `vaultScope`, checked. */
+export function writtenVaultOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
+  if (! CX.isPlainBag(vaultRaw)) { throw Refuse.storageIssue() }
+  return BX.storedVaultRow.parseConsistent(vaultRaw, CX.vaultScope.parse(vaultScope), RowOfOtherAddress)
+}
+
+/** The box row the datastore reports storing at `boxQuery`, in the vault life it names, checked. */
+export function writtenBoxOf(boxQuery: BoxQuery, boxRaw: unknown): BoxRow {
+  if (! CX.isPlainBag(boxRaw)) { throw Refuse.storageIssue() }
+  return BX.storedBoxRow.parseConsistent(boxRaw, BX.boxQuery.parse(boxQuery), RowOfOtherAddress)
+}
+// --
+
 // == [Acts]: isWriteAct, isBirthAct, isOkAct, cappedActOf
 
 /** True when the act tells the caller to store the ask's record. */
@@ -246,6 +275,8 @@ const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const
 // == [Classifying]: RowOfVault, RowOfBox, BankEnsureFetched, GateFetched, BankFetched, VaultFetched, BoxFetched, BoxesFetched, BankEnsureStored, BankBuildStored, GateStored, BankDelStored, VaultStored, BoxStored, BoxesStored, classifyEnsureBank, classifyBuildBank, classifyStoredGate, classifyDelBank, classifyStoredVault, classifyStoredBox, classifyStoredBoxes
 // The classifier checks each stored row once, and returns everything it worked out on the way to the answer. Each verb's
 // row above is judged first: when it refuses, the row asked for goes unchecked, whatever is stored there.
+// The rows it returns are the rows fetched. Under a write act, the adapter stores the record sent, and returns the row
+// the datastore reports storing in place of the row fetched (`[Rows written]`).
 
 /** A vault row from storage, unchecked, with its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
@@ -285,9 +316,9 @@ export type BankEnsureStored = Readonly<{ ok: true, act: GotAct, parent: BankRow
  * - `act` -- what storage did, or why it refused
  */
 export type BankBuildStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
-  /** The bank row after this ask: the record it stores, else the stored row, else the shell for none. */
+  /** The bank row stored, or the shell for none. */
   parent:   BankRow
-  /** A good answer's `val`: the gate record this ask stores, else the live bank's gate row; null when no live bank is stored. */
+  /** A good answer's `val`: the live bank's gate row, or null when no live bank is stored. */
   gate:     GateRecord | null
   /** What was stored at the bank's scope before any write. */
   presence: Presence
@@ -300,7 +331,7 @@ export type BankBuildStored = Readonly<({ ok: true, act: OkAct } | { ok: false, 
 export type GateStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | ParentBankAct }) & {
   /** The bank row stored, or the shell for none. */
   parent:   BankRow
-  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the stored gate row, or null for none or when the bank row refused. */
+  /** A good answer's `val`, or a refusal's `dbhas`: the gate row stored, or null for none or when the bank row refused. */
   gate:     GateRecord | null
   /** What was stored at the gate's scope before any write, or null when the bank row refused and the gate row went unchecked. */
   presence: Presence | null
@@ -311,7 +342,7 @@ export type GateStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: 
  * - `act` -- what storage did, or why it refused
  */
 export type BankDelStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct }) & {
-  /** A good answer's `val`, or a refusal's `dbhas`: the tombstone this ask stores, else the stored bank row, or null for none. */
+  /** A good answer's `val`, or a refusal's `dbhas`: the bank row stored, or null for none. */
   bank:     BankRow | null
   /** What was stored at the bank's scope before any write. */
   presence: Presence
@@ -324,7 +355,7 @@ export type BankDelStored = Readonly<({ ok: true, act: OkAct } | { ok: false, ac
 export type VaultStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | ParentBankAct }) & {
   /** The bank row stored, or the shell for none. */
   parent:   BankRow
-  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the stored vault row, or null for none or when the bank row refused. */
+  /** A good answer's `val`, or a refusal's `dbhas`: the vault row stored, or null for none or when the bank row refused. */
   vault:    VaultRow | null
   /** What was stored at the vault's scope before any write, or null when the bank row refused and the vault row went unchecked. */
   presence: Presence | null
@@ -337,7 +368,7 @@ export type VaultStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act:
 export type BoxStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: RefusedAct | BoxVaultAct }) & {
   /** The vault row stored, or the shell for none. */
   parent:   VaultRow
-  /** A good answer's `val`, or a refusal's `dbhas`: the record this ask stores, else the stored box row, or null for none or when the vault row refused. */
+  /** A good answer's `val`, or a refusal's `dbhas`: the box row stored, or null for none or when the vault row refused. */
   box:      BoxRow | null
   /** What was stored at the box's scope before any write, or null when the vault row refused and the box row went unchecked. */
   presence: Presence | null
@@ -374,22 +405,20 @@ export function classifyEnsureBank(ask: BankEnsureAsk, fetched: BankEnsureFetche
 
 // A gate row under a bank that is not live is of an ended life, and goes unchecked: the gate record is put over it.
 /** Classify a `buildBank` ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` and `ask.gate` in the same step that fetched the rows.
+ * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` and `ask.gate` in the same step that fetched the rows, and answers with the rows the datastore reports storing.
  * Throws for a damaged row, and for a live bank with no `main` gate row.
  */
 export function classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): BankBuildStored {
   const bank     = bankRowOf(ask, fetched.bank)
   const presence = presenceOf(bank)
   const act      = putActOf({ ...ask, ...BuildPolicies }, bank)
-  if (isWriteAct(act)) { return { ok: true, act, parent: ask.record, gate: ask.gate, presence } }
-
   const parent = bank ?? BX.shellBankOf(ask)
   const gate   = (bank?.am === 'a') ? mainGateOf(ask, fetched.gate, bank) : null
   return isOkAct(act) ? { ok: true, act, parent, gate, presence } : { ok: false, act, parent, gate, presence }
 }
 
 /** Classify a gate verb's ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows.
+ * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports storing.
  * Throws for a damaged row.
  */
 export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateStored {
@@ -400,24 +429,22 @@ export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateS
   const gate     = gateRowOf(ask, fetched.gate, parent)
   const presence = presenceOf(gate)
   const act      = putActOf({ ...ask, ...GatePolicies }, gate)
-  if (isWriteAct(act)) { return { ok: true, act, parent, gate: ask.record, presence } }
   return isOkAct(act) ? { ok: true, act, parent, gate, presence } : { ok: false, act, parent, gate, presence }
 }
 
 /** Classify a `delBank` ask against the bank row an adapter fetched for it, per the del table in `notes/answer-contract.md`.
- * Under `deleted`, the adapter stores `ask.record` and deletes every gate, vault and box row under the bank's scope, in the same step that fetched the row.
+ * Under `deleted`, the adapter stores `ask.record` and deletes every gate, vault and box row under the bank's scope, in the same step that fetched the row, and answers with the row the datastore reports storing.
  * Throws for a damaged row.
  */
 export function classifyDelBank(ask: BankDelAsk, fetched: BankFetched): BankDelStored {
   const bank     = bankRowOf(ask, fetched.bank)
   const presence = presenceOf(bank)
   const act      = delActOf(ask, bank)
-  if (isWriteAct(act)) { return { ok: true, act, bank: ask.record, presence } }
   return isOkAct(act) ? { ok: true, act, bank, presence } : { ok: false, act, bank, presence }
 }
 
 /** Classify a vault ask against the rows an adapter fetched for it, per the tables in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows.
+ * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports storing.
  * Throws for a row that fails its checks or is stored at another scope.
  */
 export function classifyStoredVault(ask: VaultAsk, fetched: VaultFetched): VaultStored {
@@ -428,14 +455,13 @@ export function classifyStoredVault(ask: VaultAsk, fetched: VaultFetched): Vault
   const vault    = vaultRowOf(ask, fetched.vault, parent)
   const presence = presenceOf(vault)
   const act      = rowActOf(ask, vault)
-  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, parent, vault: ask.record, presence } }
   return isOkAct(act) ? { ok: true, act, parent, vault, presence } : { ok: false, act, parent, vault, presence }
 }
 
 // A box ask is classified entirely here, top to bottom. Each fetched row is checked once, when first read, and is
 // sound and typed from then on.
 /** Classify a box ask against the rows an adapter fetched for it, per the tables in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows.
+ * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports storing.
  * Throws for a row that fails its checks or is stored at another address.
  */
 export function classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored {
@@ -449,7 +475,6 @@ export function classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored {
   const presence = presenceOf(box)
   const uncapped = rowActOf(ask, box)
   const act      = (capacity === null) ? uncapped : cappedActOf(uncapped, capacity)
-  if ((ask.op !== 'get') && isWriteAct(act)) { return { ok: true, act, parent, box: ask.record, presence, capacity } }
   return isOkAct(act) ? { ok: true, act, parent, box, presence, capacity } : { ok: false, act, parent, box, presence, capacity }
 }
 

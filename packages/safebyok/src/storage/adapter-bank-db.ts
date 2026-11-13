@@ -341,29 +341,31 @@ export abstract class AdapterBankDB implements BankDB {
 
   // == [Protected, for a subclass to write]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
   // Each is one atomic step: fetch the rows the classifier needs, classify them, and when `isWriteAct(act)` is true, store
-  // what the ask stores. A store that can run code of its own may take the whole step there.
+  // the record sent and return the row the datastore reports storing in place of the one fetched, checked by the bank
+  // classifier's `writtenBankOf`, `writtenGateOf`, `writtenVaultOf` or `writtenBoxOf`. A store that can run code of its own
+  // may take the whole step there.
 
   /** In one step: fetch the bank row, its `main` gate row and every vault row of the bank, and return `this.classifyEnsureBank(ask, fetched)`. */
   protected abstract doEnsureBank(ask: BankEnsureAsk): Awaitable<BankEnsureStored>
-  /** In one step: fetch the bank row and its `main` gate row, classify, and store `ask.record` and `ask.gate` if the act is a write. */
+  /** In one step: fetch the bank row and its `main` gate row, classify, and if the act is a write, store `ask.record` and `ask.gate` and return the rows stored. */
   protected abstract doBuildBank(ask: BankBuildAsk): Awaitable<BankBuildStored>
-  /** In one step: fetch the bank row and the gate row, classify, and store `ask.record` if the act is a write. */
+  /** In one step: fetch the bank row and the gate row, classify, and if the act is a write, store `ask.record` and return the row stored. */
   protected abstract doPutGate(ask: GatePutAsk): Awaitable<GateStored>
-  /** In one step: fetch the bank row, classify, and if the act is a write, store `ask.record` and delete every gate, vault and box row under the bank. */
+  /** In one step: fetch the bank row, classify, and if the act is a write, store `ask.record`, delete every gate, vault and box row under the bank, and return the row stored. */
   protected abstract doDelBank(ask: BankDelAsk): Awaitable<BankDelStored>
   /** In one step: fetch the bank row and the vault row at `ask`'s scope, and return `this.classifyStoredVault(ask, fetched)`. */
   protected abstract doGetVault(ask: VaultGetAsk): Awaitable<VaultStored>
-  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and store `ask.record` if the act is a write. */
+  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and if the act is a write, store `ask.record` and return the row stored. */
   protected abstract doPutVault(ask: VaultPutAsk): Awaitable<VaultStored>
-  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and if the act is a write, store `ask.record` and delete that life's boxes. */
+  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and if the act is a write, store `ask.record`, delete that life's boxes, and return the row stored. */
   protected abstract doDelVault(ask: VaultDelAsk): Awaitable<VaultStored>
   /** In one step: fetch the vault row and every box row of the asked-for life, and return `this.classifyStoredBoxes(ask, fetched)`. */
   protected abstract doListBoxes(ask: BoxListAsk): Awaitable<BoxesStored>
   /** In one step: fetch the vault row and the box row `ask` names, and return `this.classifyStoredBox(ask, fetched)`. */
   protected abstract doGetBox(ask: BoxGetAsk): Awaitable<BoxStored>
-  /** In one step: fetch the vault row, the box row and the vault's capacity at `ask`'s address, classify, and store `ask.record` if the act is a write. */
+  /** In one step: fetch the vault row, the box row and the vault's capacity at `ask`'s address, classify, and if the act is a write, store `ask.record` and return the row stored. */
   protected abstract doPutBox(ask: BoxPutAsk): Awaitable<BoxStored>
-  /** In one step: fetch the vault row and the box row at `ask`'s address, classify, and store `ask.record` if the act is a write. */
+  /** In one step: fetch the vault row and the box row at `ask`'s address, classify, and if the act is a write, store `ask.record` and return the row stored. */
   protected abstract doDelBox(ask: BoxDelAsk): Awaitable<BoxStored>
   /** Delete the vault and box rows of an ended life under the bank, and count the box rows left in it. */
   protected abstract doTidyGone(ask: BoxTidyAsk): Awaitable<Tidied>

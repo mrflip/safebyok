@@ -1,6 +1,6 @@
 /** ConvexBankDB: the shared BankDB battery run through a real ConvexClient, plus tests of its own refusals, options and cascades. */
 
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { anyApi } from 'convex/server'
 import type { ConvexClient } from 'convex/browser'
 import type { BankScope, BX, VaultScope } from 'safebyok/storage'
@@ -132,16 +132,40 @@ function failNextCall(bankDB: ConvexBankDB, text = '[Request ID: 0123456789abcde
   for (const spy of spies) { spy.mockImplementationOnce(fail) }
 }
 
+/** The row fields of the component's documents. */
+const RowFields = ['bank', 'gate', 'vault', 'box']
+
+// convex-test's database is not exported, so this alters each document on its way into the database, at the syscall that writes it.
+/** Until the test ends, have the deployment's database store a row other than the one each write sends, as a datastore that alters what it stores would. */
+function storeOtherwise(): void {
+  /** The runtime's syscall that writes, as convex-test installs it on the global `Convex`. */
+  type AsyncSyscall = (op: string, jsonArgs: string) => Promise<string>
+  const convex = (globalThis as unknown as { Convex: { asyncSyscall: unknown } }).Convex
+  // convex-test's getter answers the syscall of the test running, so the original getter is called at each write.
+  const descriptor = Object.getOwnPropertyDescriptor(convex, 'asyncSyscall') as { get: (this: unknown) => AsyncSyscall }
+  const spy = vi.spyOn(convex, 'asyncSyscall', 'get').mockImplementation(() => {
+    const asyncSyscall = descriptor.get.call(convex)
+    return async (op: string, jsonArgs: string) => {
+      if ((op !== '1.0/insert') && (op !== '1.0/replace')) { return await asyncSyscall(op, jsonArgs) }
+      const args = JSON.parse(jsonArgs) as { value: Record<string, unknown> }
+      for (const field of RowFields) { if (Object.hasOwn(args.value, field)) { args.value[field] = TH.storedOtherwiseOf(args.value[field]) } }
+      return await asyncSyscall(op, JSON.stringify(args))
+    }
+  })
+  onTestFinished(() => { spy.mockRestore() })
+}
+
 TH.describeBankDBBattery("ConvexBankDB over a ConvexClient", {
-  makeBankDB:          (opts) => bankDBOn(deploy(TH.componentHost()), opts),
-  makeTwin:            (bankDB) => bankDBOn(madeOf(bankDB).deployment, madeOf(bankDB).opts),
-  makeCappedBankDB:    (maxBoxes) => bankDBOn(deploy(TH.componentHost()), { maxBoxes }),
-  makeBankDBFor:       () => {
+  makeBankDB:            (opts) => bankDBOn(deploy(TH.componentHost()), opts),
+  makeTwin:              (bankDB) => bankDBOn(madeOf(bankDB).deployment, madeOf(bankDB).opts),
+  makeCappedBankDB:      (maxBoxes) => bankDBOn(deploy(TH.componentHost()), { maxBoxes }),
+  makeBankDBFor:         () => {
     const deployment = deploy(TH.bankHostWith(TH.bySubject))
     return (user_id) => new ConvexBankDB({ client: deployment.client(user_id), api: deployment.api.safebyokBank })
   },
-  _cheat_rowsOf:       convexRowsOf,
-  _cheat_failNextCall: (bankDB) => { failNextCall(bankDB) },
+  _cheat_rowsOf:         convexRowsOf,
+  _cheat_failNextCall:   (bankDB) => { failNextCall(bankDB) },
+  _cheat_storeOtherwise: storeOtherwise,
 })
 
 describe("ConvexBankDB's refusals", () => {

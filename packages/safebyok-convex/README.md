@@ -56,9 +56,10 @@ directly, so the component checks each ask with the core's own checks before it 
 refuses one that fails them with a `ConvexError` whose `data` has the kind and the core's message.
 It then fetches the row asked for and the row above it, classifies the ask with the core's
 classifier, and stores the record if the outcome is a write, all in one
-mutation. It answers with the rows as it fetched them, and whether it wrote: the client classifies
-the same rows to the same outcome, and refuses `unexpected_error` should the two disagree, which
-means a component out of step with the client's copy of safebyok.
+mutation. It answers with the rows as it fetched them, and the rows it stored, read back, if it
+wrote: the client classifies the fetched rows to the same outcome, and refuses `unexpected_error`
+should that outcome and whether it wrote disagree, which means a component out of step with the
+client's copy of safebyok. A write answers the rows stored.
 
 ## Use
 

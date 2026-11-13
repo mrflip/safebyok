@@ -132,7 +132,7 @@ export function oneRevisionTwoFates(received: unknown): VaultError { return new 
 export function nothingStoredWhereLive(): VaultError { return new VaultError('record_conflict', Phrases.NothingStoredWhereLive, { rows: { dbhas: null } }) }
 
 /** A `storage_issue` refusal: storage delivered `received`, which disagrees with `pins`, the fields of what was sent.
- * `pins` is the record itself for a record stored (`as_sent`), else its scope.
+ * `pins` is the scope sent, and for a record stored (`as_sent`) also the record sent's revision and life tokens.
  */
 export function deliveredNotAsSent(fielding: 'as_sent' | 'as_got' | 'as_db', received: object, pins: object): VaultError {
   const message = (fielding === 'as_db') ? Phrases.RecordOfOtherScope : Phrases.AnswerNotAsSent

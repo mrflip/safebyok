@@ -10,7 +10,7 @@ import { BankDBVersion, bankScopepathOf, boxPlaceOf, boxScopepathOf, filedIn, ga
 import { IdbBankDB, idbBankDB } from '../src/idb-bank-db'
 import type { IdbBankDBOpts } from '../src/idb-bank-db'
 
-// == [World]: databaseNameOf, makeBankDB, idbRowsOf, failNextCall, dbNamesNow, plantClosedDB
+// == [World]: databaseNameOf, makeBankDB, idbRowsOf, failNextCall, storeOtherwise, dbNamesNow, plantClosedDB
 
 /** The database name each BankDB under test was made with. */
 const dbNameOf = new WeakMap<IdbBankDB, string>()
@@ -79,6 +79,15 @@ const failNextCall = (): void => {
   })
 }
 
+/** From now on, have IndexedDB store a row other than the one each write sends, as a datastore that alters what it stores would. */
+const storeOtherwise = (): void => {
+  // The original put is held to be called with the store as `this`.
+  const { put } = IDBObjectStore.prototype // eslint-disable-line @typescript-eslint/unbound-method
+  vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (this: IDBObjectStore, row: unknown, scopepath?: IDBValidKey) {
+    return put.call(this, TH.storedOtherwiseOf(row), scopepath)
+  })
+}
+
 /** The names of all databases IndexedDB currently has. */
 async function dbNamesNow(): Promise<string[]> {
   const dbs = await indexedDB.databases()
@@ -107,9 +116,10 @@ afterEach(() => {
 TH.describeBankDBBattery("IdbBankDB", {
   makeBankDB,
   makeTwin,
-  _cheat_rowsOf:       idbRowsOf,
-  makeCappedBankDB:    (maxBoxes) => makeBankDB({ maxBoxes }),
-  _cheat_failNextCall: failNextCall,
+  _cheat_rowsOf:         idbRowsOf,
+  makeCappedBankDB:      (maxBoxes) => makeBankDB({ maxBoxes }),
+  _cheat_failNextCall:   failNextCall,
+  _cheat_storeOtherwise: storeOtherwise,
 })
 
 describe("IdbBankDB's options", () => {

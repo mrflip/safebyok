@@ -4,8 +4,8 @@ export const BankFunctionsSql = `-- safebyok-postgres: the functions PostgresBan
 --
 -- Each write function checks a record against the stored rows and stores it, in one call. It does not throw when it
 -- stores nothing. It returns one row, which says whether it stored the record (ok), and when it did, what happened
--- (act: born, replaced, deleted or reborn), the rows as they are now, and what was stored before (presence: void, live
--- or gone). When it stores nothing, it returns the rows as they stand, and PostgresBankDB works out the answer from them.
+-- (act: born, replaced, deleted or reborn), the rows as they are now, the row written as the statement that stored it
+-- returned it, and what was stored before (presence: void, live or gone). When it stores nothing, it returns the rows as they stand, and PostgresBankDB works out the answer from them.
 -- PostgresBankDB calls a vault or box function only when the record may replace the row it expects, and the gate
 -- function for every gate verb.
 -- A function never overwrites a row whose fmt differs from the record's, and never stores a row under a row above
@@ -69,15 +69,16 @@ DECLARE
 BEGIN
   ok := false;
   IF new_bank.am = 'a' AND new_bank.revision_seq = 0 THEN
-    INSERT INTO safebyok_banks VALUES (new_bank.*)
-    ON CONFLICT (user_id, banklabel) DO NOTHING;
+    INSERT INTO safebyok_banks AS b VALUES (new_bank.*)
+    ON CONFLICT (user_id, banklabel) DO NOTHING
+    RETURNING safebyok_record(to_jsonb(b)) INTO bank;
     ok := FOUND;
   END IF;
 
   IF ok THEN
-    INSERT INTO safebyok_gates VALUES (new_main.*);
+    INSERT INTO safebyok_gates AS g VALUES (new_main.*)
+    RETURNING safebyok_record(to_jsonb(g)) INTO gate;
     act := 'born';  presence := 'void';
-    bank := safebyok_record(to_jsonb(new_bank));  gate := safebyok_record(to_jsonb(new_main));
     PERFORM safebyok_tell(NULL, bank);
     PERFORM safebyok_tell(bank, gate);
     RETURN NEXT;  RETURN;
@@ -116,7 +117,8 @@ BEGIN
     AND  b.bank_tok = expected.bank_tok
     AND  b.fmt = new_bank.fmt
     AND  b.revision_seq = new_bank.revision_seq - 1
-    AND  b.am <> new_bank.am;
+    AND  b.am <> new_bank.am
+  RETURNING safebyok_record(to_jsonb(b)) INTO bank;
   ok := FOUND;
 
   IF ok THEN
@@ -125,11 +127,10 @@ BEGIN
     DELETE FROM safebyok_gates  AS g WHERE (g.user_id, g.banklabel) = (new_bank.user_id, new_bank.banklabel);
     act      := CASE WHEN new_bank.am = 'a' THEN 'reborn' ELSE 'deleted' END;
     presence := CASE WHEN expected.am = 'a' THEN 'live' ELSE 'gone' END;
-    bank     := safebyok_record(to_jsonb(new_bank));
     PERFORM safebyok_tell(NULL, bank);
     IF new_bank.am = 'a' THEN
-      INSERT INTO safebyok_gates VALUES (new_main.*);
-      gate := safebyok_record(to_jsonb(new_main));
+      INSERT INTO safebyok_gates AS g VALUES (new_main.*)
+      RETURNING safebyok_record(to_jsonb(g)) INTO gate;
       PERFORM safebyok_tell(bank, gate);
     END IF;
     RETURN NEXT;  RETURN;
@@ -170,13 +171,14 @@ BEGIN
       AND  g.am = expected.am
       AND  g.gate_tok = expected.gate_tok
       AND  g.fmt = new_gate.fmt
-      AND  g.revision_seq = new_gate.revision_seq - 1;
+      AND  g.revision_seq = new_gate.revision_seq - 1
+    RETURNING safebyok_record(to_jsonb(g)) INTO gate;
     ok := FOUND;
   END IF;
 
   IF ok THEN
     act := 'replaced';  presence := 'live';
-    bank := safebyok_record(to_jsonb(its_bank));  gate := safebyok_record(to_jsonb(new_gate));
+    bank := safebyok_record(to_jsonb(its_bank));
     PERFORM safebyok_tell(bank, gate);
     RETURN NEXT;  RETURN;
   END IF;
@@ -211,13 +213,14 @@ BEGIN
     SET    (fmt, am, revision_tok, revision_seq, registered_at, written_at, bank_tok, vault_tok)
          = (EXCLUDED.fmt, EXCLUDED.am, EXCLUDED.revision_tok, EXCLUDED.revision_seq, EXCLUDED.registered_at, EXCLUDED.written_at, EXCLUDED.bank_tok, EXCLUDED.vault_tok)
     WHERE  v.bank_tok <> EXCLUDED.bank_tok
-      AND  v.fmt = EXCLUDED.fmt;
+      AND  v.fmt = EXCLUDED.fmt
+    RETURNING safebyok_record(to_jsonb(v)) INTO vault;
     ok := FOUND;
   END IF;
 
   IF ok THEN
     act := 'born';  presence := 'void';
-    bank := safebyok_record(to_jsonb(its_bank));  vault := safebyok_record(to_jsonb(new_vault));
+    bank := safebyok_record(to_jsonb(its_bank));
     PERFORM safebyok_tell(bank, vault);
     RETURN NEXT;  RETURN;
   END IF;
@@ -259,7 +262,8 @@ BEGIN
       AND  v.vault_tok = expected.vault_tok
       AND  v.fmt = new_vault.fmt
       AND  v.revision_seq = new_vault.revision_seq - 1
-      AND  (v.am = 'a' OR new_vault.am = 'a');
+      AND  (v.am = 'a' OR new_vault.am = 'a')
+    RETURNING safebyok_record(to_jsonb(v)) INTO vault;
     ok := FOUND;
   END IF;
 
@@ -271,7 +275,7 @@ BEGIN
     END IF;
     act      := CASE WHEN expected.am <> 'a' THEN 'reborn' WHEN new_vault.am = 'a' THEN 'replaced' ELSE 'deleted' END;
     presence := CASE WHEN expected.am = 'a' THEN 'live' ELSE 'gone' END;
-    bank     := safebyok_record(to_jsonb(its_bank));  vault := safebyok_record(to_jsonb(new_vault));
+    bank     := safebyok_record(to_jsonb(its_bank));
     PERFORM safebyok_tell(bank, vault);
     RETURN NEXT;  RETURN;
   END IF;
@@ -304,14 +308,15 @@ BEGIN
   IF its_vault.am = 'a' AND its_vault.bank_tok = new_box.bank_tok AND its_vault.vault_tok = new_box.vault_tok AND its_vault.fmt = 6003
      AND new_box.am = 'a' AND new_box.revision_seq = 0
      AND boxcount < maxboxes THEN
-    INSERT INTO safebyok_boxes VALUES (new_box.*)
-    ON CONFLICT (user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel) DO NOTHING;
+    INSERT INTO safebyok_boxes AS x VALUES (new_box.*)
+    ON CONFLICT (user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel) DO NOTHING
+    RETURNING safebyok_record(to_jsonb(x)) INTO box;
     ok := FOUND;
   END IF;
 
   IF ok THEN
     act := 'born';  presence := 'void';
-    parent := safebyok_record(to_jsonb(its_vault));  box := safebyok_record(to_jsonb(new_box));
+    parent := safebyok_record(to_jsonb(its_vault));
     PERFORM safebyok_tell(parent, box);
     RETURN NEXT;  RETURN;
   END IF;
@@ -356,14 +361,15 @@ BEGIN
       AND  x.box_tok = expected.box_tok
       AND  x.fmt = new_box.fmt
       AND  x.revision_seq = new_box.revision_seq - 1
-      AND  (x.am = 'a' OR new_box.am = 'a');
+      AND  (x.am = 'a' OR new_box.am = 'a')
+    RETURNING safebyok_record(to_jsonb(x)) INTO box;
     ok := FOUND;
   END IF;
 
   IF ok THEN
     act      := CASE WHEN expected.am <> 'a' THEN 'reborn' WHEN new_box.am = 'a' THEN 'replaced' ELSE 'deleted' END;
     presence := CASE WHEN expected.am = 'a' THEN 'live' ELSE 'gone' END;
-    parent := safebyok_record(to_jsonb(its_vault));  box := safebyok_record(to_jsonb(new_box));
+    parent := safebyok_record(to_jsonb(its_vault));
     PERFORM safebyok_tell(parent, box);
     RETURN NEXT;  RETURN;
   END IF;

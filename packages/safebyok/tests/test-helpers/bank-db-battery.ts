@@ -15,6 +15,7 @@ import { describeDels } from './bank-db-battery-dels'
 import { describeRaces } from './bank-db-battery-races'
 import { describeIdentity } from './bank-db-battery-identity'
 import { describeFlaws } from './bank-db-battery-flaws'
+import { describeStoredOtherwise } from './bank-db-battery-stored'
 
 // == [The hooks a bankDB hands the battery]: BankDBRowCheats, BankDBBatteryOpts
 
@@ -54,6 +55,10 @@ export type BankDBBatteryOpts<DBT extends BankDB = BankDB> = {
   makeBankDBFor?: () => Awaitable<(user_id: string | null) => BankDB>
   /** Makes the bankDB's next call to its storage fail as its storage would; without it, the battery has no case of that failure. */
   _cheat_failNextCall?: (bankDB: DBT) => Awaitable<void>
+  /** Makes the bankDB's storage, from now on, store each row the bankDB writes as `storedOtherwiseOf` makes it, and report that row as written,
+   * as a datastore that stores other than the record sent would; without it, the battery has no cases of that.
+   */
+  _cheat_storeOtherwise?: (bankDB: DBT) => Awaitable<void>
   /** The AdapterBankDB behind a client, where the battery slips a rival write in; without it, `bankDB` itself. */
   _cheat_adapterOf?: (bankDB: DBT) => AdapterBankDB
   /** False for a bankDB whose watch hears nothing; the battery then has no cases of a watch. */
@@ -65,15 +70,16 @@ export type BankDBBatteryOpts<DBT extends BankDB = BankDB> = {
 
 /** The check of what a bankDB hands the battery: each hook a function, judged by its interface alone. */
 const batteryOpts = objCheck(({ fn, bool }) => ({
-  makeBankDB:           fn<BankDBBatteryOpts['makeBankDB']>(),
-  _cheat_rowsOf:        fn<BankDBBatteryOpts['_cheat_rowsOf']>(),
-  makeTwin:             fn<NonNullable<BankDBBatteryOpts['makeTwin']>>().optional(),
-  makeCappedBankDB:     fn<NonNullable<BankDBBatteryOpts['makeCappedBankDB']>>().optional(),
-  makeBankDBFor:        fn<NonNullable<BankDBBatteryOpts['makeBankDBFor']>>().optional(),
-  _cheat_failNextCall:  fn<NonNullable<BankDBBatteryOpts['_cheat_failNextCall']>>().optional(),
-  _cheat_adapterOf:     fn<NonNullable<BankDBBatteryOpts['_cheat_adapterOf']>>().optional(),
-  watches:              bool.optional(),
-  boxNoticesCarryVault: bool.optional(),
+  makeBankDB:            fn<BankDBBatteryOpts['makeBankDB']>(),
+  _cheat_rowsOf:         fn<BankDBBatteryOpts['_cheat_rowsOf']>(),
+  makeTwin:              fn<NonNullable<BankDBBatteryOpts['makeTwin']>>().optional(),
+  makeCappedBankDB:      fn<NonNullable<BankDBBatteryOpts['makeCappedBankDB']>>().optional(),
+  makeBankDBFor:         fn<NonNullable<BankDBBatteryOpts['makeBankDBFor']>>().optional(),
+  _cheat_failNextCall:   fn<NonNullable<BankDBBatteryOpts['_cheat_failNextCall']>>().optional(),
+  _cheat_storeOtherwise: fn<NonNullable<BankDBBatteryOpts['_cheat_storeOtherwise']>>().optional(),
+  _cheat_adapterOf:      fn<NonNullable<BankDBBatteryOpts['_cheat_adapterOf']>>().optional(),
+  watches:               bool.optional(),
+  boxNoticesCarryVault:  bool.optional(),
 }), 'bad_option')
 
 // == [The world the cases share]: Built, BatteryWorld, worldOf
@@ -99,6 +105,9 @@ export type BatteryWorld = {
   /** Whether the bankDB gave {@link BankDBBatteryOpts._cheat_failNextCall}; without it, `failNextCall` throws. */
   canFail:              boolean
   failNextCall:         (bankDB: BankDB) => Promise<void>
+  /** Whether the bankDB gave {@link BankDBBatteryOpts._cheat_storeOtherwise}; without it, `storeOtherwise` throws. */
+  canStoreOtherwise:    boolean
+  storeOtherwise:       (bankDB: BankDB) => Promise<void>
   watches:              boolean
   boxNoticesCarryVault: boolean
 }
@@ -109,7 +118,7 @@ function notGiven(hookname: string) { return (): never => { throw new TypeError(
 // Every bankDB a world's hooks are handed is one its own factories made, so narrowing one to DBT is safe;
 // a world given no `_cheat_adapterOf` was handed AdapterBankDBs.
 function worldOf<DBT extends BankDB>(opts: BankDBBatteryOpts<DBT>): BatteryWorld {
-  const { makeBankDB, _cheat_rowsOf, makeTwin, makeCappedBankDB, makeBankDBFor, _cheat_failNextCall, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
+  const { makeBankDB, _cheat_rowsOf, makeTwin, makeCappedBankDB, makeBankDBFor, _cheat_failNextCall, _cheat_storeOtherwise, _cheat_adapterOf, watches = true, boxNoticesCarryVault = true } = opts
   const fresh = async (dbOpts?: AdapterBankDBOpts): Promise<BankDB> => await makeBankDB(dbOpts)
   const putWith = async ({ vault: withVault = true, box: withBox = false } = {}): Promise<Built> => {
     const bankDB = await fresh()
@@ -125,15 +134,17 @@ function worldOf<DBT extends BankDB>(opts: BankDBBatteryOpts<DBT>): BatteryWorld
   return {
     fresh,
     putWith,
-    rowsOf:        (bankDB) => _cheat_rowsOf(bankDB as DBT),
-    twinOf:        async (bankDB) => (makeTwin ? await makeTwin(bankDB as DBT) : bankDB),
-    adapterOf:     (bankDB) => (_cheat_adapterOf ? _cheat_adapterOf(bankDB as DBT) : bankDB as AdapterBankDB),
-    hasCap:        makeCappedBankDB !== undefined,
-    makeCapped:    makeCappedBankDB ? async (maxBoxes) => await makeCappedBankDB(maxBoxes) : notGiven('makeCappedBankDB'),
-    hasIdentity:   makeBankDBFor !== undefined,
-    makeBankDBFor: makeBankDBFor ? async () => await makeBankDBFor() : notGiven('makeBankDBFor'),
-    canFail:       _cheat_failNextCall !== undefined,
-    failNextCall:  _cheat_failNextCall ? async (bankDB) => { await _cheat_failNextCall(bankDB as DBT) } : notGiven('_cheat_failNextCall'),
+    rowsOf:            (bankDB) => _cheat_rowsOf(bankDB as DBT),
+    twinOf:            async (bankDB) => (makeTwin ? await makeTwin(bankDB as DBT) : bankDB),
+    adapterOf:         (bankDB) => (_cheat_adapterOf ? _cheat_adapterOf(bankDB as DBT) : bankDB as AdapterBankDB),
+    hasCap:            makeCappedBankDB !== undefined,
+    makeCapped:        makeCappedBankDB ? async (maxBoxes) => await makeCappedBankDB(maxBoxes) : notGiven('makeCappedBankDB'),
+    hasIdentity:       makeBankDBFor !== undefined,
+    makeBankDBFor:     makeBankDBFor ? async () => await makeBankDBFor() : notGiven('makeBankDBFor'),
+    canFail:           _cheat_failNextCall !== undefined,
+    failNextCall:      _cheat_failNextCall ? async (bankDB) => { await _cheat_failNextCall(bankDB as DBT) } : notGiven('_cheat_failNextCall'),
+    canStoreOtherwise: _cheat_storeOtherwise !== undefined,
+    storeOtherwise:    _cheat_storeOtherwise ? async (bankDB) => { await _cheat_storeOtherwise(bankDB as DBT) } : notGiven('_cheat_storeOtherwise'),
     watches,
     boxNoticesCarryVault,
   }
@@ -156,6 +167,7 @@ export function describeBankDBBattery<DBT extends BankDB>(label: string, opts: B
     describeRaces(world)
     describeIdentity(world)
     describeFlaws(world)
+    if (world.canStoreOtherwise) { describeStoredOtherwise(world) }
   })
 }
 // --

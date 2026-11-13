@@ -120,11 +120,12 @@ function makeTwin(bankDB: GraphQLBankDB): GraphQLBankDB {
 
 describe("the README's Yoga recipe, its browser half", () => {
   TH.describeBankDBBattery("the README's Yoga recipe", {
-    makeBankDB:       async (opts) => await makeBankDB(opts),
-    makeCappedBankDB: async (maxBoxes) => await makeBankDB({ maxBoxes }),
+    makeBankDB:            async (opts) => await makeBankDB(opts),
+    makeCappedBankDB:      async (maxBoxes) => await makeBankDB({ maxBoxes }),
     makeTwin,
-    _cheat_rowsOf:    () => TH.rowsOf(),
-    _cheat_adapterOf: (bankDB) => serverOf(bankDB).adapter,
+    _cheat_rowsOf:         () => TH.rowsOf(),
+    _cheat_adapterOf:      (bankDB) => serverOf(bankDB).adapter,
+    _cheat_storeOtherwise: TH.storeOtherwise,
   })
 })
 
