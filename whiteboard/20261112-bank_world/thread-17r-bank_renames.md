@@ -1,6 +1,6 @@
 # Thread 17r: bank_renames (2026-11-12)
 
-Branch `20261112-bank_renames`, PR #TBD, stacked on #686. Justify: green (safebyok 2964, react 262, convex 304, demo 99, e2e 549).
+Branch `20261112-bank_renames`, PR #687, stacked on #686. Justify: green (safebyok 2964, react 262, convex 304, demo 99, e2e 549).
 
 * **Built**: four commits, plus an empty changeset (nothing exported was renamed).
   * convex `Tallies.refuses` is `wouldPassLimit` and `Tallies.weigh` is `sizeOf` (`src/component/tallies.ts`, its caller in `banks.ts`, `tests/component/tallies.test.ts`). `refuses` returned true when a put would pass a limit, which is how `wouldPassLimit` reads, so no boolean was inverted.
