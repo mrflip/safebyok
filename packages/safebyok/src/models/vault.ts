@@ -32,7 +32,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   declare readonly bank_tok:   string
   declare readonly listing:    VaultListing
 
-  /** The box listing last asked for, of the life in hand; null until asked for. */
+  /** The box listing last built by {@link boxListing}, null until then. */
   #boxListing: BoxListing | null = null
   // --
 
@@ -48,8 +48,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   get fmt(): number { return this.central.fmt }
 
   /** The listing of this vault's boxes in the life in hand.
-   * Another life of the vault gets a new listing, so ask for it here each time. A deleted vault's has no boxes, and
-   * storage refuses its calls as `absent_vault`.
+   * Another life of the vault gets a new listing, so ask for it here each time. A deleted vault still has one, but
+   * storage refuses its calls.
    */
   get boxListing(): BoxListing {
     if (this.#boxListing?.vault_tok !== this.vault_tok) { this.#boxListing = this.listing.boxListingOf(this) }
