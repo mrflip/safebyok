@@ -161,7 +161,7 @@ export class Device {
   /** Non-throwing form of {@link ensureBank}. */
   tryEnsureBank(): Promise<Outcome<Bank>> { return outcomeOf(() => this.ensureBank()) }
 
-  // Two calls under way share the one bank, its listing's, and each brings it up.
+  // Two calls under way with a bank stored both get the one bank of the listing; with none stored, the second refuses `already_asking`, the first's gating being open.
   /** Bring up the bank, refusing if a sweep or a vacate lands meanwhile. */
   async #bringUp(): Promise<Bank> {
     const { device_tok } = await this.deviceDB.ensureCachedDevice(this.scope)
