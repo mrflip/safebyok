@@ -10,7 +10,7 @@
 * **At once**: 3 threads.
 * **Status** (2026-11-13, early): #679 and #676 merged. Ready, one line: #681 → #682 → #684 →
   #683 → 18 #685 → 19 #686 → 17r #687 (#687 the top, filed at 251d43923). T #680 ready, on
-  main. The second Closer Look running (opus, at 089907992). 17 `bank_docs` (opus) building from
+  main. The second Closer Look is in its tab (https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB#39e7c475-c34f), awaiting the Coach's replies. 17 `bank_docs` (opus) building from
   #686; its filing rebases it onto #687 (its sprintbasebranch is now 20261112-bank_renames). Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
