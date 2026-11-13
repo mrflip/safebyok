@@ -56,25 +56,43 @@ export const boxesFetched = v.object({ parent: v.any(), boxes: v.array(rowOfBox)
 export const boxFetched = v.object({ parent: v.any(), box: v.any() })
 // --
 
-// == [Written]: gateWritten, bankWritten, vaultWritten, boxWritten, boxPutWritten, tidied, rowsWatched
-// The rows a write fetched, as they stood before it, and whether it stored the ask's record.
+// == [Written]: bankBuilt, gateWritten, bankWritten, vaultWritten, boxWritten, boxPutWritten, tidied, rowsWatched
+// The rows a write fetched, as they stood before it, and as `written` the rows it then stored, read back, or null if it stored nothing.
 
-/** What `buildBank` and `putGate` return: the bank row, the gate row, and whether the ask's records were stored. */
-export const gateWritten = v.object({ bank: v.any(), gate: v.any(), wrote: v.boolean() })
+/** The bank and gate rows `buildBank` stored, or null. */
+const bankAndGateStored = v.union(v.null(), v.object({ bank: v.any(), gate: v.any() }))
 
-/** What `delBank` returns: the bank row, and whether its tombstone was stored. */
-export const bankWritten = v.object({ bank: v.any(), wrote: v.boolean() })
+/** The gate row stored, or null. */
+const gateStored = v.union(v.null(), v.object({ gate: v.any() }))
 
-/** What `putVault` and `delVault` return: the bank row, the vault row, and whether the ask's record was stored. */
-export const vaultWritten = v.object({ bank: v.any(), vault: v.any(), wrote: v.boolean() })
+/** The bank row stored, or null. */
+const bankStored = v.union(v.null(), v.object({ bank: v.any() }))
 
-/** What `delBox` returns: the vault row as `parent`, the box row, and whether the ask's record was stored. */
-export const boxWritten = v.object({ parent: v.any(), box: v.any(), wrote: v.boolean() })
+/** The vault row stored, or null. */
+const vaultStored = v.union(v.null(), v.object({ vault: v.any() }))
+
+/** The box row stored, or null. */
+const boxStored = v.union(v.null(), v.object({ box: v.any() }))
+
+/** What `buildBank` returns: the bank row, its `main` gate row, and the bank and gate rows stored. */
+export const bankBuilt = v.object({ bank: v.any(), gate: v.any(), written: bankAndGateStored })
+
+/** What `putGate` returns: the bank row, the gate row, and the gate row stored. */
+export const gateWritten = v.object({ bank: v.any(), gate: v.any(), written: gateStored })
+
+/** What `delBank` returns: the bank row, and the tombstone stored. */
+export const bankWritten = v.object({ bank: v.any(), written: bankStored })
+
+/** What `putVault` and `delVault` return: the bank row, the vault row, and the vault row stored. */
+export const vaultWritten = v.object({ bank: v.any(), vault: v.any(), written: vaultStored })
+
+/** What `delBox` returns: the vault row as `parent`, the box row, and the box row stored. */
+export const boxWritten = v.object({ parent: v.any(), box: v.any(), written: boxStored })
 
 /** What `putBox` returns: the fields of {@link boxWritten}, plus the vault life's capacity.
  * `roomless` is true when the record was not stored because the life would pass a limit.
  */
-export const boxPutWritten = v.object({ parent: v.any(), box: v.any(), capacity, wrote: v.boolean(), roomless: v.boolean() })
+export const boxPutWritten = v.object({ parent: v.any(), box: v.any(), capacity, written: boxStored, roomless: v.boolean() })
 
 /** What `tidyGone` returns: how many box rows the bank's live vaults hold afterward. */
 export const tidied = v.object({ totalCount: v.number() })

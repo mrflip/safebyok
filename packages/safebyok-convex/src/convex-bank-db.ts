@@ -87,7 +87,8 @@ export class ConvexBankDB extends DB.AdapterBankDB {
   // == [Protected, the generic calls of AdapterBankDB]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
   // A get is one query, and the rows it fetched are classified here. A write is one mutation, so one transaction: the component
   // fetches the rows, classifies the ask with the same classifier, and stores the record if the act is a write. It returns the
-  // rows as it fetched them, which are classified here to the same outcome, and whether it wrote, which is checked against it.
+  // rows as it fetched them, which are classified here to the same outcome, and the rows it stored, read back, or null if it
+  // stored nothing. Whether it stored is checked against the act, and a write answers the rows stored.
 
   protected async doEnsureBank(ask: BX.BankEnsureAsk): Promise<BX.BankEnsureStored> {
     const fetched = await runOrRefuse('doEnsureBank', () => this.#client.query(this.#api.ensureBank, { ask }))
@@ -95,18 +96,24 @@ export class ConvexBankDB extends DB.AdapterBankDB {
   }
 
   protected async doBuildBank(ask: BX.BankBuildAsk): Promise<BX.BankBuildStored> {
-    const { wrote, ...fetched } = await runOrRefuse('doBuildBank', () => this.#client.mutation(this.#api.buildBank, { ask }))
-    return storedAsWritten(this.classifyBuildBank(ask, fetched), wrote)
+    const { written, ...fetched } = await runOrRefuse('doBuildBank', () => this.#client.mutation(this.#api.buildBank, { ask }))
+    const stored = storedAsWritten(this.classifyBuildBank(ask, fetched), written !== null)
+    if (written === null) { return stored }
+    return { ...stored, parent: BX.writtenBankOf(ask, written.bank), gate: BX.writtenGateOf(ask.gate, written.gate) }
   }
 
   protected async doPutGate(ask: BX.GatePutAsk): Promise<BX.GateStored> {
-    const { wrote, ...fetched } = await runOrRefuse('doPutGate', () => this.#client.mutation(this.#api.putGate, { ask }))
-    return storedAsWritten(this.classifyStoredGate(ask, fetched), wrote)
+    const { written, ...fetched } = await runOrRefuse('doPutGate', () => this.#client.mutation(this.#api.putGate, { ask }))
+    const stored = storedAsWritten(this.classifyStoredGate(ask, fetched), written !== null)
+    if (written === null) { return stored }
+    return { ...stored, gate: BX.writtenGateOf(ask, written.gate) }
   }
 
   protected async doDelBank(ask: BX.BankDelAsk): Promise<BX.BankDelStored> {
-    const { wrote, ...fetched } = await runOrRefuse('doDelBank', () => this.#client.mutation(this.#api.delBank, { ask }))
-    return storedAsWritten(this.classifyDelBank(ask, fetched), wrote)
+    const { written, ...fetched } = await runOrRefuse('doDelBank', () => this.#client.mutation(this.#api.delBank, { ask }))
+    const stored = storedAsWritten(this.classifyDelBank(ask, fetched), written !== null)
+    if (written === null) { return stored }
+    return { ...stored, bank: BX.writtenBankOf(ask, written.bank) }
   }
 
   protected async doGetVault(ask: BX.VaultGetAsk): Promise<BX.VaultStored> {
@@ -115,13 +122,17 @@ export class ConvexBankDB extends DB.AdapterBankDB {
   }
 
   protected async doPutVault(ask: BX.VaultPutAsk): Promise<BX.VaultStored> {
-    const { wrote, ...fetched } = await runOrRefuse('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask }))
-    return storedAsWritten(this.classifyStoredVault(ask, fetched), wrote)
+    const { written, ...fetched } = await runOrRefuse('doPutVault', () => this.#client.mutation(this.#api.putVault, { ask }))
+    const stored = storedAsWritten(this.classifyStoredVault(ask, fetched), written !== null)
+    if (written === null) { return stored }
+    return { ...stored, vault: BX.writtenVaultOf(ask, written.vault) }
   }
 
   protected async doDelVault(ask: BX.VaultDelAsk): Promise<BX.VaultStored> {
-    const { wrote, ...fetched } = await runOrRefuse('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask }))
-    return storedAsWritten(this.classifyStoredVault(ask, fetched), wrote)
+    const { written, ...fetched } = await runOrRefuse('doDelVault', () => this.#client.mutation(this.#api.delVault, { ask }))
+    const stored = storedAsWritten(this.classifyStoredVault(ask, fetched), written !== null)
+    if (written === null) { return stored }
+    return { ...stored, vault: BX.writtenVaultOf(ask, written.vault) }
   }
 
   protected async doListBoxes(ask: BX.BoxListAsk): Promise<BX.BoxesStored> {
@@ -137,17 +148,23 @@ export class ConvexBankDB extends DB.AdapterBankDB {
   // The component refuses a write that would take the life past one of its limits, where the classifier, which counts only the
   // cap, found a write: that refusal is `vault_full`, with the box row stored.
   protected async doPutBox(ask: BX.BoxPutAsk): Promise<BX.BoxStored> {
-    const { wrote, roomless, ...fetched } = await runOrRefuse('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes }))
-    const stored = this.classifyStoredBox(ask, fetched)
-    if (! roomless) { return storedAsWritten(stored, wrote) }
-    const { parent, presence } = storedAsWritten(stored, true)
-    const box = (fetched.box === null) ? null : BX.storedBoxRow.parse(fetched.box)
-    return { ok: false, act: 'vault_full', parent, box, presence, capacity: fetched.capacity }
+    const { written, roomless, ...fetched } = await runOrRefuse('doPutBox', () => this.#client.mutation(this.#api.putBox, { ask, maxBoxes: this.#maxBoxes }))
+    const classified = this.classifyStoredBox(ask, fetched)
+    if (roomless) {
+      const { parent, presence } = storedAsWritten(classified, true)
+      const box = (fetched.box === null) ? null : BX.storedBoxRow.parse(fetched.box)
+      return { ok: false, act: 'vault_full', parent, box, presence, capacity: fetched.capacity }
+    }
+    const stored = storedAsWritten(classified, written !== null)
+    if (written === null) { return stored }
+    return { ...stored, box: BX.writtenBoxOf(ask, written.box) }
   }
 
   protected async doDelBox(ask: BX.BoxDelAsk): Promise<BX.BoxStored> {
-    const { wrote, ...fetched } = await runOrRefuse('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask }))
-    return storedAsWritten(this.classifyStoredBox(ask, fetched), wrote)
+    const { written, ...fetched } = await runOrRefuse('doDelBox', () => this.#client.mutation(this.#api.delBox, { ask }))
+    const stored = storedAsWritten(this.classifyStoredBox(ask, fetched), written !== null)
+    if (written === null) { return stored }
+    return { ...stored, box: BX.writtenBoxOf(ask, written.box) }
   }
 
   protected async doTidyGone(ask: BoxTidyAsk): Promise<Tidied> {

@@ -163,7 +163,7 @@ describe("fakeDeployment", () => {
     await vi.waitFor(() => { expect(heard).toHaveBeenCalledTimes(1) })
     expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank: null })
     const answer = await deployment.arrange((backend) => backend.withIdentity({ subject: 'u1' }).mutation(deployment.api.safebyokBank.buildBank, buildBankArgs))
-    expect(answer).to.deep.include({ bank: null, wrote: true })
+    expect(answer).to.deep.nested.include({ bank: null, 'written.bank': bank })
     expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ bank })
     expect(await client.query(deployment.api.safebyokBank.ensureBank, bankAsked)).to.deep.include({ bank })
   })

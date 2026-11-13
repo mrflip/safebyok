@@ -77,7 +77,7 @@ export class SafebyokBankComponent {
       }),
       buildBank: publicMutation({
         args:    CVX.askArgs,
-        returns: CVX.gateWritten,
+        returns: CVX.bankBuilt,
         handler: async (ctx, args) => {
           await demandCaller(ctx, args.ask)
           return await ctx.runMutation(banks.buildBank, args)
