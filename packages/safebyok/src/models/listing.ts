@@ -502,9 +502,7 @@ const deliveryFieldingOf = {
   got:     'none',    tidied:  'none',    timely:   'none',
 } as const satisfies Record<GoodAct | BadAct, DeliveryFielding>
 
-/** Demand that `record`, which storage delivered as `fielding` says, agrees with `scope`, and for a record stored (`as_sent`) with the revision pins of `sent`.
- * Throws a `storage_issue` where it does not.
- */
+/** Throw unless the delivered `record` is of `scope`, and, for a record stored (`as_sent`), carries the revision and life tokens of `sent`. */
 export function demandDeliveredAs(fielding: 'as_sent' | 'as_got' | 'as_db', record: object, scope: object, sent: object): void {
   const pins = (fielding === 'as_sent') ? { ...scope, ...SX.revisionPins.parse(sent) } : scope
   if (! isConsistent(record, pins)) { throw deliveredNotAsSent(fielding, record, pins) }
