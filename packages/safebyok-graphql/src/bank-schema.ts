@@ -274,7 +274,7 @@ type SafebyokBoxAnswer {${answerFields}
   dbhas:      SafebyokBoxRow
 }
 
-"""What tidyGone leaves of the box rows of ended lives: none; some, which one more call deletes; or many, which it does not."""
+"""What tidyGone leaves of the box rows of ended lives: none, some (one more call deletes them) or many (it takes more than one)."""
 enum SafebyokLeftover { ${leftoverVals.join(' ')} }
 
 """The result of tidyGone: the number of box rows left in the bank's live vaults, and what is left of those of ended lives."""

@@ -52,7 +52,7 @@ export type Budget = { count: number, size: number }
 /** A cascade's whole budget, for one mutation. */
 export function cascadeBudget(): Budget { return { count: ConvexTransactionWrittenDocuments / 2, size: ConvexTransactionReadSize / 2 } }
 
-/** One `tidyGone` batch's budget: what it may delete, or count of what is left. */
+/** One `tidyGone` batch's budget, for the rows it deletes and again for the rows it counts. */
 export function tidyBudget(): Budget { return { count: MaxTidiedBoxes, size: MaxTidiedBoxSize } }
 
 /** True once `budget` is spent. */
