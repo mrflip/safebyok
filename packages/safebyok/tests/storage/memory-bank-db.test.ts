@@ -68,10 +68,10 @@ function storeOtherwise(bankDB: MemoryBankDB): void {
 }
 
 TH.describeBankDBBattery("MemoryBankDB's battery", {
-  makeBankDB:          (opts) => new MemoryBankDB(opts),
-  makeCappedBankDB:    (maxBoxes) => new MemoryBankDB({ maxBoxes }),
-  _cheat_rowsOf:       memoryRowsOf,
-  _cheat_failNextCall: failNextCall,
+  makeBankDB:            (opts) => new MemoryBankDB(opts),
+  makeCappedBankDB:      (maxBoxes) => new MemoryBankDB({ maxBoxes }),
+  _cheat_rowsOf:         memoryRowsOf,
+  _cheat_failNextCall:   failNextCall,
   _cheat_storeOtherwise: storeOtherwise,
 })
 
