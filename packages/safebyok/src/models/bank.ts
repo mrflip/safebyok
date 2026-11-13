@@ -154,7 +154,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   /** Unlock this bank if it is locked: from the lease cached on this device if it can, else by asking the user. */
   async ensureUnlocked(): Promise<this> {
-    const gate = await this.maingate.ensureTimely(VX.Promptly); this.demandPromptable()
+    const gate = await this.maingate.ensureTimely(VX.Promptly); this.demandEnabled()
     if (this.isUnlocked) { return this }
     const cached = await Lease.buildFromCache(this.#leaseFriendOf(), gate)
     if (cached) { await this.#attachLease(cached); return this }
@@ -166,7 +166,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   /** Unlock by asking the user for a passphrase or passkey, even when a lease is attached or cached. */
   async unlock(): Promise<this> {
-    await this.maingate.ensureTimely(VX.Promptly); this.demandPromptable()
+    await this.maingate.ensureTimely(VX.Promptly); this.demandEnabled()
     return this.prompt('unlock_bank')
   }
 
@@ -177,7 +177,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
    * This Bank is then disabled for good, and the device has no bank until the next `device.ensureBank()`.
    */
   async delPrompt(): Promise<this> {
-    await this.maingate.ensureTimely(VX.Promptly); this.demandPromptable()
+    await this.maingate.ensureTimely(VX.Promptly); this.demandEnabled()
     return this.prompt('del_bank')
   }
 
@@ -235,7 +235,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   /** Attach `lease` to this bank, and cache it on this device. */
   async #attachLease(lease: Lease): Promise<void> {
-    this.demandAttachable()
+    this.demandEnabled()
     this.#lease = lease
     await lease.cacheAsCacheCan()
     this.align()
@@ -340,7 +340,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
   // --
 
-  // == [Guards]: isEnabled, isPresent, isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandPresent
+  // == [Guards]: isEnabled, isPresent, isLocked, isUnlocked, demandLease, demandPresent
 
   /** True while this bank is usable: its device is enabled, and it is listed and present. */
   override get isEnabled(): boolean { return super.isEnabled && this.isPresent }
@@ -361,12 +361,6 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     if (this.#lease === null) { throw needUnlocked() }
     return this.#lease
   }
-
-  /** Throw unless {@link isEnabled} and `isPresent`: what a prompt needs. */
-  demandPromptable(): this { return this.demandEnabled().demandPresent() }
-
-  /** Throw unless {@link isEnabled} and `isPresent`: what attaching a lease needs. */
-  demandAttachable(): this { return this.demandEnabled().demandPresent() }
 
   /** Demand that this bank is present. */
   demandPresent(): this {

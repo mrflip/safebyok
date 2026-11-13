@@ -1,5 +1,6 @@
 /** The bank listing: a stub listing of the device's one bank, whose row comes with every answer about its gate and vaults. */
 
+import { noop } from 'es-toolkit'
 import type { Modelkind } from '../helpers/consts'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
@@ -124,7 +125,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   }
 
   // The bank's watch is its vault listing's: no listing of its own starts one.
-  protected watchRows(): () => void { return stopNoWatch }
+  protected watchRows(): () => void { return noop }
 
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is BankRow { return ! (('gatelabel' in row) || ('vaultlabel' in row)) }
   // --
@@ -142,9 +143,3 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
   /** Always `'bank_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'bank_listing' { return 'bank_listing' satisfies Modelkind }
 }
-
-// == [Helpers]: stopNoWatch
-
-/** Stops nothing: a stub listing starts no watch. */
-function stopNoWatch(): void { /* no watch to stop */ }
-// --

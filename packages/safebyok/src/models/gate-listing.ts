@@ -1,5 +1,6 @@
 /** The gate listing: a stub listing of a bank's one gate, whose row comes with the bank's. */
 
+import { noop } from 'es-toolkit'
 import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
@@ -156,7 +157,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   protected doTryDel(): never { throw writtenByOwnVerbs() }
 
   // The bank's watch hears the gate row: no listing of its own starts one.
-  protected watchRows(): () => void { return stopNoWatch }
+  protected watchRows(): () => void { return noop }
 
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is GateRecord { return 'gatelabel' in row }
   // --
@@ -164,9 +165,3 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   /** Always `'gate_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'gate_listing' { return 'gate_listing' satisfies Modelkind }
 }
-
-// == [Helpers]: stopNoWatch
-
-/** Stops nothing: a stub listing starts no watch. */
-function stopNoWatch(): void { /* no watch to stop */ }
-// --

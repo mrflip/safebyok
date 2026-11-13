@@ -287,7 +287,7 @@ const ActOnBank: Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlock
 
 /** The main gate of `bank`, refreshed promptly. Throws unless the bank is enabled and present. */
 async function timelyGate(bank: Bank): Promise<Gate> {
-  const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandPromptable()
+  const gate = await bank.maingate.ensureTimely(VX.Promptly); bank.demandEnabled()
   return gate
 }
 
