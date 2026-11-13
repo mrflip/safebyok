@@ -226,7 +226,8 @@ describe("the proof", () => {
     vaultUi.expectRenders(['main deleted'])
     await TH.expectRefusal(vault.get({ maxMillisSinceRefresh: 0 }), 'vault_gone')
     expect(bank.vaultAt(VaultScopeGiven)).to.eq(vault)
-    expect(vault.boxListing).not.to.eq(deletedBoxes)
+    expect(deletedBoxes.isEnabled).to.be.false
+    TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
     boxesUi.expectRenders([])
     boxUi.expectRenders(['anthropic_api_key {"nickname":"work"}'])
     revealUi.expectRenders(['unexposed'])

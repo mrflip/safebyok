@@ -3,6 +3,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { ENCRYPTED } from '../../src/helpers/consts'
 import { parseLogger } from '../../src/helpers/logger'
+import * as Phrases from '../../src/helpers/phrases'
+import type { VaultError } from '../../src/refusals/errors'
 import * as TH from '../test-helpers'
 import { Dna, Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWorldWithBox, makeWorldWithRubble, nextUnlisted, unlockTyping, useVaultWorlds } from '../test-helpers/vault-world'
 
@@ -62,7 +64,7 @@ describe("vault.beginWatch", () => {
     await vault.del(vault)
     await TH.eventually(() => ! next.isPresent)
     await TH.expectRefusal(next.beginWatch(), 'vault_gone')
-    expect(next.boxListing.things).to.deep.equal([])
+    TH.expectSyncRefusal(() => next.boxListing, 'vault_gone')
     expect(next.listing.at(next.scope)).to.eq(next)
   })
 
@@ -128,8 +130,8 @@ describe("the boxes of a vault deleted", () => {
     expect(box.isEnabled).to.be.false
     expect(box.whisper).to.eq(ENCRYPTED)
     expect(box.getSnapshot()).to.deep.include({ isExposed: false, isVeiled: false })
-    expect(vault.boxListing).not.to.eq(boxListing)
-    expect(vault.boxListing.vault_tok).to.eq(vault.vault_tok)
+    expect(boxListing.isEnabled).to.be.false
+    TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
   })
 
   it("drop their whispers exposed at a tombstone the bank's watch delivers from elsewhere", async () => {
@@ -295,24 +297,25 @@ describe("a row no listing can set aside", () => {
 })
 
 describe("a damaged record is set aside, and nothing acts on it", () => {
-  it("lists it in damaged_rows, and refuses a get of it as 'damaged_row'", async () => {
+  it("leaves it out of the list, and refuses a get of it as 'damaged_row'", async () => {
     const { openNextSession } = await makeWorldWithRubble()
     const next = await openNextSession()
     await next.beginWatch()
-    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
+    expect(next.boxListing.snapshot).to.deep.equal([boxlabel])
     expect(next.boxListing.at({ ...next.scope, boxlabel: 'rubble' })).to.be.null
     await TH.expectRefusal(next.getBox('rubble'), 'damaged_row')
     await expect(next.getBox(boxlabel)).resolves.to.have.property('boxlabel', boxlabel)
   })
 
-  it("lists a row whose label fails its check as damaged, without disturbing the other boxes", async () => {
-    const { openNextSession, boxrows } = await makeWorldWithBox()
+  it("tells of a row whose label fails its check as damaged, without disturbing the other boxes", async () => {
+    const { openNextSession, boxrows, badnews } = await makeWorldWithBox()
     boxrows.set('Not A Label', { garbage: true })
     const next = await openNextSession()
     await next.beginWatch()
     const box = await next.getBox(boxlabel)
     expect(await box?.extractWhisper()).to.deep.equal(Whisper)
-    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['Not A Label'])
+    expect(next.boxListing.snapshot).to.deep.equal([boxlabel])
+    expect(damagedToldOf(badnews)).to.deep.equal([Phrases.boxStoredDamaged('Not A Label')])
   })
 
   it("drops an instance listed under it from the list, disabled", async () => {
@@ -331,7 +334,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
   })
 
   it("is not deleted by tryDelBox", async () => {
-    const { openNextSession, boxrows } = await makeWorldWithBox()
+    const { openNextSession, boxrows, badnews } = await makeWorldWithBox()
     boxrows.set('rubble', { garbage: true })
     boxrows.set('revised', { ...boxrows.get(boxlabel) as object, boxlabel: 'revised', whisper_ciphered: 'garbled' })
     const next = await openNextSession()
@@ -340,7 +343,7 @@ describe("a damaged record is set aside, and nothing acts on it", () => {
     await TH.expectBad(next.tryDelBox('revised'), 'damaged_row')
     expect(boxrows.get('rubble')).to.deep.equal({ garbage: true })
     expect(boxrows.get('revised')).to.have.property('am', 'a')
-    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.have.members(['rubble', 'revised'])
+    expect(damagedToldOf(badnews)).to.include.members([Phrases.boxStoredDamaged('rubble'), Phrases.boxStoredDamaged('revised')])
   })
 })
 
@@ -350,7 +353,11 @@ describe("a damaged box row met by the box listing", () => {
     const next = await openNextSession()
     badnews.length = 0
     await next.beginWatch()
-    expect(badnews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row'])
-    expect(next.boxListing.damaged_rows.map((row) => row.boxlabel)).to.deep.equal(['rubble'])
+    expect(damagedToldOf(badnews)).to.deep.equal([Phrases.boxStoredDamaged('rubble')])
   })
 })
+
+/** The message of each `damaged_row` refusal in `badnews`. */
+function damagedToldOf(badnews: readonly VaultError[]): string[] {
+  return badnews.filter((news) => news.refusalkind === 'damaged_row').map((news) => news.message)
+}
