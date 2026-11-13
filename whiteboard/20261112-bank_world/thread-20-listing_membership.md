@@ -1,6 +1,6 @@
 # Thread 20: listing_membership (2026-11-13)
 
-Branch `20261113-listing_membership`, PR #TBD, stacked on #689 (bank_tidy, at 94c6b57e0). Justify: safebyok
+Branch `20261113-listing_membership`, PR #691, stacked on #689 (bank_tidy, at 94c6b57e0). Justify: safebyok
 2969 tests and typecheck green, react 262, demo 99; full justify: see the PR's **Tests:** line.
 
 Built from the Coach's five answers to the Closer Look (2026-11-13), as the orchestrator read them.
