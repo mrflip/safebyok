@@ -8,12 +8,9 @@
   the rest); worker `opus` (agent default effort); reviewer `sonnet`
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
-* **Status** (2026-11-13): #679, #676, #680 and #681 merged. Ready, one line restacked onto main
-  (092cb3bf7) after #680 and #682 both edited notes/ci.md (main's text kept; #682's rename was in it):
-  16 #682 → #684 → #683 → 18 #685 → 19 #686 → 17r #687 → 17 #688 → 17t #689 → G #678 (#678 the top,
-  squashed at a0aa07572 after its wrapup update and review; justify green at #689's 94c6b57e0;
-  rollback tags `*-prerestack-20261113042250`). Closer Look 2's items are rows on *Open Matters*. Left:
-  the Coach's answers, then the resolutions sweep, the done note, and the sprint PR squashed on top.
+* **Status** (2026-11-13): line #682 → … → #689 → G #678 ready (restacked after #680, #681).
+  The Coach's Closer Look answers make threads 20–23 (below): 20 and 22 building, 21 and 23 after;
+  G rebased on top and rechecked last; then the resolutions sweep, done note and sprint PR.
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -325,6 +322,17 @@ The Coach (2026-11-12, in chat): "yes hooray! so, align to children, and local s
 of each review leaving narrated doc blocks behind. Also owed here: the Coach's put-off ruling on
 whether a wayin change keeps making other devices prove again (asked at the sprint's end). *Orchestrator, the Coach's rulings of 2026-11-12 for 17:* renames: Convex `Tallies.refuses` → `wouldPassLimit`, `Tallies.weigh` → `sizeOf`, React devmode's `Listing<ValT>` → `PanelListing`, and `useProvided` → `useProvidedDevice` if it is exported (left if internal); IndexedDB's `Rung`/`#ring`/`#bellname` stay (the Coach: "a good name for 'only people within earshot hear this' vs notify 'tell everyone, NOW'"). `Chute:` lines stay in doc blocks (the Coach: "it helps a user 'gosh I wish I could just call a method that takes an object/doesn't hydrate/etc'"): STYLE.md *Comments and doc blocks* names them as the exception to #purpose-not-machinery, with that reason. *Orchestrator:* the one-cascade item once here was done by 18 (`align()` to children); struck.
 **Size**: M.
+
+### Closer Look triage, 2026-11-13: threads 20–23
+
+The Coach's answers on *Open Matters* (2026-11-13), verbatim where they direct; *Orchestrator:* the reading each thread takes.
+
+* **20 `listing_membership`** (opus, 400k window; review `high`, it touches what guarantees.md covers). From #689. (1.5) "> A deleted vault stays listed and enabled, That's very different than the design or guarantees, fix"; (E5) "a deleted vault should discard its listing"; (1.11) "no, damaged rows don't exist. Delist them. Listing should tell its listeners when its list changes"; (1.1) "the device should make its own snapshot, it can serve as the bank listing's parent / world"; (1.3) "who calls unwatch? It sounds like it should never throw but it should deliver bad news" (Listing.goodbye calls it; a throw goes to `device.tellBadNews`, as the watch's own errors do). *Reading:* a listing's list is its present things; a tombstoned or damaged thing is delisted and not enabled, and drops what it holds (a vault its box listing and that listing's watch); the listing tells its listeners when its list changes; the Device makes its own snapshot as the bank listing's parent, so it changes only after the bank and its boxes have aligned (the remake leaves `dismissGatingAtDiscard`).
+* **21 `gate_verbs_plain`** (opus; review `medium`). Stacked on 20. (E10) "This does not sound like readable code. [...] Why is any of them more complicated than a set of checks and then a call to this.doPutGate, followed by postcondition checks? If multiple error conditions are present and any of them is impossible, none of them are ordered. the special gate verb checks are all impossible. [...] none of those at the vault db level should look materially different than putVault." (1.7) "don't throw on any of them puritanically, it's causing agents to make bad decisions." (G's salt row) "why does the gate need to show it? Who wants to see it? Even if it's not secret, it's ugly and useless in the logs." (only the demo's WaysIn reads the gate snapshot's wayins, for presence and `registered_at`). *Reading:* the BankDB's and GateListing's gate verbs become checks, `doPutGate`, postconditions, like putVault, without `#gateMoveOf`'s lambdas or the impossible gate-verb checks; `bank.del()`, `gate.del()` and the listings' throwers do the plain thing instead of refusing; the gate snapshot carries per wayin only presence and `registered_at` (`Wayin.toJSON`, which storage may use, unchanged unless proven unused there).
+* **22 `convex_tidy`** (opus; review `medium`, convex-reviewer). From #689, beside 20. (E14) "good golly that sounds wrong. can you replace it with deleting up to 1000 and then reporting a bound on how many remain? (i.e. "zero", "one to 1000" and "more than 1000" is actionable)".
+* **23 `closer_fixes`** (sonnet; review `medium`). Stacked on 21. The plain fixes row, "a skip; f only if the other refusal is not true or if it removes code; all the rest are good": (b) bank.lock()'s doc block; (c) deliver-contract L7; (d) inline `alignChildren`, Device dedupe by `isEqual`; (e) device.ts's two-ensureBank comment; (f) only as stated; (g) the duplicates; (h) bank-ending's younger-lease test; (i) stale `world` names and the helloed `vault: null`. And (E1) "why is the time set to 2 seconds? Make it 1 hour": `VX.Promptly` 2000 → 3600000.
+* Not now: (1.9) Repeater "yes" (next sprint, as recommended); (E11) life_tok "I'd prefer to fix later, if it's not disastrous; I'm of a few minds and there's another big refactor coming".
+* Then G is rebased on top and its claims rechecked against 20 and 21.
 
 ## For the Coach
 
