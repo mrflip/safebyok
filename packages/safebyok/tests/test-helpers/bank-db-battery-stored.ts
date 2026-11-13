@@ -29,13 +29,14 @@ export function storedOtherwiseOf<ValT>(row: ValT): ValT {
 /** Registers the cases of a datastore that stores other than the record sent, over `world`. */
 export function describeStoredOtherwise({ fresh, putWith, rowsOf, storeOtherwise }: BatteryWorld): void {
   describe("a write the datastore stores other than the record sent", () => {
-    it("answers buildBank with the gate row stored", async () => {
+    it("answers buildBank with the gate row stored, and the bank row stored as its parent", async () => {
       const bankDB = await fresh()
       await storeOtherwise(bankDB)
       const ask = bankBuildAskOf(bankAt(), gateAt())
       const answer = await bankDB.tryBuildBank(ask)
-      expect(answer).to.deep.include({ ok: true, act: 'born', val: storedOtherwiseOf(ask.gate) })
+      expect(answer).to.deep.include({ ok: true, act: 'born', val: storedOtherwiseOf(ask.gate), parent: storedOtherwiseOf(ask.record) })
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(storedOtherwiseOf(ask.gate))
+      expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(storedOtherwiseOf(ask.record))
     })
 
     it("answers a gate verb with the gate row stored", async () => {
