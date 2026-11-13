@@ -49,8 +49,8 @@ describe("The checks of options", () => {
       [{ maxMillisSinceRefresh: 0, maxParentMillis: Infinity }, true, 'passes both horizons'],
       [{ maxMillisSinceRefresh: undefined },        true,  'passes a horizon left undefined'],
       [{ maxMillisSinceRefresh: -1 },               false, 'refuses a negative record horizon'],
-      [{ maxParentMillis: '5' },                    false, 'refuses a world horizon that is text'],
-      [{ maxParentMillis: NaN },                    false, 'refuses a world horizon that is NaN'],
+      [{ maxParentMillis: '5' },                    false, 'refuses a parent horizon that is text'],
+      [{ maxParentMillis: NaN },                    false, 'refuses a parent horizon that is NaN'],
     ])
     expectCases(VX.boxPutOpts, [
       [{ maxParentMillis: 5 },                      true,  'passes the horizons'],

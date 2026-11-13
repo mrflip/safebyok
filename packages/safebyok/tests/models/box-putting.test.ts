@@ -77,11 +77,11 @@ describe("box.put(patch): the vault's lease seals the whisper and the sidecar", 
   it("seals a patch of both halves over a sparse record without fetching", async () => {
     const box = builtOf(sparseBoxRecord())
     world.mw.seedPut(fullBoxRecord())
-    const ensuringWorld = vi.spyOn(world.mw.world, 'ensureTimely')
+    const ensuringParent = vi.spyOn(world.mw.world, 'ensureTimely')
     await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { account: 'home' } }, { maxParentMillis: 5 })
     expect(world.mw.callsOf('get')).to.deep.equal([])
     expect(world.mw.callsOf('put')).to.have.lengthOf(1)
-    expect(ensuringWorld).toHaveBeenCalledWith(5)
+    expect(ensuringParent).toHaveBeenCalledWith(5)
     expect(box.sidecar).to.deep.equal({ account: 'home' })
   })
 
