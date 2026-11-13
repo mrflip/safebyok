@@ -174,6 +174,8 @@ box row under another `vault_tok` is no row today.
 
 ### The gate verbs' policy
 
+*Superseded (the Coach, 2026-11-13, built by thread 21, #692): storage puts a gate row as a plain put, as `putVault` does, with no per-verb policy ("Why is any of them more complicated than a set of checks and then a call to this.doPutGate, followed by postcondition checks? [...] the special gate verb checks are all impossible."). The device keeps the checks before the call (`gating.ts`, including `demandPasskeyAddable`). What follows is the draft as it stood.*
+
 Ruled (R3): shared policy, not shared code. This table is the policy. The device checks it before
 the call, and storage checks it in the step that puts the row, best as a stored procedure of the
 database's own. The two may look nothing alike; each answers to these rows. They are today's

@@ -9,9 +9,9 @@
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
 * **Status** (2026-11-13): line #682 → … → #689 → G #678 ready (restacked after #680, #681).
-  Threads from the Coach's Closer Look answers: 22 #690 filed (on #689, ca4cd8d29); 20 #691 filed
-  (on #689, 2cb84d4cf); 21 building on #691; 23 after 21. Then a restack lines up 20, 21, 23, 22, G on
-  top rechecked against 20 and 21; then the resolutions sweep, done note and sprint PR.
+  Threads from the Coach's Closer Look answers: 22 #690 filed (on #689); 20 #691 filed (on #689);
+  21 #692 ready, in review; 23 building on #692. Then a restack lines up 20, 21, 23, 22, G on top
+  rechecked against 20 and 21; then the resolutions sweep, done note and sprint PR.
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
