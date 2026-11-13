@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { MaxLabelChars, Patterns, isVaultError } from 'safebyok'
-import type { LastCall, Listing } from '../shapes'
+import type { LastCall, PanelListing } from '../shapes'
 
 /** Track an inspector's most recent call: `call(verbname, work)` runs `work` and records what it returned, or how it refused. */
 export const useLastCall = () => {
@@ -51,7 +51,7 @@ export const timeOf = (millis: number): string => {
  * A failed load keeps the last value and sets `trouble`.
  */
 export const useListing = <ValT,>(list: () => Promise<ValT>, watch: ((onChange: () => void) => () => void) | null = null) => {
-  const [listing, setListing] = useState<Listing<ValT>>({ val: null, trouble: null })
+  const [listing, setListing] = useState<PanelListing<ValT>>({ val: null, trouble: null })
   const [relists, setRelists] = useState(0)
   useEffect(() => {
     let round = 0

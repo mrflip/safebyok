@@ -95,12 +95,6 @@ export function revokeTyping(bank: Bank, passphrase: string): Promise<Gate> { re
 /** `bank.delPrompt()`, the user typing `passphrase`. */
 export function delTyping(bank: Bank, passphrase: string): Promise<Bank> { return askTyping(bank.device, byPassphrase(passphrase), () => bank.delPrompt()) }
 
-/** `vault.del(vault)` once its bank's `ensureUnlocked` has unlocked it, which these tests expect to do by the lease cached on this device. */
-export async function delUnlocked(vault: Vault): Promise<Vault> {
-  await vault.bank.ensureUnlocked()
-  return vault.del(vault)
-}
-
 /** How long a lease these worlds grant lasts: an hour. */
 export const LeaseMillis = 60 * 60_000
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
 import * as TH from '../test-helpers'
-import { MaxVaultBoxSize, MaxVaultBoxes, capacityOf, cascadeBudget, growthOf, isSpent, refuses, spend, tallyOf, weigh } from '../../src/component/tallies'
+import { MaxVaultBoxSize, MaxVaultBoxes, capacityOf, cascadeBudget, growthOf, isSpent, sizeOf, spend, tallyOf, wouldPassLimit } from '../../src/component/tallies'
 
 const { BW } = TH
 
@@ -23,27 +23,27 @@ function boxDocOf(ciphertext_b64: string) {
   return { ...BW.vaultScope, bank_tok: box.bank_tok, vault_tok: box.vault_tok, boxlabel: box.boxlabel, box }
 }
 
-describe("weigh", () => {
+describe("sizeOf", () => {
   it("weighs a stored box document as Convex counts the document it reads", async () => {
     const backend = TH.componentTest()
     const boxDoc = boxDocOf('Y3Q')
     const stored = await backend.run(async ({ db }) => await db.get('safebyok_boxes', await db.insert('safebyok_boxes', boxDoc)))
     if (stored === null) { throw new Error('the box document was not stored') }
-    expect(weigh(stored)).to.eq(getDocumentSize(stored))
+    expect(sizeOf(stored)).to.eq(getDocumentSize(stored))
   })
 
   it("weighs a box document not yet stored as the stored one will weigh", () => {
-    expect(weigh(boxDocOf('Y3Q'))).to.eq(getDocumentSize(boxDocOf('Y3Q')))
+    expect(sizeOf(boxDocOf('Y3Q'))).to.eq(getDocumentSize(boxDocOf('Y3Q')))
   })
 
   it("grows by one for each byte of ciphertext, and is zero for no document", () => {
     const [heavier, lighter] = [boxDocOf('c'.repeat(1000)), boxDocOf('c'.repeat(10))]
-    expect(weigh(heavier) - weigh(lighter)).to.eq(990)
-    expect(weigh(null)).to.eq(0)
+    expect(sizeOf(heavier) - sizeOf(lighter)).to.eq(990)
+    expect(sizeOf(null)).to.eq(0)
   })
 })
 
-/** A tally with these `all_*` figures, its live figures zero: `refuses` and `capacityOf` read no live figure. */
+/** A tally with these `all_*` figures, its live figures zero: `wouldPassLimit` and `capacityOf` read no live figure. */
 function allOf(all_count: number, all_size: number) { return { all_count, live_count: 0, all_size, live_size: 0 } }
 
 describe("tallyOf and growthOf", () => {
@@ -52,16 +52,16 @@ describe("tallyOf and growthOf", () => {
   const tombstone = { ...live, box: BW.boxTombstoneOf(live.box) }
 
   it("tally a live box row in both its live and all figures, a tombstone in its all figures alone, and no row as nothing", () => {
-    expect(tallyOf(live)).to.deep.equal({ all_count: 1, live_count: 1, all_size: weigh(live), live_size: weigh(live) })
-    expect(tallyOf(tombstone)).to.deep.equal({ all_count: 1, live_count: 0, all_size: weigh(tombstone), live_size: 0 })
+    expect(tallyOf(live)).to.deep.equal({ all_count: 1, live_count: 1, all_size: sizeOf(live), live_size: sizeOf(live) })
+    expect(tallyOf(tombstone)).to.deep.equal({ all_count: 1, live_count: 0, all_size: sizeOf(tombstone), live_size: 0 })
     expect(tallyOf(null)).to.deep.equal({ all_count: 0, live_count: 0, all_size: 0, live_size: 0 })
   })
 
   const GrowthCases = [
-    [null,      live,      { all_count: 1, live_count: 1,  all_size: weigh(live),                      live_size: weigh(live) },                      'a born adds a row to both counts'],
-    [live,      replaced,  { all_count: 0, live_count: 0,  all_size: weigh(replaced) - weigh(live),    live_size: weigh(replaced) - weigh(live) },    'a replace changes only the sizes'],
-    [replaced,  tombstone, { all_count: 0, live_count: -1, all_size: weigh(tombstone) - weigh(replaced), live_size: -weigh(replaced) },            'a del takes a row from the live count alone'],
-    [tombstone, live,      { all_count: 0, live_count: 1,  all_size: weigh(live) - weigh(tombstone),   live_size: weigh(live) },                      'a put over a tombstone adds a row to the live count alone'],
+    [null,      live,      { all_count: 1, live_count: 1,  all_size: sizeOf(live),                         live_size: sizeOf(live) },                    'a born adds a row to both counts'],
+    [live,      replaced,  { all_count: 0, live_count: 0,  all_size: sizeOf(replaced) - sizeOf(live),      live_size: sizeOf(replaced) - sizeOf(live) }, 'a replace changes only the sizes'],
+    [replaced,  tombstone, { all_count: 0, live_count: -1, all_size: sizeOf(tombstone) - sizeOf(replaced), live_size: -sizeOf(replaced) },               'a del takes a row from the live count alone'],
+    [tombstone, live,      { all_count: 0, live_count: 1,  all_size: sizeOf(live) - sizeOf(tombstone),     live_size: sizeOf(live) },                    'a put over a tombstone adds a row to the live count alone'],
   ] as const
 
   for (const [anteDoc, boxDoc, expected, blurb] of GrowthCases) {
@@ -69,7 +69,7 @@ describe("tallyOf and growthOf", () => {
   }
 })
 
-describe("refuses", () => {
+describe("wouldPassLimit", () => {
   const full = allOf(MaxVaultBoxes, 4096)
   const heavy = allOf(10, MaxVaultBoxSize - 100)
 
@@ -94,7 +94,7 @@ describe("refuses", () => {
   ] as const
 
   for (const [tally, growth, maxBoxes, expected, blurb] of RefusalCases) {
-    it(blurb, () => { expect(refuses(tally, growth, maxBoxes)).to.eq(expected) })
+    it(blurb, () => { expect(wouldPassLimit(tally, growth, maxBoxes)).to.eq(expected) })
   }
 })
 
@@ -105,7 +105,7 @@ describe("capacityOf", () => {
 
   it("reports an uncounted vault past a limit as full in both boxes and bytes", () => {
     expect(capacityOf(null, MaxVaultBoxes)).to.deep.equal({ boxes: { used: MaxVaultBoxes, max: MaxVaultBoxes }, bytes: { used: MaxVaultBoxSize, max: MaxVaultBoxSize } })
-    expect(refuses(null, allOf(1, 0), MaxVaultBoxes)).to.be.true
+    expect(wouldPassLimit(null, allOf(1, 0), MaxVaultBoxes)).to.be.true
   })
 })
 

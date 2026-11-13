@@ -54,7 +54,7 @@ export function spend(budget: Budget, size: number): void {
 }
 // --
 
-// == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, weigh, tallyOf, growthOf, capacityOf, reckon, refuses, record, forget, countBoxes, drop
+// == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, sizeOf, tallyOf, growthOf, capacityOf, reckon, wouldPassLimit, record, forget, countBoxes, drop
 
 /** One life of a vault: its scope, its bank's `bank_tok` and its own `vault_tok`. */
 export type Life = { user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string }
@@ -72,7 +72,7 @@ export type Reckoning = { kept: Doc<'safebyok_tallies'> | null, tally: Tally | n
 export type BoxDocGiven = Omit<WithoutSystemFields<Doc<'safebyok_boxes'>>, 'box'> & { box: unknown }
 
 /** The bytes `boxDoc` counts toward its life's byte limit, or 0 for null. */
-export function weigh(boxDoc: BoxDocGiven | null): number {
+export function sizeOf(boxDoc: BoxDocGiven | null): number {
   if (boxDoc === null) { return 0 }
   const { user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, box } = boxDoc
   // The box row came through a Convex validator or out of the table, so it is a Convex value.
@@ -81,7 +81,7 @@ export function weigh(boxDoc: BoxDocGiven | null): number {
 
 /** The tally of `boxDoc` alone, or an empty tally for null. */
 export function tallyOf(boxDoc: BoxDocGiven | null): Tally {
-  const size = weigh(boxDoc)
+  const size = sizeOf(boxDoc)
   const isLive = DB.isLiveRow(boxDoc?.box)
   return { all_count: (boxDoc === null) ? 0 : 1, live_count: isLive ? 1 : 0, all_size: size, live_size: isLive ? size : 0 }
 }
@@ -111,7 +111,7 @@ export async function reckon(db: DatabaseReader, life: Life): Promise<Reckoning>
 }
 
 /** True when a put that grows the life by `growth` would pass `maxBoxes` or the byte limit. Both limits count every box row, tombstones included. */
-export function refuses(tally: Tally | null, growth: Tally, maxBoxes: number): boolean {
+export function wouldPassLimit(tally: Tally | null, growth: Tally, maxBoxes: number): boolean {
   if (tally === null) { return (growth.all_count > 0) || (growth.all_size > 0) }
   const after = plus(tally, growth)
   return ((growth.all_count > 0) && (after.all_count > maxBoxes)) || ((growth.all_size > 0) && (after.all_size > MaxVaultBoxSize))
