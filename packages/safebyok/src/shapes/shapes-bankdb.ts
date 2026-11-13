@@ -1,4 +1,4 @@
-/** What the bankDB writes and accepts: the bank, gate, vault and box rows, the asks of its verbs, and their helpers. Imported as `BX`.
+/** The rows a bankDB stores (bank, gate, vault and box), the asks of its verbs, and their helpers. Imported as `BX`.
  * The asks of `tidyGone` and `watch` are in `SX`.
  */
 
@@ -38,13 +38,16 @@ export const { bankSparse, bankRecord, bankTombstone, bankRow } = Checkers('bad_
   return { bankSparse, bankRecord, bankTombstone, bankRow }
 }, [CX])
 
+/** A bank row's sparse fields, live or a tombstone. */
 export type BankSparse    = Readonly<Z.infer<typeof bankSparse>>
+/** A live bank row. */
 export type BankRecord    = Readonly<Z.infer<typeof bankRecord>>
+/** A deleted bank's row, as `delBank` leaves it. */
 export type BankTombstone = Readonly<Z.infer<typeof bankTombstone>>
 /** A bank row as stored: live, or a tombstone. */
 export type BankRow       = BankRecord | BankTombstone
 
-/** The `parent` an answer or notice gives for a bank: a bank is at the top, with no row above it. */
+/** The `parent` an answer or notice gives for a bank, which has no row above it. */
 export const BankTop = 'main'
 // --
 
@@ -63,11 +66,11 @@ export const { passphraseWayin, passkeyWayin, wayins, gateRecord, gateSparse } =
     /** The life of the gate under its gatelabel: minted when its bank is built, and kept by every gate verb. */
     gate_tok,
     wayins,
-    /** Kept for later, and read by nothing: always empty. */
+    /** Reserved: always empty, and read by nothing. */
     auth: emptyBag,
-    /** Kept for later, and read by nothing: always empty. */
+    /** Reserved: always empty, and read by nothing. */
     sigs: emptyBag,
-    /** Kept for later, and read by nothing: always empty. */
+    /** Reserved: always empty, and read by nothing. */
     meta: emptyBag,
   }).strict()
   // A gate made in its listing starts as a tombstone at the void revision, as every listed thing does.
@@ -95,8 +98,11 @@ export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('
   return { vaultSparse, vaultRecord, vaultTombstone, vaultRow }
 }, [CX])
 
+/** A vault row's sparse fields, live or a tombstone. */
 export type VaultSparse    = Readonly<Z.infer<typeof vaultSparse>>
+/** A live vault row of a bank. */
 export type VaultRecord    = Readonly<Z.infer<typeof vaultRecord>>
+/** A deleted vault's row, as `delVault` leaves it. */
 export type VaultTombstone = Readonly<Z.infer<typeof vaultTombstone>>
 /** A bank's vault row as stored: live, or a tombstone. */
 export type VaultRow       = VaultRecord | VaultTombstone
@@ -116,18 +122,21 @@ export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_opti
   return { boxSparse, boxRecord, boxTombstone, boxRow }
 }, [CX])
 
+/** A bank's box row without its encrypted fields and sidecar, live or a tombstone. */
 export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
+/** A live box row of a bank. */
 export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
+/** A deleted box's row, as `delBox` leaves it. */
 export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
 /** A bank's box row as stored: live, or a tombstone. */
 export type BoxRow       = BoxRecord | BoxTombstone
-/** A box row that failed validation, named by where it is stored: its scope, under whatever label storage has, the life of its vault, and `am` 'd'. */
+/** A box row that failed its checks, named by where it is stored, under whatever label storage has, with `am` 'd'. */
 export type DamagedBox   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, bank_tok: string, vault_tok: string, am: 'd' }>
 // --
 
 // == [Rows stored]: storedBankRow, storedGateRow, storedVaultRow, storedBoxRow
 
-/** A bank, gate, vault or box row as storage answers it: one failing its checks refuses 'damaged_row'. */
+/** The checks of a bank, gate, vault or box row as storage returns it, refusing `damaged_row`. */
 export const { storedBankRow, storedGateRow, storedVaultRow, storedBoxRow } = Checkers('damaged_row', () => ({
   storedBankRow:  bankRow,
   storedGateRow:  gateRecord,
@@ -139,29 +148,30 @@ export const { storedBankRow, storedGateRow, storedVaultRow, storedBoxRow } = Ch
 // == [Row helpers]: vaultLifeOf, shellBankOf, shellVaultOf, shellBoxOf, damagedBoxOf, noticeParentOf
 
 // A vault is reborn under a new `vault_tok`, and its bank under a new `bank_tok`: a box row under either ended life is no row.
-/** The life of a vault, its bank's included, as one string: a vault row's own, and the one a box row or box ask is under. */
+/** The life of a vault, its bank's included, as one string: a vault row's, or the one a box row or box ask is under. */
 export function vaultLifeOf({ bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): string { return `${bank_tok}/${vault_tok}` }
 
 const shellTimes = { registered_at: SX.VoidTime, written_at: SX.VoidTime }
 
-/** The tombstone of a bank row that is not stored. */
+/** The shell for a bank row that is not stored. */
 export function shellBankOf({ user_id, banklabel }: BankScope): BankTombstone {
   return { user_id, banklabel, fmt: BankFormat, ...SX.VoidRevision, ...shellTimes, am: 'x', bank_tok: SX.VoidLifeTok }
 }
 
-/** The tombstone of a bank's vault row that is not stored. */
+/** The shell for a bank's vault row that is not stored. */
 export function shellVaultOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultTombstone {
   return { user_id, banklabel, vaultlabel, fmt: VaultFormat, ...SX.VoidRevision, ...shellTimes, am: 'x', bank_tok: SX.VoidLifeTok, vault_tok: SX.VoidLifeTok }
 }
 
-/** The tombstone of a box row that is not stored, under the life of the vault `boxQuery` names. */
+/** The shell for a box row that is not stored, under the vault life `boxQuery` names. */
 export function shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok }: BoxQuery): BoxTombstone {
   return {
     user_id, banklabel, vaultlabel, boxlabel, fmt: BoxFormat, ...SX.VoidRevision, ...shellTimes, am: 'x', bank_tok, vault_tok, box_tok: SX.VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
   }
 }
 
-/** A listing's entry for a box row that failed validation, under the life of the vault its second parameter names. Its label comes from storage, unchecked: it is part of what is reported. */
+// Its label comes from storage unchecked: it is part of what is reported.
+/** The entry listed for a box row that failed its checks, under the given vault life. */
 export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, { bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): DamagedBox {
   return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, am: 'd' }
 }
@@ -212,8 +222,8 @@ export type BankEnsureAsk = Readonly<Z.output<typeof bankEnsure>>
 // Every ask that stores a row has the same shape: its `op`, the address of the row, the row its caller
 // expects to find, and the record to store. A gate verb's ask and a vault ask also cite the `bank_tok` of the bank they
 // are made under, as a box ask cites its vault's `vault_tok`.
-/** Validators of a bankDB ask that stores a row, or gets a vault row.
- * `expected` is parsed as a row's meta and its other fields dropped, so a caller may pass the row it has, or the shell row for none.
+/** The checks of a bankDB ask that stores a row, or gets a vault row.
+ * Only the revision and life fields of `expected` are read, so pass the row in hand, or the shell for none.
  */
 export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk } = Checkers('bad_record', ({ lit, oneof, discrim, bank_tok, gate_tok, bankScope, gateScope, vaultScope }) => {
   const bankExpected  = SX.rowMeta.omit({ vault_tok: true }).extend({ bank_tok })
@@ -280,7 +290,7 @@ export type BankBuildAsk = Readonly<Z.output<typeof bankBuild>>
 export type GatePutAsk   = Readonly<Z.output<typeof gatePut>>
 /** A `delBank` ask: the bank's scope, the tombstone to store, and the expected bank row. */
 export type BankDelAsk   = Readonly<Z.output<typeof bankDel>>
-/** A vault get, put or del ask under a bank, as the bankDB receives it and passes it to its adapter and the classifier. */
+/** A vault get, put or del ask, as the bankDB receives it. */
 export type VaultAsk     = Readonly<Z.output<typeof vaultAsk>>
 /** A `getVault` ask: the vault's scope, its bank's `bank_tok`, the expected row (or shell), and the `ifAbsent` option. */
 export type VaultGetAsk  = Extract<VaultAsk, { op: 'get' }>
@@ -306,7 +316,9 @@ export type BoxListAsk = Readonly<Z.output<typeof boxList>>
 const isExpectedInLife = ({ expected, ...asked }: { bank_tok: string, vault_tok: string, expected: { bank_tok: string, vault_tok: string } }): boolean => vaultLifeOf(expected) === vaultLifeOf(asked)
 
 // A box ask cites the life of its vault, `bank_tok` and `vault_tok`, as a vault ask cites its bank's `bank_tok`.
-/** Validators of a bankDB box ask: a get, put or del. `expected` is parsed as a row's meta, as a vault ask's is. */
+/** The checks of a bankDB box ask: a get, put or del.
+ * Only the revision and life fields of `expected` are read.
+ */
 export const { boxGet, boxPut, boxDel, boxAsk } = Checkers('bad_record', ({ lit, discrim, bank_tok, box_tok }) => {
   const boxExpected = SX.rowMeta.extend({ bank_tok, box_tok })
 
@@ -334,7 +346,7 @@ export const { boxGet, boxPut, boxDel, boxAsk } = Checkers('bad_record', ({ lit,
   return { boxGet, boxPut, boxDel, boxAsk: discrim('op', [boxGet, boxPut, boxDel]) }
 }, [CX])
 
-/** A box get, put or del ask under a bank, as the bankDB receives it and passes it to its adapter and the classifier. */
+/** A box get, put or del ask, as the bankDB receives it. */
 export type BoxAsk    = Readonly<Z.output<typeof boxAsk>>
 /** A `getBox` ask: the box's scope under its vault's life, the expected row (or shell), and the `ifAbsent` option. */
 export type BoxGetAsk = Extract<BoxAsk, { op: 'get' }>
@@ -344,7 +356,7 @@ export type BoxPutAsk = Extract<BoxAsk, { op: 'put' }>
 export type BoxDelAsk = Extract<BoxAsk, { op: 'del' }>
 
 // A record is a stored row, payload and all: an answer and a refusal carry only its meta, as they may reach a log.
-/** The check of what a bankDB answer and its refusal carry of an ask: any of its fields but a record's payload.
+/** The check of what a bankDB answer and its refusal carry of an ask: its fields, but of its rows only their revision, `am` and toks.
  * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
  */
 export const loggableAsk = objStrip(({ obj, oneof, lit, user_id, banklabel, vaultlabel, boxlabel, bank_tok, gate_tok, vault_tok, box_tok }) => {
@@ -375,18 +387,18 @@ export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
 
 /** The check of an `AdapterBankDB`'s options, refusing 'bad_option'. */
 export const adapterBankDBOpts = objCheck(({ num }) => ({
-  /** The most bytes one stored box record may weigh; `DefaultMaxRecordSizeEst` by default. */
+  /** The most bytes a box record's JSON may weigh (default `DefaultMaxRecordSizeEst`). */
   maxRecordSizeEst: num.positive().optional(),
 }), 'bad_option')
 /** The check of a `MemoryBankDB`'s options, refusing 'bad_option'. */
 export const memoryBankDBOpts = objCheck(({ int }) => ({
   ...adapterBankDBOpts.shape,
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
-  /** A soft cap on the box rows of one vault life, live and deleted together. Default: `DefaultMaxBoxes`. */
+  /** A soft cap on the box rows of one vault life, live and deleted together (default `DefaultMaxBoxes`). */
   maxBoxes: int.positive().optional(),
 }), 'bad_option')
 
-/** An `AdapterBankDB`'s options: `maxRecordSizeEst`, the most bytes one stored box record may weigh. */
+/** An `AdapterBankDB`'s options: `maxRecordSizeEst`, the most bytes a box record's JSON may weigh. */
 export type AdapterBankDBOpts = Readonly<Z.input<typeof adapterBankDBOpts>>
 /** A `MemoryBankDB`'s options: an `AdapterBankDB`'s, and `maxBoxes`, a soft cap on the box rows of one vault life. */
 export type MemoryBankDBOpts  = Readonly<Z.input<typeof memoryBankDBOpts>>

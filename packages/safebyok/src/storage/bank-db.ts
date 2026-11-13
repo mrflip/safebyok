@@ -15,11 +15,15 @@ import * as Refuse from '../refusals/throwers'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, BankEnsured, BoxesListed, EnsureBankAnswer, GateAnswer, DelBankAnswer, VaultAnswer, BoxAnswer, ListBoxesAnswer, TidyGoneAnswer, Notice, answerWithVal, refusedAnswerOf, badAnswerOf
 
-/** A bankDB verb's good answer: its `val`, the `act` that says what happened, its `parent`, the row above the one asked for, and what it carries of its `ask`. */
+/** A bankDB verb's good answer.
+ * Beside its `val`, it carries the `act` that says what storage did, the row above the one asked for as `parent`, and the loggable part of its `ask`.
+ */
 export type GoodAnswer<ValT, ActT extends string, ParentT = BankRow> = GoodOutcome<ValT> & { ask: LoggableAsk, act: ActT, parent: ParentT, dbhas?: unknown }
 
 // A refusal met while delivering a good answer keeps that answer's act: storage did what the act says (`refusedAnswerOf`).
-/** A bankDB verb's refused answer: its `err`, with the `act`, `parent` and `dbhas` the refusal carries, and what it carries of its `ask`. */
+/** A bankDB verb's refused answer.
+ * Beside its `err`, it carries the `act`, the `parent` and `dbhas` rows the refusal found, and the loggable part of its `ask`.
+ */
 export type BadAnswer = BadOutcome & { ask: LoggableAsk, act: BadAct | GoodAct, parent: unknown, dbhas?: unknown }
 
 /** A `try*` verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. */
@@ -94,17 +98,17 @@ export interface BankDB {
   buildBank(ask: BankBuildAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.buildBank}. */
   tryBuildBank(ask: BankBuildAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, whose only change is to replace the passphrase wayin. Refuses `gate_issue` for any other change. */
+  /** Store the gate record `ask.record`, whose only change is to replace the passphrase wayin. */
   replacePassphrase(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.replacePassphrase}. */
   tryReplacePassphrase(ask: GateVerbAsk): Promise<GateAnswer>
   /** Store the gate record `ask.record`, whose only change is to add a passkey wayin.
-   * Refuses `camped` when a passkey wayin is already stored, and `gate_issue` for any other change.
+   * Refuses `camped` when a passkey wayin is already stored.
    */
   addPasskey(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.addPasskey}. */
   tryAddPasskey(ask: GateVerbAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, whose only change is to remove the passkey wayin. Refuses `gate_issue` for any other change.
+  /** Store the gate record `ask.record`, whose only change is to remove the passkey wayin.
    * Under the `passed` act, nothing is stored: the gate row has no passkey wayin, and `val` is that row.
    */
   revokePasskey(ask: GateVerbAsk): Promise<GoodAnswer<GateRecord, OkAct>>
@@ -115,12 +119,13 @@ export interface BankDB {
   /** Non-throwing form of {@link BankDB.delBank}. */
   tryDelBank(ask: BankDelAsk): Promise<DelBankAnswer>
   /** Get the vault row at a scope, whatever its life, in a bank live under `bank_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
+   * With `ifAbsent: 'nil'`, `val` is null where no row is stored, and the tombstone where one is; otherwise both refuse.
    */
   getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link BankDB.getVault}. */
   tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer>
   /** Store `ask.record` over the vault row `ask.expected`, in a bank live under `bank_tok`, as `ifPresent` and `ifAbsent` allow.
+   * Refuses `stale_write` when the row stored is no longer `ask.expected`: get it again, and put over that.
    * Under the `passed` act, nothing is stored, and `val` is the live row found.
    */
   putVault(ask: VaultPutAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
@@ -137,12 +142,13 @@ export interface BankDB {
   /** Non-throwing form of {@link BankDB.listBoxes}. When the vault row refuses, `parent` is that stored row. */
   tryListBoxes(ask: BoxListAsk): Promise<ListBoxesAnswer>
   /** Get a box row, with its vault row as `parent`. Refuses when the vault is not live under `bank_tok` and `vault_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone stored; otherwise both refuse.
+   * With `ifAbsent: 'nil'`, `val` is null where no row is stored, and the tombstone where one is; otherwise both refuse.
    */
   getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
   /** Non-throwing form of {@link BankDB.getBox}. */
   tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer>
   /** Store `ask.record` over the box row `ask.expected`, in a vault live under `bank_tok` and `vault_tok`, as `ifPresent` and `ifAbsent` allow.
+   * Refuses `stale_write` when the row stored is no longer `ask.expected`: get it again, and put over that.
    * Under the `passed` act, nothing is stored, and `val` is the live row found.
    */
   putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
@@ -152,7 +158,9 @@ export interface BankDB {
   delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
   /** Non-throwing form of {@link BankDB.delBox}. */
   tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer>
-  /** Housekeeping for hosts: delete the vault and box rows of an ended life under the bank, and count the box rows left. */
+  /** Delete the vault and box rows of ended lives under the bank, and count the box rows left.
+   * Housekeeping for a host: no other verb depends on it.
+   */
   tidyGone(ask: BoxTidyAsk): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
   /** Non-throwing form of {@link BankDB.tidyGone}. */
   tryTidyGone(ask: BoxTidyAsk): Promise<TidyGoneAnswer>

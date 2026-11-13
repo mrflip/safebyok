@@ -25,7 +25,9 @@ import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
 export const DefaultRefreshMillis = 5 * MinuteMillis
 // --
 
-/** This device's place in the app for the signed-in user: the host's options and functions, the one gating open, and the bank once ensured. */
+/** The signed-in user's presence on this browser for one bank: the host's options and functions, the one gating open, and the bank once ensured.
+ * Make it with `Device.make(opts)`, then call {@link ensureBank}. A `sweep()` or a `vacate()` ends it for good.
+ */
 export class Device {
   // == [Props]: user_id, banklabel, scope, gates, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #bankDB, #hostHandlers, #askUser, #vaultRefreshMillis, #bankListing, #listeners, #deviceTok, #openGating, #endCause, #vacating, #isReady, #snapshot, #getSnapshot, #subscribe
 
@@ -38,26 +40,27 @@ export class Device {
   readonly deviceDB:         DeviceDB
   readonly logger:           VaultLogger
   readonly strengthChecker:  GuardedStrengthChecker
+  /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   readonly leaseMillis:      number
-  /** The refresh horizon of each vault's boxes. */
+  /** How old a box may grow before it is fetched again, in milliseconds. */
   readonly boxRefreshMillis: number
 
   readonly #bankDB:             BankDB
-  /** The host's `onLifecycle`, guarded, and its `onBadNews`, called while the device is enabled and by its vacate. */
+  /** The host's guarded `onLifecycle` and its `onBadNews`, called while the device is enabled, and by its vacate. */
   readonly #hostHandlers:       Handlers
-  /** The host's dialog, guarded, which each bank listing is handed; null with none. */
+  /** The host's guarded `requestCleartext`, or null if the host gave none. */
   readonly #askUser:            AskUser | null
-  /** The refresh horizon of the bank and each vault. */
+  /** How old the bank or a vault may grow before it is fetched again, in milliseconds. */
   readonly #vaultRefreshMillis: number
   readonly #listeners = new Set<() => void>()
-  /** The listing the bank is made in, its one slot the device's bank; made again once the bank listed there has ended. */
+  /** The listing the bank is made in, made anew once the bank listed there has ended. */
   #bankListing:         BankListing
   /** The token of this device's row in the deviceDB, once an `ensureBank` has ensured the row; null until then. */
   #deviceTok:           string | null = null
   #openGating:          AnyGating | null = null
-  /** Why a sweep or a vacate disabled the device, its snapshot's refusal from then on; null while it is enabled. */
+  /** Why a sweep or a vacate disabled the device, shown as its snapshot's `err`; null while it is enabled. */
   #endCause:            VaultError | null = null
-  /** The first vacate's promise, which a repeat answers; null until a vacate. */
+  /** The first vacate's promise, which a repeat vacate returns; null until then. */
   #vacating:            Promise<void> | null = null
   /** Whether an `ensureBank` has succeeded. */
   #isReady              = false
@@ -74,7 +77,7 @@ export class Device {
   // == [Getters]: bank, device_tok, openGating, autolockMinutes, snapshot, getSnapshot, subscribe, toJSON
 
   // A bank deleted, or built anew elsewhere, is no longer the device's: the next ensureBank brings up another.
-  /** The bank, once an `ensureBank` has brought it up; null before, after a sweep or a vacate, and once the bank is deleted or built anew. */
+  /** The bank, once an `ensureBank` has brought it up; null before then, after a sweep or a vacate, and once the bank is deleted or built again. */
   get bank(): Bank | null {
     const bank = this.#isReady ? this.#bankListing.at(this.scope) : null
     return (bank?.isEnabled === true) ? bank : null
@@ -86,7 +89,7 @@ export class Device {
   /** The gating open on this device, or null. */
   get openGating(): AnyGating | null { return this.#openGating }
 
-  /** The autolock duration in minutes, past which a cached lease no longer unlocks a vault. */
+  /** The autolock duration in minutes, past which a cached lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / MinuteMillis }
 
   /** This device's current {@link DeviceSnapshot}. */
@@ -131,7 +134,7 @@ export class Device {
     Object.freeze(this)
   }
 
-  /** A bank listing, its changes remaking this device's snapshot. */
+  /** Make a bank listing whose changes remake this device's snapshot. */
   #makeBankListing(): BankListing {
     const listing = new BankListing(this, { bankDB: this.#bankDB, maxMillisSinceRefresh: this.#vaultRefreshMillis, askUser: this.#askUser })
     listing.subscribe(this.#remakeSnapshot)
@@ -141,7 +144,7 @@ export class Device {
 
   // == [Starting]: ensureBank, tryEnsureBank, bringUp, fetchBank, bankListingInHand
 
-  /** The bank, brought up on the first call that succeeds: this device's row ensured in the deviceDB, then the bank fetched, or built where none is stored, and its vaults watched. */
+  /** The bank, brought up on the first call that succeeds: fetched with its vaults and their watch, or built by asking the user if none is stored. */
   async ensureBank(): Promise<Bank> {
     this.demandEnabled()
     if (this.bank !== null) { return this.bank }
@@ -156,7 +159,7 @@ export class Device {
   tryEnsureBank(): Promise<Outcome<Bank>> { return outcomeOf(() => this.ensureBank()) }
 
   // Two calls under way share the one bank, its listing's, and each brings it up.
-  /** A sweep or a vacate crossing it leaves the bank's listing disabled, which refuses. */
+  /** Bring up the bank, refusing if a sweep or a vacate lands meanwhile. */
   async #bringUp(): Promise<Bank> {
     const { device_tok } = await this.deviceDB.ensureCachedDevice(this.scope)
     this.demandEnabled()
@@ -170,7 +173,7 @@ export class Device {
   }
 
   // The one ensureBank of a startup: it feeds the bank its gate and its vaults, so the vault listing is not asked to list.
-  /** The bank stored, made from the rows ensureBank answers; else, where no live bank is stored, one built through a build_bank gating. */
+  /** The stored bank, or one built through a `build_bank` gating if no live bank is stored. */
   async #fetchBank(): Promise<Bank> {
     const answer = await this.#bankDB.tryEnsureBank({ op: 'ensure', ...this.scope, gates: ['main'] })
     this.demandEnabled()
@@ -187,7 +190,7 @@ export class Device {
   }
 
   // One Bank object is one life of the bank: a listing whose bank has ended is let go, and its successor makes the next.
-  /** The bank listing, made again where the bank listed there no longer answers. */
+  /** The bank listing, made anew if the bank listed there is disabled. */
   #bankListingInHand(): BankListing {
     const listed = this.#bankListing.at(this.scope)
     if ((listed !== null) && (! listed.isEnabled)) { this.#bankListing = this.#makeBankListing() }
@@ -197,7 +200,9 @@ export class Device {
 
   // == [Ending]: vacate, sweep, disable, vacateDevice, revokeOwnLeases, forgetOwnDevice, tellHost
 
-  /** Sign out on this device: disable it and its bank, and forget every lease of this bank scope cached here and its device row, settling once each forget has been tried. */
+  /** Sign out on this device: disable it and its bank for good, and forget every lease of this bank scope cached here, and its device row.
+   * Resolves once each forget has been tried. A repeat returns the first vacate's promise.
+   */
   vacate(story: VacateStory = {}): Promise<void> {
     const { cause = deviceDisabled() } = VX.vacateStory.parse(story)
     this.#disable(cause)
@@ -207,14 +212,16 @@ export class Device {
     return this.#vacating
   }
 
-  /** Cleanup while the page lives: disable the device and its bank, leaving each cached lease for the next device. Never throws. */
+  /** Disable this device and its bank for good, leaving each cached lease for the next Device. Never throws.
+   * Call it when the page is done with this device but the user stays signed in.
+   */
   sweep(): this {
     this.#disable(deviceDisabled())
     return this
   }
 
   // Disabled first, so that the bank's lock is its lock at its end: the lease and every exposed whisper dropped, the watches ended.
-  /** The device disabled, its snapshot saying `cause`, its bank locked and its open gating dismissed, for good; a repeat is a no-op. */
+  /** Disable the device for good, with `cause` as its snapshot's `err`: lock its bank and dismiss its open gating. A repeat does nothing. */
   #disable(cause: VaultError): void {
     if (! this.isEnabled) { return }
     this.#endCause = cause
@@ -225,16 +232,15 @@ export class Device {
   }
 
   // A fresh device has no device row: the next device of this scope gets a new device_tok.
-  /** This bank scope's leases revoked and its device row forgotten on this device, then `vacated` told. */
+  /** Forget this bank scope's cached leases and device row, then tell the host `vacated`. */
   async #vacateDevice(cause: VaultError): Promise<void> {
     const unrevoked = await this.#revokeOwnLeases()
     await this.#forgetOwnDevice()
     this.#tellHost({ kind: 'vacated', cause, unrevoked })
   }
 
-  /** A vacate's revoke of every lease of this bank scope, listed or not, as a fresh page told 'identity_revoked' has listed
-   * none; answers how many it could not revoke.
-   */
+  // Every row of the bank scope, not only the bank's own: a fresh page told 'identity_revoked' has listed none.
+  /** Forget every lease of this bank scope cached on this device, returning how many it could not forget. */
   async #revokeOwnLeases(): Promise<number> {
     const listed = await listOwnLeases(this.deviceDB, this.scope)
     if (! listed.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [listed.err]); return 0 }
@@ -246,13 +252,13 @@ export class Device {
     return revoked.filter((isRevoked) => ! isRevoked).length
   }
 
-  /** A vacate's forget of this device's row in the deviceDB, a refusal told as bad news. */
+  /** Forget this device's row in the deviceDB, telling a refusal as bad news. */
   async #forgetOwnDevice(): Promise<void> {
     const forgot = await this.deviceDB.tryForgetDevice(this.scope)
     if (! forgot.ok) { tellBadNewsTo(this.#hostHandlers.onBadNews, this, [forgot.err]) }
   }
 
-  /** A vacate's word to the host's own `onLifecycle`, past the disable. */
+  /** Tell the host's own `onLifecycle`, even past the disable. */
   #tellHost(announcement: DeviceAnnouncement): void {
     // Not awaited: a host's onLifecycle that awaits device.vacate() is handed this vacate, and each would wait on the other.
     void this.#hostHandlers.onLifecycle({ ...announcement, device: this })
@@ -261,7 +267,10 @@ export class Device {
 
   // == [Telling the host]: tellBadNews, announce
 
-  /** Tell the host's `onBadNews` each of `badnews` no caller waits on: a refusal as it is, anything else as `unexpected_error`, a `disabled` refusal not at all. Never throws. */
+  /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
+   * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device is disabled, the
+   * default handler hears instead of the host's.
+   */
   tellBadNews(badnews: readonly unknown[]): void {
     const refusals = badnews.map((news) => (isVaultError(news) ? news : unexpectedError(news)))
     // A thing disabled since is no news: the host swept or vacated it, or its vault went away.
@@ -269,26 +278,28 @@ export class Device {
   }
 
   // Not awaited: an announcement is news of what happened, and nothing waits on the host's answer.
-  /** Tell the host's `onLifecycle` what happened in this device's life. Never throws. */
+  /** Tell the host's `onLifecycle` what happened in this device's life. Never throws.
+   * Once the device is disabled, the default handler hears instead of the host's.
+   */
   announce(announcement: DeviceAnnouncement): void { void this.#handlers.onLifecycle({ ...announcement, device: this }) }
   // --
 
   // == [The one gating open]: attachGating, detachGating, dismissGatingAtDiscard
 
-  /** Attach `gating` as the one this device has open, refusing while another is. */
+  /** Attach `gating` as this device's open gating. Refuses `already_asking` while another is open. */
   attachGating(gating: AnyGating): void {
     if (this.#openGating !== null) { throw alreadyAsking() }
     this.#openGating = gating
     this.#remakeSnapshot()
   }
 
-  /** Let go of the open gating, which has concluded. */
+  /** Detach the open gating, once it has concluded. */
   detachGating(): void {
     this.#openGating = null
     this.#remakeSnapshot()
   }
 
-  /** `bank` is going away: the open gating concludes, if it asks for that bank, whatever its kind. */
+  /** Dismiss the open gating if it is for `bank`, whatever its kind. */
   dismissGatingAtDiscard(bank: Bank): void {
     if (this.#openGating?.bank === bank) { this.#openGating.dismiss() }
   }
@@ -296,7 +307,8 @@ export class Device {
 
   // == [Snapshot]: remakeSnapshot, makeSnapshot
 
-  /** Make the snapshot again, and tell every listener where it differs. Bound, as the bank calls it. */
+  // An arrow, so it stays bound: the bank listing calls it as a listener.
+  /** Remake the snapshot, telling every listener if it changed. */
   readonly #remakeSnapshot = (): void => {
     const next = this.#makeSnapshot()
     const prior = this.#snapshot
@@ -322,17 +334,17 @@ export class Device {
   /** True from `Device.make` until a sweep or a vacate, and never again. */
   get isEnabled(): boolean { return this.#endCause === null }
 
-  /** Demands that this device be enabled. */
+  /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
     if (! this.isEnabled) { throw deviceDisabled() }
     return this
   }
 
-  /** The host's handlers while the device is enabled, and handlers that only report once it is disabled. */
+  /** The host's handlers while the device is enabled; once it is disabled, the defaults, which only report. */
   get #handlers(): Handlers { return this.isEnabled ? this.#hostHandlers : DefaultHandlers }
   // --
 
-  /** Answers 'device', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'device'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'device' { return 'device' satisfies Modelkind }
 }
 
@@ -343,12 +355,14 @@ const HostChecks = Checkers('bad_option', ({ fn }) => ({
   onLifecycle:      fn<LifecycleHandler>(),
 }))
 
-/** The `onBadNews` a device has when given none: each news to the device's logger. */
+/** The default `onBadNews`: warn of each failure on the device's logger. */
 export const DefaultOnBadNews: BadNewsHandler = ({ news, device }) => {
   device.logger.warn(news.message, { oplabel: 'Device.onBadNews', refusalkind: news.refusalkind })
 }
 
-/** Tell `onBadNews` each of `badnews` that reached `device`, awaiting none: the handler's throw or rejection reaches only the platform. */
+/** Tell `onBadNews` each of `badnews`, awaiting none. Never throws.
+ * Anything the handler throws or rejects with is reported to the platform, and reaches no caller.
+ */
 export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews: readonly VaultError[]): void {
   VX.tellBadNewsToArgs.parse({ onBadNews, device, badnews })
   for (const news of badnews) {
@@ -364,7 +378,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 
 // The logger too, as a platform with no reportError (Node, SSR) would hear nothing of it.
-/** `refusal` to `device`'s logger at error, and to the platform. */
+/** Log `refusal` at error on `device`'s logger, and report it to the platform. */
 function reportAtError(refusal: VaultError, device: Device): void {
   device.logger.error(refusal.message, { oplabel: 'Device.onLifecycle', refusalkind: refusal.refusalkind })
   reportToPlatform(refusal)
@@ -372,7 +386,7 @@ function reportAtError(refusal: VaultError, device: Device): void {
 
 // A lock or a vacate meant the lease gone, and a vacate tries every forget again; a tombstone's forget and an outdated
 // row's are tried again by the next lease cached.
-/** The default's answer to a cached lease that outlived its revoke. */
+/** Handle `lease_revoke_failed` for {@link DefaultOnLifecycle}. */
 function heedRevokeFailed({ refusal, where, device }: Extract<DeviceEvent, { kind: 'lease_revoke_failed' }>): void {
   if (where === 'tombstone' || where === 'undeleted') {
     device.logger.warn(refusal.message, { oplabel: 'Device.onLifecycle', refusalkind: refusal.refusalkind })
@@ -382,7 +396,12 @@ function heedRevokeFailed({ refusal, where, device }: Extract<DeviceEvent, { kin
   if (device.isEnabled) { void device.vacate() }
 }
 
-/** The `onLifecycle` a device has when given none: a lease that outlived a lock or a vacate, and a vacate with a cause, to the logger at error and the platform, the device vacated; a bring-up or beginWatch refused but by the device's end to the logger. */
+/** The default `onLifecycle`: log what a host should hear of, by the event's kind.
+ * - `lease_revoke_failed`, after a lock or a vacate: logged at error and reported to the platform, and the device vacated
+ * - the same, after a tombstone or at an unlock: a warning
+ * - `vacated`, for any cause but `disabled`: logged at error and reported to the platform
+ * - `helloed` refused, by `device.ensureBank()` or `vault.beginWatch()`, for any cause but `disabled`: a warning
+ */
 export const DefaultOnLifecycle: LifecycleHandler = (event) => {
   switch (event.kind) {
   case 'lease_revoke_failed': {
@@ -402,7 +421,7 @@ export const DefaultOnLifecycle: LifecycleHandler = (event) => {
 }
 
 // What the dialog throws is dropped: it may quote what the user typed.
-/** `requestCleartext`, made to honor its contract: the one way a gating asks the user. */
+/** Guard the host's `requestCleartext`: the guard resolves true once the host's resolves, and false on a throw, which it drops. */
 export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUser {
   const host = HostChecks.requestCleartext.parse(requestCleartext, { where: 'requestCleartext' })
   return brandGuarded(async (gating: AnyGating): Promise<boolean> => {
@@ -415,7 +434,7 @@ export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUs
   })
 }
 
-/** `onLifecycle`, made to honor its contract: the one way the core tells the host what happened in the device's life. */
+/** Guard the host's `onLifecycle`: anything it throws or rejects with is reported to the platform, never thrown. */
 export function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycleHandler {
   const host = HostChecks.onLifecycle.parse(onLifecycle, { where: 'onLifecycle' })
   return brandGuarded(async (event: DeviceEvent): Promise<void> => {
@@ -427,14 +446,14 @@ export function guardOnLifecycle(onLifecycle: LifecycleHandler): GuardedLifecycl
   })
 }
 
-/** What a device tells of its life and of bad news: the host's `onLifecycle`, guarded, and its `onBadNews`, or the defaults a disabled device tells. */
+/** A device's lifecycle and bad-news handlers: the host's, or the defaults. */
 interface Handlers {
   readonly onLifecycle: GuardedLifecycleHandler
   readonly onBadNews:   BadNewsHandler
 }
 
 // Past the disable the defaults only report: their vacate is the device's own, already under way.
-/** A disabled device's reports: `DefaultOnLifecycle` and `DefaultOnBadNews`. */
+/** The handlers of a disabled device: {@link DefaultOnLifecycle} and {@link DefaultOnBadNews}. */
 const DefaultHandlers: Handlers = { onLifecycle: guardOnLifecycle(DefaultOnLifecycle), onBadNews: DefaultOnBadNews }
 // --
 

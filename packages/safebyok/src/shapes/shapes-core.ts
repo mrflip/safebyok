@@ -1,4 +1,4 @@
-/** What every other shape stands on: the stored records' fields, the whisper and sidecar, the scopes, and the shapes of the code a host hands in. Imported as `CX`. */
+/** The shapes every other shape is built on: the stored records' fields, the whisper and sidecar, the scopes, and the host's key deriver and logger. Imported as `CX`. */
 
 import type * as Z from 'zod'
 import { never, record, uuid } from 'zod'
@@ -19,11 +19,12 @@ const SaltShape = Phrases.passphraseSaltShape(PassphraseSaltSize, PassphraseSalt
 
 // == [Ciphered]: ciphered, Ciphered
 
-/** An encrypted value as stored, a wrapped key or a ciphered whisper: its cipherIv and its ciphertext (tag on the end), each base64url text. It is strict. */
+/** The check of an encrypted value as stored, a wrapped key or a ciphered whisper. Other fields are refused. */
 export const ciphered = objCheck(({ str }) => ({
   cipher_iv_b64:  str.min(1),
   ciphertext_b64: str.min(1),
 }))
+/** An encrypted value as stored: its IV and its ciphertext (tag on the end), each base64url text. */
 export type Ciphered = Z.infer<typeof ciphered>
 // --
 
@@ -31,11 +32,11 @@ export type Ciphered = Z.infer<typeof ciphered>
 
 export { epochMillis, type EpochMillis } from './primitives'
 
-/** The checks for the tokens, the ids, the salts and the ciphered fields of the stored records, each named for the field it checks. Each `parse` quotes none of it.
- * A token is plain text, as a host's adapter may write one by hand. A device's id is a UUID. A key deriver's label
- * and a passkey's credential id are plain text, not empty. A salt or a ciphered field is
- * branded for its role, since nothing but safebyok makes one. A passphrase's salt is base64url text of
- * {@link PassphraseSaltSize} bytes, judged by its characters, its length and decoding it; a passkey's is text, not empty, and {@link prfSalt} judges its length.
+/** The checks of the stored records' tokens, ids, salts and ciphered fields, each named for its field. No refusal quotes the value.
+ * A token is any text, not empty, as a host's adapter may write one by hand, and so are a key deriver's
+ * label and a credential id. A `device_tok` is a UUID. A passphrase's salt is base64url text of
+ * {@link PassphraseSaltSize} bytes. A passkey's salt is text, not empty, whose length {@link prfSalt} judges.
+ * A salt or a ciphered field is branded for its role, as nothing but safebyok makes one.
  */
 export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok, key_deriver_label, credential_id, salt_b64, prf_salt_b64, whisper_ciphered, box_key_wrapped, bank_key_wayin_wrapped, bank_key_lease_wrapped } = Checkers('bad_record', ({ str }) => ({
   bank_tok:                str.min(1),
@@ -54,13 +55,15 @@ export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok,
   bank_key_lease_wrapped: ciphered.brand<'BankKeyLeaseWrapped'>(),
 }))
 
-/** A passkey's salt as its kind makes one: a {@link prf_salt_b64} of exactly {@link PasskeySaltSize} bytes, as a wayin record has it: a stored row with any other refuses 'damaged_row'. */
+/** The check of a passkey wayin's salt: a {@link prf_salt_b64} of exactly {@link PasskeySaltSize} bytes.
+ * A stored row with a salt of any other length is damaged.
+ */
 export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
 
 /** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */
 export type PassphraseSalt = Z.infer<typeof salt_b64>
 
-/** A passkey wayin's prfSalt, its `prf_salt_b64`: base64url text of the 32 random bytes the authenticator's PRF is asked over. */
+/** A passkey wayin's prfSalt, its `prf_salt_b64`: base64url text of the {@link PasskeySaltSize} random bytes the authenticator's PRF is asked over. */
 export type PrfSalt = Z.infer<typeof prf_salt_b64>
 
 /** A box's whisperCiphered: the whisper, ciphered under the box's boxKey. */
@@ -88,7 +91,9 @@ export type WhisperJson = string | number | boolean | null | WhisperJson[] | { [
  */
 export type Whisper = Record<string, any>
 
-/** True for a plain object, built by a literal or `Object.create(null)`: never a Date or Map, which JSON would flatten, nor one with a symbol key, such as a bag marked `Whispered`, which it would drop. */
+/** True for a plain object with no symbol key, made by a literal or `Object.create(null)`.
+ * A Date or a Map is not one, as JSON would flatten it, and neither is a bag marked `Whispered`.
+ */
 export function isPlainBag(val: unknown): val is Record<string, unknown> {
   if (typeof val !== 'object' || val === null) { return false }
   if (Object.getOwnPropertySymbols(val).length > 0) { return false }
@@ -96,9 +101,9 @@ export function isPlainBag(val: unknown): val is Record<string, unknown> {
   return proto === Object.prototype || proto === null
 }
 
-/** The check for a {@link Whisper}, a plain JSON object with no symbol key at any depth; and `whisperBag`, the same with no word on a bag marked `Whispered`, for a {@link Sidecar}.
- * Its `parse` quotes none of it, and names none of an object's keys: an
- * object that is not plain JSON fails whole.
+/** The check of a {@link Whisper}: a plain JSON object with no symbol key at any depth, returned as a copy.
+ * `whisperBag` is the same, for a {@link Sidecar}, but with no message of its own for a bag marked `Whispered`.
+ * A refusal quotes none of the value and names none of its keys: an object that is not plain JSON fails whole.
  *
  * @example whisper.parse({ apiKey: 'sk-ant-...' })      // an object passes through, copied
  * @example whisper.safeParse('sk-ant-...').success      // false: a whisper is an object -- { apiKey: 'sk-ant-...' }
@@ -121,24 +126,25 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
   return { whisper, whisperBag }
 })
 
-/** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, shown while the vault is locked. Never put secret material in it.
+/** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, readable while the bank is locked. Never put secret material in it.
  * It is stored in the clear, as the JSON object it is (a `jsonb` column, say, which a server can
- * query), so anyone who can read the database can read it, and change it: it is not authenticated,
- * and the whisper opens whatever storage did to it. A field the server should read but must not
- * change unnoticed goes in the whisper too, so that you can compare the two once the box is unsealed. safebyok never
- * looks inside it: check its shape before `putBox()`, which refuses one that fails it.
+ * query), so anyone who can read the database can read it. It is not authenticated: anyone who can
+ * write the database can change it, and the whisper still opens. A field the server should read but
+ * must not change unnoticed goes in the whisper too, so that you can compare the two once the box is
+ * unsealed. safebyok never looks inside it: check its shape yourself before `putBox()`, which refuses
+ * only one that is not a plain JSON object.
  *
  * @example sidecar.safeParse('work account').success  // false: a sidecar is an object -- { note: 'work account' }
  */
 export const sidecar = Checker(() => whisperBag, 'bad_option')
+/** A box's sidecar, as {@link sidecar} checks it. */
 export type Sidecar = Z.infer<typeof sidecar>
 // --
 
 // == [Scopes]: bankScope, gateScope, vaultScope, boxscope, BankScope, GateScope, VaultScope, Boxscope, bankedVaultScope, BankedVaultScope
 
-/** A scope as a frozen copy.
- * A scope carrying more fields passes, the rest left out: a vault's record, or a Vault object,
- * passes as its scope. Being a copy, no one it is handed to can change it for everyone else.
+/** The checks of a bank's, a gate's, a vault's and a box's scope, each returning a frozen copy.
+ * Other fields are dropped, so a record or a model passes as its scope.
  *
  * @example CX.vaultScope.parse(vault)  // { user_id, banklabel, vaultlabel }, frozen
  */
@@ -161,9 +167,9 @@ export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
 
-/** The scope naming one of a bank's vaults, as its calls are handed it: the `vaultlabel` required, the `user_id` and `banklabel` invited, each name checked.
- * It accepts whatever carries the names, a plain bag, a Vault object, its snapshot or a
- * BankVault, and leaves the rest. A bankDB or deviceDB in the scope refuses: each goes to `Device.make`.
+/** The check of the scope a bank's calls take to name a vault: its `vaultlabel`, and optionally the bank's `user_id` and `banklabel`.
+ * Anything carrying those names passes, such as a Vault or its snapshot, and the rest is dropped. A
+ * bankDB or deviceDB in it refuses, as each goes to `Device.make`.
  *
  * @example bankedVaultScope.parse({ vaultlabel: 'main', bankDB })  // throws: a bankDB goes to Device.make
  */
@@ -172,7 +178,7 @@ export const bankedVaultScope = Checker(({ obj, user_id, banklabel, vaultlabel }
   return obj({ user_id: user_id.optional(), banklabel: banklabel.optional(), vaultlabel, bankDB: database, deviceDB: database })
 }, 'bad_scope')
 
-/** The scope naming one of a bank's vaults, as {@link bankedVaultScope} checks it: its `vaultlabel`, and the bank's own `user_id` and `banklabel` if you like.
+/** The scope naming one of a bank's vaults: its `vaultlabel`, and optionally the bank's own `user_id` and `banklabel`.
  *
  * @example bank.ensureVault({ vaultlabel: 'main' })
  */
@@ -181,7 +187,9 @@ export type BankedVaultScope = Z.input<typeof bankedVaultScope>
 
 // == [Key deriver and logger]: keyDeriverShape, loggerShape
 
-/** The check of a key deriver, by the verbs the vault calls on it and the fields it reads. */
+/** The check of a host's key deriver by its interface: the functions the core calls and the fields it reads.
+ * Its `salt_size` must be {@link PassphraseSaltSize}. Its other parameters are the host's to choose.
+ */
 export const keyDeriverShape = Checker(({ obj, fn, str, lit }) => obj({
   algorithm:         str.optional(),
   key_deriver_label,
@@ -192,7 +200,7 @@ export const keyDeriverShape = Checker(({ obj, fn, str, lit }) => obj({
 
 true satisfies Z.core.util.AssertEqual<KeyDeriver, Readonly<Z.input<typeof keyDeriverShape>>>
 
-/** The shape a VaultLogger must have. It only checks: `parseLogger` guards the host's own logger, and calls it `this` and all. */
+/** The check of a host's logger by its interface. It only checks: `parseLogger` wraps the logger, and calls it with its own `this`. */
 export const loggerShape = Checker(({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)

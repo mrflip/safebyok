@@ -17,7 +17,9 @@ export type { MemoryBankDBOpts } from '../shapes/shapes-bankdb'
 
 /** The rows stored under one bank's scope: its bank row (null for none), its gate rows by gatelabel, and its vault rows by vaultlabel. */
 type Shelf = { bank: unknown, gaterows: Map<string, unknown>, vaultrows: Map<string, unknown> }
+/** The box rows of one vault life, by boxlabel. */
 type BoxLife = { scope: VaultScope, life: string, boxrows: Map<string, unknown> }
+/** A watch: the scope it hears, and the function that hears each change. */
 type Listener = { scope: WatchScope, hear: (heard: Heard) => void }
 
 /** A bankDB kept in this tab's memory, gone when the tab closes. */
@@ -58,26 +60,31 @@ export class MemoryBankDB extends AdapterBankDB {
     return boxLife.boxrows
   }
 
+  /** The box rows of the vault life `ask` names. */
   #boxRowsOf(ask: VaultScope & { bank_tok: string, vault_tok: string }): Map<string, unknown> { return this._cheat_boxRowsOf(ask, ask.bank_tok, ask.vault_tok) }
 
+  /** Store a copy of `record` as its bank row, and tell the watchers. */
   #writeBankRow(record: BankRow): void {
     const row = structuredClone(record)
     this._cheat_shelfOf(record).bank = row
     this.#tell(record, { row })
   }
 
+  /** Store a copy of `record` as its gate row, and tell the watchers. */
   #writeGateRow(bank: unknown, record: GateRecord): void {
     const row = structuredClone(record)
     this._cheat_shelfOf(record).gaterows.set(record.gatelabel, row)
     this.#tell(record, { row, parent: bank })
   }
 
+  /** Store a copy of `record` as its vault row, and tell the watchers. */
   #writeVaultRow(bank: unknown, record: VaultRow): void {
     const row = structuredClone(record)
     this._cheat_shelfOf(record).vaultrows.set(record.vaultlabel, row)
     this.#tell(record, { row, parent: bank })
   }
 
+  /** Store a copy of `record` in `boxrows`, and tell the watchers. */
   #writeBoxRow(boxrows: Map<string, unknown>, vault: unknown, record: BoxRow): void {
     const row = structuredClone(record)
     boxrows.set(record.boxlabel, row)

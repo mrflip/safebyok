@@ -1,4 +1,7 @@
-/** What the bankDB and the deviceDB share: the box rows a bank's extend, the policies, and the deviceDB's rows. Imported as `SX`. */
+/** Storage shapes shared by the bankDB and the deviceDB. Imported as `SX`.
+ * The void row's values, the fields every row has, the wayin and box forms `BX` extends into a bank's rows,
+ * the put policies, capacity, and the deviceDB's rows.
+ */
 
 import type * as Z from 'zod'
 import { Checker, Checkers, objCheck, objStrip } from '../helpers/validator'
@@ -13,11 +16,11 @@ import { type VaultScope, sidecar } from './shapes-core'
 export const VoidRevisionTok = '00000000-0000-0000-0000-000000000000'
 /** The `revision_seq` of a void row, and of a birth's prior: every populated row has 0 or more. */
 export const VoidRevisionSeq = -1
-/** The `box_tok` or `vault_tok` of a void row: no life ever minted has it. */
+/** The life tok (`bank_tok`, `gate_tok`, `vault_tok` or `box_tok`) of a void row: no life ever minted has it. */
 export const VoidLifeTok = '00000000-0000-0000-0000-000000000000'
-/** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, plain on sight. */
+/** The `registered_at` and `written_at` of a void row: 2008-08-08T08:08:08.777Z, easy to spot. */
 export const VoidTime = 1_218_182_888_777
-/** The `fmt` every box row carries. */
+/** The `fmt` of the base box form, which a bank's box row replaces with its own. */
 export const BoxFormat = 5002
 /** The revision of a void row, and of a birth's prior. */
 export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidRevisionSeq } as const
@@ -26,11 +29,11 @@ export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidR
 
 // == [Record bases]: am, revision, times, vaulted, sparseBase, Revision, Times
 
-/** What every stored row has in common: its `am`, its revision, its times and its vault's `vault_tok`, and `sparseBase`, the four together. */
+/** The checks of the fields stored rows share: `am`, the revision, the times, a vault's `vault_tok`, and `sparseBase`, the four together. */
 export const { am, revision, times, vaulted, sparseBase } = Checkers('bad_option', ({ obj, int, oneof, epochMillis, revision_tok, vault_tok }) => {
   const revision = obj({
     revision_tok,
-    /** A counter the writer moves at every put and del: of two revisions, the higher `revision_seq` is the newer. */
+    /** A counter that goes up by one at every put and del: of two revisions, the higher is the newer. */
     revision_seq: int,
   })
   const am = oneof(EX.amVals)
@@ -45,7 +48,9 @@ export const { am, revision, times, vaulted, sparseBase } = Checkers('bad_option
   return { am, revision, times, vaulted, sparseBase }
 }, [CX])
 
+/** A row's revision: its `revision_tok` and `revision_seq`. */
 export type Revision = Readonly<Z.infer<typeof revision>>
+/** A row's `registered_at` and `written_at`. */
 export type Times    = Readonly<Z.infer<typeof times>>
 // --
 
@@ -58,6 +63,7 @@ export const { watchScope, boxTidy } = Checkers('bad_scope', ({ lit, vaultlabel,
   boxTidy:    bankScope.unwrap().extend({ op: lit('tidy_gone') }),
 }), [CX])
 
+/** The scope of a watch: a bank's, and optionally a vaultlabel. */
 export type WatchScope = Readonly<Z.input<typeof watchScope>>
 /** A `tidyGone` ask: the bank's scope. */
 export type BoxTidyAsk = Readonly<Z.output<typeof boxTidy>>
@@ -65,7 +71,7 @@ export type BoxTidyAsk = Readonly<Z.output<typeof boxTidy>>
 
 // == [Wayins]: passphraseWayinRecord, passkeyWayinRecord
 
-/** The checks of the wayins as stored. */
+/** The checks of a passphrase wayin and a passkey wayin as stored, before `BX` adds their `wayinlabel`. */
 export const { passphraseWayinRecord, passkeyWayinRecord } = Checkers('bad_option', ({ obj, lit, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_tok, bank_key_wayin_wrapped }) => ({
   passphraseWayinRecord: obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_tok, registered_at: epochMillis, bank_key_wayin_wrapped }).strict(),
   passkeyWayinRecord:    obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_tok, registered_at: epochMillis, bank_key_wayin_wrapped }).strict(),
@@ -74,17 +80,15 @@ export const { passphraseWayinRecord, passkeyWayinRecord } = Checkers('bad_optio
 
 // == [Damaged rows]: DamagedVault, DamagedRow
 
-/** A vault row that failed validation, named by where it is stored: its scope, under whatever label storage has, and `am` 'd'. */
+/** A vault row that failed its checks, named by where it is stored, under whatever label storage has, with `am` 'd'. */
 export type DamagedVault   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, am: 'd' }>
-/** A vault row or a box row that failed validation, named by where it is stored.
- * A damaged row never indicates format drift: it is thrown by the bankDB tied to the datastore.
- */
+/** A vault row or a box row that failed its checks, named by where it is stored. */
 export type DamagedRow     = DamagedVault | DamagedBox
 // --
 
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
-/** The checks of a box's stored forms, which a bank's extend: its sparse fields, its live record and its tombstone. */
+/** The checks of a box's stored forms, which `BX` extends into a bank's box rows: its sparse fields, its live record and its tombstone. */
 export const { boxSparse, boxRecord, boxTombstone } = Checkers('bad_option', ({ lit, box_tok, box_key_wrapped, whisper_ciphered }) => {
   const boxSparse = CX.boxscope.unwrap().extend({
     fmt: lit(BoxFormat),
@@ -108,12 +112,15 @@ export const { boxSparse, boxRecord, boxTombstone } = Checkers('bad_option', ({ 
   return { boxSparse, boxRecord, boxTombstone }
 }, [CX])
 
+/** A box's sparse fields, in the base form `BX` extends. */
 export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
+/** A live box row, in the base form `BX` extends. */
 export type BoxRecord    = Readonly<Z.infer<typeof boxRecord>>
+/** A deleted box's row, in the base form `BX` extends. */
 export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
-/** A box row as stored: live, or a tombstone. */
+/** A box row, live or a tombstone, in the base form `BX` extends. */
 export type BoxRow       = BoxRecord | BoxTombstone
-/** A box row that failed validation, named by where it is stored: its scope, under whatever label storage has, its vault's `vault_tok`, and `am` 'd'. */
+/** A box row that failed its checks, named by where it is stored, under whatever label storage has, with its vault's `vault_tok` and `am` 'd'. */
 export type DamagedBox   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
 // --
 
@@ -137,15 +144,15 @@ export const putOpts = objCheck(({ obj, orDefault }) => ({
   ifPresent: orDefault(ifPresent, 'repl'),
 }), 'bad_option', [CX])
 
+/** A put's options through a listing: `expected`, `ifAbsent` (default `'add'`) and `ifPresent` (default `'repl'`). */
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
 // --
 
 // == [Capacity]: capacity, Capacity
 
-/** How full a vault is: its box rows against their cap, and its bytes against the most its storage allows for one vault.
- * The box rows are every box of the vault's life, live and deleted together. A `vault_full` refusal
- * carries the bankDB's count in `meta.capacity`, as an estimate: storage checks again on every
- * write. A limit storage reports as `Infinity` reads as `Number.MAX_SAFE_INTEGER`.
+/** The check of how full a vault is: its box rows against their cap, and its bytes against the most its storage allows for one vault.
+ * The box rows are every box of the vault's life, live and deleted together. The count is an estimate:
+ * storage checks again on every write. A limit reported as `Infinity` reads as `Number.MAX_SAFE_INTEGER`.
  *
  * @example { boxes: { used: 12, max: 100 }, bytes: { used: 48_000, max: 1_000_000 } }
  */
@@ -156,6 +163,7 @@ export const capacity = objCheck(({ obj, union, int, uint, lit }) => {
   const room      = obj({ used: uint, max: roomLimit })
   return { boxes: room, bytes: room }
 }, { extras: 'strip' })
+/** How full a vault is, as {@link capacity} checks it. */
 export type Capacity = Z.infer<typeof capacity>
 // --
 
@@ -179,12 +187,15 @@ export const revisionOf = ({ revision_tok, revision_seq }: Revision): Revision =
 /** Fresh revision fields for the next write, written at `written_at`. */
 export function nextRevisionOf({ revision_seq }: Revision, written_at: number) { return { revision_tok: randomId(), revision_seq: revision_seq + 1, written_at } }
 
+/** The revision, `am` and `vault_tok` of `raw`, or null where it has none. */
 function metaOf(raw: unknown) {
   const parsed = rowMeta.safeParse(raw)
   return parsed.success ? parsed.data : null
 }
 
-/** True when `raw`, a stored row or null for a void one, stands at `prior`. Storage's conditional put is atomic on this. */
+/** True when `raw`, a stored row or null for a void one, is at revision `prior`.
+ * An adapter's conditional put tests this in the same atomic step as its write.
+ */
 export function isRowAt(raw: unknown, prior: Revision): boolean {
   if (raw === null) { return (prior.revision_tok === VoidRevisionTok) && (prior.revision_seq === VoidRevisionSeq) }
   const meta = metaOf(raw)
@@ -194,13 +205,17 @@ export function isRowAt(raw: unknown, prior: Revision): boolean {
 /** True when `raw` is a live row. */
 export function isLiveRow(raw: unknown): boolean { return (metaOf(raw)?.am === 'a') }
 
-/** A listing's entry for a vault row that failed validation. Its label comes from storage, unchecked: it is part of what is reported. */
+// Its label comes from storage unchecked: it is part of what is reported.
+/** The entry listed for a vault row that failed its checks. */
 export function damagedVaultOf({ user_id, banklabel, vaultlabel }: VaultScope): DamagedVault { return { user_id, banklabel, vaultlabel, am: 'd' } }
 // --
 
 // == [The deviceDB]: leaseQuery, leaseDated, leaseRow, LeaseQuery, LeaseDated, LeaseRow, leaseScopepath, LeaseScopepath, RawLease, deviceRow, DeviceRow
 
-/** A lease row is structural here: the lease's own shape is the models'. The rest of it is carried as it came, a `lease_key` handle included. */
+/** The checks of which lease row a deviceDB verb means, and of a lease row as the deviceDB keeps it.
+ * Only the fields a row is filed by are checked here: the rest is carried as it came, a `lease_key`
+ * handle included, for the lease to check.
+ */
 export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis, bankScope, bank_tok }) => {
   const leaseQuery = bankScope.unwrap().extend({ bank_tok })
   const leaseDated = leaseQuery.extend({ proved_at: epochMillis })
@@ -211,6 +226,7 @@ export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ ep
 export type LeaseQuery   = Z.infer<typeof leaseQuery>
 /** A stowed lease as the deviceDB dates it: its query and its `proved_at`. */
 export type LeaseDated   = Z.infer<typeof leaseDated>
+/** A lease row as the deviceDB keeps it: its query and `proved_at` checked, the rest as it came. */
 export type LeaseRow     = Z.infer<typeof leaseRow>
 
 // Two strings, and no label rules: `forgetRawLease` is for reaching a row filed under labels today's checks refuse.
@@ -225,8 +241,9 @@ export type RawLease = { scopepath: LeaseScopepath, row: unknown }
 
 true satisfies Z.core.util.AssertEqual<LeaseScopepath, Z.infer<typeof leaseScopepath>>
 
-/** The device row: the `device_tok` this device goes by in one bank scope, and the version of safebyok that last asked for it. */
+/** The check of a device row: the `device_tok` this device goes by in one bank scope, and the version of safebyok that last asked for it. */
 export const deviceRow = objCheck(({ str, user_id, banklabel, device_tok }) => ({ user_id, banklabel, device_tok, package_version: str.min(1) }), 'bad_record', [CX])
 
+/** A device row, as {@link deviceRow} checks it. */
 export type DeviceRow = Z.infer<typeof deviceRow>
 // --

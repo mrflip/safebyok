@@ -1,4 +1,4 @@
-/** The checks and types of what's stored and listed: records, options, listings, boxes, vaults, banks and the device, imported as `VX`. */
+/** The checks and types of the models: record forms, options, listings, boxes, gates, vaults, banks and the device. Imported as `VX`. */
 
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
@@ -27,7 +27,7 @@ import type { StrengthChecker } from '../helpers/passphrase-strength'
 
 // == [Checks]: Checks
 
-/** The checks this module makes for itself, passed as `sources` to the validators below: `vaultError`, a VaultError as {@link isVaultError} tells one. */
+/** This module's own checks: `vaultError`, a VaultError from any copy of safebyok. */
 const Checks = Checkers('bad_record', ({ custom }) => ({
   vaultError: custom<VaultError>(isVaultError, Phrases.VaultErrorExpected),
 }))
@@ -36,7 +36,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // == [Record forms]: storableBase, liveness, tombstone, isTombstone, Liveness, SparseBase, Tombstone, Fetched, Dna
 
-/** The check of what every stored row has in common, whatever it is: its revision, its times and its `am`. */
+/** The check of what every stored row has: its revision, its times and its `am`. */
 export const storableBase = Checker(({ obj }) => obj({ ...SX.revision.shape, ...SX.times.shape, am: SX.am }), 'bad_option')
 
 /** The checks of a record's `am`, and of a tombstone's fields. */
@@ -48,16 +48,18 @@ export const { liveness, tombstone } = Checkers('bad_record', ({ obj, lit }) => 
 /** Whether a record is alive, damaged or gone: its `am`. */
 export type Liveness = Readonly<Z.infer<typeof liveness>>
 
-/** The least a sparse form carries: the scope, and what {@link storableBase} checks, the revision, the times and whether it is alive. */
+/** The least a sparse form carries: its scope, revision, times and `am`. */
 export type SparseBase<ScopeT> = ScopeT & SX.Revision & SX.Times & Liveness
 
 /** The sparse form of a deleted thing: its sparse props stay, and the user's content is gone. */
 export type Tombstone<SparseT> = SparseT & Readonly<{ am: 'x' }>
 
-/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. {@link storableBase} checks what the base knows of any of the three. */
+/** The `val` a storage call delivers: the full record, its sparse form, or its tombstone. */
 export type Fetched<RecordT, SparseT> = RecordT | SparseT | Tombstone<SparseT>
 
-/** The DNA of a storable, what a caller hands `listing.create`: the scope, and any of the record's props, each missing or undefined where not given; those the factory controls are ignored. */
+/** What a caller hands `listing.create` for a storable: its scope, and any of the record's props.
+ * A prop not given may be missing or undefined. Those the factory controls are ignored.
+ */
 export type Dna<ScopeT, RecordT> = ScopeT & { [Prop in keyof RecordT]?: RecordT[Prop] | undefined }
 
 /** True for a deleted record: its `am` is 'x'. */
@@ -67,10 +69,10 @@ export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched
 
 // == [Options]: Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, probeAsked, probeOpts, ProbeAsked, ProbeOpts, ProbeStep, ProbeReport, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
 
-/** How old, in milliseconds, a vault's record may be and still be acted on with no fetch. `ensureTimely(0)` accepts none: it fetches, or joins the fetch under way. */
+/** How old, in milliseconds, the gate's record may be before a prompt fetches it again. */
 export const Promptly = 2000
 
-/** SLOPDOC: The checks of the options a storable and its verbs accept. */
+/** The checks of the options a storable's verbs take: how fresh the record in hand must be, a get's and a put's policies, and a listener. */
 export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, orDefault, fn }) => {
   // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
@@ -82,19 +84,29 @@ export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxC
     maxWorldMillis:        maxMillis,
   })
   const fetchOpts     = timelyOpts.extend({
-    /** What an absent thing does: `fail`, the default, refuses with the listing's absent refusal; `nil` resolves null. */
+    /** Where nothing live is stored:
+     * - `'fail'` -- refuse as absent (default)
+     * - `'nil'`  -- resolve null
+     */
     ifAbsent: orDefault(SX.ifAbsent, 'fail'),
   })
   const boxPutOpts    = timelyOpts.extend({
-    /** What an absent box does: `add`, the default, creates it. */
+    /** Where no live box is stored:
+     * - `'add'`  -- create it (default)
+     * - `'fail'` -- refuse as absent
+     */
     ifAbsent:  orDefault(SX.putIfAbsent, 'add'),
-    /** What a present box does: `repl`, the default, replaces it. */
+    /** Where a live box is stored:
+     * - `'repl'` -- replace it (default)
+     * - `'fail'` -- refuse `camped`
+     * - `'get'`  -- leave it, and return it as stored
+     */
     ifPresent: orDefault(SX.ifPresent, 'repl'),
   })
   const boxCreateOpts = timelyOpts.extend({
     /** Always `add`: a create creates. */
     ifAbsent:  orDefault(lit('add'), 'add'),
-    /** What a present box does: `fail`, the default, refuses. */
+    /** Where a live box is stored: `'fail'` (default) refuses `camped`. `'repl'` and `'get'` are as a put's. */
     ifPresent: orDefault(SX.ifPresent, 'fail'),
   })
   const listener      = fn<() => void>()
@@ -110,9 +122,9 @@ export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlab
     sidecar:    CX.sidecar.default({ example: true }),
   }),
   probeOpts: obj({
-    /** How long ago, at most, the trial's vault and box were refreshed from the bankDB; apart from the bank's own refresh settings. */
+    /** How long ago, at most, the trial's vault and box were refreshed from the bankDB, whatever the device's refresh settings. */
     maxMillisSinceRefresh: horizonMillis.default(1000),
-    /** How long ago, at most, the box got back after the put was refreshed: 0, the default, asks storage; more lets the listing answer from the box the put left. */
+    /** How fresh the box fetched back after the put must be: 0 (default) asks storage, and more lets the listing answer from the box the put left. */
     maxMillisAtGetBack:    horizonMillis.default(0),
   }),
 }))
@@ -136,10 +148,10 @@ export type ProbeReport = Readonly<{
 /** How fresh the record in hand and the world must be before a verb goes on. */
 export type TimelyOpts = Z.infer<typeof timelyOpts>
 
-/** `fetch`'s options, as a caller hands them in, defaults unapplied. */
+/** The options of a get (`listing.get`, `vault.getBox`), as a caller hands them in, defaults unapplied. */
 export type FetchOpts = Z.input<typeof fetchOpts>
 
-/** `box.put`'s options, as a caller hands them in, defaults unapplied: an upcreate unless they say otherwise. */
+/** `box.put`'s options, as a caller hands them in, defaults unapplied. By default a put creates or replaces. */
 export type BoxPutOpts = Z.input<typeof boxPutOpts>
 
 /** `create`'s options, as a caller hands them in, defaults unapplied. */
@@ -149,14 +161,14 @@ export type BoxCreateOpts = Z.input<typeof boxCreateOpts>
 
 // == [A listing's options]: ListingOpts, BankListingOpts, answersEachVerb, brandedBankDB, listingOpts, bankListingOpts, listedUnder
 
-/** The options a listing is made with, after the thing above it. */
+/** The options a listing is made with, besides the thing it is made under. */
 export type ListingOpts = {
   bankDB:                BankDB
   /** The refresh horizon of each thing the listing makes: how long after its last refresh the record in hand stays timely. */
   maxMillisSinceRefresh: number
 }
 
-/** The options a bank listing is made with, after its device: a listing's, and the host's dialog, which it hands each bank it makes. */
+/** The options a bank listing is made with, besides its device: a listing's, and the host's dialog, which it hands each bank it makes. */
 export type BankListingOpts = ListingOpts & {
   /** Show the host's dialog, wrapped by `guardRequestCleartext`; null with none. */
   askUser: AskUser | null
@@ -167,7 +179,7 @@ function answersEachVerb(val: object): boolean {
   return BankDBVerbnames.every((verbname) => typeof (val as Partial<Record<string, unknown>>)[verbname] === 'function')
 }
 
-/** The check of a bankDB as a model is handed one: branded, from whichever copy of safebyok, and answering each verb with a function. */
+/** The check of a bankDB handed to a model: branded by any copy of safebyok, with a function for each verb. */
 export const brandedBankDB = Checker(({ custom }) => custom<BankDB>((val) => isBankDB(val) && answersEachVerb(val), Phrases.BankDBExpected), 'bad_option')
 
 /** The check of a listing's options. Checks only. */
@@ -202,7 +214,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, ListingOf
 
-/** A vault or box in a listing. */
+/** A thing a listing holds: a bank, gate, vault or box. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a bankDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
@@ -248,7 +260,7 @@ export interface BoxSnapshot extends Boxscope {
   readonly registered_at: number
   /** When the revision in hand was written; for a box deleted, when it was deleted. */
   readonly written_at:    number
-  /** Your app's data beside the whisper, never encrypted; null until the full record is fetched. */
+  /** Your app's data beside the whisper, never encrypted, or null until the full record is fetched. */
   readonly sidecar:       Sidecar | null
   /** True when the full record is in hand, false for a box only listed or deleted. */
   readonly isFull:        boolean
@@ -258,7 +270,7 @@ export interface BoxSnapshot extends Boxscope {
   readonly isExposed:     boolean
   /** True while `box.veil()` hides the whisper exposed. */
   readonly isVeiled:      boolean
-  /** True while the box's vault is locked. */
+  /** True while the box's bank is locked. */
   readonly isLocked:      boolean
 }
 
@@ -308,7 +320,7 @@ export type BoxPatch = Omit<Z.input<typeof boxPatch>, keyof BoxHalves> & { [Prop
 /** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
 export type BoxPut = BoxPatch & { boxlabel: string }
 
-/** SLOPDOC: What a caller hands `create` to make a box: its scope, whisper and sidecar, with no sealed parts. */
+/** What a caller hands `create` for a new box: its scope, whisper and sidecar. */
 export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<BoxHalves>
 
 // --
@@ -337,7 +349,7 @@ export interface GateSnapshot extends CX.GateScope {
 
 // == [The vault's forms]: VaultSnapshot
 
-/** A vault as a host renders it: its scope, its life and revision, and whether it is locked. */
+/** A vault as a host renders it: its scope, its life and revision, and whether it is present. */
 export interface VaultSnapshot extends VaultScope {
   /** The token of this life of the vault, new when the vault is made again for its scope. */
   readonly vault_tok:     string
@@ -357,10 +369,10 @@ export interface VaultSnapshot extends VaultScope {
 
 // == [The bank's making]: brandedDeviceDB, bankArgs
 
-/** The check of a deviceDB as a model is handed one, by its brand: an instance of a class extending DeviceDB, from whichever copy of safebyok. */
+/** The check of a deviceDB handed to a model, by its brand: an instance of a class extending DeviceDB, from any copy of safebyok. */
 export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
 
-/** The check of what a bank is made with, past its listing's options: the device that makes it, and the token of its device row, which the device has once its `ensureBank` has ensured the row. */
+/** The check of what a bank is made with, besides its listing's options: its device, and the `device_tok` of this device's row. */
 export const bankArgs = objCheck(({ custom, device_tok }) => ({
   device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
   device_tok,
@@ -405,15 +417,17 @@ export interface DeviceOpts {
   gates:                readonly ['main']
   /** The BankDB the bank is synchronized through, from a storage adapter. */
   bankDB:               BankDB
-  /** The device database that caches each vault's lease. */
+  /** The device database that caches the bank's lease and this device's row. */
   deviceDB:             DeviceDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
   keyDeriver:           KeyDeriver
-  /** Your dialog, called with each gating that needs the user's passphrase or passkey; left out, each gating waits in the device's snapshot for your own `attempt` or `dismiss`. */
+  /** Your dialog, called with each gating that needs the user's passphrase or passkey.
+   * Left out, each gating waits in the device's snapshot for your own `attempt` or `dismiss`.
+   */
   requestCleartext?:    RequestCleartext | undefined
-  /** Judges each new passphrase before a vault accepts it; without one, every new passphrase is too weak (notes/configuration.md). */
+  /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak (notes/configuration.md). */
   strengthChecker?:     StrengthChecker | undefined
-  /** Where the device says what it has no caller to throw to; the console when left out. */
+  /** Where the device reports what it has no caller to throw to: the default logger, the console, when left out. */
   logger?:              VaultLogger | undefined
   /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?:     number | undefined
@@ -421,9 +435,9 @@ export interface DeviceOpts {
   vaultRefreshMinutes?: number | undefined
   /** How recently a box's record must have been fetched to be trusted, in minutes; 5 when left out. */
   boxRefreshMinutes?:   number | undefined
-  /** Hears each refusal no caller waits on while the device is enabled and in its vacate's forget; else `DefaultOnBadNews`, the device's logger. */
+  /** Hears each refusal no caller waits on, while the device is enabled or being vacated. Left out, the device's logger warns of each. */
   onBadNews?:           BadNewsHandler | undefined
-  /** Hears what happened in the device's life, and no secret material, while the device is enabled and in its vacate's forget; `DefaultOnLifecycle` when left out. */
+  /** Hears what happened in the device's life, and no secret material, while the device is enabled or being vacated. `DefaultOnLifecycle` when left out. */
   onLifecycle?:         LifecycleHandler | undefined
 }
 
@@ -456,10 +470,15 @@ export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
 }), 'bad_option')
 
-/** Where a cached lease outlived its revoke: the bank's lock, tombstone or vacate, the device's vacate, or a row of another gate revision or life met at an unlock. */
+/** Where a cached lease outlived its revoke:
+ * - `'lock'`      -- the bank's lock
+ * - `'tombstone'` -- the bank found deleted, or of another life
+ * - `'vacate'`    -- the device's vacate
+ * - `'undeleted'` -- a cached row of another gate revision or bank life, met at an unlock
+ */
 export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 
-/** What the device and its bank's listings and vaults announce through it: a {@link DeviceEvent} before the device names itself. */
+/** What the device, its bank and their listings announce: a {@link DeviceEvent} without its `device`. */
 export type DeviceAnnouncement =
   | { readonly kind: 'lease_revoke_failed', readonly refusal: VaultError, readonly bank: Bank | null, readonly where: RevokeSite }
   | { readonly kind: 'vacated', readonly cause: VaultError, readonly unrevoked: number }
@@ -468,13 +487,17 @@ export type DeviceAnnouncement =
 /** What `onLifecycle` hears: what happened in the device's life, told by its `kind`, and the device it happened to. */
 export type DeviceEvent = { readonly device: Device } & DeviceAnnouncement
 
-/** `Device.make`'s `onLifecycle`: hears what happened in the device's life, as a bring-up or a vault's beginWatch, a vacate or a cached lease that outlived its revoke. */
+/** `Device.make`'s `onLifecycle`: hears what happened in the device's life, by `kind`: `helloed`, `vacated` or `lease_revoke_failed`. */
 export type LifecycleHandler = (event: DeviceEvent) => unknown
 
-/** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. Never throws. */
+/** `onLifecycle` as a device keeps it, wrapped by `guardOnLifecycle`. It never throws. */
 export type GuardedLifecycleHandler = (event: DeviceEvent) => Promise<void>
 
-/** `made` until an `ensureBank` succeeds; `ready` after one does; `disabled` once the device is swept or vacated, the snapshot's `err` saying why. */
+/** How far a device has come:
+ * - `'made'`     -- until an `ensureBank` succeeds
+ * - `'ready'`    -- once one has
+ * - `'disabled'` -- once the device is swept or vacated, its snapshot's `err` saying why
+ */
 export type DeviceStage = 'made' | 'ready' | 'disabled'
 
 /** A device as a host renders it: its scope, how far its `ensureBank` got, the gating it has open, and its bank. */

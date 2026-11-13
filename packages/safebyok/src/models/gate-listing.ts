@@ -1,4 +1,4 @@
-/** A bank's gate as this device has it: the stub listing a Gate is made in, whose row comes with its bank's. */
+/** The gate listing: a stub listing of a bank's one gate, whose row comes with the bank's. */
 
 import { nowMillis } from '../helpers/clock'
 import { type Modelkind, UNANSWERED } from '../helpers/consts'
@@ -37,7 +37,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
     Object.freeze(this)
   }
 
-  /** The scope of `gateish`, which must be this bank's: no listing answers for another's. */
+  /** The scope of `gateish`, which must be in this bank. */
   scopeOf(gateish: unknown):  GateScope  { return gateScope.parseConsistent(gateish, this.bank.scope, { message: Phrases.otherScope }) }
 
   /** Parse `gateish` as a {@link GateSparse}. */
@@ -50,10 +50,12 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form, gateMoveOf
   // The val is the record the verb wrote: the gate listed may have a newer one by the time the answer is delivered.
 
-  /** Lay a new passphrase wayin on the gate at `ante`, and answer the record stored. Nothing locks: the bankKey does not change. */
+  /** Replace the passphrase wayin of the gate at `ante` with `main`, and return the stored record.
+   * Locks nothing: the bankKey is unchanged.
+   */
   async replacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<GateRecord> { return valOf(await this.tryReplacePassphrase(ante, main)) }
 
-  /** {@link replacePassphrase}, answering the bankDB's own answer.
+  /** Non-throwing form of {@link replacePassphrase}: the bankDB's answer.
    * Chute: tryReplacePassphrase → bankDB.tryReplacePassphrase → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryReplacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<ThingAnswer<GateRecord>> {
@@ -66,10 +68,10 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
-  /** Lay a passkey wayin on the gate at `ante`, and answer the record stored. */
+  /** Add `passkey0` as the passkey wayin of the gate at `ante`, and return the stored record. */
   async addPasskey(ante: GateRecord, passkey0: NonNullable<Wayins['passkey0']>): Promise<GateRecord> { return valOf(await this.tryAddPasskey(ante, passkey0)) }
 
-  /** {@link addPasskey}, answering the bankDB's own answer.
+  /** Non-throwing form of {@link addPasskey}: the bankDB's answer.
    * Chute: tryAddPasskey → bankDB.tryAddPasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryAddPasskey(ante: GateRecord, passkey0: NonNullable<Wayins['passkey0']>): Promise<ThingAnswer<GateRecord>> {
@@ -82,10 +84,12 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
 
-  /** Take the passkey wayin off the gate at `ante`, and answer the record stored, or the row stored where it has no passkey wayin. */
+  /** Remove the passkey wayin of the gate at `ante`, and return the stored record.
+   * Where the stored gate has no passkey wayin, nothing is put, and that row is returned.
+   */
   async revokePasskey(ante: GateRecord): Promise<GateRecord> { return valOf(await this.tryRevokePasskey(ante)) }
 
-  /** {@link revokePasskey}, answering the bankDB's own answer.
+  /** Non-throwing form of {@link revokePasskey}: the bankDB's answer.
    * Chute: tryRevokePasskey → bankDB.tryRevokePasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async tryRevokePasskey(ante: GateRecord): Promise<ThingAnswer<GateRecord>> {
@@ -99,7 +103,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   }
 
   // A gate verb moves only the gate row's revision: its gate_tok, and the bank's, stay as they are.
-  /** The record of the gate at `ante` with its wayins moved by `move`, at the next revision, and the row it expects. */
+  /** The next record of the gate at `ante`, its wayins changed by `move`, with `ante` as the row it expects. */
   #gateMoveOf(ante: GateRecord, move: (wayins: Wayins) => Wayins): { record: GateRecord, expected: GateRecord } {
     const expected = this.recordOf(ante)
     this.demandEnabled()
@@ -113,7 +117,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   /** Whether this listing answers: its bank does. */
   get isEnabled(): boolean { return this.bank.isEnabled }
 
-  /** Demand that this listing's bank answers. */
+  /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
     this.bank.demandEnabled()
     return this
@@ -161,7 +165,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   protected isOwnRow(row: BankRow | GateRecord | VaultRow | BoxRow): row is GateRecord { return 'gatelabel' in row }
   // --
 
-  /** Answers 'gate_listing', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'gate_listing'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'gate_listing' { return 'gate_listing' satisfies Modelkind }
 }
 

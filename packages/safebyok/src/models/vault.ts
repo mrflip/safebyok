@@ -18,19 +18,21 @@ import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
 
-/** A vault as this device has it: a storable that ducks as its record, standing for its scope through its lives, whose boxes are sealed under its bank's lease. */
+/** A vault in this tab, with its record's fields as its own props.
+ * Its boxes are sealed under its bank's lease.
+ */
 export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultSnapshot> {
   // == [Props]: user_id, banklabel, vaultlabel, bank_tok, listing, #boxListing
 
-  /** The scope, tattooed on by Storable's constructor. */
+  /** The fields of this vault's scope. */
   declare readonly user_id:    string
   declare readonly banklabel:  string
   declare readonly vaultlabel: string
-  /** The life of the bank this vault is of, inscribed once by `assignInitialProps`. */
+  /** The life of this vault's bank. It never changes. */
   declare readonly bank_tok:   string
   declare readonly listing:    VaultListing
 
-  /** The listing of this vault's boxes under the life in hand; null until asked for, and again once a record of another life is received. */
+  /** The box listing for the life in hand, or null until asked for. */
   #boxListing: BoxListing | null = null
   // --
 
@@ -39,13 +41,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** The bank this vault is of. */
   get bank(): Bank { return this.listing.bank }
 
-  /** This vault's life, as the record in hand has it: a vault deleted or made again for its scope has another. */
+  /** This vault's life, as the record in hand has it. A vault deleted and made again has another. */
   get vault_tok(): string { return this.central.vault_tok }
 
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
 
-  /** The listing of this vault's boxes under the life in hand, made on first asking. */
+  /** The listing of this vault's boxes in the life in hand.
+   * Another life of the vault gets a new listing, so ask for it here each time.
+   */
   get boxListing(): BoxListing {
     this.#boxListing ??= this.listing.boxListingOf(this)
     return this.#boxListing
@@ -54,7 +58,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Construction]: assignInitialProps
 
-  /** Inscribes this vault's `bank_tok` beside what the base inscribes. */
+  /** Set `bank_tok`, and the props the base sets. */
   protected override assignInitialProps(central: Fetched<VaultRecord, VaultSparse>): void {
     tattoo(this, { bank_tok: central.bank_tok }, { configurable: false })
     super.assignInitialProps(central)
@@ -63,7 +67,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [The bank's lock]: alignLock, letBoxesGo
 
-  /** Tell the listeners, this vault's and its boxes', the bank's lock has moved; once this vault no longer answers, its boxes go. Never throws.
+  /** Realign this vault and its boxes with the bank's lock, and let the boxes go once this vault is not `isEnabled`. Never throws.
    * @internal
    */
   override alignLock(): this {
@@ -73,7 +77,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
 
   // The box listing answers only under the life it was made under, so its boxes no longer answer, and drop their whispers.
-  /** End the boxes' watch, bring them up to the lock, and let go of their listing: the next asking makes another. */
+  /** Let go of the box listing and end its watch. Its boxes drop their whispers exposed. */
   #letBoxesGo(): void {
     const boxListing = this.#boxListing
     this.#boxListing = null
@@ -84,17 +88,19 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Above the boxes]: sealStampedString, unsealStampedString, stampsOf, receiveParent
 
-  /** `whisperText` sealed under a fresh boxKey under the bankKey, both bound to the bank, this vault and `stamp`. */
+  /** Seal `whisperText` under a fresh boxKey, wrapped by the bankKey, both bound to the bank, this vault and `stamp`.
+   * `stamp` must be of this vault's scope and life.
+   */
   async sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper> {
     return this.bank.sealWith(whisperText, this.#stampsOf(stamp))
   }
 
-  /** The text `sealed` contains, bound to the bank, this vault and `stamp`. */
+  /** The text in `sealed`, which opens only under the bank, this vault and `stamp` it was sealed with. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     return this.bank.unsealWith(sealed, this.#stampsOf(stamp))
   }
 
-  /** This vault's stamp, then `stamp`, which must be of this vault's scope and life. */
+  /** This vault's stamp, then `stamp`, checked to be of this vault's scope and life. */
   #stampsOf(stamp: CipherCtxRecord): CipherCtxRecord[] {
     this.demandEnabled().demandPresent()
     const life = { ...this.scope, bank_tok: this.bank_tok, vault_tok: this.vault_tok }
@@ -104,13 +110,13 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // The vault listing receives the parent as it would a row from any vault request: a newer row of another life is
   // received into this Vault, and its boxes go.
-  /** Deliver the vault row a box answer carries. */
+  /** Deliver `parent`, the vault row a box answer carries, to the vault listing. */
   receiveParent(parent: unknown): void { this.listing.deliverRecord(BX.vaultRow.refusingAs('record_conflict').parse(parent)) }
   // --
 
   // == [Box verbs]: beginWatch, bringUp, getBox, fetchBox, putBox, delBox, each with its try form
 
-  /** List this vault's boxes and start their watch. */
+  /** List this vault's boxes and start their watch. Call it again to list them afresh. */
   async beginWatch(): Promise<this> {
     this.demandWatchable()
     const brought = await outcomeOf(() => this.#bringUp())
@@ -119,7 +125,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  /** The boxes' watch started and their listing fetched. */
+  /** Start the boxes' watch, and list them. */
   async #bringUp(): Promise<void> {
     await this.boxListing.hello()
     await this.boxListing.list()
@@ -128,7 +134,10 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link beginWatch}. */
   tryBeginWatch(): Promise<Outcome<this>> { return outcomeOf(() => this.beginWatch()) }
 
-  /** Hydrate and return the box listed at `boxlabel` (i.e. fetch if stale). A missing box is null for `ifAbsent: 'nil'`, or refused for `ifAbsent: 'fail'`.
+  /** The box at `boxlabel`, its record fetched if stale.
+   * - `ifAbsent: 'fail'` -- refuse `absent_box` where the box was never stored, or deleted (default)
+   * - `ifAbsent: 'nil'`  -- resolve null there
+   *
    * Chute: vault.getBox → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
   async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
@@ -138,13 +147,15 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link getBox}. */
   tryGetBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(boxlabel, opts)) }
 
-  /** {@link getBox}, the box's record fetched whatever its age. */
+  /** {@link getBox}, always fetching the box's record. */
   fetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> { return this.getBox(boxlabel, { ...opts, maxMillisSinceRefresh: 0 }) }
 
   /** Non-throwing form of {@link fetchBox}. */
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Seals `patch` over the box listed at its `boxlabel` as the next revision and puts it, answering the box; {@link Box.put} has the options and the refusals. */
+  /** Seal `patch` over the box at its `boxlabel`, and store it, resolving the box.
+   * {@link Box.put} has the options.
+   */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
     const box = this.boxListing.puttable({ ...patch, ...this.scope }, opts)
     return box.put(patch, opts)
@@ -153,8 +164,8 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link putBox}. */
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** Delete the box listed at `boxlabel`, and return it.
-   * Refuses `absent_box` for a box already deleted or never stored.
+  /** Delete the box at `boxlabel`, resolving it, now holding its tombstone.
+   * Refuses `absent_box` where the box was never stored, or is already deleted.
    */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
     const scope = { ...this.scope, boxlabel }
@@ -168,10 +179,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
 
   // == [Guards]: isLocked, demandWatchable, demandPresent, ensureTimely
 
-  /** Whether the bank is locked, read live: a vault has no lock of its own, and a host asks the bank. */
+  // A vault has no lock of its own: a host asks the bank.
+  /** Whether this vault's bank is locked. */
   protected get isLocked(): boolean { return this.bank.isLocked }
 
-  /** A watch needs the vault enabled and present. */
+  /** Throw unless `isEnabled` and `isPresent`. */
   demandWatchable(): this { return this.demandEnabled().demandPresent() }
 
   /** Demand that this vault is present. */
@@ -180,23 +192,23 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this
   }
 
-  /** This vault, refreshed within `maxMillis`, by default its horizon: as it stands where it is recent, otherwise fetched. */
+  /** This vault, fetched unless refreshed within `maxMillis` (default: its listing's `maxMillisSinceRefresh`). */
   ensureTimely(maxMillis?: number): Promise<this> { return this.hydrate({ maxMillisSinceRefresh: maxMillis }) }
   // --
 
   // == [Protected, overriding Storable's]: adopt, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Adopt `central`. A record of another life, a tombstone among them, lets the boxes of the life in hand go. */
+  /** Adopt `central`, letting the boxes go where it is of another life, a tombstone included. */
   protected override adopt(central: Fetched<VaultRecord, VaultSparse>): void {
     const isOtherLife = ! this.isOfLife(central)
     super.adopt(central)
     if (isOtherLife) { this.#letBoxesGo() }
   }
 
-  /** A vault row has nothing encrypted: a full one is one alive. */
+  /** Whether `fetched` is alive: a vault row has nothing more to fetch. */
   protected isFullRecord(fetched: VaultSparse): fetched is VaultRecord { return fetched.am === 'a' }
 
-  /** A vault's life is its bank's and its own: {@link BX.vaultLifeOf}. */
+  /** The life of `record`: its bank's `bank_tok`, then its `vault_tok` ({@link BX.vaultLifeOf}). */
   protected lifeTokPathOf(record: Fetched<VaultRecord, VaultSparse>): string { return BX.vaultLifeOf(record) }
 
   protected makeSnapshot(): VaultSnapshot {
@@ -212,6 +224,6 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   }
   // --
 
-  /** Answers 'vault', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'vault'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'vault' { return 'vault' satisfies Modelkind }
 }

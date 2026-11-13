@@ -1,6 +1,6 @@
-/** The cryptography under the vault: AES-256-GCM encryption and key wrapping through WebCrypto, every primitive the platform's.
- * Every encryption binds a {@link cipherCtx} as AES-GCM's additional data, so ciphertext copied
- * anywhere else refuses to open. Key derivation from a passphrase is in key-deriver.ts.
+/** Every call into WebCrypto: AES-256-GCM encryption and key wrapping, the key makers, HKDF and randomness.
+ * Every encryption binds a {@link cipherCtx} as additional data, so ciphertext moved anywhere else will not open.
+ * Key derivation from a passphrase is in `deriver/`.
  */
 
 import { base64urlnopad } from '@scure/base'
@@ -22,19 +22,19 @@ export function randomBytes(count: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(count))
 }
 
-/** A fresh random UUID from the platform, for a revisionTok, a gatingTok, or a life tok by {@link makeLifeTok}. */
+/** A fresh random UUID, for a token such as a `revision_tok` or a `device_tok`. */
 export function randomId(): string { return crypto.randomUUID() }
 
-/** A fresh life tok, a thing's `vault_tok` or `box_tok`: random, minted at each birth of the thing it marks, and only ever compared. */
+/** A fresh life tok: the `bank_tok`, `gate_tok`, `vault_tok` or `box_tok` minted at each birth of what it marks. */
 export function makeLifeTok(): string { return randomId() }
 
-/** Bytes as unpadded base64url text: the `_b64` form every stored record uses. */
+/** `bytes` as unpadded base64url text, the `_b64` form every stored record uses. */
 export function toB64(bytes: Uint8Array): string { return base64urlnopad.encode(bytes) }
 
-/** Base64url text back to bytes; throws on other text, where {@link fromB64OrNull} answers null. */
+/** Base64url text back to bytes. Throws on other text: {@link fromB64OrNull} returns null instead. */
 export function fromB64(b64: string): Uint8Array { return base64urlnopad.decode(b64) }
 
-/** Base64url text back to bytes, or null for text that is not base64url: for judging a salt's shape.
+/** Base64url text back to bytes, or null for text that is not base64url.
  *
  * @example fromB64OrNull('not/base64url+!')           // null
  */
@@ -49,16 +49,14 @@ export function fromB64OrNull(b64: string): Uint8Array | null {
 
 // == [The ctx]: CipherCtxRecord, cipherCtx, ctxBound, isBoundCtx, isBoundPart
 
-/** One record of a {@link cipherCtx}, a stamp or a header: a flat record of strings and numbers, encoded with its keys sorted, every field bound. */
+/** A stamp or a header in a {@link cipherCtx}: a flat record of strings and numbers, every field bound, encoded with its keys sorted. */
 export type CipherCtxRecord = Readonly<Record<string, string | number>>
 
-/** The ctx an encryption is bound to, as AES-GCM additional data or HKDF info: the thing's stamp, the purpose its fieldname names, and its visible header.
- * The stamp is one record, or a list of them where a thing binds the stamp of what it lies in
- * beside its own: each keeps its own field names. The ctx is the UTF-8 JSON of the parts in order,
- * each stamp, the purpose, then the header where there is one, each record's keys sorted. It is
- * rebuilt rather than stored, so ciphertext refuses to open under any other. It refuses
- * a call with no stamp, or with a part or a record's field that is undefined or null: each
- * would bind the same as some other ctx.
+/** The bytes an encryption is bound to, as AES-GCM additional data or HKDF info: the thing's stamp, a purpose, and its visible header if any.
+ * The purpose is the name of the field the ciphertext is stored in. Pass a list of stamps where a thing
+ * binds the stamp of what it lies in beside its own. The ctx is rebuilt at each use, never stored, so
+ * ciphertext opens only where every bound field is the same.
+ * It refuses a call with no stamp, or with a part or field undefined or null, since each would bind the same as some other ctx.
  *
  * @example cipherCtx([bankStamp, gateStamp], 'bank_key_passphrase_wrapped', { wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label, salt_b64, device_tok, registered_at })
  * @example cipherCtx([bankStamp, leaseStamp], 'bank_key_lease_wrapped')
@@ -70,16 +68,17 @@ export function cipherCtx(stamp: CipherCtxRecord | readonly CipherCtxRecord[], p
   return new TextEncoder().encode(stableJsonify(parts))
 }
 
-/** The check that a ctx has a stamp and that every one of its parts is bound. */
+/** The check that a ctx has a stamp and every part is bound. */
 const ctxBound = Checker(({ custom }) => custom((bag) => isBoundCtx(bag as CtxBag), Phrases.UnboundCipherCtx), 'unexpected_error')
 
 /** True when a ctx has a stamp and each of its parts is bound. */
 function isBoundCtx({ stamps, parts }: CtxBag): boolean { return stamps.length > 0 && parts.every((part) => isBoundPart(part)) }
 
-/** A ctx's stamps and its parts, as {@link ctxBound} judges them. */
+/** A ctx's stamps and its parts, for {@link ctxBound}. */
 type CtxBag = { stamps: readonly unknown[], parts: readonly (CipherCtxRecord | string)[] }
 
-/** True when `part` is a string, or a record with every field set. Undefined, null, or a record with a field undefined or null is what its type forbids and a caller may still hand in. */
+// The type forbids undefined and null, in a part or a record's field, but a caller may still hand them in.
+/** True when `part` is a string, or a record with no field undefined or null. */
 function isBoundPart(part: CipherCtxRecord | string | null | undefined): boolean {
   return (
     (part !== undefined) && (part !== null)
@@ -90,38 +89,35 @@ function isBoundPart(part: CipherCtxRecord | string | null | undefined): boolean
 
 // == [Making keys]: makeBankKey, makeBoxKey, makeLeaseKey, importWrappingKeyBytes, deriveWrappingKey
 
-/** A fresh random 256-bit AES-GCM key for wrapping other keys: a brand-new bankKey.
- * It is extractable, as a key must be to be wrapped, so keep it only inside the operation that
- * wraps it. Between operations nothing keeps a bankKey unwrapped: each wayin and a lease keep it
- * wrapped, and a lease unwraps it non-extractable, for one usage, at each cipher or decipher.
+/** A fresh random bankKey, a 256-bit AES-GCM key for wrapping other keys.
+ * It is extractable, as a key must be to be wrapped: keep it only inside the operation that wraps it.
  */
 export function makeBankKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(AesGcm, true, ['wrapKey', 'unwrapKey'])
 }
 
-/** A fresh random 256-bit AES-GCM key for one box: a boxKey, made new on every put. Extractable, so that it can be wrapped. */
+/** A fresh random boxKey, the 256-bit AES-GCM key for one seal of a whisper. It is extractable, so that it can be wrapped. */
 export function makeBoxKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(AesGcm, true, ['encrypt', 'decrypt'])
 }
 
-/** A fresh leaseKey, non-extractable so that it cannot leave the device even through the code that made it.
- * It is stored only by structured clone (IndexedDB), never as bytes.
+/** A fresh random leaseKey, a non-extractable 256-bit AES-GCM key for wrapping.
+ * No code can read its bytes, even the code that made it: store the `CryptoKey` itself, by structured clone.
  */
 export function makeLeaseKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(AesGcm, false, ['wrapKey', 'unwrapKey'])
 }
 
-/** A key deriver's output bytes as a non-extractable AES-GCM wrapping key: the passphraseKey.
- * The bytes stay with the caller: wipe or drop them promptly.
+/** Import a key deriver's output bytes as the passphraseKey, a non-extractable AES-GCM wrapping key.
+ * The bytes stay the caller's to zero.
  */
 export function importWrappingKeyBytes(keyBytes: Uint8Array): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', keyBytes as BufferSource, AesGcm, false, ['wrapKey', 'unwrapKey'])
 }
 
-/** A non-extractable AES-GCM wrapping key made by HKDF-SHA256 from uniformly random secret bytes, a passkey's PRF output: the passkeyKey.
- * It uses no salt, the RFC 5869 default for uniform input. `info` names what the key is for and
- * where, so the same bytes put to another use make another key. The bytes stay with the caller:
- * drop them promptly.
+/** Derive the passkeyKey, a non-extractable AES-GCM wrapping key, from a passkey's PRF bytes by HKDF-SHA256.
+ * `info` names what the key is for and where, so the same bytes under another `info` make another key.
+ * No salt is used, the RFC 5869 default for uniformly random input. The bytes stay the caller's to zero.
  *
  * @example await deriveWrappingKey(prfBytes, cipherCtx([bankStamp, gateStamp], 'bank_key_passkey_wrapped', header))
  */
@@ -139,7 +135,7 @@ export async function deriveWrappingKey(keyBytes: Uint8Array, info: Uint8Array):
 
 // == [Ciphering]: cipherBytes, decipherBytes
 
-/** `plainBytes` encrypted under `cipherKey`, bound to `ctx`, under a fresh cipherIv every call. */
+/** Encrypt `plainBytes` under `cipherKey`, bound to `ctx`, with a fresh random IV each call. */
 export async function cipherBytes(cipherKey: CryptoKey, plainBytes: Uint8Array, ctx: Uint8Array): Promise<Ciphered> {
   const cipherIv = randomBytes(IvSize)
   const ciphertext = await crypto.subtle.encrypt(
@@ -150,9 +146,9 @@ export async function cipherBytes(cipherKey: CryptoKey, plainBytes: Uint8Array, 
   return { cipher_iv_b64: toB64(cipherIv), ciphertext_b64: toB64(new Uint8Array(ciphertext)) }
 }
 
-/** The plain bytes back out of a {@link Ciphered}, verifying its tag and `ctx`.
- * It rejects with WebCrypto's DOMException when the key is wrong, the ctx differs, or the
- * ciphertext was altered: turn that into a calm refusal of your own.
+/** Decrypt `ciphered` under `cipherKey`, verifying it against `ctx`.
+ * It rejects with WebCrypto's DOMException when the key is wrong, the ctx differs, or the ciphertext was
+ * altered: catch that and throw a refusal of your own.
  */
 export async function decipherBytes(cipherKey: CryptoKey, ciphered: Ciphered, ctx: Uint8Array): Promise<Uint8Array> {
   const plain = await crypto.subtle.decrypt(
@@ -166,7 +162,7 @@ export async function decipherBytes(cipherKey: CryptoKey, ciphered: Ciphered, ct
 
 // == [Wrapping]: wrapKeyUnder, unwrapKeyUnder
 
-/** `wrappedKey`, which must be extractable, encrypted under `wrappingKey` and bound to `ctx`, under a fresh cipherIv every call. */
+/** Encrypt the extractable `wrappedKey` under `wrappingKey`, bound to `ctx`, with a fresh random IV each call. */
 export async function wrapKeyUnder(wrappingKey: CryptoKey, wrappedKey: CryptoKey, ctx: Uint8Array): Promise<Ciphered> {
   const cipherIv = randomBytes(IvSize)
   const ciphertext = await crypto.subtle.wrapKey(
@@ -178,13 +174,12 @@ export async function wrapKeyUnder(wrappingKey: CryptoKey, wrappedKey: CryptoKey
   return { cipher_iv_b64: toB64(cipherIv), ciphertext_b64: toB64(new Uint8Array(ciphertext)) }
 }
 
-/** The key back out of a wrapped key, verifying its tag and `ctx`.
- * It rejects with WebCrypto's DOMException on a wrong wrappingKey, a different ctx, or altered
- * ciphertext. For a wayin, that rejection is how a wrong passphrase or passkey is learned: there is
- * no comparison.
+/** Unwrap `wrapped` under `wrappingKey`, verifying it against `ctx`.
+ * It rejects with WebCrypto's DOMException on a wrong wrappingKey, a different ctx, or altered ciphertext.
+ * That rejection is how a wrong passphrase or passkey shows: no key is compared.
  *
- * @param usages - What the recovered key may do, and whether it is extractable. Unwrap
- *   non-extractable unless the operation is about to wrap the key again, and drop it after.
+ * @param usages - What the unwrapped key may do, and whether it is extractable. Unwrap it
+ *   non-extractable unless it is about to be wrapped again, and drop it after.
  */
 export async function unwrapKeyUnder(
   wrappingKey: CryptoKey,

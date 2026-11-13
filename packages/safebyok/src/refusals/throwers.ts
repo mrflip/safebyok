@@ -1,19 +1,20 @@
-/** The throwers: every refusal the core throws is made here, from a phrase in helpers/phrases.ts, so they are audited in one place.
- *
- * A refusal kind earns its place one of three ways: the core or a host routes on it; it gives a material head start in
- * debugging (this is a package bug for sure; the vault was not tombstoned but disappeared; a check that should be
- * impossible to fail did); or it groups throwers that tell one story. Guessing which of two ways a strict object check
- * failed is no head start. The stronger rule is "don't make me read": a finer kind must be worth the reading it costs.
- *
- * A thrower's name, its kind and its phrase's name agree; the phrase is of a piece with the kind, mirroring, containing or
- * eliding its words; and all three read naturally at the call site. A caller passes what it has on hand and trusts the
- * thrower to sanitize and cherry-pick. A name carries no "error" or "refusal", ends in "issue" at a loss, and is
- * empathetic and frank to the person who trusted us with their data, and readable to the coder. Reuse is welcome, never
- * forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged.
- *
- * A refusal's `meta` has what reads at a glance, and an adapter may hand a bag of its own beside the cause: props to
- * depth two only; no arrays, which are kept as their JSON text; an object past depth two replaced by the string '{...}'.
- */
+/** The throwers: every refusal the core throws is made here, from a phrase in helpers/phrases.ts. */
+
+// Every refusal is made here so that they can be audited in one place.
+//
+// A refusal kind earns its place one of three ways: the core or a host routes on it; it gives a material head start in
+// debugging (this is a package bug for sure; the vault was not tombstoned but disappeared; a check that should be
+// impossible to fail did); or it groups throwers that tell one story. Guessing which of two ways a strict object check
+// failed is no head start. The stronger rule is "don't make me read": a finer kind must be worth the reading it costs.
+//
+// A thrower's name, its kind and its phrase's name agree; the phrase is of a piece with the kind, mirroring, containing or
+// eliding its words; and all three read naturally at the call site. A caller passes what it has on hand and trusts the
+// thrower to sanitize and cherry-pick. A name carries no "error" or "refusal", ends in "issue" at a loss, and is
+// empathetic and frank to the person who trusted us with their data, and readable to the coder. Reuse is welcome, never
+// forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged.
+//
+// A refusal's `meta` has what reads at a glance, and an adapter may hand a bag of its own beside the cause: props to
+// depth two only; no arrays, which are kept as their JSON text; an object past depth two replaced by the string '{...}'.
 
 import { disagreeingFieldnames } from '../helpers/validator'
 import { PassphraseKeySize } from '../helpers/consts'
@@ -27,7 +28,7 @@ import type * as BX from '../shapes/shapes-bankdb'
 // == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, storageBlocked, unexpectedError
 
 /** The Error that stands as a refusal's cause for whatever was thrown: an Error as it is, anything else wrapped in one.
- * The header's rule on `meta` is advisory for the bag a thrower keeps: this function trims nothing it is handed.
+ * It trims nothing: an Error is kept whole, its message included.
  *
  * @example sanitizeForeignError('ECONNRESET')  // new Error('ECONNRESET')
  * @example sanitizeForeignError(42)            // an Error naming type number, 42 its cause
@@ -40,12 +41,9 @@ export function sanitizeForeignError(thrown: Thrown): Error {
 }
 
 /** A `storage_unavailable` refusal: the backend could not be reached, or failed.
- * @param cause - What the backend threw, kept for debugging as {@link sanitizeForeignError} makes it.
- *   It has only what the backend has: ciphertext and unencrypted fields. True of a bankDB
- *   adapter, never of the device database, which is handed lease records: `DeviceDB` replaces what its
- *   subclass throws with a condition that keeps only its `name`.
- * @param message - What failed, when there is more to say than that storage failed: which read or
- *   write it was, say. Never quotes a record or a name.
+ * @param cause - What a bankDB's backend threw, kept for debugging as {@link sanitizeForeignError} makes it.
+ *   Never pass a device database's throw, which may quote a lease row: use {@link deviceDBFailed}.
+ * @param message - Which call failed, when there is more to say than that storage failed. Never quote a record or a name.
  *
  * @example
  *   try { return await client.query(text, params) } catch (err) { throw storageUnavailable(err) }
@@ -94,7 +92,7 @@ export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError 
 
 // == [Listing Throwers]: rowOfOtherWorld, writtenByOwnVerbs
 
-/** A `storage_issue` refusal: storage answered a row under another `tokname` than the thing above this listing: a box of another vault life, a vault or a gate of another bank. */
+/** A `storage_issue` refusal: storage answered a row whose `tokname` is not that of the thing above it, such as a box of another vault life. */
 export function rowOfOtherWorld(received: unknown, tokname: 'bank_tok' | 'vault_tok'): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress([tokname]), { rows: { dbhas: received } }) }
 
 /** A `bad_option` refusal: a bank's row or its gate's is written only by the bank's own verbs, never put or deleted through its listing. */
@@ -106,7 +104,7 @@ export function writtenByOwnVerbs(): VaultError { return new VaultError('bad_opt
 /** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
 export function partialLoad(): VaultError { return new VaultError('bad_option', Phrases.PartialLoad) }
 
-/** A `disabled` refusal: this object was let go: its bank or its vault life ended, or its row was found damaged. */
+/** A `disabled` refusal: this object was let go, because its bank or vault life ended or its row was found damaged. */
 export function instanceDisabled(): VaultError { return new VaultError('disabled', Phrases.LetGoInstance) }
 
 /** An `absent_box` refusal: no box is stored under the label given. */
@@ -133,13 +131,17 @@ export function oneRevisionTwoFates(received: unknown): VaultError { return new 
 /** A `record_conflict` refusal: storage answered that nothing is stored where this device has a live record. */
 export function nothingStoredWhereLive(): VaultError { return new VaultError('record_conflict', Phrases.NothingStoredWhereLive, { rows: { dbhas: null } }) }
 
-/** A `storage_issue` refusal: an answer delivered `received`, which disagrees with `pins`, what was sent: the record itself for a record stored (`as_sent`), else its scope. */
+/** A `storage_issue` refusal: storage delivered `received`, which disagrees with `pins`, the fields of what was sent.
+ * `pins` is the record itself for a record stored (`as_sent`), else its scope.
+ */
 export function deliveredNotAsSent(fielding: 'as_sent' | 'as_got' | 'as_db', received: object, pins: object): VaultError {
   const message = (fielding === 'as_db') ? Phrases.RecordOfOtherScope : Phrases.AnswerNotAsSent
   return new VaultError('storage_issue', message, { meta: { fieldnames: disagreeingFieldnames(received, pins) }, rows: { dbhas: received } })
 }
 
-/** The refusal met deciding how to deliver `answer`: a refusal as it came, anything else `unexpected_error`; its meta names the delivery and the answer's ask. */
+/** The refusal for `thrown` while deciding how to deliver `answer`: a refusal as it is, anything else as `unexpected_error`.
+ * Its meta gains the delivery as `oplabel`, and `answer`'s ask.
+ */
 export function refusalOfDelivering(thrown: unknown, answer: { ask: BX.LoggableAsk }): VaultError {
   const refusal = isVaultError(thrown) ? thrown : unexpectedError(thrown)
   return Object.assign(refusal, { meta: { ...refusal.meta, oplabel: 'deliver', ask: answer.ask } })
@@ -155,7 +157,7 @@ export function boxStoredDamaged({ boxlabel }: SX.DamagedBox): VaultError { retu
 /** A `damaged_whisper` refusal: the box opened, but what is inside is not a whisper this package can read. */
 export function undecodedWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecodedWhisper) }
 
-/** The refusal of a call that works on the exposed whisper, on a box with none. */
+/** A `bad_option` refusal: the box has no exposed whisper to work on. */
 export function notExposed(): VaultError { return new VaultError('bad_option', Phrases.NotExposed) }
 // --
 
@@ -222,7 +224,7 @@ export function keyDeriverThrew(): VaultError { return new VaultError('unexpecte
 /** An `unexpected_error` refusal: the key deriver's `load()` failed, with its error as `cause`. */
 export function keyDeriverLoadFailed(cause: unknown): VaultError { return new VaultError('unexpected_error', Phrases.KeyDeriverLoadFailed, { cause }) }
 
-/** A `weak_passphrase` refusal carrying the strength checker's `reason`. */
+/** A `weak_passphrase` refusal whose message is the strength checker's `reason`. */
 export function weakPassphrase(reason: string): VaultError { return new VaultError('weak_passphrase', reason) }
 
 /** A `wrong_passphrase` refusal: the passphrase did not unlock the vault. */
@@ -282,7 +284,7 @@ export function actRefused(rowkind: 'box' | 'vault', act: EX.RefusedAct | EX.Box
   return new VaultError(refusalkind, refusalkind, { meta: { ...meta, act } })
 }
 
-/** A `box_too_large` refusal: the record's `recordSizeEst` exceed `maxRecordSizeEst`. */
+/** A `box_too_large` refusal: the record's estimated size, `recordSizeEst`, exceeds `maxRecordSizeEst`. */
 export function boxTooLarge(recordSizeEst: number, maxRecordSizeEst: number): VaultError {
   return new VaultError('box_too_large', Phrases.boxTooLarge(recordSizeEst, maxRecordSizeEst))
 }
@@ -309,7 +311,9 @@ export function mainGateMissing(parent: BX.BankSparse): VaultError {
 
 // == [DeviceDB Throwers]: deviceDBFailed
 
-/** A device database's failure as `storage_unavailable`, naming the verb and the thrown `name` and nothing else: the device database is handed every lease row, and what it throws may quote one. */
+/** A device database's failure as `storage_unavailable`, naming only the verb and the thrown `name`.
+ * What a device database throws may quote a lease row, so nothing else of it is kept.
+ */
 export function deviceDBFailed(oplabel: string, thrown: unknown): VaultError {
   const thrownName = thrownNameOf(thrown)
   const named = (thrownName === null) ? '' : Phrases.thrownNamed(thrownName)

@@ -36,26 +36,27 @@ import { VaultListing } from './vault-listing'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 
-/** The signed-in user's bank on this device, kept in step with its row: its main gate, its one lease, and its vaults, one Vault object per scope. Made by the {@link Device}, through `device.ensureBank()`.
- * One Bank object is one life of the bank: deleted, or built again elsewhere, it answers nothing more, and the device's next `ensureBank` makes another.
+/** The signed-in user's bank on this device: its main gate, its lease, and its vaults, one Vault object per scope.
+ * Get it from `device.ensureBank()`. A Bank object serves one life of the bank: once the bank is deleted or built again
+ * elsewhere, this object is disabled for good, and the next `device.ensureBank()` brings up another.
  */
 export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapshot> {
   // == [Props]: user_id, banklabel, bank_tok, listing, #deviceTok, #askUser, #gateListing, #vaultListing, #lease, #leaseFriend
 
-  /** The scope, tattooed on by Storable's constructor. */
+  /** The user's id; with `banklabel`, this bank's scope. */
   declare readonly user_id:   string
   declare readonly banklabel: string
-  /** This bank's life, inscribed once by `assignInitialProps` and never moved: one Bank object is one life of the bank. */
+  /** This bank's life token, fixed for this object: a bank built again elsewhere has another. */
   declare readonly bank_tok:  string
   declare readonly listing:   BankListing
 
   readonly #deviceTok:    string
-  /** The host's dialog, guarded, as the device handed it; null with none. */
+  /** The host's guarded `requestCleartext`, or null if the host gave none. */
   readonly #askUser:      AskUser | null
   readonly #gateListing:  GateListing
   readonly #vaultListing: VaultListing
 
-  /** The lease granted on this device, and null is what locked means. */
+  /** The lease attached to this bank; null means locked. */
   #lease: Lease | null = null
 
   #leaseFriend: LeaseFriend | null = null
@@ -63,7 +64,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Getters]: device, device_tok, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, stamp, maingate, gateListing, vaultListing
 
-  /** The device that made this bank: its options, its host's functions, its open gating and its end. */
+  /** The device this bank belongs to. */
   get device(): Device { return this.listing.device }
 
   /** The token of this device's row in the deviceDB, which each wayin records. */
@@ -81,16 +82,16 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   /** The device's strength checker, guarded. */
   get strengthChecker(): GuardedStrengthChecker { return this.device.strengthChecker }
 
-  /** How long an unlock lasts on this device. */
+  /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   get leaseMillis(): number { return this.device.leaseMillis }
 
-  /** The refresh horizon of each vault's boxes. */
+  /** How old a box may grow before it is fetched again, in milliseconds. */
   get boxRefreshMillis(): number { return this.device.boxRefreshMillis }
 
-  /** This bank's stamp, fixed for its life: what every ctx under it binds first. */
+  /** This bank's {@link BankStamp}, which every ctx under it binds first. */
   get stamp(): BankStamp { return GX.bankStamp.parse(this) }
 
-  /** The bank's one gate, which each unlock proves against. */
+  /** The bank's main gate: the wayins a user unlocks with. */
   get maingate(): Gate {
     this.demandEnabled()
     const gate = this.#gateListing.at({ ...this.scope, gatelabel: 'main' })
@@ -107,7 +108,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Construction]: constructor, assignInitialProps, launchBirth, vaultScopeOf
 
-  /** Construct the storable bank, with the host's dialog, and a listing for its gate and one for its vaults. */
+  /** The bank for the row `central`, listed in `listing`. A host gets its bank from `device.ensureBank()`. */
   constructor(listing: BankListing, central: Fetched<BankRecord, BankSparse>, opts: BankListingOpts) {
     super(listing, central)
     const { askUser, ...listingOpts } = VX.bankListingOpts.parse(opts)
@@ -120,13 +121,13 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     this.#vaultListing.subscribe(() => { if (this.snapshot.isLocked === this.isLocked) { this.align() } })
   }
 
-  /** Inscribes this bank's `bank_tok` beside what the base inscribes. */
+  /** Fix `bank_tok` on this bank, beside the base's props. */
   protected override assignInitialProps(central: Fetched<BankRecord, BankSparse>): void {
     tattoo(this, { bank_tok: central.bank_tok }, { configurable: false })
     super.assignInitialProps(central)
   }
 
-  /** Builds a bank through a build_bank gating, over the row `expected`, a tombstone or none, and answers it unlocked. */
+  /** Build the bank over `expected`, a tombstone or void row, through a `build_bank` gating, resolving it unlocked. */
   static launchBirth(listing: BankListing, expected: BankSparse, askUser: AskUser | null): Promise<Bank> {
     return Gating.launchBirth(listing, expected, Bank.#unlockBankByProving, askUser)
   }
@@ -148,13 +149,13 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Prompting]: prompt, ensureUnlocked, unlock, delPrompt, each with its try form
 
-  /** Ask the user, through a gating of `gatingkind`, to prove the change it names, and answer this bank once it is made. */
+  /** Ask the user through a gating of `gatingkind`, resolving this bank once the change it names is made. */
   async prompt(gatingkind: BankGatingkind): Promise<this> {
     await Gating.launchOn(this, gatingkind, Bank.#unlockBankByProving, this.#askUser)
     return this
   }
 
-  /** This bank unlocked: as it stands, else by the lease cached on this device, else by {@link unlock}. */
+  /** Unlock this bank if it is locked: from the lease cached on this device if it can, else by asking the user. */
   async ensureUnlocked(): Promise<this> {
     const gate = await this.maingate.ensureTimely(VX.Promptly); this.demandPromptable()
     if (this.isUnlocked) { return this }
@@ -166,7 +167,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   /** Non-throwing form of {@link ensureUnlocked}. */
   tryEnsureUnlocked(): Promise<Outcome<this>> { return outcomeOf(() => this.ensureUnlocked()) }
 
-  /** Ask the user for a passphrase or passkey, and unlock by its proving. */
+  /** Unlock by asking the user for a passphrase or passkey, even when a lease is attached or cached. */
   async unlock(): Promise<this> {
     await this.maingate.ensureTimely(VX.Promptly); this.demandPromptable()
     return this.prompt('unlock_bank')
@@ -175,7 +176,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   /** Non-throwing form of {@link unlock}. */
   tryUnlock(): Promise<Outcome<this>> { return outcomeOf(() => this.unlock()) }
 
-  /** Delete this bank, its gate, its vaults and their boxes through a del_bank gating, which asks for the passphrase. This Bank answers nothing more, and the device has no bank until its next `ensureBank`. */
+  /** Delete this bank, its gate, its vaults and their boxes, once the user proves it through a `del_bank` gating.
+   * This Bank is then disabled for good, and the device has no bank until the next `device.ensureBank()`.
+   */
   async delPrompt(): Promise<this> {
     await this.maingate.ensureTimely(VX.Promptly); this.demandPromptable()
     return this.prompt('del_bank')
@@ -189,8 +192,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // At the bank's end, a lock is its one duty: the lease and every exposed whisper are dropped, and the watches end. The
   // row cached is left: a sweep leaves it for the next page, a vacate forgets every lease of the bank scope itself.
-  /** Lock the bank, its vaults and their boxes before returning, and forget the row cached on this device; past the bank's end, leave that row.
-   * A failed revoke is announced as `lease_revoke_failed` and does not throw.
+  /** Lock the bank, and forget the lease cached on this device.
+   * The snapshots of the bank, its vaults and their boxes show the lock before this returns. A failed forget is announced as
+   * `lease_revoke_failed`, never thrown. Once the bank is disabled, a lock leaves the cached lease in place.
    */
   lock(): this {
     if (this.isEnabled) {
@@ -204,8 +208,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     return this
   }
 
-  /** Lock the bank where the lease cached on this device has expired. Call it after `ensureBank` and on your own timer.
-   * A best-effort reminder, not a guarantee: a cache that refuses or a row that will not read is told as bad news.
+  /** Lock the bank if the lease cached on this device has expired. Call it after `device.ensureBank()`, and on a timer of your own.
+   * Autolock is a best-effort reminder, not a guarantee: a device database refusal or a damaged row is told as bad news, and
+   * nothing locks.
    */
   async autolock(): Promise<void> {
     const expiring = await Lease.tryExpiresAt(this.#leaseFriendOf())
@@ -213,7 +218,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     if ((expiring.val !== null) && (expiring.val < nowMillis())) { this.lock() }
   }
 
-  /** Drops any lease granted and forgets the row cached on this device, announcing a failed revoke at `where`. */
+  /** Drop the attached lease and forget the cached row, announcing a failed forget as from `where`. */
   async #revokeLease(where: Exclude<RevokeSite, 'undeleted'>): Promise<void> {
     // The lease goes first, so a refused forget leaves none; the forget starts before any await, so forgets start in call order.
     const granted = this.#lease
@@ -224,7 +229,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     if (! revoked.ok) { this.device.announce({ kind: 'lease_revoke_failed', refusal: revoked.err, bank: this, where }) }
   }
 
-  /** Attach the lease `proved` earns, citing `cited`. A `lock()` made while the lease is being built is undone by it: the proving shows this user may unlock. */
+  /** Build the lease `proved` earns, citing `cited`, and attach it.
+   * The attach undoes a `lock()` made while the lease was built: the proving shows this user may unlock.
+   */
   async #unlockByProving(proved: Proving, cited: CitedGate = this.maingate): Promise<this> {
     const lease = await proved.buildLease(this.#leaseFriendOf(), cited)
     await this.#attachLease(lease)
@@ -240,7 +247,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
 
   // The vaults first, the bank's own align last: the device is told once, every vault's lock and the bank's together.
-  /** Bring each vault listed, and its boxes, up to this bank's lock, which their snapshots show, and then this bank's own snapshot. */
+  /** Realign each listed vault and its boxes, then this bank, to the bank's lock. */
   #alignAll(): void {
     for (const vault of this.#vaultListing.things) { vault.alignLock() }
     this.align()
@@ -255,7 +262,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [The lease's friend]: leaseFriendOf, makeLeaseFriend
 
-  /** All a lease or a proving hears of this bank, made once. */
+  /** This bank's {@link LeaseFriend}, made on first use. */
   #leaseFriendOf(): LeaseFriend {
     this.#leaseFriend ??= this.#makeLeaseFriend()
     return this.#leaseFriend
@@ -284,13 +291,15 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Sealing for the vaults]: sealWith, unsealWith
 
-  /** `whisperText` sealed under a fresh boxKey under the bankKey, each bound to the bank's stamp and then to `stamps`, in order. */
+  /** Seal `whisperText` under this bank's lease, bound to the bank's stamp and then `stamps`, in order.
+   * Needs the bank unlocked. {@link unsealWith} needs the same stamps in the same order.
+   */
   async sealWith(whisperText: string, stamps: readonly CipherCtxRecord[]): Promise<SealedWhisper> {
     const checked = GX.leaseSealArgs.parse({ whisperText, stamps })
     return this.#demandLease().sealWith(checked.whisperText, checked.stamps)
   }
 
-  /** The text `sealed` contains, bound to the bank's stamp and then to `stamps`, in order. */
+  /** The whisper text in `sealed`, under this bank's lease, given the stamps it was sealed with, in the same order. */
   async unsealWith(sealed: SealedWhisper, stamps: readonly CipherCtxRecord[]): Promise<string> {
     const checked = GX.leaseUnsealArgs.parse({ sealed, stamps })
     return this.#demandLease().unsealWith(checked.sealed, checked.stamps)
@@ -299,13 +308,15 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Vaults]: vaultAt, ensureVault, tryEnsureVault, tryProbe, probe
 
-  /** The vault listed for `scope`, a tombstone among them, or null. */
+  /** Vault **or tombstone** listed at `scope`, or null if none is listed. */
   vaultAt(scope: BankedVaultScope): Vault | null {
     this.demandEnabled()
     return this.#vaultListing.at(this.vaultScopeOf(scope))
   }
 
-  /** The vault for `scope`: the one listed, else the one stored, else one put now, which needs the bank unlocked. */
+  /** The vault at `scope`, as listed or stored, creating it if absent (void or tombstoned).
+   * Unless the vault is already listed, this needs the bank unlocked: precede with `await bank.ensureUnlocked()`.
+   */
   async ensureVault(scope: BankedVaultScope): Promise<Vault> {
     const asked = this.vaultScopeOf(scope)
     this.demandEnabled()
@@ -319,7 +330,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   /** Non-throwing form of {@link ensureVault}. */
   tryEnsureVault(scope: BankedVaultScope): Promise<Outcome<Vault>> { return outcomeOf(() => this.ensureVault(scope)) }
 
-  /** Trials this bank's storage end to end at startup and reports each step, asking the user if the bank needs it: replaces one box, fetches it back and opens it, surfacing nothing it held. */
+  /** Test this bank's storage end to end at startup: put one box, fetch it back and extract its whisper, reporting each step.
+   * The box at `asked.boxlabel` is overwritten. A locked bank asks the user. The report carries no whisper, wrapped key or ciphertext.
+   */
   tryProbe(asked: VX.ProbeAsked = {}, opts: VX.ProbeOpts = {}): Promise<Outcome<VX.ProbeReport>> { return outcomeOf(() => this.#probe(asked, opts)) }
 
   async #probe(asked: VX.ProbeAsked, opts: VX.ProbeOpts): Promise<VX.ProbeReport> {
@@ -344,10 +357,10 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Guards]: isEnabled, demandEnabled, isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandPresent
 
-  /** Whether this bank answers: its device does, and it is the device's bank, a live row of this life in hand. */
+  /** True while this bank is usable: its device is enabled, and it is listed with a live row of its own life. */
   override get isEnabled(): boolean { return super.isEnabled && this.#isLiveOfLife }
 
-  /** Demand that this bank answers: see {@link isEnabled}. */
+  /** Throw unless {@link isEnabled}. */
   override demandEnabled(): this {
     super.demandEnabled()
     if (! this.#isLiveOfLife) { throw instanceDisabled() }
@@ -355,13 +368,13 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
 
   // A tombstone carries a life token of its own, and a bank built again elsewhere another.
-  /** Whether the record in hand is a live row of this Bank's life. */
+  /** True when the record in hand is a live row of this Bank's life. */
   get #isLiveOfLife(): boolean { return this.isPresent && (this.central.bank_tok === this.bank_tok) }
 
-  /** True unless this device has a lease granted and in force. */
+  /** True when no lease is attached to this bank. */
   get isLocked(): boolean { return this.#lease === null }
 
-  /** True while this bank has a lease granted. */
+  /** True when a lease is attached to this bank. */
   get isUnlocked(): boolean { return this.#lease !== null }
 
   #demandLease(): Lease {
@@ -370,10 +383,10 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     return this.#lease
   }
 
-  /** A prompt needs the bank enabled and present. */
+  /** Throw unless {@link isEnabled} and `isPresent`: what a prompt needs. */
   demandPromptable(): this { return this.demandEnabled().demandPresent() }
 
-  /** An attach needs the bank enabled and present. */
+  /** Throw unless {@link isEnabled} and `isPresent`: what attaching a lease needs. */
   demandAttachable(): this { return this.demandEnabled().demandPresent() }
 
   /** Demand that this bank is present. */
@@ -385,8 +398,9 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
 
   // == [Protected, overriding Storable's]: adopt, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Adopt `central`. A tombstone, or a newer row of another life, ends this bank: it locks, forgets the cached row, ends the watch and dismisses a gating open for it, staying listed.
-   * A failed revoke is announced as `lease_revoke_failed`, and the record stands.
+  /** Adopt `central`. A tombstone, or a row of another life, disables this bank for good, though it stays listed.
+   * Its lease is then dropped and the cached row forgotten, its watch ends, and a gating open for it is dismissed.
+   * A failed forget is announced as `lease_revoke_failed`.
    */
   protected override adopt(central: Fetched<BankRecord, BankSparse>): void {
     super.adopt(central)
@@ -396,10 +410,10 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
     this.device.dismissGatingAtDiscard(this)
   }
 
-  /** A bank row has nothing encrypted: a full one is one alive. */
+  /** True for a live row: a bank row has no encrypted part, so a live one is always full. */
   protected isFullRecord(fetched: BankSparse): fetched is BankRecord { return fetched.am === 'a' }
 
-  /** A bank's life is its `bank_tok`. */
+  /** The life token of a bank row: its `bank_tok`. */
   protected lifeTokPathOf({ bank_tok }: Fetched<BankRecord, BankSparse>): string { return bank_tok }
 
   protected makeSnapshot(): BankSnapshot {
@@ -407,7 +421,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
   // --
 
-  /** Answers 'bank', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'bank'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 }
 
@@ -419,7 +433,7 @@ export async function listOwnLeases(deviceDB: DeviceDB, { user_id, banklabel }: 
   return listed.ok ? good(listed.val.filter((row) => (row.user_id === user_id) && (row.banklabel === banklabel))) : listed
 }
 
-/** A storage verb's answer with no wrapped key or ciphertext left in it, and when it came back. */
+/** A probe step from a box verb's answer, with no wrapped key or ciphertext left in it, timed now. */
 function probeStepOf({ act, ask, val, parent }: GoodAnswer<Box | null, GoodAct, unknown>): VX.ProbeStep {
   return { ok: true, act, ask, val: BX.boxSparse.parse(val?.sparse), parent: BX.vaultRow.parse(parent), timestamp: nowMillis() }
 }

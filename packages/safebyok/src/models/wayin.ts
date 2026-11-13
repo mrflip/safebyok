@@ -7,15 +7,16 @@ import { type BankStamp, type GateStamp, type WayinHeader, type WayinRecord, ban
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
-/** The purpose each kind of wayin binds into the ctx of its wrap. */
+/** The purpose that each kind of wayin's wrapped bankKey is bound to (see {@link wayinCtxOf}). */
 export const PurposeForWayinkind = Object.freeze({
   passphrase: 'bank_key_passphrase_wrapped',
   passkey:    'bank_key_passkey_wrapped',
 } as const satisfies Readonly<Record<Wayinkind, string>>)
 
-/** Serialized name/value pairs bound into the wrapped value as cryptographic context: the bank's stamp, the gate's, the purpose and the header.
- * The value cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
- * key. Any change to that associated data, another user_id or a forged registered_at, will not unwrap.
+/** Serialized name/value pairs bound into a wayin's wrapped bankKey as cryptographic context.
+ * They are the bank's stamp, the gate's stamp, the wayin's purpose and its header.
+ * The bankKey cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
+ * key. With any change to them, such as another `user_id` or a forged `registered_at`, it will not unwrap.
  */
 export function wayinCtxOf(bank: BankStamp, gate: GateStamp, header: WayinHeader): Uint8Array {
   const checked = wayinHeader.parse(header)
@@ -32,9 +33,13 @@ export class Wayin {
   declare readonly device_tok:              string
   declare readonly registered_at:           number
   declare readonly bank_key_wayin_wrapped: CX.BankKeyWayinWrapped
+  /** Only on a passphrase wayin. */
   declare readonly key_deriver_label?:      string
+  /** Only on a passphrase wayin. */
   declare readonly salt_b64?:               CX.PassphraseSalt
+  /** Only on a passkey wayin. */
   declare readonly credential_id?:          string
+  /** Only on a passkey wayin. */
   declare readonly prf_salt_b64?:           CX.PrfSalt
 
   readonly #pickle: WayinRecord
@@ -42,6 +47,7 @@ export class Wayin {
 
   // == [Construction]: constructor
 
+  /** A Wayin of `record`, checked as a {@link WayinRecord}. */
   constructor(record: unknown) {
     const parsed = wayinRecord.parse(record)
     Object.freeze(parsed.bank_key_wayin_wrapped)
@@ -53,16 +59,16 @@ export class Wayin {
 
   // == [Methods]: pickle, toJSON
 
-  /** This wayin as a plain {@link WayinRecord}. */
+  /** This wayin as a frozen plain {@link WayinRecord}. */
   pickle(): WayinRecord { return this.#pickle }
 
-  /** This wayin's {@link WayinHeader}, which leaves out the wrapped bankKey. */
+  /** This wayin's {@link WayinHeader}: its record without the wrapped bankKey. */
   toJSON(): WayinHeader {
     const { bank_key_wayin_wrapped: _wrapped, ...header } = this.#pickle
     return header
   }
   // --
 
-  /** Answers 'wayin', which marks this model to a check: {@link Modelkind}. */
+  /** Always `'wayin'`: marks this model for a {@link Modelkind} check. */
   get modelkind(): 'wayin' { return 'wayin' satisfies Modelkind }
 }

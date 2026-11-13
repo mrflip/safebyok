@@ -1,18 +1,16 @@
 import * as CX from '../shapes/shapes-core'
 import { consoleLogger } from './console-logger'
 
-/** Where a vault says what it has nobody to throw to, such as a background refresh that failed.
- * Pass one to the storage adapter's factory as `logger`, and the vault opened over it uses it too.
- * Pass Device.make one of its own to keep them apart. With none anywhere, it is the {@link
- * DefaultLogger}.
+/** Where safebyok reports what it has nobody to throw to, such as a background refresh that failed.
+ * Pass one to `Device.make` as `logger`. With none, a device uses the {@link DefaultLogger}.
  *
  * Each call has a plain-language `message`, a `story` of facts to filter on (`oplabel` names the
- * operation), and the error behind it, if any. The vault puts no whisper, passphrase, key,
- * ciphertext or option's value in any of the three. An error from the host's own code (its
- * storage adapter) goes as that code made it, so what it quotes is the host's to keep clean.
+ * operation), and the error behind it, if any. None of the three holds a whisper, passphrase, key,
+ * ciphertext or option value. An error the host's own bankDB threw is passed on as it was made, so
+ * what it quotes is the host's to keep clean.
  *
- * What a logger throws or rejects with is ignored. A logger typed `story?: Record<string, any>`
- * fits, and so does the console.
+ * Anything a logger throws or rejects with is ignored. The console fits, and so does a logger typed
+ * `story?: Record<string, any>`.
  *
  * @example Device.make({ ...opts, logger: { log: () => {}, warn: () => {}, error: () => {} } })  // silent
  * @example Device.make({ ...opts, logger: console })  // untagged, a missing story or error printed as undefined or null
@@ -20,14 +18,15 @@ import { consoleLogger } from './console-logger'
 export interface VaultLogger {
   /** Something worth knowing, with nothing to act on. */
   log:   (message?: string, story?: Record<string, unknown>, err?: Error | null) => void
-  /** Something went wrong, and the vault carried on safely: worth a look. */
+  /** Something went wrong, and safebyok carried on safely: worth a look. */
   warn:  (message?: string, story?: Record<string, unknown>, err?: Error | null) => void
   /** Something went wrong that the host's code or its storage should mend. */
   error: (message?: string, story?: Record<string, unknown>, err?: Error | null) => void
 }
 
-/** The three calls a {@link VaultLogger} answers. */
+/** The three levels of a {@link VaultLogger}, a call each. */
 export const vaultLoggerLevelVals = ['log', 'warn', 'error'] as const
+/** A logger level: `log`, `warn` or `error`. */
 export type VaultLoggerLevel = typeof vaultLoggerLevelVals[number]
 
 // Every logger safebyok has guarded, so that one handed back comes back as itself: kept here, out
@@ -37,12 +36,9 @@ const guardedOnes = new WeakSet<object>()
 // the vault is guarded as one object.
 const guardedFor = new WeakMap<object, VaultLogger>()
 
-/** The host's logger made safe to call, dropping whatever it throws or rejects with; {@link DefaultLogger} for null or undefined.
- * A binding says what it has to say beside the vault through it. It refuses
- * anything without `log`, `warn` and `error` functions.
- *
- * It keeps identity: a logger it made safe comes back as itself, and the same host logger always
- * comes back as the same safe one.
+/** The host's logger, checked and wrapped so that nothing it throws or rejects with reaches safebyok.
+ * Null or undefined gives the {@link DefaultLogger}. It refuses anything without `log`, `warn` and `error` functions.
+ * A logger this returned comes back as itself, and the same host logger always gets the same wrapper.
  *
  * @example parseLogger(undefined).log('opened')  // to the default: the console says 'safebyok: opened'
  */
@@ -57,13 +53,13 @@ export function parseLogger(candidate: VaultLogger | null | undefined): VaultLog
   return made
 }
 
-/** True for a logger {@link parseLogger} made safe, or the {@link DefaultLogger}: what a bank's world and a lease's friend have. */
+/** True for a logger {@link parseLogger} returned, the {@link DefaultLogger} included. */
 export const isGuardedLogger = (val: unknown): val is VaultLogger => (typeof val === 'object') && (val !== null) && guardedOnes.has(val)
 
-/** A host's logger as the guard sees it: whatever its calls return, such as an async logger's promise, is the guard's to settle. */
+/** A host's logger, whose calls may return anything, such as an async logger's promise. */
 type AnyReturningLogger = Record<VaultLoggerLevel, (message?: string, story?: Record<string, unknown>, err?: Error | null) => unknown>
 
-/** `hostLogger`, each call made so that nothing it throws or rejects with reaches the vault; kept as guarded. */
+/** `hostLogger`, wrapped to drop whatever it throws or rejects with. */
 function guarded(hostLogger: AnyReturningLogger): VaultLogger {
   const safe: VaultLogger = {
     log:   (message, story, err) => { tell(hostLogger, 'log', message, story, err) },
@@ -74,13 +70,13 @@ function guarded(hostLogger: AnyReturningLogger): VaultLogger {
   return safe
 }
 
-/** The console, each line tagged 'safebyok:', guarded: where the default logger says things until a host sets its own. */
+/** The console, wrapped, each line tagged 'safebyok:'. */
 const GuardedConsole = guarded(consoleLogger)
 
-/** Where the default logger says things now: the console, or what the host last handed setDefaultLogger. */
+/** The logger {@link DefaultLogger} hands each call to: the console, or the one last passed to `setDefaultLogger`. */
 const defaults: { target: VaultLogger } = { target: GuardedConsole }
 
-/** A logger that hands each call on to `defaults.target` as it is when called; kept as guarded, its target being so. */
+/** A logger that hands each call to `defaults.target`, read at the time of the call. */
 function forwarding(): VaultLogger {
   const forwarder: VaultLogger = {
     log:   (message, story, err) => { defaults.target.log(message, story, err) },
@@ -91,19 +87,17 @@ function forwarding(): VaultLogger {
   return forwarder
 }
 
-/** The logger every storage adapter, vault, provider and datastore uses when given none of its own.
- * It hands each call on, as it is made, to the logger last handed {@link setDefaultLogger}, or
- * else to the console, each line tagged 'safebyok:'. Pass it to Device.make or BankProvider to have
- * the vault use the default whatever its storage adapter was given.
+/** The logger a device uses when given none of its own.
+ * It hands each call, as it is made, to the logger last passed to {@link setDefaultLogger}, or else to
+ * the console, each line tagged 'safebyok:'. Passing it to `Device.make` is the same as passing no logger.
  *
  * @example Device.make({ ...opts, bankDB: idbBankDB({ logger: storageLogger }), logger: DefaultLogger })  // the storage to its own, the vault to the default
  */
 export const DefaultLogger: VaultLogger = forwarding()
 
-/** Send what safebyok would say to the console to `logger` instead, from everything made before this call or after.
- * Call it once, as the app starts. A logger handed to an adapter's factory, to Device.make or to
- * BankProvider still wins there. It is guarded as {@link parseLogger} guards one, and refused
- * alike.
+/** Send what safebyok would log to the console to `logger` instead, devices already made included.
+ * Call it once, as the app starts. A logger passed to `Device.make` still wins for that device.
+ * `logger` is checked and wrapped as {@link parseLogger} does it.
  *
  * @param logger - The app's own logger. Null or undefined puts the console back.
  */
@@ -113,6 +107,7 @@ export function setDefaultLogger(logger: VaultLogger | null | undefined): void {
   defaults.target = parsed === DefaultLogger ? GuardedConsole : parsed
 }
 
+/** Call `hostLogger` at `level`, dropping whatever it throws or rejects with. */
 function tell(hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?: string, story?: Record<string, unknown>, err?: Error | null) {
   try {
     // Called as a method, so a logger built as a class keeps its `this`.
@@ -122,7 +117,7 @@ function tell(hostLogger: AnyReturningLogger, level: VaultLoggerLevel, message?:
   }
 }
 
-/** Settle what a logger returned, dropping a rejection rather than leaving it unhandled, whatever kind of thenable it is. */
+/** Await what a logger returned, dropping any rejection. */
 async function dropRejection(pending: unknown) {
   try {
     await pending
@@ -131,5 +126,5 @@ async function dropRejection(pending: unknown) {
   }
 }
 
-/** A thrown value, for a logger's `err`: an Error as it is, anything else as null. */
+/** `thrown` as a logger's `err`: an Error as it is, anything else null. */
 export function asError(thrown: unknown): Error | null { return (thrown instanceof Error ? thrown : null) }

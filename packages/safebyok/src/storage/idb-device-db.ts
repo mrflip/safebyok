@@ -19,7 +19,7 @@ export interface IdbDeviceDBOpts {
   dbName?: string | undefined
 }
 
-/** Validator of an IdbDeviceDB's options, which `browserOpts` takes too. */
+/** The check of an IdbDeviceDB's options, which `browserOpts` takes too. */
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 
@@ -33,7 +33,7 @@ function leaseScopepathOf({ user_id, banklabel }: BankScope): LeaseScopepath { r
 /** The scopepath of the device row at `scope`. */
 function deviceRowScopepathOf({ user_id, banklabel }: BankScope): DeviceRowScopepath { return [user_id, banklabel] }
 
-/** The lease shelf: the device database of `dbName`, which has the leases. */
+/** The shelf of the lease rows, in the device database of `dbName`. */
 function leaseShelfOf(dbName: string | undefined): UseStore {
   const dbprefix = dbprefixOf(dbName)
   return versionedShelfOf({
@@ -43,7 +43,7 @@ function leaseShelfOf(dbName: string | undefined): UseStore {
 
 // A separate database, because a versioned shelf has a single object store: adding a second object store to the device
 // database would change its version, and every device would forget its leases.
-/** The device row shelf: the device row database of `dbName`, which has the device rows. */
+/** The shelf of the device rows, in the device row database of `dbName`. */
 function deviceRowShelfOf(dbName: string | undefined): UseStore {
   return versionedShelfOf({
     dbprefix: dbprefixOf(dbName), dbstem: 'devicerow', version: DeviceRowDBVersion, storename: 'devicerow', oldnames: [],
@@ -51,7 +51,9 @@ function deviceRowShelfOf(dbName: string | undefined): UseStore {
 }
 // --
 
-/** A device database that keeps this device's leases and device rows in its browser's IndexedDB. */
+/** A device database that keeps this device's leases and device rows in its browser's IndexedDB.
+ * A lease's leaseKey is stored as its `CryptoKey` handle, by structured clone, and never as bytes.
+ */
 export class IdbDeviceDB extends DeviceDB {
   // == [Props]: #leaseShelf, #deviceRowShelf
 

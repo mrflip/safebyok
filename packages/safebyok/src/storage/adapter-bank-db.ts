@@ -32,9 +32,8 @@ export type Heard = { row: unknown, parent?: unknown }
 const noUnwatching = (): void => undefined
 const noBadNews = (_news: VaultError): void => undefined
 
-/** The base of an adapter bankDB (one that wraps a datastore rather than another bankDB).
- * A subclass writes the generic `do*` calls: each base operation is one atomic step.
- * See notes/answer-contract.md for details.
+/** The base class of a bankDB that keeps its rows in a datastore: a subclass writes the `do*` calls, each one atomic step.
+ * It checks each ask, and classifies the rows a `do*` call fetches by the tables in notes/answer-contract.md.
  */
 export abstract class AdapterBankDB implements BankDB {
   // == [Props]: #maxRecordSizeEst, IsBankDB, IsAdapterBankDB
@@ -45,7 +44,7 @@ export abstract class AdapterBankDB implements BankDB {
   /** Always true: marks a bankDB for safe branding. */
   get [IsBankDB](): true { return true }
 
-  /** Always true: marks an adapter bankDB, which a client of one lacks. */
+  /** Always true: marks a bankDB over a datastore, which a client bankDB such as GraphQL's lacks. */
   get [IsAdapterBankDB](): true { return true }
   // --
 
@@ -63,27 +62,27 @@ export abstract class AdapterBankDB implements BankDB {
   /** Classify an `ensureBank` ask against the bank row, its `main` gate row and its vault rows, setting aside each vault row that fails its checks. */
   protected classifyEnsureBank(ask: BankEnsureAsk, fetched: BankEnsureFetched): BankEnsureStored { return classifyEnsureBank(ask, fetched) }
 
-  /** Classify a `buildBank` ask against the bank and gate rows stored -- `born`, `reborn`, `passed` and so on -- to route and shape its answer. */
+  /** Classify a `buildBank` ask against the bank and gate rows stored. */
   protected classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): BankBuildStored { return classifyBuildBank(ask, fetched) }
 
-  /** Classify a gate verb's ask against the bank and gate rows stored, its verb's policy included. */
+  /** Classify a gate verb's ask against the bank and gate rows stored, by its verb's policy. */
   protected classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateStored { return classifyStoredGate(ask, fetched) }
 
   /** Classify a `delBank` ask against the bank row stored. */
   protected classifyDelBank(ask: BankDelAsk, fetched: BankFetched): BankDelStored { return classifyDelBank(ask, fetched) }
 
-  /** Classify a vault ask against the bank and vault rows stored -- `bank_gone`, `stale`, `deleted` and so on -- to route and shape its answer. */
+  /** Classify a vault ask against the bank and vault rows stored. */
   protected classifyStoredVault(ask: VaultAsk, fetched: VaultFetched): VaultStored { return classifyStoredVault(ask, fetched) }
 
-  /** Classify a box ask against the vault and box rows stored -- `vault_gone`, `stale`, `born` and so on -- to route and shape its answer. */
+  /** Classify a box ask against the vault and box rows stored. */
   protected classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored { return classifyStoredBox(ask, fetched) }
 
   /** Classify a `listBoxes` ask against the vault row and box rows stored, setting aside each box row that fails its checks. */
   protected classifyStoredBoxes(ask: BoxListAsk, fetched: BoxesFetched): BoxesStored { return classifyStoredBoxes(ask, fetched) }
 
   // Every throw in a verb ends up here: an ask that fails its checks, a stored row that fails its own, or storage that is down.
-  /** Make a bad answer for a verb that threw: a refusal unchanged, anything else as `storage_unavailable`.
-   * A subclass may override it to distinguish one refusal from another.
+  /** Make a bad answer for a verb that threw: a refusal as it is, anything else as `storage_unavailable`.
+   * Override it to tell one of your datastore's errors from another.
    */
   protected answerForRefusal(err: unknown, oplabel: string, ask: unknown): BadAnswer {
     return badAnswerOf(refusalOf(err, oplabel, ask))
@@ -93,9 +92,7 @@ export abstract class AdapterBankDB implements BankDB {
   // == [Bank verbs]: ensureBank, tryEnsureBank, buildBank, tryBuildBank, delBank, tryDelBank
   // Each verb parses its ask, has the subclass fetch, classify and store, and makes its answer from what the classifier returned.
 
-  /** Get the bank row, and for a live bank its `main` gate row and its vault rows.
-   * A vault row that fails its checks is listed in `damaged_rows`. `val` is null when no live bank is stored.
-   */
+  /** Get the bank row, and for a live bank its `main` gate row and its vault rows ({@link BankDB.ensureBank}). */
   async ensureBank(ask: BankEnsureAsk) { return goodOrThrow(await this.tryEnsureBank(ask)) }
 
   /** Non-throwing form of {@link ensureBank}. */
@@ -108,9 +105,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'ensureBank', ask) }
   }
 
-  /** Store the bank record `ask.record` and its `main` gate row `ask.gate` together, over no bank or its tombstone.
-   * Under the `passed` act, nothing is stored, and `val` is the live bank's gate row.
-   */
+  /** Store a new bank record and its `main` gate row together ({@link BankDB.buildBank}). */
   async buildBank(ask: BankBuildAsk) { return goodOrThrow(await this.tryBuildBank(ask)) }
 
   /** Non-throwing form of {@link buildBank}. */
@@ -126,7 +121,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'buildBank', ask) }
   }
 
-  /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
+  /** Store the bank's tombstone, and delete every gate, vault and box row under it ({@link BankDB.delBank}). */
   async delBank(ask: BankDelAsk) { return goodOrThrow(await this.tryDelBank(ask)) }
 
   /** Non-throwing form of {@link delBank}. */
@@ -146,23 +141,19 @@ export abstract class AdapterBankDB implements BankDB {
   // A gate verb is a put of the gate record over its row, tagged with the verb. The classifier runs that verb's policy
   // against the stored gate, in the same step that stores it. Nothing is fetched here beforehand.
 
-  /** Store the gate record `ask.record`, whose only change is to replace the passphrase wayin. Refuses `gate_issue` for any other change. */
+  /** Store the gate record with its passphrase wayin replaced ({@link BankDB.replacePassphrase}). */
   async replacePassphrase(ask: GateVerbAsk) { return goodOrThrow(await this.tryReplacePassphrase(ask)) }
 
   /** Non-throwing form of {@link replacePassphrase}. */
   async tryReplacePassphrase(ask: GateVerbAsk): Promise<GateAnswer> { return this.#tryPutGate('replacePassphrase', ask) }
 
-  /** Store the gate record `ask.record`, whose only change is to add a passkey wayin.
-   * Refuses `camped` when a passkey wayin is already stored, and `gate_issue` for any other change.
-   */
+  /** Store the gate record with a passkey wayin added ({@link BankDB.addPasskey}). */
   async addPasskey(ask: GateVerbAsk) { return goodOrThrow(await this.tryAddPasskey(ask)) }
 
   /** Non-throwing form of {@link addPasskey}. */
   async tryAddPasskey(ask: GateVerbAsk): Promise<GateAnswer> { return this.#tryPutGate('addPasskey', ask) }
 
-  /** Store the gate record `ask.record`, whose only change is to remove the passkey wayin. Refuses `gate_issue` for any other change.
-   * Under the `passed` act, nothing is stored: the gate row has no passkey wayin, and `val` is that row.
-   */
+  /** Store the gate record with its passkey wayin removed ({@link BankDB.revokePasskey}). */
   async revokePasskey(ask: GateVerbAsk) { return goodOrThrow(await this.tryRevokePasskey(ask)) }
 
   /** Non-throwing form of {@link revokePasskey}. */
@@ -184,9 +175,7 @@ export abstract class AdapterBankDB implements BankDB {
 
   // == [Vault verbs]: getVault, tryGetVault, putVault, tryPutVault, delVault, tryDelVault
 
-  /** Get the vault row at a scope, whatever its life, in a bank live under `bank_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone; otherwise both refuse.
-   */
+  /** Get the vault row at a scope, whatever its life ({@link BankDB.getVault}). */
   async getVault(ask: VaultGetAsk) { return goodOrThrow(await this.tryGetVault(ask)) }
 
   /** Non-throwing form of {@link getVault}. */
@@ -201,9 +190,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'getVault', ask) }
   }
 
-  /** Store `ask.record` over the vault row `ask.expected`, in a bank live under `bank_tok`, as `ifPresent` and `ifAbsent` allow.
-   * Under the `passed` act, nothing is stored, and `val` is the live row found.
-   */
+  /** Store `ask.record` over the vault row `ask.expected` ({@link BankDB.putVault}). */
   async putVault(ask: VaultPutAsk) { return goodOrThrow(await this.tryPutVault(ask)) }
 
   /** Non-throwing form of {@link putVault}. */
@@ -218,7 +205,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'putVault', ask) }
   }
 
-  /** Store the tombstone `ask.record` over the live vault row `ask.expected`, and delete the boxes of that vault life. */
+  /** Store the vault's tombstone, and delete the boxes of that vault life ({@link BankDB.delVault}). */
   async delVault(ask: VaultDelAsk) { return goodOrThrow(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
@@ -236,9 +223,7 @@ export abstract class AdapterBankDB implements BankDB {
 
   // == [Box verbs]: listBoxes, tryListBoxes, getBox, tryGetBox, putBox, tryPutBox, #demandEnoughVolume, delBox, tryDelBox
 
-  /** List a vault's boxes, sparse, with its vault row as `parent`.
-   * Refuses when the vault is not live under `bank_tok` and `vault_tok`.
-   */
+  /** List a vault's boxes, sparse ({@link BankDB.listBoxes}). */
   async listBoxes(ask: BoxListAsk) { return goodOrThrow(await this.tryListBoxes(ask)) }
 
   /** Non-throwing form of {@link listBoxes}. When the vault row refuses, `parent` is that stored row. */
@@ -253,9 +238,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'listBoxes', ask) }
   }
 
-  /** Get a box row, with its vault row as `parent`. Refuses when the vault is not live under `bank_tok` and `vault_tok`.
-   * With `ifAbsent: 'nil'`, `val` is null for no row, or the tombstone; otherwise both refuse.
-   */
+  /** Get a box row, with its vault row as `parent` ({@link BankDB.getBox}). */
   async getBox(ask: BoxGetAsk) { return goodOrThrow(await this.tryGetBox(ask)) }
 
   /** Non-throwing form of {@link getBox}. */
@@ -270,14 +253,14 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'getBox', ask) }
   }
 
-  /** Throw `box_too_large` for a record larger than this bankDB's `maxRecordSizeEst`. */
+  /** Throw `box_too_large` unless the record's JSON fits within `maxRecordSizeEst` bytes. */
   #demandEnoughVolume({ record }: BoxPutAsk): void {
     const recordSizeEst = jsonSize(record)
     if (recordSizeEst > this.#maxRecordSizeEst) { throw Refuse.boxTooLarge(recordSizeEst, this.#maxRecordSizeEst) }
   }
 
-  /** Store `ask.record` over the box row `ask.expected`, in a vault live under `bank_tok` and `vault_tok`, as `ifPresent` and `ifAbsent` allow.
-   * Under the `passed` act, nothing is stored, and `val` is the live row found.
+  /** Store `ask.record` over the box row `ask.expected` ({@link BankDB.putBox}).
+   * Refuses `box_too_large` for a record over `maxRecordSizeEst` bytes of JSON, before the datastore is asked.
    */
   async putBox(ask: BoxPutAsk) { return goodOrThrow(await this.tryPutBox(ask)) }
 
@@ -296,7 +279,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'putBox', ask) }
   }
 
-  /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
+  /** Store the box's tombstone ({@link BankDB.delBox}). */
   async delBox(ask: BoxDelAsk) { return goodOrThrow(await this.tryDelBox(ask)) }
 
   /** Non-throwing form of {@link delBox}. */
@@ -314,7 +297,7 @@ export abstract class AdapterBankDB implements BankDB {
 
   // == [Housekeeping]: tidyGone, tryTidyGone
 
-  /** Housekeeping for hosts: delete the vault and box rows of an ended life under the bank, and count the box rows left. */
+  /** Delete the vault and box rows of ended lives under the bank, and count the box rows left ({@link BankDB.tidyGone}). */
   async tidyGone(ask: BoxTidyAsk) { return goodOrThrow(await this.tryTidyGone(ask)) }
 
   /** Non-throwing form of {@link tidyGone}. */
@@ -331,8 +314,8 @@ export abstract class AdapterBankDB implements BankDB {
 
   // == [Watch]: watch
 
-  /** Watch a bank or a vault: call `onNotice` with each changed row, and `onBadNews` with trouble in the watch.
-   * Returns a function that stops the watch.
+  /** Watch a bank or a vault, and return a function that stops the watch ({@link BankDB.watch}).
+   * A changed row that fails its checks is dropped unheard.
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void = noBadNews): () => void {
     return this.doWatch(SX.watchScope.parse(scope), ({ row, parent }) => {
@@ -352,7 +335,9 @@ export abstract class AdapterBankDB implements BankDB {
   protected abstract doEnsureBank(ask: BankEnsureAsk): Awaitable<BankEnsureStored>
   /** In one step: fetch the bank row and its `main` gate row, classify, and store `ask.record` and `ask.gate` if the act is a write. */
   protected abstract doBuildBank(ask: BankBuildAsk): Awaitable<BankBuildStored>
-  /** In one step: fetch the bank row and the gate row, classify, and store `ask.record` if the act is a write. One call serves every gate verb, named by `ask.gateVerb`. */
+  /** In one step: fetch the bank row and the gate row, classify, and store `ask.record` if the act is a write.
+   * One call serves every gate verb, named by `ask.gateVerb`.
+   */
   protected abstract doPutGate(ask: GatePutAsk): Awaitable<GateStored>
   /** In one step: fetch the bank row, classify, and if the act is a write, store `ask.record` and delete every gate, vault and box row under the bank. */
   protected abstract doDelBank(ask: BankDelAsk): Awaitable<BankDelStored>
@@ -373,7 +358,7 @@ export abstract class AdapterBankDB implements BankDB {
   /** Delete the vault and box rows of an ended life under the bank, and count the box rows left in it. */
   protected abstract doTidyGone(ask: BoxTidyAsk): Awaitable<Tidied>
   /** Start a watch: call `hear` with each changed row, and `onBadNews` with trouble, whether or not it ends the watch.
-   * Returns a function that stops it. This default, for storage with no watch, calls neither.
+   * Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    */
   protected doWatch(_scope: WatchScope, _hear: (heard: Heard) => void, _onBadNews: (news: VaultError) => void): () => void { return noUnwatching }
   // --
@@ -387,8 +372,8 @@ function goodOrThrow<ValT, ActT extends string, ParentT>(answer: Answer<ValT, Ac
   return answer
 }
 
-/** Select the appropriate refusal for a thrown error. A VaultError is returned directly. Other errors become `storage_unavailable`.
- * Either way, its meta names the `oplabel`, with what it may carry of the ask as `ask`.
+/** The refusal for `thrown`: a refusal as it is, anything else as `storage_unavailable`.
+ * Its meta gains `oplabel`, and the loggable part of `ask`.
  */
 function refusalOf(thrown: unknown, oplabel: string, ask: unknown): VaultError {
   const refusal = storageRefusalOf(thrown)
@@ -397,5 +382,6 @@ function refusalOf(thrown: unknown, oplabel: string, ask: unknown): VaultError {
   return Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableAsk.success ? loggableAsk.data : {} } })
 }
 
+/** The size of `val`'s JSON text, in UTF-8 bytes. */
 function jsonSize(val: unknown): number { return new TextEncoder().encode(JSON.stringify(val)).length }
 // --

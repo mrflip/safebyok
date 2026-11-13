@@ -11,7 +11,9 @@ import { type BankScope, isPlainBag } from '../shapes/shapes-core'
 import * as SX from '../shapes/shapes-storage'
 import type { DeviceRow, LeaseDated, LeaseQuery, LeaseRow, LeaseScopepath, RawLease } from '../shapes/shapes-storage'
 
-/** The base class of a device database. A subclass writes only the generic `do*` calls, and each must be one atomic step. */
+/** The base class of a device database: a subclass writes the `do*` calls, each one atomic step.
+ * Anything but a refusal that a subclass throws reaches the caller as `storage_unavailable`, keeping only the thrown `name`, since what it threw may quote a lease row.
+ */
 export abstract class DeviceDB {
   // == [Brand]: IsDeviceDB
 
@@ -22,7 +24,7 @@ export abstract class DeviceDB {
 
   // == [Lease verbs]: stow, tryStow, peek, tryPeek, forget, tryForget, listLeases, tryListLeases, listRawLeases, tryListRawLeases, forgetRawLease, tryForgetRawLease
 
-  /** Stow the lease row of its bank. */
+  /** Stow `row` as this device's lease for its bank, replacing any lease stowed there. */
   async stow(row: LeaseRow): Promise<void> {
     try {
       const leaseRow = SX.leaseRow.parse(row)
@@ -33,7 +35,7 @@ export abstract class DeviceDB {
   /** Non-throwing form of {@link stow}. */
   tryStow(row: LeaseRow): Promise<Outcome<void>> { return outcomeOf(() => this.stow(row)) }
 
-  /** The lease row stowed for this bank under this `bank_tok`, or null.
+  /** The lease row stowed for this bank under this `bank_tok`, or null: a row of another `bank_tok` reads as none.
    * Refuses `damaged_lease` when the stowed row fails its checks.
    */
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
@@ -52,7 +54,7 @@ export abstract class DeviceDB {
 
   // `peek` checks the `bank_tok` here in the base. `forget` leaves that check to the subclass, which must make it in one atomic
   // step with the delete.
-  /** Forget the lease row stowed for this bank under this `bank_tok`. */
+  /** Forget the lease row stowed for this bank under this `bank_tok`. A row of another `bank_tok` stays. */
   async forget(asked: LeaseQuery): Promise<void> {
     try {
       const leaseQuery = SX.leaseQuery.parse(asked)
@@ -63,7 +65,9 @@ export abstract class DeviceDB {
   /** Non-throwing form of {@link forget}. */
   tryForget(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.forget(asked)) }
 
-  /** Every lease stowed on this device, oldest first. */
+  /** Every lease stowed on this device, oldest proof first.
+   * A row that fails its checks is left out: {@link listRawLeases} has it.
+   */
   async listLeases(): Promise<LeaseDated[]> {
     try {
       const filed = await this.doListLeases()
@@ -99,7 +103,7 @@ export abstract class DeviceDB {
 
   // == [Device verbs]: ensureCachedDevice, tryEnsureCachedDevice, forgetDevice, tryForgetDevice, listRawDevices, tryListRawDevices
 
-  /** The device row of this bank scope, made with a fresh random `device_tok` on the first call.
+  /** The device row of this bank scope, made with a fresh random `device_tok` when no sound one is stored.
    * Its `package_version` is this safebyok's, whatever an earlier call stored.
    */
   async ensureCachedDevice(scope: BankScope): Promise<DeviceRow> {
@@ -124,7 +128,7 @@ export abstract class DeviceDB {
   /** Non-throwing form of {@link forgetDevice}. */
   tryForgetDevice(scope: BankScope): Promise<Outcome<void>> { return outcomeOf(() => this.forgetDevice(scope)) }
 
-  /** Every device row stored on this device, as an unchecked bag, damaged ones included. */
+  /** Every device row stored on this device, unchecked: a damaged row is included, and anything not an object left out. */
   async listRawDevices(): Promise<Record<string, unknown>[]> {
     try {
       const rows = await this.doListDevices()
@@ -150,7 +154,9 @@ export abstract class DeviceDB {
   protected abstract doListLeases(): Awaitable<RawLease[]>
   /** Delete whatever row is filed under `scopepath`, in one step. */
   protected abstract doForgetRawLease(scopepath: LeaseScopepath): Awaitable<void>
-  /** Return the device row stored at `made`'s bank scope if it passes its check, else put `made` over it and return that, in one step. */
+  /** In one step: put and return the sound device row stored at `made`'s bank scope, or `made` where there is none.
+   * The row put has `made`'s `package_version`.
+   */
   protected abstract doEnsureCachedDevice(made: DeviceRow): Awaitable<unknown>
   /** Delete whatever row is stored at this bank scope, in one step. */
   protected abstract doForgetDevice(scope: BankScope): Awaitable<void>
@@ -159,5 +165,5 @@ export abstract class DeviceDB {
   // --
 }
 
-/** The refusal for a verb's throw. A throw that is not a refusal becomes `storage_unavailable`. */
+/** The refusal for a verb's throw: a refusal as it is, anything else as `storage_unavailable`, keeping only its `name`. */
 function refusalOf(thrown: unknown, oplabel: string): VaultError { return (isVaultError(thrown) ? thrown : Refuse.deviceDBFailed(oplabel, thrown)) }

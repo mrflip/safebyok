@@ -13,19 +13,21 @@ import type { VaultListing } from '../models/vault-listing'
 import type { Wayin } from '../models/wayin'
 import type { Whisper } from '../shapes/shapes-core'
 
-/** The character a scopepath joins its parts on: `^`, which no label or user_id may contain. */
+/** The character between a scopepath's parts. No label or user_id may contain it. */
 export const ScopepathDelimiter = '^'
 
-/** The latest instant the package accepts, 2255-06-05T23:47:34.740Z, as `epochMillis` checks: the last millisecond whose epoch microseconds fit a safe integer. */
+/** The latest time the package accepts, 2255-06-05T23:47:34.740Z.
+ * It is the last millisecond whose count of microseconds since the epoch is a safe integer.
+ */
 export const FarFuture = 9_007_199_254_740 // Math.floor(Number.MAX_SAFE_INTEGER / 1000)
 
-/** The earliest instant the package accepts, 1981-01-01T00:00:00Z, as `epochMillis` checks. */
+/** The earliest time the package accepts, 1981-01-01T00:00:00Z. */
 export const FarPast = 347_155_200_000 // Date.UTC(1981, 0, 1)
 
 /** One minute, in milliseconds. */
 export const MinuteMillis = 60_000
 
-/** The span from {@link FarPast} to {@link FarFuture}, in milliseconds: the longest that runs between two instants the package accepts. */
+/** The longest span between two times the package accepts, in milliseconds: {@link FarPast} to {@link FarFuture}. */
 export const ForeverMillis = FarFuture - FarPast
 
 // The version of this package, written to each device row. A release bumps it by hand, in the Version PR; a test holds it to package.json.
@@ -40,56 +42,60 @@ export const DeviceDBVersion = '002-001-001'
 export const DeviceRowDBVersion = '002-001-001'
 
 // RFC 9106's recommendation for Argon2id. One length for every deriver, until a host asks for another.
-/** How many random bytes a passphraseSalt has: the `salt_size` of every key deriver. */
+/** The length in bytes of a passphraseSalt, and so the `salt_size` of every key deriver. */
 export const PassphraseSaltSize = 16
 
-/** How many bytes a passphraseKey is: a 256-bit AES-GCM key. */
+/** The length in bytes of a passphraseKey, a 256-bit AES-GCM key. */
 export const PassphraseKeySize = 32
 
-/** How many random bytes a passkey wayin's `prf_salt_b64` has: a new passkey's answer carries a fresh salt this long, and a stored salt of any other length fails its record's check. */
+/** The length in bytes of a passkey wayin's PRF salt.
+ * A new passkey's answer with a salt of any other length is refused, and a stored one fails its record's check.
+ */
 export const PasskeySaltSize = 32
 
-/** The default cap on a vault life's box rows, live and deleted together, for a bankDB made without `maxBoxes`. */
+/** The most box rows a vault life may have, live and deleted together, unless its bankDB was made with `maxBoxes`. */
 export const DefaultMaxBoxes = 100
 
 // About 95% of Postgres's 8,000-byte NOTIFY payload, less the 1,944 bytes of the Larger vault row in notes/reference-sizes.md, rounded down.
-/** How many bytes one stored box record may weigh, unless its bankDB was made with another `maxRecordSizeEst`. */
+/** The most bytes a box record's JSON may weigh, unless its bankDB was made with `maxRecordSizeEst`. */
 export const DefaultMaxRecordSizeEst = 5600
 
 // A brand is a `Symbol.for` key, so a second copy of safebyok (our ESM and CJS builds side by side, or one an adapter
 // bundles) wears and reads the same one, and a host may wear one on purpose. Non-enumerable, it stays out of a spread,
 // `Object.keys`, `JSON.stringify` and a log line.
-/** `obj`, wearing `Brand` as `val`, a fixed and hidden mark that {@link brandOf} reads back. */
+/** Mark `obj` with `val` under the symbol `Brand`, fixed and hidden, and return `obj`. {@link brandOf} reads it back. */
 export function brand<ObjT extends object>(obj: ObjT, Brand: symbol, val: unknown = true): ObjT {
   return Object.defineProperty(obj, Brand, { value: val, enumerable: false, writable: false, configurable: false })
 }
 
-/** The value `val` wears as `Brand`, or undefined, for anything at all. */
+/** The mark `val` carries under `Brand`, or undefined. Safe to call on any value. */
 export function brandOf(val: unknown, Brand: symbol): unknown {
   return (typeof val === 'function' || (typeof val === 'object' && val !== null)) ? (val as Partial<Record<symbol, unknown>>)[Brand] : undefined
 }
 
-/** The mark on what a box answers for a whisper it will not show.
- * Never read it, nor compare `box.whisper` with a bag: ask `box.exposure`, `box.isShowing`, `box.isVeiled` or {@link isWhisperedBag}.
+/** The mark on the stand-in that `box.whisper` returns when it will not show the whisper.
+ * Don't read the mark or compare `box.whisper` with a bag: ask `box.exposure`, `box.isShowing`, `box.isVeiled` or {@link isWhisperedBag}.
  */
 export const Whispered: unique symbol = Symbol.for('@safebyok/whispered')
 
-/** What `box.whisper` answers for a whisper it will not show: a whisper to the type checker, carrying {@link Whispered}. */
+/** The stand-in that `box.whisper` returns when it will not show the whisper. It types as a whisper, and carries {@link Whispered}. */
 export type WhisperedBag = Whisper & { readonly [Whispered]: 'encrypted' | 'locked' | 'veiled' }
 
 // Literals, not `brand()`: the mark is an own enumerable key, so a spread or an assign carries it to the put that refuses it.
 // Each copy of safebyok freezes its own bags, so a host comparing `box.whisper` with one fails across copies, where
 // `box.exposure`, a string, does not.
-/** What `box.whisper` answers for a whisper not exposed. Ask `box.exposure`, never this bag's identity. */
+/** What `box.whisper` returns when the whisper is not exposed. Ask `box.exposure` instead of comparing with this bag. */
 export const ENCRYPTED: WhisperedBag = Object.freeze({ [Whispered]: 'encrypted' })
 
-/** What `box.whisper` answers for a whisper exposed while the vault is locked. Ask `box.exposure`, never this bag's identity. */
+/** What `box.whisper` returns when the whisper is exposed but the bank is locked. Ask `box.exposure` instead of comparing with this bag. */
 export const LOCKED: WhisperedBag = Object.freeze({ [Whispered]: 'locked' })
 
-/** What `box.whisper` answers for a whisper exposed and veiled. Ask `box.exposure`, never this bag's identity. */
+/** What `box.whisper` returns when the whisper is exposed but veiled. Ask `box.exposure` instead of comparing with this bag. */
 export const VEILED: WhisperedBag = Object.freeze({ [Whispered]: 'veiled' })
 
-/** True for anything carrying {@link Whispered}, a copy included. Forging one is harmless: it only ever refuses at a put. */
+/** True for anything carrying {@link Whispered}, a spread copy included.
+ * Forging one is harmless: a put refuses it as a whisper.
+ */
 export function isWhisperedBag(val: unknown): val is WhisperedBag { return (typeof val === 'object') && (brandOf(val, Whispered) !== undefined) }
 
 // A check reads the getter in place of instanceof, which needs the class imported (a cycle, often) and fails across the
@@ -100,43 +106,43 @@ export type ClassForModelkind = {
   gating: Gating, wayin: Wayin, lease: Lease, proving: Proving,
 }
 
-/** What each model's `modelkind` getter answers: `box.modelkind` is `'box'`. */
+/** What a model's `modelkind` getter returns: `box.modelkind` is `'box'`. */
 export type Modelkind = keyof ClassForModelkind
 
-/** True when `val` is a model of one of `modelkinds`, and typed as its class. */
+/** True when `val` is a model of one of `modelkinds`, narrowing it to that class. */
 export function hasModelkind<MKT extends Modelkind>(val: unknown, ...modelkinds: MKT[]): val is ClassForModelkind[MKT] {
   return (typeof val === 'object') && (val !== null) && (modelkinds as Modelkind[]).includes((val as { modelkind?: unknown }).modelkind as Modelkind)
 }
 
-/** The tag a BankDB answers true to, so a model can tell one from a duck. */
+/** The brand every BankDB carries, read by {@link isBankDB}. */
 export const IsBankDB: unique symbol = Symbol.for('@safebyok/bankdb')
 
-/** True for a BankDB, made by whichever copy of safebyok: an object that answers true to {@link IsBankDB}. */
+/** True for a BankDB made by any copy of safebyok. */
 export function isBankDB(val: unknown): val is { [IsBankDB]: true } { return brandOf(val, IsBankDB) === true }
 
-/** The tag an AdapterBankDB answers true to, and no client of one. */
+/** The brand every AdapterBankDB carries, read by {@link isAdapterBankDB}. A client bankDB, such as GraphQL's, lacks it. */
 export const IsAdapterBankDB: unique symbol = Symbol.for('@safebyok/adapterbankdb')
 
-/** True for an AdapterBankDB, made by whichever copy of safebyok: an object that answers true to {@link IsAdapterBankDB}. */
+/** True for an AdapterBankDB made by any copy of safebyok. */
 export function isAdapterBankDB(val: unknown): val is { [IsAdapterBankDB]: true } { return brandOf(val, IsAdapterBankDB) === true }
 
-/** The tag a DeviceDB answers true to, so a model can tell one from a duck. */
+/** The brand every DeviceDB carries, read by {@link isDeviceDB}. */
 export const IsDeviceDB: unique symbol = Symbol.for('@safebyok/devicedb')
 
-/** True for a DeviceDB, made by whichever copy of safebyok: an object that answers true to {@link IsDeviceDB}. */
+/** True for a DeviceDB made by any copy of safebyok. */
 export const isDeviceDB = (val: unknown): val is { [IsDeviceDB]: true } => brandOf(val, IsDeviceDB) === true
 
-/** The tag a host's function answers true to once a bank has wrapped it, so a world can tell it from the bare one. */
+/** The brand on a host's function once the core has wrapped it, read by {@link isGuarded}. */
 export const IsGuarded: unique symbol = Symbol.for('@safebyok/guarded')
 
-/** True for a host's function as a bank wraps it: one that answers true to {@link IsGuarded}. */
+/** True for a host's function the core has wrapped, false for the bare one. */
 export const isGuarded = (val: unknown): boolean => brandOf(val, IsGuarded) === true
 
-/** `made`, frozen, answering true to {@link IsGuarded}. */
+/** Freeze `made` and brand it {@link IsGuarded}, then return it. */
 export function brandGuarded<MadeT extends object>(made: MadeT): MadeT { return Object.freeze(brand(made, IsGuarded)) }
 
-/** The tag a VaultError answers true to, so `isVaultError` knows one from any copy of safebyok. */
+/** The brand every VaultError carries, so `isVaultError` knows one from any copy of safebyok. */
 export const IsVaultError: unique symbol = Symbol.for('@safebyok/vaulterror')
 
-/** What a refusal met before storage answered hands `refusedAnswerOf` in place of an answer. */
+/** The stand-in for an answer, passed to `refusedAnswerOf` when a refusal came before storage answered. */
 export const UNANSWERED: unique symbol = Symbol.for('@safebyok/unanswered')

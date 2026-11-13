@@ -19,7 +19,7 @@ export function dbprefixOf(dbName?: string): string {
 export interface VersionedShelfSpec {
   /** The start of the name, up to its colon. */
   dbprefix:  string
-  /** The kind of database, `device`, `devicerow` or `vaults`: the part of the name before `-v` and the version. */
+  /** The kind of database, such as `device` or `devicerow`: the part of the name before `-v` and the version. */
   dbstem:    string
   /** The layout version, three zero-padded parts (`001-001-001`), so that a name sorts as its version does. */
   version:   string
@@ -44,7 +44,9 @@ const versionedShelfSpec = objCheck(({ str, arr }) => ({
 /** The shelf of each database this page has made one for, by the database's name. */
 const shelves = new Map<string, UseStore>()
 
-/** The page's shelf for the database `dbprefix:dbstem-v<version>`, made on the first call. */
+/** The page's shelf for the database `dbprefix:dbstem-v<version>`, made on the first call.
+ * Its first use starts deleting the databases of the same stem at older or unreadable versions, and those named in `oldnames`.
+ */
 export function versionedShelfOf(spec: VersionedShelfSpec): UseStore {
   const checked = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
   const dbname = `${checked.dbprefix}:${checked.dbstem}-v${checked.version}`
