@@ -347,7 +347,7 @@ export abstract class AdapterBankDB implements BankDB {
   protected abstract doEnsureBank(ask: BankEnsureAsk): Awaitable<BankEnsureStored>
   /** In one step: fetch the bank row and its `main` gate row, classify, and store `ask.record` and `ask.gate` if the act is a write. */
   protected abstract doBuildBank(ask: BankBuildAsk): Awaitable<BankBuildStored>
-  /** In one step: fetch the bank row and the gate row, classify, and store `ask.record` if the act is a write. Every gate verb calls it. */
+  /** In one step: fetch the bank row and the gate row, classify, and store `ask.record` if the act is a write. */
   protected abstract doPutGate(ask: GatePutAsk): Awaitable<GateStored>
   /** In one step: fetch the bank row, classify, and if the act is a write, store `ask.record` and delete every gate, vault and box row under the bank. */
   protected abstract doDelBank(ask: BankDelAsk): Awaitable<BankDelStored>

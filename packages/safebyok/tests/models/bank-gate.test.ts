@@ -315,7 +315,7 @@ describe("gate.addPasskeyPrompt()", () => {
     expect(isZeroed(new Uint8Array(buffer))).to.be.true
   })
 
-  it("refuses a passkey added elsewhere while its dialog was open, leaving that passkey stored", async () => {
+  it("refuses a passkey added elsewhere while its dialog was open", async () => {
     const withPasskey = await makeBornVaultWithPasskey()
     const elsewhere = withPasskey.demandStoredGate().wayins.passkey0!
     const born = await makeBornVault()

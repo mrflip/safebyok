@@ -28,7 +28,7 @@ describe("BankListing's entrypoints", () => {
     expect(bank.isPresent).to.be.true
   })
 
-  it("deletes the bank by its own del, unlocked, as the bank listing's del does", async () => {
+  it("deletes the bank by its own del, unlocked", async () => {
     const { bank, bankDB, storedBankNow } = await makeBornVault()
     const deleting = vi.spyOn(bankDB, 'tryDelBank')
     expect(await bank.del(bank.scope)).to.equal(bank)
@@ -38,7 +38,8 @@ describe("BankListing's entrypoints", () => {
     expect(bank.device.openGating).to.be.null
   })
 
-  it("refuses the gate's own del, as no bankDB verb deletes a gate alone", async () => {
+  // No bankDB verb deletes a gate alone.
+  it("refuses the gate's own del", async () => {
     const { bank, bankDB } = await makeBornVault()
     const deleting = vi.spyOn(bankDB, 'tryDelBank')
     expect(await refusalMessageOf(bank.maingate.del(bank.maingate.scope))).to.eq(writtenByOwnVerbs().message)
