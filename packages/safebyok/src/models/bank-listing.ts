@@ -6,17 +6,17 @@ import { nowMillis } from '../helpers/clock'
 import { makeLifeTok } from '../helpers/crypto'
 import * as Phrases from '../helpers/phrases'
 import type { VaultError } from '../refusals/errors'
-import { actRefused, writtenByOwnVerbs } from '../refusals/throwers'
+import { actRefused, refusalOfDelivering, writtenByOwnVerbs } from '../refusals/throwers'
 import { type AskUser, type BankStamp, type GateStamp, bankStamp, gateStamp } from '../shapes/shapes-gateish'
 import * as SX from '../shapes/shapes-storage'
-import { type BankScope, bankScope } from '../shapes/shapes-core'
+import { type BankScope, bankScope, gateScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
 import type { BankRecord, BankRow, BankSparse, BoxRow, GateRecord, VaultRow } from '../shapes/shapes-bankdb'
 import * as VX from '../shapes/shapes-vaultish'
 import type { BankListingOpts, BankSnapshot, DelTombstone, Fetched, ListingDelOpts } from '../shapes/shapes-vaultish'
 import { Bank } from './bank'
 import type { Device } from './device'
-import { Listing } from './listing'
+import { Listing, demandDeliveredAs } from './listing'
 
 // Nothing in the design extends this listing: there is no `device.banks`. It uses what `Listing` gives, so that the
 // bank row is delivered to its Bank, newer judged from older, as a vault's is. Its one slot is the device's bank: a Bank
@@ -75,6 +75,13 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
     if (! answer.ok) {
       this.panicIfRevoked(answer.err)
       throw answer.err
+    }
+    // Under born and reborn the rows answered are the ones stored, which must be as sent; under passed they are the live bank's.
+    if (answer.act === 'born' || answer.act === 'reborn') {
+      try {
+        demandDeliveredAs('as_sent', answer.parent, this.scopeOf(record), record)
+        demandDeliveredAs('as_sent', answer.val, gateScope.parse(gate), gate)
+      } catch (err) { throw refusalOfDelivering(err, answer) }
     }
     const bank = this.deliverRecord(answer.parent)
     bank.gateListing.deliverRecord(answer.val)

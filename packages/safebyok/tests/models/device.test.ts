@@ -106,6 +106,18 @@ describe("device.ensureBank", () => {
     expect(bank.vaultListing.snapshot).to.deep.equal([])
   })
 
+  it.each(['parent', 'val'] as const)("refuses as storage_issue a build whose %s the datastore stored otherwise than sent, listing no bank", async (stored) => {
+    const world = makeBankWorld()
+    const tryBuildBank = world.bankDB.tryBuildBank.bind(world.bankDB)
+    vi.spyOn(world.bankDB, 'tryBuildBank').mockImplementationOnce(async (ask) => {
+      const answer = await tryBuildBank(ask)
+      return (answer.ok ? { ...answer, [stored]: TH.storedOtherwiseOf(answer[stored]) } : answer)
+    })
+    const device = world.deviceOn()
+    await TH.expectRefusal(device.ensureBank(), 'storage_issue')
+    expect(device.bank).to.be.null
+  })
+
   it("answers the same bank on a second call, without listing again", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)

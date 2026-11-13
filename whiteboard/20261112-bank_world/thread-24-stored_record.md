@@ -1,6 +1,6 @@
 # Thread 24: stored_record (2026-11-13)
 
-Branch `20261113-stored_record`, PR #694 (draft, by instruction), stacked on #692. Justify: green; scripts 287, core 2962, IndexedDB 200, Postgres 215, fastkey 43, react 262, Convex 306, demo 99, GraphQL 415, e2e 537.
+Branch `20261113-stored_record`, PR #694 (draft, by instruction), stacked on #692. Justify: green; scripts 287, core 2968, IndexedDB 200, Postgres 215, fastkey 43, react 262, Convex 306, demo 99, GraphQL 415, e2e 537.
 
 The Coach (2026-11-13): the classifier's write branch answered `box: ask.record`, the record sent, where it should answer the stored record, the row the datastore reports holding. Repair it in every bankDB; reword the contracts so "the stored record" (what the datastore contains, as fetched or written) and "the record sent" (what the caller asked to store) are never confused.
 
@@ -15,6 +15,7 @@ The Coach (2026-11-13): the classifier's write branch answered `box: ask.record`
   * Doubles: Memory spies its shelf and box maps; IndexedDB spies `IDBObjectStore.prototype.put`; Postgres and GraphQL install a BEFORE INSERT OR UPDATE trigger on the four tables, dropped at test end; Convex spies the `asyncSyscall` getter and alters `1.0/insert` and `1.0/replace` args.
   * Core `vault-boxes.test.ts`: the delivery refuses `storage_issue` when the stored record disagrees with the record sent.
   * Wording (part 2): `notes/answer-contract.md` (Returning, gate ops, the adapter's role, Responding), `notes/deliver-contract.md` (*What an answer carries* defines both terms; the `as_sent` row; F2; open item 3), the `GateAnswer / VaultAnswer / BoxAnswer` doc blocks in `bank-db.ts`, the fielding doc in `shapes-enums.ts`, `deliveredNotAsSent` in `throwers.ts` (its pins are the scope and the revision and life tokens, not the whole record), and the verbs' banner comment in `gate-listing.ts`.
+  * Review rework: `BankListing.build` checks `answer.parent` against the bank record sent and `answer.val` against the gate sent, under `born` and `reborn`, by scope plus `revisionPins` (no field-by-field compare), throwing `deliveredNotAsSent('as_sent', ...)` as a delivery refusal. The check is the new exported `demandDeliveredAs` in `listing.ts`, which `#answerDeliveringOf` now calls too, so the two share one copy. Under `passed` the rows are the live bank's and are not checked against the sent. Proven in `device.test.ts` (`device.ensureBank`): a `tryBuildBank` answering `parent` or `val` stored otherwise refuses `storage_issue` and lists no bank; both cases fail without the check.
   * Changeset `.changeset/20261113-stored_record.md`, minor: Postgres functions to rerun, Convex component to redeploy, the testing additions.
 
 * **Decisions taken**
