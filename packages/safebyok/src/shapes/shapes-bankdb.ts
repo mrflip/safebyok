@@ -18,8 +18,7 @@ export const BankFormat = 3001
 export const GateFormat = 4001
 /** The `fmt` every vault row of a bank carries. */
 export const VaultFormat = 6003
-/** The `fmt` every box row of a bank carries. */
-export const BoxFormat = 5003
+export { BoxFormat } from './shapes-storage'
 // --
 
 // == [Bank forms]: bankSparse, bankRecord, bankTombstone, bankRow, BankSparse, BankRecord, BankTombstone, BankRow, BankTop
@@ -113,8 +112,8 @@ export type VaultRow       = VaultRecord | VaultTombstone
 // A bank's box row is the one in `SX`, with its bank's `bank_tok` beside its vault's `vault_tok`: the two name the life of
 // the vault it is under (`vaultLifeOf`).
 /** The checks of a bank's box rows: its sparse fields, its live record, its tombstone, and a row of either. */
-export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ lit, discrim, bank_tok }) => {
-  const banked       = { fmt: lit(BoxFormat), bank_tok }
+export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ discrim, bank_tok }) => {
+  const banked       = { bank_tok }
   const boxSparse    = SX.boxSparse.extend(banked)
   const boxRecord    = SX.boxRecord.extend(banked).strict()
   const boxTombstone = SX.boxTombstone.extend(banked).strict()
@@ -166,7 +165,7 @@ export function shellVaultOf({ user_id, banklabel, vaultlabel }: VaultScope): Va
 /** The shell for a box row that is not stored, under the vault life `boxQuery` names. */
 export function shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok }: BoxQuery): BoxTombstone {
   return {
-    user_id, banklabel, vaultlabel, boxlabel, fmt: BoxFormat, ...SX.VoidRevision, ...shellTimes, am: 'x', bank_tok, vault_tok, box_tok: SX.VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
+    user_id, banklabel, vaultlabel, boxlabel, fmt: SX.BoxFormat, ...SX.VoidRevision, ...shellTimes, am: 'x', bank_tok, vault_tok, box_tok: SX.VoidLifeTok, whisper_codec: 'json_v1', whisper_schema_version: 1,
   }
 }
 
