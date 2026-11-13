@@ -47,7 +47,8 @@ types here do not have, trust the types.
   contains one whisper, encrypted, along with its `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `user_id`, `banklabel` and `vaultlabel`. A vault that is
   deleted and made again is a new life, with a new `vault_tok`; the `Vault` object for its scope
-  stays the same, and moves to the new life. While deleted, it refuses a fetch or a call on its boxes as `vault_gone`.
+  stays the same, and moves to the new life. While deleted it stays enabled, and its calls answer
+  what storage has: a fetch finds the tombstone, or a new life made elsewhere, and its boxes are gone.
 * **device**: the signed-in user's presence on this browser. It holds your options and functions,
   and brings up the bank.
 * **bank**: a signed-in user's vaults and what they share: one gate, one lease and one lock. One
