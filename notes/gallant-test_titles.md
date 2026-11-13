@@ -8,7 +8,7 @@ This file is for the agent fixing titles and the reviewer checking that work. Ea
 
 **Read a title in its scope.** A `describe` names the subject, the member under test (`vault.ensureTimely(maxMillis)`),
 and below it, where one is needed, the situation (`with no passkey held`). The `it` is the predicate. Read down the chain,
-they make a sentence: "vault.revokePasskey(), with no passkey held, is a no-op". A title is right or wrong only in that
+they make a sentence: "bank.maingate.revokePasskeyPrompt(), with no passkey held, is a no-op". A title is right or wrong only in that
 chain, so read the chain, never the title alone, and a condition every sibling shares moves up into a `describe`. The lint
 allows five levels before it warns; three is usually plenty. Titles in brackets below are the enclosing `describe`.
 
@@ -51,7 +51,7 @@ list those rather than split them.
 | Goofus | Gallant |
 |---|---|
 | "lets a listener go, and tells none after" | "stops telling a listener once it unsubscribes" |
-| [vault.revokePasskey()] "answers at once with no passkey held: nobody asked, nothing moved" | "is a no-op with no passkey held" |
+| [bank.maingate.revokePasskeyPrompt()] "answers at once with no passkey held: nobody asked, nothing moved" | "is a no-op with no passkey held" |
 | [align] "notifies nobody when it changes nothing, and keeps the snapshot" | "changes nothing when there is nothing to settle" |
 | "refuses 'bad_option' fed a put's ifAbsent, and 'disabled' once vacated" | two tests: "refuses a put's ifAbsent" and "refuses once vacated" |
 
@@ -104,7 +104,7 @@ assertions check.
 |---|---|
 | [vault.beginWatch] "starts the box listing's watch, so another session's put reaches the box held" | "a put from another session reaches the box held" |
 | [isCondition] "narrows to a VaultError, so the caller can read its kind and message" | "narrows to a VaultError" |
-| [the friend a vault hands its leases] "binds the deviceDB's lease verbs to the vault's scope, so no verb takes one" | "calls the deviceDB under the vault's own scope" |
+| [the friend a bank hands its leases] "binds the deviceDB's lease verbs to the bank's scope, so no verb takes one" | "calls the deviceDB under the bank's own scope" |
 
 ## Template titles are tables `#templates-are-tables`
 

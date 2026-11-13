@@ -126,7 +126,7 @@ that the same listing had to construct.
 
 ```ts
 // Vault
-async hello() {
+async beginWatch() {
   const listed = await this.listing.fetchListed(this)      // VaultListing fetches, delivers back to this vault
   this.demandUsable()
   await this.boxListing.hello(listed)                      // made by this.listing.boxListingOf(this)
@@ -138,7 +138,7 @@ async hello() {
 
 ```ts
 // Vault
-hello() { return this.boxes.hello() }                      // BoxListing: the watch, then refresh()
+beginWatch() { return this.boxes.hello() }                 // BoxListing: the watch, then refresh()
 ```
 
 *Status: Planned, Thread 2.*
@@ -226,7 +226,7 @@ protected buildOrReceive(record) {
   const held = this.at(this.scopeOf(sparse))
 ```
 
-*Status: `box.put`, `listing.build`, Fixed. `bank.hello`, Planned, Thread 2.*
+*Status: `box.put`, `listing.build`, Fixed. `device.ensureBank`, Planned, Thread 2.*
 
 ## A try pair has one body `#one-body-per-pair`
 
@@ -322,7 +322,7 @@ if (! peeked.ok) {
   friend.tellBadNews([peeked.err])
   return null
 }
-if (checked.data.gate_epoch !== epoch || ! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+if (checked.data.gate_tok !== cited.gate_tok || ! consistent(bankStamp.parse(checked.data), bankStamp.parse(friend))) {
   await forgetOutdated(friend)
   return null
 }
@@ -335,11 +335,11 @@ try {
   const peeked = await friend.peekLease()
   if (peeked === null) { return null }
   // ...
-  if (checked.data.gate_epoch !== epoch) {
+  if (checked.data.gate_tok !== cited.gate_tok) {
     await forgetOutdated(friend)
     return null
   }
-  if (! consistent(vaultStamp.parse(checked.data), vaultStamp.parse(friend))) {
+  if (! consistent(bankStamp.parse(checked.data), bankStamp.parse(friend))) {
     await forgetOutdated(friend)
     throw damagedLease()
   }
@@ -423,7 +423,7 @@ the top of `deliver`, before it takes the answer's parent.
 ```ts
 protected async deliver(answer) {
   this.demandEnabled()
-  if (answer.parent !== null) { this.world.receiveWorld(answer.parent) }
+  if (answer.parent !== null) { this.receiveParent(answer.parent) }
 ```
 
 **Not this fault:** guards and ensures with the same body. `ensurePuttable`, `ensureUnsealable` and `ensureDeletable` all call
@@ -985,7 +985,7 @@ line each, the default marked. A term defined elsewhere ("sealed", "encrypted") 
 **Goofus:**
 
 ```ts
-/** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'vault_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
+/** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'bank_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
 async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box>
 ```
 
@@ -1004,7 +1004,7 @@ async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 **Goofus again:** a guard as a catalog, with a pointer to the ensure that cures one entry.
 
 ```ts
-/** Throws unless unlocked with a full, healthy record: refuses 'vault_locked', 'absent_box' for a box gone, or 'bad_option' for a sparse record not yet filled, which `ensureReadyToUnsealWhisper` fetches first. */
+/** Throws unless unlocked with a full, healthy record: refuses 'bank_locked', 'absent_box' for a box gone, or 'bad_option' for a sparse record not yet filled, which `ensureReadyToUnsealWhisper` fetches first. */
 demandReadyToUnsealWhisper(): this
 ```
 
@@ -1019,7 +1019,7 @@ demandUnsealable(): this
 
 ## Say what to do, not what gets refused `#say-what-to-do`
 
-"Refuses before ready" hands the caller a state they can't act on. "Precede with `await bank.hello()`" hands them the call.
+"Refuses before ready" hands the caller a state they can't act on. "Precede with `await device.ensureBank()`" hands them the call.
 A block written for its caller names the call to make before and the call to make after, and bolds the word that would
 surprise them.
 
@@ -1034,7 +1034,7 @@ vaultOf(bag: VaultBag): Vault | null
 
 ```ts
 /** Vault **or tombstone** listed at `scope`, null if absent.
- * Precede with await bank.hello(), repeated to force a refresh; then .hydrate() on the vault answered makes it timely
+ * Precede with await device.ensureBank(), repeated to force a refresh; then .hydrate() on the vault answered makes it timely
  */
 vaultAt(scope: BankedVaultScope): Vault | null
 ```

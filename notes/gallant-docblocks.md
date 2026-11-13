@@ -58,7 +58,7 @@ caller has when it resolves, and any case that is an exception.
 **Goofus:**
 
 ```ts
-/** The vault listed for `bag`, nobody asked, locked unless the host unlocks it; else one built by asking the user through a build_vault gating, or another's that won the slot, locked. Refuses before ready, and 'already_asking' while a gating is open. */
+/** The vault listed for `bag`, nobody asked, locked unless the host unlocks it; else one built by asking the user through a build_bank gating, or another's that won the slot, locked. Refuses before ready, and 'already_asking' while a gating is open. */
 async ensureVault(bag: VaultBag): Promise<Vault>
 ```
 
@@ -76,14 +76,14 @@ async ensureVault(scope: BankedVaultScope): Promise<Vault>
 **Goofus:**
 
 ```ts
-/** Refuse 'vault_locked' while the vault is locked, as a box's `demandUnlocked` does. */
+/** Refuse 'bank_locked' while the vault is locked, as a box's `demandUnlocked` does. */
 #demandUnlocked(): void
 ```
 
 **Gallant:**
 
 ```ts
-/** refuse `'vault_locked'` if locked, else no-op */
+/** refuse `'bank_locked'` if locked, else no-op */
 #demandUnlocked(): void
 ```
 
@@ -96,7 +96,7 @@ pointer to where the terms are defined, and a list of the option values, as `#no
 **Goofus:**
 
 ```ts
-/** Seal `patch` over the record in hand and put it over that record's revision, resolving once storage's answer is received; a snapshot shows the change only then. A half the patch leaves out is kept: the sidecar is read off the record, and the whisper unsealed and resealed, as the stamp binds the sidecar. Refuses 'bad_option', naming the field, `opts` or a patch that fails {@link MSX.boxPatch}, before any guard; 'vault_locked', at the seal's end too, storing nothing; and 'stale_write' where the record moved, the record stored delivered first. On a box gone, this is its rebirth, its sidecar `{}` where left out, and a whisper left out refuses 'no_whisper'. A refusal leaves nothing behind.
+/** Seal `patch` over the record in hand and put it over that record's revision, resolving once storage's answer is received; a snapshot shows the change only then. A half the patch leaves out is kept: the sidecar is read off the record, and the whisper unsealed and resealed, as the stamp binds the sidecar. Refuses 'bad_option', naming the field, `opts` or a patch that fails {@link MSX.boxPatch}, before any guard; 'bank_locked', at the seal's end too, storing nothing; and 'stale_write' where the record moved, the record stored delivered first. On a box gone, this is its rebirth, its sidecar `{}` where left out, and a whisper left out refuses 'no_whisper'. A refusal leaves nothing behind.
  * Over a live record, storage decides by {@link MSX.ifPresentVals}; under `get`, the put resolves with the box holding what storage holds, `patch` discarded.
  */
 async put(patch: BoxPatch, opts: SendOpts = {}): Promise<this>
@@ -202,8 +202,8 @@ for you, so attend to that first: explain only what remains.
 
 ```ts
 // device-db.ts
-  /** Read the lease of one vault, or null for none. The core reads it through `KeptLease.tryPeek`, which checks it and holds it closed; the vault judges whether it still fits. */
-  async peekLease(scope: VaultScope): Promise<KeptLeaseRow | null> {
+  /** Read the lease of one bank, or null for none. The core reads it through `KeptLease.tryPeek`, which checks it and holds it closed; the bank judges whether it still fits. */
+  async peekLease(scope: BankScope): Promise<KeptLeaseRow | null> {
 ```
 
 From the signature: You get a lease; matching your scope; but sometimes null.
@@ -280,7 +280,7 @@ The first pairs are in `notes/gallant.md`. These two tell the state left behind 
 
 ```ts
 // proving.ts
-  /** Hold `lease`, which this proving made of the record it just stored, as the vault's lease: its expiry armed, the snapshot replaced. */
+  /** Hold `lease`, which this proving made of the record it just stored, as the bank's lease: its expiry armed, the snapshot replaced. */
   holdLease:   (lease: Lease) => Lease
 ```
 
@@ -289,7 +289,7 @@ The state left behind, as participial absolutes: "its expiry armed, the snapshot
 **Gallant:**
 
 ```ts
-/** Attach `lease` to the vault and attend to any consequences (snapshot, expiry, notifications). */
+/** Attach `lease` to the bank and attend to any consequences (snapshot, expiry, notifications). */
   attachLease:   (lease: Lease) => Lease
 ```
 
@@ -297,7 +297,7 @@ The state left behind, as participial absolutes: "its expiry armed, the snapshot
 
 ```ts
 // proving.ts
-  /** Demand that the gate's current wayin at its slotlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
+  /** Demand that the gate's current wayin at its wayinlabel opens under this proving, keeping nothing: 'wrong_passphrase' or 'wrong_passkey' when it will not.
    * It demands on the proving before and after its one wait, so a gate that moved meanwhile refuses
    * as the demand does, never as a wrong proof.
    */
@@ -309,7 +309,7 @@ Narrates when it demands relative to its one wait, with a "so" clause giving the
 **Gallant:**
 
 ```ts
-/** Demand that this proving opens the gate's current wayin at its slotlabel. */
+/** Demand that this proving opens the gate's current wayin at its wayinlabel. */
 ```
 
 ## Name the act `#name-the-act`
@@ -320,7 +320,7 @@ A function that stores, wraps or attaches opens with that verb. A past-tense eve
 
 ```ts
 // gating.ts
-  /** A `lock()` landed, or the vault went gone, while it was pending: every waiter refuses 'vault_locked', or `told` when the lock was storage's refusal, and `lockLanded` settles. */
+  /** A `lock()` landed, or the bank went gone, while it was pending: every waiter refuses 'bank_locked', or `told` when the lock was storage's refusal, and `lockLanded` settles. */
   landLock(told?: VaultError): void {
 ```
 
@@ -329,7 +329,7 @@ The first sentence describes an event in the past tense, not the act the method 
 **Gallant:**
 
 ```ts
-/** End this pending gating (because vault `lock()`ed, or is gone, etc):
+/** End this pending gating (because the bank `lock()`ed, or is gone, etc):
  * promised waiters are refused, notifications sent, other cleanup.
  */
 ```
@@ -338,7 +338,7 @@ The first sentence describes an event in the past tense, not the act the method 
 
 ```ts
 // proving.ts
-  /** `bankKey` wrapped under the wayinKey, bound to `visible`, a wayin's header in this vault: the wrap a wayin stores. */
+  /** `bankKey` wrapped under the wayinKey, bound to `visible`, a wayin's header in this bank: the wrap a wayin stores. */
   async wrappedWith(bankKey: CryptoKey, visible: WayinHeader): Promise<BankKeyWayinWrapped> {
 ```
 
@@ -426,10 +426,10 @@ The first pairs (`create`, `demandUnsealable`) are in `notes/gallant.md`.
 
 ```ts
 // vault-opts.ts
-/** Bank.make's options, checked and read, before storage is touched.
+/** Device.make's options, checked and read, before storage is touched.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
  * 'bad_option' for anything but a bag, or for an option it does not take, of the wrong type or out
- * of range, every one it finds named in one refusal led by "In Bank.make's options"; then
+ * of range, every one it finds named in one refusal led by "In Device.make's options"; then
  * 'bad_scope' for a `user_id` that fails its check or a `banklabel` that is not a label; then
  * 'bad_option' for a key deriver a vault does not keep, or a clock that throws or reads out of
  * bounds. The limits are held to the default `bankDB`'s here, and to a vault's own at its birth.
@@ -442,7 +442,7 @@ Every refusal kind in throw order, chained with "then" and semicolons.
 **Gallant:**
 
 ```ts
-/** Check and read Bank.make's options before storage is touched. Every bad option is named in one refusal. */
+/** Check and read Device.make's options before storage is touched. Every bad option is named in one refusal. */
 ```
 
 ## Say what to do, the detailed specimen `#say-what-to-do`
@@ -690,7 +690,7 @@ A guard says what it asks, with a link where the predicate has a name. It does n
 
 ```ts
 // vault.ts
-  /** The lease in hand, for `call` about to use it, demanded consistent with the picture and in force: 'vault_locked' with none. */
+  /** The lease in hand, for `call` about to use it, demanded consistent with the picture and in force: 'bank_locked' with none. */
   #demandLease(call: VaultCall): Lease {
 ```
 
@@ -792,7 +792,7 @@ A doc states what the body does, never what the old prose or a test title claime
 
 ```ts
 // proving.ts
-  /** True when `vaultRecord`'s wayin at this proving's slotlabel carries its header: the proving opens the gate it holds. */
+  /** True when `vaultRecord`'s wayin at this proving's wayinlabel carries its header: the proving opens the gate it holds. */
   isCarriedBy(vaultRecord: Pick<VaultRecord, 'gate'>): boolean {
 ```
 
@@ -801,7 +801,7 @@ It says the proving "opens the gate it holds", but the body only compares visibl
 **Gallant:**
 
 ```ts
-/** True when `vaultRecord`'s wayin at this proving's slotlabel carries this proving's header. */
+/** True when `vaultRecord`'s wayin at this proving's wayinlabel carries this proving's header. */
 ```
 
 ## Slop tropes
@@ -967,7 +967,7 @@ Goofus: "Unheard, ...; heard, ...": a handler is attached or not
 Gallant:
     // Without this handler, a dropped connection crashes the process. With it, every watch goes quiet until you listen again.
 
-Goofus: "behind the same gate": the sign-in check is not the Gate; gate means `Gate` and `vault.gate` only
+Goofus: "behind the same gate": the sign-in check is not the Gate; gate means `Gate` and `bank.maingate` only
     the rest, behind the same gate: a host calls `tidyGone({ user_id, banklabel })` on its
 Gallant:
     the rest, behind the same sign-in check: a host calls `tidyGone({ user_id, banklabel })` on its
