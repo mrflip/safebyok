@@ -8,6 +8,7 @@ import * as TH from './test-helpers'
 import { ConvexBankDB } from '../src/index'
 import type { ConvexBankDBOpts } from '../src/index'
 import { fakeDeployment } from '../src/testing'
+import { MaxTidiedBoxSize, MaxTidiedBoxes } from '../src/component/tallies'
 import type { FakeDeployment, FakeHost } from '../src/testing'
 
 const { BW } = TH
@@ -214,43 +215,10 @@ describe("ConvexBankDB's constructor", () => {
   })
 })
 
-/** How many box rows are stored under the bank, across every life. */
-async function boxCountOf(deployment: ComponentDeployment): Promise<number> {
-  const boxDocs = await deployment.as(null).run(async ({ db }) => await db.query('safebyok_boxes')
-    .withIndex('by_box', (idx) => idx.eq('user_id', BW.bankScope.user_id).eq('banklabel', BW.bankScope.banklabel))
-    .collect())
-  return boxDocs.length
-}
-
-/** Plant `qty` box rows in the vault life of `vault`, past its tally, in batches each well inside one transaction. */
-async function plantBoxes(deployment: ComponentDeployment, vault: BX.VaultRecord, qty: number): Promise<void> {
-  const { vaultlabel, bank_tok, vault_tok } = vault
-  for (let beg = 0; beg < qty; beg += 2500) {
-    await deployment.as(null).run(async ({ db }) => {
-      for (let ii = beg; ii < Math.min(beg + 2500, qty); ii += 1) {
-        const boxlabel = `box${String(ii).padStart(5, '0')}`
-        const box = BW.boxAt(0, bank_tok, vault_tok, { vaultlabel, boxlabel })
-        await db.insert('safebyok_boxes', { ...BW.bankScope, vaultlabel, bank_tok, vault_tok, boxlabel, box })
-      }
-    })
-  }
-}
-
-/** A bankDB, on a backend that keeps Convex's transaction limits, with the bank built and its vault put. */
-async function builtWithLimits() {
-  const deployment = deploy({ api: anyApi, createTest: () => TH.componentTest(true) })
-  const bankDB = bankDBOn(deployment)
-  const bank = BW.bankAt()
-  const vault = BW.vaultAt()
-  await bankDB.buildBank(BW.bankBuildAskOf(bank))
-  await bankDB.putVault(BW.vaultPutAskOf(vault))
-  return { deployment, bankDB, bank, vault }
-}
-
 /** More box rows than a cascade's budget for one transaction. */
 const Overflow = 10_000
 
-// A transaction may write 16,000 documents, and a cascade spends half of that: past it, delBank and tidyGone leave rows for the next tidyGone.
+// A transaction may write 16,000 documents, and delBank's cascade spends half of that: past it, it leaves rows for tidyGone.
 describe("ConvexBankDB's cascades, past what one transaction holds", () => {
   it("leaves the rows past its budget after a delBank, unreachable, for tidyGone to delete", { timeout: 60_000 }, async () => {
     const { deployment, bankDB, bank, vault } = await builtWithLimits()
@@ -269,20 +237,105 @@ describe("ConvexBankDB's cascades, past what one transaction holds", () => {
     const rebornBox = BW.boxAt(0, 'bank2', 'life1')
     await bankDB.putVault(BW.vaultPutAskOf(rebornVault))
     await bankDB.putBox(BW.boxPutAskOf(rebornBox))
-    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 1 } })
+    const leftovers = []
+    for (let ii = 0; ii < 3; ii += 1) {
+      const { val } = await bankDB.tidyGone(BW.boxTidyAsk)
+      leftovers.push(val.leftover)
+    }
+    expect(leftovers).to.deep.equal(['many', 'some', 'none'])
     expect(await boxCountOf(deployment)).to.eq(1)
     expect(await bankDB.getBox(BW.boxGetAskOf({ ...BW.boxQuery, bank_tok: 'bank2' }))).to.deep.include({ val: rebornBox })
   })
+})
 
-  it("deletes the rows of ended lives over as many tidyGone calls as they take, and none of a live life", { timeout: 60_000 }, async () => {
+const TidyCases = [
+  // none left:
+  [0,                        "none", 'leaves none when there were none'],
+  [3,                        "none", 'deletes a few in one call'],
+  [MaxTidiedBoxes,           "none", 'deletes exactly a batch in one call'],
+  // some left, which the next call deletes:
+  [MaxTidiedBoxes + 3,       "some", 'leaves some when a few are past the batch'],
+  [2 * MaxTidiedBoxes,       "some", 'leaves some when exactly a batch is past the batch'],
+  // many left, more than the next call deletes:
+  [(2 * MaxTidiedBoxes) + 1, "many", 'leaves many when more than a batch is past the batch'],
+] as const
+
+// The live vault holds one box row, which every call leaves, and the rows planted under an earlier bank life are of an ended one.
+describe("ConvexBankDB's tidyGone, deleting a batch of 1000 box rows of ended lives", () => {
+  for (const [planted, leftover, blurb] of TidyCases) {
+    it(blurb, async () => {
+      const { deployment, bankDB, vault } = await builtWithLimits()
+      const box = BW.boxAt()
+      await bankDB.putBox(BW.boxPutAskOf(box))
+      await plantBoxes(deployment, { ...vault, bank_tok: 'bank0' }, planted)
+      expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 1, leftover } })
+      expect(await boxCountOf(deployment)).to.eq(1 + planted - Math.min(planted, MaxTidiedBoxes))
+      expect(await bankDB.getBox(BW.boxGetAskOf())).to.deep.include({ val: box })
+    })
+  }
+
+  it("deletes what it left as some on the next call", async () => {
     const { deployment, bankDB, vault } = await builtWithLimits()
-    const box = BW.boxAt()
-    await bankDB.putBox(BW.boxPutAskOf(box))
-    await plantBoxes(deployment, { ...vault, bank_tok: 'bank0' }, Overflow)
-    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 1 } })
-    expect(await boxCountOf(deployment)).to.be.above(1).and.below(Overflow)
-    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 1 } })
-    expect(await boxCountOf(deployment)).to.eq(1)
-    expect(await bankDB.getBox(BW.boxGetAskOf())).to.deep.include({ val: box })
+    await plantBoxes(deployment, { ...vault, bank_tok: 'bank0' }, MaxTidiedBoxes + 3)
+    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 0, leftover: 'some' } })
+    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 0, leftover: 'none' } })
+    expect(await boxCountOf(deployment)).to.eq(0)
+  })
+
+  it("deletes fewer box rows when they pass its batch's bytes first, and counts what is left by the same bytes", async () => {
+    const { deployment, bankDB, vault } = await builtWithLimits()
+    const ciphertext_b64 = 'c'.repeat(MaxTidiedBoxSize / 16)
+    await plantBoxes(deployment, { ...vault, bank_tok: 'bank0' }, 40, ciphertext_b64)
+    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 0, leftover: 'many' } })
+    expect(await boxCountOf(deployment)).to.eq(40 - 16)
+    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 0, leftover: 'some' } })
+    expect(await boxCountOf(deployment)).to.eq(40 - 32)
   })
 })
+
+// The rows of the ended life sort after the live ones, under a later bank_tok, so the call reads every live row before them.
+describe("ConvexBankDB's tidyGone, within one transaction", () => {
+  it("fits beside a live vault near its byte limit", async () => {
+    const { deployment, bankDB, vault } = await builtWithLimits()
+    const ciphertext_b64 = 'c'.repeat(MaxTidiedBoxSize / 16)
+    await plantBoxes(deployment, vault, 48, ciphertext_b64)
+    await bankDB.putBox(BW.boxPutAskOf(BW.boxAt()))
+    await plantBoxes(deployment, { ...vault, bank_tok: 'bank2' }, 40, ciphertext_b64)
+    expect(await bankDB.tidyGone(BW.boxTidyAsk)).to.deep.include({ val: { totalCount: 49, leftover: 'many' } })
+    expect(await boxCountOf(deployment)).to.eq(49 + 40 - 16)
+  })
+})
+
+/** How many box rows are stored under the bank, across every life. */
+async function boxCountOf(deployment: ComponentDeployment): Promise<number> {
+  const boxDocs = await deployment.as(null).run(async ({ db }) => await db.query('safebyok_boxes')
+    .withIndex('by_box', (idx) => idx.eq('user_id', BW.bankScope.user_id).eq('banklabel', BW.bankScope.banklabel))
+    .collect())
+  return boxDocs.length
+}
+
+/** Plant `qty` box rows in the vault life of `vault`, past its tally, in batches each well inside one transaction. */
+async function plantBoxes(deployment: ComponentDeployment, vault: BX.VaultRecord, qty: number, ciphertext_b64 = 'Y3Q'): Promise<void> {
+  const { vaultlabel, bank_tok, vault_tok } = vault
+  for (let beg = 0; beg < qty; beg += 2500) {
+    await deployment.as(null).run(async ({ db }) => {
+      for (let ii = beg; ii < Math.min(beg + 2500, qty); ii += 1) {
+        const boxlabel = `box${String(ii).padStart(5, '0')}`
+        const box = BW.boxAt(0, bank_tok, vault_tok, { vaultlabel, boxlabel, whisper_ciphered: { cipher_iv_b64: 'aXY', ciphertext_b64 } })
+        await db.insert('safebyok_boxes', { ...BW.bankScope, vaultlabel, bank_tok, vault_tok, boxlabel, box })
+      }
+    })
+  }
+}
+
+/** A bankDB, on a backend that keeps Convex's transaction limits, with the bank built and its vault put. */
+async function builtWithLimits() {
+  const deployment = deploy({ api: anyApi, createTest: () => TH.componentTest(true) })
+  const bankDB = bankDBOn(deployment)
+  const bank = BW.bankAt()
+  const vault = BW.vaultAt()
+  await bankDB.buildBank(BW.bankBuildAskOf(bank))
+  await bankDB.putVault(BW.vaultPutAskOf(vault))
+  return { deployment, bankDB, bank, vault }
+}
+

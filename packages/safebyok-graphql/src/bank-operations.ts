@@ -166,7 +166,7 @@ ${boxAnswerFragments}`,
   tidyGone: `mutation SafebyokTidyGone($user_id: String!, $banklabel: String!) {
   safebyokTidyGone(user_id: $user_id, banklabel: $banklabel) {
     ok act
-    val { totalCount }
+    val { totalCount leftover }
     parent { user_id banklabel }
     ask { ...SafebyokAskFields }
     err { ...SafebyokErrFields }

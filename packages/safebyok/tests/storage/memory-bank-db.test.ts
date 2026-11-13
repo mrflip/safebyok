@@ -251,7 +251,7 @@ describe("MemoryBankDB.tidyGone", () => {
     bankDB._cheat_shelfOf(bankScope).vaultrows.set('stale', { ...vaultAt(0, 'bank0', 'life9'), vaultlabel: 'stale' })
     bankDB._cheat_boxRowsOf(stale, 'bank0', 'life9').set('openai', boxAt(0, 'bank0', 'life9'))
     const answer = await bankDB.tidyGone(boxTidyAsk)
-    expect(answer.val).to.deep.equal({ totalCount: 1 })
+    expect(answer.val).to.deep.equal({ totalCount: 1, leftover: 'none' })
     expect(answer.parent).to.deep.equal(bankScope)
     expect(bankDB._cheat_shelfOf(bankScope).vaultrows.has('stale')).to.eq(false)
     expect(bankDB._cheat_boxRowsOf(stale, 'bank0', 'life9').size).to.eq(0)

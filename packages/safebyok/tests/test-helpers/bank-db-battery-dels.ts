@@ -259,17 +259,17 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
   })
 
   describe("tidyGone", () => {
-    it("removes the box rows of a vault life that is over, and counts the box rows left in the bank", async () => {
+    it("removes the box rows of a vault life that is over, counts the box rows left in the bank, and leaves none of an ended life", async () => {
       const { bankDB, vault, box } = await putWith({ box: true })
       await rowsOf(bankDB).plantBoxRow(boxscope, 'bank1', 'oldlife', boxAt(0, 'bank1', 'oldlife'))
-      expect(await bankDB.tidyGone(boxTidyAsk)).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 1 }, parent: bankScope })
+      expect(await bankDB.tidyGone(boxTidyAsk)).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 1, leftover: 'none' }, parent: bankScope })
       expect(await rowsOf(bankDB).boxRowsOf(vaultScope, 'bank1', 'oldlife')).to.have.property('size', 0)
       expect(await storedBoxOf(bankDB)).to.deep.equal(box)
 
       // A box row under the life a tombstone ended: one a store that cannot delete a life's boxes with its vault would leave.
       await bankDB.delVault(vaultDelAskOf(vault))
       await rowsOf(bankDB).plantBoxRow(boxscope, 'bank1', 'life1', box)
-      expect(await bankDB.tidyGone(boxTidyAsk)).to.deep.include({ val: { totalCount: 0 } })
+      expect(await bankDB.tidyGone(boxTidyAsk)).to.deep.include({ val: { totalCount: 0, leftover: 'none' } })
       expect(await rowsOf(bankDB).boxRowsOf(vaultScope, 'bank1', 'life1')).to.have.property('size', 0)
     })
 
@@ -278,7 +278,7 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
       const endedScope = vaultScopeOf('ended')
       await rowsOf(bankDB).plantVaultRow(endedScope, vaultAt(0, 'bank0', 'life1', { vaultlabel: 'ended' }))
       await rowsOf(bankDB).plantBoxRow({ ...endedScope, boxlabel: 'openai' }, 'bank0', 'life1', boxAt(0, 'bank0', 'life1', { vaultlabel: 'ended' }))
-      expect(await bankDB.tidyGone(boxTidyAsk)).to.deep.include({ val: { totalCount: 0 } })
+      expect(await bankDB.tidyGone(boxTidyAsk)).to.deep.include({ val: { totalCount: 0, leftover: 'none' } })
       expect(await rowsOf(bankDB).vaultRowOf(endedScope)).to.be.null
       expect(await rowsOf(bankDB).boxRowsOf(endedScope, 'bank0', 'life1')).to.have.property('size', 0)
       expect(await rowsOf(bankDB).vaultRowOf(vaultScope)).to.deep.equal(vault)

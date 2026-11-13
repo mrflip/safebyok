@@ -213,43 +213,43 @@ export const delBox = mutation({
 // == [Upkeep]: tidyGone, watchRows
 
 // A vault row is of an ended life when its `bank_tok` is not the live bank row's, and a box row or a tally when its life pair is
-// not that of a live vault row. Like `delBank`, it deletes while the cascade's budget lasts, and reaches the box rows of ended
-// lives through the index alone, never reading one of a live life: a host calls it again to delete the rest. A vault row that
-// fails its checks is left alone, with every box row and tally under its vaultlabel, and those box rows go uncounted.
-/** Delete the vault and box rows and the tallies of every ended life in a bank, as many as one transaction allows. Returns how many box rows its live vaults hold. */
+// not that of a live vault row. A vault row that fails its checks is left alone, with every box row and tally under its
+// vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one transaction can hold, so it
+// deletes a batch of them, and a host calls it again until it answers that none are left.
+/** Delete the vault rows and tallies of every ended life in a bank, and a batch of their box rows.
+ * Returns how many box rows its live vaults hold, and what is left of the box rows of ended lives.
+ */
 export const tidyGone = mutation({
   args:    CVX.askArgs,
   returns: CVX.tidied,
   handler: async (ctx, { ask: sent }) => {
     const ask = askFor(() => DB.boxTidy.parse(sent))
-    const budget = Tallies.cascadeBudget()
     const bankDoc = await getBankDoc(ctx.db, ask)
     const bank_tok = liveBankTokOf(bankDoc?.bank ?? null)
     const vaultDocs = await listVaultDocs(ctx.db, ask)
     const lives: Life[] = []
     const damagedlabels: string[] = []
-    const endedVaultDocs: VaultDoc[] = []
     for (const vaultDoc of vaultDocs) {
       const { vaultlabel } = vaultDoc
       const vault = BX.vaultRow.safeParse(vaultDoc.vault)
       if (! vault.success) {
         damagedlabels.push(vaultlabel)
       } else if (vault.data.bank_tok !== bank_tok) {
-        endedVaultDocs.push(vaultDoc)
+        await ctx.db.delete('safebyok_vaults', vaultDoc._id)
       } else if (vault.data.am === 'a') {
         lives.push(lifeOf({ ...ask, vaultlabel, bank_tok: vault.data.bank_tok, vault_tok: vault.data.vault_tok }))
       }
     }
-    await deleteWithin(ctx.db, 'safebyok_vaults', endedVaultDocs, budget)
-    const endedBoxQueryList = endedBoxQueries(ctx.db, ask, damagedlabels, lives)
-    for (const endedBoxes of endedBoxQueryList) { await deleteWithin(ctx.db, 'safebyok_boxes', endedBoxes, budget) }
     const liveCkeys = new Set(lives.map((life) => ckeyOfLife(life)))
+    const isEnded = (doc: Life) => (! damagedlabels.includes(doc.vaultlabel)) && (! liveCkeys.has(ckeyOfLife(doc)))
     const tallyDocs = await listTallyDocs(ctx.db, ask)
-    const endedTallyDocs = tallyDocs.filter((tallyDoc) => (! damagedlabels.includes(tallyDoc.vaultlabel)) && (! liveCkeys.has(ckeyOfLife(tallyDoc))))
-    await deleteWithin(ctx.db, 'safebyok_tallies', endedTallyDocs, budget)
+    for (const tallyDoc of tallyDocs) {
+      if (isEnded(tallyDoc)) { await ctx.db.delete('safebyok_tallies', tallyDoc._id) }
+    }
+    const leftover = await deleteEndedBoxes(ctx.db, ask, isEnded)
     let totalCount = 0
     for (const life of lives) { totalCount += await Tallies.countBoxes(ctx.db, life) }
-    return { totalCount }
+    return { totalCount, leftover }
   },
 })
 
@@ -319,7 +319,7 @@ function storedOrNull<StoredT>(classify: () => StoredT): StoredT | null {
 function isWrite(stored: { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct } | null): boolean { return (stored !== null) && BX.isWriteAct(stored.act) }
 // --
 
-// == [Cascades]: deleteBank, deleteBoxes, deleteWithin, endedBoxQueries
+// == [Cascades]: deleteBank, deleteBoxes, deleteWithin, deleteEndedBoxes
 
 /** Delete the gate, vault and box rows and the tallies under the bank at `scope`, while the cascade's budget lasts. */
 async function deleteBank(db: DatabaseWriter, scope: BankScope): Promise<void> {
@@ -346,40 +346,31 @@ async function deleteWithin<TableT extends TableNames>(db: DatabaseWriter, table
   }
 }
 
-// The box index runs vaultlabel, bank_tok, vault_tok, boxlabel. A box row of an ended life lies under a vaultlabel with no live
-// vault row, or beside the one live life of its vaultlabel: under another bank_tok, or under its bank_tok and another vault_tok.
-// Each range excludes its bounds, so no query reads a box row of a live life, or one under a vaultlabel in `sparedlabels`.
-/** Queries for the bank's box rows that belong to no life in `lives` and lie under no vaultlabel in `sparedlabels`. */
-function endedBoxQueries(db: DatabaseReader, { user_id, banklabel }: BankScope, sparedlabels: readonly string[], lives: readonly Life[]) {
-  // The index orders strings by code unit, as `<` does, and a label is ASCII.
-  const bounds = [...new Set([...sparedlabels, ...lives.map(({ vaultlabel }) => vaultlabel)])].toSorted(byCodeUnits)
-  const begs = [undefined, ...bounds]
-  const ends = [...bounds, undefined]
-  const between = begs.map((beg, ii) => {
-    const end = ends[ii]
-    return db.query('safebyok_boxes').withIndex('by_box', (idx) => {
-      const bank = idx.eq('user_id', user_id).eq('banklabel', banklabel)
-      if (beg === undefined) { return (end === undefined) ? bank : bank.lt('vaultlabel', end) }
-      return (end === undefined) ? bank.gt('vaultlabel', beg) : bank.gt('vaultlabel', beg).lt('vaultlabel', end)
-    })
-  })
-  const beside = lives.flatMap(({ vaultlabel, bank_tok, vault_tok }) => [
-    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).lt('bank_tok', bank_tok)),
-    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).gt('bank_tok', bank_tok)),
-    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).lt('vault_tok', vault_tok)),
-    db.query('safebyok_boxes').withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).gt('vault_tok', vault_tok)),
-  ])
-  return [...between, ...beside]
+// It reads the bank's box rows in index order, live ones among them, as `watchRows` does. Each box row of an ended life past the
+// batch is read only to count it, against a second budget the size of the first: the rows counted within it are what the next
+// call's batch deletes, if no more are left in the meantime.
+/** Delete a batch of the bank's box rows that `isEnded` holds of, and say what is left of them. */
+async function deleteEndedBoxes(db: DatabaseWriter, scope: BankScope, isEnded: (boxDoc: BoxDoc) => boolean): Promise<DB.Leftover> {
+  const deleting = Tallies.tidyBudget()
+  const counting = Tallies.tidyBudget()
+  let leftover: DB.Leftover = 'none'
+  for await (const boxDoc of listBoxDocsQuery(db, scope)) {
+    if (! isEnded(boxDoc)) { continue }
+    if (! Tallies.isSpent(deleting)) {
+      Tallies.spend(deleting, getDocumentSize(boxDoc))
+      await db.delete('safebyok_boxes', boxDoc._id)
+    } else if (Tallies.isSpent(counting)) {
+      return 'many'
+    } else {
+      Tallies.spend(counting, getDocumentSize(boxDoc))
+      leftover = 'some'
+    }
+  }
+  return leftover
 }
 // --
 
-// == [Helpers]: byCodeUnits, lifeOf, ckeyOfLife, liveBankTokOf, getBankDoc, getGateDoc, getVaultDoc, getBoxDoc, writeBankDoc, writeGateDoc, writeVaultDoc, writeBoxDoc, the list queries, BankDoc, GateDoc, VaultDoc, BoxDoc
-
-/** Order two strings as an index does, by code unit. */
-function byCodeUnits(aa: string, bb: string): number {
-  if (aa === bb) { return 0 }
-  return (aa < bb) ? -1 : 1
-}
+// == [Helpers]: lifeOf, ckeyOfLife, liveBankTokOf, getBankDoc, getGateDoc, getVaultDoc, getBoxDoc, writeBankDoc, writeGateDoc, writeVaultDoc, writeBoxDoc, the list queries, BankDoc, GateDoc, VaultDoc, BoxDoc
 
 /** The {@link Life} of an ask or a record, without its other fields. */
 function lifeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life): Life { return { user_id, banklabel, vaultlabel, bank_tok, vault_tok } }

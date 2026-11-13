@@ -207,7 +207,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
         const vault = vaultOfLabel.get(vaultlabel)
         if ((vault === undefined) || (vault.am === 'x') || (BX.vaultLifeOf(vault) !== BX.vaultLifeOf(tokpair))) { store.delete(scopepath) } else { totalCount += 1 }
       }
-      return { totalCount }
+      return { totalCount, leftover: 'none' }
     })
   }
 

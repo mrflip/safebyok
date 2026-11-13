@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getDocumentSize } from 'convex/values'
 import * as TH from '../test-helpers'
-import { MaxVaultBoxSize, MaxVaultBoxes, capacityOf, cascadeBudget, growthOf, isSpent, sizeOf, spend, tallyOf, wouldPassLimit } from '../../src/component/tallies'
+import { MaxTidiedBoxSize, MaxTidiedBoxes, MaxVaultBoxSize, MaxVaultBoxes, capacityOf, cascadeBudget, growthOf, isSpent, sizeOf, spend, tallyOf, tidyBudget, wouldPassLimit } from '../../src/component/tallies'
 
 const { BW } = TH
 
@@ -120,5 +120,12 @@ describe("a cascade's budget", () => {
     const crowded = { ...cascadeBudget(), count: 1 }
     spend(crowded, 1)
     expect(isSpent(crowded)).to.be.true
+  })
+})
+
+describe("a tidyGone batch's budget", () => {
+  it("is 1000 box rows or 2 MiB of them, whichever runs out first", () => {
+    expect(tidyBudget()).to.deep.equal({ count: 1000, size: 2 * MiB })
+    expect([MaxTidiedBoxes, MaxTidiedBoxSize]).to.deep.equal([1000, 2 * MiB])
   })
 })

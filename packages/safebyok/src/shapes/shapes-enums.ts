@@ -154,3 +154,10 @@ export const badActVals = [...refusedActVals, ...boxVaultActVals, ...parentBankA
 export type BadAct = typeof badActVals[number]
 
 // --
+
+// == [Upkeep]: leftoverVals, Leftover
+
+/** What `tidyGone` leaves of the box rows of ended lives: `none`; `some`, which one more call deletes; or `many`, which one more call does not. */
+export const leftoverVals = ['none', 'some', 'many'] as const
+export type Leftover = typeof leftoverVals[number]
+// --

@@ -5,7 +5,7 @@ import { IsBankDB, UNANSWERED } from '../helpers/consts'
 import { type VaultError, isVaultError, rowsOfRefusal } from '../refusals/errors'
 import type { BadOutcome, GoodOutcome } from '../refusals/outcome'
 import type { BankScope } from '../shapes/shapes-core'
-import type { BadAct, GoodAct, GotAct, ListAct, OkAct } from '../shapes/shapes-enums'
+import type { BadAct, GoodAct, GotAct, Leftover, ListAct, OkAct } from '../shapes/shapes-enums'
 import type { BoxTidyAsk, DamagedVault, WatchScope } from '../shapes/shapes-storage'
 import type {
   BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRow, BankTop, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, BoxSparse, DamagedBox,
@@ -33,8 +33,8 @@ export type Answer<ValT, ActT extends string, ParentT = BankRow> = GoodAnswer<Va
 export type BankEnsured = { gates: { main: GateRecord }, vaults: VaultRow[], damaged_rows: DamagedVault[] }
 /** A vault's boxes from `listBoxes`, sparse, and the rows that failed their checks. */
 export type BoxesListed = { boxes: BoxSparse[], damaged_rows: DamagedBox[] }
-/** The count of box rows left after `tidyGone`. */
-export type Tidied = { totalCount: number }
+/** What `tidyGone` leaves: `totalCount`, the box rows of the bank's live vaults, and `leftover`, what is left of the box rows of ended lives. */
+export type Tidied = { totalCount: number, leftover: Leftover }
 
 /** The answer to `ensureBank`. Its `val` is null when no live bank is stored. */
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>
@@ -155,6 +155,7 @@ export interface BankDB {
   /** Non-throwing form of {@link BankDB.delBox}. */
   tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer>
   /** Delete the vault and box rows of ended lives under the bank, and count the box rows left.
+   * A store that deletes them in batches leaves some for another call, and says so in `leftover`: call again until it is `none`.
    * Housekeeping for a host: no other verb depends on it.
    */
   tidyGone(ask: BoxTidyAsk): Promise<GoodAnswer<Tidied, 'tidied', BankScope>>
