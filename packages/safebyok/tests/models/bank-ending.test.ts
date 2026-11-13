@@ -2,19 +2,24 @@
 
 import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from '../../src/refusals/errors'
+import type { Bank } from '../../src/models/bank'
+import type { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
 import * as Phrases from '../../src/helpers/phrases'
 import { nowMillis } from '../../src/helpers/clock'
 import { makeLifeTok } from '../../src/helpers/crypto'
 import { Lease } from '../../src/models/lease'
 import { good } from '../../src/refusals/outcome'
-import type { LeaseRow } from '../../src/shapes/shapes-storage'
+import type { LeaseRow, WatchScope } from '../../src/shapes/shapes-storage'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, BankScopeGiven, OtherScopeGiven, VaultScopeGiven, makeBankWithVault, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
-import { Dna, Passphrase, T0, byPassphrase } from '../test-helpers/vault-world'
+import { Dna, NewPassphrase, Passphrase, T0, bankTyping, boxlabel, byPassphrase, delTyping, makeWorldWithBox, useVaultWorlds } from '../test-helpers/vault-world'
+import { parseLogger } from '../../src/helpers/logger'
+import type { MemoryBankDB } from '../../src/storage/memory-bank-db'
 
 useBankWorlds()
+useVaultWorlds()
 
 const AutolockMillis = AutolockMinutes * 60_000
 const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
@@ -570,3 +575,130 @@ describe("a bank past a vacate", () => {
     await vacating
   })
 })
+
+describe("the end of a bank, a vault and a device, as their listeners and the bankDB's watches see it", () => {
+  const Endings = [
+    // the bank deleted on another device, its row delivered here:
+    [false, false, 'shows a device listener the bank locked and its box let go, at a tombstone'],
+    [true,  false, 'shows a device listener the bank locked and its box let go, at a bank of another life'],
+    // the delivery dismisses the unlock gating open, which tells the device's listeners:
+    [false, true,  'shows a device listener the bank locked and its box let go, at a tombstone that dismisses a gating'],
+  ] as const
+
+  for (const [isBuiltAgain, isAsking, blurb] of Endings) {
+    it(blurb, async () => {
+      const { device, bank, box, dialog, anotherDevice, storedBankNow } = await makeWorldWithBox()
+      bank.vaultListing.goodbye()
+      await box.expose()
+      const other = anotherDevice()
+      await delTyping(await other.ensureBank(), Passphrase)
+      if (isBuiltAgain) { await bankTyping(other, byPassphrase(NewPassphrase)) }
+      const unlocking = isAsking ? startUnlocking(bank, dialog) : null
+      if (unlocking !== null) { await TH.eventually(() => device.openGating !== null) }
+      const seen: unknown[] = []
+      device.subscribe(() => { seen.push(readEnding(device, bank, box)) })
+      bank.receiveParent(storedBankNow())
+      expect(seen).to.deep.equal([{ bank_tok: null, openGating: null, isLocked: true, box: { isExposed: false, isLocked: true } }])
+      if (unlocking !== null) { await TH.expectRefusal(unlocking) }
+    })
+  }
+
+  it("ends a vault's box watch at its tombstone and every watch at a sweep, each once, and a disabled lock ends nothing more", async () => {
+    const world = await makeWorldWithBox()
+    const watches = spyWatches(world.bankDB)
+    const next = await world.openNextSession()
+    await next.beginWatch()
+    const { bank, boxListing } = next
+    expect(watches.live()).to.deep.equal([Dna.banklabel, `${Dna.banklabel}/${Dna.vaultlabel}`])
+    bank.lock()
+    expect(watches.live()).to.deep.equal([Dna.banklabel, `${Dna.banklabel}/${Dna.vaultlabel}`])
+    await world.vault.del(world.vault)
+    await TH.eventually(() => ! next.isPresent)
+    expect(watches.live()).to.deep.equal([Dna.banklabel])
+    await TH.expectRefusal(next.beginWatch(), 'vault_gone')
+    await TH.expectRefusal(boxListing.hello(), 'disabled')
+    TH.expectSyncRefusal(() => next.boxListing, 'vault_gone')
+    expect(watches.live()).to.deep.equal([Dna.banklabel])
+    await bank.ensureVault(Dna)
+    await next.beginWatch()
+    expect(watches.live()).to.deep.equal([Dna.banklabel, `${Dna.banklabel}/${Dna.vaultlabel}`])
+    bank.device.sweep()
+    expect(watches.live()).to.deep.equal([])
+    bank.lock()
+    expect(watches.live()).to.deep.equal([])
+    expect(watches.stoppedTwice()).to.deep.equal([])
+  })
+
+  it("logs an unwatch that throws at a sweep as bad news, never throwing, and aligns every snapshot all the same", async () => {
+    const spy = TH.spyLogger()
+    const world = await makeWorldWithBox({ logger: parseLogger(spy.logger) })
+    const watches = spyWatches(world.bankDB, Dna.banklabel)
+    const next = await world.openNextSession()
+    await next.beginWatch()
+    const box = (await next.getBox(boxlabel))!
+    await box.expose()
+    const { device } = next.bank
+    expect(() => device.sweep()).not.to.throw()
+    expect(watches.live()).to.deep.equal([])
+    expect(device.snapshot).to.include({ stage: 'disabled', bank_tok: null })
+    expect(next.bank.snapshot.isLocked).to.be.true
+    expect(box.snapshot).to.include({ isExposed: false, isLocked: true })
+    expect(spy.calls.map(({ level, story }) => ({ level, refusalkind: story?.['refusalkind'] }))).to.deep.include({ level: 'warn', refusalkind: 'unexpected_error' })
+  })
+
+  it("tells the host of an unwatch that throws at a vault's tombstone, and lets the boxes go all the same", async () => {
+    const world = await makeWorldWithBox()
+    const watches = spyWatches(world.bankDB, `${Dna.banklabel}/${Dna.vaultlabel}`)
+    const next = await world.openNextSession()
+    await next.beginWatch()
+    const box = (await next.getBox(boxlabel))!
+    await box.expose()
+    world.badnews.length = 0
+    await world.vault.del(world.vault)
+    await TH.eventually(() => ! next.isPresent)
+    expect(watches.live()).to.deep.equal([Dna.banklabel])
+    expect(box.snapshot).to.include({ isExposed: false })
+    expect(world.badnews.map((news) => news.refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+})
+
+// == [Helpers]: startUnlocking, readEnding, spyWatches, watchedOf
+
+/** `bank.unlock()` after a lock, its dialog left up until the gating concludes. */
+function startUnlocking(bank: Bank, dialog: { requestCleartext: RequestCleartext }): Promise<Bank> {
+  bank.lock()
+  dialog.requestCleartext = (gating) => gating.whenConcluded
+  return bank.unlock()
+}
+
+/** What a device listener reads of the device, its bank and a box, as the bank's life ends. */
+function readEnding(device: Device, bank: Bank, box: Box) {
+  const { isExposed, isLocked } = box.snapshot
+  return { bank_tok: device.snapshot.bank_tok, openGating: device.snapshot.openGating, isLocked: bank.snapshot.isLocked, box: { isExposed, isLocked } }
+}
+
+/** Spy on `bankDB`'s watch from here on, telling each watch by the scope it watches; the unwatch of the watch of `throwsAt` throws once it has stopped. */
+function spyWatches(bankDB: MemoryBankDB, throwsAt: string | null = null) {
+  const watches: { watched: string, stops: number }[] = []
+  const watch = bankDB.watch.bind(bankDB)
+  vi.spyOn(bankDB, 'watch').mockImplementation((scope, onNotice, onBadNews) => {
+    const started = { watched: watchedOf(scope), stops: 0 }
+    const unwatch = watch(scope, onNotice, onBadNews)
+    watches.push(started)
+    return () => {
+      started.stops += 1
+      unwatch()
+      if (started.watched === throwsAt) { throw new Error('the adapter could not stop its watch') }
+    }
+  })
+  return {
+    /** What each watch started and not stopped watches, oldest first. */
+    live:         () => watches.filter(({ stops }) => stops === 0).map(({ watched }) => watched),
+    /** What each watch stopped more than once watches. */
+    stoppedTwice: () => watches.filter(({ stops }) => stops > 1).map(({ watched }) => watched),
+  }
+}
+
+/** What a watch of `scope` watches: its banklabel, and its vaultlabel after a slash for a vault's. */
+function watchedOf({ banklabel, vaultlabel }: WatchScope): string { return (vaultlabel === undefined) ? banklabel : `${banklabel}/${vaultlabel}` }
+// --

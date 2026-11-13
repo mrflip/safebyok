@@ -58,7 +58,7 @@ Each test compares the record received (`rcvd`) with the record of the instance 
 | L3  | An instance's record never moves to a lower `revision_seq`.                                                                                 | R1                                |
 | L4  | An instance's record is a row storage answered, or the void stand-in. Nothing made on this device is merged into it.                        | every `adopt` adopts `rcvd` whole |
 | L5  | At one `revision_seq` there is one row: one `revision_tok`, one life token, live or gone.                                                   | F4 to F6                          |
-| L6  | An instance whose record is gone stays listed, without its secrets: a box without its exposed whisper, a vault without its boxes, a bank without its lease, and no longer the device's. | `receiveRecord` of a tombstone    |
+| L6  | An instance whose record is gone leaves the listing's list (its snapshot), and is kept at its scope only to judge later rows against and to receive a new life. It drops what it holds: a box its exposed whisper; a vault its box listing, and it is disabled until a new life is received; a bank its lease, and it is disabled for good and no longer the device's. | `receiveRecord` of a tombstone    |
 | L7  | Each change to the listing is followed by one new snapshot, and the listeners are told once.                                                | `doDeliverRecord`                 |
 | L8  | Nothing is received under a bank that is not enabled (the device is disabled, or the bank is no longer the device's), nor at a box listing whose vault has taken another life. | F1 |
 | L9  | An instance is marked refreshed only when storage answered a record not older than its own, and its record is then *whole*.                 | every `mod` but `older`           |
@@ -144,7 +144,7 @@ The vault row beside a box answer:
 | #   | the parent                                      | `held` | by     | the vault afterwards                                                                       | the caller gets      |
 | --- | ----------------------------------------------- | ------ | ------ | ------------------------------------------------------------------------------------------ | -------------------- |
 | W1  | the sentinel: no vault row is stored            | @      | R1     | as it was                                                                                  | `vault_void`         |
-| W2  | a tombstone under another `vault_tok`, newer    | @      | R2     | The Vault has the tombstone, and lets its box listing go.                                  | `vault_gone`         |
+| W2  | a tombstone under another `vault_tok`, newer    | @      | R2     | The Vault has the tombstone, is disabled, and discards its box listing, whose watch ends.  | `vault_gone`         |
 | W2  | a live row under another `vault_tok`, newer     | @      | R2     | The Vault has the parent, and lets its box listing go: the box listing that brought the answer refuses `disabled` from then on. | `vault_reborn` |
 | W3  | a row of this `vault_tok`, older                | @      | R1     | as it was                                                                                  | the answer's own act |
 | W3  | a row of this `vault_tok`, at the same revision | @      | R4     | as it was                                                                                  | the answer's own act |

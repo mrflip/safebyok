@@ -56,12 +56,12 @@ function laySecondVaultRow(world: Awaited<ReturnType<typeof makeBornVault>>): Va
 }
 
 // A tombstone is of a life of its own, which the vault listed takes on: it stands for its scope through its lives.
-/** Past its forget, `vault` stands listed as the tombstone of a life after `lived`, the vault_tok it had. */
+/** Past its forget, `vault` stands at its scope, out of the list and disabled, as the tombstone of a life after `lived`, the vault_tok it had. */
 async function expectLandedGone(vault: Vault, lived: string, { listing }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing'>) {
   await forgotten()
   expect(listing.at(Dna)).to.eq(vault)
   expect(vault.vault_tok).to.not.eq(lived)
-  expect(vault).to.include({ isPresent: false, isEnabled: true })
+  expect(vault).to.include({ isPresent: false, isEnabled: false })
   expect(listing.snapshot).to.deep.equal([])
 }
 
@@ -88,7 +88,7 @@ describe("a tombstone over a live vault", () => {
     await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'disabled')
     expect(box.isEnabled).to.be.false
     await TH.expectRefusal(listing.get(Dna, { maxMillisSinceRefresh: 0 }), 'vault_gone')
-    expect(vault.boxListing).to.not.eq(boxes)
+    TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
   })
 
   it("leaves the bank unlocked and its lease cached when the vault is first listed as a tombstone", async () => {
@@ -168,8 +168,7 @@ describe("vault.del(vault)", () => {
     await expectLandedGone(world.vault, lived, world)
     await TH.expectRefusal(boxes.get(omit(BoxDna, ['whisper', 'sidecar']), { maxMillisSinceRefresh: 0 }), 'disabled')
     expect(world.storedNow()).to.include({ am: 'x', revision_seq: 1 })
-    const gone = await world.vault.ensureTimely(0)
-    TH.expectSyncRefusal(() => gone.demandPresent(), 'vault_gone')
+    await TH.expectRefusal(world.vault.ensureTimely(0), 'vault_gone')
     expect(world.bank.isUnlocked).to.be.true
   })
 })
@@ -350,35 +349,37 @@ describe("a damaged row", () => {
 })
 
 describe("a damaged row met by listing the bank's vaults", () => {
-  it("lets the listed vault go and keeps the row in damaged_rows", async () => {
+  it("lets the listed vault go, out of the list, and tells of the row as bad news", async () => {
     const { vault, listing, restoreRow, badnews } = await makeBornVault()
     restoreRow({ garbage: true } as never)
     await listing.list()
-    expect(listing.damaged_rows).to.deep.equal([{ ...omit(Dna, []), am: 'd' }])
+    expect(listing.snapshot).to.deep.equal([])
     expect(listing.at(Dna)).to.be.null
     expect(vault.isEnabled).to.be.false
     expect(badnews.map((news) => news.refusalkind)).to.include('damaged_row')
   })
 
-  it("clears damaged_rows at the next listing that finds none", async () => {
-    const { listing, restoreRow, demandStored } = await makeBornVault()
+  it("lists another vault at the next listing that finds the row whole", async () => {
+    const { vault, listing, restoreRow, demandStored } = await makeBornVault()
     const stored = demandStored()
     restoreRow({ garbage: true } as never)
     await listing.list()
     restoreRow(stored)
     await listing.list()
-    expect(listing.damaged_rows).to.deep.equal([])
+    expect(listing.snapshot).to.deep.equal([Dna.vaultlabel])
+    expect(listing.at(Dna)).to.not.eq(vault)
   })
 
-  it("notifies its listeners only when damaged_rows changes", async () => {
+  it("tells its listeners when its list changes, and only then", async () => {
     const { listing, restoreRow, demandStored } = await makeBornVault()
     const stored = demandStored()
-    restoreRow({ garbage: true } as never)
-    await listing.list()
     const listener = vi.fn()
     listing.subscribe(listener)
+    restoreRow({ garbage: true } as never)
     await listing.list()
-    expect(listener).not.toHaveBeenCalled()
+    await listing.list()
+    expect(listing.snapshot).to.deep.equal([])
+    expect(listener).toHaveBeenCalledOnce()
     restoreRow(tombstoneOver(stored))
     await listing.list()
     expect(listing.snapshot).to.deep.equal([])

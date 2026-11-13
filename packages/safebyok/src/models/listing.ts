@@ -19,12 +19,12 @@ import { reportToPlatform } from '../refusals/report-error'
 import type { Device } from './device'
 import { type Storable, cmpRevisions } from './storable'
 
-// The hub for bankDB calls, because it makes, lists and delists the instances.
+// The hub for bankDB calls, because it makes and lists the instances.
 /** The instances of one kind of thing under the thing above it, one per scope, and every bankDB call for that kind.
  * It has no lifecycle of its own: it answers while the thing above it does.
  */
 export abstract class Listing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>, SnapshotT, ThingT extends Storable<ScopeT, RecordT, SparseT, SnapshotT>, DamagedT extends ScopeT & SX.DamagedRow = ScopeT & SX.DamagedRow> {
-  // == [Props]: device, maxMillisSinceRefresh, bankDB, #things, #joinedGetOf, #doTryListJoined, #listeners, #snapshot, #unwatch, #getSnapshot, #subscribe
+  // == [Props]: device, maxMillisSinceRefresh, bankDB, #things, #joinedGetOf, #listeners, #snapshot, #unwatch, #getSnapshot, #subscribe
 
   /** The device of this listing's bank. The listing's bad news goes to it. */
   readonly device: Device
@@ -36,8 +36,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   // Keyed by scopepath, not by instance: a scope may have no instance listed to key on.
   /** The storage get under way for each scope, which a get of that scope joins. */
   readonly #joinedGetOf = new Map<string, () => Promise<Joined<ListingAnswer<RecordT, SparseT>, ThingT | null>>>()
-  /** The rows the last list set aside as damaged. */
-  #damagedRows: readonly DamagedT[] = Object.freeze([])
   readonly #listeners = new Set<() => void>()
   #snapshot: readonly string[] = Object.freeze([])
   #unwatch:  (() => void) | null = null
@@ -50,18 +48,14 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Getters]: things, damaged_rows, snapshot, getSnapshot, subscribe
+  // == [Getters]: things, snapshot, getSnapshot, subscribe
 
-  /** Every instance listed, whether present or deleted. */
+  // A deleted thing is kept at its scope, out of the list, to judge later rows against and to receive a new life into.
+  /** Every instance kept, one per scope: the present ones, which make the list, and the deleted ones. */
   get things(): readonly ThingT[] { return [...this.#things.values()] }
 
-  /** The rows the last list found damaged, each giving only where it is stored.
-   * The listeners are told when these change.
-   */
-  get damaged_rows(): readonly DamagedT[] { return this.#damagedRows }
-
-  /** The label of each present instance, in a frozen array that stays the same until one comes or goes.
-   * A thing's own changes are its own snapshot's: subscribe to the thing for those.
+  /** The list: the label of each present instance, in a frozen array that stays the same until one comes or goes.
+   * The listeners are told when it changes, and only then. A thing's own changes are its own snapshot's: subscribe to the thing for those.
    */
   get snapshot(): readonly string[] { return this.#snapshot }
 
@@ -89,26 +83,17 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async ensureTimelyWorld(maxMillis?: number): Promise<void> { VX.maxMillis.parse(maxMillis) } // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
   // --
 
-  // == [The listed things]: at, isListed, delist, enlist
+  // == [The things kept]: at, isListed, enlist
 
-  /** The instance listed at `recordish`'s scope, **tombstoned or not**, or null if none. */
+  /** The instance kept at `recordish`'s scope, **present or deleted**, or null if none. */
   at(recordish: unknown): ThingT | null {
     return this.#things.get(this.scopepathOf(this.scopeOf(recordish))) ?? null
   }
 
-  /** Whether `thing` is the instance listed at its scope. */
+  /** Whether `thing` is the instance kept at its scope, present or deleted. */
   isListed(thing: Thing<ScopeT, RecordT, SparseT>): boolean {
     const listed: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(this.scopepathOf(thing.scope))
     return listed === thing
-  }
-
-  /** Delist `thing` if it is the instance listed at its scope, else do nothing. */
-  delist(thing: Thing<ScopeT, RecordT, SparseT>): void {
-    const scopepath = this.scopepathOf(this.scopeOf(thing))
-    const listed: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(scopepath)
-    if (listed !== thing) { return }
-    this.#things.delete(scopepath)
-    this.#remakeSnapshot()
   }
 
   /** Enlist a new `thing` at its scope. */
@@ -126,10 +111,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#unwatch ??= this.watchRows(this.deliverNotice, (news) => { this.device.tellBadNews([news]) })
   }
 
-  /** End the watch. The instances stay as they are. */
+  // An unwatch is the adapter's, called from inside a lock or a sweep: what it throws is news, and the cascade goes on.
+  /** End the watch. The instances stay as they are. Never throws: a failed unwatch is told as bad news. */
   goodbye(): void {
-    this.#unwatch?.()
+    const unwatch = this.#unwatch
     this.#unwatch = null
+    try {
+      unwatch?.()
+    } catch (err) {
+      this.device.tellBadNews([err])
+    }
   }
 
   // A listing whose thing above has ended, or moved to another life, answers nothing more: its watch ends here.
@@ -142,10 +133,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Storage verbs]: list, tryList, doTryListJoined, listedAt, get, tryGet, doTryGetJoined, handleIfAbsent, put, tryPut, del, tryDel
+  // == [Storage verbs]: list, tryList, doTryListJoined, get, tryGet, doTryGetJoined, handleIfAbsent, put, tryPut, del, tryDel
 
   /** List this kind's rows from storage, and return their instances.
-   * A damaged row goes to {@link Listing.damaged_rows}, and delists the instance at its scope, which drops its secrets.
+   * A damaged row is told as bad news, and lets the instance at its scope go, which drops its secrets.
    * A list made while another runs shares it.
    * Chute: list → tryList → #doTryListJoined → doTryList → deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
@@ -171,10 +162,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       return { answer, val: this.deliverListing(answer) }
     } catch (err) { return { answer, err } }
   })
-
-  // A damaged row's address is storage's, under whatever labels it holds, so it is looked up as it is, never checked as a scope.
-  /** The instance listed at a damaged row's address, or null. */
-  #listedAt(damaged: DamagedT): ThingT | null { return this.#things.get(this.scopepathOf(damaged)) ?? null }
 
   /** The instance at `scoped`, refreshed by a storage get unless the one listed is whole and recent enough.
    * - `maxMillisSinceRefresh`: how recent is enough (default: the listing's horizon)
@@ -275,7 +262,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
 
   // --
 
-  // == [Delivering]: deliverAnswer, answerDeliveringOf, deliverRecord, recordDeliveringOf, doDeliverRecord, deliverListing
+  // == [Delivering]: deliverAnswer, answerDeliveringOf, deliverRecord, recordDeliveringOf, doDeliverRecord, deliverListing, takeDown
 
   /** Deliver storage's `answer`, and return the instance listed at `sent`'s scope, or null if the answer carries no record.
    * A refused answer's record is delivered too, and its refusal thrown. Any refusal its delivery meets is told as bad news.
@@ -374,7 +361,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return thing
   }
 
-  // A row set aside as damaged takes down the instance listed at its scope: delisted, it answers nothing more, and drops
+  // A row set aside as damaged takes down the instance kept at its scope: let go, it answers nothing more, and drops
   // what it has of secrets. The row is told as bad news.
   /** Deliver every row of a listing `answer`, setting its damaged rows aside, and return the instances.
    * Chute: deliverListing → deliverRecord → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
@@ -387,11 +374,8 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
       throw answer.err
     }
     const { listed, damaged_rows } = answer.val
-    const isDamageNews = ! isEqual(this.#damagedRows, damaged_rows)
-    this.#damagedRows = Object.freeze(damaged_rows)
-    for (const damaged of damaged_rows) { this.#takeDown(this.#listedAt(damaged)) }
+    for (const damaged of damaged_rows) { this.#takeDown(damaged) }
     this.device.tellBadNews(damaged_rows.map((damaged) => this.damagedStoredError(damaged)))
-    if (isDamageNews) { this.tellListeners() }
     // Every row is delivered: the first refusal met is thrown, any after it told as bad news.
     const things: ThingT[] = []
     const refusals: unknown[] = []
@@ -405,11 +389,15 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return things
   }
 
-  /** Delist `thing`, if any, and align it, which drops its secrets. */
-  #takeDown(thing: ThingT | null): void {
-    if (thing === null) { return }
-    this.delist(thing)
+  // A damaged row's address is storage's, under whatever labels it holds, so it is looked up as it is, never checked as a scope.
+  /** Let the instance kept at `damaged`'s address go, if any, and align it, which drops its secrets. */
+  #takeDown(damaged: DamagedT): void {
+    const scopepath = this.scopepathOf(damaged)
+    const thing = this.#things.get(scopepath)
+    if (thing === undefined) { return }
+    this.#things.delete(scopepath)
     thing.align()
+    this.#remakeSnapshot()
   }
   // --
 
@@ -430,18 +418,13 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
   // --
 
-  // == [Snapshot]: remakeSnapshot, tellListeners
+  // == [Snapshot]: remakeSnapshot
 
-  /** Remake the listing's snapshot from the present instances, and tell the listeners if it changed. */
+  /** Remake the list from the present instances, and tell the listeners if it changed. Never throws. */
   #remakeSnapshot(): void {
     const next = this.things.filter((thing) => thing.isPresent).map((thing) => this.labelOf(thing.scope))
     if (isEqual(next, this.#snapshot)) { return }
     this.#snapshot = Object.freeze(next)
-    this.tellListeners()
-  }
-
-  /** Tell every listener of a change the snapshot does not show. Never throws. */
-  protected tellListeners(): void {
     for (const listener of this.#listeners) {
       try {
         listener()

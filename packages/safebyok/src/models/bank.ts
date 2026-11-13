@@ -340,14 +340,15 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
   // --
 
-  // == [Guards]: isEnabled, isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandPresent
+  // == [Guards]: isEnabled, isPresent, isLocked, isUnlocked, demandLease, demandPromptable, demandAttachable, demandPresent
 
-  /** True while this bank is usable: its device is enabled, and it is listed with a live row of its own life. */
-  override get isEnabled(): boolean { return super.isEnabled && this.#isLiveOfLife }
+  /** True while this bank is usable: its device is enabled, and it is listed and present. */
+  override get isEnabled(): boolean { return super.isEnabled && this.isPresent }
 
-  // A tombstone carries a life token of its own, and a bank built again elsewhere another.
+  // A tombstone carries a life token of its own, and a bank built again elsewhere another: either ends this Bank's life,
+  // and takes it out of its listing's list.
   /** True when the record in hand is a live row of this Bank's life. */
-  get #isLiveOfLife(): boolean { return this.isPresent && (this.central.bank_tok === this.bank_tok) }
+  override get isPresent(): boolean { return super.isPresent && (this.central.bank_tok === this.bank_tok) }
 
   /** True when no lease is attached to this bank. */
   get isLocked(): boolean { return this.#lease === null }
@@ -381,17 +382,25 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   override del(): Promise<this> { return Promise.reject(writtenByOwnVerbs()) }
   // --
 
+  // == [Aligning]: align
+
+  // Dismissed once everything below is aligned: the dismiss tells the device's listeners.
+  /** Align (see {@link Storable.align}), dismissing a gating open for this bank once its life has ended. Never throws. */
+  override align(): void {
+    super.align()
+    if (! this.isPresent) { this.device.dismissGatingAtDiscard(this) }
+  }
+  // --
+
   // == [Protected, overriding Storable's]: adopt, children, isFullRecord, lifeTokPathOf, makeSnapshot
 
-  /** Adopt `central`. A tombstone, or a row of another life, disables this bank for good, though it stays listed.
-   * Its lease is then dropped and the cached row forgotten, and a gating open for it is dismissed.
+  // The lease goes before the align, so that every snapshot below shows the bank locked.
+  /** Adopt `central`. A tombstone, or a row of another life, disables this bank for good, and its lease is dropped and the cached row forgotten.
    * A failed forget is announced as `lease_revoke_failed`.
    */
   protected override adopt(central: Fetched<BankRecord, BankSparse>): void {
     super.adopt(central)
-    if (this.#isLiveOfLife) { return }
-    void this.#revokeLease('tombstone')
-    this.device.dismissGatingAtDiscard(this)
+    if (! this.isPresent) { void this.#revokeLease('tombstone') }
   }
 
   /** The bank's gate listing and vault listing. */

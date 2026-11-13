@@ -470,7 +470,7 @@ describe("vault.del()", () => {
     expect(vault).to.include({ isPresent: false, vault_tok: tombstone?.vault_tok })
     expect(bank.isUnlocked).to.be.true
     expect(deviceDB.cachedNow()).to.not.be.null
-    expect(vault.boxListing).to.not.eq(boxes)
+    TH.expectSyncRefusal(() => vault.boxListing, 'vault_gone')
     await TH.expectRefusal(boxes.get({ ...vault.scope, boxlabel }, { maxMillisSinceRefresh: 0 }), 'disabled')
   })
 
