@@ -10,10 +10,10 @@
 * **At once**: 3 threads.
 * **Status** (2026-11-13): #679, #676, #680 and #681 merged. Ready, one line restacked onto main
   (092cb3bf7) after #680 and #682 both edited notes/ci.md (main's text kept; #682's rename was in it):
-  16 #682 → #684 → #683 → 18 #685 → 19 #686 → 17r #687 → 17 #688 → 17t #689 (#689 the top, at
-  94c6b57e0; justify green there; rollback tags `*-prerestack-20261113042250`). Closer Look 2 in its
-  tab, its items now rows on *Open Matters*. Wrapup: G #678 in its update (opus), rebasing onto the
-  new tip; then squashed above #689, the sprint PR squashed on top.
+  16 #682 → #684 → #683 → 18 #685 → 19 #686 → 17r #687 → 17 #688 → 17t #689 → G #678 (#678 the top,
+  squashed at a0aa07572 after its wrapup update and review; justify green at #689's 94c6b57e0;
+  rollback tags `*-prerestack-20261113042250`). Closer Look 2's items are rows on *Open Matters*. Left:
+  the Coach's answers, then the resolutions sweep, the done note, and the sprint PR squashed on top.
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -286,6 +286,8 @@ battery. A refusal's null parent (no row fetched) stays. **Levels**: worker `son
 ### G `guarantees_bank` (added 2026-11-12)
 
 The Coach (Coach notes): the bank-* drafts are "for swapping in atop the notes/ versions when you wish. They were written prospectively, though, so I might have a sonnet merge them as you go, with the code overriding both." *Orchestrator:* `guarantees-bank.md` merged into `notes/guarantees.md` now, the code at 9's tip overriding both; what the draft anticipated of thread 10 is not claimed, and listed for 8d. Thread 10 leaves `notes/guarantees.md` alone and reports the lines it falsifies. `deliver-contract-bank.md` stays with 10. **Levels**: worker `sonnet`; review `medium` (sonnet), checking each claim against the code. **After**: 9 (stacked on #674), beside 10. **Size**: S-M, docs. *Orchestrator, on the Coach's word (2026-11-12):* G is the line's living guarantees note: it stays a draft, nothing stacks on it (the Coach: "if it is going to be at the end, other branches should not stack on it"), later threads report the lines they falsify instead of editing it, and at the wrapup it is updated once, squashed, and placed at the top of the line just below the squashed plan. *Orchestrator:* ready as #678 (docs only, so no review, per the skill); then rebased onto 10's ready tip (#677) and a second leg brings the note up to 10's lifecycle, so 8d edits no guarantees. Found: `Bank.autolock` holds the lease row (with its key handle) from `DeviceDB.tryPeek` (TOP row, Open Matters). The draft is promoted and removed from this directory, as is `deliver-contract-bank.md` (10 promoted it). *Orchestrator:* lines later threads falsify, for the wrapup update: 12 reported `vault.lock` and `ensureUnlocked` still named; 16 reported line 124 ("not to the host's VaultDB") and line 206 ("`bank_key_wayin_wrapped` (VaultDB)"), both now BankDB.
+
+*Review (G, wrapup):* `fixed` (sonnet, medium; [#678](https://github.com/mrflip/safebyok/pull/678)). Every guarantee, *Kept by* and *Checked by* checked against the code at the tip; all 27 cited tests assert their claim; no guarantee broken. Fixes, docs only: VOCABULARY words; `mash`'s `subtle.digest` and `utils`' `mask` named; G6 cites the zeroing test; `proved_at` for "a deadline"; G4's lease row filing and `tryStow`; G9's host DeviceDB `peek`; `bank.tryProbe`'s whisper path; the `gate.ts` row; `refusalFor`. Left for the note's next restatement (*Finally*): the header's changelog paragraphs, two long paragraphs, "takes another life" and bare "no key". To *Open Matters*: "no wrap and no secret" in place of "no salt" in snapshots. Squashed at a0aa07572.
 
 ### T `sprint_tools` (added 2026-11-12)
 
