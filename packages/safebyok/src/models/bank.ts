@@ -190,7 +190,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   // At the bank's end, a lock is its one duty: the lease and every exposed whisper are dropped, and the watches end. The
   // row cached is left: a sweep leaves it for the next page, a vacate forgets every lease of the bank scope itself.
   /** Lock the bank, and forget the lease cached on this device.
-   * The snapshots of the bank, its vaults and their boxes show the lock before this returns. A failed forget is announced as
+   * The snapshots of the bank and of its boxes show the lock before this returns. A failed forget is announced as
    * `lease_revoke_failed`, never thrown. Once the bank is disabled, a lock leaves the cached lease in place.
    */
   lock(): this {
