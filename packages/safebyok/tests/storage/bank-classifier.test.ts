@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import * as BX from '../../src/shapes/shapes-bankdb'
 import * as SX from '../../src/shapes/shapes-storage'
 import { type VaultError, rowsOfRefusal } from '../../src/refusals/errors'
-import { classifyBuildBank, classifyDelBank, classifyEnsureBank, classifyStoredBox, classifyStoredBoxes, classifyStoredGate, classifyStoredVault } from '../../src/storage/bank-classifier'
+import { classifyBuildBank, classifyDelBank, classifyEnsureBank, classifyStoredBox, classifyStoredBoxes, classifyStoredGate, classifyStoredVault, writtenBankOf, writtenBoxOf, writtenGateOf, writtenVaultOf } from '../../src/storage/bank-classifier'
 import {
-  bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, boxAt, boxGetAskOf, boxListAsk, boxQuery, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
+  bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, bankTombstoneOf, boxAt, boxGetAskOf, boxListAsk, boxQuery, gateAt, gatePutAskOf, gateScope, mainWayin, otherMainWayin, passkey0Wayin,
   vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultTombstoneOf,
 } from '../test-helpers/bankdb-world'
 
@@ -219,5 +219,35 @@ describe("classifyStoredBox and classifyStoredBoxes, under a bank's vault row", 
 
   it("refuses damaged_vault for a vault row that fails its checks", () => {
     expect(refusalOf(() => classifyStoredBox(get, { parent: { ...boxVault, smuggled: 'field' }, box: null })).refusalkind).to.eq('damaged_vault')
+  })
+})
+
+describe("writtenBankOf, writtenGateOf, writtenVaultOf and writtenBoxOf, the row a write reports storing", () => {
+  it("answers the row written, at its address", () => {
+    expect(writtenBankOf(bankScope, liveBank)).to.deep.equal(liveBank)
+    expect(writtenGateOf(gateScope, liveGate)).to.deep.equal(liveGate)
+    expect(writtenVaultOf(vaultScope, liveVault)).to.deep.equal(liveVault)
+    expect(writtenBoxOf(boxQuery, boxAt(Seq))).to.deep.equal(boxAt(Seq))
+  })
+
+  it("refuses storage_issue where the datastore reports no row, or something other than a bag", () => {
+    for (const raw of [null, undefined, 42, "rubble", [liveBank]]) {
+      expect(refusalOf(() => writtenBankOf(bankScope, raw)).refusalkind).to.eq('storage_issue')
+      expect(refusalOf(() => writtenGateOf(gateScope, raw)).refusalkind).to.eq('storage_issue')
+      expect(refusalOf(() => writtenVaultOf(vaultScope, raw)).refusalkind).to.eq('storage_issue')
+      expect(refusalOf(() => writtenBoxOf(boxQuery, raw)).refusalkind).to.eq('storage_issue')
+    }
+  })
+
+  it("refuses storage_issue for a row of another address, a box row of another life among them", () => {
+    expect(refusalOf(() => writtenBankOf(bankScope, { ...liveBank, banklabel: 'other' })).refusalkind).to.eq('storage_issue')
+    expect(refusalOf(() => writtenGateOf(gateScope, { ...liveGate, user_id: 'u2' })).refusalkind).to.eq('storage_issue')
+    expect(refusalOf(() => writtenVaultOf(vaultScope, { ...liveVault, vaultlabel: 'other' })).refusalkind).to.eq('storage_issue')
+    expect(refusalOf(() => writtenBoxOf(boxQuery, boxAt(Seq, 'bank1', 'life2'))).refusalkind).to.eq('storage_issue')
+  })
+
+  it("refuses damaged_row for a row that fails its checks", () => {
+    expect(refusalOf(() => writtenBankOf(bankScope, { ...liveBank, smuggled: 'field' })).refusalkind).to.eq('damaged_row')
+    expect(refusalOf(() => writtenBoxOf(boxQuery, { ...boxAt(Seq), whisper_ciphered: 42 })).refusalkind).to.eq('damaged_row')
   })
 })
