@@ -163,7 +163,6 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     } catch (err) { return { answer, err } }
   })
 
-
   /** The instance at `scoped`, refreshed by a storage get unless the one listed is whole and recent enough.
    * - `maxMillisSinceRefresh`: how recent is enough (default: the listing's horizon)
    * - `maxWorldMillis`: how recent the thing above must be; it is refreshed first if not
