@@ -12,17 +12,18 @@ TH.bootDatabaseFirst()
 
 describe("GraphQLBankDB over the typed schema", () => {
   TH.describeBankDBBattery("GraphQLBankDB", {
-    makeBankDB:          async (opts) => await TH.makeBankDB(opts),
-    makeCappedBankDB:    async (maxBoxes) => await TH.makeBankDB({ maxBoxes }),
-    makeTwin:            TH.makeTwin,
-    makeBankDBFor:       async () => {
+    makeBankDB:            async (opts) => await TH.makeBankDB(opts),
+    makeCappedBankDB:      async (maxBoxes) => await TH.makeBankDB({ maxBoxes }),
+    makeTwin:              TH.makeTwin,
+    makeBankDBFor:         async () => {
       await TH.emptyTables()
       const schema = TH.schemaOver(await TH.serverOver())
       return (user_id) => TH.browserOver(schema, TH.signedInAs(user_id))
     },
-    _cheat_rowsOf:       () => TH.rowsOf(),
-    _cheat_failNextCall: (bankDB) => { bankDB.failNext() },
-    _cheat_adapterOf:    TH.adapterOf,
+    _cheat_rowsOf:         () => TH.rowsOf(),
+    _cheat_failNextCall:   (bankDB) => { bankDB.failNext() },
+    _cheat_adapterOf:      TH.adapterOf,
+    _cheat_storeOtherwise: TH.storeOtherwise,
   })
 
   it("keeps a sidecar's own __typename while dropping the ones urql's cache adds", async () => {
