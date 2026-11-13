@@ -83,7 +83,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   async ensureParentTimely(maxMillis?: number): Promise<void> { VX.maxMillis.parse(maxMillis) } // eslint-disable-line @typescript-eslint/require-await -- async so that a refusal rejects
   // --
 
-  // == [The things kept]: at, isListed, enlist
+  // == [The things kept]: at, isKept, enlist
 
   /** The instance kept at `recordish`'s scope, **present or deleted**, or null if none. */
   at(recordish: unknown): ThingT | null {
@@ -91,9 +91,9 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
   }
 
   /** Whether `thing` is the instance kept at its scope, present or deleted. */
-  isListed(thing: Thing<ScopeT, RecordT, SparseT>): boolean {
-    const listed: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(this.scopepathOf(thing.scope))
-    return listed === thing
+  isKept(thing: Thing<ScopeT, RecordT, SparseT>): boolean {
+    const kept: Thing<ScopeT, RecordT, SparseT> | undefined = this.#things.get(this.scopepathOf(thing.scope))
+    return kept === thing
   }
 
   /** Enlist a new `thing` at its scope. */

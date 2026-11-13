@@ -262,7 +262,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   // == [Guards]: isEnabled, isLocked, isTimely, isHydratedWithin, isRefreshedWithin, isPresent, isFull, isWhole, isWholeRecord, isTombstoneRecord, demandDeletable, demandUnlocked, demandEnabled, demandFull, demandWhole, demandFullProps, ensureDeletable
 
   /** Whether its listing is enabled and still lists this instance at its scope. */
-  get isEnabled(): boolean { return this.listing.isEnabled && this.listing.isListed(this) }
+  get isEnabled(): boolean { return this.listing.isEnabled && this.listing.isKept(this) }
 
   /** Whether this thing's bank is locked. */
   protected abstract get isLocked(): boolean
