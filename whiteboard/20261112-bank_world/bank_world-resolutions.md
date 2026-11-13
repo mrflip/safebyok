@@ -4,6 +4,13 @@ The Coach's rulings on the sprint's open matters, from the sprint doc's *Resolve
 
 ## The Coach's rulings
 
+### 2026-11-13, after the close: #694, #695, #678 and the owed wayin question (chat)
+
+- **YOLO: buildBank's answer gets the same as_sent check a vault or box answer gets** (#694, thread 24). The rework checks the scope plus `revisionPins` under born/reborn, with a core test; it puts back the check buildBank had by construction. Rec: keep. Coach (2026-11-13, in chat): "1-3 approve". Went to: as built.
+- **A deleted Vault is enabled again, but putBox and beginWatch on it still refuse vault_gone** (#695, thread 25). Both refusals are older than thread 20, and both are true. Rec: keep both. Coach (2026-11-13, in chat): "1-3 approve". Went to: as built.
+- **With Promptly at an hour, a lease cached before a gate verb on another device can still load here for up to an hour if the watch misses the new gate revision** (#678, G's update leg). Rec: accept. Coach (2026-11-13, in chat): "1-3 approve", and: "Yes. subscriptions, polling, and page reload/backgrounding set the floor for staleness, and it's under customers' control". Went to: as built; notes/guarantees.md G4 and notes/security.md already state it.
+- **Does a wayin change keep making other devices prove again?** (owed since the plan). Coach (2026-11-13, in chat): "Yes". Went to: design.md's *Which token changes when* paragraph; the lease keeps `gate_revision_tok`.
+
 ### 2026-11-13, the deleted Vault and box, and #691, #692, #694 (threads 20, 21, 24)
 
 - **Deleted Vault refuses vault_gone** (asked on #691, thread 20). Matter: YOLO, a deleted Vault's own calls refuse vault_gone (get, del, beginWatch and the box verbs always; hydrate and ensureTimely when they must fetch), so a host can't refresh a deleted Vault object to find a new life through it. Rec: keep. Coach (2026-11-13): "let a deleted vault and box stay enabled". Went to: thread 25 `vault_enabled`, stacked on #694. A deleted Vault stays enabled, as a box does, and is still delisted and discards its box listing (the earlier 1.5 and E5 rulings).

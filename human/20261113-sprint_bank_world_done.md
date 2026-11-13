@@ -31,18 +31,14 @@ Stacked as main → #691 → #692 → #693 → #694 → #695 → #690 → #678 �
 
 ## YOLO decisions
 
-The earlier ones are in the resolutions file, with the Coach's answers. Still open on *Open Matters*:
+All are in the resolutions file, with the Coach's answers. The last, buildBank's `as_sent` check (#694), was approved on 2026-11-13.
 
-- **buildBank's answer gets the same `as_sent` check a vault or box answer gets** (#694). Before #694, the rows were the record sent by construction. Rec: keep.
+## Answered after the close
 
-## Still open, for the Coach
+The Coach, 2026-11-13, in chat. These were the last questions; none is left open.
 
-On *Open Matters* when the sprint closed:
-
-- The buildBank `as_sent` check (above).
-- A deleted Vault's `putBox` and `beginWatch` still refuse `vault_gone`, both true and both older than thread 20 (#695). Rec: keep.
-- With Promptly at an hour, a lease cached before a gate verb on another device can still load here for up to an hour if the watch misses the new gate revision. No guarantee breaks (#678). Rec: accept.
-- Owed since the plan: does a wayin change go on making other devices prove again?
+- A wayin change goes on making other devices prove again: "Yes".
+- The three rows left on *Open Matters*: "1-3 approve". These were the buildBank `as_sent` check (#694); `putBox` and `beginWatch` on a deleted Vault refusing `vault_gone` (#695); and a lease cached before a gate change elsewhere loading for up to an hour (#678). On that last one: "Yes. subscriptions, polling, and page reload/backgrounding set the floor for staleness, and it's under customers' control".
 
 ## Carried to the next sprint
 

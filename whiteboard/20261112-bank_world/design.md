@@ -133,10 +133,9 @@ put by `buildBank` and `delBank` alone, so its `revision_tok` changes exactly wh
 The `main` gate is built and deleted with its bank, so its `gate_tok` does too. They come apart
 only when something else puts the bank row, or a gate that is not `main` is built or deleted.
 
-Whether a wayin change should go on making other devices prove again is **put off to the end of
-the sprint** (the Coach: "yeah probably"). Until then the lease is built to keep that behaviour, by
-`gate_revision_tok`: one field for `gate_epoch`, so the tests of it keep their meaning. Dropping
-it later changes a device's cache row and nothing in storage.
+A wayin change goes on making other devices prove again (the Coach, 2026-11-13: "Yes"; earlier,
+"yeah probably"). The lease keeps that behaviour by `gate_revision_tok`: one field for
+`gate_epoch`, so the tests of it keep their meaning.
 
 ## BankDB
 
@@ -366,8 +365,6 @@ await bank.maingate.addPasskeyPrompt()                // asks: add_passkey
 
 ## Put off by the Coach
 
-* **To the end of the sprint**: whether a wayin change goes on making other devices prove again.
-  Built meanwhile to keep doing so, by `gate_revision_tok` on the lease (*Which token changes when*).
 * **Until asked**: the ordering of startup, and so whether a page can load without asking a
   first-time user for a passphrase. `device.ensureBank()` is the one startup call until then.
 
