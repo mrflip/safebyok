@@ -551,6 +551,16 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       }
     })
 
+    it("a gate verb refuses 'stale_write' where the row stored has the revision_tok its record brings, storing nothing", async () => {
+      const { bankDB, bank, gate } = await putWith()
+      const ask = gatePutAskOf(gate, { main: otherMainWayin })
+      const { val: stored } = await bankDB.replacePassphrase(ask)
+      const answer = await bankDB.tryReplacePassphrase(ask)
+      expect(answer).to.deep.include({ ok: false, act: 'retcon', dbhas: stored, parent: bank })
+      expect(answer.err?.refusalkind).to.eq('stale_write')
+      expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(stored)
+    })
+
     it("refuses a record whose revision_seq is not next after its prior, or that changes gate_tok or bank_tok", async () => {
       const { bankDB, gate } = await putWith()
       const ask = gatePutAskOf(gate, { main: otherMainWayin })
