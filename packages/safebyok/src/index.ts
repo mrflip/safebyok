@@ -27,7 +27,7 @@ export { DefaultLogger, setDefaultLogger, type VaultLogger } from './helpers/log
 export type { BankDB } from './storage/bank-db'
 export type { AdapterBankDB } from './storage/adapter-bank-db'
 export type { GatingSnapshot } from './shapes/shapes-gateish'
-export type { BankSnapshot, DeviceSnapshot, BoxExposedPatch, BoxPutOpts, BoxSnapshot, GateSnapshot, VaultSnapshot } from './shapes/shapes-vaultish'
+export type { BankSnapshot, DeviceSnapshot, BoxExposedPatch, BoxPutOpts, BoxSnapshot, GateSnapshot, VaultSnapshot, WayinSnapshot } from './shapes/shapes-vaultish'
 export type { Awaitable } from './helpers/helpers'
 export type { BankScope, Boxscope, Sidecar } from './shapes/shapes-core'
 export type { Capacity } from './shapes/shapes-storage'

@@ -188,7 +188,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
       revision_seq:  this.revision_seq,
       registered_at: this.registered_at,
       written_at:    this.written_at,
-      wayins:        Object.freeze({ main: main.toJSON(), ...(passkey0 && { passkey0: passkey0.toJSON() }) }),
+      wayins:        Object.freeze({ main: { registered_at: main.registered_at }, ...(passkey0 && { passkey0: { registered_at: passkey0.registered_at } }) }),
     })
   }
   // --
