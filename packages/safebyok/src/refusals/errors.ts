@@ -67,7 +67,7 @@ export const refusalkindVals = [
   'gating_concluded',    // an attempt under way was for a prompt that ended meanwhile -- it was answered or dismissed -- so it unlocked nothing
   'damaged_lease',       // this device's lease would not unwrap under its leaseKey: it was forgotten, and the vault locked
   'attempt_in_flight',   // a gating's attempt was made while another of its attempts was under way, so it was not tried
-  'already_asking',      // a gating is open on this bank, so a second one was not launched: one dialog at a time, and no join
+  'already_asking',      // a gating is open on this device, so a second one was not launched: one dialog at a time, and no join
   'dismissed',           // the dialog was dismissed with no attempt under way, so nothing was done
   'gate_made_elsewhere', // another device or tab made this vault first, so the passphrase just typed was not set and nothing was changed
   'same_passphrase',     // a new passphrase that is the one the vault already has
