@@ -2,7 +2,7 @@
 
 import { type Tidied } from './bank-db'
 import { type Heard, AdapterBankDB } from './adapter-bank-db'
-import { isWriteAct } from './bank-classifier'
+import { isWriteAct, writtenBankOf, writtenBoxOf, writtenGateOf, writtenVaultOf } from './bank-classifier'
 import type { BankBuildStored, BankDelStored, BankEnsureStored, BoxesStored, BoxStored, GateStored, VaultStored } from './bank-classifier'
 import { DefaultMaxBoxes } from '../helpers/consts'
 import { ckeyOf } from '../helpers/helpers'
@@ -63,32 +63,40 @@ export class MemoryBankDB extends AdapterBankDB {
   /** The box rows of the vault life `ask` names. */
   #boxRowsOf(ask: VaultScope & { bank_tok: string, vault_tok: string }): Map<string, unknown> { return this._cheat_boxRowsOf(ask, ask.bank_tok, ask.vault_tok) }
 
-  /** Store a copy of `record` as its bank row, and tell the watchers. */
-  #writeBankRow(record: BankRow): void {
-    const row = structuredClone(record)
-    this._cheat_shelfOf(record).bank = row
+  // Each write reads its row back, so that what it answers and tells is what the store holds.
+  /** Store a copy of `record` as its bank row, tell the watchers, and return the row stored. */
+  #writeBankRow(record: BankRow): unknown {
+    const shelf = this._cheat_shelfOf(record)
+    shelf.bank = structuredClone(record)
+    const row = shelf.bank
     this.#tell(record, { row })
+    return row
   }
 
-  /** Store a copy of `record` as its gate row, and tell the watchers. */
-  #writeGateRow(bank: unknown, record: GateRecord): void {
-    const row = structuredClone(record)
-    this._cheat_shelfOf(record).gaterows.set(record.gatelabel, row)
+  /** Store a copy of `record` as its gate row, tell the watchers, and return the row stored. */
+  #writeGateRow(bank: unknown, record: GateRecord): unknown {
+    const { gaterows } = this._cheat_shelfOf(record)
+    gaterows.set(record.gatelabel, structuredClone(record))
+    const row = gaterows.get(record.gatelabel)
     this.#tell(record, { row, parent: bank })
+    return row
   }
 
-  /** Store a copy of `record` as its vault row, and tell the watchers. */
-  #writeVaultRow(bank: unknown, record: VaultRow): void {
-    const row = structuredClone(record)
-    this._cheat_shelfOf(record).vaultrows.set(record.vaultlabel, row)
+  /** Store a copy of `record` as its vault row, tell the watchers, and return the row stored. */
+  #writeVaultRow(bank: unknown, record: VaultRow): unknown {
+    const { vaultrows } = this._cheat_shelfOf(record)
+    vaultrows.set(record.vaultlabel, structuredClone(record))
+    const row = vaultrows.get(record.vaultlabel)
     this.#tell(record, { row, parent: bank })
+    return row
   }
 
-  /** Store a copy of `record` in `boxrows`, and tell the watchers. */
-  #writeBoxRow(boxrows: Map<string, unknown>, vault: unknown, record: BoxRow): void {
-    const row = structuredClone(record)
-    boxrows.set(record.boxlabel, row)
+  /** Store a copy of `record` in `boxrows`, tell the watchers, and return the row stored. */
+  #writeBoxRow(boxrows: Map<string, unknown>, vault: unknown, record: BoxRow): unknown {
+    boxrows.set(record.boxlabel, structuredClone(record))
+    const row = boxrows.get(record.boxlabel)
     this.#tell(record, { row, parent: vault })
+    return row
   }
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
@@ -119,33 +127,31 @@ export class MemoryBankDB extends AdapterBankDB {
   protected doBuildBank(ask: BankBuildAsk): BankBuildStored {
     const { bank, gaterows } = this._cheat_shelfOf(ask)
     const stored = this.classifyBuildBank(ask, { bank, gate: gaterows.get('main') ?? null })
-    if (isWriteAct(stored.act)) {
-      this.#writeBankRow(ask.record)
-      this.#writeGateRow(ask.record, ask.gate)
-    }
-    return stored
+    if (! isWriteAct(stored.act)) { return stored }
+    const parent = writtenBankOf(ask, this.#writeBankRow(ask.record))
+    const gate   = writtenGateOf(ask.gate, this.#writeGateRow(parent, ask.gate))
+    return { ...stored, parent, gate }
   }
 
   protected doPutGate(ask: GatePutAsk): GateStored {
     const { bank, gaterows } = this._cheat_shelfOf(ask)
     const stored = this.classifyStoredGate(ask, { bank, gate: gaterows.get(ask.gatelabel) ?? null })
-    if (isWriteAct(stored.act)) { this.#writeGateRow(bank, ask.record) }
-    return stored
+    if (! isWriteAct(stored.act)) { return stored }
+    return { ...stored, gate: writtenGateOf(ask, this.#writeGateRow(bank, ask.record)) }
   }
 
   protected doDelBank(ask: BankDelAsk): BankDelStored {
     const shelf  = this._cheat_shelfOf(ask)
     const stored = this.classifyDelBank(ask, { bank: shelf.bank })
-    if (isWriteAct(stored.act)) {
-      this.#writeBankRow(ask.record)
-      // A bank's gates, vaults and boxes end with its life: nothing under it outlives the bank row.
-      shelf.gaterows.clear()
-      shelf.vaultrows.clear()
-      for (const [ckey, { scope }] of this.#boxLives) {
-        if ((scope.user_id === ask.user_id) && (scope.banklabel === ask.banklabel)) { this.#boxLives.delete(ckey) }
-      }
+    if (! isWriteAct(stored.act)) { return stored }
+    const bank = writtenBankOf(ask, this.#writeBankRow(ask.record))
+    // A bank's gates, vaults and boxes end with its life: nothing under it outlives the bank row.
+    shelf.gaterows.clear()
+    shelf.vaultrows.clear()
+    for (const [ckey, { scope }] of this.#boxLives) {
+      if ((scope.user_id === ask.user_id) && (scope.banklabel === ask.banklabel)) { this.#boxLives.delete(ckey) }
     }
-    return stored
+    return { ...stored, bank }
   }
 
   protected doGetVault(ask: VaultGetAsk): VaultStored {
@@ -156,19 +162,18 @@ export class MemoryBankDB extends AdapterBankDB {
   protected doPutVault(ask: VaultPutAsk): VaultStored {
     const { bank, vaultrows } = this._cheat_shelfOf(ask)
     const stored = this.classifyStoredVault(ask, { bank, vault: vaultrows.get(ask.vaultlabel) ?? null })
-    if (isWriteAct(stored.act)) { this.#writeVaultRow(bank, ask.record) }
-    return stored
+    if (! isWriteAct(stored.act)) { return stored }
+    return { ...stored, vault: writtenVaultOf(ask, this.#writeVaultRow(bank, ask.record)) }
   }
 
   protected doDelVault(ask: VaultDelAsk): VaultStored {
     const { bank, vaultrows } = this._cheat_shelfOf(ask)
     const stored = this.classifyStoredVault(ask, { bank, vault: vaultrows.get(ask.vaultlabel) ?? null })
-    if (isWriteAct(stored.act)) {
-      this.#writeVaultRow(bank, ask.record)
-      // A vault's boxes end with its life: no call fetches a box row from a life that is over.
-      this._cheat_boxRowsOf(ask, ask.bank_tok, ask.expected.vault_tok).clear()
-    }
-    return stored
+    if (! isWriteAct(stored.act)) { return stored }
+    const vault = writtenVaultOf(ask, this.#writeVaultRow(bank, ask.record))
+    // A vault's boxes end with its life: no call fetches a box row from a life that is over.
+    this._cheat_boxRowsOf(ask, ask.bank_tok, ask.expected.vault_tok).clear()
+    return { ...stored, vault }
   }
 
   protected doListBoxes(ask: BoxListAsk): BoxesStored {
@@ -189,8 +194,8 @@ export class MemoryBankDB extends AdapterBankDB {
     const box      = boxrows.get(ask.boxlabel) ?? null
     const capacity = this.#roomIn(boxrows)
     const stored   = this.classifyStoredBox(ask, { parent, box, capacity })
-    if (isWriteAct(stored.act)) { this.#writeBoxRow(boxrows, parent, ask.record) }
-    return stored
+    if (! isWriteAct(stored.act)) { return stored }
+    return { ...stored, box: writtenBoxOf(ask, this.#writeBoxRow(boxrows, parent, ask.record)) }
   }
 
   protected doDelBox(ask: BoxDelAsk): BoxStored {
@@ -198,8 +203,8 @@ export class MemoryBankDB extends AdapterBankDB {
     const parent  = this._cheat_shelfOf(ask).vaultrows.get(ask.vaultlabel) ?? null
     const box     = boxrows.get(ask.boxlabel) ?? null
     const stored  = this.classifyStoredBox(ask, { parent, box })
-    if (isWriteAct(stored.act)) { this.#writeBoxRow(boxrows, parent, ask.record) }
-    return stored
+    if (! isWriteAct(stored.act)) { return stored }
+    return { ...stored, box: writtenBoxOf(ask, this.#writeBoxRow(boxrows, parent, ask.record)) }
   }
 
   // A row that fails its checks is left alone: it is neither of this life nor provably of an ended one.

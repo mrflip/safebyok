@@ -72,10 +72,10 @@ describe("classifyStoredVault, the vault tables under a live bank", () => {
     expect(classifyStoredVault(nilGet, { bank: liveBank, vault: liveVault })).to.deep.include({ ok: true, act: 'gotlive', vault: liveVault })
     expect(classifyStoredVault(vaultGetAskOf(), { bank: liveBank, vault: null })).to.deep.include({ ok: false, act: 'void' })
     const put = vaultPutAskOf(vault0)
-    expect(classifyStoredVault(put, { bank: liveBank, vault: null })).to.deep.include({ ok: true, act: 'born', vault: vault0 })
+    expect(classifyStoredVault(put, { bank: liveBank, vault: null })).to.deep.include({ ok: true, act: 'born', vault: null })
     expect(classifyStoredVault(put, { bank: liveBank, vault: liveVault })).to.deep.include({ ok: false, act: 'stale', vault: liveVault })
     const del = vaultDelAskOf(liveVault)
-    expect(classifyStoredVault(del, { bank: liveBank, vault: liveVault })).to.deep.include({ ok: true, act: 'deleted', vault: del.record })
+    expect(classifyStoredVault(del, { bank: liveBank, vault: liveVault })).to.deep.include({ ok: true, act: 'deleted', vault: liveVault })
     expect(classifyStoredVault(del, { bank: liveBank, vault: vaultTombstoneOf(liveVault) })).to.deep.include({ ok: false, act: 'retcon' })
   })
 
@@ -87,9 +87,9 @@ describe("classifyStoredVault, the vault tables under a live bank", () => {
 function fetchedOver(gate: unknown) { return { bank: liveBank, gate } }
 
 describe("classifyStoredGate, the put table over a live bank's gate", () => {
-  it("replaces the gate row it cites, answering the record it stores", () => {
+  it("replaces the gate row it cites, answering the row fetched", () => {
     const ask = gatePutAskOf(keyedGate, { main: otherMainWayin, passkey0: passkey0Wayin })
-    expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: ask.record, presence: 'live' })
+    expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: keyedGate, presence: 'live' })
   })
 
   it("answers a replay of the stored record as retcon, storing nothing", () => {
@@ -114,16 +114,16 @@ describe("classifyStoredGate, the put table over a live bank's gate", () => {
 })
 
 describe("classifyBuildBank, the bank and its gate in one step", () => {
-  it("is born over nothing, answering the records it stores", () => {
+  it("is born over nothing, answering the shell and no gate row", () => {
     const ask = bankBuildAskOf()
-    expect(classifyBuildBank(ask, { bank: null, gate: null })).to.deep.equal({ ok: true, act: 'born', parent: ask.record, gate: ask.gate, presence: 'void' })
+    expect(classifyBuildBank(ask, { bank: null, gate: null })).to.deep.equal({ ok: true, act: 'born', parent: BX.shellBankOf(bankScope), gate: null, presence: 'void' })
   })
 
   it("is reborn over the tombstone it cites, whatever gate row an ended life left", () => {
     const record = { ...bankAt(Seq + 1, 'bank2'), revision_tok: 'krev-new' }
     const ask    = bankBuildAskOf(record, gateAt(0, 'bank2'), goneBank)
     for (const gateRaw of [null, liveGate]) {
-      expect(classifyBuildBank(ask, { bank: goneBank, gate: gateRaw })).to.deep.include({ ok: true, act: 'reborn', parent: record, gate: ask.gate, presence: 'gone' })
+      expect(classifyBuildBank(ask, { bank: goneBank, gate: gateRaw })).to.deep.include({ ok: true, act: 'reborn', parent: goneBank, gate: null, presence: 'gone' })
     }
   })
 
@@ -145,9 +145,9 @@ describe("classifyBuildBank, the bank and its gate in one step", () => {
 })
 
 describe("classifyDelBank, the bank's tombstone and its cascade", () => {
-  it("deletes the live bank it cites, answering the tombstone it stores", () => {
+  it("deletes the live bank it cites, answering the row fetched", () => {
     const ask = bankDelAskOf(liveBank)
-    expect(classifyDelBank(ask, { bank: liveBank })).to.deep.equal({ ok: true, act: 'deleted', bank: ask.record, presence: 'live' })
+    expect(classifyDelBank(ask, { bank: liveBank })).to.deep.equal({ ok: true, act: 'deleted', bank: liveBank, presence: 'live' })
   })
 
   it("refuses by the del table otherwise", () => {
