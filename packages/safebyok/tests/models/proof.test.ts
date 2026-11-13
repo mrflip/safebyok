@@ -10,7 +10,7 @@ import type { Box } from '../../src/models/box'
 import type { Device } from '../../src/models/device'
 import type { Gatingkind } from '../../src/shapes/shapes-enums'
 import type { RequestCleartext } from '../../src/shapes/shapes-gateish'
-import type { BadNews, BankSnapshot, BoxSnapshot, DeviceSnapshot, GateSnapshot, VaultSnapshot } from '../../src/shapes/shapes-vaultish'
+import { Promptly, type BadNews, type BankSnapshot, type BoxSnapshot, type DeviceSnapshot, type GateSnapshot, type VaultSnapshot } from '../../src/shapes/shapes-vaultish'
 import type { Whisper } from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
@@ -123,8 +123,8 @@ async function buildHost(logger?: VaultLogger) {
 
 const AutolockMillis = AutolockMinutes * 60_000
 
-/** Longer than a vault waits before it asks the bankDB again. */
-const StaleMillis = 10 * 60_000
+/** Longer than a prompt waits before it fetches the gate again. */
+const StaleMillis = Promptly + 1
 
 const ApiKey = Object.freeze({ boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-not-a-real-key' }, sidecar: { nickname: 'work' } })
 

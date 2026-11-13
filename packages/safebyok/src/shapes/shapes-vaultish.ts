@@ -69,7 +69,7 @@ export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched
 // == [Options]: Promptly, horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener, probeAsked, probeOpts, ProbeAsked, ProbeOpts, ProbeStep, ProbeReport, TimelyOpts, FetchOpts, BoxPutOpts, BoxCreateOpts
 
 /** How old, in milliseconds, the gate's record may be before a prompt fetches it again. */
-export const Promptly = 2000
+export const Promptly = 3_600_000
 
 /** The checks of the options a storable's verbs take: how fresh the record in hand must be, a get's and a put's policies, and a listener. */
 export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, orDefault, fn }) => {
