@@ -1,7 +1,9 @@
 # Thread 20: listing_membership (2026-11-13)
 
-Branch `20261113-listing_membership`, PR #691, stacked on #689 (bank_tidy, at 94c6b57e0). Justify: safebyok
-2969 tests and typecheck green, react 262, demo 99; full justify: see the PR's **Tests:** line.
+Branch `20261113-listing_membership`, PR #691, stacked on #689 (bank_tidy, at 94c6b57e0). Justify: green
+(safebyok 2969, react 262, demo 99, e2e 549, graphql 409, convex 304, postgres 213, indexeddb 197, fastkey 43,
+scripts 287). The branch's `sprintbase` config was 9d0495ecc, a pre-restack bank_tidy; the worktree was reset to
+94c6b57e0 (origin's #689) before any work, and the config set to match.
 
 Built from the Coach's five answers to the Closer Look (2026-11-13), as the orchestrator read them.
 
