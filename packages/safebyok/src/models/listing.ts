@@ -111,10 +111,16 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     this.#unwatch ??= this.watchRows(this.deliverNotice, (news) => { this.device.tellBadNews([news]) })
   }
 
-  /** End the watch. The instances stay as they are. */
+  // An unwatch is the adapter's, called from inside a lock or a sweep: what it throws is news, and the cascade goes on.
+  /** End the watch. The instances stay as they are. Never throws: a failed unwatch is told as bad news. */
   goodbye(): void {
-    this.#unwatch?.()
+    const unwatch = this.#unwatch
     this.#unwatch = null
+    try {
+      unwatch?.()
+    } catch (err) {
+      this.device.tellBadNews([err])
+    }
   }
 
   // A listing whose thing above has ended, or moved to another life, answers nothing more: its watch ends here.

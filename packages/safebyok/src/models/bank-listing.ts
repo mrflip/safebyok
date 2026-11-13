@@ -19,7 +19,7 @@ import { Listing } from './listing'
 
 // Nothing in the design extends this listing: there is no `device.banks`. It uses what `Listing` gives, so that the
 // bank row is delivered to its Bank, newer judged from older, as a vault's is. Its one slot is the device's bank: a Bank
-// that has ended stays listed, and the device makes another listing for the next one.
+// that has ended leaves the list but is kept in the slot, and the device makes another listing for the next one.
 /** The device's one bank, listed at the device's scope. */
 export class BankListing extends Listing<BankScope, BankRecord, BankSparse, BankSnapshot, Bank> {
   // == [Props]: #askUser
