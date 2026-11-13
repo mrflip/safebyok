@@ -23,7 +23,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
  *   `stale_write`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
  *   `vault_gone`, `vault_reborn`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
- *   `same_passphrase`, `camped`, `vault_empty`.
+ *   `same_passphrase`, `camped`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
  *   the user. `damaged_whisper`, `damaged_lease`, `newer_format`,
  *   `identity_revoked`, `damaged_row`, `damaged_vault`, `storage_issue`.
@@ -72,7 +72,6 @@ export const refusalkindVals = [
   'gate_made_elsewhere', // another device or tab made this vault first, so the passphrase just typed was not set and nothing was changed
   'same_passphrase',     // a new passphrase that is the one the vault already has
   'camped',              // a bankDB put told not to replace a live row found one there
-  'vault_empty',         // a bankDB call named a vault_tok no row has, and no live row stands there: nothing of this life
   'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
   'damaged_vault',       // the vault row stored above a box asked for failed its checks, as the classifier of notes/answer-contract.md found it
   'gate_issue',          // a bankDB gate verb whose params disagree with the stored row: its registered_at
@@ -121,7 +120,6 @@ export const RefusalFamilyForKind = {
   gate_made_elsewhere: 'condition',
   same_passphrase:     'condition',
   camped:              'condition',
-  vault_empty:         'condition',
   damaged_row:         'bad_news',
   damaged_vault:       'bad_news',
   gate_issue:          'misuse',
