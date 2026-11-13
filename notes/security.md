@@ -72,10 +72,14 @@ added or folded into through the subagent, and no other entry changes.
   with their wrapped boxKeys and ciphered whispers; no key is destroyed. Any copy of those box rows kept elsewhere (a backup, a replica, a log) can still be unsealed by whoever can unwrap the bankKey: anyone with a current wayin's cleartext,
   or a device holding an unexpired lease of the bank. Before, deleting a vault deleted its gate and the vaultKey wrapped there.
   `bank.delPrompt()`, a `del_bank` gating proved with the passphrase, locks the bank and deletes its row; the bankDB stores the tombstone under a new `bank_tok` and deletes every gate row, which holds the wrapped bankKey, and every vault and box row under the bank's scope,
-  in the same step, and checks no proof (the passphrase is checked in the page, as `del_vault`'s was). `bank.del()` and `gate.del()` refuse `bad_option`. SECURITY.md says the same.
+  in the same step, and checks no proof (the passphrase is checked in the page, as `del_vault`'s was). `bank.del()` and `gate.del()` refuse `bad_option` (amended 2026-11-13 (sprint bank_world, thread 21): `bank.del()` no longer does; see below). SECURITY.md says the same.
   Where a write races the delete (a vault born in `safebyok-postgres` while its bank is deleted), or the delete runs out of one transaction's budget (Convex), a vault or box row may remain under the ended bank life. It holds no wrapped key, and nothing reads it once the bank row is a tombstone.
   `tidyGone` deletes it in both stores. In `safebyok-postgres` a `buildBank` over the tombstone (`safebyok_revise_bank`) also deletes every row under the scope; Convex's `buildBank` deletes none, so there only `tidyGone` does.
   The Coach ruled on 2026-11-12 that a row that stays is acceptable.
+  Amended 2026-11-13 (sprint bank_world, thread 21, PR #692; the Coach, 2026-11-13): `bank.del()` deletes an unlocked bank, with its gate, vaults and boxes, through the bank listing (`BankListing.doTryDel`, `models/bank-listing.ts`; `Storable.del`, `demandDeletable`),
+  with no prompt and no proof, and nothing locks the bank first. `bank.delPrompt()` (`models/bank.ts`) is the door that proves: a `del_bank` gating with the passphrase, then the lock, then the delete. `gate.del()` still refuses `bad_option`.
+  When the bank's tombstone is delivered, the device drops the lease from memory, forgets the cached row, and drops every exposed whisper as the Boxes align (`Bank.adopt`). A page holding an unlocked Bank can delete it without the passphrase typed.
+  The Coach accepted it: "the customer is not an adversary; delPrompt is the friendly door". `notes/guarantees.md` states it in its construction paragraph.
 
 * 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world) (the Coach, 2026-11-12): **Two boundaries hold the security: `isUnlocked` in the page, and the bastion side of the bankDB's backing store.**
   The bankKey is reachable in the page only through an attached `Lease` (`bank.isUnlocked`). The device-side bankDB code (`AdapterBankDB`, the classifier, an adapter's client) runs in the same page as any script or browser extension the page loads, and is not a boundary.
@@ -417,6 +421,10 @@ added or folded into through the subagent, and no other entry changes.
   attempt, and land conditional on its revision at the vaultDB, so a change crossing another refuses `stale_write` and stores nothing.
   The prior `Gate.with*` and closure-taking `attemptProof` (host code handed proof closures) are gone: what the user types arrives as
   cleartexts through the one gating, and is spent by `spendCleartexts`, which also zeroes a bare `ArrayBuffer` `prfBytes`.
+  Amended 2026-11-13 (sprint bank_world, thread 23, PR #693; the Coach, 2026-11-13): `VX.Promptly` (`shapes/shapes-vaultish.ts`) is one hour, not two seconds. A prompt (unlock, add passkey, delPrompt, and the other gating acts: `timelyGate`, `models/gating.ts`; `Bank.unlock`, `Bank.ensureUnlocked`, `Bank.delPrompt`)
+  trusts a gate refreshed within the last hour rather than fetching it. A gate change still lands conditional on the gate row's revision, so one made over a stale gate refuses `stale_write`.
+  A lease cached before a gate verb on another device (removing a passkey's wayin, say) can still load on this device for up to an hour if the bank's watch misses the new gate revision (`Lease.buildFromCache` compares the row's `gate_revision_tok` with the gate in hand).
+  A wayin change does not rotate the bankKey, so the bankKey is unchanged by it; `notes/guarantees.md` G4 states the hour. An open matter to the Coach asks whether to accept the window (recommended) or shorten it later.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`del_vault`'s proof is a client-side confirmation; the vaultDB checks no
   proof.** Its delete is conditional on the revision (`VaultListing.del`, `models/vault-listing.ts`). the `del_vault` act (`delVault` in `models/gating.ts`; amended 2026-11-05 (lease_fold): it was `Vault.#runDelVault`) locks first,
   so no box opens under a lease while the tombstone goes out; a refused delete leaves the vault locked. A `lock()` does not conclude a
