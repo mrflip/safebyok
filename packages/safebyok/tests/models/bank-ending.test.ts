@@ -28,7 +28,7 @@ const Stamp = Object.freeze({ boxlabel: 'anthropic_api_key', revision_seq: 1 })
 function oldLeaseRow(world: ReturnType<typeof makeBankWorld>): LeaseRow { return { ...(world.leaseRows()[0] as LeaseRow), bank_tok: makeLifeTok(), proved_at: T0 - (2 * AutolockMillis) } }
 
 describe("bank.autolock", () => {
-  it("locks a listed vault past its autolock, which forgets its lease, leaving a younger one", async () => {
+  it("locks past its autolock and forgets the lease, and not before", async () => {
     const { world, bank } = await makeBankWithVault()
     await bank.autolock()
     expect(bank.isUnlocked).to.be.true
