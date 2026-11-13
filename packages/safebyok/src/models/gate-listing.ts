@@ -51,7 +51,7 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
 
   // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form
   // Each puts the next revision of the gate at `ante`, under the same gate_tok and bank_tok, with `ante` as the row it expects.
-  // The val is the record the verb wrote: the gate listed may have a newer one by the time the answer is delivered.
+  // The val is the stored record the verb's answer carries: the gate listed may have a newer one by the time the answer is delivered.
 
   /** Replace the passphrase wayin of the gate at `ante` with `main`, and return the stored record.
    * Locks nothing: the bankKey is unchanged.

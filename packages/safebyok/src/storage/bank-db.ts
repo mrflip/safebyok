@@ -38,13 +38,13 @@ export type Tidied = { totalCount: number }
 
 /** The answer to `ensureBank`. Its `val` is null when no live bank is stored. */
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>
-/** The answer to `buildBank` or a gate verb: the gate row put, or under `passed` the live one found. */
+/** The answer to `buildBank` or a gate verb: the gate row as the datastore reports storing it, or under `passed` the live one found. */
 export type GateAnswer              = Answer<GateRecord, OkAct>
 /** The answer to `delBank`: the bank's tombstone, or the bank row found. Its `parent` is `main`: a bank has no row above it. */
 export type DelBankAnswer           = Answer<BankRow | null, OkAct, typeof BankTop>
-/** The answer to a vault get, put or del. Its `val` is the stored row after the call, or null for none. */
+/** The answer to a vault get, put or del. Its `val` is the stored row after the call, as the datastore reports it, or null for none. */
 export type VaultAnswer             = Answer<VaultRow | null, OkAct>
-/** The answer to a box get, put or del, with its vault row as `parent`. Its `val` is the stored row after the call, or null for none. */
+/** The answer to a box get, put or del, with its vault row as `parent`. Its `val` is the stored row after the call, as the datastore reports it, or null for none. */
 export type BoxAnswer               = Answer<BoxRow | null, OkAct, VaultRow>
 /** The answer to `listBoxes`, with its vault row as `parent`. */
 export type ListBoxesAnswer         = Answer<BoxesListed, ListAct, VaultRow>

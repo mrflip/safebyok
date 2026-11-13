@@ -18,7 +18,7 @@ export const ageVals = ['older', 'same', 'newer'] as const
 export type Age = typeof ageVals[number]
 
 /** Where a listing finds the record an answer delivers, by its act:
- * - `as_sent` -- in `val`, and it must be the record sent, at its revision
+ * - `as_sent` -- in `val`, the stored record, which must agree with the record sent in scope, revision and life
  * - `as_got`  -- in `val`, and it must be of the scope sent; null where storage answered that nothing is stored
  * - `as_db`   -- in `dbhas`, and it must be of the scope sent; null where nothing is stored
  * - `none`    -- nowhere: the answer says nothing of the record, as a box's `vault_*` act or an unclassified_storing refusal
