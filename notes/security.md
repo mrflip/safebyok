@@ -41,6 +41,52 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world): **A bank has one gate, `maingate`, and its wayins wrap the one bankKey that wraps every boxKey in every vault of the bank.**
+  A bank is the signed-in user's vaults in one app, scoped by `{ user_id, banklabel }`. Its one gate, `main`, is one gate row in the bankDB (`GateRecord`, fmt 4001), holding the bank's wayins: `main`, the passphrase, and `passkey0`, a passkey if one was added.
+  Each wayin stores the bank's one random bankKey wrapped under that wayin's wayinKey (`bank_key_wayin_wrapped`; the passphraseKey from Argon2id, or the passkeyKey from the passkey's PRF answer via HKDF-SHA256).
+  The bankKey wraps every boxKey of every vault of the bank (`box_key_wrapped`), and each boxKey ciphers its box's whisper. A vault row (`VaultRecord`, fmt 6003) holds no gate, no wayins and nothing encrypted.
+  Ciphertext binds stamps (AAD): a wayin's ctx binds the bank's stamp, the gate's stamp and the wayin's header (`wayinCtxOf`, `models/wayin.ts`); a box's `box_key_wrapped` and `whisper_ciphered` bind the bank's, the vault's and the box's stamps
+  (`Lease.#ctxOf`, `models/lease.ts`); a lease's binds the bank's stamp and its own.
+  A wayin change (`replacePassphrase`, `addPasskey`, `revokePasskey`, on `bank.maingate`) needs the current passphrase, is one conditional gate verb of the bankDB, wraps the same bankKey under the new wayin and does not rotate it: no box is resealed, and rotation is not built.
+  Before this, each vault had its own gate, wayins and vaultKey (see the entries below that name a vaultKey, and the amendments on them).
+
+* 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world): **One unlock on a device opens every vault of the bank, and the lease is one per bank per device: the bankKey wrapped under a non-extractable `lease_key`.**
+  An `unlock_bank` gating (the user's passphrase or passkey), or attaching the lease cached on the device, unlocks the Bank, and from then until the bank locks every box of every vault of that bank can be unsealed on that device.
+  Before, each vault had its own gate and was unlocked on its own. A host that wants separately unlocked groups of secrets must use separate banks (separate `banklabel`s), each with its own passphrase. SECURITY.md says the same.
+  The lease is one deviceDB row per bank scope (`LeaseRecord`, `user_id`, `banklabel`, fmt 7003), holding the bankKey as `bank_key_lease_wrapped` under the device's non-extractable WebCrypto `lease_key`, which never leaves the device,
+  and citing the bank's stamp, `gatelabel`, `gate_tok` and `gate_revision_tok`. `bank.ensureUnlocked()` attaches the cached lease if it cites the bank life and the gate in hand, at its revision;
+  a row citing another bank life, another gate life or another revision is never attached and is forgotten when read (`Lease.buildFromCache`, `models/lease.ts`), and the user is asked.
+  `bank.lock()` drops the lease's keys and forgets the cached row; a failed forget is announced to the host as `lease_revoke_failed`, and the default lifecycle handler vacates the whole device (the Coach's ruling: nothing should then be trying to access it).
+  Adopting a bank tombstone, or a bank row of another life, also drops the lease and forgets its row. `device.vacate()` (sign-out) forgets every cached lease of the bank scope and the device row.
+  A wayin change grants the acting device a new lease citing the revision it wrote; another device is asked to prove again at its next `ensureUnlocked` once it holds the new gate row, and a lease already attached in a page is not tested against later gate revisions and stays until the bank locks.
+  **Open ruling, owed by the Coach:** whether a wayin change (replace passphrase, add or revoke passkey) should keep making other devices prove again. This entry states today's behaviour only.
+
+* 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world): **Autolock: a lease lasts `leaseMillis` from its `proved_at`, and the core sets no timers.**
+  The host's `autolockMinutes` (default 14 days; `Infinity` allowed) sets `leaseMillis`. `Lease.buildFromCache` does not load a row past it, and `ensureUnlocked` goes on to ask the user.
+  `bank.autolock()` (`models/bank.ts`) reads the expiry of the bank's one cached lease row with `Lease.tryExpiresAt` (`models/lease.ts`) and calls `lock()` once it is past, which locks every vault with the bank; the host calls it after `device.ensureBank()` and on a timer of its own.
+  It is best-effort, not a guarantee: a deviceDB refusal or a damaged row is told as bad news (`device.tellBadNews`, the host's `onBadNews`) and nothing locks. The lease reports its own expiry through a method the Bank does not see into;
+  the ground truth is the live lease the bank holds, not the cache.
+
+* 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world): **Deleting a vault removes no wrapped key from storage; deleting the bank is the delete that does.**
+  A vault row has no wayins, so `vault.del()` deletes an unlocked vault with no prompt, and the bankDB checks no proof for it (the bank must be unlocked; there is no `del_vault` gating). It leaves the vault's tombstone and deletes that life's box rows,
+  with their wrapped boxKeys and ciphered whispers; no key is destroyed. Any copy of those box rows kept elsewhere (a backup, a replica, a log) can still be unsealed by whoever can unwrap the bankKey: anyone with a current wayin's cleartext,
+  or a device holding an unexpired lease of the bank. Before, deleting a vault deleted its gate and the vaultKey wrapped there.
+  `bank.delPrompt()`, a `del_bank` gating proved with the passphrase, locks the bank and deletes its row; the bankDB stores the tombstone under a new `bank_tok` and deletes every gate row, which holds the wrapped bankKey, and every vault and box row under the bank's scope,
+  in the same step, and checks no proof (the passphrase is checked in the page, as `del_vault`'s was). `bank.del()` and `gate.del()` refuse `bad_option`. SECURITY.md says the same.
+  Where a write races the delete (a vault born in `safebyok-postgres` while its bank is deleted), or the delete runs out of one transaction's budget (Convex), a vault or box row may remain under the ended bank life. It holds no wrapped key, and nothing reads it once the bank row is a tombstone.
+  `tidyGone` deletes it in both stores. In `safebyok-postgres` a `buildBank` over the tombstone (`safebyok_revise_bank`) also deletes every row under the scope; Convex's `buildBank` deletes none, so there only `tidyGone` does.
+  The Coach ruled on 2026-11-12 that a row that stays is acceptable.
+
+* 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world) (the Coach, 2026-11-12): **Two boundaries hold the security: `isUnlocked` in the page, and the bastion side of the bankDB's backing store.**
+  The bankKey is reachable in the page only through an attached `Lease` (`bank.isUnlocked`). The device-side bankDB code (`AdapterBankDB`, the classifier, an adapter's client) runs in the same page as any script or browser extension the page loads, and is not a boundary.
+  The bastion side is the store's own code: `safebyok_put_gate` and the other stored functions in `safebyok-postgres`, the `putGate` mutation of the Convex component. It re-runs the gate verbs' policy inside the database, over the rows fetched in the same step that stores the record:
+  the record keeps the stored `registered_at` and every wayin but its verb's own, and `addPasskey` and `revokePasskey` store only where `passkey0` is absent or present. It checks no proof; neither does it check an unlock's, a `del_bank`'s or a `del_vault`'s.
+  Nothing beyond those two boundaries was added by the move to one gate per bank.
+
+* 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world): **Records written by the per-vault design are not read; IndexedDB databases are named with a `safebyok` prefix.**
+  Before 1.0.0 there is no migration: old vault rows with wayins, old leases and old IndexedDB databases fail safe, read as absent or damaged, or are never opened. IndexedDB databases are now named
+  `safebyok:<store>-v...`, or `safebyok-<dbName>:<store>-v...` with a `dbName`, so the new code never opens an old database.
+
 * 2026-11-11 (vaultdb_asks, package `safebyok`): **A vaultDB answer's `ask`, and a vaultDB refusal's `meta.ask`, never carry a record's payload.**
   Every vaultDB answer (`GoodAnswer`, `BadAnswer`, `storage/vault-db.ts`) and every vaultDB refusal's `meta` (`RefusalMeta`, `refusals/errors.ts`) carries `ask: LoggableAsk`, where they carried `req_params: ReqParams`
   (`ReqParams`, `reqParams`, `requestParams` and `reqParamsOf` no longer exist). `loggableAsk` (`shapes/shapes-storage.ts`) is where this is kept: an `objStrip` of optional fields, `op`, `applabel`, `user_id`, `vaultlabel`, `boxlabel`,
@@ -68,6 +114,10 @@ added or folded into through the subagent, and no other entry changes.
   In `safebyok-postgres` that step is two calls with no transaction: the vault row is fetched and classified, then `safebyok_revise_vault` stores the record only where the stored row still has the expected
   `revision_tok`, `am`, `vault_tok` and the `revision_seq` one below the record's, so the row the tests ran over is the row replaced, or nothing is stored.
   Every ask is checked in `AdapterVaultDB` before an adapter is called, and an adapter is handed the checked ask.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the gate is one row per bank in the bankDB, not a part of a vault row, and a gate verb is a `putGate` over the bank's one gate row, `maingate`; no vault row has a gate, and there is no `gate_epoch`. The policy is `GateActOfForVerb` in `storage/bank-classifier.ts`:
+  the record keeps the stored `registered_at` and every wayin but its verb's own (`main` for `replacePassphrase`, `passkey0` for the passkey verbs); `addPasskey` stores only where no `passkey0` is stored, and `revokePasskey` only where one is.
+  A record that moves more is refused `gate_issue`. In `safebyok-postgres` `safebyok_put_gate` holds the same policy as the conditions of the one statement that stores the record, so the step is one call, not two;
+  Convex's `putGate` mutation runs the classifier on the gate row it read in the same mutation. The vaultDB of this entry is the bankDB, and the classifier's tests are made over the gate row; see the 2026-11-13 entry on the gate.
 
 * 2026-11-11 (vaultdb_classifier, package `safebyok-postgres`): **`safebyok-postgres` writes vault and box rows through stored functions its setup SQL creates, run as the calling role.**
   `VaultFunctionsSql` (`packages/safebyok-postgres/src/vault-functions.ts`, shipped as `vault-functions.sql`) creates six functions: `safebyok_record`, `safebyok_tell`, `safebyok_birth_vault`,
@@ -92,6 +142,11 @@ added or folded into through the subagent, and no other entry changes.
   a box's `sidecar`, `box_key_wrapped`, `whisper_ciphered`) and a tombstone to lacking them; and each `jsonb` field to its outline (the gate's `gate_epoch` a number, `passphrase_wayin` an object,
   `passkey_wayin` an object or null; each ciphered field an object with two strings). They do not judge `fmt`, and they do not look inside a wayin, so a row garbled deeper than the outline can still be stored.
   Every secret field the functions handle is ciphertext as stored; they log nothing and raise nothing that quotes a value.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the setup SQL is `BankFunctionsSql` (`packages/safebyok-postgres/src/bank-functions.ts`, shipped as `bank-functions.sql`, over `bank-tables.sql`) and creates nine functions: `safebyok_record`, `safebyok_tell`,
+  `safebyok_birth_bank`, `safebyok_revise_bank`, `safebyok_put_gate`, `safebyok_birth_vault`, `safebyok_revise_vault`, `safebyok_birth_box` and `safebyok_revise_box`. They run with the caller's privileges, and each is `REVOKE ALL ... FROM PUBLIC`.
+  A notice carries the stored row and the row above it (a gate or vault row's bank row, a box row's vault row). A vault row holds no wayins, so a vault's notice, and a box's with its vault row, hold no wrapped key; a gate row's notice carries its wayins,
+  the wrapped bankKey and the key-derivation parameters, to any role that can `LISTEN` on `safebyok_<user_id>`. The rows a `safebyok_revise_bank` or `safebyok_revise_vault` tombstone deletes with it are not told of.
+  A gate, vault or box write reads the row above it without a lock (the 2026-11-13 entry on deleting a vault).
 
 * 2026-11-10 (old_gaps, branch `20261109-old_gaps`): **Five possibilities whose pinning tests were deleted, on the Coach's ruling, as paranoia.**
   (1) A VaultDB that answers a rebirth with the buried record's `registered_at`, as a database default might keep it, is adopted quietly, and the box's `registered_at` follows it.
@@ -119,6 +174,8 @@ added or folded into through the subagent, and no other entry changes.
   stale `prior` answers `stale_write`. The gate verbs run the checks above and then put through `putVault` with `{ prior, ifAbsent: 'fail', ifPresent: 'repl' }`, which they supply themselves
   (`gateVerbOpts` and `delOpts` refuse an offered `ifAbsent` or `ifPresent` as `bad_option`); the device's own code (`VaultListing`) changes the gate only through them.
   The host is outside the threat model (it can already delete its user's vault) and the vaultDB holds only ciphertext.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): a gate is the bank's, built by `GateListing` (`models/gate-listing.ts`: the next `GateRecord` by `SX.nextRevisionOf`, the verb's wayin laid on) and sent with `putGate` and its verb; the policy is in the
+  2026-11-11 entry above, as amended. A vault row has no gate, so `putVault` replacing a gate no longer applies: besides `buildBank`, which stores the first gate with the bank row, `putGate` is the one verb that stores a gate row. A gate change moves the bank's one gate row (`GateRecord`, fmt 4001), not a `VaultRecord`, and `VaultRecord` (fmt 6003) holds no wayin; see the 2026-11-13 entry on the gate.
 
 * 2026-11-09 (react_forms, branch `20261109-react_forms`): **`safebyok-react` hands a passkey answer to `gating.attempt` at once, whether or not the dialog or button is shown.**
   `PasskeyUnlockButton` (`components/passkey-unlock-button.tsx`) and the add-passkey modal (`modals/add-passkey-modal.tsx`) no longer zero, untried, an answer (`prfBytes`)
@@ -216,6 +273,7 @@ added or folded into through the subagent, and no other entry changes.
   bank's panic goes to a handler that only reports to the platform, or that `DefaultOnPanic` logs each panic, read `DefaultOnLifecycle`, whose error log is `{ call: 'Bank.onLifecycle', refusalkind }` (amended 2026-11-12 (vaultdb_asks): `{ oplabel: 'Bank.onLifecycle', refusalkind }`; the logger's story names its operation as `oplabel`) with the message only.
   (5) `BankFriend` gains `announce`, branded by `brandGuarded` and checked by `isGuarded` like `panic`, `tellBadNews` and `askUser`; it is protected in TypeScript only, on `Listing.bankFriend`, as the others are,
   so a host holding a vault listing can reach it at runtime and make the bank tell its `onLifecycle` an event the bank did not see.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): sign-out is `device.vacate()`, which forgets every cached lease of the bank scope (`{ user_id, banklabel }`) and the device row; see the 2026-11-13 entry on the lease. A failed forget in `bank.lock()` is announced as `lease_revoke_failed`, and the default lifecycle handler vacates the whole device.
 
 * 2026-11-07 (devicedb_idb, sprint devicedb_idb, thread 7, at the Coach's direction, branch `20261107-brands`): **Every brand in the core is a `Symbol.for('@safebyok/<name>')` key that
   anyone may wear, and `isVaultError` now recognises a `VaultError` of another copy of safebyok by its brand.** In `packages/safebyok/src/helpers/consts.ts`, a brand is
@@ -239,6 +297,8 @@ added or folded into through the subagent, and no other entry changes.
   every `${dbName}:device-v<N>` below the current version without reading them; a tab of an older build holding one open blocks that delete
   until it closes (`notes/wontfix.md`). A lease row that fails its check is neither listed nor forgotten (`notes/wontfix.md`);
   `DeviceDB.listRawLeases()` returns every row unchecked.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the row is the bank's one lease, keyed `[user_id, banklabel]`, `fmt` 7003, and holds the bankKey as `bank_key_lease_wrapped` under `lease_key`; `forget` deletes it only where its `bank_tok` matches.
+  The databases are named `safebyok:<store>-v…`, or `safebyok-<dbName>:<store>-v…` with a `dbName`. The `${dbName}:device-v1` database named here is never opened; see the 2026-11-13 entries on the lease and on stored records.
 
 * 2026-11-07 (the Coach, branch `20261104-newdesign_plan`; a proposal to seal each revision's prior `revision_seq` and a hash of its ciphertext inside the
   encrypted value, so devices could check a chain, was declined): **the new core detects storage that rolls a record back only within one session,
@@ -331,12 +391,18 @@ added or folded into through the subagent, and no other entry changes.
   device: `deviceDB.peek` answers null for another `vault_tok`, so `Lease.peek` never forgets it, and `deviceDB.vacate` leaves it. It stays until a lease of that life is cached over it, or nothing; clearing rows of no listed vault is a task not yet designed.
   A row past autolock stays on the deviceDB, with its leaseKey handle and the wrapped vaultKey, though `Lease.peek` reads it as no row and the vault asks for a proof; it stays until the next proof's lease is written over it or a host's `bank.autolock` locks it and so forgets it, and a host that never calls `bank.autolock` keeps it until then. Both go by the host's clock: a clock jumping forward destroys nothing, and setting the clock back reopens the row until the clock catches up. `notes/guarantees.md` G4 says the same. Autolock is a best-effort reminder process, not a guarantee, and `bank.autolock` is called by the host, not by `hello`. (Models are not yet exported from
   `src/index.ts`.)
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the lease is per bank, not per vault, so `bank.autolock()` (`models/bank.ts`) reads the expiry of the bank's one cached lease row with `Lease.tryExpiresAt` (`models/lease.ts`; `Lease.peek` is gone)
+  and calls `lock()` once it is past, locking every vault with the bank. A deviceDB refusal or a damaged row is told as bad news (`device.tellBadNews`) and nothing locks. `Lease.buildFromCache` does not load a row past autolock,
+  and `ensureUnlocked` goes on to ask the user. The host calls `autolock()` on its own timer after `device.ensureBank()`. Where this entry says a vault, a `vault_tok` or the vaultKey, it is the bank, its `bank_tok` and the bankKey,
+  and the autolock that "locks only listed vaults of the row's own `vault_tok`" is gone. The host's `autolockMinutes` sets `leaseMillis`, and a cached lease past it is never attached. See the 2026-11-13 entry on autolock.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change does not rotate the vaultKey, so it ends no session.**
   `Vault.replacePassphrasePrompt`, `addPasskeyPrompt` and `revokePasskeyPrompt` (`packages/safebyok/src/models/vault.ts`) lock no session on any device,
   and a device that holds the vaultKey keeps it to its lock. Revoking a passkey or replacing a passphrase stops new unlocks through the
   old way in; it does not evict a device already unlocked, nor undo what an attacker who once held the vaultKey learned. A lease held on
   the acting device is renewed under the new gate epoch (`#renewLease`), unless a `lock()` crossed the change. (Models are not yet
   exported from the package.)
+  Amended 2026-11-13 (bank_docs, sprint bank_world): there is no vaultKey: the key is the bank's one bankKey, which a gate change does not rotate. The gate is the bank's, so the three prompts are on `bank.maingate` (`models/gate.ts`), they rotate no bankKey, and a change ends no session on another device. The acting device is granted a new lease
+  citing the gate revision it wrote (`unlockByProving(bank, proved, written)`, `models/gating.ts`), not a renewed one. A cached lease of another device cites the earlier revision and is forgotten when read (the 2026-11-13 entries on the gate and the lease, whose ruling is open). A device already unlocked when the gate changes stays unlocked until the bank locks.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **`replacePassphrasePrompt` keeps the passkey.** A vault must always have a
   passphrase; the passkey is optional. Replacing the passphrase after a suspected compromise does not remove a passkey; a host wanting
   both gone calls `revokePasskeyPrompt` as well.
@@ -345,6 +411,7 @@ added or folded into through the subagent, and no other entry changes.
   Someone who knew the old passphrase and added a passkey before the change keeps access through that passkey; the user's remedy is `revokePasskeyPrompt`,
   a gate change that itself needs the passphrase. The earlier design removed the passkey on replacement, and was judged unnecessary. Pinned by "keeps the
   passkey wayin as stored, and the passkey still opens" in `packages/safebyok/tests/models/vault-gate.test.ts`.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the passphrase and the passkey are wayins of the bank's gate (`main` and `passkey0`), not of a vault; see the 2026-11-13 entry on the gate.
 * 2026-11-03 (gate_changes, branch `20261103-gate_changes`): **A gate change is its params, with no client-side next gate.** The params
   spread the record read after a timely refresh (`vault.ensureTimely(MSX.Promptly)`, `timelyAnte` in `models/gating.ts`) inside the
   attempt, and land conditional on its revision at the vaultDB, so a change crossing another refuses `stale_write` and stores nothing.
@@ -360,6 +427,8 @@ added or folded into through the subagent, and no other entry changes.
   (the `del_vault` act), and a host holding the listing can call it directly, with no proof asked. `vaultListing.del(ante)`
   refuses `stale_write`, asking nothing of the vaultDB, for an instance of another life than the slot's vault, as a delivered answer
   would tombstone the live vault locally.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): `delVault` deletes no key, since a vault holds none, and there is no `del_vault` gating or act. `vault.del()` is `Storable.del` over an unlocked bank (`demandDeletable`) and prompts for nothing; the delete is conditional on the revision, as here, and refuses
+  `stale_write` for another life than the vault listed. Deleting the bank is the `del_bank` gating, which locks first and checks its passphrase in the page (the 2026-11-13 entry on deleting a vault).
 * 2026-11-03 (gating, branch `20261103-gating`): **A birth whose put answers another's vault attaches no lease to it.** In
   `VaultListing.#runBirth` (`packages/safebyok/src/models/vault-listing.ts`), where `ensureVault` answers a vault of another `vault_tok`
   (another device won the slot), the proving is of the record that lost, so no lease is built or attached: that vault is answered
@@ -373,6 +442,7 @@ added or folded into through the subagent, and no other entry changes.
   instance at the void revision and hands it its record through `receiveRecord`, as it does for an instance already listed, so with no lease held
   the tombstone handling calls `Lease.tryForget`, which forgets any lease cached on this device from an earlier session (pinned by
   `vault-listing.test.ts`, "forgets the lease cached on this device when the vault is first listed as a tombstone"). (Models are not yet exported from the package.)
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the cached lease is per bank; a bank tombstone, or a bank row of another life, taken in drops the lease and forgets its row, and a lease citing another bank life is never attached. See the 2026-11-13 entry on the lease.
 * 2026-11-03 (vault_slot, branch `20261103-vault_slot`): **A stored row that fails its checks is removed only by the customer naming
   it.** Such a row is never delivered to an instance and nothing acts on it. `delVault` / `delBox` land only where the tombstone's
   `prior` matches the row as `damaged_records` lists it (its revision and `vault_tok`, or the sentinels where the row cannot be read);
@@ -421,6 +491,9 @@ added or folded into through the subagent, and no other entry changes.
   (`packages/safebyok/src/models/vault.ts`) evicts and nulls the lease before it calls the deviceDB's forget, and turns a synchronous
   throw from a duck's `tryRevoke` into a refusal, so `lock()` cannot fail open: it reads locked and does not throw, and the refused
   forget goes to the panic path above.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the lease is the bank's, so `bank.lock()` (`models/bank.ts`) revokes the bank's one lease (`#revokeLease`) and every vault locks with it. A refused forget is announced as `lease_revoke_failed` with `where: 'lock'`
+  to the device's `onLifecycle`; `DefaultOnLifecycle` logs it at error, reports it to the platform and vacates the device (`device.vacate()`), while a host's own `onLifecycle` replaces that and the bank stays locked with the row in place.
+  A tombstone's or an `undeleted` forget is a warning. Where this entry says vault, `vault_tok` or `onPanic`, read bank, `bank_tok` and `onLifecycle`.
 * 2026-11-03 (lease_seams, [#455](https://github.com/mrflip/safebyok/pull/455), branch `20261103-lease_seams`; ruled by the Coach):
   **A `lock()` crossing an unlock before its attach ends unlocked.** This includes a `lock()` during `Lease.peek` or during the proof:
   the forget lands, then the attach holds a lease and caches its row afresh, so the row and the unlocked state stand after a `lock()`
@@ -647,6 +720,7 @@ added or folded into through the subagent, and no other entry changes.
   (3) A `KeyDeriver` may carry an optional `load()`, as a strength checker can; each bank's `hello()` runs both before any vault is born.
   A failing deriver `load` refuses `unexpected_error` with what it threw kept as the error's `cause`, unlike `deriveKeyBytes`, whose throws
   are never kept: `load` is never handed a passphrase. `Bank.make` refuses a `load` that is not a function.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): the bank is scoped by `{ user_id, banklabel }` (the applabel this entry names is now the banklabel), and one bank has exactly one gate; see the 2026-11-13 entry on the gate.
 * 2026-10-26 (restyle sprint, thread 6, PR [#277](https://github.com/mrflip/safebyok/pull/277)): **a host-facing function takes `applabel`,
   `user_id` and `vaultlabel` as flat arguments, so the `user_id` that is authorized is the one that scopes the call.**
   (1) `SafebyokComponent.api`'s `getVault`, `getBox`, `putBox`, `getCapacity`, `delBox`, `delVault`, `watchVault` and safebyok-graphql's
@@ -816,6 +890,7 @@ added or folded into through the subagent, and no other entry changes.
   Amended 2026-11-03 (gate_changes): in `models/vault.ts` the passphrase's proof is a client-side confirmation only; the vaultDB is
   conditional on the revision and checks no proof. the `del_vault` act locks first and the delete follows, where this entry has the lock
   after it; a refused delete leaves the vault locked. See the 2026-11-03 (gate_changes) entry on `del_vault`.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): a vault has no gate and no passphrase of its own, and no `del_vault` gating exists: the passphrase or passkey proves the bank (`unlock_bank`, `del_bank`, and the gate changes), and `delVault` stores no key and removes none; there is no `gate_epoch`. See the 2026-11-13 entry on deleting a vault. `delDamagedVault` is not part of the delete described here.
 * 2026-10-23 (primitives sprint, thread 9, gating): **a grant the device database refuses after a change to the ways in landed is warned of, not
   thrown (today's contract).** For change passphrase and put or delete passkey, a `storage_unavailable` or `storage_blocked`
   from `tryPutLease` after the gate was stored is logged through the host's logger as a warning, the vault left locked on this
@@ -992,6 +1067,7 @@ added or folded into through the subagent, and no other entry changes.
   it all refuse as over no vault, which is how a stale writer is kept from reviving a deleted vault.
   `getVault` reads a tombstone as no vault (`Expectations.isTombstone`, `Expectations.tombstoneOf`,
   `packages/safebyok/src/expectations.ts`; VAULTDB.md 3.1, 3.2, 3.5).
+  Amended 2026-11-13 (bank_docs, sprint bank_world): `delVault` still leaves the vault's tombstone, and deletes that life's box rows; no gate or key is deleted with it; see the 2026-11-13 entry on deleting a vault.
 * 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **`delVault` expects `{ vault_tok, gate_epoch }`,
   and `delDamagedVault` expects the `vault_tok` alone.** A delete proven against a gate another device has since
   changed (an old passphrase in a stale tab) refuses as stale and cannot delete the vault. The one path with no
@@ -1003,6 +1079,7 @@ added or folded into through the subagent, and no other entry changes.
   record is raised to the tombstone's `vault_epoch` after it (see the rollback check entry).
   Amended 2026-10-23 (thread 9, gating): **`del()` is a gating, `del_vault`, proven by the passphrase** (see the entry on deleting a vault);
   the delete still expects `{ vault_tok, gate_epoch }`, and the lock follows the gating's success.
+  Amended 2026-11-13 (bank_docs, sprint bank_world): a vault has no gate, so `delVault` no longer expects a `gate_epoch`; see the 2026-11-13 entry on deleting a vault.
 * 2026-10-22 (thread store_verbs, branch 20261022-store_verbs): **a restored backup is not noticed by every device,
   and the host must wipe what it restores.** `vault_epoch` moves only on writes to the gate and on deletion, so a
   restore that rolls back boxes alone under the same gate is seen by no device (the toldjaso entry 1, already
