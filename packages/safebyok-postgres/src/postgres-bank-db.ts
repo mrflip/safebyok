@@ -357,7 +357,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       await tx.query(DeleteEndedVaultsSql, [user_id, banklabel])
       await tx.query(DeleteEndedBoxesSql, [user_id, banklabel])
       const [counted] = await rowsFrom(tx, CountBoxesSql, [user_id, banklabel]) as [{ boxcount: number }]
-      return { totalCount: counted.boxcount }
+      return { totalCount: counted.boxcount, leftover: 'none' }
     })
   }
 

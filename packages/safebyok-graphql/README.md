@@ -109,7 +109,8 @@ them to a new one. On sign-out, or a sign-in as someone else, call `device.vacat
 device with `Device.make` for the new user. The resolvers refuse the old bank's calls as
 `identity_revoked`, and that is all they do about it.
 
-`tidyGone`, which removes the vault and box rows of ended lives and counts the box rows left, is an
+`tidyGone`, which removes the vault and box rows of ended lives, counts the box rows left and says
+whether rows of ended lives are left for another call, is an
 operation like the rest, behind the same sign-in check: a host calls
 `tidyGone({ op: 'tidy_gone', user_id, banklabel })` on its `GraphQLBankDB`, and the bankDB behind
 your resolvers tidies the signed-in user's bank.

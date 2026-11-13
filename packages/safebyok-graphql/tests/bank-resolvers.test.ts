@@ -181,7 +181,7 @@ describe("bankResolvers", () => {
     const goneVault = BX.delVaultAnswer.parse(await sentAsk(schema, BankOperations.delVault, BX.vaultDel, BW.vaultDelAskOf(vault)))
     expect(goneVault).to.deep.include({ ok: true, val: BW.vaultTombstoneOf(vault) })
     const tidied = BX.tidyGoneAnswer.parse(await sent(schema, BankOperations.tidyGone, BW.bankScope))
-    expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0 }, parent: BW.bankScope })
+    expect(tidied).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 0, leftover: 'none' }, parent: BW.bankScope })
     const goneBank = BX.delBankAnswer.parse(await sentAsk(schema, BankOperations.delBank, BX.bankDel, BW.bankDelAskOf(bank)))
     expect(goneBank).to.deep.include({ ok: true, act: 'deleted', val: BW.bankTombstoneOf(bank), parent: BX.BankTop })
   })

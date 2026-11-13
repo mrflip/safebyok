@@ -221,7 +221,7 @@ export class MemoryBankDB extends AdapterBankDB {
       if ((scope.user_id !== ask.user_id) || (scope.banklabel !== ask.banklabel)) { continue }
       if (isLifeOver(vaultrows.get(scope.vaultlabel) ?? null, life)) { this.#boxLives.delete(ckey) } else { totalCount += boxrows.size }
     }
-    return { totalCount }
+    return { totalCount, leftover: 'none' }
   }
 
   protected override doWatch(scope: WatchScope, hear: (heard: Heard) => void): () => void {

@@ -138,13 +138,14 @@ deletes the box rows of the life it ends, in the same mutation, and the next lif
 deletes the gate, vault and box rows under it while half of each limit lasts, and leaves the rest.
 What it leaves is out of reach: a gate or vault row under another bank life than its bank row's
 reads as no row, and a box row is found only by its own life's tokens. `tidyGone` deletes the rows
-of every ended life, those a `delBank` left included, on the same budget per call: it reads the
-bank's vault rows and tallies, and reaches the box rows of ended lives through the index without
-reading a live one. **Call `tidyGone` now and then**, as housekeeping: what one call leaves, the
-next deletes. Its count, of the box rows in the bank's live vaults, does not tell you whether rows
-of ended lives remain. The bank-wide `watch` reads every box row of the
+of every ended life, those a `delBank` left included: every vault row and tally of one, and up to
+1000 of their box rows, or 2 MiB of them, whichever comes first. Its `leftover` says what is left
+of those box rows: `none`; `some`, which the next call deletes; or `many`, which takes more calls
+than one. **Call `tidyGone` now and then**, as housekeeping, and again while it answers `some` or
+`many`. To find the box rows of ended lives, it reads the bank's box rows in order, live ones
+among them, until it has counted what is left. The bank-wide `watch` reads every box row of the
 bank's live vaults each time a row changes, so a bank whose live vaults together pass 16 MiB makes
-it go quiet.
+it go quiet; `tidyGone` needs room for its batch beside them, and fails past about 12 MiB.
 
 ## Testing your own functions
 

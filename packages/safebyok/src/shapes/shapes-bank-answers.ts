@@ -125,7 +125,7 @@ export const {
   const boxish      = { parent: BX.vaultRecord, badParent: BX.vaultRow, dbhas: BX.boxRow }
   const bankEnsured = obj({ gates: obj({ main: BX.gateRecord }).strict(), vaults: arr(BX.vaultRow), damaged_rows: arr(damagedVault) }).strict()
   const boxesListed = obj({ boxes: arr(BX.boxSparse.strict()), damaged_rows: arr(damagedBox) }).strict()
-  const tidied      = obj({ totalCount: uint }).strict()
+  const tidied      = obj({ totalCount: uint, leftover: oneof(EX.leftoverVals) }).strict()
 
   const noticedAbove = union([BX.bankRow, BX.vaultRow, lit(BX.BankTop)])
   const crossedNotice = discrim('ok', [

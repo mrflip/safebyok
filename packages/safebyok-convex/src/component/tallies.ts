@@ -34,15 +34,26 @@ export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 export const MaxVaultBoxSize = (ConvexTransactionReadSize / 2) - ConvexDocumentSize - TallyReserveSize
 // --
 
-// == [Budgets]: Budget, cascadeBudget, isSpent, spend
-// A cascade deletes the rows under a bank, or the rows of its ended lives, which may be more than one transaction can hold. It
-// draws on a budget of half of each limit it meets, which leaves room for the rest of its mutation, and stops once that is spent.
+// == [Budgets]: MaxTidiedBoxes, MaxTidiedBoxSize, Budget, cascadeBudget, tidyBudget, isSpent, spend
+// `delBank` deletes the rows under a bank, which may be more than one transaction can hold. It draws on a budget of half of each
+// limit it meets, which leaves room for the rest of its mutation, and stops once that is spent. `tidyGone` deletes a batch of the
+// box rows of ended lives, and reads as many again to say what is left. It reads the bank's live box rows besides, as
+// `watchRows` does, so its two budgets together take a quarter of what a transaction may read, and leave the rest to those.
+
+/** The most box rows of ended lives one `tidyGone` deletes. */
+export const MaxTidiedBoxes = 1000
+
+/** The most bytes of box rows of ended lives one `tidyGone` deletes, measured by Convex's `getDocumentSize`. */
+export const MaxTidiedBoxSize = ConvexTransactionReadSize / 8
 
 /** What a cascade may still delete in its transaction: `count` documents, and `size` bytes read. */
 export type Budget = { count: number, size: number }
 
 /** A cascade's whole budget, for one mutation. */
 export function cascadeBudget(): Budget { return { count: ConvexTransactionWrittenDocuments / 2, size: ConvexTransactionReadSize / 2 } }
+
+/** One `tidyGone` batch's budget, for the rows it deletes and again for the rows it counts. */
+export function tidyBudget(): Budget { return { count: MaxTidiedBoxes, size: MaxTidiedBoxSize } }
 
 /** True once `budget` is spent. */
 export function isSpent({ count, size }: Budget): boolean { return (count <= 0) || (size <= 0) }

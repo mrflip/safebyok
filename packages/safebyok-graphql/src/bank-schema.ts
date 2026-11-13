@@ -1,4 +1,4 @@
-import { refusalkindVals } from 'safebyok/storage'
+import { leftoverVals, refusalkindVals } from 'safebyok/storage'
 
 // Each operation is one bankDB verb. It returns what the verb's `try*` form returns, as a typed
 // object with any refusal in its `err` field. A GraphQL error is left for what GraphQL itself
@@ -274,9 +274,13 @@ type SafebyokBoxAnswer {${answerFields}
   dbhas:      SafebyokBoxRow
 }
 
-"""The result of tidyGone: the number of box rows left in the bank."""
+"""What tidyGone leaves of the box rows of ended lives: none, some (one more call deletes them) or many (it takes more than one)."""
+enum SafebyokLeftover { ${leftoverVals.join(' ')} }
+
+"""The result of tidyGone: the number of box rows left in the bank's live vaults, and what is left of those of ended lives."""
 type SafebyokTidied {
   totalCount: Int!
+  leftover:   SafebyokLeftover!
 }
 
 """The answer to tidyGone: val and the bank's scope on success, err on a refusal."""

@@ -94,8 +94,8 @@ export const boxWritten = v.object({ parent: v.any(), box: v.any(), written: box
  */
 export const boxPutWritten = v.object({ parent: v.any(), box: v.any(), capacity, written: boxStored, roomless: v.boolean() })
 
-/** What `tidyGone` returns: how many box rows the bank's live vaults hold afterward. */
-export const tidied = v.object({ totalCount: v.number() })
+/** What `tidyGone` returns: how many box rows the bank's live vaults hold afterward, and what is left of the box rows of ended lives. */
+export const tidied = v.object({ totalCount: v.number(), leftover: v.union(...DB.leftoverVals.map((leftover) => v.literal(leftover))) })
 
 /** What `watchRows` returns: the bank row, every gate and vault row in scope, and the box rows of each live vault. */
 export const rowsWatched = v.object({
