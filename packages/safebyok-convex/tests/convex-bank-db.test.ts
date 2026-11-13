@@ -261,7 +261,7 @@ const TidyCases = [
 ] as const
 
 // The live vault holds one box row, which every call leaves, and the rows planted under an earlier bank life are of an ended one.
-describe("ConvexBankDB's tidyGone, deleting a batch of 1000 box rows of ended lives", () => {
+describe("ConvexBankDB's tidyGone, deleting a batch of box rows of ended lives", () => {
   for (const [planted, leftover, blurb] of TidyCases) {
     it(blurb, async () => {
       const { deployment, bankDB, vault } = await builtWithLimits()

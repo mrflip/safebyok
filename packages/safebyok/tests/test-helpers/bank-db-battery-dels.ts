@@ -259,7 +259,7 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
   })
 
   describe("tidyGone", () => {
-    it("removes the box rows of a vault life that is over, counts the box rows left in the bank, and leaves none of an ended life", async () => {
+    it("removes the box rows of a vault life that is over, and counts the box rows left in the bank", async () => {
       const { bankDB, vault, box } = await putWith({ box: true })
       await rowsOf(bankDB).plantBoxRow(boxscope, 'bank1', 'oldlife', boxAt(0, 'bank1', 'oldlife'))
       expect(await bankDB.tidyGone(boxTidyAsk)).to.deep.include({ ok: true, act: 'tidied', val: { totalCount: 1, leftover: 'none' }, parent: bankScope })
