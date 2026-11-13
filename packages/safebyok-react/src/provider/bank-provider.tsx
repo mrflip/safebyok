@@ -7,10 +7,12 @@ import { useWarnOfIgnoredOpts } from './provider-hooks'
 
 // == [Context]: BankContext, useProvided
 
-/** The provider's device, null while it has none; undefined, the default, outside any provider. */
+/** The nearest provider's device, or null while it has none. It is undefined, the default, outside any provider. */
 const BankContext = createContext<Device | null | undefined>(undefined)
 
-/** Return the nearest BankProvider's device, or null while it has none. Throws an error naming `hookname` when there is no provider above. */
+/** Return the nearest BankProvider's device, or null while it has none.
+ * Throws an error naming `hookname` when no BankProvider is above.
+ */
 export function useProvided(hookname: string): Device | null {
   const device = useContext(BankContext)
   if (device === undefined) { throw new Error(`${hookname} needs a <BankProvider> above it.`) }
@@ -20,15 +22,15 @@ export function useProvided(hookname: string): Device | null {
 
 // == [The provider's device]: useProviderDevice
 
-/** Make the provider's device from the first render's `opts`, and keep it until unmount; null while `user_id` is null.
- * Later changes to `opts` are ignored.
+/** Make the provider's device from the first render's `opts`, start bringing up its bank, and sweep it at unmount.
+ * Returns null while `user_id` is null. Later changes to `opts` are ignored, with a warning, but the device always calls the latest `handlers`.
  */
 function useProviderDevice(opts: ProviderDeviceOpts, handlers: Handlers, isHostAsking: boolean, onMade: (device: Device) => void): Device | null {
   const [madeFrom] = useState(opts)
   const [device, setDevice] = useState<Device | null>(null)
 
   // The device is made once but always calls the latest handlers, so a host may pass inline arrow functions.
-  /** Return the handlers from the latest render. */
+  /** The handlers from the latest render. */
   const latest = useEffectEvent(() => handlers)
 
   // This effect owns the device: it makes the device, and its cleanup sweeps it. When the effect runs again
@@ -61,8 +63,9 @@ function useProviderDevice(opts: ProviderDeviceOpts, handlers: Handlers, isHostA
 
 // == [BankProvider]: BankProvider, OpenGatingDialog, UserBankProvider
 
-/** Provide the hooks below it with the signed-in user's device and its bank; with no device while `user_id` is null.
- * It also shows the built-in dialog for the device's open gating, building or deleting the bank among them, unless `requestCleartext` is given.
+/** Provide the hooks below it with the signed-in user's device, or with none while `user_id` is null.
+ * Unless `requestCleartext` is given, it shows a built-in dialog for each gating the device opens.
+ * Its children remount whenever `user_id` or `banklabel` changes. The previous user's device is vacated when the next user's device is made.
  */
 export const BankProvider = (props: BankProviderProps) => {
   const { user_id, banklabel } = bankProviderProps.parse(props, { where: 'BankProvider' })
@@ -93,11 +96,11 @@ function OpenGatingDialog({ device, ...dialogProps }: Pick<GatingModalProps, 'pa
   return <GatingModal gating={openGating} leaseMillis={device.leaseMillis} {...dialogProps} />
 }
 
-/** Provide one user's device and its bank, and render the dialog for its open gating. */
+/** Provide one user's device to the hooks below it, with the built-in dialogs unless `requestCleartext` is given. */
 function UserBankProvider(props: BankProviderProps & { onMade: (device: Device) => void }) {
   const { passphraseUsername, passkeyRpId, children, onMade, onLifecycle = DefaultOnLifecycle, onBadNews = DefaultOnBadNews, requestCleartext, ...deviceish } = props
   // The device is made once, so this is fixed at the first render, like the device's other options.
-  /** True when the host's `requestCleartext` handles this device's gatings, in place of the built-in dialogs. */
+  /** True when the host's `requestCleartext` handles this device's gatings instead of the built-in dialogs. */
   const [isHostAsking] = useState(requestCleartext !== undefined)
   const device = useProviderDevice(deviceish, { onLifecycle, onBadNews, requestCleartext }, isHostAsking, onMade)
 

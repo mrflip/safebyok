@@ -8,7 +8,7 @@ import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
 
 // == [Provider]: BankProviderProps, bankProviderProps, ProviderDeviceOpts, Handlers, GatingModalProps, BoundaryProps, BoundarySource
 
-/** BankProvider's props: the `Device.make` options except `gates`, which it fills in, plus the signed-in `user_id` and props for the dialogs. */
+/** BankProvider's props: every `Device.make` option except `gates`, with a `user_id` that may be null, and props for the built-in dialogs. */
 export interface BankProviderProps extends Omit<DeviceOpts, 'user_id' | 'gates' | 'requestCleartext'> {
   /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `useDevice()`'s `vacate()` at sign-out. */
   user_id:             string | null
@@ -67,14 +67,14 @@ export type BoundarySource = 'PassphraseModal' | 'ReplacePassphraseModal' | 'Add
 // == [Hooks]: VaultStage, VaultLifecycle
 
 /** The lifecycle stage of the vault a hook asked for.
- * - `'bankless'` -- no bank is in hand: nobody is signed in, the bank is still coming up, none is built, or it was deleted
- * - `'absent'`   -- the bank is in hand and has no vault under that vaultlabel: `bank.ensureVault` puts one, the bank unlocked
+ * - `'bankless'` -- no bank is up: nobody is signed in, the bank is still coming up, none is built, or it was deleted or built anew elsewhere
+ * - `'absent'`   -- the bank is up but has no vault by that vaultlabel. Call `bank.ensureVault` on the unlocked bank to create one
  * - `'present'`  -- the vault exists
  * - `'spent'`    -- the device was swept or vacated
  */
 export type VaultStage = 'bankless' | 'absent' | 'present' | 'spent'
 
-/** `useVault`'s return value: the vault's stage, the Vault object while `present`, and the reason the device ended once `spent`. */
+/** What `useVault` returns: the vault's stage, the Vault object while `present`, and the reason the device ended once `spent`. */
 export type VaultLifecycle = { stage: 'bankless' | 'absent', vault: null } | { stage: 'present', vault: Vault } | { stage: 'spent', vault: null, cause: VaultError }
 // --
 
@@ -90,9 +90,11 @@ export type CreatePasskeyOpts = {
   timeout?: number | undefined
 }
 
-/** Options for `askPasskey`: the `rpId` the passkey was created under, if it was not the page's own domain, and a `timeout` in milliseconds. */
+/** Options for `askPasskey`. */
 export type AskPasskeyOpts = {
+  /** The relying-party id the passkey was created under. Defaults to the page's own domain. */
   rpId?:    string | undefined
+  /** Milliseconds the browser waits for the user. Defaults to the browser's own limit. */
   timeout?: number | undefined
 }
 
@@ -168,12 +170,12 @@ export type CreateVaultButtonProps = { vaultlabel: string }
 /** The `name` attribute of a passphrase field. Password managers read it, and the form action looks the field up by it. */
 export type PassphraseFieldname = 'current-password' | 'new-password' | 'confirm-password'
 
-/** The message a dialog shows for a refused attempt, with the refusal's kind, which identifies the field at fault. */
+/** The message a dialog shows for a refused attempt. Its `refusalkind` tells which field is at fault. */
 export type Gripe = { text: string, refusalkind: string }
 
 /** Props of `ModalForm`, the layout every dialog shares. */
 export type ModalFormProps = {
-  /** Called on Cancel and on Escape: a gating's dialog dismisses its gating. */
+  /** Called on Cancel and on Escape. A gating's dialog dismisses its gating here. */
   onCancel:       () => void
   /** The heading. It is also the dialog's accessible name. */
   title:          string
@@ -185,7 +187,7 @@ export type ModalFormProps = {
   pendingWord:    string
   /** False to keep the submit button disabled. */
   isSubmittable?: boolean | undefined
-  /** True to focus Cancel when the dialog opens, as a confirm with no fields does; otherwise the first control has focus. */
+  /** True to focus Cancel when the dialog opens, as for a confirmation with no fields. Otherwise the first control takes focus. */
   cancelTakesFocus?: boolean | undefined
   /** The message for the live region, or null for none. */
   gripeText:      string | null
@@ -271,13 +273,18 @@ export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }
 /** The result of a panel's last button press: the verb called, whether it succeeded, and the text to show. */
 export type LastCall = { verbname: string, isOk: boolean, said: string }
 
-/** A panel's listing state: the rows from the last listing, null before the first, and the error text if the last attempt failed. */
-export type Listing<ValT> = { val: ValT | null, trouble: string | null }
+/** A panel's listed rows, and the error from its last attempt. */
+export type Listing<ValT> = {
+  /** The rows from the last listing that succeeded, or null before the first. */
+  val:     ValT | null
+  /** The error text if the last attempt failed, else null. */
+  trouble: string | null
+}
 
 /** A lease row for the table, with its scopepath when `listRawLeases` supplied one. */
 export type ListedLease = { row: Record<string, unknown>, scopepath: LeaseScopepath | null }
 
-/** Props for one lease row of the table: the row, its scopepath, and its button handlers. A null handler means the row has no such button. */
+/** Props for one lease row of the table: the row, its scopepath, and its button handlers. A null `onForgetRaw` means the row has no forgetRawLease button. */
 export type LeaseRowLineProps = {
   row:       Record<string, unknown>
   scopepath: LeaseScopepath | null

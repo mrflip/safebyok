@@ -6,10 +6,11 @@ import type { BankScope, BX, VaultScope } from 'safebyok/storage'
 
 // == [The database]: BankDBVersion, shelfOf, filedIn, Filed
 
-/** The layout version of the bank database: three zero-padded parts, so that a name sorts as its version does. */
+// Zero-padded, so that a database name sorts as its version does.
+/** The layout version of the bank database, in three zero-padded parts. */
 export const BankDBVersion = '001-001-001'
 
-/** The shelf of the bank database for the host's `dbName`, named `safebyok:bank-v<version>`, or `safebyok-<dbName>:bank-v<version>` with one. */
+/** The shelf of the bank database `safebyok-<dbName>:bank-v<version>`, or `safebyok:bank-v<version>` with no `dbName`. */
 export function shelfOf(dbName?: string): UseStore {
   return versionedShelfOf({ dbprefix: dbprefixOf(dbName), dbstem: 'bank', version: BankDBVersion, storename: 'rows', oldnames: [] })
 }
@@ -39,7 +40,7 @@ export type GateScopepath = [tag: 'gate', user_id: string, banklabel: string, ga
 export type VaultScopepath = [tag: 'vault', user_id: string, banklabel: string, vaultlabel: string]
 
 // The key holds both toks, so a box row under any other pair of lives is at another key, and a put under one cannot overwrite it.
-/** The shelf key of a box row. It includes the `bank_tok` and `vault_tok`, so each life of a vault in each life of its bank has its own boxes. */
+/** The shelf key of a box row. Each vault life has its own box rows. */
 export type BoxScopepath = [tag: 'box', user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string, boxlabel: string]
 
 /** The scopepath of the bank row at `scope`. */
@@ -77,7 +78,7 @@ export function vaultsRangeOf({ user_id, banklabel }: BankScope): IDBKeyRange { 
 /** The key range of every box row of the bank, across all its vaults and their lives. */
 export function boxesRangeOf({ user_id, banklabel }: BankScope): IDBKeyRange { return rangeUnder(['box', user_id, banklabel]) }
 
-/** The key range of every box row under one life of a vault in one life of its bank. */
+/** The key range of every box row of one vault life. */
 export function lifeRangeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: VaultScope & { bank_tok: string, vault_tok: string }): IDBKeyRange {
   return rangeUnder(['box', user_id, banklabel, vaultlabel, bank_tok, vault_tok])
 }

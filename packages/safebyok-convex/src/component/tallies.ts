@@ -30,7 +30,7 @@ const TallyReserveSize = 1024
 /** The most box rows one life of a vault may have, tombstones included. */
 export const MaxVaultBoxes = ConvexTransactionWrittenDocuments / 2
 
-/** The most bytes one life's box rows may total, tombstones included, measured as Convex sizes a document. */
+/** The most bytes one life's box rows may total, tombstones included, measured by Convex's `getDocumentSize`. */
 export const MaxVaultBoxSize = (ConvexTransactionReadSize / 2) - ConvexDocumentSize - TallyReserveSize
 // --
 
@@ -56,19 +56,22 @@ export function spend(budget: Budget, size: number): void {
 
 // == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, weigh, tallyOf, growthOf, capacityOf, reckon, refuses, record, forget, countBoxes, drop
 
-/** The labels and tokens that name one life of one vault: its own `vault_tok`, under its bank's `bank_tok`. */
+/** One life of a vault: its scope, its bank's `bank_tok` and its own `vault_tok`. */
 export type Life = { user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string }
 
-/** A life's box rows counted and weighed: `all_*` of every row, tombstones included, and `live_*` of the live rows alone. */
+/** The count and byte size of a life's box rows:
+ * - `all_count`, `all_size`   -- every row, tombstones included
+ * - `live_count`, `live_size` -- the live rows only
+ */
 export type Tally = { all_count: number, live_count: number, all_size: number, live_size: number }
 
-/** A life's tally as read for a put. `kept` is the stored tally row, if any. `tally` is null when the life is past a limit. */
+/** A life's tally as read for a put. `kept` is the stored tally row, or null for none. `tally` is null when the life is past a limit. */
 export type Reckoning = { kept: Doc<'safebyok_tallies'> | null, tally: Tally | null }
 
-/** A box document, stored or about to be. Its `box` row is `unknown` until the core's predicates have checked it. */
+/** A box document, stored or about to be. Its `box` row is `unknown` until the core has checked it. */
 export type BoxDocGiven = Omit<WithoutSystemFields<Doc<'safebyok_boxes'>>, 'box'> & { box: unknown }
 
-/** Return the bytes `boxDoc` counts toward its life's limit, by Convex's `getDocumentSize` with its allowance for system fields. Null counts 0. */
+/** The bytes `boxDoc` counts toward its life's byte limit, or 0 for null. */
 export function weigh(boxDoc: BoxDocGiven | null): number {
   if (boxDoc === null) { return 0 }
   const { user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, box } = boxDoc
@@ -83,10 +86,10 @@ export function tallyOf(boxDoc: BoxDocGiven | null): Tally {
   return { all_count: (boxDoc === null) ? 0 : 1, live_count: isLive ? 1 : 0, all_size: size, live_size: isLive ? size : 0 }
 }
 
-/** How a life's tally changes when `boxDoc` is written in place of `anteDoc`, or as a new row where it is null. */
+/** The change to a life's tally when `boxDoc` replaces `anteDoc`, or is added where `anteDoc` is null. */
 export function growthOf(anteDoc: BoxDocGiven | null, boxDoc: BoxDocGiven): Tally { return plus(tallyOf(boxDoc), negated(tallyOf(anteDoc))) }
 
-/** Return how full a life is against `maxBoxes` and the byte limit. A life past a limit (a null tally) is reported as full. */
+/** How full a life is, against `maxBoxes` and the byte limit. A null tally, for a life past a limit, reads as full. */
 export function capacityOf(tally: Tally | null, maxBoxes: number) {
   return {
     boxes: { used: tally?.all_count ?? maxBoxes, max: maxBoxes },
@@ -94,7 +97,7 @@ export function capacityOf(tally: Tally | null, maxBoxes: number) {
   }
 }
 
-/** Read the life's tally: the stored one, or else a count of its box rows that stops once a limit is passed. */
+/** Read the life's tally for a put, counting its box rows when no tally row is stored. */
 export async function reckon(db: DatabaseReader, life: Life): Promise<Reckoning> {
   const kept = await getTallyRow(db, life)
   if (kept) { return { kept, tally: { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size } } }
@@ -114,7 +117,7 @@ export function refuses(tally: Tally | null, growth: Tally, maxBoxes: number): b
   return ((growth.all_count > 0) && (after.all_count > maxBoxes)) || ((growth.all_size > 0) && (after.all_size > MaxVaultBoxSize))
 }
 
-/** Add a put's `growth` to the life's tally, inserting the tally row the first time. A life past a limit gets no tally row. */
+/** Add a put's `growth` to the life's stored tally, creating it if needed. A life past a limit gets none. */
 export async function record(db: DatabaseWriter, life: Life, { kept, tally }: Reckoning, growth: Tally): Promise<void> {
   if (tally === null) { return }
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(tally, growth)) } else { await db.insert('safebyok_tallies', { ...life, ...plus(tally, growth) }) }
@@ -127,7 +130,7 @@ export async function forget(db: DatabaseWriter, life: Life, growth: Tally): Pro
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(kept, growth)) }
 }
 
-/** How many box rows `life` has, tombstones included: its tally's count, or else a count of its rows. */
+/** How many box rows `life` has, tombstones included. */
 export async function countBoxes(db: DatabaseReader, life: Life): Promise<number> {
   const kept = await getTallyRow(db, life)
   if (kept) { return kept.all_count }

@@ -28,8 +28,8 @@ export function isPostgresClient(candidate: unknown): candidate is PostgresClien
 
 /** Options for `new PostgresBankDB(opts)`, in addition to {@link BX.AdapterBankDBOpts}:
  * - `client`   -- runs the queries and transactions
- * - `listen`   -- subscribes to Postgres notifications, so `watch` hears other devices' writes; without it, `watch` hears nothing
- * - `maxBoxes` -- soft cap on the box rows of one vault life, live and deleted together (default: `DefaultMaxBoxes`)
+ * - `listen`   -- subscribes to Postgres notifications for `watch`, which hears nothing without it
+ * - `maxBoxes` -- soft cap on the box rows of one vault life, tombstones included (default: `DefaultMaxBoxes`)
  */
 export type PostgresBankDBOpts = Readonly<BX.AdapterBankDBOpts & { client: PostgresClient, listen?: PostgresListen, maxBoxes?: number }>
 
@@ -94,7 +94,7 @@ function isHeardIn(scope: WatchScope, told: Told): boolean {
 
 // == [Refusals]: refusalOf, causeOf, codeOf
 
-/** Convert a thrown value to a VaultError: a setup fault (SQLSTATE class 42) is an unexpected error, anything else is storage unavailable. */
+/** The VaultError for `thrown`: `unexpected_error` for a setup fault (SQLSTATE class 42), else `storage_unavailable`. */
 function refusalOf(thrown: unknown): VaultError {
   if (DB.isVaultError(thrown)) { return thrown }
   if (codeOf(thrown)?.startsWith('42')) { return DB.unexpectedError(causeOf(thrown)) }
@@ -203,7 +203,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
     return await this.#firstRow(GetBoxWithVaultSql, [user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel])
   }
 
-  /** The capacity of a vault life with `used` box rows, live and deleted. */
+  /** The capacity of a vault life with `used` box rows, tombstones included. */
   #roomAt(used: number): Capacity {
     return { boxes: { used, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }

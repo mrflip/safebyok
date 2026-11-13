@@ -4,7 +4,7 @@ import { BX } from 'safebyok/storage'
 
 // == [Types]: BankResolversOpts, BankFieldArgs, CrossingAnswer, CrossingNotice, BankFieldResolver, BankResolvers
 
-/** Options for {@link bankResolvers}, which you call once when your server starts. */
+/** Options for {@link bankResolvers}. */
 export type BankResolversOpts<ContextT> = {
   /** The bankDB that serves every request, such as a `PostgresBankDB`. */
   bankDB:    DB.AdapterBankDB
@@ -100,7 +100,9 @@ const bankResolversOpts = DB.objCheck(({ custom, fn }) => ({
   getUserId: fn<BankResolversOpts<unknown>['getUserId']>(),
 }), 'bad_option')
 
-/** Make the resolvers for `BankSchemaSdl`. A request can reach only the bank of the user it is signed in as. */
+/** Make the resolvers for `BankSchemaSdl`, once when your server starts.
+ * A request can reach only the bank of the user it is signed in as.
+ */
 export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): BankResolvers<ContextT> {
   const { bankDB, getUserId } = bankResolversOpts.parse(opts)
 
@@ -212,7 +214,8 @@ const epochMillisOf = (val: unknown): number => {
   throw new GraphQLError('SafebyokEpochMillis is a time in integer UTC epoch milliseconds')
 }
 
-/** `SafebyokEpochMillis`: a time in integer UTC epoch milliseconds. GraphQL's own Int is 32-bit, too small for one. */
+// GraphQL's own Int is 32-bit, too small for a time in milliseconds.
+/** `SafebyokEpochMillis`: a time in integer UTC epoch milliseconds. */
 const safebyokEpochMillis = new GraphQLScalarType<number, number>({
   name:               'SafebyokEpochMillis',
   coerceOutputValue:  epochMillisOf,

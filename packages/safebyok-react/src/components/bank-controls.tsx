@@ -3,7 +3,9 @@ import { Messages } from '../helpers/messages'
 import { useBank, useBankSnapshot, useDevice } from '../hooks/hooks'
 import type { CreateVaultButtonProps } from '../shapes'
 
-/** Render whether the signed-in user's bank is locked, with a Lock or Unlock button; nothing while there is no bank. */
+/** Show whether the signed-in user's bank is locked, with a button to lock or unlock it.
+ * Renders nothing while there is no bank. A failed unlock goes to the provider's `onBadNews`, but a dismissed dialog does not.
+ */
 export function BankLockControl() {
   const bank = useBank()
   const snapshot = useBankSnapshot()
@@ -25,7 +27,9 @@ export function BankLockControl() {
 
 // A returning user on a new device has a bank and no vault, and a user who cancelled the bank's build at sign-in has
 // neither: the one click ensures each step, asking the user only where a step needs it.
-/** Render a button that creates the signed-in user's vault named `vaultlabel`: the bank first, built or unlocked where it needs to be. */
+/** Render a button that creates the signed-in user's vault named `vaultlabel`, building or unlocking the bank first if needed.
+ * It is disabled while nobody is signed in. A failure goes to the provider's `onBadNews`, but a dismissed dialog does not.
+ */
 export function CreateVaultButton({ vaultlabel }: Readonly<CreateVaultButtonProps>) {
   const device = useDevice()
   const create = async () => {
@@ -45,7 +49,7 @@ export function CreateVaultButton({ vaultlabel }: Readonly<CreateVaultButtonProp
   )
 }
 
-/** Tell `device`'s host of `err`, unless the user dismissed a dialog. */
+/** Send `err` to `device`'s `onBadNews`, unless it is the user dismissing a dialog. */
 function tellUnlessDismissed(device: Device, err: unknown): void {
   if (! isVaultError(err, 'dismissed')) { device.tellBadNews([err]) }
 }
