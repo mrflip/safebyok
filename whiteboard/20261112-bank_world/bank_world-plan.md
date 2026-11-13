@@ -9,9 +9,8 @@
   (agent default effort); style pass `sonnet`. Threads that differ say so below.
 * **At once**: 3 threads.
 * **Status** (2026-11-13, early): #679 and #676 merged. Ready, one line: #681 → #682 → #684 →
-  #683 → 18 #685 → 19 #686 → 17r #687 (#687 the top, filed at 251d43923). T #680 ready, on
-  main. The second Closer Look is in its tab (https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB#39e7c475-c34f), awaiting the Coach's replies. 17 `bank_docs` (opus) building from
-  #686; its filing rebases it onto #687 (its sprintbasebranch is now 20261112-bank_renames). Sprint doc: https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB
+  #683 → 18 #685 → 19 #686 → 17r #687 → 17 #688 (#688 the top, filed at 2d4da3784). T #680 ready, on
+  main. The second Closer Look is in its tab (https://claude.ai/artifact/NWm2C8wNdM6WYz6kWRVcgB#39e7c475-c34f), awaiting the Coach's replies. 17t `bank_tidy` (sonnet) building from #688: five code leftovers 17 found. Then wrapup.
 
 The Coach's text for each thread is `threads.md`, *The threads*, verbatim, in this directory; it is
 not copied again here. What follows is the gloss.
@@ -308,6 +307,8 @@ The Coach (2026-11-12, in chat): "yes hooray! so, align to children, and local s
 ### 17 `bank_docs`
 
 *Orchestrator, 2026-11-13:* split in two, since its owed items run past four in different code: 17 keeps the Coach's text (READMEs, SECURITY.md, notes/, TODO, the changesets as one note) and the prose owed to it (the Chute exception in STYLE.md, VOCABULARY's *lease* and Vault-per-life lines, the stale design notes, the changeset corrections, the delBank-race docs note), `opus`; **17r `bank_renames`** takes the code: the Coach's renames below, `hooks.ts`'s banner and `VaultLifecycle`, the `delUnlocked` helper, and the `ensureUnlocked` calls before `ensureVault` in `bank-controls.tsx` and `KnockKnockWidget.tsx`, `sonnet`, review `medium`. Both cut from #686 (19); the wayin-proving ruling stays the Coach's, at the end.
+
+*Review (17):* none (docs only, as the gloss set). Done: READMEs, SECURITY.md, notes/security.md (sonnet subagent), VOCABULARY, STYLE's Chute exception, the changesets as one note, design-models.md and design-proof.md rewritten to the code, gallant facts, old_vocabulary, TODO judged entry by entry (commit b25094227 gives each reason), the Coach's `__typename` side quest. To *Open Matters*: the wayin-proving ruling (TOP), gallant's `#no-fake-values` pair, the stale TODO on a read before a create. Code leftovers to **17t `bank_tidy`** (sonnet, stacked on #688): two `BoxFormat`s (5002 exported from `safebyok/storage`, 5003 used), `vault_empty` never thrown, `errors.ts`'s `already_asking` comment, `validator.ts`'s `gate_epoch` example, `Bank.demandPresent` maybe unreachable. Filed at 2d4da3784, rebased onto #687.
 
 *Review (17r):* `fixed` (sonnet, medium; [#687](https://github.com/mrflip/safebyok/pull/687)). One whitespace fix (a test table realigned after `sizeOf`). Checked: `wouldPassLimit` has `refuses`'s polarity; no renamed name is exported, so the changeset is empty; `useProvided` is internal, left; both `ensureUnlocked` calls kept, since `putBox` still demands an unlocked bank and `CreateVaultButton` promises the unlock dialog (the *Finally* item's premise was wrong; *Your calls*). Filed at 251d43923, on #686.
 
