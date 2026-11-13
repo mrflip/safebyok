@@ -18,6 +18,7 @@ export const BankFormat = 3001
 export const GateFormat = 4001
 /** The `fmt` every vault row of a bank carries. */
 export const VaultFormat = 6003
+/** The `fmt` every box row of a bank carries, as `SX.BoxFormat` defines it. */
 export { BoxFormat } from './shapes-storage'
 // --
 
