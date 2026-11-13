@@ -83,8 +83,9 @@ In order. A later item that depends on an earlier one says so.
 
 * **A void vault in place of the create dialog.** The Coach, 2026-11-07 (thread 11 of the react_new
   sprint, [#578](https://github.com/mrflip/safebyok/pull/578)): a vault not yet stored starts as a
-  tombstone, as a box does, so `bank.ensureVault` never opens a dialog by itself. A thread of its
-  own, after the react_new sprint. Meanwhile the React layer works around it: `useVault` never
+  tombstone, as a box does. Since the bank_world sprint `bank.ensureVault` opens no dialog (a vault's
+  birth asks nobody, and a locked bank will do); what is left is the void vault itself. A thread of its
+  own. Meanwhile the React layer works around it: `useVault` never
   asks, and the first click that needs the vault creates it.
 
 * **A bank's hello could load far more efficiently.** Today it reads every box three times, and whole. The plan, and
@@ -154,19 +155,14 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 * **The demo shows an account-like badge while the vault is unlocked** (the Coach, on #261):
   you can click it to log out with an in-place confirmation.
 * **The React demo offers a format helper for the lease's deadline** (the Coach, 2026-10-22):
-  `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` in the user's locale for
-  `vault.askPassphraseAt`, as a `passphraseDeadlineText` ("Tue, Oct 27, 3:00 PM") and a
-  `passphraseUntilText` ("in 2 days"); `askPassphraseAt`'s doc block already hints at them.
+  `Intl.DateTimeFormat` and `Intl.RelativeTimeFormat` in the user's locale, as a `passphraseDeadlineText`
+  ("Tue, Oct 27, 3:00 PM") and a `passphraseUntilText` ("in 2 days"). No public call hands a host the bank
+  lease's deadline today: `Lease.tryExpiresAt`, which `bank.autolock()` reads, is internal. One comes first.
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
-  priority, make it a TODO"): without a passphrase, a user may forget the vault on this device
+  priority, make it a TODO"): without a passphrase, a user may forget the bank on this device
   (`bank.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
-  bankDB: `vault.del()` needs the passphrase.
+  bankDB: `bank.delPrompt()` asks for a proof, and `vault.del()` needs the bank unlocked.
 
-* **After the restyle (#273 to #283): two later changes.** Each changes a signature or a
-  refusal, so each waited for its own PR. `Box.seal` still accepts the two epochs from its caller
-  without checking them; reading them from the vault's own record would remove the argument. A
-  `damaged_wayin` refusal's meta and a Wayin's JSON still carry the older wayin summary with
-  `vault_tok`, whereas the snapshot shows each wayin as its sparse shape.
 * **The names' byte-size refusals are unreachable.** Since the restyle (#273) names are short
   labels, so their share of the vault's byte check and of `box_too_large` cannot be reached from
   a vault. The code stays until the box-limit code is next changed; drop it then.
@@ -227,10 +223,11 @@ is shaped around it.
 
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
 first matter said rotation "re-wraps the remaining wayins", but it can't: each wayin's key
-comes from a passphrase or a passkey touch the vault never keeps, and any shortcut would hand the
+comes from a passphrase or a passkey touch the bank never keeps, and any shortcut would hand the
 new bankKey to the wayin being removed. So the design keeps only the wayins the user proves
 during the rotation and removes the rest -- which is also what locks out a lost phone's passkey,
-and signs every other device out until it is asked again. The alternative, a key pair per wayin
+and signs every other device out until it is asked again. The bankKey wraps the boxKey of every box in every
+vault of the bank, so one rotation rewraps them all, and signs a device out of every vault at once. The alternative, a key pair per wayin
 so rotation can re-wrap every wayin unasked (HPKE), is a new construction (the design's open
 question 1). That design file is gone: the Coach (2026-10-18) removed it, "we will have a different
 plan", so the question remains open for the plan that replaces it.
@@ -244,8 +241,8 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 `prior_bank_key` (the previous bankKey, wrapped under the current one) and the check that its
 epoch was one below the vault props'. `trust_lines` (2026-10-21) removed `vault_key_epoch` from every record, and
 storage's comparison of a box's epoch against the vault props', on the Coach's ruling: the bankKey
-never changes until rotation is built, and a vault made anew has a new `vault_tok`, which already
-voids every box. Rotation adds an epoch back, with its own format bump, when it is built.
+never changes until rotation is built, a vault made anew has a new `vault_tok`, which already
+voids every box, and a bank built anew has a new bankKey. Rotation adds an epoch back, with its own format bump, when it is built.
 
 ### "tombstone vaults; decide if the vault_tok is a check -- the labels are meant to be the primary key"
 
@@ -256,36 +253,24 @@ user id, vaultlabel) while `vault_tok` is checked against the device's mark and 
 Decide whether a deleted vault leaves a tombstone, and whether `vault_tok`
 stays a check or the labels alone identify the vault.
 
-### `del()`'s edge cases
-
-From the Convex sprint ([#18](https://github.com/mrflip/safebyok/pull/18)): a handle that never
-saw vault props resolves `del()` without deleting anything, even if a vault has since appeared elsewhere, so
-"delete account" can report success while a vault is stored. And after a refused `del()`, an
-app's automatic retry deletes the vault that was made again in between. The Coach (2026-10-16):
-assess these once the contract is tight and the tests unified -- that is, against
-the old design's [`VAULTDB.md`](https://github.com/mrflip/safebyok/blob/100256bb79797b80de9e7a9affd92073b49671f3/packages/safebyok-old/VAULTDB.md) ([#107](https://github.com/mrflip/safebyok/pull/107)) and the
-shared battery ([#114](https://github.com/mrflip/safebyok/pull/114)), after the Convex tests settle
-in their home ([#111](https://github.com/mrflip/safebyok/pull/111)). First check whether big_feats
-changed either.
-
 ### Lock timing vs. work in flight: what is left of the policy
 
 `packages/safebyok/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
 that has been sent completes or is refused as storage decides; a call still at a step before its write refuses with
-`vault_locked`; a read that would return a whisper refuses; and a lock and an unlock each do their own work, in order,
-so a lock that lands during an unlock's proof leaves the vault unlocked. Still open, from the scenarios that
+`bank_locked`; a read that would return a whisper refuses; and a lock and an unlock each do their own work, in order,
+so a lock that lands during an unlock's proof leaves the bank unlocked. Still open, from the scenarios that
 `softlock_gone` (2026-10-19) listed:
 
-* **The DeviceDB throws when a lock revokes the lease** (`lock()` refuses with `storage_blocked` or
-  `storage_unavailable`, and the vault is locked in memory): the lease on disk survives, and the next
-  birth on this device takes it up. Decide whether a lease a lock failed to revoke is marked, or
-  the next birth asks first.
+* **The DeviceDB throws when a lock forgets the lease**: `bank.lock()` locks in memory at once, and a refused forget
+  is announced as `lease_revoke_failed`, on which `DefaultOnLifecycle` vacates the device. A host whose
+  `onLifecycle` does less leaves the lease row on disk, and the next Bank on this device takes it up
+  (`Lease.buildFromCache`). Decide whether a lease a lock failed to forget is marked, or the next unlock asks first.
 * **A sign-out with an unlock in flight in another tab**: harmless today, because a lease is scoped
-  by user id.
+  by the bank's scope, the user id included.
 * **A call is not refused when a lock lands during its opening hello** (the documentarian's run 2,
   [#312](https://github.com/mrflip/safebyok/pull/312)): the call then finds no lease and prompts
-  the user, whereas a lock that lands one step later makes the call refuse with 'vault_locked'.
-  Decide whether the opening hello is a step at which a lock makes the call refuse.
+  the user, whereas a lock that lands one step later makes the call refuse with 'bank_locked'.
+  Decide whether the opening refresh is a step at which a lock makes the call refuse.
 
 ### Should there be a notification for vacate, delete, sweep and lock events?
 
@@ -294,24 +279,23 @@ enabled flag, so a thing learns of its end only by asking (`isEnabled`, or a cal
 host or a listener hears no event at a vacate, a delete, a sweep or a lock beyond the device's one
 tell. Decide whether each of these is announced, to whom, and whether a listener can tell which.
 
-### Must the passphrase be asked again once a vault has a passkey?
+### Must the passphrase be asked again once a bank has a passkey?
 
 The Gripefest doc's NOT YET row G530: whether asking for the passphrase again whenever a lease
-expires is still the right demand once a vault has a passkey. (The question beside it, whether a
-vault should have several passphrases, was settled by the Coach on 2026-10-19: one passphrase and
-at most one passkey, built in `slots`, B4a of the contract sprint.) Decide before the wayin
+expires is still the right demand once a bank has a passkey. (The question beside it, whether a
+bank should have several passphrases, was settled by the Coach on 2026-10-19: one passphrase and
+at most one passkey, the main gate's wayins `main` and `passkey0`.) Decide before the wayin
 surface is 1.0.
 
-### A passkey made for a refused `putWayin`
+### A passkey made for a refused `add_passkey` gating
 
-From the contract sprint's B4 (`put_wayin`): `vault.putWayin(passphrase, answer)` accepts a passkey's
-answer made before the call, so the core has no UI and calls no host code inside the change. If
-the vault then refuses the passphrase (a typo, say), that new passkey stays on the authenticator
-and unlocks nothing, and each retry makes another. The earlier `addPasskey(passphrase, makePasskey)`
-asked the authenticator only after the passphrase was proven, at the cost of running host code
-inside the call. Decide, once the control flow is mature, whether the user experience justifies
-checking the passphrase before `createPasskey` (as a separate call, or by passing a maker function
-again), or whether the README's note is enough.
+From the contract sprint's B4 (`put_wayin`): an `add_passkey` gating (`bank.maingate.addPasskeyPrompt()`) is
+answered with the passphrase and a passkey's answer made before the attempt, so the core has no UI and calls no
+host code inside the change. If the gate then refuses the passphrase (a typo, say), that new passkey stays on the
+authenticator and unlocks nothing, and each retry makes another. The earlier `addPasskey(passphrase, makePasskey)`
+asked the authenticator only after the passphrase was proven, at the cost of running host code inside the call.
+Decide, once the control flow is mature, whether the user experience justifies checking the passphrase before
+`createPasskey` (as a separate call, or by passing a maker function again), or whether the README's note is enough.
 `safebyok-react`'s add-passkey dialog asks for the passphrase before `createPasskey` when the field
 is empty (the Coach, 2026-11-07); a typo still leaves a passkey behind.
 
@@ -343,11 +327,6 @@ So a dialog that fails for a reason the host could name (a lost user gesture, a 
 platform refused) cannot say so. Decide what a `requestCleartext` may refuse with: a short list of
 kinds it may throw as `VaultError`s, which are passed on unchanged, or a `gating.refuse(kind)`
 beside `dismiss()`.
-
-The same throw reaches `del()` (the documentarian's run 2,
-[#312](https://github.com/mrflip/safebyok/pull/312)): once its write is sent, a `requestCleartext`
-that throws becomes the gating's late landing, so a deletion storage then refuses reaches the
-caller as 'unexpected_error', not 'vault_locked'.
 
 ### "Add "sensitive" and "host" flags to refusals"
 
@@ -387,16 +366,6 @@ the package for other work done on every call that could be composed once when t
 adapter is made, or memoized: a check of an option, a formatter, a validator built per call. Measure
 first; maintainability beats speed unless something is shown slow.
 
-### A wayin change racing this handle's own refresh
-
-From thread 4 ([#132](https://github.com/mrflip/safebyok/pull/132), `thread-4-refusals_and_catchup.md`,
-*A pre-existing race*): during a change to the wayins, this handle's own bell refresh can read the
-new vault props before `reviseWayins` sets it, judge the key `outlived`, drop it and discard the
-lease. `grantLease` restores the key in memory, but that discard can be written after the
-new record, so the next open asks for the passphrase. The direction is safe, and serializing the
-refreshes does not cure it. The Coach (2026-10-16): into the TODO, beside the multiple-passphrases
-question. The fix, small: do not judge `outlived` against vault props this handle wrote itself.
-
 ### A gate row landing between a gate verb's write and its lease grant
 
 From the bank_world sprint's thread 8c ([#673](https://github.com/mrflip/safebyok/pull/673)): a gate
@@ -410,10 +379,9 @@ issue? (The Coach thinks so.) Should the lease row in the deviceDB be written by
 ### Cross-device invalidation, by a token each device authenticates
 
 From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second
-review): a device learns that another deleted the vault, or changed its ways in, only when it next
-reads, so until then it may stay unlocked on vault props that are no longer stored (it fails safe at
-that read: the key is dropped and the lease revoked). `a_sec2` closed the only window in which that
-could outlast a read: a first unlock that creates the vault while it is being deleted. The Coach (2026-10-19):
+review): a device learns that another deleted the bank, or changed its gate, only when the row reaches it (by a
+watch or its next fetch). A device already unlocked stays unlocked across another device's gate verb, by design;
+a bank's tombstone, once it arrives, ends its Bank and forgets its lease. The Coach (2026-10-19):
 "cross device invalidation should be done by a proper mechanism that is coming, where each device
 authenticates a token when it joins or creates a vault." Not to be built piecemeal ahead of it: the
 design question is the token, what storage checks it against, and how a deletion revokes it.
@@ -438,35 +406,23 @@ how an adopted capacity ages, since a hello's listing recounts it.
 ### The stamp, not the scope, as a BankDB request's parameter
 
 The Coach (2026-10-22): each BankDB verb takes the scope and an expectation beside it; a verb
-could instead take the whole stamp (`{ ...scope, vault_tok, vault_epoch, gate_epoch }`). Also send
+could instead take the whole stamp (`bankStamp`, `gateStamp`, `vaultStamp`: the scope, its life's tok and
+`registered_at`). Also send
 the authenticated immutable fields with puts and reads, so that a server can refuse early what the
 ctx would refuse late. Decide with the wire shapes (`safebyok-graphql`, the Postgres route), since
 both are contracts a host's server and browser share.
 
-### Whether `damaged_lease` calls `lock()`
-
-The Coach (2026-10-22): a lease that will not unwrap is dropped and revoked the same way `lock()`
-drops and revokes it, but without calling `lock()`. Decide whether that path should call `lock()`
-itself (which would end a pending gating and conclude `lockLanded`), taking care that the lock does
-not recurse into the call that found the damage.
-
-### Who keeps the lease's expiry
-
-The Coach (2026-10-22): have only the passphrase proving, or a parent object, hold the lease's
-expiry, instead of the Vault object's timer. Thread 8 of the primitives sprint considered it and
-kept the Vault object's timer; decide once the gating's chains have settled.
-
 ### A policy for asking every time
 
 The Coach (on #261: "figure out how to give that policy"): a host may want the user asked at
-every call. `autolockMinutes` has a minimum above zero; today the host calls `lock()` when it is
+every call. `autolockMinutes` has a minimum above zero; today the host calls `bank.lock()` when it is
 done. Decide how a host says "ask every time", and what a zero-length lease means for the DeviceDB.
 
 ### What "rollback" means
 
 The Coach (2026-10-26): "We have a lot of things surrounding the very muddy meaning of rollback." The device watermark
 is gone, and storage that rolls a record back is not detected beyond one session (`notes/wontfix.md`, 2026-11-07). What remains is
-`gate_epoch`, `revision_seq` and `stale_write`, each guarding against a different kind of "going backwards". Settle one definition,
+`gate_revision_tok` (a lease citing an earlier gate revision is forgotten), `revision_seq` and `stale_write`, each guarding against a different kind of "going backwards". Settle one definition,
 say which mechanism guards which case, and name each mechanism for its case.
 
 ### An edit is never put to the device cache
@@ -480,36 +436,24 @@ listing's `align` (the staged record has the whisper sealed, never in the clear,
 safe to keep), and what a restored staged edit means when another device may have written a later
 revision in the meantime.
 
-### Flush and remake every instance of a vault made anew
-
-The Coach (2026-10-30, the storable sprint, thread 9): "If box receives a record with a different
-vault_tok it should throw unexpected error, I'm pretty sure we will want to flush all instances and
-remake them". Today a storable's `vault_tok` is fixed at its birth, and a record with a different
-`vault_tok` throws 'unexpected_error' from `reconcileCentral`, before any row, to the fetch, put,
-del or build that delivered it, or to `onBadNews` from a notice or a refresh the timer launches.
-Nothing remakes anything: the host must load the vault again. The design question: who notices that
-a vault has been made anew (the vault listing on the vault's own record, or a box listing on its
-first box), and how every instance of the old life is released, its listeners notified, and the
-listing rebuilt under the new `vault_tok`, with its device cache cleared.
-
 ### An extended key structure for the deviceDB
 
 The Coach (2026-11-07, on the devicedb_verbs thread): "I've got concerns about the key structure
 (or I can put it more cheerfully: I believe that an extended key structure can ameliorate some
-problems) but I'll leave that for later". Today a lease row is keyed by its scope (banklabel,
-user id, vaultlabel) alone, and its `vault_tok` is a field checked against the query: `peek`
+problems) but I'll leave that for later". Today a lease row is keyed by its bank scope (user id,
+banklabel) alone, and its `bank_tok` is a field checked against the query: `peek`
 checks it in the base, and `forget` leaves the check to the DeviceDB, which makes it in one atomic
-step with its delete. A key that also included the `vault_tok` would make `forget` a delete at a
+step with its delete. A key that also included the `bank_tok` would make `forget` a delete at a
 key, with no check to run. The design question: which fields the key includes, and what it
 ameliorates beyond that.
 
-### A cached lease newer than the vault in hand refreshes the vault
+### A cached lease newer than the gate in hand refreshes the gate
 
-The Coach (2026-11-10): "We should not be dumb about loading from the cache." `Lease.buildFromCache` forgets a cached row whose
-`gate_epoch` or `vault_tok` differs and asks for a proof, even though the row may be another tab's good lease for a vault of which this
-tab has a stale copy; that behaviour is broken, and `lease.ts` marks it so. Write the lease transactionally, so that when a stowed lease
-is newer than this tab's copy of the vault, by `vault_tok`, `gate_epoch` or the vault's revision, the vault is refreshed and the lease is
-used. A lease carries no revision today.
+The Coach (2026-11-10): "We should not be dumb about loading from the cache." `Lease.buildFromCache` forgets a cached row
+whose `gate_tok` or `gate_revision_tok` differs from the main gate in hand, and the user is asked to prove again, even though
+the row may be another tab's good lease, made after a gate verb of which this tab has a stale copy; that behaviour is broken,
+and `lease.ts` marks it so. Write the lease transactionally, so that when a stowed lease cites a gate revision newer than this
+tab's copy of the gate, the gate is refreshed and the lease is used. A lease carries no revision of its own today.
 
 ### A fetch that meets a damaged row, and edge cases generally
 
@@ -565,7 +509,7 @@ Evaluate whether a Bank, one per device, needs replacing at all; until that is d
 The Coach (2026-11-12): "bank should get vacate at some point; is there a reason it can't go on storable -- vacate myself, vacate my protected getter
 `children():Listing` -- now that bank vault and box look more alike?" The answer so far: thread 10 ([#677](https://github.com/mrflip/safebyok/pull/677))
 removed the per-thing vacate so that the device's enabled flag is the only one. A `bank.vacate()` could be the public name of the Bank's existing end
-path (its lease revoked, its vault listing let go), which would also clear an ended Bank's snapshot of its vaults (#677's other open row). Putting
+path (its lease revoked, its vault listing let go). Putting
 vacate on `Storable` with `children()` would bring back per-thing ended state; that is the cost to weigh.
 
 ## Potential Optimizations

@@ -505,7 +505,10 @@ A member that will not describe in a line is a smell: report it.
   above the block (below); a caveat, a progress note or an open question goes to `human/` or the whiteboard, never here.
 * **A doc block does not read the body aloud** `#purpose-not-machinery`: not the steps or their order, the helpers it calls,
   the fields it touches, or the state a refusal leaves behind. The body is a line below, and a caller who needs it will open
-  it. The test: cover the body and ask of each sentence whether the caller still needs it.
+  it. The test: cover the body and ask of each sentence whether the caller still needs it. The one exception is a
+  `Chute:` line, last in the block: the chain of calls from this member down to the one that receives the record
+  (`Chute: tryPut → doTryPut → deliverAnswer → … → thing.receiveRecord`). It is kept because "it helps a user 'gosh I wish
+  I could just call a method that takes an object/doesn't hydrate/etc'" (the Coach): it shows where to step in.
 * **The first sentence names the act or the thing** `#name-the-act`. A function that puts, decrypts, asks the user or sends opens with that
   verb: `Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata`. A lookup, a type
   or a constant opens with what it is or returns: ``Vault **or tombstone** listed at `scope`, null if absent.`` When that

@@ -11,14 +11,22 @@ devices through a storage layer the host plugs in.
 * **The backend has ciphertext it cannot decrypt.** It can read labels and times, which are
   authenticated but never encrypted, and each box's sidecar, which is neither: the backend can read
   and change a sidecar, and the box still opens. Put no secret in a sidecar (*Whisper and sidecar*).
-* **Nothing is recoverable, and removal is not revocation.** Nobody can unlock a vault whose
+* **One unlock opens every vault of the bank.** A bank has one passphrase, and at most one passkey,
+  for all its vaults. Once the user unlocks it on a device, every box of every vault in it can be
+  unsealed there until the bank locks. Secrets that must be unlocked separately belong in separate
+  banks, each under its own `banklabel`.
+* **Nothing is recoverable, and removal is not revocation.** Nobody can unlock a bank whose
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
-  no longer unlocks the vault, but the bankKey never changes, so a copy of the old record can still
-  be unlocked with the old passphrase or passkey.
-* **State is framework-agnostic.** `Device`, `Bank`, `Vault`, `Box` and `vault.boxListing` each have
-  `subscribe` and `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore`
-  takes them. A snapshot is the same object until something changes, and never contains a whisper.
-  It is plain data, except for the device's `openGating`, which is the live gating your dialog calls.
+  no longer unlocks the bank, but the bankKey never changes, so a copy of the old gate row can still
+  be unlocked with the old passphrase or passkey. Deleting a vault deletes its boxes but no key:
+  a copy of those boxes kept elsewhere still unseals under the bank's key. Only deleting the bank,
+  with `bank.delPrompt()`, removes the stored copies of its key.
+* **State is framework-agnostic.** `Device`, `Bank`, `Vault`, `Box`, the main gate
+  (`bank.maingate`) and each listing (`bank.vaultListing`, `vault.boxListing`) have `subscribe` and
+  `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore` takes them. A
+  snapshot is the same object until something changes, shows only its own thing's state (a
+  listing's is its labels), and never contains a whisper. It is plain data, except for the device's
+  `openGating`, which is the live gating your dialog calls.
 * **The core speaks only to interfaces**: a `BankDB` for what syncs, a `DeviceDB` for what stays
   on this device, and a `KeyDeriver`. Each adapter is its own package. The core uses no Node
   built-ins, so it runs wherever the host does.
@@ -38,16 +46,19 @@ types here do not have, trust the types.
 * **whisper**: the secret, always a plain JSON object, such as `{ apiKey: 'sk-...' }`. A **box**
   contains one whisper, encrypted, along with its `boxlabel` and sidecar.
 * **vault**: one user's boxes, named by `user_id`, `banklabel` and `vaultlabel`. A vault that is
-  deleted and made again is a new life, with a new `vault_tok` and a new `Vault` instance.
+  deleted and made again is a new life, with a new `vault_tok`; the `Vault` object for its scope
+  stays the same, and moves to the new life.
 * **device**: the signed-in user's presence on this browser. It holds your options and functions,
   and brings up the bank.
-* **bank**: a signed-in user's vaults and what they share. One per signed-in user.
-* **wayin**: one way into a vault: its passphrase or its passkey. A vault has one passphrase and at
-  most one passkey; together they are its **gate**.
+* **bank**: a signed-in user's vaults and what they share: one gate, one lease and one lock. One
+  per signed-in user and `banklabel`. A bank deleted, or built again on another device, disables its
+  `Bank` object; `device.ensureBank()` then returns another.
+* **wayin**: one way into the bank: its passphrase or its passkey. A bank has one passphrase and at
+  most one passkey; together they are its **gate**, `bank.maingate`.
 * **gating**: one request for the user's passphrase or passkey, and the only place where UI meets
-  the vault. It appears in the device's snapshot as `openGating`, and the device passes it to your
+  the bank. It appears in the device's snapshot as `openGating`, and the device passes it to your
   `requestCleartext` if you gave one.
-* **lease**: a grant that lets this device unlock again without asking the user, until
+* **lease**: a grant that lets this device unlock the bank again without asking the user, until
   `autolockMinutes` have passed.
 
 ## Whisper and sidecar
@@ -110,7 +121,7 @@ dialog.
 
 Easy to get wrong:
 
-* With no `strengthChecker`, every new passphrase is refused as `weak_passphrase`, so no vault can
+* With no `strengthChecker`, every new passphrase is refused as `weak_passphrase`, so no bank can
   be built. `browserOpts` supplies `zxcvbnStrengthChecker`, whose dictionary loads at `device.ensureBank()`.
 * The core sets no timers. Call `bank.autolock()` after `ensureBank` and on a timer of your own.
 * `vault.beginWatch()` lists a vault's boxes and starts watching them. Until you call it,
@@ -136,9 +147,9 @@ Easy to get wrong:
 * **`onLifecycle` receives the device's lifecycle events.** Each is a `DeviceEvent`, distinguished by
   its `kind`: `helloed`, with the outcome of each `vault.beginWatch()` and of each `device.ensureBank()`
   until the bank is up; `lease_revoke_failed`, when a cached lease could not be removed, with
-  `where` it happened and the vault, if there is one; and `vacated`. If you pass no `onLifecycle`,
+  `where` it happened and the bank, if there is one; and `vacated`. If you pass no `onLifecycle`,
   `DefaultOnLifecycle` handles them. For a lease that a lock or a vacate could not remove, it logs
-  an error, reports it to the platform and vacates the vault. It reports a vacate's cause the same
+  an error, reports it to the platform and vacates the device. It reports a vacate's cause the same
   way, unless the cause is `disabled`. It logs a warning for anything else that went wrong. Your own
   `onLifecycle` replaces that policy; to keep the default's policy as well, call it from yours:
 
@@ -165,8 +176,8 @@ Easy to get wrong:
 `await bank.tryProbe()` tries the whole storage path once: it replaces one box, `box1` in the
 vault `home`, fetches it back and unseals it. A missing grant or a blocked database then shows up at
 startup, not at the first `putBox`. It returns an `Outcome`. On success, its `val` says what each
-step found and when, and contains no whisper, ciphertext or wrapped key. The probe prompts the user
-if the vault is absent or locked. You can pass each label, the whisper and the sidecar.
+step found and when, and contains no whisper, ciphertext or wrapped key. The probe asks the user
+if the bank is locked, and makes the vault if it is absent. You can pass each label, the whisper and the sidecar.
 `{ maxMillisSinceRefresh }`, 1000 by default, sets how fresh the vault and box must be, independently
 of the device's own refresh settings. The probe leaves the box in place, and it counts toward the
 vault's `maxBoxes`.
@@ -179,7 +190,7 @@ fields, and a put of that bag is refused. `box.exposure` says whether it is show
 `'unexposed'`, `'locked'`, `'veiled'` or `'showing'` (`useBoxExposure` in safebyok-react). `box.isShowing` and
 `box.isVeiled` are the two booleans, and `isWhisperedBag(val)` is true for one of those bags and
 false for a whisper. Don't compare `box.whisper` with a bag or read its mark: a second copy of
-safebyok has bags of its own. A veiled box stays veiled while its vault is locked: `box.isVeiled`
+safebyok has bags of its own. A veiled box stays veiled while its bank is locked: `box.isVeiled`
 is still true, and `box.exposure` is `'locked'`. A box's snapshot has `isExposed`, `isVeiled`, and
 `isLocked`, its bank's lock; a vault's snapshot has no lock of its own. `box.veil()` hides
 the whisper and `box.unveil()` shows it again, and the veil is cleared when the whisper is removed.
@@ -192,7 +203,7 @@ each of these changes.
 const device = Device.make({
   /* ... */
   requestCleartext: async (gating) => {
-    await gating.attempt({ passphraseClear: await doppler.get('VAULT_PASSPHRASE') })
+    await gating.attempt({ passphraseClear: await doppler.get('BANK_PASSPHRASE') })
   },
 })
 const bank = await device.ensureBank()

@@ -20,7 +20,7 @@ This repository is a pnpm workspace. Its packages:
   Client that calls them from the browser.
 * [`safebyok-fastkey`](packages/safebyok-fastkey) -- Argon2id through WebAssembly: a
   key deriver several times faster than the core's, deriving the same bytes under the same specs.
-* [`safebyok-indexeddb`](packages/safebyok-indexeddb) -- IndexedDB storage: a vault stored in this
+* [`safebyok-indexeddb`](packages/safebyok-indexeddb) -- IndexedDB storage: a bank stored in this
   browser, each call in one transaction, and a template for a key-value backend of your own.
 * [`safebyok-demo-react`](demos/safebyok-demo-react) -- a playground app; never published.
 * [`safebyok-e2e`](e2e) -- the tests that pair an adapter with a framework's client; never published.
@@ -28,30 +28,43 @@ This repository is a pnpm workspace. Its packages:
 `pnpm install`, then `pnpm justify` lints, typechecks, tests and builds every package.
 [CONTRIBUTING.md](CONTRIBUTING.md) has the rest.
 
-## Basic e2ee architecture:
+## The shape of it
 
-The old design's sketch. The new design's calls are in [its README](packages/safebyok/README.md).
+A sketch; the calls and their contracts are in [the core's README](packages/safebyok/README.md),
+and the names in [VOCABULARY.md](VOCABULARY.md).
 
-### Backend (BankDB)
+### Storage: the bankDB
 
-Facade over a backing database (convex, postgres, etc) or another bankDB (graphQL, etc).
-Has vault​s and box​es scoped by user_id, banklabel, vaultlabel and boxlabel.
-* A box has a sidecar under the app's control and an encrypted whisper​
-* verbs: vault: getVault (record and listing in one step), ensureVault (fetch or create; over a tombstone a new life), putVaultRecord, delVault (leaving a tombstone), subscribe; box: getBox, putBox, delBox.
+A facade over a backing database (Convex, Postgres, IndexedDB) or over another bankDB (GraphQL),
+holding four kinds of row, each scoped by `user_id` and `banklabel`:
+
+* a **bank** row, one per user and `banklabel`;
+* its **gate** row, `main`, holding the bankKey wrapped once for each wayin: the passphrase, and at
+  most one passkey;
+* a **vault** row per `vaultlabel`, holding nothing encrypted;
+* a **box** row per `boxlabel` in a vault, with the app's sidecar in the clear, and its whisper
+  sealed under a boxKey that the bankKey wraps.
+
+Its calls: `ensureBank`, `buildBank`, `delBank` and the gate verbs (`replacePassphrase`,
+`addPasskey`, `revokePasskey`); `getVault`, `putVault`, `delVault`; `listBoxes`, `getBox`, `putBox`,
+`delBox`; `tidyGone` and `watch`. A delete leaves a tombstone; a bank or vault made again is a new
+life, with a new token.
 
 ### Browser
 
-* a vault​ object
-  - Device.make({ user_id, banklabel, gates: ['main'], bankDB, deviceDB, keyDeriver, requestCleartext, ... })​: Device, non-async, one per signed-in user
-  - device.ensureBank(): Bank, once the deviceDB has this device's row and the vaults are listed; device.vacate() at sign-out
-  - bank.ensureVault({ vaultlabel }, { bankDB?, deviceDB? }?): Vault, born from one read of storage (never absent: `novel` until its passphrase is set)
-  - vault.beginWatch() (reads storage once its picture has aged; never asks the user)
-  - ensureUnlocked, lock​, putWayin(slotlabel)​, delWayin(slotlabel)​, del(), getBox(boxlabel)​, getWhisper(boxlabel)​, putBox({ boxlabel, sidecar? }, whisper?)​, delBox(boxlabel)
-  - a gating, handed to the app's requestCleartext, is the one place the user is asked for the passphrase or passkey
-* a pantry​ keeping keys
-* a DeviceDB​ safely keeping and managing access to the boxes (indexedDB)
-* a pluggable KDF (Argon2id wasm/native)
+* `Device.make({ user_id, banklabel, gates: ['main'], bankDB, deviceDB, keyDeriver, requestCleartext, ... })`:
+  a Device, synchronously, one per signed-in user. `device.vacate()` at sign-out.
+* `device.ensureBank()`: the Bank, once the deviceDB has this device's row and the vaults are
+  listed. One unlock of the bank (`bank.ensureUnlocked()`) opens every vault in it, until
+  `bank.lock()`; a lease kept in the deviceDB lets this device unlock again without asking, until it
+  expires. `bank.maingate` changes the passphrase or passkeys; `bank.delPrompt()` deletes the bank.
+* `bank.ensureVault({ vaultlabel })`: a Vault, fetched or made, asking nobody.
+  `vault.beginWatch()` lists its boxes and watches them; `vault.getBox`, `putBox` and `delBox` do
+  the rest.
+* A gating, handed to the app's `requestCleartext` or shown in the device's snapshot, is the one
+  place the user is asked for the passphrase or passkey.
+* The key derivation function is pluggable: Argon2id in the browser by default, or through
+  WebAssembly with `safebyok-fastkey`.
 
-assume initially that the app provides and guarantees the user_id, and that the bankDB can access all and only the records needed to support this.
-the app interface is to call  non-async At the app level, whisper is anything JSONable.
-for concreteness of discussion, assume a postgres backing database,
+The app vouches for the `user_id`, and its bankDB reaches all and only that user's rows. A whisper
+is any JSON object.

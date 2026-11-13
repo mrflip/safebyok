@@ -1,6 +1,6 @@
 # safebyok-react
 
-React bindings for the safebyok vault: a provider, hooks, and dialogs. A full guide is coming.
+React bindings for safebyok's bank and vaults: a provider, hooks, and dialogs. A full guide is coming.
 
 ## Building a form safely
 
@@ -32,8 +32,8 @@ function ApiKeyField({ box }) {
 ```
 
 The whisper reaches no prop or state of yours, so it is only in the page (and on the screen), where React's dev tools
-do not list it. The field goes blank when the vault locks or the box is veiled, and comes back, with any unsaved edit,
-when the whisper shows again. Nothing is stored until `fields.put()`. Both calls fail while the vault is locked, so
+do not list it. The field goes blank when the bank locks or the box is veiled, and comes back, with any unsaved edit,
+when the whisper shows again. Nothing is stored until `fields.put()`. Both calls fail while the bank is locked (`box.expose()` refuses `bank_locked`), so
 `showOutcome` and `showRefusal`, yours to write, should say so. `BoxFields.of` returns the same instance for a box
 wherever it is called. Outside React, `const letGo = BoxFields.of(box).bind('apiKey')(el)` fills any element that has
 a `value`, and `letGo()` unbinds it.
