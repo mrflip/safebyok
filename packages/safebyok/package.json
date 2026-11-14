@@ -1,0 +1,87 @@
+{
+  "name": "safebyok",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The lean core of safebyok: the device, bank, gate, gating, wayins, provings and lease, with no storage of their own",
+  "license": "Apache-2.0",
+  "author": "Philip (flip) Kromer <flip@mrflip.com>",
+  "homepage": "https://github.com/mrflip/safebyok#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mrflip/safebyok.git",
+    "directory": "packages/safebyok"
+  },
+  "bugs": {
+    "url": "https://github.com/mrflip/safebyok/issues"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "prebuild": "pnpm build:deps",
+    "build:watch": "tsdown --watch",
+    "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok^...' build",
+    "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "pretest": "pnpm build:deps",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "pretest:coverage": "pnpm build:deps",
+    "justify": "pnpm install && pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/core": "^0.18.5",
+    "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "^24.19.2",
+    "@vitest/coverage-v8": "^5.1.0",
+    "@vitest/eslint-plugin": "^1.6.28",
+    "eslint": "^10.14.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-chai-expect": "^4.1.1",
+    "eslint-plugin-chai-friendly": "^1.2.1",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-jsdoc": "^65.4.3",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "eslint-plugin-unicorn": "^79.0.0",
+    "publint": "^0.3.25",
+    "tsdown": "^0.23.5",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.1.0",
+    "zod": "^4.6.7"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "@safebyok/source": "./src/index.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "safebyok-big": "workspace:*"
+  },
+  "peerDependencies": {
+    "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  }
+}
