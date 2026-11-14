@@ -17,11 +17,11 @@ means merged, or on #470. *Planned* means ruled or proposed for a later thread i
 
 Contents:
 
-* **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`
+* **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`, `#lede-first`
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#chain-guards`, `#no-second-ensure`
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
-* **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`
-* **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`
+* **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`, `#callee-parses`
+* **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`, `#record-then-opts`, `#stamp-is-a-getter`
 * **Words:** `#purpose-not-path`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`, `#a-helper-gets-a-phrase`, `#its-name-is-its-doc`
 * **Reading the Coach:** `#a-fact-is-not-a-ruling`, `#dont-overstretch-a-request`
 
@@ -350,6 +350,27 @@ try {
   return null
 }
 ```
+
+## Lead with the star `#lede-first`
+
+When the thing a passage exists to make shows up only as an argument to something else, the reader has to dig for it.
+Name it on a line of its own, then use it.
+
+**Goofus:** the bank's record, the point of the step, is buried as an argument to the bank's own `make`. It was proposed in
+the design of the new core's birth.
+
+```ts
+bank = Bank.make(Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins } }), { device })
+```
+
+**Gallant:**
+
+```ts
+const bankRecord = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins } })
+const bank = Bank.make(bankRecord, { device })
+```
+
+*Status: Fixed in the design, `whiteboard/20261114-lean_gate`.*
 
 ---
 
@@ -769,6 +790,46 @@ return this.boxListing.puttable({ ...patch, ...this.scope }, opts).put(patch, op
 
 *Status: `boxPut`, Fixed. `bankOpts` and the listings' opts, Planned, Thread 2.*
 
+## The callee parses `#callee-parses`
+
+A function checks what it is handed, and a caller passes what it has. A parse at the call site, into the callee's shape,
+guesses at what the callee wants, muddies the call, and checks the same thing twice.
+
+**Goofus:** the lease's builder parses the record it is about to hand the Lease's constructor, which parses it again.
+
+```ts
+return new Lease(friend, leaseRecord.parse({ ...granted, lease_key: leaseKey, bank_key_lease_wrapped }), false)
+```
+
+**Gallant:** `make` takes its validator's input type (`Z.input<typeof GX.leaseRecord>`), so a value not yet branded passes,
+and its own parse brands it.
+
+```ts
+return Lease.make({ ...granted, lease_key: leaseKey, bank_key_lease_wrapped }, { bank })
+```
+
+**Goofus again:** the bank runs the lease's own validator, `leaseSealArgs`, then hands the same arguments to the lease, which
+runs it again.
+
+```ts
+async sealWith(whisperText: string, stamps: readonly CipherCtxRecord[]): Promise<SealedWhisper> {
+  const checked = GX.leaseSealArgs.parse({ whisperText, stamps })
+  return this.#demandLease().sealWith(checked.whisperText, checked.stamps)
+}
+```
+
+**Gallant again:**
+
+```ts
+async sealWith(whisperText: string, stamps: readonly CipherCtxRecord[]): Promise<SealedWhisper> {
+  return this.#demandLease().sealWith(whisperText, stamps)
+}
+```
+
+A function that parses its own return value, to brand what it hands back, is not making this mistake.
+
+*Status: the new core follows it, thread `20261114-lean_gate`, not yet merged. `safebyok-big` keeps the Goofus, frozen.*
+
 ---
 
 # Shapes and state
@@ -937,6 +998,65 @@ demandEnabled():    this { if (! this.#isEnabled) { throw disabledError() } retu
 demandPromptable(): this { return this.demandEnabled().demandPresent() }                  // one recipe, chained
 // demandBoxesUsable -- moved to Box and renamed for its callers                          // belongs near callers, as per its name
 ```
+
+## Record first, then what's live `#record-then-opts`
+
+A `make` takes `(recordish, livepropsAndOpts)`, or `(recordish, livepropsAndOpts, friend)`. The first argument is the
+record, give or take a few fields. The second carries what comes out of band: the live objects the thing reaches (its
+device, its bank) and its options. Each is shaped like a pick of the class's interface, so both parts duck as the thing.
+A friend means something specific, a bag of callbacks into its owner's private state, and goes in neither: only third.
+
+**Goofus:** the friend comes first, and a flag rides along beside the record.
+
+```ts
+private constructor(friend: LeaseFriend, record: LeaseRecord, isFromCache: boolean)
+```
+
+**Goofus again:** part of the record, the bank's main gate, travels with the live device. This was proposed in the new
+core's first draft.
+
+```ts
+Bank.make(record, { device, maingate })
+```
+
+**Gallant:** the main gate is part of the bank's record, and the device is what's live.
+
+```ts
+Bank.make({ ...record, maingate }, { device })
+Lease.make(record, { bank })
+```
+
+*Status: the new core follows it, thread `20261114-lean_gate`, not yet merged. `safebyok-big` keeps the Goofus, frozen.*
+
+## A stamp is read off its owner `#stamp-is-a-getter`
+
+A thing's `stamp` and `scope` are getters, read from whatever owns them. A copy parsed once and kept, or a frozen public
+prop, is a second source that can drift from the first, and every reader has to wonder which one is right.
+
+**Goofus:** the lease parses its bank's stamp out of the friend, once at construction and again in its builder, and keeps
+the copy.
+
+```ts
+readonly #bankStamp: BankStamp
+this.#bankStamp = bankStamp.parse(friend)
+const bankstamp = bankStamp.parse(friend)
+```
+
+**Goofus again:** the device's scope is a frozen public prop, beside the same fields tattooed onto the device itself.
+
+```ts
+readonly scope: BankScope
+this.scope = bankScope.parse({ user_id, banklabel })
+```
+
+**Gallant:**
+
+```ts
+#ctxOf(stamps, purpose) { return cipherCtx([this.#bank.stamp, ...stamps], purpose) }
+get scope(): BankScope { return CX.bankScope.parse(this) }
+```
+
+*Status: the new core follows it, thread `20261114-lean_gate`, not yet merged. `safebyok-big` keeps the Goofus, frozen.*
 
 ---
 

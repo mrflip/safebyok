@@ -173,7 +173,7 @@ export function undecipheredWhisper(): VaultError { return new VaultError('damag
 export function leaseNotInForce(): VaultError { return new VaultError('bank_locked', Phrases.LeaseNotInForce) }
 // --
 
-// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, cleartextsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight
+// == [Gating Throwers]: alreadyAsking, requestCleartextThrew, cleartextsThrew, samePassphrase, gateMadeElsewhere, gatingDismissed, gatingConcluded, attemptInFlight, gatingUnlaunched
 
 /** An `already_asking` refusal: a prompt is already open on this device. */
 export function alreadyAsking(): VaultError { return new VaultError('already_asking', Phrases.AlreadyAsking) }
@@ -198,6 +198,9 @@ export function gateMadeElsewhere(): VaultError { return new VaultError('gate_ma
 
 /** An `attempt_in_flight` refusal: another attempt on this prompt is still running. */
 export function attemptInFlight(): VaultError { return new VaultError('attempt_in_flight', Phrases.AttemptInFlight) }
+
+/** A `gating_unlaunched` refusal: an attempt on a gating before its launch. */
+export function gatingUnlaunched(): VaultError { return new VaultError('gating_unlaunched', Phrases.GatingUnlaunched) }
 
 // --
 
