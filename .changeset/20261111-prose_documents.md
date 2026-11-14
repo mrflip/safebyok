@@ -1,5 +1,5 @@
 ---
-"safebyok": patch
+"safebyok-big": patch
 "safebyok-react": patch
 "safebyok-fastkey": patch
 "safebyok-indexeddb": patch

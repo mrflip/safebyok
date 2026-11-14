@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 "safebyok-postgres": minor
 "safebyok-convex": minor
 "safebyok-graphql": minor

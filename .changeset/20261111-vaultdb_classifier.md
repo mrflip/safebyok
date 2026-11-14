@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 "safebyok-indexeddb": minor
 "safebyok-convex": minor
 "safebyok-graphql": minor

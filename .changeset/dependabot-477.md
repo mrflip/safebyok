@@ -1,5 +1,5 @@
 ---
-"safebyok": patch
+"safebyok-big": patch
 ---
 
 Dependabot moved a runtime dependency:

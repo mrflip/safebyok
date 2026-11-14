@@ -1,6 +1,6 @@
 ---
 "safebyok-graphql": minor
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 **safebyok-graphql is rewritten onto the new VaultDB.** In the browser, `graphqlVaultDB({ client })` gives way to `new GraphQLVaultDB({ client, maxRecordBytes? })`, a `VaultDB` from `safebyok/storage` over your urql Client, with `VaultOperations`, the documents it sends. On the server, `vaultResolvers({ vaultDB, userIdOf })` serves one vaultDB to every request, and refuses as `identity_revoked` an operation whose `user_id` is not the one `userIdOf(context)` answers; the per-request VaultDB factory is gone. `VaultSchemaSdl` is new: one root field per generic call, rows, records and options crossing as one `SafebyokJson` scalar, and `watch` a subscription, `safebyokHeard`. The field-by-field types and `fields` exports are gone. A refusal crosses with its message and `extensions: { kind, capacity?, fieldnames? }`, and nothing of its cause; in the browser it is that VaultError again, and a network failure or an error the resolvers did not send is `storage_unavailable`. Deploy the server and browser halves together: an older half on either side reads every answer as `record_conflict` or `storage_unavailable`. **`VaultDB` has `relay`**, the generic calls checked as their verbs check them, for a server carrying a vaultDB to its clients, with the type `VaultDBRelay` from `safebyok/storage`. **Stored format:** unchanged.

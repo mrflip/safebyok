@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 **A new entry point, `safebyok/dom`, exports `BoxFields`** and the types `BoxFieldEl` and `BoxFieldRef`. It needs no DOM types: an element is anything with a `value` string. `BoxFields.of(box)` answers the one instance for a box, wherever it is called.

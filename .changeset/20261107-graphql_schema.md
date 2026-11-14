@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 A vaultDB's verbs are an interface of their own, so a client of a store can stand where the store does. Nothing here reads what an older release wrote or sent.
