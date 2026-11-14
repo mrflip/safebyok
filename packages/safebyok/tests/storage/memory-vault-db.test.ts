@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateThing, ShellMeta, lifeseqOf } from '../../src/storage/shapes-thing'
+import { type GateThing, ShellCited, lifeseqOf } from '../../src/storage/shapes-thing'
 import type { ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -62,7 +62,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), the plain path", () => {
     expect(answer).to.deep.include({ ok: true, act: 'replaced', val: next })
   })
 
-  it("takes an expected gate of no more than its meta", async () => {
+  it("takes a citation of no more than ThingCited names", async () => {
     const stored = TH.gateThingOf()
     const vaultDB = await vaultDBWith(stored)
     const { revtok, revseq, am, lifeseq, lifepath, born_at } = stored
@@ -77,7 +77,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), the plain path", () => {
     expect(answer).to.deep.include({ ok: true, act: 'passed', val: stored })
   })
 
-  it("logs the ask's meta, never its wayins", async () => {
+  it("logs what the ask cites, never its wayins", async () => {
     const answer = await new MemoryVaultDB().tryWriteThing(TH.birthAskOf())
     expect(answer.ask).to.deep.include({ op: 'write', ...TH.GateScope })
     expect(JSON.stringify(answer.ask)).to.not.include(TH.BW.mainWayin.salt_b64)
@@ -136,8 +136,8 @@ describe("MemoryVaultDB.tryWriteThing(ask), under a storage policy", () => {
 
   it("refuses to replace a passphrase wayin other than the one proved against", async () => {
     const vaultDB = await vaultDBWith(stored)
-    const expected = { ...stored, wayins: { main: TH.BW.otherMainWayin } }
-    const ask = TH.replaceAskOf(expected, TH.nextGateOf(stored, { wayins: { main: TH.BW.otherMainWayin } }), { policies: ['replace_passphrase'] })
+    const cited = { ...stored, wayins: { main: TH.BW.otherMainWayin } }
+    const ask = TH.replaceAskOf(cited, TH.nextGateOf(stored, { wayins: { main: TH.BW.otherMainWayin } }), { policies: ['replace_passphrase'] })
     const answer = await vaultDB.tryWriteThing(ask)
     await TH.expectBad(Promise.resolve(answer), 'gate_issue')
     expect(answer).to.deep.include({ dbhas: stored })
@@ -214,9 +214,9 @@ describe("MemoryVaultDB.watch(scope, onNotice)", () => {
   })
 })
 
-describe("ShellMeta", () => {
+describe("ShellCited", () => {
   it("is the frozen void sentinel at life and revision -1", () => {
-    expect(Object.isFrozen(ShellMeta)).to.be.true
-    expect(ShellMeta).to.deep.include({ revseq: -1, lifeseq: '-1', lifepath: '/-1', am: 'x' })
+    expect(Object.isFrozen(ShellCited)).to.be.true
+    expect(ShellCited).to.deep.include({ revseq: -1, lifeseq: '-1', lifepath: '/-1', am: 'x' })
   })
 })

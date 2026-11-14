@@ -41,7 +41,7 @@ export type Actual<ActT extends EX.GoodAct> =
 export interface VaultDB {
   /** The Thing at `ask`'s scope. */
   tryGetThing(ask: GetThingAsk): Promise<GetThingAnswer>
-  /** Write `ask.record` over the Thing `ask.expected`, if that is the Thing stored. */
+  /** Write `ask.record` over the Thing `ask.cited`, if that is the Thing stored. */
   tryWriteThing(ask: WriteThingAsk): Promise<WriteThingAnswer>
   /** Watch the Things of a bank, and return a function that stops the watch. */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews?: (news: Errors.VaultError) => void): () => void

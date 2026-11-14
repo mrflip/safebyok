@@ -1,6 +1,7 @@
 /** The shapes of a Thing, the record a vaultDB stores every kind as, and of the asks a vaultDB takes. */
 
 import type * as Z from 'zod'
+import { exactOptional } from 'zod'
 import { BX, type Consts, EX, Errors, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 
@@ -41,7 +42,7 @@ function isLabelpath(labelpath: string): boolean {
 }
 // --
 
-// == [Thing]: thingScope, thingMeta, expectedMeta, gateThing, gateExpected, ThingScope, ThingMeta, ExpectedMeta, GateThing, GateExpected, Thing, ShellMeta
+// == [Thing]: thingScope, thingCited, gateThing, gateCited, ThingScope, ThingCited, GateThing, Thing, ShellCited
 
 const LifeseqPattern  = /^[\da-v]{10}$/
 const LifepathPattern = /^(?:\/[\da-v]{10})+$/
@@ -55,21 +56,29 @@ function isLifepathOwn({ lifepath, lifeseq }: Lived): boolean { return lifepath 
 function isParityRight({ am, lifeseq }: Lived): boolean { return (am === 'x') === isGoneLifeseq(lifeseq) }
 /** True unless the Thing is the main gate, deleted: the main gate is never deleted. */
 function isMainGateLive({ label, am }: { label?: string, am: string }): boolean { return (label !== 'main') || (am === 'a') }
-/** True when an expected record is the shell in all three of its marks, or in none. */
+/** The fields of `shape`, each optional but never undefined, as `Partial` reads them under exactOptionalPropertyTypes. */
+function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> } {
+  // Object.fromEntries loses the fieldnames' types: the cast restores them.
+  return Object.fromEntries(Object.entries(shape).map(([fieldname, check]) => [fieldname, exactOptional(check)])) as { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> }
+}
+
+/** True when a citation is the shell in all three of its marks, or in none. */
 function isShellWhole({ revtok, revseq, lifeseq }: Revised): boolean {
   const isShell = (revseq === SX.VoidRevisionSeq)
   return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifeseq === ShellLifeseq))
 }
 
-/** The checks of a Thing's fields, and of the main gate as a Thing, as proposed and as expected. */
-export const { thingScope, thingMeta, expectedMeta, gateThing, gateExpected } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, user_id, label, epochMillis }) => {
+/** The checks of a Thing's fields, and of the main gate as a Thing, as proposed and as cited. */
+export const { thingScope, thingCited, gateThing, gateCited } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, user_id, label, epochMillis }) => {
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
   const am           = SX.am.exclude(['d'])
   const thingScope   = obj({ userid: user_id, banklabel: label, labelpath })
-  const thingMeta    = obj({ revtok: str.min(1), revseq: uint, am, lifeseq, lifepath, born_at: epochMillis })
-  const expectedMeta = thingMeta.extend({
+  const revisioned   = { revtok: str.min(1), revseq: uint, am, lifeseq, lifepath, born_at: epochMillis }
+  // A write may cite the shell, so its revseq and life may be the shell's -1.
+  const thingCited   = obj({
+    ...revisioned,
     revseq:   int.min(SX.VoidRevisionSeq),
     lifeseq:  union([lifeseq, lit(ShellLifeseq)]),
     lifepath: union([lifepath, lit(ShellLifepath)]),
@@ -77,7 +86,7 @@ export const { thingScope, thingMeta, expectedMeta, gateThing, gateExpected } = 
   const emptyBag     = obj({}).strict()
   // A stored record is strict: a field this version does not know is damage, or a newer format.
   const gateBase     = obj({
-    ...thingScope.shape, ...thingMeta.shape,
+    ...thingScope.shape, ...revisioned,
     labelpath:  lit('gate/main'),
     label:      lit('main'),
     fmt:        lit(GateThingFormat),
@@ -94,38 +103,34 @@ export const { thingScope, thingMeta, expectedMeta, gateThing, gateExpected } = 
     .refine(isLifepathOwn,  Phrases.LifepathNotOwn)
     .refine(isParityRight,  Phrases.LifeseqParity)
     .refine(isMainGateLive, Phrases.MainGateDeleted)
-  // What is expected need carry only its meta; any other field of the gate it carries must check.
-  const gateExpected = gateBase.partial().extend(expectedMeta.shape).strict()
-    .refine(isShellWhole,  Phrases.ExpectedHalfShell)
+  // A citation of the gate must carry what ThingCited names; any other field of the gate it carries must check.
+  const gateCited    = obj({ ...exactPartialOf(gateBase.shape), ...thingCited.shape }).strict()
+    .refine(isShellWhole,  Phrases.CitedHalfShell)
     .refine(isLifepathOwn, Phrases.LifepathNotOwn)
     .refine(isParityRight, Phrases.LifeseqParity)
-  return { thingScope, thingMeta, expectedMeta, gateThing, gateExpected }
+  return { thingScope, thingCited, gateThing, gateCited }
 })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof thingScope>>
-/** What the store compares of a Thing expected and the one stored: its revision, its life and its liveness. */
-export type ThingMeta    = Readonly<Z.infer<typeof thingMeta>>
-/** The meta of the Thing a write expects to find, which may be the shell's. */
-export type ExpectedMeta = Readonly<Z.infer<typeof expectedMeta>>
+/** What a write cites of the Thing it expects to find, the shell's included: its revision, its life and its liveness. */
+export type ThingCited   = Readonly<Z.infer<typeof thingCited>>
 /** The main gate, as a Thing. */
 export type GateThing    = Readonly<Z.infer<typeof gateThing>>
-/** The main gate a write expects to find: its meta, and any of its other fields. */
-export type GateExpected = Readonly<Z.infer<typeof gateExpected>>
 /** Any Thing a vaultDB stores: the main gate alone, for now. */
 export type Thing        = GateThing
 
-/** The meta of the shell, the void sentinel for no Thing stored: what a birth expects. */
-export const ShellMeta: ExpectedMeta = Object.freeze({
+/** What a birth cites: the shell, the void sentinel for no Thing stored. */
+export const ShellCited: ThingCited = Object.freeze({
   revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: ShellLifepath, born_at: SX.VoidTime,
 })
 // --
 
 // == [Each kind's checks]: KindChecks, kindChecksOf
 
-/** The checks of each kind of Thing a vaultDB stores: the record proposed, the record expected, and the record stored. */
+/** The checks of each kind of Thing a vaultDB stores: the record proposed, the record cited, and the record stored. */
 const KindChecks = {
-  gate: { record: gateThing, expected: gateExpected, stored: gateThing.refusingAs('damaged_row') },
+  gate: { record: gateThing, cited: gateCited, stored: gateThing.refusingAs('damaged_row') },
 } as const
 
 /** The checks of the kind of Thing at `labelpath`, or throw `bad_option` for a kind this vaultDB does not store yet */
@@ -146,7 +151,7 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof 
   return {
     getThingAsk:     thingScope.extend({ op: lit('get'), ifAbsent: SX.ifAbsent }).strict(),
     writeThingAsk:   thingScope.extend({
-      op: lit('write'), expected: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(),
+      op: lit('write'), cited: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(),
     }).strict(),
     thingWatchScope: thingScope.pick({ userid: true, banklabel: true }),
   }
@@ -156,8 +161,14 @@ export const { thingWatchScope } = AskChecks
 
 /** An ask for the Thing at its scope. */
 export type GetThingAsk     = Readonly<Z.infer<typeof AskChecks.getThingAsk>>
-/** An ask to write `record` over the Thing `expected`: a live record puts it, a tombstone deletes it. */
-export type WriteThingAsk   = Readonly<Omit<Z.infer<typeof AskChecks.writeThingAsk>, 'expected' | 'record'> & { expected: GateExpected, record: GateThing }>
+/** An ask to write `record` over the Thing it `cited`: a live record puts it, a tombstone deletes it.
+ * `cited` carries what {@link ThingCited} names, which the store compares with the Thing stored. Any other field of the
+ * record it carries is read only by a storage policy that takes it as testimony.
+ */
+export type WriteThingAsk<RecordT extends Thing = Thing> = Readonly<Omit<Z.infer<typeof AskChecks.writeThingAsk>, 'cited' | 'record'> & {
+  cited:  ThingCited & Partial<RecordT>
+  record: RecordT
+}>
 /** The scope a watch hears: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof thingWatchScope>>
 
@@ -170,25 +181,25 @@ export function checkedGetThingAsk(ask: unknown): GetThingAsk {
 
 /** `ask`, with its records checked by their kind and against each other, or throw `bad_option` or `bad_record` */
 export function checkedWriteThingAsk(ask: unknown): WriteThingAsk {
-  const { expected, record, ...rest } = AskChecks.writeThingAsk.parse(ask)
+  const { cited, record, ...rest } = AskChecks.writeThingAsk.parse(ask)
   const checks  = kindChecksOf(rest.labelpath)
-  const checked = { ...rest, expected: checks.expected.parse(expected), record: checks.record.parse(record) }
+  const checked = { ...rest, cited: checks.cited.parse(cited), record: checks.record.parse(record) }
   checkWriteInvariants(checked)
   return checked
 }
 
-/** Refuse a write whose record does not follow from the one it expects. */
-function checkWriteInvariants({ expected, record, options, userid, banklabel, labelpath }: WriteThingAsk): void {
-  const isLifeFlipped = (record.am !== expected.am)
-  demandHeld(record.revseq === expected.revseq + 1,                                                      Phrases.RevseqNotNext)
-  demandHeld((record.revtok !== expected.revtok) && (record.revtok !== SX.VoidRevisionTok),              Phrases.RevtokNotNew)
+/** Refuse a write whose record does not follow from the one it cites. */
+function checkWriteInvariants({ cited, record, options, userid, banklabel, labelpath }: WriteThingAsk): void {
+  const isLifeFlipped = (record.am !== cited.am)
+  demandHeld(record.revseq === cited.revseq + 1,                                                      Phrases.RevseqNotNext)
+  demandHeld((record.revtok !== cited.revtok) && (record.revtok !== SX.VoidRevisionTok),              Phrases.RevtokNotNew)
   demandHeld(Validator.isConsistent(record, { userid, banklabel, labelpath }),                           Phrases.RecordOfOtherScope)
-  demandHeld((record.am === 'a') || (expected.am === 'a'),                                               Phrases.TombstoneOverTombstone)
-  demandHeld(seqOfLifeseq(record.lifeseq) === seqOfLifeseq(expected.lifeseq) + (isLifeFlipped ? 1 : 0),  Phrases.LifeseqNotNext)
+  demandHeld((record.am === 'a') || (cited.am === 'a'),                                               Phrases.TombstoneOverTombstone)
+  demandHeld(seqOfLifeseq(record.lifeseq) === seqOfLifeseq(cited.lifeseq) + (isLifeFlipped ? 1 : 0),  Phrases.LifeseqNotNext)
   if (record.am === 'a') {
-    demandHeld(isLifeFlipped ? (record.born_at === record.written_at) : (record.born_at === expected.born_at), Phrases.BornAtNotKept)
+    demandHeld(isLifeFlipped ? (record.born_at === record.written_at) : (record.born_at === cited.born_at), Phrases.BornAtNotKept)
   }
-  if (options?.policies.includes('replace_passphrase')) { demandHeld(expected.wayins?.main !== undefined, Phrases.TestimonyMissing) }
+  if (options?.policies.includes('replace_passphrase')) { demandHeld(cited.wayins?.main !== undefined, Phrases.TestimonyMissing) }
 }
 
 /** Throw `bad_record`, saying `phrase`, unless `isHeld` */
@@ -199,11 +210,11 @@ function demandHeld(isHeld: boolean, phrase: string): void {
 
 // == [Loggable asks]: loggableAsk, LoggableAsk, loggableAskOf
 
-/** The part of an ask that is safe to log: its scope, its flags, and each record's meta, never a gate's wayins.
+/** The part of an ask that is safe to log: its scope, its flags, and what each record cites, never a gate's wayins.
  * Each field is optional, so that a refusal of an ask that is not whole carries what of it was sound.
  */
 export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => {
-  const meta = expectedMeta.partial()
+  const citedFields = thingCited.partial()
   return {
     op:        oneof(['get', 'write']).optional(),
     userid:    user_id.optional(),
@@ -212,8 +223,8 @@ export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label
     ifAbsent:  SX.anyIfAbsent.optional(),
     ifPresent: SX.ifPresent.optional(),
     options:   obj({ policies: arr(oneof(EX.storagePolicyVals)) }).optional(),
-    expected:  meta.optional(),
-    record:    meta.optional(),
+    cited:     citedFields.optional(),
+    record:    citedFields.optional(),
   }
 }, 'bad_option')
 

@@ -23,14 +23,14 @@ export const LifepathNotOwn = "A Thing's lifepath is '/' and its own lifeseq: Th
 /** A Thing whose am and lifeseq disagree. */
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
-/** An expected record that is half the shell. */
-export const ExpectedHalfShell = "An expected record is the shell, at revseq -1, lifeseq '-1' and the void revtok, in all three or in none."
+/** A citation that is half the shell. */
+export const CitedHalfShell = "What a write cites is the shell, at revseq -1, lifeseq '-1' and the void revtok, in all three or in none."
 
 /** A write whose revseq does not follow. */
-export const RevseqNotNext = "A write's record must have the revseq one past the expected record's."
+export const RevseqNotNext = "A write's record must have the revseq one past the cited one's."
 
 /** A write whose revtok is not new. */
-export const RevtokNotNew = "A write's record must have a new revtok: neither the expected record's, nor the void one."
+export const RevtokNotNew = "A write's record must have a new revtok: neither the cited one's, nor the void one."
 
 /** A write whose record is at another scope. */
 export const RecordOfOtherScope = "A write's record is at the scope its ask names: its userid, banklabel and labelpath."
@@ -39,16 +39,16 @@ export const RecordOfOtherScope = "A write's record is at the scope its ask name
 export const TombstoneOverTombstone = "A tombstone is never written over a tombstone."
 
 /** A write whose lifeseq does not follow. */
-export const LifeseqNotNext = "A write's record keeps the expected lifeseq when am stays, and has the next one when am flips."
+export const LifeseqNotNext = "A write's record keeps the cited lifeseq when am stays, and has the next one when am flips."
 
 /** A write whose born_at does not follow. */
-export const BornAtNotKept = "A write's record keeps the expected born_at over a live record, and is born when it is written over a tombstone."
+export const BornAtNotKept = "A write's record keeps the cited born_at over a live record, and is born when it is written over a tombstone."
 
 /** A tombstone of the main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
 
-/** A policy that needs testimony the expected record lacks. */
-export const TestimonyMissing = "The replace_passphrase policy reads the expected record's wayins: send them with it."
+/** A policy that needs testimony the citation lacks. */
+export const TestimonyMissing = "The replace_passphrase policy reads the cited gate's wayins: cite them."
 
 /** A write of a kind this vaultDB does not store yet. */
 export const ThingkindNotStored = "This vaultDB stores the main gate only, for now: a bank or a box is not yet a Thing it takes."

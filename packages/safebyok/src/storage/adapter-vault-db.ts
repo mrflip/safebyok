@@ -39,7 +39,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
   }
 
-  /** Write `ask.record` over the Thing `ask.expected` ({@link VaultDB.tryWriteThing}). */
+  /** Write `ask.record` over the Thing `ask.cited` ({@link VaultDB.tryWriteThing}). */
   async tryWriteThing(ask: WriteThingAsk): Promise<WriteThingAnswer> {
     try {
       const checked     = checkedWriteThingAsk(ask)

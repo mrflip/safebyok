@@ -3,68 +3,66 @@
 import { isEqual, omit } from 'es-toolkit'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers } from 'safebyok-big/internals'
 import type { Actual } from './vault-db'
-import { type ExpectedMeta, type GetThingAsk, type GateExpected, type GateThing, type Thing, type ThingScope, type WriteThingAsk, kindChecksOf, thingScope } from './shapes-thing'
+import { type GetThingAsk, type GateThing, type Thing, type ThingCited, type ThingScope, type WriteThingAsk, kindChecksOf, thingScope } from './shapes-thing'
 
-// == [Columns]: Meta, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeOff
+// == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeOff
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
-/** The fields of a Thing, stored or expected, that the tables compare. */
-type Meta = Pick<ExpectedMeta, 'revtok' | 'revseq' | 'am' | 'lifepath'>
-/** A write ask, as the tables read it. */
-type WriteCmpAsk = Pick<WriteThingAsk, 'ifAbsent' | 'ifPresent'> & { expected: Meta, record: Meta }
+/** A write ask, as the tables read it: its flags, and what its two records cite. */
+type WriteCmpAsk = Pick<WriteThingAsk, 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
 
 /** What is stored at a scope: no Thing, a tombstone, or a live Thing. */
 type Presence = 'void' | 'gone' | 'live'
 
 /** The presence of `stored`, `'void'` for null. */
-function presenceOf(stored: Meta | null): Presence {
+function presenceOf(stored: ThingCited | null): Presence {
   if (stored === null) { return 'void' }
   return (stored.am === 'a') ? 'live' : 'gone'
 }
 
 /** The stored revtok compared with the ask's.
- * - `'birth'` -- expected the shell, and none is stored
+ * - `'birth'` -- cited the shell, and none is stored
  * - `'=next'` -- the stored Thing already has the revtok this ask would write
- * - `'eq'`    -- expected exactly the revtok stored
+ * - `'eq'`    -- cited exactly the revtok stored
  * - `'neq'`   -- anything else
  */
 type RevtokCmp = 'birth' | '=next' | 'eq' | 'neq'
 
-/** The ask's expected revseq compared with the stored one.
- * - `'birth'` -- expected the shell
- * - `'eq'`    -- expected exactly the revseq stored
- * - `'stale'` -- expected an older revision: a write has intervened
- * - `'ahead'` -- expected a newer revision, or a Thing where none is stored: an impossible situation
+/** The ask's cited revseq compared with the stored one.
+ * - `'birth'` -- cited the shell
+ * - `'eq'`    -- cited exactly the revseq stored
+ * - `'stale'` -- cited an older revision: a write has intervened
+ * - `'ahead'` -- cited a newer revision, or a Thing where none is stored: an impossible situation
  */
 type RevseqCmp = 'birth' | 'eq' | 'stale' | 'ahead'
 
 /** The stored revtok compared with the ask's, as {@link RevtokCmp} reads. */
-function revtokCmpOf({ expected, record }: WriteCmpAsk, stored: Meta | null): RevtokCmp {
-  if (stored === null)                 { return (expected.revtok === SX.VoidRevisionTok) ? 'birth' : 'neq' }
+function revtokCmpOf({ cited, record }: WriteCmpAsk, stored: ThingCited | null): RevtokCmp {
+  if (stored === null)                 { return (cited.revtok === SX.VoidRevisionTok) ? 'birth' : 'neq' }
   if (stored.revtok === record.revtok) { return '=next' }
-  return (stored.revtok === expected.revtok) ? 'eq' : 'neq'
+  return (stored.revtok === cited.revtok) ? 'eq' : 'neq'
 }
 
-/** The ask's expected revseq compared with the stored one, as {@link RevseqCmp} reads. */
-function revseqCmpOf({ expected }: WriteCmpAsk, stored: Meta | null): RevseqCmp {
-  if (expected.revseq === SX.VoidRevisionSeq) { return 'birth' }
+/** The ask's cited revseq compared with the stored one, as {@link RevseqCmp} reads. */
+function revseqCmpOf({ cited }: WriteCmpAsk, stored: ThingCited | null): RevseqCmp {
+  if (cited.revseq === SX.VoidRevisionSeq) { return 'birth' }
   if (stored === null)                        { return 'ahead' }
-  if (expected.revseq === stored.revseq)      { return 'eq' }
-  return (expected.revseq < stored.revseq) ? 'stale' : 'ahead'
+  if (cited.revseq === stored.revseq)      { return 'eq' }
+  return (cited.revseq < stored.revseq) ? 'stale' : 'ahead'
 }
 
 // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
-/** True when a Thing is stored, and the one expected differs from it in its life or its liveness. */
-function isLifeOff({ expected }: WriteCmpAsk, stored: Meta | null): boolean {
-  return (stored !== null) && ((stored.lifepath !== expected.lifepath) || (stored.am !== expected.am))
+/** True when a Thing is stored, and the one cited differs from it in its life or its liveness. */
+function isLifeOff({ cited }: WriteCmpAsk, stored: ThingCited | null): boolean {
+  return (stored !== null) && ((stored.lifepath !== cited.lifepath) || (stored.am !== cited.am))
 }
 // --
 
 // == [Tables]: getActOf, putActOf, delActOf, writeActOf, isRefusedAct, isWriteAct
 
 /** Classify a get: see the get table in `notes/answer-contract.md`. */
-function getActOf({ ifAbsent }: Pick<GetThingAsk, 'ifAbsent'>, stored: Meta | null): EX.GotAct | 'void' | 'gone' {
+function getActOf({ ifAbsent }: Pick<GetThingAsk, 'ifAbsent'>, stored: ThingCited | null): EX.GotAct | 'void' | 'gone' {
   const presence = presenceOf(stored)
   if (presence === 'live') { return 'gotlive' }
   if (presence === 'void') { return (ifAbsent === 'nil') ? 'gotvoid' : 'void' }
@@ -72,7 +70,7 @@ function getActOf({ ifAbsent }: Pick<GetThingAsk, 'ifAbsent'>, stored: Meta | nu
 }
 
 /** Classify a write of a live record: see the put table in `notes/answer-contract.md`. The first matching row wins. */
-function putActOf(ask: WriteCmpAsk, stored: Meta | null): EX.PutAct | EX.RefusedAct {
+function putActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.PutAct | EX.RefusedAct {
   const presence  = presenceOf(stored)
   // The policy that applies: `ifPresent` over a live Thing, `ifAbsent` over a tombstone or none.
   const opflag    = (presence === 'live') ? ask.ifPresent : ask.ifAbsent
@@ -90,7 +88,7 @@ function putActOf(ask: WriteCmpAsk, stored: Meta | null): EX.PutAct | EX.Refused
 }
 
 /** Classify a write of a tombstone: see the del table in `notes/answer-contract.md`. The first matching row wins. */
-function delActOf(ask: WriteCmpAsk, stored: Meta | null): EX.DelAct | EX.RefusedAct {
+function delActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.DelAct | EX.RefusedAct {
   const presence  = presenceOf(stored)
   const revseqCmp = revseqCmpOf(ask, stored)
   const revtokCmp = revtokCmpOf(ask, stored)
@@ -104,7 +102,7 @@ function delActOf(ask: WriteCmpAsk, stored: Meta | null): EX.DelAct | EX.Refused
 }
 
 /** Classify a write: by the put table for a live record, by the del table for a tombstone. */
-function writeActOf(ask: WriteCmpAsk, stored: Meta | null): EX.PutAct | EX.DelAct | EX.RefusedAct {
+function writeActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.PutAct | EX.DelAct | EX.RefusedAct {
   return (ask.record.am === 'a') ? putActOf(ask, stored) : delActOf(ask, stored)
 }
 
@@ -173,28 +171,28 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.
 /** Each storage policy: what it demands of a gate write's records and of the gate stored, throwing `gate_issue` where it refuses. */
 const GatePolicies = {
   /** The record replaces the passphrase wayin the gating proved against, and nothing else. */
-  replace_passphrase(expected: GateExpected, record: GateThing, stored: GateThing): void {
-    if (! isEqual(expected.wayins?.main, stored.wayins.main))                         { throw gateIssue(stored, BigPhrases.ProvedWayinMoved) }
+  replace_passphrase(cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing): void {
+    if (! isEqual(cited.wayins?.main, stored.wayins.main))                            { throw gateIssue(stored, BigPhrases.ProvedWayinMoved) }
     if (! isEqual(omit(record.wayins, ['main']), omit(stored.wayins, ['main'])))       { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
   /** The record adds a passkey wayin to a gate that has none, and changes nothing else. */
-  add_passkey(_expected: GateExpected, record: GateThing, stored: GateThing): void {
+  add_passkey(_cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing): void {
     if (stored.wayins.passkey0 !== undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyStored) }
     if (record.wayins.passkey0 === undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyNotAdded) }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0']))) { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
   /** The record removes the gate's passkey wayin, and changes nothing else. */
-  revoke_passkey(_expected: GateExpected, record: GateThing, stored: GateThing): void {
+  revoke_passkey(_cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing): void {
     if (stored.wayins.passkey0 === undefined)                                         { throw gateIssue(stored, BigPhrases.NoPasskeyStored) }
     if (record.wayins.passkey0 !== undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyNotRevoked) }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0']))) { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
-} as const satisfies Record<EX.StoragePolicy, (expected: GateExpected, record: GateThing, stored: GateThing) => void>
+} as const satisfies Record<EX.StoragePolicy, (cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing) => void>
 
 /** Apply each storage policy `ask` names to the gate stored. Throws `gate_issue` at the first that refuses. */
-function demandPolicies({ expected, record, options }: WriteThingAsk, stored: GateThing): void {
+function demandPolicies({ cited, record, options }: WriteThingAsk, stored: GateThing): void {
   const policies = options?.policies ?? []
-  for (const policy of policies) { GatePolicies[policy](expected, record, stored) }
+  for (const policy of policies) { GatePolicies[policy](cited, record, stored) }
 }
 
 /** A `gate_issue` refusal of a write over `stored`, saying `why`. */

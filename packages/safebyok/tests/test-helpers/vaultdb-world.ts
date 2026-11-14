@@ -1,7 +1,7 @@
 /** The Things and asks a vaultDB's tests share: the main gate at a revision, and the asks that get it and write over it. */
 
 import { BW } from 'safebyok-big/testing'
-import { type GateExpected, type GateThing, type GetThingAsk, type WriteThingAsk, GateThingFormat, ShellMeta, lifeseqOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetThingAsk, type WriteThingAsk, GateThingFormat, ShellCited, lifeseqOf } from '../../src/storage/shapes-thing'
 import { T0 } from './models-world'
 
 /** The bank the Things stand in. */
@@ -30,12 +30,12 @@ export function nextGateOf(prior: GateThing, overrides: Partial<GateThing> = {})
 
 /** The ask that births the main gate as `record`, over the shell. */
 export function birthAskOf(record: GateThing = gateThingOf()): WriteThingAsk {
-  return { op: 'write', ...GateScope, expected: ShellMeta, record, ifAbsent: 'add', ifPresent: 'fail' }
+  return { op: 'write', ...GateScope, cited: ShellCited, record, ifAbsent: 'add', ifPresent: 'fail' }
 }
 
-/** The ask that writes `record` over the main gate `expected`, under the storage `policies`. */
-export function replaceAskOf(expected: GateExpected, record: GateThing, policies?: WriteThingAsk['options']): WriteThingAsk {
-  return { op: 'write', ...GateScope, expected, record, ifAbsent: 'fail', ifPresent: 'repl', ...(policies && { options: policies }) }
+/** The ask that writes `record` over the main gate it `cited`, under the storage `policies`. */
+export function replaceAskOf(cited: WriteThingAsk['cited'], record: GateThing, policies?: WriteThingAsk['options']): WriteThingAsk {
+  return { op: 'write', ...GateScope, cited, record, ifAbsent: 'fail', ifPresent: 'repl', ...(policies && { options: policies }) }
 }
 
 /** The ask that gets the main gate, answering null for none under `'nil'`. */
