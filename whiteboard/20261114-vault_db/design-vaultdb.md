@@ -36,7 +36,7 @@ the body. Everything else in the record is the **body**, which the store carries
   `main`. More gates per bank come later. The bank's own `label` is open (below); the gate's `main` and the bank's
   label do not tie to each other.
 * **`lifeseq`** is `n.toString(32).padStart(10, '0')`: digits `0-9a-v`, which sort as the numbers do, up to
-  `32**10 - 1`, inside a safe integer. Because 32 is even, the parity of the number is the parity of its last digit,
+  `32**10 - 1`, inside a safe integer. Because 32 is even, the even/odd parity of the number is the parity of its last digit,
   so a store can check it without decoding (Postgres: `right(lifeseq, 1) IN ('1','3',...,'v')`).
 * **The shell**, the void sentinel for no Thing stored, is a tombstone at `revseq: -1` and `lifeseq: -1`, with `revtok`
   void. So the first Thing stored is at `revseq` 0 and `lifeseq` 0; its deletion is life 1, a rebirth life 2. Nothing
@@ -141,6 +141,17 @@ Big's act tables carry over unchanged. They already compare only a revision, an 
   The `vault_*` family goes with the Vault.
 * **refused by a storage policy**: `gate_issue`, as #698 has it.
 
+**The lifeseq checks are big's life-tok checks, plus the step on a change of life.** Each place big read a life tok
+has its lifeseq counterpart:
+
+| Big read | of | Now |
+|---|---|---|
+| the ask's `isLifeTokPlaced`: the expected tok over a live row, a new one on a birth or deletion | `gate_tok`, `vault_tok`, `box_tok`, `bank_tok` | the ask's `lifeseq` check: the same lifeseq while `am` stays, one more when it flips |
+| the classifier's `isLifeOff`: the expected life against the stored one | the row's own life tok | `lifepath` and `am`, expected against stored |
+| Postgres's `gate_tok = expected.gate_tok` | the row's own life tok | `stored.lifepath = expected.lifepath` |
+| the row above's life: `bank_reborn`, `vault_reborn`, a box keyed under its vault's life | `bank_tok`, `vault_tok` on the row below | the lifepath's leading lifeseqs: waits for depth 2 |
+| the seal's binding of the box's life, and `nextRevisionOf` minting a new tok over a tombstone | `box_tok` | the box's `lifepath`: waits on `BoxRecord` taking it |
+
 `lifeseq` is ordered, so the classifier could also tell a life that is behind from one that clashes. It is not
 needed for these acts.
 
@@ -151,7 +162,7 @@ needed for these acts.
 type ThingScope = { userid, banklabel, labelpath }
 
 /** What the store compares of expected and actual. */
-type ThingMeta = Pick<Thing, 'revtok' | 'revseq' | 'am' | 'lifeseq' | 'lifepath'>
+type ThingMeta = Pick<Thing, 'revtok' | 'revseq' | 'am' | 'lifeseq' | 'lifepath' | 'born_at'>
 
 type GetThingAsk = ThingScope & { op: 'get', ifAbsent: 'fail' | 'nil' }
 
@@ -223,57 +234,104 @@ write functions and returned with their result.
 #### A lifeseq's digits
 
 ```sql
--- The 10 base-32 digits (0-9a-v) of n: a lifeseq. n is between 0 and 32^10 - 1.
-CREATE OR REPLACE FUNCTION safebyok_base32_of_bigint(n bigint) RETURNS text
-LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
-  SELECT string_agg(substr('0123456789abcdefghijklmnopqrstuv', ((n >> (5 * place)) & 31)::integer + 1, 1), '' ORDER BY place DESC)
-  FROM   generate_series(0, 9) AS place
-$$;
+-- The 10 base-32 digits (0-9a-v) of seq: a lifeseq. Raises unless seq is between 0 and 32^10 - 1.
+CREATE OR REPLACE FUNCTION safebyok_base32_of_bigint(seq bigint) RETURNS text
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+BEGIN
+  IF ((seq < 0) OR (seq >= (1::bigint << 50))) THEN    -- 2^50 is 32^10
+    RAISE EXCEPTION 'safebyok_base32_of_bigint: a lifeseq is a life from 0 to 32^10 - 1';
+  END IF;
+  RETURN (
+    SELECT string_agg(substr('0123456789abcdefghijklmnopqrstuv', (((seq >> (5 * place)) & 31)::integer + 1), 1), '' ORDER BY place DESC)
+    FROM   generate_series(0, 9) AS place
+  );
+END $$;
 
--- The number a lifeseq's base-32 digits spell.
+-- The number base-32 digits spell, either case. Raises for anything but base-32 digits.
 CREATE OR REPLACE FUNCTION safebyok_bigint_of_base32(digits text) RETURNS bigint
-LANGUAGE sql IMMUTABLE STRICT PARALLEL SAFE AS $$
-  SELECT sum((strpos('0123456789abcdefghijklmnopqrstuv', substr(digits, place, 1)) - 1)::bigint << (5 * (length(digits) - place)))::bigint
-  FROM   generate_series(1, length(digits)) AS place
-$$;
+LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
+BEGIN
+  IF (digits !~ '^[0-9a-vA-V]+$') THEN
+    RAISE EXCEPTION 'safebyok_bigint_of_base32: a lifeseq is base-32 digits, 0-9 and a-v';
+  END IF;
+  RETURN (
+    SELECT sum((strpos('0123456789abcdefghijklmnopqrstuv', substr(lower(digits), place, 1)) - 1)::bigint << (5 * (length(digits) - place)))::bigint
+    FROM   generate_series(1, length(digits)) AS place
+  );
+END $$;
 ```
 
 #### The checks, each a named function
 
-Each returns true or false and takes plain values, so one function serves every kind's table.
+Each returns true or false and takes plain values, so one function serves every kind's table. A rule about one row
+alone is a CHECK on the table, never a clause in the write; a function holds only what compares the proposed record
+with the stored row or the expected one.
 
 ```sql
--- Whether proposed_lifeseq follows stored_lifeseq: odd exactly when gone, one past the stored when am flips, the same
--- when not. A null stored is the shell: life -1, gone. So a birth is life 0.
+-- Whether proposed_lifeseq follows stored_lifeseq: one past the stored when am flips, the same when not. A null stored
+-- is the shell: life -1, gone. So a birth is life 0. The parity of each lifeseq is a CHECK on the row, not this.
 CREATE OR REPLACE FUNCTION safebyok_lifeseq_ok(stored_lifeseq text, stored_am text, proposed_lifeseq text, proposed_am text) RETURNS boolean
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
-  SELECT (proposed_am = 'x') = (safebyok_bigint_of_base32(proposed_lifeseq) % 2 = 1)
-     AND proposed_lifeseq = safebyok_base32_of_bigint(
-           COALESCE(safebyok_bigint_of_base32(stored_lifeseq), -1) + CASE WHEN COALESCE(stored_am, 'x') <> proposed_am THEN 1 ELSE 0 END)
+  SELECT (
+    proposed_lifeseq = safebyok_base32_of_bigint(
+      (COALESCE(safebyok_bigint_of_base32(stored_lifeseq), -1))
+      + (CASE WHEN (COALESCE(stored_am, 'x') <> proposed_am) THEN 1 ELSE 0 END)
+    )
+  )
 $$;
 
--- Whether a gate write keeps each storage policy named, one clause per policy, as notes/storage-policies.md lists them.
--- Big's clauses, less their registered_at check: the write function checks born_at for every live-over-live write.
+-- The storage policies, one function each, as notes/storage-policies.md lists them: big's clauses, less their
+-- registered_at check, as the write function checks born_at for every live-over-live write.
+
+-- Whether a gate write replaces the passphrase wayin the gating proved against, and nothing else.
+CREATE OR REPLACE FUNCTION safebyok_replace_passphrase_ok(stored_wayins jsonb, expected_wayins jsonb, proposed_wayins jsonb) RETURNS boolean
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT (
+        ((stored_wayins -> 'main') = (expected_wayins -> 'main'))
+    AND ((stored_wayins - 'main') = (proposed_wayins - 'main'))
+  )
+$$;
+
+-- Whether a gate write adds a passkey wayin to a gate that has none, and changes nothing else.
+CREATE OR REPLACE FUNCTION safebyok_add_passkey_ok(stored_wayins jsonb, proposed_wayins jsonb) RETURNS boolean
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT (
+        (NOT (stored_wayins ? 'passkey0'))
+    AND (proposed_wayins ? 'passkey0')
+    AND ((stored_wayins - 'passkey0') = (proposed_wayins - 'passkey0'))
+  )
+$$;
+
+-- Whether a gate write removes the gate's passkey wayin, and changes nothing else.
+CREATE OR REPLACE FUNCTION safebyok_revoke_passkey_ok(stored_wayins jsonb, proposed_wayins jsonb) RETURNS boolean
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+  SELECT (
+        (stored_wayins ? 'passkey0')
+    AND (NOT (proposed_wayins ? 'passkey0'))
+    AND ((stored_wayins - 'passkey0') = (proposed_wayins - 'passkey0'))
+  )
+$$;
+
+-- Whether a gate write keeps each storage policy it names.
 CREATE OR REPLACE FUNCTION safebyok_gate_policies_ok(policies text[], stored_wayins jsonb, expected_wayins jsonb, proposed_wayins jsonb)
 RETURNS boolean
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
-  SELECT (NOT ('replace_passphrase' = ANY (policies)) OR (
-              stored_wayins -> 'main' = expected_wayins -> 'main'
-          AND (stored_wayins - 'main') = (proposed_wayins - 'main')))
-     AND (NOT ('add_passkey' = ANY (policies)) OR (
-              NOT (stored_wayins ? 'passkey0') AND proposed_wayins ? 'passkey0'
-          AND (stored_wayins - 'passkey0') = (proposed_wayins - 'passkey0')))
-     AND (NOT ('revoke_passkey' = ANY (policies)) OR (
-              stored_wayins ? 'passkey0' AND NOT (proposed_wayins ? 'passkey0')
-          AND (stored_wayins - 'passkey0') = (proposed_wayins - 'passkey0')))
+  SELECT (
+        ((NOT ('replace_passphrase' = ANY (policies))) OR safebyok_replace_passphrase_ok(stored_wayins, expected_wayins, proposed_wayins))
+    AND ((NOT ('add_passkey'        = ANY (policies))) OR safebyok_add_passkey_ok(stored_wayins, proposed_wayins))
+    AND ((NOT ('revoke_passkey'     = ANY (policies))) OR safebyok_revoke_passkey_ok(stored_wayins, proposed_wayins))
+  )
 $$;
 
 -- Whether the boxes under labelpath_prefix leave room for one more live box. When boxes come.
 -- STABLE, so it counts in the calling statement's snapshot. The count takes no lock, so the cap stays soft.
 CREATE OR REPLACE FUNCTION safebyok_capacity_ok(of_userid text, of_banklabel text, labelpath_prefix text, cap integer) RETURNS boolean
 LANGUAGE sql STABLE PARALLEL SAFE AS $$
-  SELECT count(*) < cap FROM safebyok_boxes AS box
-  WHERE  (box.userid, box.banklabel) = (of_userid, of_banklabel) AND box.labelpath LIKE labelpath_prefix || '/%' AND box.am = 'a'
+  SELECT (count(*) < cap)
+  FROM   safebyok_boxes AS box
+  WHERE  ((box.userid, box.banklabel) = (of_userid, of_banklabel))
+    AND  (box.labelpath LIKE (labelpath_prefix || '/%'))
+    AND  (box.am = 'a')
 $$;
 ```
 
@@ -300,10 +358,15 @@ CREATE TABLE IF NOT EXISTS safebyok_gates (
   sigs       jsonb   NOT NULL,
   meta       jsonb   NOT NULL,
   PRIMARY KEY (userid, banklabel, labelpath),
-  CHECK (am IN ('a', 'x') AND revseq >= 0),
+  -- The Thing's CHECKs, the same in every kind's table:
+  CHECK (am IN ('a', 'x') AND revseq >= 0 AND born_at <= written_at),
+  CHECK (lifeseq ~ '^[0-9a-v]{10}$'),
+  CHECK ((am = 'x') = (right(lifeseq, 1) IN ('1','3','5','7','9','b','d','f','h','j','l','n','p','r','t','v'))),
+  CHECK (right(lifepath, 11) = '/' || lifeseq),
+  CHECK (right(labelpath, length(label) + 1) = '/' || label),
+  -- The gate's own:
   CHECK (labelpath = 'gate/' || label),
   CHECK (label <> 'main' OR am = 'a'),          -- the main gate is never deleted
-  CHECK (lifeseq ~ '^[0-9a-v]{10}$' AND (am = 'x') = (safebyok_bigint_of_base32(lifeseq) % 2 = 1)),
   CHECK (lifepath = '/' || lifeseq),            -- depth 1, for now
   CHECK (COALESCE(
         jsonb_typeof(wayins->'main') = 'object'
@@ -333,12 +396,14 @@ BEGIN
   SET    (fmt, am, lifepath, lifeseq, revtok, revseq, born_at, written_at, wayins, auth, sigs, meta)
        = (proposed.fmt, proposed.am, proposed.lifepath, proposed.lifeseq, proposed.revtok, proposed.revseq,
           proposed.born_at, proposed.written_at, proposed.wayins, proposed.auth, proposed.sigs, proposed.meta)
-  WHERE  (stored.userid, stored.banklabel, stored.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath)
-    AND  stored.revtok = expected.revtok AND stored.am = expected.am AND stored.lifepath = expected.lifepath
-    AND  stored.revseq = proposed.revseq - 1
-    AND  stored.fmt = proposed.fmt
-    AND  (stored.am = 'a' OR proposed.am = 'a')
-    AND  (stored.am <> proposed.am OR stored.born_at = proposed.born_at)
+  WHERE  ((stored.userid, stored.banklabel, stored.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath))
+    AND  (stored.revtok   = expected.revtok)
+    AND  (stored.am       = expected.am)
+    AND  (stored.lifepath = expected.lifepath)
+    AND  (stored.revseq   = (proposed.revseq - 1))
+    AND  (stored.fmt      = proposed.fmt)
+    AND  ((stored.am = 'a') OR (proposed.am = 'a'))
+    AND  ((stored.am <> proposed.am) OR (stored.born_at = proposed.born_at))
     AND  safebyok_lifeseq_ok(stored.lifeseq, stored.am, proposed.lifeseq, proposed.am)
     AND  safebyok_gate_policies_ok(policies, stored.wayins, expected.wayins, proposed.wayins)
   RETURNING safebyok_record(to_jsonb(stored)) INTO gate;    -- the row as now stored
@@ -370,8 +435,8 @@ row that otherwise matches is `gate_issue`. A box's write function returns `capa
 Nothing in how the statement runs, and the result gets cleaner.
 
 * **The plan.** A SQL function whose body is one expression, with no FROM, that is not STRICT and is IMMUTABLE or
-  STABLE, is inlined by the planner. `safebyok_lifeseq_ok` and `safebyok_gate_policies_ok` then plan as the clauses
-  they hold. Even without inlining, the UPDATE finds one row by its primary key, so a call per row is one call.
+  STABLE, is inlined by the planner. `safebyok_lifeseq_ok`, `safebyok_gate_policies_ok` and each policy's function
+  then plan as the clauses they hold. Even without inlining, the UPDATE finds one row by its primary key, so a call per row is one call.
 * **The locks.** The checks read only their arguments and take no lock. The UPDATE takes the row lock it took before,
   and nothing else. `safebyok_capacity_ok` reads the box table with no row lock, as big's count does. It is STABLE
   because a VOLATILE function would take a fresh snapshot of its own.
@@ -407,7 +472,8 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
 * **The adapter needs a map from modelkind to the check of each kind's record**, so that it never stores what its own
   models would refuse. It is keyed by the modelkind at the base of the `labelpath`, which a get has too; each check
   pins its kind's `fmt`. That map is the one place the adapter names kinds; Postgres names them in its tables.
-* **Storage policies** become named functions over the kind's columns, such as `safebyok_gate_policies_ok`.
+* **Storage policies** become named functions over the kind's columns, one per policy (`safebyok_add_passkey_ok`),
+  gathered by `safebyok_gate_policies_ok`.
 * **The box cap** becomes `safebyok_capacity_ok`, a count of live boxes under a `labelpath` prefix. It stays soft.
 * **The compound write.** Big's `buildBank` stores a bank and its main gate in one step. A `writeThing` stores one Thing.
   That is the Bank–Gate intertwingling, left for later.
@@ -430,5 +496,8 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
 
 ## Where things stand
 
-* The design only. Nothing is built.
-* The thread will be cut from #697's tip once this settles.
+* Built in `packages/safebyok`, exported as `safebyok/storage`: the Thing's shapes (`shapes-thing.ts`), the classifier
+  (`thing-classifier.ts`), `vault-db.ts`, `adapter-vault-db.ts` and `memory-vault-db.ts`, for the main gate.
+* Postgres is the design above, not built.
+* The Gate model still holds big's `GateRecord`: moving it onto the gate's Thing, and the lease's stamp off `gate_tok`,
+  is the next step.
