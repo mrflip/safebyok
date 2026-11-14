@@ -8,7 +8,7 @@ import * as Sealers from './sealers'
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock'>
 
 /** The sealer of kind `KindT`, in `sealers.ts`. */
-type SealerOf<KindT extends Sealers.Sealerkind> = typeof Sealers[`${KindT}Sealer`]
+type SealerOf<KindT extends Sealers.Sealerkind> = typeof Sealers[KindT]
 /** What the sealer of kind `KindT` seals the next revision of: its record without the sealed fields. */
 export type AnteOf<KindT extends Sealers.Sealerkind>       = SealerOf<KindT> extends Sealers.Sealer<infer AnteT, unknown, unknown> ? AnteT : never
 /** What the sealer of kind `KindT` gives back: its record, sealed. */
@@ -184,6 +184,6 @@ export class Lease implements GX.LeaseStamp {
 // lookup is computed, which import-x/namespace cannot check; the sealerkind's check stands in for it.
 /** The sealer of kind `sealerkind`, or throw `bad_option` for a kind there is none of */
 function sealerOf<KindT extends Sealers.Sealerkind>(sealerkind: KindT): Sealers.Sealer<AnteOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> {
-  return Sealers[`${Checks.sealerkind.parse(sealerkind)}Sealer`] as Sealers.Sealer<AnteOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> // eslint-disable-line import-x/namespace
+  return Sealers[Checks.sealerkind.parse(sealerkind)] as Sealers.Sealer<AnteOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> // eslint-disable-line import-x/namespace
 }
 // --

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Crypto, GX } from 'safebyok-big/internals'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
-import { BoxWhisperSealer } from '../../src/models/sealers'
+import { BoxWhisper } from '../../src/models/sealers'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -107,7 +107,7 @@ describe("lease.seal(sealerkind, ante, cleartexts) and lease.unseal(sealerkind, 
 
   it("zeroes the whisper's bytes once each has sealed or opened them", async () => {
     const { lease } = await leaseWorld()
-    const text = BoxWhisperSealer.encode(Cleartexts)
+    const text = BoxWhisper.encode(Cleartexts)
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     const decode = vi.spyOn(TextDecoder.prototype, 'decode')
     const sealed = await lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
@@ -123,9 +123,9 @@ describe("lease.seal(sealerkind, ante, cleartexts) and lease.unseal(sealerkind, 
   })
 
   const SealerkindCases = [
-    [BoxWhisperSealer,   'a sealer'],
+    [BoxWhisper,         'a sealer'],
     [null,               'null'],
-    ['BoxWhisperSealer', "a sealer's name"],
+    ['sealerkindVals',   "another of the module's exports"],
     ['boxwhisper',       'a kind in the wrong case'],
     ['toString',         "a name every object has"],
   ] as const

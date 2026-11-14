@@ -42,13 +42,15 @@ added or folded into through the subagent, and no other entry changes.
 ## Of Interest
 
 * 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, `packages/safebyok` (not `safebyok-big`), a box's seal binds the bank's stamp and the box's sparse fields, and no vault stamp.**
-  In `safebyok-big` a whisper's ctx bound the bank's stamp, the vault's stamp, then the box's sparse fields. The new core has no Vault: the ctx binds the bank's stamp, then what `BoxWhisperSealer.stampsOf` returns, the box row's sparse fields (`models/sealers.ts`, `Lease.seal` in `models/lease.ts`).
+  In `safebyok-big` a whisper's ctx bound the bank's stamp, the vault's stamp, then the box's sparse fields. The new core has no Vault: the ctx binds the bank's stamp, then what `BoxWhisper.stampsOf` returns, the box row's sparse fields (`models/sealers.ts`, `Lease.seal` in `models/lease.ts`).
+  amended 2026-11-14 (lean_gate): the sealer's export was named `BoxWhisperSealer`; it is now `BoxWhisper`.
   Those fields include `vault_tok` and `bank_tok`, so the life of the box's container is still bound through them. A future `lifepath` field is to replace `vault_tok` and `box_tok`.
 
 * 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, the lease takes a sealerkind string and can use only a sealer that `models/sealers.ts` defines.**
   A Sealer chooses the ctx purposes, the stamps, the codec (`encode`, `decode`) and the record fields; the lease only wraps a fresh key under the bankKey and ciphers (`Lease.seal`, `Lease.unseal`, `models/lease.ts`).
-  The caller passes a sealerkind (today `'BoxWhisper'`), never a sealer. The lease checks it against `sealerkindVals` in `models/sealers.ts`, refusing `bad_option` otherwise, and picks `${sealerkind}Sealer` from that module (`import * as Sealers`; `sealerOf`, `models/lease.ts`). A sealer from elsewhere would choose its own stamps and would see the cleartext in `encode` and `decode`; none can be handed in.
+  The caller passes a sealerkind (today `'BoxWhisper'`), never a sealer. The lease checks it against `sealerkindVals` in `models/sealers.ts`, refusing `bad_option` otherwise, and picks `Sealers[sealerkind]` from that module (`import * as Sealers`; `sealerOf`, `models/lease.ts`); a sealer's export name is its sealerkind, and `sealerkindVals` or any other export of the module is refused as a kind, `bad_option`. A sealer from elsewhere would choose its own stamps and would see the cleartext in `encode` and `decode`; none can be handed in.
   amended 2026-11-14 (lean_gate): this said the lease took a sealer object and ran an `isSealer` identity check on every `seal` and `unseal`; `isSealer` no longer exists.
+  amended 2026-11-14 (lean_gate): the lease picked `${sealerkind}Sealer` (the export was `BoxWhisperSealer`); it now picks `Sealers[sealerkind]`, the export being `BoxWhisper`.
 
 * 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, `Proving.buildLease(bank, gate)` builds the lease whole, so the bankKey crosses no method boundary.**
   It unwraps the bankKey, wraps it under a fresh non-extractable leaseKey and passes the record to `Lease.make`, all in one method (`models/proving.ts`). `safebyok-big` had a separate `Lease.buildGranted(bank, bankKey, ...)` that received the naked bankKey.

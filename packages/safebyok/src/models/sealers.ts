@@ -2,7 +2,7 @@ import { BX, CX, Clock, Crypto, SX, StableJsonify, Throwers, Validator } from 's
 
 // == [The Sealer]: sealerkindVals, Sealerkind, Sealed, SealPurposes, Sealer
 
-/** The kinds of sealer, each named for the part it seals: the sealer of kind `K` is `${K}Sealer`, below. */
+/** The kinds of sealer, each named for the part it seals: the sealer of kind `K` is the export `K` below. */
 export const sealerkindVals = ['BoxWhisper'] as const
 export type Sealerkind = typeof sealerkindVals[number]
 
@@ -40,9 +40,9 @@ export interface Sealer<AnteT, RecordT, CleartextsT> {
 
 // --
 
-// == [A box's whisper]: BoxAnte, BoxCleartexts, BoxWhisperSealer
+// == [A box's whisper]: BoxAnte, BoxCleartexts, BoxWhisper
 
-/** A box's record without its sealed fields, live or a tombstone: what {@link BoxWhisperSealer} seals the next revision of. */
+/** A box's record without its sealed fields, live or a tombstone: what {@link BoxWhisper} seals the next revision of. */
 export type BoxAnte = Omit<BX.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered' | 'am'> & { am: 'a' | 'x' }
 
 /** What a box seals: its whisper. */
@@ -57,7 +57,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj }) => ({
 }))
 
 /** Seals a box's whisper, bound to every sparse field of the box: its scope, its life and its revision. Its sidecar stays in the clear. */
-export const BoxWhisperSealer: Sealer<BoxAnte, BX.BoxRecord, BoxCleartexts> = Object.freeze({
+export const BoxWhisper: Sealer<BoxAnte, BX.BoxRecord, BoxCleartexts> = Object.freeze({
   nextRevisionOf(ante: BoxAnte): BoxAnte {
     const parsed = Checks.boxAnte.parse(ante)
     const written_at = Clock.nowMillis()

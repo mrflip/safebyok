@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { BX, Crypto, GX } from 'safebyok-big/internals'
-import { BoxWhisperSealer } from '../../src/models/sealers'
+import { BoxWhisper } from '../../src/models/sealers'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -34,7 +34,7 @@ function changed(val: unknown): unknown { return ((typeof val === 'number') ? va
 async function sealedWorld() {
   const { bank } = await TH.buildBornBank()
   const box = await bank.sealBox(TH.boxAnteOf(), { whisper: TH.Whisper })
-  const [boxStamp] = BoxWhisperSealer.stampsOf(box)
+  const [boxStamp] = BoxWhisper.stampsOf(box)
   return { bank, box, boxStamp: boxStamp!, bankKey: await TH._cheat_bankKeyOf(bank) }
 }
 
