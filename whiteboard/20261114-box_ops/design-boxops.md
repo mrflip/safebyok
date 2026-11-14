@@ -119,9 +119,9 @@ const KindChecks = {
   | Builder   | Policies                                |
   | --------- | --------------------------------------- |
   | `getAsk`  | `ifAbsent: 'nil'`                       |
-  | `listAsk` | `ifAbsent: 'fail'`, `listkind: 'children'` |
-  | `putAsk`  | `ifAbsent: 'add'`, `ifPresent: 'repl'`  |
-  | `delAsk`  | `ifAbsent: 'fail'`, `ifPresent: 'repl'` |
+  | `listAsk` | `ifAbsent: 'fail'`, of the parent                         |
+  | `putAsk`  | `ifAbsent: 'add'`, `ifPresent: 'repl'`                    |
+  | `delAsk`  | `ifAbsent: 'fail'`, `ifPresent: 'repl'`, neither overridable |
 
   A verb takes only a whole ask, so every logged ask shows its policies.
 
@@ -129,6 +129,16 @@ const KindChecks = {
 
 The verbs are unchanged. A box can be deleted, which the main gate never is: a `del` of a live box answers `deleted`,
 a `put` over its tombstone answers `reborn` at the next lifeseq, and a `del` over a tombstone refuses `dubdel`.
+
+### Ensuring parentage on a write (TODO)
+
+A write ask may carry `parentage: SparseParent[]`, with `SparseParent = { revtok, born_at }`, plus `whisper_sealed`
+for a box. It names every parent of the Thing written, or it is left out.
+
+* **Where a parent is stored live**, nothing happens to it.
+* **Where a parent is missing, or is a tombstone one lifeseq short of the lifepath written**, its sparse parent is
+  filled out and stored in its place. It takes the `written_at` of the Thing written, and the scope, life and other
+  fields its position implies. Its sealed part binds those same fields.
 
 ### Listing a Thing's children: `tryListThings`
 
@@ -140,8 +150,8 @@ vaultDB.tryListThings(ask: ListThingsAsk) → Promise<ListThingsAnswer>   never 
 /** A record's Thing fields, without its body: what a listing gives of each Thing. */
 type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecord>
 
-/** List the Things under the Thing at this scope: its children, or its whole subtree. */
-type ListThingsAsk = ThingScope & { op: 'list', modelkind: Thingkind, listkind: 'children' | 'subtree', ifAbsent: 'fail' | 'nil' }
+/** List the children of the Thing at this scope. */
+type ListThingsAsk = ThingScope & { op: 'list', modelkind: Thingkind, ifAbsent: 'fail' | 'nil' }
 
 /** A stored child that fails its kind's checks, named by where it is stored. */
 type DamagedThing = ThingScope & { am: 'd' }
@@ -151,25 +161,28 @@ type ListedBeside<RecordT extends Thing> = { parent: Sparse<RecordT> | null, dam
 
 type ListThingsAnswer<RecordT extends Thing = Thing> =
   | (GoodAnswer<Sparse<RecordT>[], EX.GotAct> & ListedBeside<RecordT>)
-  | (BadAnswer<Sparse<RecordT>[]>              & ListedBeside<RecordT>)
+  | (BadAnswer<Sparse<RecordT>[] | null>       & ListedBeside<RecordT>)
 ```
 
 `BadAnswer` takes the type of its `dbhas`, as `GoodAnswer` takes the type of its `val`. Its default is `Thing | null`,
-which every other verb keeps.
+which every other verb keeps. A get's refusal has the stored record as its `dbhas`: the tombstone under `gone`, and
+null under `void` or wherever the store's answer is in doubt.
 
-* **`val` is the Things listed, sparse**: the parent's children, or its whole subtree. They come in labelpath order,
-  byte for byte, as Postgres's `COLLATE "C"` sorts them. A full record comes from a get.
-* **`dbhas` has `val`'s shape**, and changes with it. A parent that is void or gone has nothing under it, so a refused
-  `void` or `gone` has `dbhas: []`.
-* **`parent` and `damaged_rows` are the same for every `listkind`.** `parent` is the parent's sparse record, or null
-  for none.
-* **The act says whether the parent is there**, since that decides whether anything can be listed: `gotlive`,
-  `gotgone` or `gotvoid`, or under `ifAbsent: 'fail'` a refused `void` or `gone`.
+* **A listing is similar to a sparse get of the parent that also gives its sparse children.** Its act is the
+  parent's: with `ifAbsent: 'nil'` it answers `gotlive`, `gotgone` or `gotvoid`, and with `ifAbsent: 'fail'` it refuses
+  `void` or `gone`.
+* **`val` is an array of sparse children**, not descendants, in labelpath order, byte for byte, as Postgres's
+  `COLLATE "C"` sorts them. A full record comes from a get.
+* **`dbhas` has `val`'s shape, and changes with it.** `parent` and `damaged_rows` do not change with the shape of
+  what is listed. Under `gone`, `dbhas` is `[]`: nothing is written under a tombstone's odd lifeseq. Under `void` it
+  is open question 4. Under any other refusal it is null.
+* **`parent`** is the parent's sparse record, or null for none.
 * **Tombstones are listed**, `am: 'x'`, so that a cache learns of a delete from a listing.
-* **A listed Thing that fails its checks goes into `damaged_rows`**, and the rest are listed as usual. A row stored
+* **A child that fails its checks is listed in `damaged_rows`**, and the rest are listed as usual. A row stored
   outside the parent refuses `storage_issue`, because the store is broken.
-* **A subtree is a flat list too.** Labels are `[a-z0-9_]`, every byte of them above `/`, so labelpath order puts each
-  Thing's descendants right after it: a depth-first walk. Each Thing's depth is the count of its segments.
+* **Descendants come later, in the same answer.** Labels are `[a-z0-9_]`, every byte of them above `/`, so labelpath
+  order puts each Thing's descendants right after it: a depth-first walk. A listing of a subtree gives the same flat
+  `val`, each Thing's depth the count of its segments, and a filter narrows it.
 
 ```
 adapter.tryListThings(ask)
@@ -184,7 +197,7 @@ adapter.tryListThings(ask)
     return this.answerForThrown(thrown, 'listThings', ask)
 
 store.doListThings(ask)                                            one read
-  fetch the raw parent at ask's scope, and every raw Thing under it, one label down or all the way, each with its labelpath
+  fetch the raw parent at ask's scope, and every raw Thing one label under it, each with its labelpath
   return this.classifyListThings(ask, fetched)
 ```
 
@@ -204,8 +217,6 @@ type BirthBankAsk = BankScope & { op: 'birth', bank: BankThing, gate: GateThing,
 
 type BirthBankAnswer = Answer<{ bank: BankThing, gate: GateThing, root: BoxThing }, 'born' | 'passed'>
 ```
-
-The bank is unlocked while it is born, so the root box is sealed.
 
 * **Where no bank is stored**, it writes all three, each over the shell, and answers `born`.
 * **Where a live bank is stored with its gate and root box**, it writes nothing, and answers `passed` with the three
@@ -237,8 +248,7 @@ As for the gate, this is not built.
 
 * **`safebyok_write_box(proposed, cited)`** is the gate's write function without the policies.
 * **The listing** is two SELECTs on the primary key: the parent's row, and the range under it,
-  `labelpath >= 'box/' AND labelpath < 'box0'`, filtered to the parent's lifepath, and for `children` to one more
-  segment.
+  `labelpath >= 'box/' AND labelpath < 'box0'`, filtered to one more segment and to the parent's lifepath.
 * **`safebyok_birth_bank(bank, gate, root)`** inserts the three rows in one call, which Postgres runs atomically.
 
 ## The models
@@ -394,9 +404,10 @@ Three PRs, each stacked on the one before:
 3. **`Sealed`'s fields.** Your `sealers.ts` has `wrapped`, `codec`, and a ciphered `schematag`, and your doc has
    `key_wrapped`, `codectag`, and a plain `schematag`. I took the doc's: a stored field is underbar_case, and the
    schematag is visible, so a host reads it without unlocking.
-4. **`listkind: 'subtree'` in this thread.** Every box is a child of the root for now, so a subtree lists what
-   `children` does. I recommend building it here anyway, with a test that nests a row by hand: it costs one filter
-   fewer than `children`, and it fixes the answer's shape before nested boxes arrive.
+4. **A listing's `dbhas` under `void`.** Rows can be stored under a missing parent, because a write does not check its
+   parent, and a parentage write is built to mend just that. None of them is a child, since the parent has no life,
+   but `[]` would read as "nothing is there", which the store cannot say. I recommend `dbhas: null` under `void`. A
+   `gotvoid` listing has `val: []` all the same, since a good answer's `val` is always a list.
 
 ## Principles
 
