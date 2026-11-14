@@ -7,7 +7,7 @@ implementation.
   compromised one: its passkeys removed, its lease revoked, and nothing it holds reading
   what is written next. Vault-key rotation does the cryptography (not yet built; its design was
   removed on 2026-10-18 for a different plan); what waits is the UX, a device list, and, if the Coach
-  wants rotation not to sign every other device out, a key pair per wayin (`TODO.md`, *Which wayins
+  wants rotation not to sign every other device out, a key pair per wayin (`TODO-big.md`, *Which wayins
   a rotation keeps*). The data it needs goes
   in with rotation: a random `device_tok` per bank per device, recorded on every wayin it adds.
   * **What we record now.** `device_tok` is random, minted per bank per device, never derived from
