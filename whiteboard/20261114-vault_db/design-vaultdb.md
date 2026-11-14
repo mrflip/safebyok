@@ -6,8 +6,8 @@ is the analog of big's `bank-db.ts`, `adapter-bank-db.ts` and `memory-bank-db.ts
 holds Things, and a Gate, a Bank and a Box are each a Thing. The Gate comes first. Bank and Gate are left
 intertwingled for now.
 
-Words used below: **proposed** is `ask.record`, the record the caller would store. **expected** is `ask.expected`, the
-record in hand, or the shell for none. **actual** is the record the store holds.
+Words used below: **proposed** is `ask.record`, the record the caller would store. **cited** is `ask.cited`, what the
+caller cites of the record in hand, or the shell for none. **actual** is the record the store holds.
 
 ## The Thing
 
@@ -52,18 +52,18 @@ the body. Everything else in the record is the **body**, which the store carries
 
 ### Invariants
 
-The adapter checks proposed against expected when the ask is parsed, before anything is fetched (`bad_record`):
+The adapter checks proposed against cited when the ask is parsed, before anything is fetched (`bad_record`):
 
-* `proposed.revseq === expected.revseq + 1`.
-* `proposed.revtok` is new: not `expected.revtok`, and not void.
+* `proposed.revseq === cited.revseq + 1`.
+* `proposed.revtok` is new: not `cited.revtok`, and not void.
 * `proposed` is at the ask's scope, and its `label` is the last label of its `labelpath`.
 * `proposed.lifepath` ends in `/` + `proposed.lifeseq`.
-* `am: 'x'` exactly when `lifeseq` is odd, in both `proposed` and `expected`.
+* `am: 'x'` exactly when `lifeseq` is odd, in both `proposed` and `cited`.
 * Live over live keeps `lifeseq` and `born_at`. Gone over live is `lifeseq + 1`. Live over gone is `lifeseq + 1`
   too: a birth (over the shell) is 0, a rebirth is the tombstone's `lifeseq + 1`. Either has `born_at === written_at`.
 * A tombstone never goes over a tombstone.
 
-The store checks expected against actual, in the step that stores the record: the act tables below.
+The store checks cited against actual, in the step that stores the record: the act tables below.
 
 ## The two verbs
 
@@ -147,8 +147,8 @@ has its lifeseq counterpart:
 | Big read | of | Now |
 |---|---|---|
 | the ask's `isLifeTokPlaced`: the expected tok over a live row, a new one on a birth or deletion | `gate_tok`, `vault_tok`, `box_tok`, `bank_tok` | the ask's `lifeseq` check: the same lifeseq while `am` stays, one more when it flips |
-| the classifier's `isLifeOff`: the expected life against the stored one | the row's own life tok | `lifepath` and `am`, expected against stored |
-| Postgres's `gate_tok = expected.gate_tok` | the row's own life tok | `stored.lifepath = expected.lifepath` |
+| the classifier's `isLifeOff`: the expected life against the stored one | the row's own life tok | `lifepath` and `am`, cited against stored |
+| Postgres's `gate_tok = expected.gate_tok` | the row's own life tok | `stored.lifepath = cited.lifepath` |
 | the row above's life: `bank_reborn`, `vault_reborn`, a box keyed under its vault's life | `bank_tok`, `vault_tok` on the row below | the lifepath's leading lifeseqs: waits for depth 2 |
 | the seal's binding of the box's life, and `nextRevisionOf` minting a new tok over a tombstone | `box_tok` | the box's `lifepath`: waits on `BoxRecord` taking it |
 
@@ -161,14 +161,14 @@ needed for these acts.
 /** Where a Thing is stored. */
 type ThingScope = { userid, banklabel, labelpath }
 
-/** What the store compares of expected and actual. */
-type ThingMeta = Pick<Thing, 'revtok' | 'revseq' | 'am' | 'lifeseq' | 'lifepath' | 'born_at'>
+/** What a write cites of the Thing it expects, which the store compares with actual. */
+type ThingCited = Pick<Thing, 'revtok' | 'revseq' | 'am' | 'lifeseq' | 'lifepath' | 'born_at'>   // or the shell's
 
 type GetThingAsk = ThingScope & { op: 'get', ifAbsent: 'fail' | 'nil' }
 
 type WriteThingAsk<RecordT extends Thing> = ThingScope & {
   op:        'write'
-  expected:  ExpectedOf<RecordT>    // ThingMeta, plus what a named policy takes as testimony of the old version
+  cited:     ThingCited & Partial<RecordT>   // plus what a named policy takes as testimony of the old version
   record:    RecordT                // proposed
   ifAbsent:  'add' | 'fail'
   ifPresent: 'repl' | 'fail' | 'get'
@@ -190,9 +190,9 @@ type Actual<RecordT extends Thing> =
 type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'act' | 'val' | 'world'>
 ```
 
-* **`expected` requires what is needed, and forgives extras that check.** It must carry its `ThingMeta`. Where a
-  policy takes fields of the old version as testimony, it must carry those too: `replace_passphrase` reads
-  `expected.wayins.main`, the wayin the gating proved against. Any other field of the record is allowed and unread,
+* **`cited` requires what is needed, and forgives extras that check.** It must carry what `ThingCited` names, and only
+  that is compared with the Thing stored. Where a policy takes fields of the old version as testimony, it must carry
+  those too: `replace_passphrase` reads `cited.wayins.main`, the wayin the gating proved against. Any other field of the record is allowed and unread,
   so the record in hand can be passed whole; a field that fails its kind's check refuses `bad_record`.
 * **`world` is the bank's Thing**, read in the same step, as `{ world, boxes }` is in STYLE.md: null until the Bank
   is a Thing. Other fields earn their own place on the answer. "Parent" is kept for a Thing's parent in the tree.
@@ -211,7 +211,7 @@ The adapter is shared TypeScript. A store implements the primitives under it.
 |---|---|---|
 | keying | one `Map`, `ckeyOf(userid, banklabel, labelpath)` → record, each a `structuredClone`; the labelpath's modelkind keeps the kinds apart | a table per kind (`safebyok_banks`, `safebyok_gates`, `safebyok_boxes`), each keyed `(userid, banklabel, labelpath)`, the Thing's fields and the kind's body as columns |
 | `doGetThing(ask): Awaitable<Actual>` | read the map, classify | one SELECT from the kind's table, classify |
-| `doWriteThing(ask): Awaitable<Actual>` | synchronous, so atomic: read, classify, apply the policies, write, read back | one call of the kind's write function, picked by the labelpath's modelkind: `safebyok_write_gate(proposed, expected, policies)` |
+| `doWriteThing(ask): Awaitable<Actual>` | synchronous, so atomic: read, classify, apply the policies, write, read back | one call of the kind's write function, picked by the labelpath's modelkind: `safebyok_write_gate(proposed, cited, policies)` |
 | `doWatch(scope, hear, onBadNews)` | `queueMicrotask` to each matching watcher | `pg_notify` from the write function; refetch when the payload is too big |
 | atomicity | the step is synchronous | one UPDATE (or INSERT over the shell) inside the call's implicit transaction, as big's functions are |
 
@@ -265,7 +265,7 @@ END $$;
 
 Each returns true or false and takes plain values, so one function serves every kind's table. A rule about one row
 alone is a CHECK on the table, never a clause in the write; a function holds only what compares the proposed record
-with the stored row or the expected one.
+with the stored row or the cited one.
 
 ```sql
 -- Whether proposed_lifeseq follows stored_lifeseq: one past the stored when am flips, the same when not. A null stored
@@ -284,10 +284,10 @@ $$;
 -- registered_at check, as the write function checks born_at for every live-over-live write.
 
 -- Whether a gate write replaces the passphrase wayin the gating proved against, and nothing else.
-CREATE OR REPLACE FUNCTION safebyok_replace_passphrase_ok(stored_wayins jsonb, expected_wayins jsonb, proposed_wayins jsonb) RETURNS boolean
+CREATE OR REPLACE FUNCTION safebyok_replace_passphrase_ok(stored_wayins jsonb, cited_wayins jsonb, proposed_wayins jsonb) RETURNS boolean
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT (
-        ((stored_wayins -> 'main') = (expected_wayins -> 'main'))
+        ((stored_wayins -> 'main') = (cited_wayins -> 'main'))
     AND ((stored_wayins - 'main') = (proposed_wayins - 'main'))
   )
 $$;
@@ -313,11 +313,11 @@ LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
 $$;
 
 -- Whether a gate write keeps each storage policy it names.
-CREATE OR REPLACE FUNCTION safebyok_gate_policies_ok(policies text[], stored_wayins jsonb, expected_wayins jsonb, proposed_wayins jsonb)
+CREATE OR REPLACE FUNCTION safebyok_gate_policies_ok(policies text[], stored_wayins jsonb, cited_wayins jsonb, proposed_wayins jsonb)
 RETURNS boolean
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT (
-        ((NOT ('replace_passphrase' = ANY (policies))) OR safebyok_replace_passphrase_ok(stored_wayins, expected_wayins, proposed_wayins))
+        ((NOT ('replace_passphrase' = ANY (policies))) OR safebyok_replace_passphrase_ok(stored_wayins, cited_wayins, proposed_wayins))
     AND ((NOT ('add_passkey'        = ANY (policies))) OR safebyok_add_passkey_ok(stored_wayins, proposed_wayins))
     AND ((NOT ('revoke_passkey'     = ANY (policies))) OR safebyok_revoke_passkey_ok(stored_wayins, proposed_wayins))
   )
@@ -330,7 +330,8 @@ LANGUAGE sql STABLE PARALLEL SAFE AS $$
   SELECT (count(*) < cap)
   FROM   safebyok_boxes AS box
   WHERE  ((box.userid, box.banklabel) = (of_userid, of_banklabel))
-    AND  (box.labelpath LIKE (labelpath_prefix || '/%'))
+    AND  (box.labelpath >= (labelpath_prefix || '/'))    -- the labelpaths under the prefix: '0' is the byte after '/'
+    AND  (box.labelpath <  (labelpath_prefix || '0'))
     AND  (box.am = 'a')
 $$;
 ```
@@ -341,15 +342,15 @@ $$;
 -- wayins holds the bank's passphrase wayin under main, and its passkey wayin under passkey0 when it has one.
 -- auth, sigs and meta are kept for later, and are always empty.
 CREATE TABLE IF NOT EXISTS safebyok_gates (
-  userid     text    NOT NULL,
-  banklabel  text    NOT NULL,
-  labelpath  text    COLLATE "C" NOT NULL,       -- C collation, so a prefix LIKE uses the primary key
-  label      text    NOT NULL,
+  userid     text    COLLATE "C" NOT NULL,
+  banklabel  text    COLLATE "C" NOT NULL,
+  labelpath  text    COLLATE "C" NOT NULL,
+  label      text    COLLATE "C" NOT NULL,
   fmt        integer NOT NULL,
   am         text    NOT NULL,
   lifepath   text    COLLATE "C" NOT NULL,
-  lifeseq    text    NOT NULL,
-  revtok     text    NOT NULL,
+  lifeseq    text    COLLATE "C" NOT NULL,
+  revtok     text    COLLATE "C" NOT NULL,
   revseq     integer NOT NULL,
   born_at    bigint  NOT NULL,
   written_at bigint  NOT NULL,
@@ -375,39 +376,46 @@ CREATE TABLE IF NOT EXISTS safebyok_gates (
 );
 ```
 
+**Every text column is `COLLATE "C"`**, compared and sorted byte for byte. Nothing here sorts for a person, and every
+name is compared byte for byte, as the TypeScript compares it. The database's default collation (libc's or ICU's) can
+reorder strings when the operating system or ICU is upgraded: an index over such a column is then silently out of
+order, and a lookup by primary key, or an `ON CONFLICT`, can miss the row that is there. A `userid` mixes case and
+punctuation (`-_.~:@+|%`), which is just what such upgrades reorder. `"C"` also keeps `lifeseq` in the order of its
+lives, and lets a prefix range on `labelpath` use the primary key.
+
 The foreign key to `safebyok_banks` comes back when the bank's table takes the Thing's columns. Whatever the bank's
 label, a bank's table holds one row per `(userid, banklabel)`, and declares that unique so the key can reference it.
 
 #### The gate's write function
 
 ```sql
--- Store a writeThing ask's gate record over the expected gate row, under the storage policies it names.
+-- Store a writeThing ask's gate record over the gate row it cites, under the storage policies it names.
 -- The adapter has made every check below already. They are made again here because this is the boundary that counts:
 -- behind GraphQL, Postgres or Convex the adapter's TypeScript runs on the device, under the app's control, and only
 -- what runs here holds against it. And only this statement sees the row it writes over.
-CREATE OR REPLACE FUNCTION safebyok_write_gate(proposed_record jsonb, expected_record jsonb, policies text[])
+CREATE OR REPLACE FUNCTION safebyok_write_gate(proposed_record jsonb, cited_record jsonb, policies text[])
 RETURNS TABLE (ok boolean, gate jsonb, lifeseq_ok boolean, policies_ok boolean)
 LANGUAGE plpgsql AS $$
 DECLARE
   proposed safebyok_gates := jsonb_populate_record(NULL::safebyok_gates, proposed_record);
-  expected safebyok_gates := jsonb_populate_record(NULL::safebyok_gates, expected_record);
+  cited    safebyok_gates := jsonb_populate_record(NULL::safebyok_gates, cited_record);
 BEGIN
   UPDATE safebyok_gates AS stored
   SET    (fmt, am, lifepath, lifeseq, revtok, revseq, born_at, written_at, wayins, auth, sigs, meta)
        = (proposed.fmt, proposed.am, proposed.lifepath, proposed.lifeseq, proposed.revtok, proposed.revseq,
           proposed.born_at, proposed.written_at, proposed.wayins, proposed.auth, proposed.sigs, proposed.meta)
   WHERE  ((stored.userid, stored.banklabel, stored.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath))
-    AND  (stored.revtok   = expected.revtok)
-    AND  (stored.am       = expected.am)
-    AND  (stored.lifepath = expected.lifepath)
+    AND  (stored.revtok   = cited.revtok)
+    AND  (stored.am       = cited.am)
+    AND  (stored.lifepath = cited.lifepath)
     AND  (stored.revseq   = (proposed.revseq - 1))
     AND  (stored.fmt      = proposed.fmt)
     AND  ((stored.am = 'a') OR (proposed.am = 'a'))
     AND  ((stored.am <> proposed.am) OR (stored.born_at = proposed.born_at))
     AND  safebyok_lifeseq_ok(stored.lifeseq, stored.am, proposed.lifeseq, proposed.am)
-    AND  safebyok_gate_policies_ok(policies, stored.wayins, expected.wayins, proposed.wayins)
+    AND  safebyok_gate_policies_ok(policies, stored.wayins, cited.wayins, proposed.wayins)
   RETURNING safebyok_record(to_jsonb(stored)) INTO gate;    -- the row as now stored
-  -- Over the shell (expected.revseq = -1): INSERT ... SELECT proposed.* WHERE safebyok_lifeseq_ok(NULL, NULL, ...)
+  -- Over the shell (cited.revseq = -1): INSERT ... SELECT proposed.* WHERE safebyok_lifeseq_ok(NULL, NULL, ...)
   -- ON CONFLICT DO NOTHING, in place of the UPDATE.
 
   IF FOUND THEN
@@ -419,7 +427,7 @@ BEGIN
   ok := false;
   SELECT safebyok_record(to_jsonb(stored)),
          safebyok_lifeseq_ok(stored.lifeseq, stored.am, proposed.lifeseq, proposed.am),
-         safebyok_gate_policies_ok(policies, stored.wayins, expected.wayins, proposed.wayins)
+         safebyok_gate_policies_ok(policies, stored.wayins, cited.wayins, proposed.wayins)
   INTO   gate, lifeseq_ok, policies_ok
   FROM   safebyok_gates AS stored
   WHERE  (stored.userid, stored.banklabel, stored.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath);
