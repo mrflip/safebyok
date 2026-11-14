@@ -1,9 +1,9 @@
 import { defineConfig } from 'tsdown'
 
 // The lean core, built as safebyok-big is (its tsdown.config.ts says why each setting is there). Each entry is a subpath:
-// `safebyok/core` now, `safebyok/storage` to come; `safebyok` itself waits on the instance sugar.
+// `safebyok`, the front door of what a host touches, `safebyok/core` and `safebyok/storage`.
 export default defineConfig({
-  entry:      ['src/index.ts', 'src/core.ts'],
+  entry:      ['src/index.ts', 'src/core.ts', 'src/storage.ts'],
   format:     ['esm', 'cjs'],
   platform:   'neutral',
   target:     'es2022',

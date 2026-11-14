@@ -217,6 +217,7 @@ handful of named subsets of it (STYLE.md, *Shapes and duck typing*).
 | **tombstone** | The record a deletion leaves behind (`VaultTombstone`, `BoxTombstone`).                                                                                                                  |
 | **void**      | An item that is missing altogether, rather than tombstoned; a vacant row. |
 | **shell**     | The tombstone that stands for a void row, never stored: its revision is seq -1 under the void tokens (`shellVaultOf`, `shellBoxOf`). A request that expects no row cites the shell. |
+| **cited**     | What a write cites of the record it expects to find, for storage to compare with the one stored: its revision, its life and its liveness, or the shell's (a write ask's `cited`, a `ThingCited`; the shell's is `ShellCited`). It may carry other fields of the record, each checked, which only a storage policy reads, as testimony. |
 | **dated**     | A row's scope, the token of its life and the time it is judged by, without the rest of the row. For a cached lease these are its bank's scope, `bank_tok` and `proved_at` (`LeaseDated`), and this is the shape the deviceDB's `listLeases` returns. |
 | **snapshot**  | For a stateful thing, what a host renders: its sparse shape plus the state that changes alongside it (`VaultSnapshot`). It is frozen plain data that keeps its identity until something changes. |
 

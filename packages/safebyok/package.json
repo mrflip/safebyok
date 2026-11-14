@@ -69,9 +69,15 @@
       "import": "./dist/core.js",
       "require": "./dist/core.cjs"
     },
+    "./storage": {
+      "@safebyok/source": "./src/storage.ts",
+      "import": "./dist/storage.js",
+      "require": "./dist/storage.cjs"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "es-toolkit": "^1.53.1",
     "safebyok-big": "workspace:*"
   },
   "peerDependencies": {
@@ -87,6 +93,10 @@
         "import": "./dist/core.js",
         "require": "./dist/core.cjs"
       },
+      "./storage": {
+        "import": "./dist/storage.js",
+        "require": "./dist/storage.cjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -97,6 +107,9 @@
     "*": {
       "core": [
         "./dist/core.d.cts"
+      ],
+      "storage": [
+        "./dist/storage.d.cts"
       ]
     }
   }

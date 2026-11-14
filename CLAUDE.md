@@ -24,6 +24,10 @@ kept apart from networking, caching and instance sugar. Code is teleported into 
 * **`safebyok-big` is frozen and private.** Every adapter, `safebyok-react`, the demo and e2e still
   build on it. Its code changes only to export more for the new core to import, through
   `safebyok-big/internals`.
+* **Re-export from `safebyok-big` freely, and ask no one.** When a host, or a signature the new core
+  exports, needs something big defines (`VaultError`, a logger, a shape, a type a field names),
+  re-export it from the new core's entry point (`safebyok`, `safebyok/core`, `safebyok/storage`)
+  rather than redefining it: a copy would split one class in two. Say it in the PR.
 * **A note, README or guide that names files under `packages/safebyok-big/` describes
   safebyok-big alone**: `notes/guarantees.md`, `notes/wontfix.md`, the package READMEs and the rest.
   It says nothing about the new core until it is rewritten for it.
