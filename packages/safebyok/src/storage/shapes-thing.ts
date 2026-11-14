@@ -5,7 +5,7 @@ import { exactOptional } from 'zod'
 import { BX, type Consts, EX, Errors, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 
-// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOf, seqOfLifeseq, isGoneLifeseq
+// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOf, seqOfLifeseq, isGoneLifeseq, lifeseqOfLifepath
 
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10
@@ -23,6 +23,9 @@ export function seqOfLifeseq(lifeseq: string): number { return Number.parseInt(l
 
 /** True when `lifeseq` is a tombstone's: an odd life, the shell's among them. */
 export function isGoneLifeseq(lifeseq: string): boolean { return Math.abs(seqOfLifeseq(lifeseq) % 2) === 1 }
+
+/** The Thing's own lifeseq: the last of its lifepath. */
+export function lifeseqOfLifepath(lifepath: string): string { return lifepath.slice(lifepath.lastIndexOf('/') + 1) }
 // --
 
 // == [Kinds]: thingkindVals, Thingkind, GateThingFormat, isLabelpath
@@ -47,13 +50,15 @@ function isLabelpath(labelpath: string): boolean {
 const LifeseqPattern  = /^[\da-v]{10}$/
 const LifepathPattern = /^(?:\/[\da-v]{10})+$/
 
-type Lived    = { lifeseq: string, lifepath: string, am: string }
-type Revised  = { revtok: string, revseq: number, lifeseq: string }
+type Lived    = { lifepath: string, am: string }
+type Revised  = { revtok: string, revseq: number, lifepath: string }
 
 /** True when a Thing is written at depth 1: its lifepath is its own lifeseq alone. */
-function isLifepathOwn({ lifepath, lifeseq }: Lived): boolean { return lifepath === `/${lifeseq}` }
-/** True when a Thing's lifeseq is odd exactly when it is a tombstone. */
-function isParityRight({ am, lifeseq }: Lived): boolean { return (am === 'x') === isGoneLifeseq(lifeseq) }
+function isLifepathOwn({ lifepath, lifeseq }: Lived & { lifeseq: string }): boolean { return lifepath === `/${lifeseq}` }
+/** True when a lifepath is at depth 1: one lifeseq after a `/`. */
+function isDepthOne({ lifepath }: Lived): boolean { return lifepath.lastIndexOf('/') === 0 }
+/** True when a Thing's own lifeseq is odd exactly when it is a tombstone. */
+function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === isGoneLifeseq(lifeseqOfLifepath(lifepath)) }
 /** True unless the Thing is the main gate, deleted: the main gate is never deleted. */
 function isMainGateLive({ label, am }: { label?: string, am: string }): boolean { return (label !== 'main') || (am === 'a') }
 /** The fields of `shape`, each optional but never undefined, as `Partial` reads them under exactOptionalPropertyTypes. */
@@ -63,9 +68,9 @@ function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT 
 }
 
 /** True when a citation is the shell in all three of its marks, or in none. */
-function isShellWhole({ revtok, revseq, lifeseq }: Revised): boolean {
+function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
   const isShell = (revseq === SX.VoidRevisionSeq)
-  return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifeseq === ShellLifeseq))
+  return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifepath === ShellLifepath))
 }
 
 /** The checks of a Thing's fields, and of the main gate as a Thing, as proposed and as cited. */
@@ -76,11 +81,11 @@ export const { thingScope, thingCited, gateThing, gateCited } = Validator.Checke
   const am           = SX.am.exclude(['d'])
   const thingScope   = obj({ userid: user_id, banklabel: label, labelpath })
   const revisioned   = { revtok: str.min(1), revseq: uint, am, lifeseq, lifepath, born_at: epochMillis }
-  // A write may cite the shell, so its revseq and life may be the shell's -1.
+  // Just what the act tables compare. A write may cite the shell, so its revseq and life may be the shell's -1.
   const thingCited   = obj({
-    ...revisioned,
+    revtok:   revisioned.revtok,
     revseq:   int.min(SX.VoidRevisionSeq),
-    lifeseq:  union([lifeseq, lit(ShellLifeseq)]),
+    am,
     lifepath: union([lifepath, lit(ShellLifepath)]),
   })
   const emptyBag     = obj({}).strict()
@@ -106,14 +111,14 @@ export const { thingScope, thingCited, gateThing, gateCited } = Validator.Checke
   // A citation of the gate must carry what ThingCited names; any other field of the gate it carries must check.
   const gateCited    = obj({ ...exactPartialOf(gateBase.shape), ...thingCited.shape }).strict()
     .refine(isShellWhole,  Phrases.CitedHalfShell)
-    .refine(isLifepathOwn, Phrases.LifepathNotOwn)
+    .refine(isDepthOne,    Phrases.LifepathNotOwn)
     .refine(isParityRight, Phrases.LifeseqParity)
   return { thingScope, thingCited, gateThing, gateCited }
 })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof thingScope>>
-/** What a write cites of the Thing it expects to find, the shell's included: its revision, its life and its liveness. */
+/** What a write cites of the Thing it expects to find, the shell's included: its revision, its life and its liveness, just what the store compares. */
 export type ThingCited   = Readonly<Z.infer<typeof thingCited>>
 /** The main gate, as a Thing. */
 export type GateThing    = Readonly<Z.infer<typeof gateThing>>
@@ -122,7 +127,7 @@ export type Thing        = GateThing
 
 /** What a birth cites: the shell, the void sentinel for no Thing stored. */
 export const ShellCited: ThingCited = Object.freeze({
-  revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: ShellLifepath, born_at: SX.VoidTime,
+  revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: ShellLifepath,
 })
 // --
 
@@ -195,10 +200,9 @@ function checkWriteInvariants({ cited, record, options, userid, banklabel, label
   demandHeld((record.revtok !== cited.revtok) && (record.revtok !== SX.VoidRevisionTok),              Phrases.RevtokNotNew)
   demandHeld(Validator.isConsistent(record, { userid, banklabel, labelpath }),                           Phrases.RecordOfOtherScope)
   demandHeld((record.am === 'a') || (cited.am === 'a'),                                               Phrases.TombstoneOverTombstone)
-  demandHeld(seqOfLifeseq(record.lifeseq) === seqOfLifeseq(cited.lifeseq) + (isLifeFlipped ? 1 : 0),  Phrases.LifeseqNotNext)
-  if (record.am === 'a') {
-    demandHeld(isLifeFlipped ? (record.born_at === record.written_at) : (record.born_at === cited.born_at), Phrases.BornAtNotKept)
-  }
+  demandHeld(seqOfLifeseq(record.lifeseq) === seqOfLifeseq(lifeseqOfLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0),  Phrases.LifeseqNotNext)
+  // A live record over a live one keeps the stored born_at: the store checks that, against the Thing it holds.
+  if (isLifeFlipped && (record.am === 'a')) { demandHeld(record.born_at === record.written_at, Phrases.BornAtNotNow) }
   if (options?.policies.includes('replace_passphrase')) { demandHeld(cited.wayins?.main !== undefined, Phrases.TestimonyMissing) }
 }
 

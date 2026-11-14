@@ -17,8 +17,8 @@ export const LifepathShape = "A lifepath is one or more lifeseqs, each after a '
 /** A Thing whose label is not its labelpath's last. */
 export const LabelNotLast = "A Thing's label is the last label of its labelpath."
 
-/** A Thing written below depth 1. */
-export const LifepathNotOwn = "A Thing's lifepath is '/' and its own lifeseq: Things are written at depth 1 for now."
+/** A Thing written or cited below depth 1. */
+export const LifepathNotOwn = "A lifepath is one lifeseq after a '/', the Thing's own: Things are written at depth 1 for now."
 
 /** A Thing whose am and lifeseq disagree. */
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
@@ -41,8 +41,11 @@ export const TombstoneOverTombstone = "A tombstone is never written over a tombs
 /** A write whose lifeseq does not follow. */
 export const LifeseqNotNext = "A write's record keeps the cited lifeseq when am stays, and has the next one when am flips."
 
-/** A write whose born_at does not follow. */
-export const BornAtNotKept = "A write's record keeps the cited born_at over a live record, and is born when it is written over a tombstone."
+/** A write over a tombstone that is not born as it is written. */
+export const BornAtNotNow = "A write over a tombstone or none is a birth: its born_at is its written_at."
+
+/** A write over a live Thing that moves its born_at. */
+export const BornAtNotStored = "A write over a live Thing keeps the stored Thing's born_at."
 
 /** A tombstone of the main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."

@@ -2,6 +2,7 @@
 
 import { isEqual, omit } from 'es-toolkit'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers } from 'safebyok-big/internals'
+import { BornAtNotStored } from '../phrases'
 import type { Actual } from './vault-db'
 import { type GetThingAsk, type GateThing, type Thing, type ThingCited, type ThingScope, type WriteThingAsk, kindChecksOf, thingScope } from './shapes-thing'
 
@@ -142,7 +143,7 @@ export function noticedThingOf(raw: unknown): Thing | null {
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing
+// == [Classifying]: classifyGetThing, classifyWriteThing, demandBornAtKept
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
 export function classifyGetThing(ask: GetThingAsk, raw: unknown): Actual<EX.GotAct> {
@@ -159,8 +160,16 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.
   const act    = writeActOf(ask, stored)
   if (isRefusedAct(act)) { return { ok: false, act, world: null, record: stored } }
   // `replaced` means a live Thing was found.
-  if (act === 'replaced') { demandPolicies(ask, stored!) }
+  if (act === 'replaced') {
+    demandBornAtKept(ask.record, stored!)
+    demandPolicies(ask, stored!)
+  }
   return { ok: true, act, world: null, record: stored }
+}
+
+/** Throw `bad_record` unless `record` keeps the born_at of `stored`, the live Thing it would replace */
+function demandBornAtKept(record: Thing, stored: Thing): void {
+  if (record.born_at !== stored.born_at) { throw new Errors.VaultError('bad_record', BornAtNotStored, { rows: { dbhas: stored } }) }
 }
 // --
 

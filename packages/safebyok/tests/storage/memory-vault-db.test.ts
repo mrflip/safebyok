@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type GateThing, ShellCited, lifeseqOf } from '../../src/storage/shapes-thing'
 import type { ThingNotice } from '../../src/storage/vault-db'
+import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 
 /** A vaultDB holding the main gate as `stored`, written there by a birth. */
@@ -65,8 +66,8 @@ describe("MemoryVaultDB.tryWriteThing(ask), the plain path", () => {
   it("takes a citation of no more than ThingCited names", async () => {
     const stored = TH.gateThingOf()
     const vaultDB = await vaultDBWith(stored)
-    const { revtok, revseq, am, lifeseq, lifepath, born_at } = stored
-    const answer = await vaultDB.tryWriteThing(TH.replaceAskOf({ revtok, revseq, am, lifeseq, lifepath, born_at }, TH.nextGateOf(stored)))
+    const { revtok, revseq, am, lifepath } = stored
+    const answer = await vaultDB.tryWriteThing(TH.replaceAskOf({ revtok, revseq, am, lifepath }, TH.nextGateOf(stored)))
     expect(answer).to.deep.include({ ok: true, act: 'replaced' })
   })
 
@@ -110,6 +111,14 @@ describe("MemoryVaultDB.tryWriteThing(ask), refused by the act tables", () => {
       expect(answer).to.deep.include({ ok: false, act, dbhas: next })
     })
   }
+
+  it("refuses a replacement that moves the stored born_at", async () => {
+    const vaultDB = await vaultDBWith(stored)
+    const answer = await vaultDB.tryWriteThing(TH.replaceAskOf(stored, TH.nextGateOf(stored, { born_at: TH.T0 + 1 })))
+    const err = await TH.expectBad(Promise.resolve(answer), 'bad_record')
+    expect(err.message).to.include(Phrases.BornAtNotStored)
+    expect(answer).to.deep.include({ dbhas: stored })
+  })
 
   it("refuses a write over nothing under ifAbsent 'fail'", async () => {
     const answer = await new MemoryVaultDB().tryWriteThing({ ...TH.birthAskOf(), ifAbsent: 'fail' })
@@ -217,6 +226,6 @@ describe("MemoryVaultDB.watch(scope, onNotice)", () => {
 describe("ShellCited", () => {
   it("is the frozen void sentinel at life and revision -1", () => {
     expect(Object.isFrozen(ShellCited)).to.be.true
-    expect(ShellCited).to.deep.include({ revseq: -1, lifeseq: '-1', lifepath: '/-1', am: 'x' })
+    expect(ShellCited).to.deep.equal({ revtok: '00000000-0000-0000-0000-000000000000', revseq: -1, lifepath: '/-1', am: 'x' })
   })
 })

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  type WriteThingAsk, ShellCited, checkedGetThingAsk, checkedWriteThingAsk, isGoneLifeseq, lifeseqOf, loggableAskOf, seqOfLifeseq,
+  type WriteThingAsk, ShellCited, ShellLifeseq, checkedGetThingAsk, checkedWriteThingAsk, isGoneLifeseq, lifeseqOf, lifeseqOfLifepath, loggableAskOf, seqOfLifeseq,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -27,12 +27,20 @@ describe("lifeseqOf(seq) and seqOfLifeseq(lifeseq)", () => {
     expect(sorted.map((lifeseq) => seqOfLifeseq(lifeseq))).to.deep.equal(seqs.toSorted((aa, bb) => aa - bb))
   })
 
-  it("reads the shell's lifeseq as life -1", () => { expect(seqOfLifeseq(ShellCited.lifeseq)).to.eq(-1) })
+  it("reads the shell's lifeseq as life -1", () => { expect(seqOfLifeseq(ShellLifeseq)).to.eq(-1) })
+})
+
+describe("lifeseqOfLifepath(lifepath)", () => {
+  it("is the last lifeseq of the lifepath", () => {
+    expect(lifeseqOfLifepath(`/${lifeseqOf(3)}`)).to.eq(lifeseqOf(3))
+    expect(lifeseqOfLifepath(`/${lifeseqOf(3)}/${lifeseqOf(4)}`)).to.eq(lifeseqOf(4))
+    expect(lifeseqOfLifepath(ShellCited.lifepath)).to.eq(ShellLifeseq)
+  })
 })
 
 describe("isGoneLifeseq(lifeseq)", () => {
   it("holds of odd lives, the shell's among them", () => {
-    expect([ShellCited.lifeseq, lifeseqOf(0), lifeseqOf(1), lifeseqOf(32), lifeseqOf(33)].map((lifeseq) => isGoneLifeseq(lifeseq))).to.deep.equal([true, false, true, false, true])
+    expect([ShellLifeseq, lifeseqOf(0), lifeseqOf(1), lifeseqOf(32), lifeseqOf(33)].map((lifeseq) => isGoneLifeseq(lifeseq))).to.deep.equal([true, false, true, false, true])
   })
 })
 
@@ -65,15 +73,14 @@ describe("checkedWriteThingAsk(ask)", () => {
 
   const lifeseq1 = lifeseqOf(1)
   const lifeseq2 = lifeseqOf(2)
-  const noTestimony = { revtok: stored.revtok, revseq: 0, am: 'a' as const, lifeseq: stored.lifeseq, lifepath: stored.lifepath, born_at: TH.T0 }
+  const noTestimony = { revtok: stored.revtok, revseq: 0, am: 'a' as const, lifepath: stored.lifepath }
   const BadRecordCases: readonly (readonly [WriteThingAsk, string, string])[] = [
     // the record does not follow the one cited:
     [{ ...good, record: { ...next, revseq: 2 } },                                    Phrases.RevseqNotNext,      'a revseq that skips one'],
     [{ ...good, record: { ...next, revtok: stored.revtok } },                        Phrases.RevtokNotNew,       'a revtok that is not new'],
     [TH.birthAskOf(TH.gateThingOf({ revtok: ShellCited.revtok })),                    Phrases.RevtokNotNew,       'the void revtok'],
     [{ ...good, record: { ...next, lifeseq: lifeseq2, lifepath: `/${lifeseq2}` } },  Phrases.LifeseqNotNext,     'a new life where am stays'],
-    [TH.birthAskOf(TH.gateThingOf({ born_at: TH.T0 - 1 })),                          Phrases.BornAtNotKept,      'a birth born before it is written'],
-    [{ ...good, record: { ...next, born_at: TH.T0 + 1 } },                           Phrases.BornAtNotKept,      'a born_at that moved'],
+    [TH.birthAskOf(TH.gateThingOf({ born_at: TH.T0 - 1 })),                          Phrases.BornAtNotNow,       'a birth born before it is written'],
     [{ ...good, record: { ...next, banklabel: 'other' } },                           Phrases.RecordOfOtherScope, 'a record at another scope'],
     [{ ...good, cited: noTestimony, options: { policies: ['replace_passphrase'] } }, Phrases.TestimonyMissing, 'replace_passphrase without the wayins it reads'],
     // the record is not a sound Thing:
@@ -84,7 +91,9 @@ describe("checkedWriteThingAsk(ask)", () => {
     [{ ...good, record: { ...next, wayins: {} } } as never,                         'wayins.main',              'a gate with no passphrase wayin'],
     // the citation is not a sound one:
     [{ ...good, cited: { ...ShellCited, revtok: 'rev-0' } },                          Phrases.CitedHalfShell,     'a citation half the shell'],
-    [{ ...good, cited: { revtok: 'rev-0', revseq: 0 } } as never,                   'lifeseq',                  'a citation of too little'],
+    [{ ...good, cited: { revtok: 'rev-0', revseq: 0 } } as never,                   'lifepath',                 'a citation of too little'],
+    [{ ...good, cited: { ...noTestimony, am: 'x' } },                                Phrases.LifeseqParity,      'a citation whose am its lifepath belies'],
+    [{ ...good, cited: { ...noTestimony, lifepath: `${stored.lifepath}${stored.lifepath}` } }, Phrases.LifepathNotOwn, 'a citation below depth 1'],
     [{ ...good, cited: { ...stored, wayins: {} } } as never,                        'wayins.main',              'a cited gate whose wayins fail'],
   ]
 
@@ -106,7 +115,7 @@ describe("loggableAskOf(ask)", () => {
   it("keeps the scope, the flags and what each record cites, and drops a gate's wayins", () => {
     const loggable = loggableAskOf(TH.birthAskOf())
     expect(loggable).to.deep.include({ op: 'write', ...TH.GateScope, ifAbsent: 'add', ifPresent: 'fail' })
-    expect(loggable.record).to.deep.equal({ revtok: 'rev-0', revseq: 0, am: 'a', lifeseq: lifeseqOf(0), lifepath: `/${lifeseqOf(0)}`, born_at: TH.T0 })
+    expect(loggable.record).to.deep.equal({ revtok: 'rev-0', revseq: 0, am: 'a', lifepath: `/${lifeseqOf(0)}` })
     expect(JSON.stringify(loggable)).to.not.include(TH.BW.mainWayin.salt_b64)
   })
 
