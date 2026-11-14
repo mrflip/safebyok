@@ -122,6 +122,7 @@ const FamilyCases = [
   ["gating_concluded",    "condition", 'a gating ended while its attempt ran is the user moving on, not a fault'],
   ["damaged_lease",       "bad_news",  'a lease damaged on this device is reported to the user, who unlocks again'],
   ["attempt_in_flight",   "condition", 'a second submit while the first attempt runs is the user being quick, not a fault'],
+  ["gating_unlaunched",   "misuse",    'an attempt on a gating never launched is the caller skipping a step, a bug'],
   ["already_asking",      "condition", 'a second launch while a dialog is up is the host deduping late, not a fault'],
   ["dismissed",           "condition", 'a dismissed dialog is not a fault'],
   ["same_passphrase",     "condition", 'a new passphrase equal to the current one asks the user for another'],
