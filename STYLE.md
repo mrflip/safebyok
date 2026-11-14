@@ -4,7 +4,7 @@ How the `.ts` files in this repository read: the conventions a reviewer checks a
 does not. Read the section you need; a reviewer is handed it whole. The lower-yield rules and the
 measurements behind a few of these are in `notes/more_style.md`.
 
-The core's `eslint.config.mjs` (`packages/safebyok/`) is the source of truth for anything
+The core's `eslint.config.mjs` (`packages/safebyok-big/`) is the source of truth for anything
 mechanically enforceable; where it and this document disagree, the linter wins and this document
 is a bug. These are defaults with reasons. Where one makes a piece of code worse, say so and
 propose the exception.

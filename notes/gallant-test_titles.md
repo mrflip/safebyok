@@ -1,6 +1,6 @@
 # Goofus and Gallant: test titles
 
-Test titles from `packages/safebyok/tests/`, collected 2026-11-05 at `b7bacb68`, each showing one fault, with its
+Test titles from `packages/safebyok-big/tests/`, collected 2026-11-05 at `b7bacb68`, each showing one fault, with its
 rewrite. The rule is STYLE.md *Tests*. A title is one plain clause naming the behaviour. The assertions carry the kinds no
 customer reacts to. A pointer to an `@example` is a `// member @example 2` comment on the test's first line.
 

@@ -34,7 +34,7 @@ For each rule, ask what going wrong costs and who would catch it:
 * **Moves to PROCESS.md** when it is a git, PR, packaging or dependency habit.
 * **Moves into a file's own comments or README** when it explains one file (a tsconfig, the e2e
   layout) that can carry the explanation itself.
-* **Cut** when the linter enforces it (`rg` the rule in `packages/safebyok/eslint.config.mjs`),
+* **Cut** when the linter enforces it (`rg` the rule in `packages/safebyok-big/eslint.config.mjs`),
   training knows it, or another line in CLAUDE.md says it. A rule said three ways in three
   sections becomes one.
 * **A list becomes its rule** when the rule reproduces the list and will not go stale: a list of

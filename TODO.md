@@ -54,7 +54,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
 * **The bankDB throwers' banner names the wrong field.** Found 2026-11-11
   ([#645](https://github.com/mrflip/safebyok/pull/645), the storage prose pass): the
   `/* The refusals of a bankDB ... */` comment under `[Refusal throwers]` in
-  `packages/safebyok/src/refusals/throwers.ts` says `meta` carries the `parent` and `dbhas` the
+  `packages/safebyok-big/src/refusals/throwers.ts` says `meta` carries the `parent` and `dbhas` the
   answer carries. The throwers put those rows in the error's `rows` option (`RefusalRows` in
   `refusals/errors.ts`), which `rowsOfRefusal` reads, and `actRefused` carries none. Reword it.
 * **A `fooOf` that does more than derive.** Found 2026-11-11 (the names-that-jar report, ruled
@@ -255,7 +255,7 @@ stays a check or the labels alone identify the vault.
 
 ### Lock timing vs. work in flight: what is left of the policy
 
-`packages/safebyok/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
+`packages/safebyok-big/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
 that has been sent completes or is refused as storage decides; a call still at a step before its write refuses with
 `bank_locked`; a read that would return a whisper refuses; and a lock and an unlock each do their own work, in order,
 so a lock that lands during an unlock's proof leaves the bank unlocked. Still open, from the scenarios that
