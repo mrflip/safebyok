@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 "safebyok-indexeddb": minor
 "safebyok-fastkey": minor
 ---

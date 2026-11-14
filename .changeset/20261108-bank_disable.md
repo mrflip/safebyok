@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 A bank swept or vacated is spent from the call on: `bank.isEnabled` turns false for good, its snapshot reads `refused` with a `disabled` err, and `hello`, `ensureVault` and `vaultAt` refuse `disabled`; make another bank with `Bank.make`. A disabled bank asks the user nothing and calls neither the host's `onPanic` nor its `onBadNews`: a panic's refusal goes to the platform, and bad news to the bank's logger. The one exception: `bank.vacate()` disables the bank first, then erases the bank's leases on this device, and that erase still tells the host's own `onPanic` of a lease it cannot erase and `onBadNews` of a refused listing. `bank.vacate()` now answers a promise, which settles once each erase has been tried. A vault's own lease erase during a bank's vacate is reported to the platform, as the bank's erase covers that row too.

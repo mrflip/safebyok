@@ -1,9 +1,9 @@
 /** safebyok's bankDB in this browser's IndexedDB. */
 
 import { promisifyRequest, type UseStore } from 'idb-keyval'
-import * as DB from 'safebyok/storage'
-import { BX } from 'safebyok/storage'
-import type { BankScope, VaultScope, WatchScope } from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
+import { BX } from 'safebyok-big/storage'
+import type { BankScope, VaultScope, WatchScope } from 'safebyok-big/storage'
 import { bankScopepathOf, boxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, gatesRangeOf, gateScopepathOf, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './bank-shelf'
 
 // == [Options]: IdbBankDBOpts, idbBankDBOpts

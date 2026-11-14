@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { Device, MemoryDeviceDB, type Vault } from 'safebyok'
-import { MemoryBankDB } from 'safebyok/storage'
-import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
+import { Device, MemoryDeviceDB, type Vault } from 'safebyok-big'
+import { MemoryBankDB } from 'safebyok-big/storage'
+import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../../src/lib/saved-api-key'
 
 const Boxlabel = 'anthropic_api_key_test'

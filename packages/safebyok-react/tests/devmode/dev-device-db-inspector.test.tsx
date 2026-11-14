@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ckeyOf } from 'safebyok/storage'
+import { ckeyOf } from 'safebyok-big/storage'
 import { DevDeviceDBInspector } from '../../src/devmode'
 import * as TH from '../test-helpers'
 

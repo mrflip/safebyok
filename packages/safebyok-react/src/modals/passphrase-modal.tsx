@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import type { Gating } from 'safebyok'
+import type { Gating } from 'safebyok-big'
 import { PasskeyUnlockButton, offersPasskey } from '../components/passkey-unlock-button'
 import { Messages } from '../helpers/messages'
 import type { PassphraseModalProps } from '../shapes'

@@ -1,8 +1,8 @@
 /** The shelf: the single object store of an IdbBankDB's database. Each row is keyed by an array scopepath. */
 
 import { promisifyRequest, type UseStore } from 'idb-keyval'
-import { dbprefixOf, versionedShelfOf } from 'safebyok/storage'
-import type { BankScope, BX, VaultScope } from 'safebyok/storage'
+import { dbprefixOf, versionedShelfOf } from 'safebyok-big/storage'
+import type { BankScope, BX, VaultScope } from 'safebyok-big/storage'
 
 // == [The database]: BankDBVersion, shelfOf, filedIn, Filed
 

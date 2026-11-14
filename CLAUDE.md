@@ -10,6 +10,24 @@ never leave it, and synchronized between devices through a storage layer the hos
 plugs in; the backend only ever has ciphertext. Not yet used outside the project that motivated
 it, but close to a wider release.
 
+### The move to a new core
+
+The core is being rebuilt as a new, lean `safebyok` (`packages/safebyok`), with its gate and lease
+kept apart from networking, caching and instance sugar. Code is teleported into it from
+`safebyok-big` (`packages/safebyok-big`), the old core, a piece at a time. While that lasts:
+
+* **Design files are in flux** (`whiteboard/20261114-lean_gate/` and its successors). Read them for
+  intent, and expect them to change under you.
+* **The new core is not bound to the old interface or its guarantees.** Some functionality may be
+  loosened or dropped, to be added again later. Say so where you do it, rather than carrying an old
+  guarantee over by reflex.
+* **`safebyok-big` is frozen and private.** Every adapter, `safebyok-react`, the demo and e2e still
+  build on it. Its code changes only to export more for the new core to import, through
+  `safebyok-big/internals`.
+* **A note, README or guide that names files under `packages/safebyok-big/` describes
+  safebyok-big alone**: `notes/guarantees.md`, `notes/wontfix.md`, the package READMEs and the rest.
+  It says nothing about the new core until it is rewritten for it.
+
 ## Working relationship
 
 This project follows an Agent-Coach approach: experienced human architects are the Coaches, you
@@ -97,9 +115,9 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
 * `notes/` -- durable notes. A decision a security reviewer should see goes into
   `notes/security.md` through a `sonnet` subagent (the file's header says how); don't read it
   yourself. `notes/wontfix.md`: behaviour left undefined on purpose. `notes/guarantees.md`: where
-  secret material lives, as guarantees. **Before changing a file `notes/guarantees.md` names
-  under *Where the guarantees are kept*, read its *The guarantees* section, and check the change
-  against it.**
+  secret material lives in `safebyok-big`, as guarantees. **Before changing a file
+  `notes/guarantees.md` names under *Where the guarantees are kept*, read its *The guarantees*
+  section, and check the change against it.**
 
 ## Reading
 
@@ -128,7 +146,7 @@ with `rg -l` first, then open the hits that matter.
   validation, shapes and tests: specific, unguessable, and only partly linted. **Writing code,
   read *Naming* once; read *Comments and doc blocks*, *Tests*, *Validation* or *Shapes and duck
   typing* when you write a doc block, a test, a validator, or a type or class that keeps state.**
-* `packages/safebyok/eslint.config.mjs` -- the final authority on formatting. Where it and a prose
+* `packages/safebyok-big/eslint.config.mjs` -- the final authority on formatting. Where it and a prose
   document disagree, flag the bug. `@ts-expect-error`, `eslint-disable-line` and the other safety
   hatches are allowed as the correct compromise; **report each one you add**, in chat (STYLE.md,
   *Safety hatches*).

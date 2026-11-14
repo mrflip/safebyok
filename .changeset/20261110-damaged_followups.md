@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 The refusal kind `damaged_box` is now `damaged_whisper`: a whisper that will not open under the vault's key, or opens to no whisper. A host that branches on `damaged_box` changes the name; nothing else about it changes.

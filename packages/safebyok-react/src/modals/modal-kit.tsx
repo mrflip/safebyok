@@ -1,6 +1,6 @@
 import { useActionState, useId, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type RefObject } from 'react'
 import { useFormStatus } from 'react-dom'
-import { ForeverMillis, MinuteMillis, type AnyGating } from 'safebyok'
+import { ForeverMillis, MinuteMillis, type AnyGating } from 'safebyok-big'
 import { gripeOfRefusal } from '../helpers/attempt-refusals'
 import { Doing, Locale, Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'

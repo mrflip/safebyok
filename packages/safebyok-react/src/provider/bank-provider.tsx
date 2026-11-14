@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffectEvent, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { DefaultOnBadNews, DefaultOnLifecycle, Device } from 'safebyok'
+import { DefaultOnBadNews, DefaultOnLifecycle, Device } from 'safebyok-big'
 import { bankProviderProps } from '../shapes'
 import type { BankProviderProps, GatingModalProps, Handlers, ProviderDeviceOpts } from '../shapes'
 import { GatingModal } from './gating-modal'

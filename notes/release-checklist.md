@@ -13,7 +13,7 @@ PR, and do not mark it ready.
 ## Real authenticators
 
 On each authenticator, create a vault, add a passkey, lock, unlock with the passkey, and remove it
-(`packages/safebyok/README.md`, *A host*; the demo shows the prompts).
+(`packages/safebyok-big/README.md`, *A host*; the demo shows the prompts).
 
 * [ ] A platform authenticator with PRF: Touch ID or Face ID on a current Mac or iPhone (Safari
   and Chrome), Windows Hello (Edge or Chrome), and Android's fingerprint in Chrome.

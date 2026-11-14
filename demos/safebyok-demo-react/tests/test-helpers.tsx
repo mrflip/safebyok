@@ -1,10 +1,10 @@
-/** The demo's test helpers, star-imported as `TH`. Re-exports `safebyok/testing`, and adds helpers to render a component inside a BankProvider with in-memory storage, watch the vault beside it, fill in the provider's dialogs, and fake Anthropic. */
+/** The demo's test helpers, star-imported as `TH`. Re-exports `safebyok-big/testing`, and adds helpers to render a component inside a BankProvider with in-memory storage, watch the vault beside it, fill in the provider's dialogs, and fake Anthropic. */
 import type { ReactNode } from 'react'
 import { expect, onTestFinished, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { Device, MemoryDeviceDB, type BankSnapshot, type VaultSnapshot } from 'safebyok'
-import { MemoryBankDB } from 'safebyok/storage'
-import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok/testing'
+import { Device, MemoryDeviceDB, type BankSnapshot, type VaultSnapshot } from 'safebyok-big'
+import { MemoryBankDB } from 'safebyok-big/storage'
+import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { BankProvider, useBank, useBankSnapshot, useVault, useVaultSnapshot } from 'safebyok-react'
 import { SessionBar } from '../src/components/SessionBar'
 import { useSession } from '../src/hooks/useSession'
@@ -12,7 +12,7 @@ import { JokeModel } from '../src/lib/anthropic'
 import { createAuth, type Auth } from '../src/lib/auth'
 import type { StringStorage } from '../src/lib/string-storage'
 
-export * from 'safebyok/testing'
+export * from 'safebyok-big/testing'
 
 /** Render `ui` inside a BankProvider signed in as `u1`, with the cheap test deriver, over a fresh in-memory bankDB and deviceDB. Returns the two.
  * The bankDB holds u1's bank, built with {@link Passphrase} as another device builds it, so it opens locked; with `isBankBuilt: false` it is

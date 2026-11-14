@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import type { Device } from 'safebyok'
+import type { Device } from 'safebyok-big'
 import type { ProviderDeviceOpts } from '../shapes'
 
 // == [Ignored options]: changedFieldnames, useWarnOfIgnoredOpts

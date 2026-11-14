@@ -1,0 +1,23 @@
+// What the new `safebyok` core imports from this package while it is built beside it: the helpers, refusals and shapes
+// it shares, one namespace per module, so that two modules' names never collide. `VaultError` comes from here too, so
+// that it stays one class across both packages. Not for hosts: the entry goes once the core has its own.
+export * as Clock from './helpers/clock'
+export * as Consts from './helpers/consts'
+export * as Crypto from './helpers/crypto'
+export * as Helpers from './helpers/helpers'
+export * as Logger from './helpers/logger'
+export * as Phrases from './helpers/phrases'
+export * as StableJsonify from './helpers/stable-jsonify'
+export * as Strength from './helpers/passphrase-strength'
+export * as Validator from './helpers/validator'
+export * as Deriver from './deriver/basederiver'
+export * as Errors from './refusals/errors'
+export * as Outcome from './refusals/outcome'
+export * as ReportError from './refusals/report-error'
+export * as Throwers from './refusals/throwers'
+export * as BX from './shapes/shapes-bankdb'
+export * as CX from './shapes/shapes-core'
+export * as EX from './shapes/shapes-enums'
+export * as GX from './shapes/shapes-gateish'
+export * as SX from './shapes/shapes-storage'
+export * as VX from './shapes/shapes-vaultish'

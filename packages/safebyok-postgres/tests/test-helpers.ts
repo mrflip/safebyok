@@ -4,7 +4,7 @@ import type { PGlite } from '@electric-sql/pglite'
 import type { PostgresClient } from '../src/index'
 
 // Re-export the core's test helpers, so a test here imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-big/testing'
 
 // On a CI runner, PGlite's WebAssembly can take eight seconds or more to compile from cold, longer than a test's default timeout.
 export const BootMillis = 60_000

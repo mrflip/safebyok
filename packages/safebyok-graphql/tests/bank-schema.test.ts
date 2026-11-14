@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { buildSchema, getNamedType, isInputObjectType, isLeafType, isObjectType, isUnionType } from 'graphql'
 import type { GraphQLField, GraphQLInputObjectType, GraphQLInputType, GraphQLNamedType, GraphQLObjectType, GraphQLOutputType, GraphQLSchema } from 'graphql'
 import type * as Z from 'zod'
-import { BX } from 'safebyok/storage'
+import { BX } from 'safebyok-big/storage'
 import { BankSchemaSdl } from '../src/server'
 
 // == [The walk]: schemaDriftOf, driftOf

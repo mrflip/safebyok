@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import 'fake-indexeddb/auto'
 import { describe, expect, it } from 'vitest'
-import { IdbDeviceDB, zxcvbnStrengthChecker } from 'safebyok/browser'
+import { IdbDeviceDB, zxcvbnStrengthChecker } from 'safebyok-big/browser'
 import { OutageBankDB } from '../../src/lib/outage-bank-db'
 import { bankOpts } from '../../src/lib/storage'
 

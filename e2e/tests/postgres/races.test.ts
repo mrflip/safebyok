@@ -2,7 +2,7 @@
 /** Writers for a vault's last place on a real Postgres, each on a pool of its own, so their statements run at the same moment. */
 
 import { expect, it } from 'vitest'
-import * as DB from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
 import type { PostgresBankDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
 

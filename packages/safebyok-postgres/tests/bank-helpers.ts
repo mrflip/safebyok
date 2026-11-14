@@ -2,8 +2,8 @@
 
 import { afterAll, beforeAll, onTestFinished } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
-import type { BankScope, Boxscope, BX, VaultScope } from 'safebyok/storage'
-import * as TH from 'safebyok/testing'
+import type { BankScope, Boxscope, BX, VaultScope } from 'safebyok-big/storage'
+import * as TH from 'safebyok-big/testing'
 import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf } from '../src/index'
 import type { PostgresBankDBOpts, PostgresListen } from '../src/index'
 import { BootMillis, flakyClientOf } from './test-helpers'

@@ -30,7 +30,7 @@ This repository is a pnpm workspace. Its packages:
 
 ## The shape of it
 
-A sketch; the calls and their contracts are in [the core's README](packages/safebyok/README.md),
+A sketch; the calls and their contracts are in [the core's README](packages/safebyok-big/README.md),
 and the names in [VOCABULARY.md](VOCABULARY.md).
 
 ### Storage: the bankDB

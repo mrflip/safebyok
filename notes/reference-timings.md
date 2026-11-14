@@ -4,7 +4,7 @@ How long each event takes, in milliseconds, so that we can judge which crossings
 crossing is one operation called while another is still in flight.
 
 **Measured** is one throwaway run on 2026-11-03: Node 24 under vitest, in a Linux VM on Apple Silicon, over
-`packages/safebyok/src` as it was that day. The table uses that day's names, not the design's (*Names*, below),
+`packages/safebyok-big/src` as it was that day. The table uses that day's names, not the design's (*Names*, below),
 and several have changed since. Each figure is the median of 20 runs, or of 5 for anything over 100 ms.
 **Estimate** is from memory, with nothing measured.
 

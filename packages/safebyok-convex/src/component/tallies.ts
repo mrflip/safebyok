@@ -1,4 +1,4 @@
-import * as DB from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
 import { getDocumentSize } from 'convex/values'
 import type { Value } from 'convex/values'
 import type { WithoutSystemFields } from 'convex/server'

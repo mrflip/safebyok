@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { MaxLabelChars, Patterns, isVaultError } from 'safebyok'
+import { MaxLabelChars, Patterns, isVaultError } from 'safebyok-big'
 import type { LastCall, PanelListing } from '../shapes'
 
 /** Track an inspector's most recent call: `call(verbname, work)` runs `work` and records what it returned, or how it refused. */

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { ForeverMillis, MinuteMillis, VaultError } from 'safebyok'
+import { ForeverMillis, MinuteMillis, VaultError } from 'safebyok-big'
 import { PassphraseModal } from '../src/modals/passphrase-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'

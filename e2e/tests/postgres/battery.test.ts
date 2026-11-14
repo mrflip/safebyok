@@ -2,8 +2,8 @@
 /** The bankDB battery over a real Postgres through `pg`, each bankDB a pool and a listener of its own, and its watch heard across servers. */
 
 import { expect, it, onTestFinished, vi } from 'vitest'
-import type * as DB from 'safebyok/storage'
-import { BX } from 'safebyok/storage'
+import type * as DB from 'safebyok-big/storage'
+import { BX } from 'safebyok-big/storage'
 import type { PostgresBankDB } from 'safebyok-postgres'
 import * as TH from './test-helpers'
 

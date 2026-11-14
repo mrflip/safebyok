@@ -2,8 +2,8 @@
 /** GraphQLBankDB over real sockets to Yoga servers, each hosting a PostgresBankDB over a real Postgres: the battery, and a watch heard across servers. */
 
 import { expect, it, onTestFinished, vi } from 'vitest'
-import type * as DB from 'safebyok/storage'
-import type { BX } from 'safebyok/storage'
+import type * as DB from 'safebyok-big/storage'
+import type { BX } from 'safebyok-big/storage'
 import type { GraphQLBankDB } from 'safebyok-graphql'
 import * as TH from './test-helpers'
 

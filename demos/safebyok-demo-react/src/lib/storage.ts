@@ -1,4 +1,4 @@
-import { browserOpts } from 'safebyok/browser'
+import { browserOpts } from 'safebyok-big/browser'
 import { prefixedStorage, type StringStorage } from './string-storage'
 import { OutageBankDB } from './outage-bank-db'
 

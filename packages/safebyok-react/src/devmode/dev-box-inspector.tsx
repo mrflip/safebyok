@@ -1,5 +1,5 @@
 import { useId, useRef, useState, useSyncExternalStore } from 'react'
-import type { BoxPutOpts, BoxSnapshot, Whisper } from 'safebyok'
+import type { BoxPutOpts, BoxSnapshot, Whisper } from 'safebyok-big'
 import { WhisperField } from '../components/whisper-field'
 import { Messages } from '../helpers/messages'
 import { subscribeToNothing, useBank, useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useWhisper } from '../hooks/hooks'

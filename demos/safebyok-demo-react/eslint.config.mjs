@@ -1,4 +1,4 @@
-// eslint.config.mjs -- lint rules for the demo, copied from the core's (packages/safebyok/). The core's
+// eslint.config.mjs -- lint rules for the demo, copied from the core's (packages/safebyok-big/). The core's
 // config is the authority on house style: where the two disagree, the core's is right and this one has
 // the bug. This copy adds React's rules (hooks, JSX, accessibility, Vite's fast refresh), .tsx files, and
 // React's file naming: a component's file is named for the component, and a hook's file for the hook.
@@ -456,7 +456,7 @@ export default defineConfig([
       // this the only way to satisfy the rule is to pad it with a token runtime assertion,
       // which tells the reader nothing about what the test is for. A helper of the tests' own
       // whose name begins `expect` asserts too, and counts as the test's assertion: as
-      // `expectRefusal` (safebyok/testing, called as `TH.expectRefusal` outside its own
+      // `expectRefusal` (safebyok-big/testing, called as `TH.expectRefusal` outside its own
       // module) asserts on the rejection it is handed.
       'vitest/expect-expect': ['error', {
         assertFunctionNames: ['expect*', 'TH.expect*'],

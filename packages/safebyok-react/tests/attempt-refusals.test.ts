@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { correctablekindVals, VaultError, type AnyGating, type Refusalkind } from 'safebyok'
+import { correctablekindVals, VaultError, type AnyGating, type Refusalkind } from 'safebyok-big'
 import { gripeOfRefusal } from '../src/helpers/attempt-refusals'
 
 const Open = { isOpen: true } as AnyGating

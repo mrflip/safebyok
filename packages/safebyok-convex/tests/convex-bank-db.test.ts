@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { anyApi } from 'convex/server'
 import type { ConvexClient } from 'convex/browser'
-import type { BankScope, BX, VaultScope } from 'safebyok/storage'
+import type { BankScope, BX, VaultScope } from 'safebyok-big/storage'
 import * as TH from './test-helpers'
 import { ConvexBankDB } from '../src/index'
 import type { ConvexBankDBOpts } from '../src/index'

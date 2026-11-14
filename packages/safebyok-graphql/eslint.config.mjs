@@ -1,4 +1,4 @@
-// eslint.config.mjs -- the GraphQL adapter's lint, copied from the core's (packages/safebyok/).
+// eslint.config.mjs -- the GraphQL adapter's lint, copied from the core's (packages/safebyok-big/).
 // The core's config is the authority on house style: where the two disagree, the core's is right
 // and this file has the bug. It differs only in its config names and in having no console-logger.
 //

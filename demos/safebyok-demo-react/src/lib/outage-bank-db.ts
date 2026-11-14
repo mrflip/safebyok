@@ -1,6 +1,6 @@
 import { IdbBankDB } from 'safebyok-indexeddb'
-import { storageUnavailable } from 'safebyok/storage'
-import type { BoxTidyAsk, BX } from 'safebyok/storage'
+import { storageUnavailable } from 'safebyok-big/storage'
+import type { BoxTidyAsk, BX } from 'safebyok-big/storage'
 
 /** The message of every refusal while the outage switch is off. */
 const OutageMessage = "The demo's backend is switched off: switch it back on to reach the vault."

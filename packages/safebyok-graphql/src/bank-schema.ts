@@ -1,4 +1,4 @@
-import { leftoverVals, refusalkindVals } from 'safebyok/storage'
+import { leftoverVals, refusalkindVals } from 'safebyok-big/storage'
 
 // Each operation is one bankDB verb. It returns what the verb's `try*` form returns, as a typed
 // object with any refusal in its `err` field. A GraphQL error is left for what GraphQL itself

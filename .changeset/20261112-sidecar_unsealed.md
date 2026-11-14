@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 **A box's sidecar is no longer sealed with its whisper.** Storage, or anyone who can write it, may change a sidecar and the box still opens: the sidecar is readable and writable on the server, and not authenticated. The whisper and the box's other stored fields are bound as before. A field the server should read but must not change unnoticed goes in both the whisper and the sidecar, and the app compares the two once the box is unsealed.

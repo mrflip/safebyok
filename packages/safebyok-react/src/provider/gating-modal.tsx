@@ -1,5 +1,5 @@
 import { useEffect, type ComponentType } from 'react'
-import type { AnyGating, Gating, Gatingkind } from 'safebyok'
+import type { AnyGating, Gating, Gatingkind } from 'safebyok-big'
 import { AddPasskeyModal } from '../modals/add-passkey-modal'
 import { DelBankModal } from '../modals/del-bank-modal'
 import { PassphraseModal } from '../modals/passphrase-modal'

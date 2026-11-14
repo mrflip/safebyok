@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 "safebyok-react": minor
 "safebyok-graphql": minor
 ---

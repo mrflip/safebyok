@@ -1,4 +1,4 @@
-import { correctablekindVals, isVaultError, type AnyGating } from 'safebyok'
+import { correctablekindVals, isVaultError, type AnyGating } from 'safebyok-big'
 import { boundaryRefusalOf } from '../provider/boundary'
 import type { BoundarySource, Gripe } from '../shapes'
 

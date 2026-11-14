@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 **A whisper is always a plain object of JSON.** `WhisperHolder` and `{ val }` are gone: `box.extractWhisper`, `tryExtractWhisper`, `box.whisper`, `box.put`, `vault.putBox` and `boxListing.create` take and give a `Whisper`, `Record<string, any>`, which the entry point now exports. So `box.whisper.org` and `box.put({ whisper: box.whisper })` compile. Change `whisper: { val: 'sk-...' }` to `whisper: { apiKey: 'sk-...' }`, and `const { val } = await box.extractWhisper()` to `const { apiKey } = await box.extractWhisper()`. A bare string, number, boolean, array, null or undefined now refuses (`bad_option` at a put). A whisper left out at a birth is `{}`. A whisper or a sidecar with a symbol key at any depth refuses, as JSON would drop the key and leave `{}`.

@@ -1,6 +1,6 @@
 import { useTransition } from 'react'
 import { useFormStatus } from 'react-dom'
-import type { AnyGating } from 'safebyok'
+import type { AnyGating } from 'safebyok-big'
 import { gripeOfRefusal } from '../helpers/attempt-refusals'
 import { Messages } from '../helpers/messages'
 import { askPasskey, attemptThenZero, passkeysAvailable } from '../helpers/passkey'

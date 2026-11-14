@@ -1,14 +1,14 @@
 import { anyApi, defineSchema } from 'convex/server'
 import { convexTest, defineTestApp } from 'convex-test'
-import * as DB from 'safebyok/storage'
-import { BW } from 'safebyok/testing'
+import * as DB from 'safebyok-big/storage'
+import { BW } from 'safebyok-big/testing'
 import type { SafebyokBankApi } from 'safebyok-convex'
 import { SafebyokBankComponent } from 'safebyok-convex/server'
 import type { GetUserId } from 'safebyok-convex/server'
 import { modules, register, schema } from 'safebyok-convex/test'
 
 // Everything the core's tests use too, so a test here star-imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-big/testing'
 
 /** A host of only the component, its functions at the root, for a fake deployment whose clients act as any user. */
 export const componentHost = () => ({ api: anyApi, createTest: () => convexTest({ schema, modules }) })

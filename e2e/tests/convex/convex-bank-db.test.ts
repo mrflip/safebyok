@@ -4,7 +4,7 @@
 // which run over a ConvexClient so that package's suite stands alone: a change to one is made in both.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ConvexReactClient } from 'convex/react'
-import type { BankScope, BX, VaultScope } from 'safebyok/storage'
+import type { BankScope, BX, VaultScope } from 'safebyok-big/storage'
 import { ConvexBankDB } from 'safebyok-convex'
 import type { ConvexBankDBOpts } from 'safebyok-convex'
 import { fakeDeployment } from 'safebyok-convex/testing'

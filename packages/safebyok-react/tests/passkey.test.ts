@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PasskeySaltSize, PrfAnswerSize, VaultError, type WayinHeader } from 'safebyok'
-import { fromB64 } from 'safebyok/utils'
+import { PasskeySaltSize, PrfAnswerSize, VaultError, type WayinHeader } from 'safebyok-big'
+import { fromB64 } from 'safebyok-big/utils'
 import { Messages } from '../src/helpers/messages'
 import { askPasskey, attemptThenZero, createPasskey, passkeysAvailable } from '../src/helpers/passkey'
 import * as TH from './test-helpers'

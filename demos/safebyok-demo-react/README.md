@@ -58,7 +58,7 @@ this aside.
 
 | Layer | Where |
 |---|---|
-| the library | the `safebyok` workspace package (`packages/safebyok/src/`) |
+| the library | the `safebyok-big` workspace package (`packages/safebyok-big/src/`) |
 | React plumbing | the `safebyok-react` workspace package (provider, hooks, controls, the dialogs) |
 | app scaffolding a host replaces | [src/lib/auth.ts](src/lib/auth.ts) (fake sign-in over localStorage; a real app brings its own auth and passes `user_id` to the provider), [src/lib/storage.ts](src/lib/storage.ts) (the bank's options: this browser's IndexedDB standing in for a backend) |
 | developer tools | [src/lib/outage-bank-db.ts](src/lib/outage-bank-db.ts), [src/components/OutageSwitch.tsx](src/components/OutageSwitch.tsx) |

@@ -1,5 +1,5 @@
 import { useState, useSyncExternalStore } from 'react'
-import type { Gate, Outcome } from 'safebyok'
+import type { Gate, Outcome } from 'safebyok-big'
 import { passkeysAvailable, useBank } from 'safebyok-react'
 import { isQuietRefusal } from '../lib/refusals'
 

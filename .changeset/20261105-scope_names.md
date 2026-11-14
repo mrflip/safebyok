@@ -1,5 +1,5 @@
 ---
-"safebyok": minor
+"safebyok-big": minor
 ---
 
 **A bank's calls ask for a scope.** `bank.vaultOf` is now `bank.vaultAt`. `VaultBag` is `BankedVaultScope`, which requires the `vaultlabel`, and `BankBag` is gone. A `Vault` or a snapshot still passes as a duck, and a store handed in the scope is refused. The entry point now exports `BankedVaultScope` and `VaultScope`.

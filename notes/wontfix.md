@@ -16,7 +16,7 @@ not as a settled ruling, and check it against the current design before relying 
   undefined behaviour, whether the handles are in one tab or in two. A device keeps one lease
   and one device mark per vault, shared by every handle on it, and each handle reads them by its
   own settings. Today, for the lease: an open with a shorter `leaseHours` than the lease was
-  granted under discards it (see `Lease.buildFromCache` in `packages/safebyok/src/models/lease.ts`), so a tab
+  granted under discards it (see `Lease.buildFromCache` in `packages/safebyok-big/src/models/lease.ts`), so a tab
   opened with the shorter setting discards the lease a tab with the longer one granted, and every
   tab on the device asks for the passphrase again.
   That is the safe direction, and it is all we say of it. A host that varies a setting by route
@@ -56,7 +56,7 @@ not as a settled ruling, and check it against the current design before relying 
   lease forgets nothing, because the lease already dropped its record. The entry on a refused forget
   of a cached lease covers `Lease.buildFromCache`; this one covers `revoke()` itself. The deviceDB is
   a cache, and the next session asks for the passphrase. Pinned by
-  `packages/safebyok/tests/models/lease.test.ts`, *a revoke whose forget is refused*; the Coach, "yeah skip", on
+  `packages/safebyok-big/tests/models/lease.test.ts`, *a revoke whose forget is refused*; the Coach, "yeah skip", on
   retrying a refused forget.
 * 2026-11-02 (the Coach, unrace, `unrace-new_vault.md` at commit e135d0352, since deleted; not yet built):
   **a failed delete still locks the vault on this device.** `del_vault` locks first, because a lock

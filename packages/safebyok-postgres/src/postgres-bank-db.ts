@@ -1,8 +1,8 @@
 /** A bankDB adapter that stores its rows in Postgres. */
 
-import * as DB from 'safebyok/storage'
-import type { Awaitable, BankScope, BoxTidyAsk, Capacity, Tidied, VaultError, VaultScope, WatchScope } from 'safebyok/storage'
-import { BX } from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
+import type { Awaitable, BankScope, BoxTidyAsk, Capacity, Tidied, VaultError, VaultScope, WatchScope } from 'safebyok-big/storage'
+import { BX } from 'safebyok-big/storage'
 import {
   BirthBankSql, BirthBoxSql, BirthVaultSql, CountBoxesSql, DeleteEndedBoxesSql, DeleteEndedVaultsSql, EnsureBankSql, GetBankSql, GetBoxWithVaultSql,
   GetGateWithBankSql, GetVaultWithBankSql, ListBoxesWithVaultSql, PutGateSql, ReviseBankSql, ReviseBoxSql, ReviseVaultSql,

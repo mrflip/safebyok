@@ -1,5 +1,5 @@
 import { Component } from 'react'
-import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok'
+import { HostErrorSanitizer, VaultError, isVaultError } from 'safebyok-big'
 import type { BoundaryProps, BoundarySource } from '../shapes'
 
 /** An error boundary: render `fallback` once a child has thrown, and call `onCaught`. */

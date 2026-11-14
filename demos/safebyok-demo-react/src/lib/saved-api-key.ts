@@ -1,4 +1,4 @@
-import type { Box, Device, Vault } from 'safebyok'
+import type { Box, Device, Vault } from 'safebyok-big'
 
 /** The vaultlabel of the vault where the knock-knock flows keep their API key. */
 export const ApiKeyVaultlabel = 'main'

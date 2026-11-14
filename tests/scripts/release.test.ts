@@ -13,10 +13,10 @@ describe("the workspace as it stands", () => {
     expect(Release.releaseProblems(packages, RepoRoot, fixed)).to.deep.equal([])
   })
 
-  it("releases the core, and no demo", async () => {
+  it("releases neither safebyok-big, private while its successor is built, nor a demo", async () => {
     const packages = await Release.listWorkspace(Release.processRunner(RepoRoot))
     const publicNames = Release.publicPackages(packages, RepoRoot).map((pkg) => pkg.name)
-    expect(publicNames).to.include('safebyok')
+    expect(publicNames).to.not.include('safebyok-big')
     expect(publicNames.filter((pkgname) => pkgname.includes('demo'))).to.deep.equal([])
   })
 })
@@ -194,7 +194,7 @@ describe("packedManifest", () => {
     expect(packed.exitCode, packed.stderr).to.eq(0)
     const manifest = await Release.packedManifest(Release.processRunner(scratch), tarball)
     expect(Release.workspaceRanges(manifest)).to.deep.equal([])
-    expect((manifest['peerDependencies'] as Record<string, string>)['safebyok']).to.match(/^\^\d+\.\d+\.\d+/)
+    expect((manifest['peerDependencies'] as Record<string, string>)['safebyok-big']).to.match(/^\^\d+\.\d+\.\d+/)
   }, 30_000)
 
   it("ships the dist-only exports: the workspace's source condition never leaves the repo", async () => {

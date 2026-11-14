@@ -2,7 +2,7 @@
 
 import { zodOutputToConvex, zodToConvex } from 'convex-helpers/server/zod4'
 import { v } from 'convex/values'
-import * as DB from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
 
 // An ask is any value here. Each function parses its ask with the core's own checker before it reads a row, and the client
 // classifies every row it gets back with the core's classifier: what Convex's validators could check of either, the core does.

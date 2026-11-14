@@ -1,9 +1,9 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
-import type { Box, Vault } from 'safebyok'
-import { BoxFields } from 'safebyok/dom'
-import { WhisperFieldAttributes } from 'safebyok/utils'
+import type { Box, Vault } from 'safebyok-big'
+import { BoxFields } from 'safebyok-big/dom'
+import { WhisperFieldAttributes } from 'safebyok-big/utils'
 import { BoxWhisperField } from '../src/components/box-whisper-field'
 import * as TH from './test-helpers'
 

@@ -1,5 +1,5 @@
-import { PasskeySaltSize, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok'
-import { fromB64, toB64 } from 'safebyok/utils'
+import { PasskeySaltSize, VaultError, type PasskeyAnswer, type WayinHeader } from 'safebyok-big'
+import { fromB64, toB64 } from 'safebyok-big/utils'
 import { PasskeyChecks, type AskPasskeyOpts, type CreatePasskeyOpts } from '../shapes'
 import { Messages } from './messages'
 

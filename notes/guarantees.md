@@ -1,5 +1,8 @@
 # Security guarantees: where secret material lives
 
+This note describes `safebyok-big`, the old core, alone. The new `safebyok` is not bound by it
+(CLAUDE.md, *The move to a new core*).
+
 This note states what safebyok promises about its secret material: which values are secret, in what
 form each may exist, for how long, and which code may have or use it. SECURITY.md says what is in
 scope for a report; this note says what such a report would show to be broken. VOCABULARY.md names
@@ -15,7 +18,7 @@ Last verified against the code 2026-10-27, on `main` after #302, with
 2026-10-28 for [#316](https://github.com/mrflip/safebyok/pull/316) and the aead_narrow thread.
 Rewritten for the published core (`packages/safebyok`) on 2026-11-06, against `main` at 4e63ae760, for
 [#528](https://github.com/mrflip/safebyok/pull/528), the guarantees_models thread: every site and test is the
-core's, and its paths are under `packages/safebyok/` unless they say otherwise. The old core
+core's, and its paths are under `packages/safebyok-big/` unless they say otherwise. The old core
 (`packages/safebyok-old`, removed 2026-11-10) is no longer described here; where the core has no counterpart to one
 of its sites, the note says so. A claim the code no longer supports is listed in #528's open questions.
 Restated for one gate per bank on 2026-11-12, against the bank_world line at 876bb2330 (thread 9, #674), for the
@@ -43,18 +46,18 @@ guarantees until shown otherwise.
 
 | File | What it keeps |
 |---|---|
-| `packages/safebyok/src/helpers/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
-| `packages/safebyok/src/shapes/shapes-gateish.ts`, `shapes-core.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
-| `packages/safebyok/src/models/proving.ts` | the wayinKey; the bankKey, which is unwrapped per call, passed from one proving to another inside `buildWayin(source)`, and handed only to `Lease.buildGranted`; the PRF bytes, which it reads to derive the passkeyKey and leaves for the gating to zero |
-| `packages/safebyok/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedCleartexts`; `spendCleartexts`, the only place the PRF bytes are zeroed; each kind's act, which proves the cleartexts and then makes its change, passing them only to `checkedCleartexts` and a `Proving` builder |
-| `packages/safebyok/src/models/lease.ts` | the leaseKey handle and the bankKey wrapped under it, unwrapped per call in `#bankKey`; every seal and unseal of a box's whisper; `evict`, `revoke` and `forget`; `expiresAt`, which peeks the cached row and answers only its expiry (G4) |
-| `packages/safebyok/src/models/gate.ts` | has no key: it has wayin pickles, by `wayinlabel`, and its bank's stamp and its own; `Gate.recordOfBirth` is handed wayins, never a proving: the passphrase proving of a `build_bank` gating stays in the `buildBank` act (`models/gating.ts`), which drops it once it has built the bank's lease |
-| `packages/safebyok/src/models/box.ts` | has no key: it hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
-| `packages/safebyok/src/models/vault.ts` | the whisper's JSON text, passed through `sealStampedString` and `unsealStampedString` to the Bank's `sealWith` and `unsealWith` and back (G6); it has no lease and no key |
-| `packages/safebyok/src/models/bank.ts` | the whisper's JSON text, passed through `sealWith` and `unsealWith` to `Lease.sealWith` and `unsealWith` and back (G6); the bank's one `Lease`, kept private in `#lease`, which no method hands out (G9); `autolock`, which asks `Lease.tryExpiresAt` for the cached lease's expiry, a number, and locks once it has passed (G4); `listOwnLeases`, which lists the leases cached for a bank scope, without their leaseKeys |
-| `packages/safebyok/src/models/device.ts` | the wrappers of the host's functions, made in its constructor, among them `guardRequestCleartext`; `vacate`, which lists the leases cached for its bank scope (`listOwnLeases`), forgets each, and forgets the device row (G4) |
-| `packages/safebyok/src/deriver/argon2id-webv1.ts` | `deriveKeyBytes`, which takes the passphrase as an argument and returns the passphraseKey bytes in a buffer of its own, which `passphraseKeyOf` imports and zeroes (G1, G2) |
-| `packages/safebyok/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrapper takes the new passphrase as an argument, parses the host checker's verdict inside the wrapper, and passes anything the checker throws to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
+| `packages/safebyok-big/src/helpers/crypto.ts` | every call into WebCrypto: key makers, import, HKDF, wrap, unwrap, cipher, decipher, randomness, ctx |
+| `packages/safebyok-big/src/shapes/shapes-gateish.ts`, `shapes-core.ts` | the `leaseRecord` and `whisper` checks, which say what a stored leaseKey and a whisper are |
+| `packages/safebyok-big/src/models/proving.ts` | the wayinKey; the bankKey, which is unwrapped per call, passed from one proving to another inside `buildWayin(source)`, and handed only to `Lease.buildGranted`; the PRF bytes, which it reads to derive the passkeyKey and leaves for the gating to zero |
+| `packages/safebyok-big/src/models/gating.ts` | the chain that carries a passphrase or an answer from the host's dialog to a proving; `checkedCleartexts`; `spendCleartexts`, the only place the PRF bytes are zeroed; each kind's act, which proves the cleartexts and then makes its change, passing them only to `checkedCleartexts` and a `Proving` builder |
+| `packages/safebyok-big/src/models/lease.ts` | the leaseKey handle and the bankKey wrapped under it, unwrapped per call in `#bankKey`; every seal and unseal of a box's whisper; `evict`, `revoke` and `forget`; `expiresAt`, which peeks the cached row and answers only its expiry (G4) |
+| `packages/safebyok-big/src/models/gate.ts` | has no key: it has wayin pickles, by `wayinlabel`, and its bank's stamp and its own; `Gate.recordOfBirth` is handed wayins, never a proving: the passphrase proving of a `build_bank` gating stays in the `buildBank` act (`models/gating.ts`), which drops it once it has built the bank's lease |
+| `packages/safebyok-big/src/models/box.ts` | has no key: it hands the lease the whisper's JSON text and a stamp, through the Vault's seal verbs, and gets text back; it makes no bytes to zero, and the text cannot be zeroed (G6) |
+| `packages/safebyok-big/src/models/vault.ts` | the whisper's JSON text, passed through `sealStampedString` and `unsealStampedString` to the Bank's `sealWith` and `unsealWith` and back (G6); it has no lease and no key |
+| `packages/safebyok-big/src/models/bank.ts` | the whisper's JSON text, passed through `sealWith` and `unsealWith` to `Lease.sealWith` and `unsealWith` and back (G6); the bank's one `Lease`, kept private in `#lease`, which no method hands out (G9); `autolock`, which asks `Lease.tryExpiresAt` for the cached lease's expiry, a number, and locks once it has passed (G4); `listOwnLeases`, which lists the leases cached for a bank scope, without their leaseKeys |
+| `packages/safebyok-big/src/models/device.ts` | the wrappers of the host's functions, made in its constructor, among them `guardRequestCleartext`; `vacate`, which lists the leases cached for its bank scope (`listOwnLeases`), forgets each, and forgets the device row (G4) |
+| `packages/safebyok-big/src/deriver/argon2id-webv1.ts` | `deriveKeyBytes`, which takes the passphrase as an argument and returns the passphraseKey bytes in a buffer of its own, which `passphraseKeyOf` imports and zeroes (G1, G2) |
+| `packages/safebyok-big/src/helpers/passphrase-strength.ts` | `guardStrengthChecker`, whose wrapper takes the new passphrase as an argument, parses the host checker's verdict inside the wrapper, and passes anything the checker throws to `HostErrorSanitizer.refusalFor` (G1, G8, G9) |
 
 Besides these files, three host functions handle the passphrase. Each is wrapped once, in `Device`'s constructor, and from
 there on the core has the wrapper and never the host's own function. What a proving is given of its device

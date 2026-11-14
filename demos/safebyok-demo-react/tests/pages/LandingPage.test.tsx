@@ -10,9 +10,9 @@ import * as TH from '../test-helpers'
 // second each here. These tests exercise the page, not the deriver (the core's tests cover that), so
 // they swap in the cheap test deriver. They also swap in the quiet logger, which skips the console
 // notice about a `test_` deriver label.
-vi.mock('safebyok/browser', async (importOriginal) => {
-  const browser = await importOriginal<typeof import('safebyok/browser')>()
-  const { quietLogger, testDeriver } = await import('safebyok/testing')
+vi.mock('safebyok-big/browser', async (importOriginal) => {
+  const browser = await importOriginal<typeof import('safebyok-big/browser')>()
+  const { quietLogger, testDeriver } = await import('safebyok-big/testing')
   return { ...browser, browserOpts: (opts: { dbName: string }) => ({ ...browser.browserOpts(opts), keyDeriver: testDeriver, logger: quietLogger }) }
 })
 

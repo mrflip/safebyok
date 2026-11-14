@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MinuteMillis, type RequestCleartext, type VaultError } from 'safebyok'
+import { MinuteMillis, type RequestCleartext, type VaultError } from 'safebyok-big'
 import { BankProvider } from '../src/provider/bank-provider'
 import { BankLockControl, CreateVaultButton } from '../src/components/bank-controls'
 import * as TH from './test-helpers'

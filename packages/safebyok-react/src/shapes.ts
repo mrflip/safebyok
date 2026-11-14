@@ -1,7 +1,7 @@
 import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode, Ref } from 'react'
-import type { AnyGating, BadNewsHandler, Box, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultError } from 'safebyok'
-import { Checker, Checkers, deviceOpts, type AssertEqual, type CheckerInput, type LeaseQuery, type LeaseScopepath } from 'safebyok/storage'
-import { fromB64, type WhisperFieldAttributes } from 'safebyok/utils'
+import type { AnyGating, BadNewsHandler, Box, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultError } from 'safebyok-big'
+import { Checker, Checkers, deviceOpts, type AssertEqual, type CheckerInput, type LeaseQuery, type LeaseScopepath } from 'safebyok-big/storage'
+import { fromB64, type WhisperFieldAttributes } from 'safebyok-big/utils'
 
 // The types and checkers of safebyok-react, grouped by area. This file imports nothing from a component or
 // hook, so it cannot be part of an import cycle at run time.
