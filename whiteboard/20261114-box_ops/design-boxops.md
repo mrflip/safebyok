@@ -10,6 +10,8 @@ bank seals a box into the record the vaultDB stores, signs a box's tombstone, an
 
 * **A labelpath is a modelkind, then zero or more labels**, joined by `/`: `box`, `box/openai`. A Thing whose
   labelpath is its modelkind alone is the **root** of its kind. A root's label is its modelkind.
+* **Each kind's root**: the bank at `bank`, the main gate at `gate`, the root box at `box`. Further gates sit at
+  `gate/<label>`, under the main gate, which has authority over them. Gates nest no deeper. Boxes nest to any depth.
 * **A lifepath has one lifeseq for each segment of the labelpath**, joined by `/`. The first is the root's, and the
   last is the Thing's own. The root box's lifepath is `<lifeseq>`, and a box under it has `<root's lifeseq>/<lifeseq>`.
   Every kind's check demands the two counts match.
@@ -75,7 +77,7 @@ type UnsealedOf<RecordT, CleartextsT> =
 
 | Field       | The bank                 | Big's bank row  |
 | ----------- | ------------------------ | --------------- |
-| `labelpath` | `bank` (open question 1) |                 |
+| `labelpath` | `bank`                   |                 |
 | `label`     | `bank`                   |                 |
 | `fmt`       | `BankThingFormat`, 3101  | 3001            |
 | `lifepath`  | `<lifeseq>`              | `bank_tok`      |
@@ -110,12 +112,14 @@ const KindChecks = {
   record an ask carries. An ask whose modelkind is not its labelpath's first segment, or whose op does not match its
   record's `am`, refuses `bad_option`.
 * **The vaultDB builds each kind of ask.** `vaultDB.getAsk(scope)`, `listAsk(scope)`, `putAsk({ cited, record })` and
-  `delAsk({ cited, record })` fill in the op, the modelkind and the default policies:
+  `delAsk({ cited, record })` parse what they are given with zod, which fills in the op, the modelkind and the default
+  policies. Front-end methods call them. Everywhere else an ask is either loggable or wholly checked, and no other
+  code fills in a default or a null.
 
   | Builder   | Policies                                |
   | --------- | --------------------------------------- |
   | `getAsk`  | `ifAbsent: 'nil'`                       |
-  | `listAsk` | `ifAbsent: 'fail'`                      |
+  | `listAsk` | `ifAbsent: 'fail'`, `listkind: 'children'` |
   | `putAsk`  | `ifAbsent: 'add'`, `ifPresent: 'repl'`  |
   | `delAsk`  | `ifAbsent: 'fail'`, `ifPresent: 'repl'` |
 
@@ -136,13 +140,13 @@ vaultDB.tryListThings(ask: ListThingsAsk) → Promise<ListThingsAnswer>   never 
 /** A record's Thing fields, without its body: what a listing gives of each Thing. */
 type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecord>
 
-/** Get the Thing at this scope, and list its children. */
-type ListThingsAsk = ThingScope & { op: 'list', modelkind: Thingkind, ifAbsent: 'fail' | 'nil' }
+/** List the Things under the Thing at this scope: its children, or its whole subtree. */
+type ListThingsAsk = ThingScope & { op: 'list', modelkind: Thingkind, listkind: 'children' | 'subtree', ifAbsent: 'fail' | 'nil' }
 
 /** A stored child that fails its kind's checks, named by where it is stored. */
 type DamagedThing = ThingScope & { am: 'd' }
 
-/** What every listing answer carries, refused or not: the parent, and the children that failed their checks. */
+/** What every listing answer carries, refused or not: the parent, and the listed Things that failed their checks. */
 type ListedBeside<RecordT extends Thing> = { parent: Sparse<RecordT> | null, damaged_rows: DamagedThing[] }
 
 type ListThingsAnswer<RecordT extends Thing = Thing> =
@@ -153,21 +157,19 @@ type ListThingsAnswer<RecordT extends Thing = Thing> =
 `BadAnswer` takes the type of its `dbhas`, as `GoodAnswer` takes the type of its `val`. Its default is `Thing | null`,
 which every other verb keeps.
 
-* **A listing is a get of the parent that also gives its children.** Its act is the parent's: `gotlive`, `gotgone` or
-  `gotvoid`, or under `ifAbsent: 'fail'` a refused `void` or `gone`.
-* **`val` is the children, sparse**, in labelpath order, byte for byte, as Postgres's `COLLATE "C"` sorts them. A
-  full record comes from a get.
-* **`dbhas` has `val`'s shape.** A parent that is void or gone has no children, so a refused `void` or `gone` has
-  `dbhas: []`.
-* **`parent`** is the parent's sparse record, or null for none.
+* **`val` is the Things listed, sparse**: the parent's children, or its whole subtree. They come in labelpath order,
+  byte for byte, as Postgres's `COLLATE "C"` sorts them. A full record comes from a get.
+* **`dbhas` has `val`'s shape**, and changes with it. A parent that is void or gone has nothing under it, so a refused
+  `void` or `gone` has `dbhas: []`.
+* **`parent` and `damaged_rows` are the same for every `listkind`.** `parent` is the parent's sparse record, or null
+  for none.
+* **The act says whether the parent is there**, since that decides whether anything can be listed: `gotlive`,
+  `gotgone` or `gotvoid`, or under `ifAbsent: 'fail'` a refused `void` or `gone`.
 * **Tombstones are listed**, `am: 'x'`, so that a cache learns of a delete from a listing.
-* **A child that fails its checks is listed in `damaged_rows`**, and the rest are listed as usual. A row stored
+* **A listed Thing that fails its checks goes into `damaged_rows`**, and the rest are listed as usual. A row stored
   outside the parent refuses `storage_issue`, because the store is broken.
-
-**Why `val` is a flat list.** Labels are `[a-z0-9_]`, every byte of them above `/`, so labelpath order puts each
-Thing's descendants right after it: a depth-first walk of the tree. A listing of a whole subtree gives the same flat
-list, each Thing's depth the count of its segments, and a filter narrows it. So `val` is the Things asked for in each
-case.
+* **A subtree is a flat list too.** Labels are `[a-z0-9_]`, every byte of them above `/`, so labelpath order puts each
+  Thing's descendants right after it: a depth-first walk. Each Thing's depth is the count of its segments.
 
 ```
 adapter.tryListThings(ask)
@@ -176,13 +178,13 @@ adapter.tryListThings(ask)
     const loggableAsk = loggableAskOf(checked)
     const actual      = await this.doListThings(checked)
     const beside      = { parent: actual.parent, damaged_rows: actual.damaged_rows }
-    actual.ok ? { ok, ask: loggableAsk, act, world, ...beside, val: actual.children }
-              : { ok, ask: loggableAsk, act, world, ...beside, dbhas: actual.children, err }
+    actual.ok ? { ok, ask: loggableAsk, act, world, ...beside, val: actual.listed }
+              : { ok, ask: loggableAsk, act, world, ...beside, dbhas: actual.listed, err }
   catch (thrown)
     return this.answerForThrown(thrown, 'listThings', ask)
 
 store.doListThings(ask)                                            one read
-  fetch the raw parent at ask's scope, and every raw Thing one label under it, each with its labelpath
+  fetch the raw parent at ask's scope, and every raw Thing under it, one label down or all the way, each with its labelpath
   return this.classifyListThings(ask, fetched)
 ```
 
@@ -229,11 +231,14 @@ As for the gate, this is not built.
   | `right(labelpath, length(label) + 1) = '/' \|\| label` | a root, whose label is its labelpath | `label = substring(labelpath from '[^/]*$')`                                                         |
   | `right(lifepath, 11) = '/' \|\| lifeseq`               | a root's lifepath, its lifeseq alone | `lifeseq = substring(lifepath from '[^/]*$')`                                                        |
   | (none)                                                 |                                      | `array_length(string_to_array(lifepath, '/'), 1) = array_length(string_to_array(labelpath, '/'), 1)` |
-  | the gate's `lifepath = '/' \|\| lifeseq`               | every gate                           | `lifepath = lifeseq`                                                                                 |
+  | the gate's `lifepath = '/' \|\| lifeseq`               | every gate                           | `lifepath = lifeseq` for the main gate; the depth check for the rest                                 |
+  | the gate's `labelpath = 'gate/' \|\| label`            | the main gate, at `gate`             | `labelpath IN ('gate', 'gate/' \|\| label)`                                                          |
+  | the gate's `label <> 'main' OR am = 'a'`               |                                      | `labelpath <> 'gate' OR am = 'a'`                                                                    |
 
 * **`safebyok_write_box(proposed, cited)`** is the gate's write function without the policies.
-* **The listing** is two SELECTs on the primary key: the parent's row, and its children's range,
-  `labelpath >= 'box/' AND labelpath < 'box0'`, filtered to one more segment and to the parent's lifepath.
+* **The listing** is two SELECTs on the primary key: the parent's row, and the range under it,
+  `labelpath >= 'box/' AND labelpath < 'box0'`, filtered to the parent's lifepath, and for `children` to one more
+  segment.
 * **`safebyok_birth_bank(bank, gate, root)`** inserts the three rows in one call, which Postgres runs atomically.
 
 ## The models
@@ -262,11 +267,16 @@ with the sidecar to store.
   tombstone's lifeseq is odd, and the next one is a live box's.
 * **`bank.unsealBox(box: BoxRecord | BoxTombstone)`** checks the seal and gives the box unsealed. A tombstone's gives
   its Thing fields and its empty whisper, and the check is its signature.
-* **Each method checks the box is the bank's own.** `bank.#demandOwnBox(box)` parses the box by its own shape,
+* **Each method checks the box is the bank's own.** `bank.#demandBox(box)` parses the box by its own shape,
   returns it, and refuses `record_conflict` unless its `userid` and `banklabel` are the bank's and its lifepath starts
   with the lifeseq of the bank's root box.
-* **Two sealers**, `Sealers.BoxWhisper` and `Sealers.BoxTombstone`, seal the same part. Each `nextRevisionOf` gives
-  the revision its method promises. They and their helpers live in `models/sealers.ts`.
+* **The lease's seal is built**, and stays: `lease.seal(sealerkind, prior, cleartexts)` asks the sealer for the next
+  revision, wraps a fresh key, and ciphers the cleartexts under it. `Sealers.BoxWhisper` changes in three places: its
+  `sealedOf` and `recordOf` read and write `whisper_sealed`, its `stampsOf` binds the box's Thing fields and the two
+  tags, and its `nextRevisionOf` starts a new life with the next lifeseq in place of a new `box_tok`.
+* **A tombstone needs a different next revision**, `am: 'x'` at the next lifeseq, and the lease asks the sealer for
+  it. So `Sealers.BoxTombstone` is `{ ...BoxWhisper, nextRevisionOf: boxTombstoneOf }`, one line, and
+  `bank.tombstoneBox` seals `{ whisper: {} }` with it. The sealers and their helpers live in `models/sealers.ts`.
 * **The seal binds** the bank's stamp, then the box's Thing fields, then `codectag` and `schematag`. A security
   reviewer should see this change: it goes into `notes/security.md` through a `sonnet` subagent when it is built.
 
@@ -295,7 +305,9 @@ them, so a wayin stored today does not unwrap after the change: it fails safe as
 
 ### Light sugar on the bank
 
-The bank is given a VaultDB when it is made. Each method fills in the bank's scope and the modelkind.
+The bank is given a VaultDB when it is made. Each method fills in the bank's scope and the modelkind. `safebyok/core`
+exports the bank with its sugar, for a host that wants only lock, unlock and a few secrets. The header of `core.ts`,
+which says core does no storing, is corrected to match the README.
 
 * **`bank.rootBox`**: the root box's sparse record, held since the bank was made.
 * **`bank.tryListBoxes()`**: `tryListThings` of the root box.
@@ -354,7 +366,7 @@ delete  const record  = await bank.tombstoneBox(prior)
    empty one gives `val: []`. A caller that read `gotvoid` as "no boxes" reads `val.length === 0` instead.
 8. **The bank's stamp binds its lifeseq, not a random `bank_tok`.** Each life of a bank has a new bankKey, so a wrap
    from an earlier life opens only to that life's key. What the random token added: a wrap never opens in another life,
-   even where storage loses the bank row and a bank is born again at the same lifeseq.
+   even where storage loses the bank row and a bank is born again at the same lifeseq. In TODO.md.
 
 ## Guarantees abandoned
 
@@ -364,9 +376,10 @@ delete  const record  = await bank.tombstoneBox(prior)
 
 Three PRs, each stacked on the one before:
 
-1. **Storage**: roots, lifepaths with no leading `/` and one lifeseq per segment, `put` and `del` with a modelkind,
-   the ask builders, the bank and box kinds and their policies, `tryListThings`, `tryBirthBank`, the memory store, and
-   their tests.
+1. **Storage**: roots, the main gate at `gate`, lifepaths with no leading `/` and one lifeseq per segment, `put` and
+   `del` with a modelkind, the ask builders, the bank and box kinds and their policies, `tryListThings`,
+   `tryBirthBank`, the memory store, and their tests. design-vaultdb.md's labelpaths and roots are brought up to date
+   with it.
 2. **Sealing**: `Sealed` at `<part>_sealed`, `SealedOf` and `UnsealedOf`, the two box sealers, signed tombstones,
    `sealBox`, `tombstoneBox` and `unsealBox`, and the security note.
 3. **The bank on its Thing**: its props, `rootBox`, the stamp, and the sugar, with one test of the flows above
@@ -374,29 +387,16 @@ Three PRs, each stacked on the one before:
 
 ## Open questions
 
-1. **The bank at `bank`, or at `bank/<banklabel>`.** I recommend `bank`. Every scope carries the banklabel, so bob's
-   bank is `(userid, 'bob', 'bank')` and alice's is `(userid, 'alice', 'bank')`: a user's banks are apart with nothing
-   more. `bank/bob` repeats the banklabel, which a check must then hold equal to the scope's. It also puts the bank at
-   depth 2 under a root bank that is never stored, so its lifepath breaks one lifeseq per segment. It would earn its
-   place if a listing could name a user without a bank, to list their banks, and no scope does that yet.
-2. **The main gate as the root gate, at `gate`.** One lifeseq per segment puts `gate/main` at depth 2, under a root
-   gate that is never stored. I recommend the main gate move to `gate`, with label `gate`. Then every root is at depth
-   1, a get of `gate` answers the main gate, and later gates nest under it. The other way exempts the gate from the
-   rule. Either changes the gate's stored shape.
-3. **A tombstone's seal: an empty whisper, or a key alone.** Your table had no `whisper_sealed` on a tombstone, but
-   something has to carry its signature. I recommend an empty whisper: a tombstone then has a live box's sealed part,
-   read by the same unseal, for a few dozen bytes. A key alone is a `Sealed` without its `ciphered`, a shape of its
-   own.
-4. **The sugar in `safebyok/core`.** `core.ts` says core has no storing and no instance sugar, and `bank.tryPutBox`
-   stores. I recommend core take it on and say so: someone who wants only lock, unlock and a few secrets needs them
-   stored. The gate and the lease stay apart from storing. Only the bank's sugar touches a VaultDB.
-5. **How the bank knows its root box.** I recommend it hold the root box, as it holds its main gate, given by
+1. **How the bank knows its root box.** I recommend it hold the root box, as it holds its main gate, given by
    `tryBirthBank` or a listing. A rule tying the root's lifeseq to the bank's is your TODO, and nothing here needs it.
-6. **The gate's wayins as `Sealed` parts.** They fit the shape, and moving them is a change to the gate's stored
+2. **The gate's wayins as `Sealed` parts.** They fit the shape, and moving them is a change to the gate's stored
    shape. I recommend a thread of its own after this one.
-7. **`Sealed`'s fields.** Your `sealers.ts` has `wrapped`, `codec`, and a ciphered `schematag`, and your doc has
+3. **`Sealed`'s fields.** Your `sealers.ts` has `wrapped`, `codec`, and a ciphered `schematag`, and your doc has
    `key_wrapped`, `codectag`, and a plain `schematag`. I took the doc's: a stored field is underbar_case, and the
    schematag is visible, so a host reads it without unlocking.
+4. **`listkind: 'subtree'` in this thread.** Every box is a child of the root for now, so a subtree lists what
+   `children` does. I recommend building it here anyway, with a test that nests a row by hand: it costs one filter
+   fewer than `children`, and it fixes the answer's shape before nested boxes arrive.
 
 ## Principles
 
