@@ -1,4 +1,4 @@
-import { BX, CX, Clock, Crypto, SX, StableJsonify, Throwers } from 'safebyok-big/internals'
+import { BX, CX, Clock, Crypto, SX, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 
 // == [The Sealer]: Sealed, SealPurposes, Sealer, isSealer
 
@@ -48,13 +48,16 @@ export interface BoxCleartexts {
   whisper: CX.Whisper
 }
 
-/** The checks of a box's ante. */
-const boxAnte = BX.boxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true, am: true }).extend({ am: SX.am.exclude(['d']) })
+/** The checks of a box's ante, and of what it seals. */
+const Checks = Validator.Checkers('bad_option', ({ obj }) => ({
+  boxAnte:       BX.boxRecord.omit({ box_key_wrapped: true, whisper_ciphered: true, am: true }).extend({ am: SX.am.exclude(['d']) }),
+  boxCleartexts: obj({ whisper: CX.whisper }),
+}))
 
 /** Seals a box's whisper, bound to every sparse field of the box: its scope, its life and its revision. Its sidecar stays in the clear. */
 export const BoxWhisperSealer: Sealer<BoxAnte, BX.BoxRecord, BoxCleartexts> = Object.freeze({
   nextRevisionOf(ante: BoxAnte): BoxAnte {
-    const parsed = boxAnte.parse(ante)
+    const parsed = Checks.boxAnte.parse(ante)
     const written_at = Clock.nowMillis()
     const next = { ...parsed, ...SX.nextRevisionOf(parsed, written_at), am: 'a' as const }
     // A box put over its tombstone starts a new life.
@@ -65,7 +68,7 @@ export const BoxWhisperSealer: Sealer<BoxAnte, BX.BoxRecord, BoxCleartexts> = Ob
 
   purposes: Object.freeze({ key: 'box_key_wrapped', cipher: 'whisper_ciphered' }),
 
-  encode({ whisper }: BoxCleartexts): string { return StableJsonify.stableJsonify(CX.whisper.parse(whisper)) },
+  encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(Checks.boxCleartexts.parse(cleartexts).whisper) },
 
   decode(text: string): BoxCleartexts { return { whisper: deserializeWhisper(text) } },
 

@@ -129,6 +129,8 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
    * Refuses `already_asking` while another gating is open on the device.
    */
   async launch(): Promise<Bank> {
+    // A gating concluded before its launch has nothing to ask: it rejects with its outcome, and never takes the device.
+    if (this.#outcome !== null) { return Outcome.valOf(this.#outcome) }
     this.#device.attachGating(this)
     if (this.#askUser !== null) { void this.#askHost(this.#askUser) }
     return Outcome.valOf(await this.#concluded)
@@ -202,7 +204,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   #concludeOnce(outcome: Outcome.Outcome<Bank>): void {
     if (this.#outcome !== null) { return }
     this.#outcome = outcome
-    this.#device.detachGating()
+    this.#device.detachGating(this)
     this.#conclude(outcome)
   }
   // --

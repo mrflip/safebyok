@@ -133,8 +133,10 @@ export class Device {
     this.#openGating = gating
   }
 
-  /** Detach the open gating, once it has concluded. */
-  detachGating(): void { this.#openGating = null }
+  /** Detach `gating`, once it has concluded, if it is the one open. */
+  detachGating(gating: Gating): void {
+    if (this.#openGating === gating) { this.#openGating = null }
+  }
   // --
 
   // == [Guards]: isEnabled, demandEnabled

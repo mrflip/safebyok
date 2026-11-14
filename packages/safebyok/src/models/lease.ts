@@ -59,12 +59,12 @@ export class Lease implements GX.LeaseStamp {
   /** The lease of `record`, granted to `opts.bank`, which must be the bank `record` is stamped with. */
   static make(record: Z.input<typeof GX.leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
-  private constructor(record: Z.input<typeof GX.leaseRecord>, { bank }: LeaseOpts) {
-    const { record: parsed, opts } = Checks.leaseMakeArgs.parse({ record, opts: { bank } })
-    Validator.checkedConsistent(GX.bankStamp.parse(parsed), opts.bank.stamp, { kind: 'damaged_lease' })
+  private constructor(record: Z.input<typeof GX.leaseRecord>, opts: LeaseOpts) {
+    const { record: parsed, opts: checked } = Checks.leaseMakeArgs.parse({ record, opts })
+    Validator.checkedConsistent(GX.bankStamp.parse(parsed), checked.bank.stamp, { kind: 'damaged_lease' })
     this.#record = parsed
     Helpers.tattoo(this, GX.leaseStamp.parse(parsed), { configurable: false })
-    this.#bank = bank
+    this.#bank = opts.bank
     Object.freeze(this)
   }
   // --

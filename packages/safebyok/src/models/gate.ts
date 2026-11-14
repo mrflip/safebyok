@@ -19,9 +19,10 @@ export interface GateOpts {
 /** The checks of {@link Gate.make}'s and {@link Gate.makeRecord}'s arguments. */
 const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => {
   const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
+  const wayins = obj({ main: wayin, passkey0: wayin.nullable() })
   return {
     gateMakeArgs:   obj({ record: BX.gateRecord, opts: obj({ bank: obj({ stamp: GX.bankStamp }) }) }),
-    makeRecordArgs: obj({ bankStamp: GX.bankStamp, wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),
+    makeRecordArgs: obj({ bankStamp: GX.bankStamp, dna: obj({ wayins }) }),
   }
 })
 
@@ -81,24 +82,23 @@ export class Gate implements GX.GateStamp {
   /** The gate of `record`, which must be of `opts.bank`. */
   static make(record: BX.GateRecord, opts: GateOpts): Gate { return new Gate(record, opts) }
 
-  private constructor(record: BX.GateRecord, { bank }: GateOpts) {
-    const { record: parsed, opts } = Checks.gateMakeArgs.parse({ record, opts: { bank } })
-    Validator.checkedConsistent({ ...CX.bankScope.parse(parsed), bank_tok: parsed.bank_tok }, opts.bank.stamp, { kind: 'record_conflict' })
-    this.#bank = bank
-    this.#record = Object.freeze({ ...parsed, wayins: Object.freeze(parsed.wayins) })
+  private constructor(record: BX.GateRecord, opts: GateOpts) {
+    const { record: parsed, opts: checked } = Checks.gateMakeArgs.parse({ record, opts })
+    Validator.checkedConsistent({ ...CX.bankScope.parse(parsed), bank_tok: parsed.bank_tok }, checked.bank.stamp, { kind: 'record_conflict' })
+    this.#bank = opts.bank
     this.#main = Wayin.make(parsed.wayins.main)
     this.#passkey0 = parsed.wayins.passkey0 === undefined ? null : Wayin.make(parsed.wayins.passkey0)
+    this.#record = Object.freeze({ ...parsed, wayins: wayinsOf(this.#main, this.#passkey0) })
     Helpers.tattoo(this, { ...GX.gateStamp.parse(parsed), bank_tok: parsed.bank_tok }, { configurable: false })
     Object.freeze(this)
   }
 
   /** The first record of a new gate of the bank stamped `bankStamp`, made of `dna`. */
   static makeRecord(bankStamp: GX.BankStamp, dna: GateDna): BX.GateRecord {
-    const { wayins, ...stampish } = dna
-    const checked = Checks.makeRecordArgs.parse({ bankStamp, wayins })
+    const { bankStamp: checkedBank, dna: { wayins } } = Checks.makeRecordArgs.parse({ bankStamp, dna })
     return BX.gateRecord.parse({
-      ...GX.gateStamp.parse(stampish), fmt: BX.GateFormat, ...SX.nextRevisionOf(SX.VoidRevision, Clock.nowMillis()), am: 'a',
-      bank_tok: checked.bankStamp.bank_tok, wayins: wayinsOf(checked.wayins.main, checked.wayins.passkey0), auth: {}, sigs: {}, meta: {},
+      ...GX.gateStamp.parse(dna), fmt: BX.GateFormat, ...SX.nextRevisionOf(SX.VoidRevision, Clock.nowMillis()), am: 'a',
+      bank_tok: checkedBank.bank_tok, wayins: wayinsOf(wayins.main, wayins.passkey0), auth: {}, sigs: {}, meta: {},
     })
   }
   // --

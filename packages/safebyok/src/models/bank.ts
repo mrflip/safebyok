@@ -28,11 +28,12 @@ export interface BankOpts {
 }
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, and of the proving an unlock is given. */
-const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => ({
-  bankMakeArgs: obj({ record: BX.bankRecord, maingate: BX.gateRecord, opts: obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device') }) }),
+/** The checks of {@link Bank.make}'s arguments, of the proving an unlock is given, and of the bank a box claims. */
+const Checks = Validator.Checkers('bad_option', ({ obj, custom, user_id, banklabel, bank_tok }) => ({
+  bankMakeArgs: obj({ record: BX.bankRecord.extend({ maingate: BX.gateRecord }), opts: obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device') }) }),
   proving:      custom<Proving>((val) => val instanceof Proving, 'Expected a Proving'),
-}))
+  boxOfBank:    obj({ user_id, banklabel, bank_tok }),
+}), [CX])
 
 /** The signed-in user's bank on this device: its main gate, and its lease while unlocked.
  * Boxes are sealed and unsealed under the lease, which the bank keeps private.
@@ -87,8 +88,8 @@ export class Bank implements GX.BankStamp {
   /** The bank of `record`, with its main gate, on `opts.device`. */
   static make(record: BankRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
-  private constructor({ maingate: gaterecord, ...bankrecord }: BankRecord, { device }: BankOpts) {
-    const { record: parsed, maingate } = Checks.bankMakeArgs.parse({ record: bankrecord, maingate: gaterecord, opts: { device } })
+  private constructor(record: BankRecord, opts: BankOpts) {
+    const { record: { maingate, ...parsed }, opts: { device } } = Checks.bankMakeArgs.parse({ record, opts })
     Validator.checkedConsistent(CX.bankScope.parse(parsed), device.scope, { kind: 'record_conflict' })
     this.#device = device
     this.#record = Object.freeze(parsed)
@@ -109,10 +110,9 @@ export class Bank implements GX.BankStamp {
 
   /** The first record of a new bank and its main gate, made of `dna`. */
   static makeRecord(dna: BankDna): BankRecord {
-    const { maingate, ...stampish } = dna
-    const bankStamp = GX.bankStamp.parse(stampish)
+    const bankStamp = GX.bankStamp.parse(dna)
     const record = BX.bankRecord.parse({ ...bankStamp, fmt: BX.BankFormat, ...SX.nextRevisionOf(SX.VoidRevision, Clock.nowMillis()), am: 'a' })
-    return { ...record, maingate: Gate.makeRecord(bankStamp, maingate) }
+    return { ...record, maingate: Gate.makeRecord(bankStamp, dna.maingate) }
   }
   // --
 
@@ -158,19 +158,23 @@ export class Bank implements GX.BankStamp {
    * Over a tombstone, the box starts a new life.
    */
   async sealBox(ante: BoxAnte, cleartexts: BoxCleartexts): Promise<BX.BoxRecord> {
-    return this.#demandLease().seal(BoxWhisperSealer, ante, cleartexts)
+    const lease = this.#demandLease()
+    this.#demandOwnBox(ante)
+    return lease.seal(BoxWhisperSealer, ante, cleartexts)
   }
 
   /** `box` with its whisper unsealed, and its sealed fields left out. Needs the bank unlocked. */
   async unsealBox(box: BX.BoxRecord): Promise<BoxUnsealed> {
+    const lease = this.#demandLease()
     const parsed = BX.boxRecord.parse(box)
-    const { whisper } = await this.#demandLease().unseal(BoxWhisperSealer, parsed)
+    this.#demandOwnBox(parsed)
+    const { whisper } = await lease.unseal(BoxWhisperSealer, parsed)
     const { box_key_wrapped: _keyWrapped, whisper_ciphered: _ciphered, ...unsealed } = parsed
     return { ...unsealed, whisper }
   }
   // --
 
-  // == [Guards]: isEnabled, isLocked, isUnlocked, demandEnabled, demandLease
+  // == [Guards]: isEnabled, isLocked, isUnlocked, demandEnabled, demandOwnBox, demandLease
 
   /** True while this bank's device is enabled. */
   get isEnabled(): boolean { return this.#device.isEnabled }
@@ -185,6 +189,11 @@ export class Bank implements GX.BankStamp {
   demandEnabled(): this {
     this.#device.demandEnabled()
     return this
+  }
+
+  /** Throw `record_conflict` unless `box` claims this bank's scope and life */
+  #demandOwnBox(box: unknown): void {
+    Validator.checkedConsistent(Checks.boxOfBank.parse(box), this.stamp, { kind: 'record_conflict' })
   }
 
   /** The attached lease, or throw while locked */
