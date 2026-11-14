@@ -419,6 +419,9 @@ importers:
 
   packages/safebyok:
     dependencies:
+      es-toolkit:
+        specifier: ^1.53.1
+        version: 1.53.1
       safebyok-big:
         specifier: workspace:*
         version: link:../safebyok-big

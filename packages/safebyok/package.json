@@ -72,6 +72,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "es-toolkit": "^1.53.1",
     "safebyok-big": "workspace:*"
   },
   "peerDependencies": {
