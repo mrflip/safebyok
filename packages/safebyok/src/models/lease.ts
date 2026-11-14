@@ -2,10 +2,19 @@ import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
 import { Crypto, GX, Helpers, Throwers, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
-import { type SealPurposes, type Sealed, type Sealer, isSealer } from './sealers'
+import * as Sealers from './sealers'
 
 /** What a lease is given of its bank: its stamp, and its lock, called when the bankKey will not unwrap. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock'>
+
+/** The sealer of kind `KindT`, in `sealers.ts`. */
+type SealerOf<KindT extends Sealers.Sealerkind> = typeof Sealers[`${KindT}Sealer`]
+/** What the sealer of kind `KindT` seals the next revision of: its record without the sealed fields. */
+export type AnteOf<KindT extends Sealers.Sealerkind>       = SealerOf<KindT> extends Sealers.Sealer<infer AnteT, unknown, unknown> ? AnteT : never
+/** What the sealer of kind `KindT` gives back: its record, sealed. */
+export type RecordOf<KindT extends Sealers.Sealerkind>     = SealerOf<KindT> extends Sealers.Sealer<unknown, infer RecordT, unknown> ? RecordT : never
+/** What the sealer of kind `KindT` seals: its cleartexts. */
+export type CleartextsOf<KindT extends Sealers.Sealerkind> = SealerOf<KindT> extends Sealers.Sealer<unknown, unknown, infer CleartextsT> ? CleartextsT : never
 
 /** What {@link Lease.make} is given besides its record. */
 export interface LeaseOpts {
@@ -14,18 +23,18 @@ export interface LeaseOpts {
 }
 
 // Defined here, not with the shapes: it names a model class.
-/** The checks of {@link Lease.make}'s arguments, and of the sealer a seal or unseal is given. */
-const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom }) => {
+/** The checks of {@link Lease.make}'s arguments, and of the sealerkind a seal or unseal is given. */
+const Checks = Validator.Checkers('bad_option', ({ obj, fn, oneof }) => {
   const bank = obj({ stamp: GX.bankStamp, lock: fn<() => unknown>() })
   return {
     leaseMakeArgs: obj({ record: GX.leaseRecord, opts: obj({ bank }) }),
-    sealer:        custom<Sealer<unknown, unknown, unknown>>(isSealer, 'Expected a Sealer'),
+    sealerkind:    oneof(Sealers.sealerkindVals),
   }
 })
 
 /** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
  * The bankKey stays wrapped under a non-extractable leaseKey. Each seal or unseal unwraps it for that call alone, and nothing hands it out.
- * What is sealed, and how, is the {@link Sealer}'s: the lease knows nothing of boxes.
+ * What is sealed, and how, is the sealer's in `sealers.ts`, named by its kind: the lease knows nothing of boxes.
  * A lease whose bankKey will not unwrap refuses `damaged_lease`, and its bank locks.
  */
 export class Lease implements GX.LeaseStamp {
@@ -77,27 +86,27 @@ export class Lease implements GX.LeaseStamp {
 
   // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
 
-  /** The next revision of `ante`, with the part `sealer` names sealed from `cleartexts` under a fresh key.
-   * The seal is bound to the bank's stamp, then to what `sealer` stamps the record with. The text's bytes are zeroed afterwards, sealed or refused.
+  /** The next revision of `ante`, with the part `sealerkind` names sealed from `cleartexts` under a fresh key.
+   * The seal is bound to the bank's stamp, then to what the sealer stamps the record with. The text's bytes are zeroed afterwards, sealed or refused.
    */
-  async seal<AnteT, RecordT, CleartextsT>(sealer: Sealer<AnteT, RecordT, CleartextsT>, ante: AnteT, cleartexts: CleartextsT): Promise<RecordT> {
-    Checks.sealer.parse(sealer)
+  async seal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, ante: AnteOf<KindT>, cleartexts: CleartextsOf<KindT>): Promise<RecordOf<KindT>> {
+    const sealer = sealerOf(sealerkind)
     const next = sealer.nextRevisionOf(ante)
     const sealed = await this.#sealText(sealer.encode(cleartexts), sealer.stampsOf(next), sealer.purposes)
     return sealer.recordOf(next, sealed)
   }
 
-  /** The cleartexts of the part `sealer` names in `record`.
+  /** The cleartexts of the part `sealerkind` names in `record`.
    * Unsealing authenticates the ciphertexts and the stamps together: a change to either refuses as damaged.
    */
-  async unseal<AnteT, RecordT, CleartextsT>(sealer: Sealer<AnteT, RecordT, CleartextsT>, record: RecordT): Promise<CleartextsT> {
-    Checks.sealer.parse(sealer)
+  async unseal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, record: RecordOf<KindT>): Promise<CleartextsOf<KindT>> {
+    const sealer = sealerOf(sealerkind)
     const text = await this.#openSealed(sealer.sealedOf(record), sealer.stampsOf(record), sealer.purposes)
     return sealer.decode(text)
   }
 
   /** `text`, ciphered under a fresh key, the key wrapped under the bankKey */
-  async #sealText(text: string, stamps: readonly Crypto.CipherCtxRecord[], purposes: SealPurposes): Promise<Sealed> {
+  async #sealText(text: string, stamps: readonly Crypto.CipherCtxRecord[], purposes: Sealers.SealPurposes): Promise<Sealers.Sealed> {
     const bankKey = await this.#bankKey('wrapKey')
     const partKey = await Crypto.makeBoxKey()
     const keyWrapped = await Crypto.wrapKeyUnder(bankKey, partKey, this.#ctxOf(stamps, purposes.key))
@@ -112,7 +121,7 @@ export class Lease implements GX.LeaseStamp {
   }
 
   /** The text in `sealed` */
-  async #openSealed(sealed: Sealed, stamps: readonly Crypto.CipherCtxRecord[], purposes: SealPurposes): Promise<string> {
+  async #openSealed(sealed: Sealers.Sealed, stamps: readonly Crypto.CipherCtxRecord[], purposes: Sealers.SealPurposes): Promise<string> {
     const bankKey = await this.#bankKey('unwrapKey')
     const keyCtx    = this.#ctxOf(stamps, purposes.key)
     const cipherCtx = this.#ctxOf(stamps, purposes.cipher)
@@ -168,3 +177,13 @@ export class Lease implements GX.LeaseStamp {
   /** Always `'lease'`: marks this model for a {@link Consts.Modelkind} check. */
   get modelkind(): 'lease' { return 'lease' satisfies Consts.Modelkind }
 }
+
+// == [Helpers]: sealerOf
+
+// TypeScript cannot follow a generic kind to its sealer's types: the cast names what the lookup by that kind gives. The
+// lookup is computed, which import-x/namespace cannot check; the sealerkind's check stands in for it.
+/** The sealer of kind `sealerkind`, or throw `bad_option` for a kind there is none of */
+function sealerOf<KindT extends Sealers.Sealerkind>(sealerkind: KindT): Sealers.Sealer<AnteOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> {
+  return Sealers[`${Checks.sealerkind.parse(sealerkind)}Sealer`] as Sealers.Sealer<AnteOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> // eslint-disable-line import-x/namespace
+}
+// --

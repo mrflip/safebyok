@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { BX } from 'safebyok-big/internals'
-import { BoxWhisperSealer, isSealer } from '../../src/models/sealers'
+import * as Sealers from '../../src/models/sealers'
+import { BoxWhisperSealer } from '../../src/models/sealers'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -8,11 +9,13 @@ TH.useFakeClock()
 /** A live box ante at its first revision, as a seal over {@link TH.boxAnteOf}'s shell leaves it, without its sealed fields. */
 function liveAnte() { return BoxWhisperSealer.nextRevisionOf(TH.boxAnteOf()) }
 
-describe("isSealer(val)", () => {
-  it("is true of BoxWhisperSealer, and of nothing shaped like it", () => {
-    expect(isSealer(BoxWhisperSealer)).to.be.true
-    expect(isSealer({ ...BoxWhisperSealer })).to.be.false
-    expect(isSealer(null)).to.be.false
+describe("sealerkindVals", () => {
+  it("names, for each kind, a frozen sealer in the module as `${kind}Sealer`", () => {
+    for (const sealerkind of Sealers.sealerkindVals) {
+      const sealer: unknown = Sealers[`${sealerkind}Sealer`]
+      expect(sealer).to.be.an('object')
+      expect(Object.isFrozen(sealer)).to.be.true
+    }
   })
 })
 

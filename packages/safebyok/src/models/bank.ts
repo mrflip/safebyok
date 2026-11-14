@@ -4,7 +4,7 @@ import { Device } from './device'
 import { Gate, type GateDna } from './gate'
 import type { Lease } from './lease'
 import { Proving } from './proving'
-import { type BoxAnte, type BoxCleartexts, BoxWhisperSealer } from './sealers'
+import type { BoxAnte, BoxCleartexts } from './sealers'
 import { PutNotBuilt } from '../phrases'
 
 /** A bank's record: its row, with its main gate's record, of the same life, as `maingate`. */
@@ -160,7 +160,7 @@ export class Bank implements GX.BankStamp {
   async sealBox(ante: BoxAnte, cleartexts: BoxCleartexts): Promise<BX.BoxRecord> {
     const lease = this.#demandLease()
     this.#demandOwnBox(ante)
-    return lease.seal(BoxWhisperSealer, ante, cleartexts)
+    return lease.seal('BoxWhisper', ante, cleartexts)
   }
 
   /** `box` with its whisper unsealed, and its sealed fields left out. Needs the bank unlocked. */
@@ -168,7 +168,7 @@ export class Bank implements GX.BankStamp {
     const lease = this.#demandLease()
     const parsed = BX.boxRecord.parse(box)
     this.#demandOwnBox(parsed)
-    const { whisper } = await lease.unseal(BoxWhisperSealer, parsed)
+    const { whisper } = await lease.unseal('BoxWhisper', parsed)
     const { box_key_wrapped: _keyWrapped, whisper_ciphered: _ciphered, ...unsealed } = parsed
     return { ...unsealed, whisper }
   }

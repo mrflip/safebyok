@@ -47,8 +47,8 @@ describe("Lease.make(record, { bank })", () => {
 
   it("opens what another lease of the same record sealed", async () => {
     const { bank, lease, record } = await leaseWorld()
-    const sealed = await lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
-    expect(await Lease.make(record, { bank }).unseal(BoxWhisperSealer, sealed)).to.deep.equal(Cleartexts)
+    const sealed = await lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
+    expect(await Lease.make(record, { bank }).unseal('BoxWhisper', sealed)).to.deep.equal(Cleartexts)
   })
 
   const MalformedCases = [
@@ -96,13 +96,13 @@ describe("Lease.make(record, { bank })", () => {
   })
 })
 
-describe("lease.seal(sealer, ante, cleartexts) and lease.unseal(sealer, record)", () => {
+describe("lease.seal(sealerkind, ante, cleartexts) and lease.unseal(sealerkind, record)", () => {
   it("round-trips a box's whisper", async () => {
     const { lease } = await leaseWorld()
-    const sealed = await lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
+    const sealed = await lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
     expect(sealed).to.have.property('box_key_wrapped')
     expect(sealed).to.have.property('whisper_ciphered')
-    expect(await lease.unseal(BoxWhisperSealer, sealed)).to.deep.equal(Cleartexts)
+    expect(await lease.unseal('BoxWhisper', sealed)).to.deep.equal(Cleartexts)
   })
 
   it("zeroes the whisper's bytes once each has sealed or opened them", async () => {
@@ -110,8 +110,8 @@ describe("lease.seal(sealer, ante, cleartexts) and lease.unseal(sealer, record)"
     const text = BoxWhisperSealer.encode(Cleartexts)
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     const decode = vi.spyOn(TextDecoder.prototype, 'decode')
-    const sealed = await lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
-    expect(await lease.unseal(BoxWhisperSealer, sealed)).to.deep.equal(Cleartexts)
+    const sealed = await lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
+    expect(await lease.unseal('BoxWhisper', sealed)).to.deep.equal(Cleartexts)
     const sealedBytes = encode.mock.results[encode.mock.calls.findIndex(([encoded]) => encoded === text)]?.value as Uint8Array
     const openedBytes = decode.mock.calls[decode.mock.results.findIndex((decoded) => decoded.value === text)]?.[0] as Uint8Array
     encode.mockRestore()
@@ -122,26 +122,28 @@ describe("lease.seal(sealer, ante, cleartexts) and lease.unseal(sealer, record)"
     expect(TH.isZeroed(openedBytes)).to.be.true
   })
 
-  const SealerCases = [
-    [() => ({ ...BoxWhisperSealer }), 'a copy of a sealer'],
-    [() => null,                      'null'],
-    [() => 'BoxWhisperSealer',        "a sealer's name"],
+  const SealerkindCases = [
+    [BoxWhisperSealer,   'a sealer'],
+    [null,               'null'],
+    ['BoxWhisperSealer', "a sealer's name"],
+    ['boxwhisper',       'a kind in the wrong case'],
+    ['toString',         "a name every object has"],
   ] as const
 
-  for (const [sealerOf, blurb] of SealerCases) {
-    it(`refuses ${blurb} in place of a sealer, at the seal and the unseal`, async () => {
+  for (const [sealerkind, blurb] of SealerkindCases) {
+    it(`refuses ${blurb} in place of a sealerkind, at the seal and the unseal`, async () => {
       const { lease } = await leaseWorld()
-      const sealed = await lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
-      await TH.expectRefusal(lease.seal(sealerOf() as never, TH.boxAnteOf(), Cleartexts), 'bad_option')
-      await TH.expectRefusal(lease.unseal(sealerOf() as never, sealed), 'bad_option')
+      const sealed = await lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
+      await TH.expectRefusal(lease.seal(sealerkind as never, TH.boxAnteOf(), Cleartexts), 'bad_option')
+      await TH.expectRefusal(lease.unseal(sealerkind as never, sealed), 'bad_option')
     })
   }
 
   it("refuses 'damaged_whisper' for what another bankKey sealed, and locks nothing", async () => {
     const { bank, lease } = await leaseWorld()
     const { lease: other } = await TH._cheat_grantedLease(await provingWithWayin(), TH.fakeLeaseBankOf())
-    const sealed = await other.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
-    await TH.expectRefusal(lease.unseal(BoxWhisperSealer, sealed), 'damaged_whisper')
+    const sealed = await other.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
+    await TH.expectRefusal(lease.unseal('BoxWhisper', sealed), 'damaged_whisper')
     expect(bank.lock).not.toHaveBeenCalled()
     expect(lease.isEvicted).to.be.false
   })
@@ -150,11 +152,11 @@ describe("lease.seal(sealer, ante, cleartexts) and lease.unseal(sealer, record)"
 describe("lease.evict() and isEvicted", () => {
   it("drops the keys, so that a seal or an unseal refuses 'bank_locked', and locks nothing", async () => {
     const { bank, lease } = await leaseWorld()
-    const sealed = await lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
+    const sealed = await lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
     lease.evict()
     expect(lease.isEvicted).to.be.true
-    await TH.expectRefusal(lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts), 'bank_locked')
-    await TH.expectRefusal(lease.unseal(BoxWhisperSealer, sealed), 'bank_locked')
+    await TH.expectRefusal(lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts), 'bank_locked')
+    await TH.expectRefusal(lease.unseal('BoxWhisper', sealed), 'bank_locked')
     expect(bank.lock).not.toHaveBeenCalled()
   })
 
@@ -167,7 +169,7 @@ describe("lease.evict() and isEvicted", () => {
 
   it("refuses 'bank_locked' for a seal already under way when it lands", async () => {
     const { lease } = await leaseWorld()
-    const sealing = lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
+    const sealing = lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
     lease.evict()
     await TH.expectRefusal(sealing, 'bank_locked')
   })
@@ -186,14 +188,14 @@ describe("a tampered lease record", () => {
   for (const [tamper, blurb] of TamperCases) {
     it(`with ${blurb} locks its bank at its first unseal, and is evicted`, async () => {
       const { proving, bank, lease, record } = await leaseWorld()
-      const sealed = await lease.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts)
+      const sealed = await lease.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts)
       const { record: other } = await TH._cheat_grantedLease(proving, bank)
       const tampered = Lease.make(tamper(record, other) as GX.LeaseRecord, { bank })
-      const err = await TH.expectRefusal(tampered.unseal(BoxWhisperSealer, sealed), 'damaged_lease')
+      const err = await TH.expectRefusal(tampered.unseal('BoxWhisper', sealed), 'damaged_lease')
       expect(TH.thrownText(err)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
       expect(bank.lock).toHaveBeenCalledTimes(1)
       expect(tampered.isEvicted).to.be.true
-      await TH.expectRefusal(tampered.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts), 'bank_locked')
+      await TH.expectRefusal(tampered.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts), 'bank_locked')
       expect(bank.lock).toHaveBeenCalledTimes(1)
     })
   }
@@ -201,7 +203,7 @@ describe("a tampered lease record", () => {
   it("refuses at its first seal too, sealing nothing", async () => {
     const { bank, record } = await leaseWorld()
     const tampered = Lease.make({ ...record, proved_at: TH.T0 + 1 }, { bank })
-    await TH.expectRefusal(tampered.seal(BoxWhisperSealer, TH.boxAnteOf(), Cleartexts), 'damaged_lease')
+    await TH.expectRefusal(tampered.seal('BoxWhisper', TH.boxAnteOf(), Cleartexts), 'damaged_lease')
     expect(bank.lock).toHaveBeenCalledTimes(1)
   })
 })

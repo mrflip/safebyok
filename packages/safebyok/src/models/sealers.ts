@@ -1,6 +1,10 @@
 import { BX, CX, Clock, Crypto, SX, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 
-// == [The Sealer]: Sealed, SealPurposes, Sealer, isSealer
+// == [The Sealer]: sealerkindVals, Sealerkind, Sealed, SealPurposes, Sealer
+
+/** The kinds of sealer, each named for the part it seals: the sealer of kind `K` is `${K}Sealer`, below. */
+export const sealerkindVals = ['BoxWhisper'] as const
+export type Sealerkind = typeof sealerkindVals[number]
 
 /** One sealed part's ciphertexts: its fresh key, wrapped under the bankKey, and the cleartext, ciphered under that key. */
 export interface Sealed {
@@ -34,8 +38,6 @@ export interface Sealer<AnteT, RecordT, CleartextsT> {
   recordOf(next: AnteT, sealed: Sealed): RecordT
 }
 
-/** True for one of the sealers in this module, and nothing else. */
-export function isSealer(val: unknown): val is Sealer<unknown, unknown, unknown> { return (val === BoxWhisperSealer) }
 // --
 
 // == [A box's whisper]: BoxAnte, BoxCleartexts, BoxWhisperSealer
