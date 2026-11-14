@@ -371,16 +371,16 @@ the act returns → gating concludes ok → ensureUnlocked resolves
 
 ## Changing the gate
 
-A bank's gate changes through its own bankDB verbs, named for what each does: `replacePassphrase`, `addPasskey` or
-`revokePasskey`. No `Gate` is made for the next gate row: the gate listing mints the whole next record, and each verb lets
-the bankDB check it against the row (`notes/answer-contract.md`). Each change ends the same way, and needs nothing that the
+A bank's gate changes through one bankDB verb, `putGate`, under the storage policy named for the gating:
+`replace_passphrase`, `add_passkey` or `revoke_passkey`. No `Gate` is made for the next gate row: the gate listing mints
+the whole next record, and the policy lets the bankDB check it against the row (`notes/storage-policies.md`). Each change ends the same way, and needs nothing that the
 bank does not already have:
 
 ```text
 each gate change's act, past its provings
-├─ written = await gateListing.<gate verb>(ante, wayin)    ← the commit; ante, the gate record the attempt read
-│  ├─ expected = ante; record = ante at nextRevisionOf(expected), the moved wayin laid on its wayins
-│  ├─ the bankDB's verb, called with { expected, record }    a put of the gate row; moved → 'stale_write', nothing stored
+├─ written = await gateListing.putGate(ante, wayins, { policies: [policy] })    ← the commit; ante, the gate record the attempt read
+│  ├─ expected = ante; record = ante at nextRevisionOf(expected), with the next wayins
+│  ├─ bankDB.putGate({ expected, record, options })        a put of the gate row; moved → 'stale_write', its policy refusing → 'gate_issue', nothing stored
 │  └─ the answer delivered                           checked against what it sent
 │     no lock: adopt never locks on a gate's next revision
 └─ unlockByProving(bank, proved, written)            a fresh lease of full term citing written; a lock() crossing the change does not stay in effect
@@ -399,9 +399,10 @@ each gate change's act, past its provings
   the verb again.
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, citing the older gate revision, is forgotten at its next session (Decided).
-* **The bankDB stores a gate verb's record as it stores any put.** The record is built from `ante`, so it changes only
-  its verb's wayin. `add_passkey` refuses before proving when the gate the attempt read has a passkey (`bad_option`).
-  The bankDB cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
+* **The bankDB applies the gating's storage policy, in the step that stores the record.** The record is built from
+  `ante`, so it changes only its gating's wayin, and the policy refuses one that changes more (`gate_issue`). The device
+  never meets that refusal: `add_passkey` refuses before proving when the gate the attempt read has a passkey
+  (`bad_option`). The bankDB cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
 
 Each prompt is the gate's, and starts the same way:
 
@@ -426,8 +427,8 @@ gating.attempt({ antePassphraseClear, nextPassphraseClear })
 │    weak → may re-enter
 └─ then the change, from { ante, anteProving, nextProving }           ── no cleartext is used past here ──
    ├─ nextWayin = nextProving.buildWayin(anteProving)    unwrap the bankKey; wrap; dropped
-   └─ gateListing.<gate verb>, then unlockByProving(bank, anteProving, written)
-      commit: gateListing.replacePassphrase(ante, main)    ← the commit; main is nextWayin.pickle()
+   └─ gateListing.putGate, then unlockByProving(bank, anteProving, written)
+      commit: gateListing.putGate(ante, { ...ante.wayins, main }, { policies: ['replace_passphrase'] })    ← the commit; main is nextWayin.pickle()
 ```
 
 The current passphrase is proved before the next is judged, so the `strengthChecker` is given a next
@@ -448,8 +449,8 @@ gating.attempt({ passphraseClear, passkeyClear })
 ├─ passkeyProving = PasskeyProving.buildNovel(bank.stamp, gate.stamp, passkeyClear, bank)
 └─ then the change, from { ante, proved, passkeyProving }             ── no cleartext is used past here ──
    ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the bankKey; wrap; dropped
-   └─ gateListing.<gate verb>, then unlockByProving(bank, proved, written)
-      commit: gateListing.addPasskey(ante, passkey0)                  ← the commit; passkey0 is passkeyWayin.pickle()
+   └─ gateListing.putGate, then unlockByProving(bank, proved, written)
+      commit: gateListing.putGate(ante, { ...ante.wayins, passkey0 }, { policies: ['add_passkey'] })    ← the commit; passkey0 is passkeyWayin.pickle()
            one added before the attempt read ante → 'bad_option', nothing proved; after it → 'stale_write'
 ```
 
@@ -465,8 +466,8 @@ gating.attempt({ passphraseClear })
 ├─ proved = PassphraseProving.buildStored(gate, passphraseClear, bank)
 │    wrong → may re-enter
 └─ then the change, from { ante, proved }                             ── no cleartext is used past here ──
-   └─ gateListing.<gate verb>, then unlockByProving(bank, proved, written)
-      commit: gateListing.revokePasskey(ante)                              ← the commit
+   └─ gateListing.putGate, then unlockByProving(bank, proved, written)
+      commit: gateListing.putGate(ante, { main: ante.wayins.main }, { policies: ['revoke_passkey'] })    ← the commit
            revoked before the attempt read ante → the next revision stored, with no passkey still; after it → 'stale_write'
 ```
 

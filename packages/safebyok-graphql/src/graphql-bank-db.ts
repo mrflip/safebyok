@@ -94,42 +94,18 @@ export class GraphQLBankDB implements BX.BankDB {
   }
   // --
 
-  // == [Gate verbs]: replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey
+  // == [Gate verbs]: putGate, tryPutGate
 
-  /** Store the gate record with its passphrase wayin replaced ({@link BX.BankDB.replacePassphrase}). */
-  async replacePassphrase(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryReplacePassphrase(ask)) }
+  /** Store the gate record over the gate row expected, under its storage policy ({@link BX.BankDB.putGate}). */
+  async putGate(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryPutGate(ask)) }
 
-  /** Non-throwing form of {@link replacePassphrase}. */
-  async tryReplacePassphrase(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
+  /** Non-throwing form of {@link putGate}. */
+  async tryPutGate(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
     try {
       const checked = BX.gatePut.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.replacePassphrase, 'safebyokReplacePassphrase', { ask: checked })
-      return BX.replacePassphraseAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'replacePassphrase', ask) }
-  }
-
-  /** Store the gate record with a passkey wayin added ({@link BX.BankDB.addPasskey}). */
-  async addPasskey(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryAddPasskey(ask)) }
-
-  /** Non-throwing form of {@link addPasskey}. */
-  async tryAddPasskey(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
-    try {
-      const checked = BX.gatePut.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.addPasskey, 'safebyokAddPasskey', { ask: checked })
-      return BX.addPasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'addPasskey', ask) }
-  }
-
-  /** Store the gate record with its passkey wayin removed ({@link BX.BankDB.revokePasskey}). */
-  async revokePasskey(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryRevokePasskey(ask)) }
-
-  /** Non-throwing form of {@link revokePasskey}. */
-  async tryRevokePasskey(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
-    try {
-      const checked = BX.gatePut.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.revokePasskey, 'safebyokRevokePasskey', { ask: checked })
-      return BX.revokePasskeyAnswer.parse(rowAnswerOf(crossed))
-    } catch (err) { return answerForRefusal(err, 'revokePasskey', ask) }
+      const crossed = await this.#runMutation(BankOperations.putGate, 'safebyokPutGate', { ask: checked })
+      return BX.putGateAnswer.parse(rowAnswerOf(crossed))
+    } catch (err) { return answerForRefusal(err, 'putGate', ask) }
   }
   // --
 
@@ -404,7 +380,7 @@ const ensuredOf: Drop = (val) => dropTypename(val, { gates: (gates) => dropTypen
 /** The drop for a listing of boxes: its rows. Its `damaged_rows` are left as sent. */
 const listedOf: Drop = (val) => dropTypename(val, { boxes: rowsOf })
 
-const askOf: Drop = (val) => dropTypename(val, { expected: dropTypename, record: dropTypename, gate: dropTypename })
+const askOf: Drop = (val) => dropTypename(val, { options: dropTypename, expected: dropTypename, record: dropTypename, gate: dropTypename })
 
 /** Make the drop for an answer or a notice, using `valDrop` for its `val`. */
 function answerDrop(valDrop: Drop): Drop { return (val) => dropTypename(val, { val: valDrop, parent: rowOf, dbhas: rowOf, ask: askOf, err: dropTypename }) }

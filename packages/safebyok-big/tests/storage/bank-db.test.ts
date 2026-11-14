@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { UNANSWERED } from '../../src/helpers/consts'
+import * as Refuse from '../../src/refusals/throwers'
 import { VaultError } from '../../src/refusals/errors'
 import { BankDBVerbnames, answerWithVal, badAnswerOf, refusedAnswerOf } from '../../src/storage/bank-db'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
@@ -24,7 +25,7 @@ describe("the bankDB's answer helpers, with the row above as parent", () => {
   })
 
   it("badAnswerOf reads the parent and dbhas a refusal carries, and a null parent where it carries none", () => {
-    const err = new VaultError('storage_issue', 'moved', { rows: { parent: bank, dbhas: gate } })
+    const err = Refuse.bankGateIssue(bank, gate, 'moved')
     expect(badAnswerOf(err)).to.deep.include({ ok: false, err, act: 'unclassified_storing', parent: bank, dbhas: gate })
     expect(refusedAnswerOf(new VaultError('storage_issue', 'lost'), UNANSWERED)).to.deep.include({ parent: null })
   })

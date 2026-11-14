@@ -19,9 +19,7 @@ export type BankFieldArgs = {
   safebyokListBoxes:         Omit<BX.BoxListAsk, 'op'>
   safebyokGetBox:            { ask: BX.BoxGetAsk }
   safebyokBuildBank:         { ask: BX.BankBuildAsk }
-  safebyokReplacePassphrase: { ask: BX.GatePutAsk }
-  safebyokAddPasskey:        { ask: BX.GatePutAsk }
-  safebyokRevokePasskey:     { ask: BX.GatePutAsk }
+  safebyokPutGate:           { ask: BX.GatePutAsk }
   safebyokDelBank:           { ask: BX.BankDelAsk }
   safebyokPutVault:          { ask: BX.VaultPutAsk }
   safebyokDelVault:          { ask: BX.VaultDelAsk }
@@ -71,9 +69,7 @@ export type BankResolvers<ContextT> = {
   }
   Mutation: {
     safebyokBuildBank:         BankFieldResolver<ContextT, 'safebyokBuildBank'>
-    safebyokReplacePassphrase: BankFieldResolver<ContextT, 'safebyokReplacePassphrase'>
-    safebyokAddPasskey:        BankFieldResolver<ContextT, 'safebyokAddPasskey'>
-    safebyokRevokePasskey:     BankFieldResolver<ContextT, 'safebyokRevokePasskey'>
+    safebyokPutGate:           BankFieldResolver<ContextT, 'safebyokPutGate'>
     safebyokDelBank:           BankFieldResolver<ContextT, 'safebyokDelBank'>
     safebyokPutVault:          BankFieldResolver<ContextT, 'safebyokPutVault'>
     safebyokDelVault:          BankFieldResolver<ContextT, 'safebyokDelVault'>
@@ -174,9 +170,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
     },
     Mutation: {
       safebyokBuildBank:         async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryBuildBank(ask)),
-      safebyokReplacePassphrase: async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryReplacePassphrase(ask)),
-      safebyokAddPasskey:        async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryAddPasskey(ask)),
-      safebyokRevokePasskey:     async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryRevokePasskey(ask)),
+      safebyokPutGate:           async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryPutGate(ask)),
       safebyokDelBank:           async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryDelBank(ask)),
       safebyokPutVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryPutVault(ask)),
       safebyokDelVault:          async (_parent, { ask }, context) => await serveSignedIn(context, ask.user_id, ask, async () => await bankDB.tryDelVault(ask)),

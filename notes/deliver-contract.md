@@ -4,7 +4,7 @@ Nov 12, 2026 · as built on `20261112-one_enabled`
 
 A listing keeps one instance for each scope: a Vault or a Box, and in the stub listings of a bank and a gate, the one
 Bank and its `maingate`. Every record the bankDB hands back is **delivered**: compared with the record the instance has,
-then adopted or not. The record may come in the answer to a get, put, del, list or gate verb, or in a watch notice.
+then adopted or not. The record may come in the answer to a get, put, del, list or `putGate`, or in a watch notice.
 This note is the contract for that step, in the form `notes/answer-contract.md` uses: tests that produce tags, checks
 for the impossible, and a table for each decision.
 
@@ -16,7 +16,7 @@ Many entries, one chute: once an answer or a record has entered, nothing downstr
 
 | entry                                                | enters at                                                   |
 | ---------------------------------------------------- | ----------------------------------------------------------- |
-| `tryGet` (a get), `tryPut`, `tryDel`, the gate verbs | `deliverAnswer(answer, sent)`                               |
+| `tryGet` (a get), `tryPut`, `tryDel`, `tryPutGate`  | `deliverAnswer(answer, sent)`                               |
 | `tryList` (a vault listing's is `ensureBank`)        | `deliverListing(answer)`, then `deliverRecord` for each row |
 | the bankDB's watch                                   | `deliverNotice`: its parent, then `deliverRecord`           |
 | `Bank.receiveParent`, `Vault.receiveParent`, `BoxListing.#shellFor` | `deliverRecord(record)`                      |

@@ -73,9 +73,9 @@ describe("BankListing's entrypoints", () => {
 })
 
 describe("GateListing's entrypoints", () => {
-  it("refuses the generic put and del, as only the gate verbs write a gate row, calling no bankDB verb", async () => {
+  it("refuses the generic put and del, as only putGate writes a gate row, calling no bankDB verb", async () => {
     const { bank, bankDB } = await makeBornVault()
-    const replacing = vi.spyOn(bankDB, 'tryReplacePassphrase')
+    const replacing = vi.spyOn(bankDB, 'tryPutGate')
     const gate = bank.maingate
     const putting = bank.gateListing.put(gate.pickle(), { expected: gate.sparse })
     expect(await refusalMessageOf(putting)).to.eq(writtenByOwnVerbs().message)
@@ -83,20 +83,21 @@ describe("GateListing's entrypoints", () => {
     expect(replacing).not.toHaveBeenCalled()
   })
 
-  it("refuses each gate verb over an ante that is no gate row, calling no bankDB verb", async () => {
+  it("refuses putGate over an ante that is no gate row, under each policy, calling no bankDB verb", async () => {
     const { bank, bankDB } = await makeBornVault()
-    const spies = [vi.spyOn(bankDB, 'tryReplacePassphrase'), vi.spyOn(bankDB, 'tryAddPasskey'), vi.spyOn(bankDB, 'tryRevokePasskey')]
+    const putting = vi.spyOn(bankDB, 'tryPutGate')
     const notGate = { ...GateScope } as never
-    await TH.expectRefusal(bank.gateListing.replacePassphrase(notGate, bank.maingate.wayins.main))
-    await TH.expectRefusal(bank.gateListing.addPasskey(notGate, { ...TH.passkeyWayin, wayinlabel: 'passkey0' }))
-    await TH.expectRefusal(bank.gateListing.revokePasskey(notGate))
-    for (const spy of spies) { expect(spy).not.toHaveBeenCalled() }
+    const { main } = bank.maingate.wayins
+    await TH.expectRefusal(bank.gateListing.putGate(notGate, { main }, { policies: ['replace_passphrase'] }))
+    await TH.expectRefusal(bank.gateListing.putGate(notGate, { main, passkey0: { ...TH.passkeyWayin, wayinlabel: 'passkey0' } }, { policies: ['add_passkey'] }))
+    await TH.expectRefusal(bank.gateListing.putGate(notGate, { main }, { policies: ['revoke_passkey'] }))
+    expect(putting).not.toHaveBeenCalled()
   })
 
-  it("refuses a gate verb whose wayin does not check, the gate unmoved", async () => {
+  it("refuses putGate with wayins that do not check, the gate unmoved", async () => {
     const { bank } = await makeBornVault()
     const ante = bank.maingate.pickle()
-    await TH.expectRefusal(bank.gateListing.replacePassphrase(ante, { wayinlabel: 'main' } as never))
+    await TH.expectRefusal(bank.gateListing.putGate(ante, { main: { wayinlabel: 'main' } } as never, { policies: ['replace_passphrase'] }))
     expect(bank.maingate.pickle()).to.deep.equal(ante)
   })
 

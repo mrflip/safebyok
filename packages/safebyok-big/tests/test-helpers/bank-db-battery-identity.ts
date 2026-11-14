@@ -19,9 +19,9 @@ function everyVerbOn(bankDB: BankDB) {
   return {
     ensureBank:        () => bankDB.ensureBank(bankEnsureAsk),
     buildBank:         () => bankDB.buildBank(bankBuildAskOf(bankAt(0, 'bank2'), gateAt(0, 'bank2'))),
-    replacePassphrase: () => bankDB.replacePassphrase(gatePutAskOf(gate, { main: otherMainWayin })),
-    addPasskey:        () => bankDB.addPasskey(gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin })),
-    revokePasskey:     () => bankDB.revokePasskey(gatePutAskOf(gate, MainOnly)),
+    putGateReplacing:  () => bankDB.putGate(gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })),
+    putGateAdding:     () => bankDB.putGate(gatePutAskOf('add_passkey', gate, { main: mainWayin, passkey0: passkey0Wayin })),
+    putGateRevoking:   () => bankDB.putGate(gatePutAskOf('revoke_passkey', gate, MainOnly)),
     getVault:          () => bankDB.getVault(vaultGetAskOf()),
     putVault:          () => bankDB.putVault(vaultPutAskOf(vaultAt(1), vault)),
     listBoxes:         () => bankDB.listBoxes(boxListAsk),

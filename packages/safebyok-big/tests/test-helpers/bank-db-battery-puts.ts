@@ -3,6 +3,9 @@
 import { describe, expect, it } from 'vitest'
 import * as BX from '../../src/shapes/shapes-bankdb'
 import * as SX from '../../src/shapes/shapes-storage'
+import * as Phrases from '../../src/helpers/phrases'
+import type { GatePutAsk, GateRecord, Wayins } from '../../src/shapes/shapes-bankdb'
+import type { StoragePolicy } from '../../src/shapes/shapes-enums'
 import type { BankDB } from '../../src/storage/bank-db'
 import { omitting } from './refusals'
 import {
@@ -32,6 +35,31 @@ const nextBox   = boxAt(1)
 
 /** The gate's wayins with its passkey wayin added. */
 const WithPasskey = { main: mainWayin, passkey0: passkey0Wayin }
+
+/** A put each demand of a gate put's storage policy refuses, over the gate row stored: plain where `keyed` is false, with a passkey wayin where true. */
+const PolicyRefusedAsks: readonly (readonly [StoragePolicy, boolean, (gate: GateRecord) => GatePutAsk, string, string])[] = [
+  // replace_passphrase:
+  ["replace_passphrase", false, (gate) => registeredLater(gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })),                       Phrases.RegisteredAtNotStored, 'a record whose registered_at is not the stored one'],
+  ["replace_passphrase", false, (gate) => provedOver(gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin }), otherMainWayin),           Phrases.ProvedWayinMoved,      'an expected passphrase wayin that is not the stored one, at the stored revision'],
+  ["replace_passphrase", false, (gate) => gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin, passkey0: passkey0Wayin }),             Phrases.OtherWayinMoved,       'a record that also adds a passkey wayin'],
+  ["replace_passphrase", true,  (gate) => gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin }),                                      Phrases.OtherWayinMoved,       'a record that also drops the passkey wayin'],
+  // add_passkey:
+  ["add_passkey",        false, (gate) => registeredLater(gatePutAskOf('add_passkey', gate, WithPasskey)),                                         Phrases.RegisteredAtNotStored, 'a record whose registered_at is not the stored one'],
+  ["add_passkey",        true,  (gate) => gatePutAskOf('add_passkey', gate, { main: mainWayin, passkey0: { ...passkey0Wayin, credential_id: 'cred2' } }), Phrases.PasskeyStored,  'a passkey over one stored'],
+  ["add_passkey",        false, (gate) => gatePutAskOf('add_passkey', gate, MainOnly),                                                             Phrases.PasskeyNotAdded,       'a record with no passkey wayin'],
+  ["add_passkey",        false, (gate) => gatePutAskOf('add_passkey', gate, { main: otherMainWayin, passkey0: passkey0Wayin }),                    Phrases.OtherWayinMoved,       'a record that also moves the main wayin'],
+  // revoke_passkey:
+  ["revoke_passkey",     true,  (gate) => registeredLater(gatePutAskOf('revoke_passkey', gate, MainOnly)),                                         Phrases.RegisteredAtNotStored, 'a record whose registered_at is not the stored one'],
+  ["revoke_passkey",     false, (gate) => gatePutAskOf('revoke_passkey', gate, MainOnly),                                                          Phrases.NoPasskeyStored,       'a gate with no passkey wayin stored'],
+  ["revoke_passkey",     true,  (gate) => gatePutAskOf('revoke_passkey', gate, WithPasskey),                                                       Phrases.PasskeyNotRevoked,     'a record that keeps the passkey wayin'],
+  ["revoke_passkey",     true,  (gate) => gatePutAskOf('revoke_passkey', gate, { main: otherMainWayin }),                                          Phrases.OtherWayinMoved,       'a record that also moves the main wayin'],
+]
+
+/** `ask` with its record registered later than the gate row it replaces. */
+function registeredLater(ask: GatePutAsk): GatePutAsk { return { ...ask, record: { ...ask.record, registered_at: Now + 5 } } }
+
+/** `ask` expecting `main` as the passphrase wayin its gating proved against, at the same revision. */
+function provedOver(ask: GatePutAsk, main: Wayins['main']): GatePutAsk { return { ...ask, expected: { ...ask.expected, wayins: { ...ask.expected.wayins, main } } } }
 
 /** Puts and dels of the box that the row expected and the record cannot both be true of, each over the live box at seq 0 unless it says otherwise. */
 const UnstorableBoxAsks = [
@@ -492,11 +520,11 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
     })
   })
 
-  describe("gate verbs", () => {
-    it("replacePassphrase replaces the main wayin, keeping gate_tok and bank_tok, and leaves the bank row", async () => {
+  describe("putGate", () => {
+    it("under replace_passphrase replaces the main wayin, keeping gate_tok and bank_tok, and leaves the bank row", async () => {
       const { bankDB, bank, gate } = await putWith()
-      const ask = gatePutAskOf(gate, { main: otherMainWayin })
-      const { act, val, parent } = await bankDB.replacePassphrase(ask)
+      const ask = gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })
+      const { act, val, parent } = await bankDB.putGate(ask)
       expect(act).to.eq('replaced')
       expect(parent).to.deep.equal(bank)
       expect(val).to.deep.equal(ask.record)
@@ -506,44 +534,44 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(bank)
     })
 
-    it("addPasskey adds a passkey, keeping gate_tok and bank_tok, and leaves the bank row", async () => {
+    it("under add_passkey adds a passkey, keeping gate_tok and bank_tok, and leaves the bank row", async () => {
       const { bankDB, bank, gate } = await putWith()
-      const { act, val } = await bankDB.addPasskey(gatePutAskOf(gate, WithPasskey))
+      const { act, val } = await bankDB.putGate(gatePutAskOf('add_passkey', gate, WithPasskey))
       expect(act).to.eq('replaced')
       expect(val).to.deep.include({ gate_tok: gate.gate_tok, bank_tok: gate.bank_tok, wayins: WithPasskey })
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(val)
       expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(bank)
     })
 
-    it("revokePasskey removes a stored passkey, keeping gate_tok and bank_tok, and leaves the bank row", async () => {
+    it("under revoke_passkey removes a stored passkey, keeping gate_tok and bank_tok, and leaves the bank row", async () => {
       const { bankDB, bank, gate } = await putWith()
-      const { val: withPasskey } = await bankDB.addPasskey(gatePutAskOf(gate, WithPasskey))
-      const { act, val } = await bankDB.revokePasskey(gatePutAskOf(withPasskey, MainOnly))
+      const { val: withPasskey } = await bankDB.putGate(gatePutAskOf('add_passkey', gate, WithPasskey))
+      const { act, val } = await bankDB.putGate(gatePutAskOf('revoke_passkey', withPasskey, MainOnly))
       expect(act).to.eq('replaced')
       expect(val).to.deep.include({ gate_tok: gate.gate_tok, bank_tok: gate.bank_tok, revision_seq: 2, wayins: MainOnly })
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(val)
       expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(bank)
     })
 
-    it("a gate verb refuses a record over the stored revision_tok under another gate_tok, leaving the row", async () => {
+    it("refuses a record over the stored revision_tok under another gate_tok, under each policy, leaving the row", async () => {
       const { bankDB, bank, gate } = await putWith()
       const otherLife = { ...gate, gate_tok: 'gate2' }
       const answers = [
-        await bankDB.tryReplacePassphrase(gatePutAskOf(otherLife, { main: otherMainWayin })),
-        await bankDB.tryAddPasskey(gatePutAskOf(otherLife, WithPasskey)),
-        await bankDB.tryRevokePasskey(gatePutAskOf(otherLife, MainOnly)),
+        await bankDB.tryPutGate(gatePutAskOf('replace_passphrase', otherLife, { main: otherMainWayin })),
+        await bankDB.tryPutGate(gatePutAskOf('add_passkey', otherLife, WithPasskey)),
+        await bankDB.tryPutGate(gatePutAskOf('revoke_passkey', otherLife, MainOnly)),
       ]
       for (const answer of answers) { expect(answer).to.deep.include({ ok: false, act: 'clash', dbhas: gate, parent: bank }) }
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(gate)
     })
 
-    it("a gate verb refuses 'stale_write' when the gate row has moved past its revision", async () => {
+    it("refuses 'stale_write' under each policy when the gate row has moved past its revision", async () => {
       const { bankDB, bank, gate } = await putWith()
-      const { val: moved } = await bankDB.addPasskey(gatePutAskOf(gate, WithPasskey))
+      const { val: moved } = await bankDB.putGate(gatePutAskOf('add_passkey', gate, WithPasskey))
       const answers = [
-        await bankDB.tryAddPasskey(gatePutAskOf(gate, WithPasskey)),
-        await bankDB.tryRevokePasskey(gatePutAskOf(gate, MainOnly)),
-        await bankDB.tryReplacePassphrase(gatePutAskOf(gate, { main: otherMainWayin })),
+        await bankDB.tryPutGate(gatePutAskOf('add_passkey', gate, WithPasskey)),
+        await bankDB.tryPutGate(gatePutAskOf('revoke_passkey', gate, MainOnly)),
+        await bankDB.tryPutGate(gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })),
       ]
       for (const answer of answers) {
         expect(answer).to.deep.include({ ok: false, act: 'stale', dbhas: moved, parent: bank })
@@ -551,11 +579,11 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       }
     })
 
-    it("a gate verb refuses 'stale_write' where the row stored has the revision_tok its record brings, storing nothing", async () => {
+    it("refuses 'stale_write' where the row stored has the revision_tok its record brings, storing nothing", async () => {
       const { bankDB, bank, gate } = await putWith()
-      const ask = gatePutAskOf(gate, { main: otherMainWayin })
-      const { val: stored } = await bankDB.replacePassphrase(ask)
-      const answer = await bankDB.tryReplacePassphrase(ask)
+      const ask = gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })
+      const { val: stored } = await bankDB.putGate(ask)
+      const answer = await bankDB.tryPutGate(ask)
       expect(answer).to.deep.include({ ok: false, act: 'retcon', dbhas: stored, parent: bank })
       expect(answer.err?.refusalkind).to.eq('stale_write')
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(stored)
@@ -563,30 +591,45 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
 
     it("refuses a record whose revision_seq is not next after its prior, or that changes gate_tok or bank_tok", async () => {
       const { bankDB, gate } = await putWith()
-      const ask = gatePutAskOf(gate, { main: otherMainWayin })
+      const ask = gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })
       const unfit = [
         { ...ask, record: { ...ask.record, revision_seq: 2 } },
         { ...ask, record: { ...ask.record, gate_tok: 'gate2' } },
         { ...ask, record: { ...ask.record, bank_tok: 'bank2' } },
       ]
-      for (const unfitAsk of unfit) { expect(await bankDB.tryReplacePassphrase(unfitAsk)).to.deep.include({ ok: false, act: 'unclassified_storing' }) }
+      for (const unfitAsk of unfit) { expect(await bankDB.tryPutGate(unfitAsk)).to.deep.include({ ok: false, act: 'unclassified_storing' }) }
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(gate)
     })
 
     it("writes the record it was given, minting no revision of its own", async () => {
       const { bankDB, gate } = await putWith()
-      const ask = gatePutAskOf(gate, { main: otherMainWayin })
-      expect(await bankDB.replacePassphrase(ask)).to.deep.include({ act: 'replaced', val: ask.record })
+      const ask = gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })
+      expect(await bankDB.putGate(ask)).to.deep.include({ act: 'replaced', val: ask.record })
       const stored = await bankDB.ensureBank(bankEnsureAsk)
       expect(stored.val?.gates).to.deep.equal({ main: ask.record })
     })
 
-    it("carries no wayin in what its answer carries of its ask", async () => {
+    it("carries its policy, and no wayin, in what its answer carries of its ask", async () => {
       const { bankDB, gate } = await putWith()
-      const { ask } = await bankDB.replacePassphrase(gatePutAskOf(gate, { main: otherMainWayin }))
-      expect(ask).to.deep.include({ op: 'put' })
+      const { ask } = await bankDB.putGate(gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin }))
+      expect(ask).to.deep.include({ op: 'put', options: { policies: ['replace_passphrase'] } })
       expect(JSON.stringify(ask)).to.not.include('wayin')
       expect(JSON.stringify(ask)).to.not.include(otherMainWayin.salt_b64)
+    })
+
+    // A bankDB over a shared store may empty it for each bankDB made, so each case makes one.
+    describe("refuses a put its storage policy refuses, storing nothing", () => {
+      for (const [policy, keyed, askOf, phrase, blurb] of PolicyRefusedAsks) {
+        it(`under ${policy}, ${blurb}`, async () => {
+          const { bankDB, bank, gate: bare } = await putWith()
+          const { val: gate } = keyed ? await bankDB.putGate(gatePutAskOf('add_passkey', bare, WithPasskey)) : { val: bare }
+          const answer = await bankDB.tryPutGate(askOf(gate))
+          expect(answer).to.deep.include({ ok: false, dbhas: gate, parent: bank })
+          expect(answer.err?.refusalkind).to.eq('gate_issue')
+          expect(answer.err?.message).to.include(phrase)
+          expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(gate)
+        })
+      }
     })
   })
 
@@ -605,9 +648,9 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
   describe("the row above a gate or vault verb", () => {
     /** Each gate and vault verb, made under the bank life `bank1`, with an ask its stored rows would let through. */
     const AboveAsks = [
-      ['replacePassphrase', async (bankDB: BankDB) => await bankDB.tryReplacePassphrase(gatePutAskOf(gateAt(), { main: otherMainWayin }))],
-      ['addPasskey',        async (bankDB: BankDB) => await bankDB.tryAddPasskey(gatePutAskOf(gateAt(), WithPasskey))],
-      ['revokePasskey',     async (bankDB: BankDB) => await bankDB.tryRevokePasskey(gatePutAskOf(gateAt(), MainOnly))],
+      ['putGate under replace_passphrase', async (bankDB: BankDB) => await bankDB.tryPutGate(gatePutAskOf('replace_passphrase', gateAt(), { main: otherMainWayin }))],
+      ['putGate under add_passkey',        async (bankDB: BankDB) => await bankDB.tryPutGate(gatePutAskOf('add_passkey', gateAt(), WithPasskey))],
+      ['putGate under revoke_passkey',     async (bankDB: BankDB) => await bankDB.tryPutGate(gatePutAskOf('revoke_passkey', gateAt(), MainOnly))],
       ['getVault',          async (bankDB: BankDB) => await bankDB.tryGetVault(vaultGetAskOf('bank1', 'nil'))],
       ['putVault',          async (bankDB: BankDB) => await bankDB.tryPutVault(vaultPutAskOf(vaultAt()))],
       ['delVault',          async (bankDB: BankDB) => await bankDB.tryDelVault(vaultDelAskOf(vaultAt()))],

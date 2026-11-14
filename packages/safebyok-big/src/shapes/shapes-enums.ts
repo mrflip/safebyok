@@ -43,7 +43,7 @@ export const deliveryModificationVals = ['older', 'same', 'adopt'] as const
 export type DeliveryModification = typeof deliveryModificationVals[number]
 // --
 
-// == [Policies]: askOpVals, AskOp, ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent
+// == [Policies]: askOpVals, AskOp, ifPresentVals, IfPresent, ifAbsentVals, IfAbsent, putIfAbsentVals, PutIfAbsent, storagePolicyVals, StoragePolicy
 
 /** What a bankDB ask asks for, the tag every ask carries as its `op`: `ensure` for `ensureBank` and `build` for `buildBank`. */
 export const askOpVals = ['get', 'put', 'del', 'list', 'tidy_gone', 'ensure', 'build'] as const
@@ -60,6 +60,12 @@ export type IfAbsent = typeof ifAbsentVals[number]
 /** The policies for a put over a thing absent, never stored or deleted: `add`, the default, puts it; `fail` refuses. */
 export const putIfAbsentVals = ['add', 'fail'] as const
 export type PutIfAbsent = typeof putIfAbsentVals[number]
+
+/** The policies a storage operation may be put under, each demanding what the stored row and the ask must be for it to go ahead.
+ * A gate put names the one gating it is for: `replace_passphrase`, `add_passkey` or `revoke_passkey`.
+ */
+export const storagePolicyVals = ['replace_passphrase', 'add_passkey', 'revoke_passkey'] as const
+export type StoragePolicy = typeof storagePolicyVals[number]
 // --
 
 // == [The whisper]: boxExposureVals, BoxExposure

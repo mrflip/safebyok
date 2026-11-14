@@ -39,11 +39,11 @@ export function describeStoredOtherwise({ fresh, putWith, rowsOf, storeOtherwise
       expect(await rowsOf(bankDB).bankRowOf(bankScope)).to.deep.equal(storedOtherwiseOf(ask.record))
     })
 
-    it("answers a gate verb with the gate row stored", async () => {
+    it("answers a gate put with the gate row stored", async () => {
       const { bankDB, gate } = await putWith({ vault: false })
       await storeOtherwise(bankDB)
-      const ask = gatePutAskOf(gate, { main: otherMainWayin })
-      const answer = await bankDB.tryReplacePassphrase(ask)
+      const ask = gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })
+      const answer = await bankDB.tryPutGate(ask)
       expect(answer).to.deep.include({ ok: true, act: 'replaced', val: storedOtherwiseOf(ask.record) })
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(storedOtherwiseOf(ask.record))
     })

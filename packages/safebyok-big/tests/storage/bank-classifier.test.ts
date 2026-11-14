@@ -24,7 +24,7 @@ function refusalOf(classify: () => unknown): VaultError {
 }
 
 describe("classifyStoredGate and classifyStoredVault, the row above", () => {
-  const replace = gatePutAskOf(liveGate, { main: otherMainWayin })
+  const replace = gatePutAskOf('replace_passphrase', liveGate, { main: otherMainWayin })
   const vaultGet = vaultGetAskOf()
   const BankCases = [
     [null,       "bank_void",   'no bank row'],
@@ -88,27 +88,32 @@ function fetchedOver(gate: unknown) { return { bank: liveBank, gate } }
 
 describe("classifyStoredGate, the put table over a live bank's gate", () => {
   it("replaces the gate row it cites, answering the row fetched", () => {
-    const ask = gatePutAskOf(keyedGate, { main: otherMainWayin, passkey0: passkey0Wayin })
+    const ask = gatePutAskOf('replace_passphrase', keyedGate, { main: otherMainWayin, passkey0: passkey0Wayin })
     expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: keyedGate, presence: 'live' })
   })
 
+  it("applies no storage policy, replacing a gate row its policy would refuse", () => {
+    const ask = gatePutAskOf('add_passkey', keyedGate, { main: mainWayin, passkey0: { ...passkey0Wayin, credential_id: 'cred2' } })
+    expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: keyedGate })
+  })
+
   it("answers a replay of the stored record as retcon, storing nothing", () => {
-    const ask = gatePutAskOf(liveGate, { main: mainWayin, passkey0: passkey0Wayin })
+    const ask = gatePutAskOf('add_passkey', liveGate, { main: mainWayin, passkey0: passkey0Wayin })
     expect(classifyStoredGate(ask, fetchedOver(ask.record))).to.deep.include({ ok: false, act: 'retcon', gate: ask.record })
   })
 
   it("refuses a gate row the revision rules refuse", () => {
-    const ask = gatePutAskOf(gateAt(Seq - 1), { main: mainWayin, passkey0: passkey0Wayin })
+    const ask = gatePutAskOf('add_passkey', gateAt(Seq - 1), { main: mainWayin, passkey0: passkey0Wayin })
     expect(classifyStoredGate(ask, fetchedOver(liveGate))).to.deep.include({ ok: false, act: 'stale', gate: liveGate })
   })
 
   it("puts no gate row where the live bank stores none", () => {
-    const ask = gatePutAskOf(liveGate, { main: otherMainWayin })
+    const ask = gatePutAskOf('replace_passphrase', liveGate, { main: otherMainWayin })
     expect(classifyStoredGate(ask, fetchedOver(null))).to.deep.include({ ok: false, act: 'ahead', gate: null, presence: 'void' })
   })
 
   it("refuses damaged_row for a gate row that fails its checks", () => {
-    const ask = gatePutAskOf(liveGate, { main: otherMainWayin })
+    const ask = gatePutAskOf('replace_passphrase', liveGate, { main: otherMainWayin })
     expect(refusalOf(() => classifyStoredGate(ask, fetchedOver({ ...liveGate, auth: { smuggled: 'field' } }))).refusalkind).to.eq('damaged_row')
   })
 })

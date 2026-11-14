@@ -8,7 +8,7 @@ import type { Bank } from '../../src/models/bank'
 import type { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import { PasskeyProving, PassphraseProving } from '../../src/models/proving'
-import type { Gatingkind } from '../../src/shapes/shapes-enums'
+import type { Gatingkind, StoragePolicy } from '../../src/shapes/shapes-enums'
 import { passphraseCleartext } from '../../src/shapes/shapes-gateish'
 import { Promptly } from '../../src/shapes/shapes-vaultish'
 import { MemoryDeviceDB } from '../../src/storage/memory-device-db'
@@ -41,10 +41,11 @@ function dialogOf({ dialog }: Born) {
 /** The proving of the bank's main gate that `passphrase` opens, refusing 'wrong_passphrase' otherwise. */
 function proveBy(bank: Bank, passphrase: string) { return PassphraseProving.buildStored(bank.maingate, passphraseCleartext.parse(passphrase), bank) }
 
-/** Moves the gate row past what the attempt read, as another device does just before `verb`'s commit reaches the bankDB. */
-function movedBeforeCommit({ bankDB, demandStoredGate, putGateBehindOurBack }: Born, verb: 'tryReplacePassphrase' | 'tryAddPasskey' | 'tryRevokePasskey') {
-  const commit = bankDB[verb].bind(bankDB)
-  vi.spyOn(bankDB, verb).mockImplementationOnce((ask) => {
+/** Moves the gate row past what the attempt read, as another device does just before its put under `policy` reaches the bankDB. */
+function movedBeforeCommit({ bankDB, demandStoredGate, putGateBehindOurBack }: Born, policy: StoragePolicy) {
+  const commit = bankDB.tryPutGate.bind(bankDB)
+  vi.spyOn(bankDB, 'tryPutGate').mockImplementationOnce((ask) => {
+    expect(ask.options.policies).to.deep.equal([policy])
     putGateBehindOurBack(demandStoredGate())
     return commit(ask)
   })
@@ -162,7 +163,7 @@ describe("gate.replacePassphrasePrompt()", () => {
   it("refuses 'stale_write' a row moved since the attempt read it", async () => {
     const born = await makeBornVault()
     const { bank, demandStoredGate } = born
-    movedBeforeCommit(born, 'tryReplacePassphrase')
+    movedBeforeCommit(born, 'replace_passphrase')
     await TH.expectRefusal(replaceTyping(bank, Passphrase, NewPassphrase), 'stale_write')
     expect(bank.maingate.revision_seq).to.eq(demandStoredGate().revision_seq)
     expect(bank.isUnlocked).to.be.true
@@ -171,9 +172,9 @@ describe("gate.replacePassphrasePrompt()", () => {
 
   it("leases citing the gate row it wrote, not a newer one that arrived meanwhile", async () => {
     const { bank, bankDB, deviceDB, demandStoredGate, putGateBehindOurBack } = await makeBornVault()
-    const commit = bankDB.tryReplacePassphrase.bind(bankDB)
+    const commit = bankDB.tryPutGate.bind(bankDB)
     let written = ''
-    vi.spyOn(bankDB, 'tryReplacePassphrase').mockImplementationOnce(async (ask) => {
+    vi.spyOn(bankDB, 'tryPutGate').mockImplementationOnce(async (ask) => {
       const answer = await commit(ask)
       written = ask.record.revision_tok
       putGateBehindOurBack(demandStoredGate())
@@ -331,7 +332,7 @@ describe("gate.addPasskeyPrompt()", () => {
 
   it("refuses 'stale_write' a row moved since the attempt read it", async () => {
     const born = await makeBornVault()
-    movedBeforeCommit(born, 'tryAddPasskey')
+    movedBeforeCommit(born, 'add_passkey')
     await TH.expectRefusal(addPasskeyTyping(born.bank, Passphrase, 'laptop'), 'stale_write')
     expect(born.demandStoredGate().wayins.passkey0).to.be.undefined
   })
@@ -376,7 +377,7 @@ describe("gate.revokePasskeyPrompt()", () => {
 
   it("refuses 'stale_write' a row moved since the attempt read it", async () => {
     const born = await makeBornVaultWithPasskey()
-    movedBeforeCommit(born, 'tryRevokePasskey')
+    movedBeforeCommit(born, 'revoke_passkey')
     await TH.expectRefusal(revokeTyping(born.bank, Passphrase), 'stale_write')
     expect(born.demandStoredGate().wayins.passkey0).not.to.be.undefined
   })
@@ -563,8 +564,8 @@ describe("A gate change after its record is stored", () => {
   it.each(['sweep', 'vacate'] as const)("a %s as the answer arrives refuses, though the row is stored", async (ending) => {
     const { device, bank, bankDB, demandStoredGate } = await makeBornVault()
     const ante = demandStoredGate()
-    const commit = bankDB.tryReplacePassphrase.bind(bankDB)
-    vi.spyOn(bankDB, 'tryReplacePassphrase').mockImplementationOnce(async (ask) => {
+    const commit = bankDB.tryPutGate.bind(bankDB)
+    vi.spyOn(bankDB, 'tryPutGate').mockImplementationOnce(async (ask) => {
       const answer = await commit(ask)
       await Promise.resolve(device[ending]())
       return answer
@@ -700,8 +701,8 @@ describe("A lease renewed through a gate change", () => {
     const born = await makeBornVault()
     const { bank, bankDB } = born
     const revision_seq0 = bank.maingate.revision_seq
-    const commit = bankDB.tryReplacePassphrase.bind(bankDB)
-    vi.spyOn(bankDB, 'tryReplacePassphrase').mockImplementationOnce(async (ask) => {
+    const commit = bankDB.tryPutGate.bind(bankDB)
+    vi.spyOn(bankDB, 'tryPutGate').mockImplementationOnce(async (ask) => {
       const written = await commit(ask)
       bank.lock()
       return written
@@ -742,64 +743,76 @@ describe("The cached lease across a gate change", () => {
 })
 // --
 
-// == [From vault-listing.test.ts]: the gate listing's gate verbs
+// == [From vault-listing.test.ts]: the gate listing's putGate
 
-describe("the gate listing's gate verbs", () => {
+describe("the gate listing's putGate", () => {
   const MovedDevice = '00000000-0000-4000-8000-0000000000d2'
   const Passkey0 = { ...TH.passkeyWayin, wayinlabel: 'passkey0' as const }
 
-  it("replacePassphrase sends the next revision with the new wayin, its gate_tok and bank_tok kept", async () => {
+  it("sends the next revision with the new wayins, its gate_tok and bank_tok kept, under the policy given", async () => {
     const { bank, bankDB } = await makeBornVault()
     const ante = bank.maingate.pickle()
     const main = { ...ante.wayins.main, device_tok: MovedDevice }
-    const replacing = vi.spyOn(bankDB, 'tryReplacePassphrase')
-    const stored = await bank.gateListing.replacePassphrase(ante, main)
-    const [ask] = replacing.mock.calls[0]!
+    const putting = vi.spyOn(bankDB, 'tryPutGate')
+    const stored = await bank.gateListing.putGate(ante, { ...ante.wayins, main }, { policies: ['replace_passphrase'] })
+    const [ask] = putting.mock.calls[0]!
     expect(ask.record).to.deep.include({ registered_at: ante.registered_at, revision_seq: ante.revision_seq + 1, written_at: nowMillis(), gate_tok: ante.gate_tok, bank_tok: ante.bank_tok, wayins: { ...ante.wayins, main } })
     expect(ask.record.revision_tok).to.not.eq(ante.revision_tok)
-    expect(ask.expected).to.include({ revision_tok: ante.revision_tok, revision_seq: ante.revision_seq })
+    expect(ask.expected).to.deep.include({ revision_tok: ante.revision_tok, revision_seq: ante.revision_seq, wayins: ante.wayins })
+    expect(ask.options).to.deep.equal({ policies: ['replace_passphrase'] })
     expect(stored).to.deep.equal(ask.record)
   })
 
-  it("addPasskey sends the next revision with the passkey", async () => {
+  it("adds a passkey under add_passkey", async () => {
     const { bank, bankDB } = await makeBornVault()
     const ante = bank.maingate.pickle()
-    const adding = vi.spyOn(bankDB, 'tryAddPasskey')
-    const stored = await bank.gateListing.addPasskey(ante, Passkey0)
-    const [ask] = adding.mock.calls[0]!
+    const putting = vi.spyOn(bankDB, 'tryPutGate')
+    const stored = await bank.gateListing.putGate(ante, { ...ante.wayins, passkey0: Passkey0 }, { policies: ['add_passkey'] })
+    const [ask] = putting.mock.calls[0]!
     expect(ask.record).to.deep.include({ revision_seq: ante.revision_seq + 1, written_at: nowMillis(), gate_tok: ante.gate_tok, wayins: { ...ante.wayins, passkey0: Passkey0 } })
+    expect(ask.options).to.deep.equal({ policies: ['add_passkey'] })
     expect(stored).to.deep.equal(ask.record)
   })
 
-  it("revokePasskey sends the next revision with no passkey", async () => {
+  it("removes the passkey under revoke_passkey", async () => {
     const { bank, bankDB } = await makeBornVaultWithPasskey()
     const ante = bank.maingate.pickle()
-    const revoking = vi.spyOn(bankDB, 'tryRevokePasskey')
-    const stored = await bank.gateListing.revokePasskey(ante)
-    const [ask] = revoking.mock.calls[0]!
+    const putting = vi.spyOn(bankDB, 'tryPutGate')
+    const stored = await bank.gateListing.putGate(ante, { main: ante.wayins.main }, { policies: ['revoke_passkey'] })
+    const [ask] = putting.mock.calls[0]!
     expect(ask.record).to.deep.include({ revision_seq: ante.revision_seq + 1, written_at: nowMillis(), gate_tok: ante.gate_tok, wayins: { main: ante.wayins.main } })
+    expect(ask.options).to.deep.equal({ policies: ['revoke_passkey'] })
     expect(stored).to.deep.equal(ask.record)
+  })
+
+  it("refuses a revoke with no passkey stored, the gate unmoved", async () => {
+    const { bank } = await makeBornVault()
+    const ante = bank.maingate.pickle()
+    await TH.expectRefusal(bank.gateListing.putGate(ante, { main: ante.wayins.main }, { policies: ['revoke_passkey'] }), 'gate_issue')
+    expect(bank.maingate.pickle()).to.deep.equal(ante)
   })
 
   it("refuses an answer that is not the record it sent", async () => {
     const { bank, bankDB } = await makeBornVault()
-    const commit = bankDB.tryAddPasskey.bind(bankDB)
-    vi.spyOn(bankDB, 'tryAddPasskey').mockImplementationOnce(async (ask) => {
+    const commit = bankDB.tryPutGate.bind(bankDB)
+    vi.spyOn(bankDB, 'tryPutGate').mockImplementationOnce(async (ask) => {
       const answer = await commit(ask)
       return answer.ok ? { ...answer, val: { ...answer.val, revision_tok: 'rev-of-another' } } : answer
     })
-    await TH.expectRefusal(bank.gateListing.addPasskey(bank.maingate.pickle(), Passkey0), 'storage_issue')
+    const ante = bank.maingate.pickle()
+    await TH.expectRefusal(bank.gateListing.putGate(ante, { ...ante.wayins, passkey0: Passkey0 }, { policies: ['add_passkey'] }), 'storage_issue')
   })
 
   it("refuses a record of another user", async () => {
     const { bank } = await makeBornVault()
     const ante = bank.maingate.pickle()
-    await TH.expectRefusal(bank.gateListing.replacePassphrase({ ...ante, user_id: 'someone_else' }, ante.wayins.main))
+    await TH.expectRefusal(bank.gateListing.putGate({ ...ante, user_id: 'someone_else' }, ante.wayins, { policies: ['replace_passphrase'] }))
   })
 
-  it("tryRevokePasskey returns the act, with the written record as its val", async () => {
+  it("tryPutGate returns the act, with the written record as its val", async () => {
     const { bank } = await makeBornVaultWithPasskey()
-    const answer = await bank.gateListing.tryRevokePasskey(bank.maingate.pickle())
+    const ante = bank.maingate.pickle()
+    const answer = await bank.gateListing.tryPutGate(ante, { main: ante.wayins.main }, { policies: ['revoke_passkey'] })
     expect(answer.ok).to.be.true
     expect(answer.act).to.eq('replaced')
     expect(answer.val).to.deep.include({ gate_tok: bank.maingate.gate_tok })
@@ -808,11 +821,11 @@ describe("the gate listing's gate verbs", () => {
   it("returns a bad answer once its device is swept, asking storage nothing", async () => {
     const { bank, bankDB } = await makeBornVaultWithPasskey()
     const ante = bank.maingate.pickle()
-    const tryRevokePasskey = vi.spyOn(bankDB, 'tryRevokePasskey')
+    const putting = vi.spyOn(bankDB, 'tryPutGate')
     bank.device.sweep()
-    const answer = await bank.gateListing.tryRevokePasskey(ante)
+    const answer = await bank.gateListing.tryPutGate(ante, { main: ante.wayins.main }, { policies: ['revoke_passkey'] })
     expect(answer.err?.refusalkind).to.eq('disabled')
-    expect(tryRevokePasskey).not.toHaveBeenCalled()
+    expect(putting).not.toHaveBeenCalled()
   })
 })
 // --

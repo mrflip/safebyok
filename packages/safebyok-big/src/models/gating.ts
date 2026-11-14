@@ -233,7 +233,7 @@ async function replacePassphrase(bank: Bank, cleartexts: unknown, unlockByProvin
   const nextProving = await PassphraseProving.buildNovel(bank.stamp, gate.stamp, nextPassphraseClear, bank)
 
   const nextWayin = await nextProving.buildWayin(anteProving)
-  const written   = await bank.gateListing.replacePassphrase(ante, BX.passphraseWayin.parse(nextWayin.pickle()))
+  const written   = await bank.gateListing.putGate(ante, { ...ante.wayins, main: BX.passphraseWayin.parse(nextWayin.pickle()) }, { policies: ['replace_passphrase'] })
   return unlockByProving(bank, anteProving, written)
 }
 
@@ -246,7 +246,7 @@ async function addPasskey(bank: Bank, cleartexts: unknown, unlockByProving: Unlo
   const passkeyProving = await PasskeyProving.buildNovel(bank.stamp, gate.stamp, passkeyClear, bank)
 
   const passkeyWayin = await passkeyProving.buildWayin(proved)
-  const written      = await bank.gateListing.addPasskey(ante, BX.passkeyWayin.parse(passkeyWayin.pickle()))
+  const written      = await bank.gateListing.putGate(ante, { ...ante.wayins, passkey0: BX.passkeyWayin.parse(passkeyWayin.pickle()) }, { policies: ['add_passkey'] })
   return unlockByProving(bank, proved, written)
 }
 
@@ -256,7 +256,7 @@ async function revokePasskey(bank: Bank, cleartexts: unknown, unlockByProving: U
   const { ante, gate } = await timelyAnte(bank)
   const proved = await PassphraseProving.buildStored(gate, passphraseClear, bank)
 
-  const written = await bank.gateListing.revokePasskey(ante)
+  const written = await bank.gateListing.putGate(ante, { main: ante.wayins.main }, { policies: ['revoke_passkey'] })
   return unlockByProving(bank, proved, written)
 }
 
@@ -291,7 +291,7 @@ async function timelyGate(bank: Bank): Promise<Gate> {
   return gate
 }
 
-/** The main gate of `bank`, refreshed promptly, and its current record as `ante`: the row a gate verb expects to replace. */
+/** The main gate of `bank`, refreshed promptly, and its current record as `ante`: the row a gate change expects to replace. */
 async function timelyAnte(bank: Bank): Promise<{ ante: GateRecord, gate: Gate }> {
   const gate = await timelyGate(bank)
   return { ante: gate.pickle(), gate }

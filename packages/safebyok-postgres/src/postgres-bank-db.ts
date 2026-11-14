@@ -119,7 +119,7 @@ function codeOf(thrown: unknown): string | undefined {
 /** A write function's verdict, unchecked. */
 type Verdict = { ok?: boolean, act?: unknown, presence?: unknown }
 
-/** The database's result for a `buildBank` ask or a gate verb's, unchecked: the bank row, its gate row, and a write function's verdict. */
+/** The database's result for a `buildBank` or `putGate` ask, unchecked: the bank row, its gate row, and a write function's verdict. */
 type GateAnswered = BX.GateFetched & Verdict
 
 /** The database's result for a `delBank` ask, unchecked: the bank row, and a write function's verdict. */
@@ -281,10 +281,10 @@ export class PostgresBankDB extends DB.AdapterBankDB {
     return stored
   }
 
-  // The function checks the bank row as it stores, so a gate verb always calls it: when nothing is stored, the
+  // The function checks the bank row as it stores, so putGate always calls it: when nothing is stored, the
   // classifier answers from the rows it returns.
   protected async doPutGate(ask: BX.GatePutAsk): Promise<BX.GateStored> {
-    const answered = await this.#firstRow<GateAnswered>(PutGateSql, [JSON.stringify(ask.record), JSON.stringify(ask.expected)])
+    const answered = await this.#firstRow<GateAnswered>(PutGateSql, [JSON.stringify(ask.record), JSON.stringify(ask.expected), ask.options.policies])
     const stored   = this.classifyStoredGate(ask, answered)
     if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
     return stored

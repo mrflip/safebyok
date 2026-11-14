@@ -16,7 +16,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *
  * * **Misuse**: a programming error, the host developer's to fix. Let it reach an error boundary
  *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`,
- *   `bad_option`, `bad_record`, `insecure_context`, `unexpected_error`, `disabled`.
+ *   `bad_option`, `bad_record`, `insecure_context`, `unexpected_error`, `gate_issue`, `disabled`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `bank_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
@@ -74,6 +74,7 @@ export const refusalkindVals = [
   'camped',              // a bankDB put told not to replace a live row found one there
   'damaged_row',         // a row read from storage failed its checks, on the way out, and is set aside
   'damaged_vault',       // the vault row stored above a box asked for failed its checks, as the classifier of notes/answer-contract.md found it
+  'gate_issue',          // a bankDB gate put that its storage policy refuses: it changes more of the stored gate row than its gating does, or the row is not one its gating changes
   'disabled',            // a call on a bank, a listing or a thing of theirs no longer enabled, since a sweep, a vacate or a delete: it answers nothing more
 ] as const
 /** A refusal's kind, one of {@link refusalkindVals}. */
@@ -121,6 +122,7 @@ export const RefusalFamilyForKind = {
   camped:              'condition',
   damaged_row:         'bad_news',
   damaged_vault:       'bad_news',
+  gate_issue:          'misuse',
   disabled:            'misuse',
 } as const satisfies Readonly<Record<Refusalkind, RefusalFamily>>
 // --

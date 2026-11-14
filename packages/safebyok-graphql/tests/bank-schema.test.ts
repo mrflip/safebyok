@@ -1,10 +1,10 @@
 /** BankSchemaSdl compared with the core's checks: every schema type has exactly the fields its check expects. */
 
 import { describe, expect, it } from 'vitest'
-import { buildSchema, getNamedType, isInputObjectType, isLeafType, isObjectType, isUnionType } from 'graphql'
+import { buildSchema, getNamedType, isEnumType, isInputObjectType, isLeafType, isObjectType, isUnionType } from 'graphql'
 import type { GraphQLField, GraphQLInputObjectType, GraphQLInputType, GraphQLNamedType, GraphQLObjectType, GraphQLOutputType, GraphQLSchema } from 'graphql'
 import type * as Z from 'zod'
-import { BX } from 'safebyok-big/storage'
+import { BX, storagePolicyVals } from 'safebyok-big/storage'
 import { BankSchemaSdl } from '../src/server'
 
 // == [The walk]: schemaDriftOf, driftOf
@@ -119,9 +119,7 @@ const AnswerChecks = [
   ['safebyokListBoxes',         BX.listBoxesAnswer],
   ['safebyokGetBox',            BX.getBoxAnswer],
   ['safebyokBuildBank',         BX.buildBankAnswer],
-  ['safebyokReplacePassphrase', BX.replacePassphraseAnswer],
-  ['safebyokAddPasskey',        BX.addPasskeyAnswer],
-  ['safebyokRevokePasskey',     BX.revokePasskeyAnswer],
+  ['safebyokPutGate',           BX.putGateAnswer],
   ['safebyokDelBank',           BX.delBankAnswer],
   ['safebyokPutVault',          BX.putVaultAnswer],
   ['safebyokDelVault',          BX.delVaultAnswer],
@@ -136,9 +134,7 @@ const InputChecks = [
   ['safebyokGetVault',          'ask', BX.vaultGet],
   ['safebyokGetBox',            'ask', BX.boxGet],
   ['safebyokBuildBank',         'ask', BX.bankBuild],
-  ['safebyokReplacePassphrase', 'ask', BX.gatePut],
-  ['safebyokAddPasskey',        'ask', BX.gatePut],
-  ['safebyokRevokePasskey',     'ask', BX.gatePut],
+  ['safebyokPutGate',           'ask', BX.gatePut],
   ['safebyokDelBank',           'ask', BX.bankDel],
   ['safebyokPutVault',          'ask', BX.vaultPut],
   ['safebyokDelVault',          'ask', BX.vaultDel],
@@ -172,6 +168,27 @@ describe("BankSchemaSdl", () => {
   it("fails the drift check when an ask lacks a field of the row it expects", () => {
     const shorted = buildSchema(BankSchemaSdl.replace(/(input SafebyokBoxExpectedInput \{[^}]*?)\n {2}box_tok: {6}String!/u, '$1'))
     expect(schemaDriftOf(shorted).join('\n')).to.include('safebyokPutBox(ask).expected')
+  })
+
+  it("fails the drift check when a gate put lacks its options", () => {
+    const shorted = buildSchema(BankSchemaSdl.replace(/(input SafebyokGatePutAskInput \{[^}]*?)\n {2}options: +SafebyokGateOptionsInput!/u, '$1'))
+    expect(schemaDriftOf(shorted).join('\n')).to.include('safebyokPutGate(ask)')
+  })
+
+  it("fails the drift check when a gate put's expected row lacks its wayins", () => {
+    const shorted = buildSchema(BankSchemaSdl.replace(/(input SafebyokGateExpectedInput \{[^}]*?)\n {2}wayins: +SafebyokWayinsInput!/u, '$1'))
+    expect(schemaDriftOf(shorted).join('\n')).to.include('safebyokPutGate(ask).expected')
+  })
+
+  it("fails the drift check when an answer's ask lacks its options", () => {
+    const shorted = buildSchema(BankSchemaSdl.replace(/(type SafebyokAsk \{[^}]*?)\n {2}options: +SafebyokAskOptions/u, '$1'))
+    expect(schemaDriftOf(shorted).join('\n')).to.include('options')
+  })
+
+  it("takes a gate put's policy as one of the storage policies, and no other", () => {
+    const policyEnum = buildSchema(BankSchemaSdl).getType('SafebyokStoragePolicy')
+    const policies = isEnumType(policyEnum) ? policyEnum.getValues().map((policy) => policy.value as unknown) : null
+    expect(policies).to.deep.equal([...storagePolicyVals])
   })
 })
 

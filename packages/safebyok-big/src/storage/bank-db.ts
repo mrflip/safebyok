@@ -38,7 +38,7 @@ export type Tidied = { totalCount: number, leftover: Leftover }
 
 /** The answer to `ensureBank`. Its `val` is null when no live bank is stored. */
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>
-/** The answer to `buildBank` or a gate verb: the gate row as the datastore reports storing it, or under `passed` the live one found. */
+/** The answer to `buildBank` or `putGate`: the gate row as the datastore reports storing it, or under `passed` the live one found. */
 export type GateAnswer              = Answer<GateRecord, OkAct>
 /** The answer to `delBank`: the bank's tombstone, or the bank row found. Its `parent` is `main`: a bank has no row above it. */
 export type DelBankAnswer           = Answer<BankRow | null, OkAct, typeof BankTop>
@@ -98,18 +98,12 @@ export interface BankDB {
   buildBank(ask: BankBuildAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.buildBank}. */
   tryBuildBank(ask: BankBuildAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, its passphrase wayin replaced, over the gate row `ask.expected`. */
-  replacePassphrase(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
-  /** Non-throwing form of {@link BankDB.replacePassphrase}. */
-  tryReplacePassphrase(ask: GatePutAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, a passkey wayin added, over the gate row `ask.expected`. */
-  addPasskey(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
-  /** Non-throwing form of {@link BankDB.addPasskey}. */
-  tryAddPasskey(ask: GatePutAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record`, its passkey wayin removed, over the gate row `ask.expected`. */
-  revokePasskey(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
-  /** Non-throwing form of {@link BankDB.revokePasskey}. */
-  tryRevokePasskey(ask: GatePutAsk): Promise<GateAnswer>
+  /** Store the gate record `ask.record` over the gate row `ask.expected`, under the storage policy `ask.options.policies` names.
+   * Refuses `gate_issue` when the policy refuses the change over the gate row stored.
+   */
+  putGate(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
+  /** Non-throwing form of {@link BankDB.putGate}. */
+  tryPutGate(ask: GatePutAsk): Promise<GateAnswer>
   /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
   delBank(ask: BankDelAsk): Promise<GoodAnswer<BankRow | null, OkAct, typeof BankTop>>
   /** Non-throwing form of {@link BankDB.delBank}. */
@@ -172,7 +166,7 @@ export interface BankDB {
 /** The name of each verb of {@link BankDB}. A duck check demands that a bankDB has a function under each name. */
 export const BankDBVerbnames = [
   'ensureBank', 'tryEnsureBank', 'buildBank', 'tryBuildBank',
-  'replacePassphrase', 'tryReplacePassphrase', 'addPasskey', 'tryAddPasskey', 'revokePasskey', 'tryRevokePasskey',
+  'putGate', 'tryPutGate',
   'delBank', 'tryDelBank', 'getVault', 'tryGetVault', 'putVault', 'tryPutVault', 'delVault', 'tryDelVault',
   'listBoxes', 'tryListBoxes', 'getBox', 'tryGetBox', 'putBox', 'tryPutBox', 'delBox', 'tryDelBox',
   'tidyGone', 'tryTidyGone', 'watch',
