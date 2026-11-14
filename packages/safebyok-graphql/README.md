@@ -134,8 +134,8 @@ integer UTC epoch milliseconds beyond the range of GraphQL's 32-bit `Int`.
 A verb that stores a row, or gets one, takes one argument, `ask`: an input whose fields are those of
 the core's ask (`op`, the address, the `bank_tok` or `vault_tok` of the life it is made under,
 `ifAbsent` and `ifPresent`, the row it `expected`, read as that row's revision, `am` and tokens, the
-`record` to store, and a build's `gate`). Each gate verb is a mutation of its own, with the same
-ask. `ensureBank`, `listBoxes` and `tidyGone` take their scope as typed arguments. So your
+`record` to store, a build's `gate`, and a gate put's `options`, which name its storage policy).
+A gate change is `safebyokPutGate`, whichever change it is: its `options.policies` says which. `ensureBank`, `listBoxes` and `tidyGone` take their scope as typed arguments. So your
 logs and allowlists see whose bank each operation reaches. Every name the schema adds begins
 `safebyok` or `Safebyok`, to sit beside your own. `BankOperations` has the documents
 `GraphQLBankDB` sends, for a server that allows only the operations it knows.

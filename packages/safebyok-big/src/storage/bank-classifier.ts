@@ -267,7 +267,7 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 
 // == [Policies]: BuildPolicies, GatePolicies
 
-// `buildBank` puts over a tombstone or nothing, and answers the live bank it finds; a gate verb replaces a live gate row.
+// `buildBank` puts over a tombstone or nothing, and answers the live bank it finds; `putGate` replaces a live gate row.
 const BuildPolicies = { ifAbsent: 'add',  ifPresent: 'get'  } as const
 const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const
 // --
@@ -286,7 +286,7 @@ export type RowOfBox   = { boxlabel: string, box: unknown }
 /** The rows an adapter fetched for an `ensureBank` ask in one step, unchecked: the bank row and its `main` gate row, each null for none, and the bank's vault rows. */
 export type BankEnsureFetched = Readonly<{ bank: unknown, gate: unknown, vaults: readonly RowOfVault[] }>
 
-/** The rows an adapter fetched for a `buildBank` ask or a gate verb's in one step, unchecked: the bank row and its `main` gate row, each null for none. */
+/** The rows an adapter fetched for a `buildBank` or `putGate` ask in one step, unchecked: the bank row and its `main` gate row, each null for none. */
 export type GateFetched = Readonly<{ bank: unknown, gate: unknown }>
 
 /** The bank row an adapter fetched for a `delBank` ask, unchecked, or null for none. */
@@ -324,7 +324,7 @@ export type BankBuildStored = Readonly<({ ok: true, act: OkAct } | { ok: false, 
   presence: Presence
 }>
 
-/** A gate verb's ask, classified against the bank and gate rows stored.
+/** A `putGate` ask, classified against the bank and gate rows stored.
  * - `ok`  -- true for a good answer, false for a refusal
  * - `act` -- what storage did, or why it refused
  */
@@ -417,8 +417,8 @@ export function classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): Bank
   return isOkAct(act) ? { ok: true, act, parent, gate, presence } : { ok: false, act, parent, gate, presence }
 }
 
-/** Classify a gate verb's ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports storing.
+/** Classify a `putGate` ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
+ * Applies no storage policy: under `replaced`, the caller applies the ask's (`demandStorage`, `helpers/policies.ts`) before it stores `ask.record`, in the same step that fetched the rows.
  * Throws for a damaged row.
  */
 export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateStored {

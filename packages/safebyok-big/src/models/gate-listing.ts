@@ -10,7 +10,7 @@ import { valOf } from '../refusals/outcome'
 import { mainGateMissing, rowOfOtherLife, writtenByOwnVerbs } from '../refusals/throwers'
 import { type GateScope, gateScope } from '../shapes/shapes-core'
 import * as BX from '../shapes/shapes-bankdb'
-import type { BankRow, BoxRow, GateRecord, GateSparse, VaultRow, Wayins } from '../shapes/shapes-bankdb'
+import type { BankRow, BoxRow, GatePutAsk, GateRecord, GateSparse, VaultRow, Wayins } from '../shapes/shapes-bankdb'
 import * as SX from '../shapes/shapes-storage'
 import * as VX from '../shapes/shapes-vaultish'
 import type { DelTombstone, Fetched, GateSnapshot, ListingOpts, ThingAnswer } from '../shapes/shapes-vaultish'
@@ -49,61 +49,24 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
   recordOf(gateish: unknown): GateRecord { return BX.gateRecord.parseConsistent(gateish, this.bank.scope, { message: Phrases.otherScope }) }
   // --
 
-  // == [The gate verbs]: replacePassphrase, addPasskey, revokePasskey, each with its try form
-  // Each puts the next revision of the gate at `ante`, under the same gate_tok and bank_tok, with `ante` as the row it expects.
-  // The val is the stored record the verb's answer carries: the gate listed may have a newer one by the time the answer is delivered.
+  // == [The gate's put]: putGate, tryPutGate
 
-  /** Replace the passphrase wayin of the gate at `ante` with `main`, and return the stored record.
-   * Locks nothing: the bankKey is unchanged.
+  /** Put the next revision of the gate at `ante`, with `wayins`, under the storage policy `options.policies` names, and return the stored record.
+   * The record keeps `ante`'s gate_tok and bank_tok, and `ante` is the row the put expects. Locks nothing: the bankKey is unchanged.
    */
-  async replacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<GateRecord> { return valOf(await this.tryReplacePassphrase(ante, main)) }
+  async putGate(ante: GateRecord, wayins: Wayins, options: GatePutAsk['options']): Promise<GateRecord> { return valOf(await this.tryPutGate(ante, wayins, options)) }
 
-  /** Non-throwing form of {@link replacePassphrase}: the bankDB's answer.
-   * Chute: tryReplacePassphrase → bankDB.tryReplacePassphrase → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
+  // The val is the stored record the answer carries: the gate listed may have a newer one by the time the answer is delivered.
+  /** Non-throwing form of {@link putGate}: the bankDB's answer.
+   * Chute: tryPutGate → bankDB.tryPutGate → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
-  async tryReplacePassphrase(ante: GateRecord, main: Wayins['main']): Promise<ThingAnswer<GateRecord>> {
+  async tryPutGate(ante: GateRecord, wayins: Wayins, options: GatePutAsk['options']): Promise<ThingAnswer<GateRecord>> {
     let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
     try {
       const expected = this.recordOf(ante)
       this.demandEnabled()
-      const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: { ...expected.wayins, main } }
-      answer = await this.bankDB.tryReplacePassphrase({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
-      this.deliverAnswer(answer, record)
-      return answerWithVal(answer, valOf(answer))
-    } catch (err) { return refusedAnswerOf(err, answer) }
-  }
-
-  /** Add `passkey0` as the passkey wayin of the gate at `ante`, and return the stored record. */
-  async addPasskey(ante: GateRecord, passkey0: NonNullable<Wayins['passkey0']>): Promise<GateRecord> { return valOf(await this.tryAddPasskey(ante, passkey0)) }
-
-  /** Non-throwing form of {@link addPasskey}: the bankDB's answer.
-   * Chute: tryAddPasskey → bankDB.tryAddPasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
-   */
-  async tryAddPasskey(ante: GateRecord, passkey0: NonNullable<Wayins['passkey0']>): Promise<ThingAnswer<GateRecord>> {
-    let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
-    try {
-      const expected = this.recordOf(ante)
-      this.demandEnabled()
-      const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: { ...expected.wayins, passkey0 } }
-      answer = await this.bankDB.tryAddPasskey({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
-      this.deliverAnswer(answer, record)
-      return answerWithVal(answer, valOf(answer))
-    } catch (err) { return refusedAnswerOf(err, answer) }
-  }
-
-  /** Remove the passkey wayin of the gate at `ante`, and return the stored record. */
-  async revokePasskey(ante: GateRecord): Promise<GateRecord> { return valOf(await this.tryRevokePasskey(ante)) }
-
-  /** Non-throwing form of {@link revokePasskey}: the bankDB's answer.
-   * Chute: tryRevokePasskey → bankDB.tryRevokePasskey → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
-   */
-  async tryRevokePasskey(ante: GateRecord): Promise<ThingAnswer<GateRecord>> {
-    let answer: GateAnswer | typeof UNANSWERED = UNANSWERED
-    try {
-      const expected = this.recordOf(ante)
-      this.demandEnabled()
-      const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins: { main: expected.wayins.main } }
-      answer = await this.bankDB.tryRevokePasskey({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record })
+      const record: GateRecord = { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), wayins }
+      answer = await this.bankDB.tryPutGate({ op: 'put', ...this.scopeOf(record), bank_tok: record.bank_tok, expected, record, options })
       this.deliverAnswer(answer, record)
       return answerWithVal(answer, valOf(answer))
     } catch (err) { return refusedAnswerOf(err, answer) }

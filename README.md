@@ -45,8 +45,8 @@ holding four kinds of row, each scoped by `user_id` and `banklabel`:
 * a **box** row per `boxlabel` in a vault, with the app's sidecar in the clear, and its whisper
   sealed under a boxKey that the bankKey wraps.
 
-Its calls: `ensureBank`, `buildBank`, `delBank` and the gate verbs (`replacePassphrase`,
-`addPasskey`, `revokePasskey`); `getVault`, `putVault`, `delVault`; `listBoxes`, `getBox`, `putBox`,
+Its calls: `ensureBank`, `buildBank`, `delBank` and `putGate`, under the storage policy of the
+gate change it makes (`notes/storage-policies.md`); `getVault`, `putVault`, `delVault`; `listBoxes`, `getBox`, `putBox`,
 `delBox`; `tidyGone` and `watch`. A delete leaves a tombstone; a bank or vault made again is a new
 life, with a new token.
 

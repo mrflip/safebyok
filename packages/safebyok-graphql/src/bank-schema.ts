@@ -1,4 +1,4 @@
-import { leftoverVals, refusalkindVals } from 'safebyok-big/storage'
+import { leftoverVals, refusalkindVals, storagePolicyVals } from 'safebyok-big/storage'
 
 // Each operation is one bankDB verb. It returns what the verb's `try*` form returns, as a typed
 // object with any refusal in its `err` field. A GraphQL error is left for what GraphQL itself
@@ -98,6 +98,9 @@ enum SafebyokPutIfAbsent { add fail }
 """A put's policy for a live row: replace it, fail, or return the existing row."""
 enum SafebyokIfPresent { repl fail get }
 
+"""A storage policy an ask is put under: a gate put names the one gating it is for."""
+enum SafebyokStoragePolicy { ${storagePolicyVals.join(' ')} }
+
 # Rows
 
 """A wrapped key or a ciphered whisper: its IV and its ciphertext, each as base64url text."""
@@ -186,9 +189,15 @@ type SafebyokAsk {
   vault_tok:  String
   ifAbsent:   String
   ifPresent:  SafebyokIfPresent
+  options:    SafebyokAskOptions
   expected:   SafebyokAskRow
   record:     SafebyokAskRow
   gate:       SafebyokAskRow
+}
+
+"""The options an ask carried. A field is null when the ask did not have it."""
+type SafebyokAskOptions {
+  policies:   [SafebyokStoragePolicy!]
 }
 
 """The revision, liveness and life tokens of a row an ask names. A field is null when the ask did not have it."""
@@ -357,12 +366,18 @@ input SafebyokBankExpectedInput {
   bank_tok:     String!
 }
 
-"""The metadata of the gate row the caller expects to find."""
+"""The metadata and wayins of the gate row the caller expects to find."""
 input SafebyokGateExpectedInput {
   revision_tok: String!
   revision_seq: Int!
   am:           String!
   gate_tok:     String!
+  wayins:       SafebyokWayinsInput!
+}
+
+"""A gate put's options: the storage policy of the one gating it is for."""
+input SafebyokGateOptionsInput {
+  policies:   [SafebyokStoragePolicy!]!
 }
 
 """The metadata of the vault row the caller expects to find, or of the shell row if it expects none."""
@@ -393,8 +408,8 @@ input SafebyokBankBuildAskInput {
   gate:       SafebyokGateRecordInput!
 }
 
-"""A gate verb's request: the gate's scope, its bank's bank_tok, the gate row it expects to find, and the gate record to store."""
-input SafebyokGateVerbAskInput {
+"""A putGate request: the gate's scope, its bank's bank_tok, the gate row it expects to find, the gate record to store, and its storage policy."""
+input SafebyokGatePutAskInput {
   op:         SafebyokOp!
   user_id:    String!
   banklabel:  String!
@@ -402,6 +417,7 @@ input SafebyokGateVerbAskInput {
   bank_tok:   String!
   expected:   SafebyokGateExpectedInput!
   record:     SafebyokGateRecordInput!
+  options:    SafebyokGateOptionsInput!
 }
 
 """A delBank request: the bank's scope, the bank row it expects to find, and the tombstone to store."""
@@ -500,9 +516,7 @@ type Query {
 
 type Mutation {
   safebyokBuildBank(ask: SafebyokBankBuildAskInput!): SafebyokBuildBankAnswer!
-  safebyokReplacePassphrase(ask: SafebyokGateVerbAskInput!): SafebyokGateAnswer!
-  safebyokAddPasskey(ask: SafebyokGateVerbAskInput!): SafebyokGateAnswer!
-  safebyokRevokePasskey(ask: SafebyokGateVerbAskInput!): SafebyokGateAnswer!
+  safebyokPutGate(ask: SafebyokGatePutAskInput!): SafebyokGateAnswer!
   safebyokDelBank(ask: SafebyokBankDelAskInput!): SafebyokDelBankAnswer!
   safebyokPutVault(ask: SafebyokVaultPutAskInput!): SafebyokVaultAnswer!
   safebyokDelVault(ask: SafebyokVaultDelAskInput!): SafebyokVaultAnswer!

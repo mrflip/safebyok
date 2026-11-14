@@ -3,7 +3,7 @@
 import * as BX from '../../src/shapes/shapes-bankdb'
 import * as SX from '../../src/shapes/shapes-storage'
 import type { BankScope, Boxscope, VaultScope } from '../../src/shapes/shapes-core'
-import type { IfAbsent, IfPresent, PutIfAbsent } from '../../src/shapes/shapes-enums'
+import type { IfAbsent, IfPresent, PutIfAbsent, StoragePolicy } from '../../src/shapes/shapes-enums'
 import type {
   BankBuildAsk, BankDelAsk, BankRecord, BankRow, BankTombstone, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxTombstone,
   GatePutAsk, GateRecord, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, Wayins,
@@ -85,10 +85,10 @@ export function bankBuildAskOf(record: BankRecord = bankAt(), gate: GateRecord =
   return { op: 'build', ...scope, expected: expected ?? BX.shellBankOf(scope), record, gate }
 }
 
-/** A gate verb's ask: the gate row `stored` at its next revision with `wayins`, under its own bank life unless `bank_tok` is given. */
-export function gatePutAskOf(stored: GateRecord, wayins: Wayins, bank_tok: string = stored.bank_tok): GatePutAsk {
+/** A `putGate` ask under `policy`: the gate row `stored` at its next revision with `wayins`, under its own bank life unless `bank_tok` is given. */
+export function gatePutAskOf(policy: StoragePolicy, stored: GateRecord, wayins: Wayins, bank_tok: string = stored.bank_tok): GatePutAsk {
   const record = { ...stored, ...SX.nextRevisionOf(SX.revisionOf(stored), Now + 1), wayins }
-  return { op: 'put', ...gateScope, bank_tok, expected: stored, record }
+  return { op: 'put', ...gateScope, bank_tok, expected: stored, record, options: { policies: [policy] } }
 }
 
 /** The `delBank` ask of the bank row `expected`, storing `record`: its tombstone, unless given. */

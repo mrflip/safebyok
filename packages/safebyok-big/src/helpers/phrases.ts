@@ -392,10 +392,34 @@ export const StrengthCheckerLoadFailed = "The strengthChecker's load() failed: c
 export const KeyDeriverLoadFailed = "The keyDeriver's load() failed: check your package and build settings."
 // --
 
-// == [Refusals: bankDB and deviceDB]: rowOfOtherAddress, boxTooLarge, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVaultLife, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
+// == [Refusals: bankDB and deviceDB]: rowOfOtherAddress, gateIssue, RegisteredAtNotStored, OtherWayinMoved, ProvedWayinMoved, PasskeyStored, NoPasskeyStored, PasskeyNotAdded, PasskeyNotRevoked, boxTooLarge, StorageFull, SeqNotNext, RevisionTokNotNew, ExpectedHalfVoid, LifeTokMisplaced, ExpectedOfOtherVaultLife, RecordOfOtherAddress, BankTokNotNew, GateOfOtherBank, GateNotBorn, MainGateMissing, deviceDBFailed, thrownNamed
 
 /** A well-formed row from storage whose `fieldnames` name another address than the one asked for. */
 export const rowOfOtherAddress = (fieldnames: readonly string[]): string => `The vault's storage answered with a row naming another ${fieldnames.join(' and ')} than the one asked for: the database or its storage adapter has filed it under the wrong address.`
+
+/** A gate put its storage policy refuses, `why` saying which demand it failed. */
+export function gateIssue(why: string): string { return `This change of the gate was refused: ${why}` }
+
+/** Why a gate put whose record names a registered_at the stored gate does not have is refused, as {@link gateIssue}'s `why`. */
+export const RegisteredAtNotStored = "its registered_at is not the stored one."
+
+/** Why a gate put whose record changes a wayin its policy leaves alone is refused, as {@link gateIssue}'s `why`. */
+export const OtherWayinMoved = "it changes a wayin its policy does not."
+
+/** Why a replace_passphrase put is refused when the passphrase wayin it expected is not the stored one, as {@link gateIssue}'s `why`. */
+export const ProvedWayinMoved = "the passphrase wayin it expected is not the stored one."
+
+/** Why an add_passkey put over a stored passkey wayin is refused, as {@link gateIssue}'s `why`. */
+export const PasskeyStored = "a passkey wayin is stored already: revoke it first."
+
+/** Why a revoke_passkey put over a gate with no passkey wayin is refused, as {@link gateIssue}'s `why`. */
+export const NoPasskeyStored = "no passkey wayin is stored."
+
+/** Why an add_passkey put whose record has no passkey wayin is refused, as {@link gateIssue}'s `why`. */
+export const PasskeyNotAdded = "its record has no passkey wayin to add."
+
+/** Why a revoke_passkey put whose record keeps a passkey wayin is refused, as {@link gateIssue}'s `why`. */
+export const PasskeyNotRevoked = "its record still has a passkey wayin."
 
 /** A box record over the bytes its storage allows in one record. */
 export function boxTooLarge(recordSizeEst: number, maxRecordSizeEst: number): string { return `That box weighs ${String(recordSizeEst)} bytes, over the ${String(maxRecordSizeEst)} its storage allows in one record.` }

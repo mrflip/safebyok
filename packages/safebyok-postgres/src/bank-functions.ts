@@ -145,10 +145,11 @@ BEGIN
   RETURN NEXT;
 END $$;
 
--- Store a gate verb's record over the expected gate row.
+-- Store a putGate ask's record over the expected gate row, under the storage policies it names.
 -- The record is stored only if the bank is live in the record's bank_tok, the stored gate row has that bank_tok and
--- the expected revision_tok, am and gate_tok, and the record's revision_seq is one past the row's.
-CREATE OR REPLACE FUNCTION safebyok_put_gate(new_record jsonb, expected_row jsonb)
+-- the expected revision_tok, am and gate_tok, the record's revision_seq is one past the row's, and the row passes each
+-- policy named, one clause per policy below, as notes/storage-policies.md lists them.
+CREATE OR REPLACE FUNCTION safebyok_put_gate(new_record jsonb, expected_row jsonb, policies text[])
 RETURNS TABLE (ok boolean, act text, bank jsonb, gate jsonb, presence text)
 LANGUAGE plpgsql AS $$
 DECLARE
@@ -172,6 +173,20 @@ BEGIN
       AND  g.gate_tok = expected.gate_tok
       AND  g.fmt = new_gate.fmt
       AND  g.revision_seq = new_gate.revision_seq - 1
+      AND  (NOT ('replace_passphrase' = ANY (policies)) OR (
+                 g.registered_at = new_gate.registered_at
+             AND g.wayins -> 'main' = expected_row -> 'wayins' -> 'main'
+             AND (g.wayins - 'main') = (new_gate.wayins - 'main')))
+      AND  (NOT ('add_passkey' = ANY (policies)) OR (
+                 g.registered_at = new_gate.registered_at
+             AND NOT (g.wayins ? 'passkey0')
+             AND new_gate.wayins ? 'passkey0'
+             AND (g.wayins - 'passkey0') = (new_gate.wayins - 'passkey0')))
+      AND  (NOT ('revoke_passkey' = ANY (policies)) OR (
+                 g.registered_at = new_gate.registered_at
+             AND g.wayins ? 'passkey0'
+             AND NOT (new_gate.wayins ? 'passkey0')
+             AND (g.wayins - 'passkey0') = (new_gate.wayins - 'passkey0')))
     RETURNING safebyok_record(to_jsonb(g)) INTO gate;
     ok := FOUND;
   END IF;
@@ -388,7 +403,7 @@ REVOKE ALL ON FUNCTION safebyok_record(jsonb)                              FROM 
 REVOKE ALL ON FUNCTION safebyok_tell(jsonb, jsonb)                         FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_birth_bank(jsonb, jsonb, jsonb)            FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_revise_bank(jsonb, jsonb, jsonb)           FROM PUBLIC;
-REVOKE ALL ON FUNCTION safebyok_put_gate(jsonb, jsonb)                     FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_put_gate(jsonb, jsonb, text[])             FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_birth_vault(jsonb, jsonb)                  FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_revise_vault(jsonb, jsonb)                 FROM PUBLIC;
 REVOKE ALL ON FUNCTION safebyok_birth_box(jsonb, jsonb, integer)           FROM PUBLIC;

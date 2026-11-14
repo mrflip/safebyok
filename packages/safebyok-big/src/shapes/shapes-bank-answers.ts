@@ -37,6 +37,7 @@ export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('un
     vault_tok:    vault_tok.nullable().default(null),
     box_tok:      box_tok.nullable().default(null),
   }).strict()
+  const crossedOptions = obj({ policies: arr(oneof(EX.storagePolicyVals)).nullable().default(null) }).strict()
   const crossedAsk = obj({
     op:         oneof(EX.askOpVals).nullable().default(null),
     user_id:    user_id.nullable().default(null),
@@ -48,6 +49,7 @@ export const { crossedErr, crossedAsk, damagedVault, damagedBox } = Checkers('un
     vault_tok:  vault_tok.nullable().default(null),
     ifAbsent:   SX.anyIfAbsent.nullable().default(null),
     ifPresent:  SX.ifPresent.nullable().default(null),
+    options:    crossedOptions.nullable().default(null),
     expected:   crossedMeta.nullable().default(null),
     record:     crossedMeta.nullable().default(null),
     gate:       crossedMeta.nullable().default(null),
@@ -65,7 +67,7 @@ export type CrossedErr = Z.output<typeof crossedErr>
 export type CrossedAsk = Z.output<typeof crossedAsk>
 // --
 
-// == [Answers]: ensureBankAnswer, buildBankAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delBankAnswer, getVaultAnswer, putVaultAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice
+// == [Answers]: ensureBankAnswer, buildBankAnswer, putGateAnswer, delBankAnswer, getVaultAnswer, putVaultAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice
 
 /** The answer a verb returns, made from the one that crossed the wire, with its refusal a VaultError again. */
 function answerOfCrossed<ValT, ActT extends string, ParentT>(crossed: Crossed<ValT, ActT, ParentT>): Answer<ValT, ActT, ParentT> {
@@ -82,9 +84,10 @@ type Crossed<ValT, ActT extends string, ParentT> = { ask: CrossedAsk, dbhas: unk
 )
 
 /** `crossed` as the core has an answer's ask, with every null field left out, in its rows too. */
-function askOfCrossed({ expected, record, gate, ...crossed }: CrossedAsk): LoggableAsk {
+function askOfCrossed({ options, expected, record, gate, ...crossed }: CrossedAsk): LoggableAsk {
   return {
     ...withoutNulls(crossed),
+    ...((options !== null) && { options: withoutNulls(options) }),
     ...((expected !== null) && { expected: withoutNulls(expected) }),
     ...((record !== null) && { record: withoutNulls(record) }),
     ...((gate !== null) && { gate: withoutNulls(gate) }),
@@ -102,7 +105,7 @@ function vaultErrorOfCrossed({ refusalkind, message, meta }: CrossedErr, answere
 
 /** The checks of each bankDB verb's answer as it crosses the wire, and of a notice. */
 export const {
-  ensureBankAnswer, buildBankAnswer, replacePassphraseAnswer, addPasskeyAnswer, revokePasskeyAnswer, delBankAnswer,
+  ensureBankAnswer, buildBankAnswer, putGateAnswer, delBankAnswer,
   getVaultAnswer, putVaultAnswer, delVaultAnswer, listBoxesAnswer, getBoxAnswer, putBoxAnswer, delBoxAnswer, tidyGoneAnswer, crossedNotice,
 } = Checkers('unexpected_error', ({ obj, arr, uint, lit, oneof, union, discrim }) => {
   /** The parts of one verb's answer check: its `val`, its acts, and its `parent` and `dbhas`, good or refused. */
@@ -145,9 +148,7 @@ export const {
   return {
     ensureBankAnswer:        answerCheck({ val: bankEnsured.nullable(), acts: EX.gotActVals, parent: BX.bankRow, badParent: BX.bankRow, dbhas: lit(null) }),
     buildBankAnswer:         answerCheck({ val: BX.gateRecord, acts: EX.putActVals, parent: BX.bankRow, badParent: BX.bankRow, dbhas: BX.bankRow }),
-    replacePassphraseAnswer: answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
-    addPasskeyAnswer:        answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
-    revokePasskeyAnswer:     answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
+    putGateAnswer:           answerCheck({ val: BX.gateRecord, acts: gateActs, ...gateish }),
     delBankAnswer:           answerCheck({ val: BX.bankTombstone, acts: EX.delActVals, parent: lit(BX.BankTop), badParent: lit(BX.BankTop), dbhas: BX.bankRow }),
     getVaultAnswer:          answerCheck({ val: BX.vaultRow.nullable(), acts: EX.gotActVals, ...vaultish }),
     putVaultAnswer:          answerCheck({ val: BX.vaultRow, acts: EX.putActVals, ...vaultish }),

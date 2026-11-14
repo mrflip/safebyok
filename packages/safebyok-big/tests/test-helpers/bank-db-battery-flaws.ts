@@ -32,10 +32,10 @@ function bankReadersOf(bankDB: BankDB): [string, () => Promise<Answered>][] {
 /** The verbs that read the main gate row, each called over the world's rows as their owner could call it. */
 function gateReadersOf(bankDB: BankDB): [string, () => Promise<Answered>][] {
   return [
-    ['buildBank',         () => bankDB.tryBuildBank(bankBuildAskOf(bankAt(0, 'bank2'), gateAt(0, 'bank2')))],
-    ['replacePassphrase', () => bankDB.tryReplacePassphrase(gatePutAskOf(gate, { main: otherMainWayin }))],
-    ['addPasskey',        () => bankDB.tryAddPasskey(gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin }))],
-    ['revokePasskey',     () => bankDB.tryRevokePasskey(gatePutAskOf(gate, MainOnly))],
+    ['buildBank',                        () => bankDB.tryBuildBank(bankBuildAskOf(bankAt(0, 'bank2'), gateAt(0, 'bank2')))],
+    ['putGate under replace_passphrase', () => bankDB.tryPutGate(gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin }))],
+    ['putGate under add_passkey',        () => bankDB.tryPutGate(gatePutAskOf('add_passkey', gate, { main: mainWayin, passkey0: passkey0Wayin }))],
+    ['putGate under revoke_passkey',     () => bankDB.tryPutGate(gatePutAskOf('revoke_passkey', gate, MainOnly))],
   ]
 }
 

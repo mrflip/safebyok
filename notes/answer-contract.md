@@ -261,7 +261,7 @@ Coverage check: a vault get's expected revision is not compared, so 3 vault stat
 
 ### Vault put
 
-A gate verb (replacePassphrase, addPasskey, revokePasskey) is a put of the gate row with `ifAbsent: fail` and `ifPresent: repl`, read by the table below like any put (*Gate ops*).
+A `putGate` is a put of the gate row with `ifAbsent: fail` and `ifPresent: repl`, read by the table below like any put, and then by its storage policy (*Gate ops*).
 
 | #     | `v_tok` | `v_seq` | flags | vault  | act        | returning  | result |
 | ----- | :-----: | ------- | :---: | ------ | ---------- | ---------- | :----: |
@@ -340,7 +340,7 @@ get, put or del of a bank, gate or vault row reads the tables above, with these 
   verb, `buildBank` and `ensureBank`; the vault row for a box verb; none for `delBank`. The shell
   stands in for none.
 - `bank_tok` and `gate_tok` are life toks as `vault_tok` and `box_tok` are. buildBank mints both, a
-  gate verb keeps both, delBank stores a new `bank_tok` on the bank's tombstone.
+  `putGate` keeps both, delBank stores a new `bank_tok` on the bank's tombstone.
 - A gate row is never tombstoned: it is put with its bank and deleted with it.
 - A box row's life is the pair of its `bank_tok` and `vault_tok`, `${bank_tok}/${vault_tok}` as one
   string (`BX.vaultLifeOf`). Where it is not its vault row's, the box row is of an ended life: it
@@ -385,11 +385,14 @@ its live bank's is of an ended life: it counts as no row, and the op tables read
 
 ### Gate ops
 
-A gate verb is a put of the gate row, with `ifAbsent: fail` and `ifPresent: repl`, read by the put
-table, and nothing more: the three verbs differ only in their name. A good answer is `replaced`, with
-the stored record (**reqval**); a replay of the stored record is `retcon`. The ask's check (V2)
-holds the empty `auth`, `sigs` and `meta`; P4 and the revision rules hold `bank_tok` and `gate_tok`
-being the row's.
+A `putGate` is a put of the gate row, with `ifAbsent: fail` and `ifPresent: repl`, read by the put
+table. Where the table answers `replaced`, the storage policy the ask names (`options.policies`, one of
+`replace_passphrase`, `add_passkey` and `revoke_passkey`) is applied to the rows fetched, in the same
+step, before anything is stored (`notes/storage-policies.md`). A put it refuses answers `gate_issue`,
+with the stored gate row as `dbhas`, and nothing is stored. A good answer is `replaced`, with the
+stored record (**reqval**); a replay of the stored record is `retcon`. The ask's check (V2) holds the
+empty `auth`, `sigs` and `meta`, and exactly one policy; P4 and the revision rules hold `bank_tok` and
+`gate_tok` being the row's.
 
 ### The bank adapter
 
@@ -403,7 +406,7 @@ returns what the classifier returned:
 | ------------- | -------------------------------------------------- | ------------------------------------------------------------ |
 | `doEnsureBank`  | ensureBank                                       | the bank row, its gate rows and vault rows                   |
 | `doBuildBank`   | buildBank                                        | the bank row and its `main` gate row                         |
-| `doPutGate`     | replacePassphrase, addPasskey, revokePasskey     | the bank row and the gate row                                |
+| `doPutGate`     | putGate                                          | the bank row and the gate row                                |
 | `doDelBank`     | delBank                                          | the bank row, and every gate, vault and box row under it     |
 | `doGetVault`, `doPutVault`, `doDelVault` | the vault verbs         | the bank row and the vault row; a del, that life's box rows  |
 | `doListBoxes`, `doGetBox`, `doPutBox`, `doDelBox` | the box verbs  | the vault row and the box rows of its life                   |

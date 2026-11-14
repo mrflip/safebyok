@@ -89,17 +89,32 @@ describe("BX.bankBuild", () => {
 })
 
 describe("BX.gatePut", () => {
-  const keyed = gateAt(3, 'bank1', { main: mainWayin, passkey0: passkey0Wayin })
+  const keyed    = gateAt(3, 'bank1', { main: mainWayin, passkey0: passkey0Wayin })
+  const replace  = gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })
+  const { wayins: _wayins, ...expectedBare } = replace.expected
+  const { options: _options, ...optionless } = replace
   expectCases(BX.gatePut, [
-    [gatePutAskOf(gate, { main: otherMainWayin }),                          true,  'passes a record with its main wayin replaced'],
-    [gatePutAskOf(gate, { main: mainWayin, passkey0: passkey0Wayin }),      true,  'passes a record with a passkey wayin added'],
-    [gatePutAskOf(keyed, { main: mainWayin }),                              true,  'passes a record with its passkey wayin removed'],
-    [{ ...gatePutAskOf(gate, { main: otherMainWayin }), gatelabel: 'side' }, false, 'refuses a gate other than main'],
+    [replace,                                                                     true,  'passes a record with its main wayin replaced'],
+    [gatePutAskOf('add_passkey', gate, { main: mainWayin, passkey0: passkey0Wayin }), true, 'passes a record with a passkey wayin added'],
+    [gatePutAskOf('revoke_passkey', keyed, { main: mainWayin }),                  true,  'passes a record with its passkey wayin removed'],
+    [{ ...replace, gatelabel: 'side' },                                           false, 'refuses a gate other than main'],
+    // the policy it is under:
+    [optionless,                                                                  false, 'refuses an ask with no options'],
+    [{ ...replace, options: {} },                                                 false, 'refuses options with no policies'],
+    [{ ...replace, options: { policies: [] } },                                   false, 'refuses an empty list of policies'],
+    [{ ...replace, options: { policies: ["replace_passphrase", "add_passkey"] } }, false, 'refuses two policies'],
+    [{ ...replace, options: { policies: ["replacePassphrase"] } },                false, 'refuses a policy of no known name'],
+    [{ ...replace, options: { policies: ["replace_passphrase"], ifAbsent: "add" } }, false, 'refuses an extra field in its options'],
+    // the expected row:
+    [{ ...replace, expected: expectedBare },                                      false, 'refuses an expected row without its wayins'],
   ])
 
   it("refuses a record under another gate_tok than the live row it replaces", () => {
-    const ask = gatePutAskOf(gate, { main: otherMainWayin })
-    expect(() => BX.gatePut.parse({ ...ask, record: { ...ask.record, gate_tok: 'gate2' } })).to.throw(VaultError).with.property('refusalkind', 'bad_record')
+    expect(() => BX.gatePut.parse({ ...replace, record: { ...replace.record, gate_tok: 'gate2' } })).to.throw(VaultError).with.property('refusalkind', 'bad_record')
+  })
+
+  it("refuses a put with no policy as it does a malformed record", () => {
+    expect(() => BX.gatePut.parse({ ...replace, options: { policies: [] } })).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 })
 
@@ -128,5 +143,11 @@ describe("BX.loggableAsk", () => {
     const logged = BX.loggableAsk.parse(ask)
     expect(logged.gate).to.deep.equal({ ...SX.revisionOf(ask.gate), am: 'a', bank_tok: 'bank1', gate_tok: 'gate1' })
     expect(JSON.stringify(logged)).not.to.include('salt_b64')
+  })
+
+  it("keeps a gate put's policies, and drops the wayins of its expected row and record", () => {
+    const logged = BX.loggableAsk.parse(gatePutAskOf('add_passkey', gate, { main: mainWayin, passkey0: passkey0Wayin }))
+    expect(logged.options).to.deep.equal({ policies: ['add_passkey'] })
+    expect(JSON.stringify(logged)).not.to.include('wayin')
   })
 })

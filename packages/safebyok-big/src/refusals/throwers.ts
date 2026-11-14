@@ -296,7 +296,12 @@ export function storageFull(cause: Thrown): VaultError {
 
 // --
 
-// == [BankDB Throwers]: mainGateMissing
+// == [BankDB Throwers]: bankGateIssue, mainGateMissing
+
+/** A `gate_issue` refusal from a bankDB: a gate put's storage policy refuses it over the gate row `gate`, for the reason `why`. */
+export function bankGateIssue(parent: BX.BankRow, gate: BX.GateRecord, why: string): VaultError {
+  return new VaultError('gate_issue', Phrases.gateIssue(why), { rows: { parent, dbhas: gate } })
+}
 
 /** A `damaged_row` refusal from a bankDB: the live bank `parent` is stored without its `main` gate row. */
 export function mainGateMissing(parent: BX.BankSparse): VaultError {

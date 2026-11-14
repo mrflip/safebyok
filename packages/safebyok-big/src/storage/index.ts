@@ -10,8 +10,8 @@ export { ckeyOf } from '../helpers/helpers'
 // --
 
 // == [The acts]: what an answer and its ask say of what happened
-export { askOpVals, badActVals, boxVaultActVals, goodActVals, foundActVals, ifAbsentVals, leftoverVals, refusedActVals, writeActVals } from '../shapes/shapes-enums'
-export type { AskOp, BadAct, DelAct, GotAct, ListAct, OkAct, PutAct, BoxAct, GoodAct, Leftover, ParentBankAct, VaultAct, WriteAct } from '../shapes/shapes-enums'
+export { askOpVals, badActVals, boxVaultActVals, goodActVals, foundActVals, ifAbsentVals, leftoverVals, refusedActVals, storagePolicyVals, writeActVals } from '../shapes/shapes-enums'
+export type { AskOp, BadAct, DelAct, GotAct, ListAct, OkAct, PutAct, BoxAct, GoodAct, Leftover, ParentBankAct, StoragePolicy, VaultAct, WriteAct } from '../shapes/shapes-enums'
 // --
 
 // == [The bankDB]: AdapterBankDB, BankDB, their brands, the one in memory, and the rest of its contract as BX
@@ -57,6 +57,7 @@ export type { ConsistencyRefusal, ObjCheckOpts, RefusalOpts, Refusing, Story } f
 // --
 
 // == [The refusals]: an adapter's throwers
+export { bankGateIssue } from '../refusals/throwers'
 export { sanitizeForeignError, storageBlocked, storageUnavailable, unexpectedError } from '../refusals/throwers'
 export { actRefused, boxTooLarge, storageFull, deviceDBFailed } from '../refusals/throwers'
 export { storageFailed, identityRevoked } from '../refusals/throwers'

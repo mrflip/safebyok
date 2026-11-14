@@ -218,9 +218,14 @@ export type BankEnsureAsk = Readonly<Z.output<typeof bankEnsure>>
 /** The checks of a bankDB ask that stores a row, or gets a vault row.
  * Only the revision and life fields of `expected` are read, so pass the row in hand, or the shell for none.
  */
-export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk } = Checkers('bad_record', ({ lit, discrim, bank_tok, gate_tok, bankScope, gateScope, vaultScope }) => {
+export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk } = Checkers('bad_record', ({ obj, lit, oneof, tuple, discrim, bank_tok, gate_tok, bankScope, gateScope, vaultScope }) => {
   const bankExpected  = SX.rowMeta.omit({ vault_tok: true }).extend({ bank_tok })
-  const gateExpected  = SX.rowMeta.omit({ vault_tok: true }).extend({ gate_tok })
+  // A gate put's expected row keeps its wayins: the wayins the gating proved against.
+  const gateExpected  = SX.rowMeta.omit({ vault_tok: true }).extend({ gate_tok, wayins })
+  const gateOptions   = obj({
+    /** The one gating this put is for, whose storage policy the bankDB applies to the stored gate row. */
+    policies: tuple([oneof(EX.storagePolicyVals)]),
+  }).strict()
   const vaultExpected = SX.rowMeta
   const vaultCited    = vaultScope.unwrap().extend({ bank_tok })
 
@@ -236,7 +241,7 @@ export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultA
     .refine(isGateOfBank,     Phrases.GateOfOtherBank)
     .refine(isGateBorn,       Phrases.GateNotBorn)
   const gatePut = gateScope.unwrap().extend({
-    op: lit('put'), bank_tok, expected: gateExpected, record: gateRecord,
+    op: lit('put'), bank_tok, expected: gateExpected, record: gateRecord, options: gateOptions,
   }).refine(isSeqNext,        Phrases.SeqNotNext)
     .refine(isRevisionTokNew, Phrases.RevisionTokNotNew)
     .refine(isExpectedWhole,  Phrases.ExpectedHalfVoid)
@@ -276,7 +281,7 @@ export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultA
 
 /** A `buildBank` ask: the bank's scope, the bank record to store over the expected tombstone or shell, and its `main` gate's record. */
 export type BankBuildAsk = Readonly<Z.output<typeof bankBuild>>
-/** A gate verb's ask, as `replacePassphrase`, `addPasskey` and `revokePasskey` take it: the gate's scope, its bank's `bank_tok`, and the gate record to store over the expected gate row. */
+/** A `putGate` ask: the gate's scope, its bank's `bank_tok`, the gate record to store over the expected gate row, and the storage policy it is under. */
 export type GatePutAsk   = Readonly<Z.output<typeof gatePut>>
 /** A `delBank` ask: the bank's scope, the tombstone to store, and the expected bank row. */
 export type BankDelAsk   = Readonly<Z.output<typeof bankDel>>
@@ -346,7 +351,7 @@ export type BoxDelAsk = Extract<BoxAsk, { op: 'del' }>
 /** The check of what a bankDB answer and its refusal carry of an ask: its fields, but of its rows only their revision, `am` and toks.
  * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
  */
-export const loggableAsk = objStrip(({ obj, oneof, lit, user_id, banklabel, vaultlabel, boxlabel, bank_tok, gate_tok, vault_tok, box_tok }) => {
+export const loggableAsk = objStrip(({ obj, arr, oneof, lit, user_id, banklabel, vaultlabel, boxlabel, bank_tok, gate_tok, vault_tok, box_tok }) => {
   const meta = obj({ ...SX.revision.shape, am: SX.am, bank_tok, gate_tok, vault_tok, box_tok }).partial()
   return {
     op:         oneof(EX.askOpVals).optional(),
@@ -359,6 +364,7 @@ export const loggableAsk = objStrip(({ obj, oneof, lit, user_id, banklabel, vaul
     vault_tok:  vault_tok.optional(),
     ifAbsent:   SX.anyIfAbsent.optional(),
     ifPresent:  SX.ifPresent.optional(),
+    options:    obj({ policies: arr(oneof(EX.storagePolicyVals)) }).partial().optional(),
     expected:   meta.optional(),
     record:     meta.optional(),
     gate:       meta.optional(),

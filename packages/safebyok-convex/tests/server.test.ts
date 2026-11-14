@@ -32,7 +32,7 @@ async function seeded(): Promise<Backend> {
 const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['ensureBank', (caller) => caller.query(fns.ensureBank, { ask: BW.bankEnsureAsk })],
   ['buildBank',  (caller) => caller.mutation(fns.buildBank, { ask: BW.bankBuildAskOf(BW.bankAt(1, 'bank2'), BW.gateAt(0, 'bank2'), bank) })],
-  ['putGate',    (caller) => caller.mutation(fns.putGate, { ask: BW.gatePutAskOf(gate, withPasskey) })],
+  ['putGate',    (caller) => caller.mutation(fns.putGate, { ask: BW.gatePutAskOf('add_passkey', gate, withPasskey) })],
   ['delBank',    (caller) => caller.mutation(fns.delBank, { ask: BW.bankDelAskOf(bank) })],
   ['getVault',   (caller) => caller.query(fns.getVault, { ask: BW.vaultGetAskOf() })],
   ['putVault',   (caller) => caller.mutation(fns.putVault, { ask: BW.vaultPutAskOf(vault) })],

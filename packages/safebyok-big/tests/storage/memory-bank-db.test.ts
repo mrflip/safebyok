@@ -6,6 +6,7 @@ import { BankDBVerbnames } from '../../src/storage/bank-db'
 import { MemoryBankDB } from '../../src/storage/memory-bank-db'
 import { VaultError } from '../../src/refusals/errors'
 import * as BX from '../../src/shapes/shapes-bankdb'
+import * as Phrases from '../../src/helpers/phrases'
 import type { Notice } from '../../src/storage/bank-db'
 import {
   bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, boxAt, boxDelAskOf, boxGetAskOf, boxListAsk, boxPutAskOf, boxQuery, boxTidyAsk,
@@ -156,22 +157,37 @@ describe("MemoryBankDB's bank verbs", () => {
   })
 })
 
-describe("MemoryBankDB's gate verbs", () => {
+describe("MemoryBankDB's putGate", () => {
   const keyed = { main: mainWayin, passkey0: passkey0Wayin }
 
   it("adds a passkey wayin, changing only the gate row", async () => {
     const bankDB = await builtBankDB()
-    const answer = await bankDB.addPasskey(gatePutAskOf(gateAt(), keyed))
+    const answer = await bankDB.putGate(gatePutAskOf('add_passkey', gateAt(), keyed))
     expect(answer.act).to.eq('replaced')
     expect(answer.val.wayins).to.deep.equal(keyed)
     expect(answer.parent).to.deep.equal(bankAt())
     expect(bankDB._cheat_shelfOf(bankScope).bank).to.deep.equal(bankAt())
   })
 
-  it("refuses a gate verb under an ended bank life as vault_reborn", async () => {
+  it("refuses a revoke with no passkey wayin stored, leaving the gate row", async () => {
+    const bankDB = await builtBankDB()
+    const ask = gatePutAskOf('revoke_passkey', gateAt(), { main: mainWayin })
+    const refusal = await TH.expectRefusal(bankDB.putGate(ask), 'gate_issue')
+    expect(refusal.message).to.include(Phrases.NoPasskeyStored)
+    expect(bankDB._cheat_shelfOf(bankScope).gaterows.get('main')).to.deep.equal(gateAt())
+  })
+
+  it("refuses a passphrase replacement that also adds a passkey wayin", async () => {
+    const bankDB = await builtBankDB()
+    const ask = gatePutAskOf('replace_passphrase', gateAt(), { main: otherMainWayin, passkey0: passkey0Wayin })
+    const refusal = await TH.expectRefusal(bankDB.putGate(ask), 'gate_issue')
+    expect(refusal.message).to.include(Phrases.OtherWayinMoved)
+  })
+
+  it("refuses a gate put under an ended bank life as vault_reborn", async () => {
     const bankDB = await builtBankDB()
     bankDB._cheat_shelfOf(bankScope).bank = bankAt(0, 'bank2')
-    const answer = await bankDB.tryReplacePassphrase(gatePutAskOf(gateAt(), { main: otherMainWayin }))
+    const answer = await bankDB.tryPutGate(gatePutAskOf('replace_passphrase', gateAt(), { main: otherMainWayin }))
     expect(answer.ok).to.eq(false)
     expect(answer.act).to.eq('bank_reborn')
     expect(answer.err?.refusalkind).to.eq('vault_reborn')

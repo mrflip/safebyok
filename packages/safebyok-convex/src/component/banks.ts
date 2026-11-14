@@ -54,7 +54,7 @@ export const buildBank = mutation({
   },
 })
 
-/** Classify a gate verb's ask against the bank row and the gate row, and store its gate record if the act is a write. */
+/** Classify a `putGate` ask against the bank row and the gate row, apply its storage policy, and store its gate record if the act is a write. */
 export const putGate = mutation({
   args:    CVX.askArgs,
   returns: CVX.gateWritten,
@@ -63,7 +63,7 @@ export const putGate = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const gateDoc = await getGateDoc(ctx.db, ask, ask.gatelabel)
     const fetched = { bank: bankDoc?.bank ?? null, gate: gateDoc?.gate ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredGate(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! isWrite(storedOrNull(() => policedGateOf(ask, fetched)))) { return { ...fetched, written: null } }
     return { ...fetched, written: { gate: await writeGateDoc(ctx.db, gateDoc, ask.record) } }
   },
 })
@@ -281,7 +281,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Asks and refusals]: askFor, crossingOf, storedOrNull, isWrite
+// == [Asks and refusals]: askFor, crossingOf, policedGateOf, storedOrNull, isWrite
 
 // Anyone signed in may call these functions with an ask of their own making, so each parses its ask again here, with the core's
 // own checker, before a row is read, and continues with what the parse returns.
@@ -302,6 +302,14 @@ function crossingOf(thrown: unknown): unknown {
   const { refusalkind: kind, message } = thrown
   const sentenceKind = sentenceKindVals.find((crossed) => crossed === kind)
   return (sentenceKind === undefined) ? thrown : new ConvexError<SafebyokErrorData>({ kind: sentenceKind, message })
+}
+
+// `replaced` means a live gate row was found, so `stored.gate` is set.
+/** A `putGate` ask classified against `fetched`, its storage policy applied where it would replace the gate row. Throws `gate_issue` where the policy refuses. */
+function policedGateOf(ask: BX.GatePutAsk, fetched: BX.GateFetched): BX.GateStored {
+  const stored = BX.classifyStoredGate(ask, fetched)
+  if (stored.act === 'replaced') { BX.demandStorage(ask, { parent: stored.parent, gate: stored.gate! }) }
+  return stored
 }
 
 // The client classifies the same rows with the same classifier, and throws the refusal itself, with its rows.
