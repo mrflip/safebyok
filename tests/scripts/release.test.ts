@@ -13,10 +13,10 @@ describe("the workspace as it stands", () => {
     expect(Release.releaseProblems(packages, RepoRoot, fixed)).to.deep.equal([])
   })
 
-  it("releases the core, and no demo", async () => {
+  it("releases neither safebyok-big, private while its successor is built, nor a demo", async () => {
     const packages = await Release.listWorkspace(Release.processRunner(RepoRoot))
     const publicNames = Release.publicPackages(packages, RepoRoot).map((pkg) => pkg.name)
-    expect(publicNames).to.include('safebyok-big')
+    expect(publicNames).to.not.include('safebyok-big')
     expect(publicNames.filter((pkgname) => pkgname.includes('demo'))).to.deep.equal([])
   })
 })
