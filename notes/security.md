@@ -41,6 +41,12 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-14 (vault_db, branch `20261114-vault_db`): **In the new core, `packages/safebyok` (not `safebyok-big`), the vaultDB's verbs never throw, and what an answer or refusal carries of the ask is `loggableAskOf(ask)`.**
+  `tryGetThing` and `tryWriteThing` return an answer or a refusal for every failure. Each throw lands in `AdapterVaultDB.answerForThrown` (`storage/adapter-vault-db.ts`), which has a try/catch of its own and a last-resort answer, `unexpected_error` with an empty ask.
+  `loggableAskOf` (`storage/shapes-thing.ts`) keeps the scope, the flags, the policies and each record's meta (`revtok`, `revseq`, `am`, `lifeseq`, `lifepath`, `born_at`) and strips a gate's `wayins`, which hold the bankKey wrapped under each wayin, so no wrapped key travels in an error's meta or a log. An ask that will not parse logs as `{}`. A non-VaultError thrown by a store becomes `storage_unavailable` through big's `Outcome.storageRefusalOf`, which does not keep the foreign error's text.
+  A Thing read back from storage is checked by its kind, strictly (an unknown field is damage, `damaged_row`), and against the scope asked for (another scope, or a non-object, is `storage_issue`), as big's bankDB does. The main gate is never stored as a tombstone (`MainGateDeleted`).
+  Design, not yet built: the Postgres write functions repeat every adapter check. Behind GraphQL, Postgres or Convex the adapter's TypeScript runs on the device under the app's control, so only checks in the database hold against it (whiteboard `20261114-vault_db/design-vaultdb.md`).
+
 * 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, `packages/safebyok` (not `safebyok-big`), a box's seal binds the bank's stamp and the box's sparse fields, and no vault stamp.**
   In `safebyok-big` a whisper's ctx bound the bank's stamp, the vault's stamp, then the box's sparse fields. The new core has no Vault: the ctx binds the bank's stamp, then what `BoxWhisper.stampsOf` returns, the box row's sparse fields (`models/sealers.ts`, `Lease.seal` in `models/lease.ts`).
   amended 2026-11-14 (lean_gate): the sealer's export was named `BoxWhisperSealer`; it is now `BoxWhisper`.
