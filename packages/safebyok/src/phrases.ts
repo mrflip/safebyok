@@ -2,3 +2,57 @@
 
 /** A put met where storing is not built: the layer above stores the bank. */
 export const PutNotBuilt = 'This layer stores nothing: the layer above puts the bank.'
+
+// == [Things]: the sentences of a Thing's checks, and of a vaultDB's asks
+
+/** A labelpath that is not a modelkind and then labels. */
+export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then one or more labels, each after a '/'."
+
+/** A lifeseq that is not 10 base-32 digits. */
+export const LifeseqShape = "A lifeseq is 10 base-32 digits, 0-9 and a-v."
+
+/** A lifepath that is not lifeseqs, each after a '/'. */
+export const LifepathShape = "A lifepath is one or more lifeseqs, each after a '/'."
+
+/** A Thing whose label is not its labelpath's last. */
+export const LabelNotLast = "A Thing's label is the last label of its labelpath."
+
+/** A Thing written below depth 1. */
+export const LifepathNotOwn = "A Thing's lifepath is '/' and its own lifeseq: Things are written at depth 1 for now."
+
+/** A Thing whose am and lifeseq disagree. */
+export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
+
+/** An expected record that is half the shell. */
+export const ExpectedHalfShell = "An expected record is the shell, at revseq -1, lifeseq '-1' and the void revtok, in all three or in none."
+
+/** A write whose revseq does not follow. */
+export const RevseqNotNext = "A write's record must have the revseq one past the expected record's."
+
+/** A write whose revtok is not new. */
+export const RevtokNotNew = "A write's record must have a new revtok: neither the expected record's, nor the void one."
+
+/** A write whose record is at another scope. */
+export const RecordOfOtherScope = "A write's record is at the scope its ask names: its userid, banklabel and labelpath."
+
+/** A write of a tombstone over a tombstone. */
+export const TombstoneOverTombstone = "A tombstone is never written over a tombstone."
+
+/** A write whose lifeseq does not follow. */
+export const LifeseqNotNext = "A write's record keeps the expected lifeseq when am stays, and has the next one when am flips."
+
+/** A write whose born_at does not follow. */
+export const BornAtNotKept = "A write's record keeps the expected born_at over a live record, and is born when it is written over a tombstone."
+
+/** A tombstone of the main gate. */
+export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
+
+/** A policy that needs testimony the expected record lacks. */
+export const TestimonyMissing = "The replace_passphrase policy reads the expected record's wayins: send them with it."
+
+/** A write of a kind this vaultDB does not store yet. */
+export const ThingkindNotStored = "This vaultDB stores the main gate only, for now: a bank or a box is not yet a Thing it takes."
+
+/** The last resort of a vaultDB's error handler. */
+export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
+// --
