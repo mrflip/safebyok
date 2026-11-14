@@ -1,5 +1,5 @@
-// Kept out of the main entry (`safebyok`), so a host's autocomplete never shows the adapter contract, and an adapter imports from one place.
-/** `safebyok/storage`: what a storage adapter is written against, the AdapterBankDB and the DeviceDB. */
+// Kept out of the main entry (`safebyok-big`), so a host's autocomplete never shows the adapter contract, and an adapter imports from one place.
+/** `safebyok-big/storage`: what a storage adapter is written against, the AdapterBankDB and the DeviceDB. */
 
 // == [The deviceDB]: DeviceDB, its brand and the one in memory
 export { DeviceDB } from './device-db'

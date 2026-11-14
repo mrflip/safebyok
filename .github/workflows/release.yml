@@ -16,7 +16,7 @@ name: Release
 #   PR has just been merged, and the run is not the nightly one. `pack` checks the lockstep group, lints, typechecks, tests and builds
 #   every package, and packs each package to release with pnpm (which writes real ranges in place
 #   of `workspace:`). `publish` stages each tarball on npm (scripts/release.ts); the changesets
-#   action then tags each package staged (`safebyok@0.2.0`) and writes its GitHub release from its
+#   action then tags each package staged (`safebyok-big@0.2.0`) and writes its GitHub release from its
 #   CHANGELOG.md, and the core's release is made the repository's latest.
 # * none -- nothing to do.
 #
@@ -200,7 +200,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PUBLISHED: ${{ steps.publish.outputs.published-packages }}
         run: |
-          version=$(jq -r '.[] | select(.name == "safebyok") | .version' <<< "$PUBLISHED")
+          version=$(jq -r '.[] | select(.name == "safebyok-big") | .version' <<< "$PUBLISHED")
           if [[ -n "$version" && "$version" != *-* ]]; then
-            gh release edit "safebyok@$version" --repo "$GITHUB_REPOSITORY" --latest
+            gh release edit "safebyok-big@$version" --repo "$GITHUB_REPOSITORY" --latest
           fi

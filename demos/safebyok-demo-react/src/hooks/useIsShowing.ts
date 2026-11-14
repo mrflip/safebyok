@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react'
-import type { Box } from 'safebyok'
+import type { Box } from 'safebyok-big'
 
 const unsubscribeFromNothing = () => { /* nothing to unsubscribe from */ }
 const subscribeToNothing = () => unsubscribeFromNothing

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { refusalkindVals } from 'safebyok/storage'
+import { refusalkindVals } from 'safebyok-big/storage'
 import { safebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
 
 const ErrorDataCases = [

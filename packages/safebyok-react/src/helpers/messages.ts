@@ -1,7 +1,7 @@
 // All the text safebyok-react shows to a user is in this file. A sentence with a variable part is one template
 // function, so a translation can reorder it. Messages meant for developers stay next to the code that uses them.
 
-import type { Gatingkind } from 'safebyok'
+import type { Gatingkind } from 'safebyok-big'
 
 /** The locale of the built-in dialogs' text. */
 export const Locale = 'en'

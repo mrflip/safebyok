@@ -1,5 +1,5 @@
 {
-  "name": "safebyok",
+  "name": "safebyok-big",
   "version": "0.5.0",
   "description": "Bring-your-own-key vault: end-to-end encrypted, browser-side storage for API keys and other small secrets, over a pluggable database layer",
   "keywords": [
@@ -18,7 +18,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mrflip/safebyok.git",
-    "directory": "packages/safebyok"
+    "directory": "packages/safebyok-big"
   },
   "bugs": {
     "url": "https://github.com/mrflip/safebyok/issues"
@@ -84,6 +84,11 @@
       "import": "./dist/dom/index.js",
       "require": "./dist/dom/index.cjs"
     },
+    "./internals": {
+      "@safebyok/source": "./src/internals.ts",
+      "import": "./dist/internals.js",
+      "require": "./dist/internals.cjs"
+    },
     "./storage": {
       "@safebyok/source": "./src/storage/index.ts",
       "import": "./dist/storage/index.js",
@@ -122,6 +127,9 @@
       "dom": [
         "./dist/dom/index.d.cts"
       ],
+      "internals": [
+        "./dist/internals.d.cts"
+      ],
       "storage": [
         "./dist/storage/index.d.cts"
       ],
@@ -146,6 +154,10 @@
       "./dom": {
         "import": "./dist/dom/index.js",
         "require": "./dist/dom/index.cjs"
+      },
+      "./internals": {
+        "import": "./dist/internals.js",
+        "require": "./dist/internals.cjs"
       },
       "./storage": {
         "import": "./dist/storage/index.js",

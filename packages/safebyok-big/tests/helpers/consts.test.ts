@@ -166,7 +166,7 @@ describe("isGuarded", () => {
 describe("PackageVersion", () => {
   it("is the version in package.json", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../../package.json'), 'utf8')) as { version: string }
-    const bumpByHand = `PackageVersion in packages/safebyok/src/helpers/consts.ts is not packages/safebyok/package.json's version, ${manifest.version}: a release bumps it by hand, in the Version PR`
+    const bumpByHand = `PackageVersion in packages/safebyok-big/src/helpers/consts.ts is not packages/safebyok-big/package.json's version, ${manifest.version}: a release bumps it by hand, in the Version PR`
     expect(PackageVersion, bumpByHand).to.eq(manifest.version)
   })
 })

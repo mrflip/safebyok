@@ -60,7 +60,7 @@ describe("a saved Argon2id value", () => {
   })
 })
 
-describe("safebyok/browser", () => {
+describe("safebyok-big/browser", () => {
   it("derives a 32-byte key under the argon2id_web_v1 label with argon2idWebV1Deriver", { timeout: FullStrengthDeriveMillis }, async () => {
     expect(argon2idWebV1Deriver.key_deriver_label).to.eq('argon2id_web_v1')
     const keyBytes = await argon2idWebV1Deriver.deriveKeyBytes('a short passphrase', salt)

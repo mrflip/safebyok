@@ -1,5 +1,5 @@
 // eslint.config.mjs -- the workspace root's own lint: its tooling in scripts/, those scripts'
-// tests, and the root's config files. Cut from the core's (packages/safebyok/), which is the
+// tests, and the root's config files. Cut from the core's (packages/safebyok-big/), which is the
 // authority on house style: where the two disagree, the core's is right and this one is the bug.
 // Each package under packages/, demos/ and e2e/ is its own workspace package, with its own dependencies,
 // TS project and eslint config, and lints itself; the root's `pnpm lint` runs them all.
@@ -366,7 +366,7 @@ export default defineConfig([
       // this the only way to satisfy the rule is to pad it with a token runtime assertion,
       // which tells the reader nothing about what the test is for. A helper of the tests' own
       // whose name begins `expect` asserts too, and counts as the test's assertion: as
-      // `expectRefusal` (safebyok/testing, called as `TH.expectRefusal` outside its own
+      // `expectRefusal` (safebyok-big/testing, called as `TH.expectRefusal` outside its own
       // module) asserts on the rejection it is handed.
       'vitest/expect-expect': ['error', {
         assertFunctionNames: ['expect*', 'TH.expect*'],

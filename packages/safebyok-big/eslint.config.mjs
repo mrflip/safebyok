@@ -199,7 +199,7 @@ export default defineConfig([
   // A library writes nothing to the console: what it has to say goes back to its caller, who
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // The one exception is src/helpers/console-logger.ts, the fallback when a host passes no logger, which
-  // disables no-console for itself alone. The helpers published as `safebyok/testing`
+  // disables no-console for itself alone. The helpers published as `safebyok-big/testing`
   // (tests/test-helpers.ts and the parts it re-exports, in tests/test-helpers/) ship to hosts too,
   // so they keep the rules of src/ in this section and in 3c, besides the rules of the tests.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
@@ -450,7 +450,7 @@ export default defineConfig([
       // this the only way to satisfy the rule is to pad it with a token runtime assertion,
       // which tells the reader nothing about what the test is for. A helper of the tests' own
       // whose name begins `expect` asserts too, and counts as the test's assertion: as
-      // `expectRefusal` (safebyok/testing, called as `TH.expectRefusal` outside its own
+      // `expectRefusal` (safebyok-big/testing, called as `TH.expectRefusal` outside its own
       // module) asserts on the rejection it is handed.
       'vitest/expect-expect': ['error', {
         assertFunctionNames: ['expect*', 'TH.expect*'],

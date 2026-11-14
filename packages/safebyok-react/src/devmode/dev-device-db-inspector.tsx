@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
-import type { DeviceDB } from 'safebyok'
-import { leaseQuery } from 'safebyok/storage'
-import type { LeaseScopepath } from 'safebyok/storage'
+import type { DeviceDB } from 'safebyok-big'
+import { leaseQuery } from 'safebyok-big/storage'
+import type { LeaseScopepath } from 'safebyok-big/storage'
 import type { DevDeviceDBInspectorProps, LeaseRowLineProps, ListedLease } from '../shapes'
 import { LastCallLine, timeOf, useLastCall, useListing } from './last-call'
 

@@ -1,5 +1,5 @@
 /** The refusal to throw in place of a foreign throw: one safebyok did not make, which may quote a secret it was handed.
- * Import it whole: `import { HostErrorSanitizer } from 'safebyok'`, then `HostErrorSanitizer.refusalFor(...)`.
+ * Import it whole: `import { HostErrorSanitizer } from 'safebyok-big'`, then `HostErrorSanitizer.refusalFor(...)`.
  * Call it from a catch with what a host's function threw after hearing the passphrase (a
  * `keyDeriver`, `strengthChecker`, or `requestCleartext`), or what
  * a storage client threw, which may quote the call it was handed.

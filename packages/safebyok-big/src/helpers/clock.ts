@@ -1,5 +1,5 @@
 // The one clock the package reads. A host has no say in it: the time is the device's. The two
-// `_cheat_` exports are a test's backdoor, reached from `safebyok/testing` and never from the main
+// `_cheat_` exports are a test's backdoor, reached from `safebyok-big/testing` and never from the main
 // entry; vitest's fake timers move `Date.now()` too, and need neither.
 
 // == [The clock]: nowMillis, _cheat_clock, _cheat_clockReset

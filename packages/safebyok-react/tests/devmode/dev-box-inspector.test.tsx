@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { describe, expect, it } from 'vitest'
-import type { RequestCleartext } from 'safebyok'
+import type { RequestCleartext } from 'safebyok-big'
 import { BankProvider } from '../../src/provider/bank-provider'
 import { DevBoxInspector } from '../../src/devmode'
 import * as TH from '../test-helpers'

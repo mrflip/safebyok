@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { isVaultError } from 'safebyok'
+import { isVaultError } from 'safebyok-big'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 import { isQuietRefusal } from '../lib/refusals'
 

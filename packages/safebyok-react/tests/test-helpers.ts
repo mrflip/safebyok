@@ -1,16 +1,16 @@
-/** safebyok-react's test helpers. This file re-exports everything in `safebyok/testing`, and adds helpers for
+/** safebyok-react's test helpers. This file re-exports everything in `safebyok-big/testing`, and adds helpers for
  * rendering, open gatings, typing in the dialogs, and a fake authenticator.
  * Helpers that need JSX are in `test-helpers-react.tsx`, re-exported here. Star-import this file as `TH` (`import * as TH from './test-helpers'`).
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { Component, createElement, use, type ReactElement, type ReactNode } from 'react'
 import { expect, onTestFinished, vi } from 'vitest'
-import { MemoryDeviceDB, type AnyGating, type Device, type DeviceOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok'
-import { Passphrase, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok/testing'
-import { fromB64, toB64 } from 'safebyok/utils'
+import { MemoryDeviceDB, type AnyGating, type Device, type DeviceOpts, type Gating, type Gatingkind, type Outcome, type PasskeyAnswer, type RequestCleartext, type Vault } from 'safebyok-big'
+import { Passphrase, anyStrengthChecker, passkeyOf, quietLogger, testDeriver, useBankWorlds, type BankWorld } from 'safebyok-big/testing'
+import { fromB64, toB64 } from 'safebyok-big/utils'
 import type { BankProviderProps, PassphraseGating } from '../src/shapes'
 
-export * from 'safebyok/testing'
+export * from 'safebyok-big/testing'
 export * from './test-helpers-react'
 
 /** Sweep every bank a test made, once the test ends. This is `useBankWorlds`, under a name that React's hook lint does not mistake for a hook. */

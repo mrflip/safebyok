@@ -65,7 +65,7 @@
     "eslint-plugin-sonarjs": "^4.2.2",
     "eslint-plugin-unicorn": "^79.0.0",
     "publint": "^0.3.25",
-    "safebyok": "workspace:*",
+    "safebyok-big": "workspace:*",
     "tsdown": "^0.23.5",
     "typescript": "6.0.3",
     "typescript-eslint": "^8.72.1",
@@ -73,7 +73,7 @@
     "zod": "^4.6.7"
   },
   "peerDependencies": {
-    "safebyok": "workspace:^"
+    "safebyok-big": "workspace:^"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",

@@ -24,7 +24,7 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
  * it has succeeded, and forget a failure. A `load` that fails refuses the `ensureBank()` that ran it, so
  * a device that cannot judge a new passphrase never opens a bank.
  *
- * `safebyok/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To judge as
+ * `safebyok-big/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To judge as
  * the user types, call `gating.judgeStrength(typed)`. With no checker, every new passphrase is judged weak
  * ({@link DefaultStrengthChecker}).
  *
@@ -51,7 +51,7 @@ export const StrongVerdict: PassphraseVerdict = Object.freeze({ strong: true })
 /** The verdict {@link DefaultStrengthChecker} returns for every passphrase, with a word to the user and one to the app's makers. */
 const DefaultVerdict: PassphraseVerdict = Object.freeze({
   strong: false,
-  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Device.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok/browser, as notes/configuration.md in safebyok's repository says under Pluggable Passphrase Strength Checker.",
+  reason: "This app can't accept a new passphrase yet: it hasn't been set up to judge how strong one is, so nothing was saved. To the app's makers: Device.make needs a strengthChecker, such as zxcvbnStrengthChecker from safebyok-big/browser, as notes/configuration.md in safebyok's repository says under Pluggable Passphrase Strength Checker.",
 })
 
 /** The strength checker of a device given none: it judges every passphrase weak, so no bank can be built and no passphrase replaced.

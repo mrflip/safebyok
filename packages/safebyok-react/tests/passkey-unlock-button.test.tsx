@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { type Gating, VaultError } from 'safebyok'
+import { type Gating, VaultError } from 'safebyok-big'
 import { Messages } from '../src/helpers/messages'
 import { createPasskey } from '../src/helpers/passkey'
 import { PasskeyUnlockButton } from '../src/components/passkey-unlock-button'

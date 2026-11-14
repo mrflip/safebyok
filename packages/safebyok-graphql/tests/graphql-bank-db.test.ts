@@ -3,8 +3,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Client, CombinedError } from '@urql/core'
 import { GraphQLError } from 'graphql'
-import * as DB from 'safebyok/storage'
-import type { BX } from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
+import type { BX } from 'safebyok-big/storage'
 import { GraphQLBankDB } from '../src/index'
 import * as TH from './test-helpers'
 

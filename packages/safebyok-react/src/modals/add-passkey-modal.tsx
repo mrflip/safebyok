@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import type { PasskeyAnswer } from 'safebyok'
+import type { PasskeyAnswer } from 'safebyok-big'
 import { Messages } from '../helpers/messages'
 import { attemptThenZero, createPasskey } from '../helpers/passkey'
 import type { AddPasskeyModalProps } from '../shapes'

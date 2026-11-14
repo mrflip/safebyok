@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { DeviceOpts } from 'safebyok'
+import type { DeviceOpts } from 'safebyok-big'
 import { ReplacePassphraseModal } from '../src/modals/replace-passphrase-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'

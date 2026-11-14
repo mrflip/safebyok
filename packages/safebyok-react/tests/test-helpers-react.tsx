@@ -2,7 +2,7 @@
  * `test-helpers.ts` re-exports them, so import them as `TH` (`import * as TH from './test-helpers'`), never from this file.
  */
 import { Activity, useEffect, type ReactNode } from 'react'
-import type { Bank, BankSnapshot, VaultSnapshot } from 'safebyok'
+import type { Bank, BankSnapshot, VaultSnapshot } from 'safebyok-big'
 import { useBank, useBankSnapshot, useDeviceSnapshot, useVault, useVaultSnapshot } from '../src/hooks/hooks'
 
 /** Wrap `shown` in an Activity in `mode`, so a test can `rerender` to hide it and show it again.

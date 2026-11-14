@@ -1,6 +1,6 @@
 /** The test world of `src/models/`: a fake vault (the {@link FakeVault}), with its bank and device, a {@link TestableBankDB} over one live bank and vault row, one log of every call made to them, and the builders of the records they have.
  * Import it directly, not through `TH`: `src/models/` is not exported, and the door
- * `tests/test-helpers.ts` is published as `safebyok/testing`.
+ * `tests/test-helpers.ts` is published as `safebyok-big/testing`.
  *
  * Time. The clock is settable, and starts at {@link T0}. A timer schedules with `setTimeout`, a delay
  * computed from the clock, so the world installs vitest's

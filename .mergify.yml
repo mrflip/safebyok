@@ -43,7 +43,7 @@ queue_rules:
 #     files:
 #       core:
 #         include:
-#           - packages/safebyok/**
+#           - packages/safebyok-big/**
 #       safebyok-adapters:
 #         include:
 #           - packages/safebyok-{convex,postgres,graphql,indexeddb}/**

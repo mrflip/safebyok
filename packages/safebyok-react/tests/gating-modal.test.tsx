@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { AnyGating } from 'safebyok'
+import type { AnyGating } from 'safebyok-big'
 import { GatingModal } from '../src/provider/gating-modal'
 import { Messages } from '../src/helpers/messages'
 import * as TH from './test-helpers'

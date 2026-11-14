@@ -421,7 +421,7 @@ export interface DeviceOpts {
   bankDB:               BankDB
   /** The device database that caches the bank's lease and this device's row. */
   deviceDB:             DeviceDB
-  /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
+  /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
   keyDeriver:           KeyDeriver
   /** Your dialog, called with each gating that needs the user's passphrase or passkey.
    * Left out, each gating waits in the device's snapshot for your own `attempt` or `dismiss`.

@@ -4,7 +4,7 @@ import { makeFunctionReference } from 'convex/server'
 import type { FunctionReference } from 'convex/server'
 import { Base64, ConvexError, convexToJson, jsonToConvex } from 'convex/values'
 import type { JSONValue, Value } from 'convex/values'
-import { Checkers } from 'safebyok/storage'
+import { Checkers } from 'safebyok-big/storage'
 
 // The fake replaces the network and the server, so it tests neither. Calls run one at a time, in
 // arrival order. Every watched query reruns after each mutation. Each socket is signed in as one

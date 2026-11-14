@@ -6,7 +6,7 @@ import type { GetUserId, SafebyokBankApi, SafebyokErrorData } from '../src/serve
 import { modules, register, schema } from '../src/test'
 
 // Re-export the core's test helpers, so a test here can star-import this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-big/testing'
 
 /** The component's bankDB functions typed as a client calls them (`SafebyokBankApi`), at the root: no host wrapper and no auth. */
 export const rootBankApi = anyApi['banks'] as unknown as SafebyokBankApi

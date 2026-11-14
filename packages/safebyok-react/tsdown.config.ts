@@ -2,7 +2,7 @@ import { defineConfig } from 'tsdown'
 
 // The same build as the core's: ESM and CommonJS, each with declarations and source maps. `exports`
 // writes package.json's entry points from what was built. publint and attw check the package the way a
-// consumer would, and fail the build on anything they find. `safebyok` and `react` are peer dependencies,
+// consumer would, and fail the build on anything they find. `safebyok-big` and `react` are peer dependencies,
 // so they stay external and this package uses the host's single copy of each. The entry also gets the
 // core's `@safebyok/source` condition, for the workspace's tsconfigs.
 //

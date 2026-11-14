@@ -26,7 +26,7 @@ describe("_cheat_clock(fn) and _cheat_clockReset()", () => {
     expect(nowMillis()).to.be.closeTo(Date.now(), 1000)
   })
 
-  it("are the backdoor safebyok/testing publishes", () => {
+  it("are the backdoor safebyok-big/testing publishes", () => {
     expect(TH._cheat_clock).to.eq(_cheat_clock)
     expect(TH._cheat_clockReset).to.eq(_cheat_clockReset)
   })

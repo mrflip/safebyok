@@ -151,7 +151,7 @@ describe("pnpm changeset --package, with no terminal", () => {
   const RepoRoot = path.resolve(import.meta.dirname, '../..')
 
   it("refuses a branch that is not a thread branch, and writes nothing", () => {
-    const result = spawnSync(process.execPath, [Script, '--package', 'safebyok', '--bump', 'patch', '--message', 'A fix.'], { cwd: RepoRoot, encoding: 'utf8', env: { ...process.env, GIT_DIR: path.join(RepoRoot, '.git-nowhere') } })
+    const result = spawnSync(process.execPath, [Script, '--package', 'safebyok-big', '--bump', 'patch', '--message', 'A fix.'], { cwd: RepoRoot, encoding: 'utf8', env: { ...process.env, GIT_DIR: path.join(RepoRoot, '.git-nowhere') } })
     expect(result.status).to.eq(2)
     expect(result.stderr).to.include('is not a thread branch')
   })

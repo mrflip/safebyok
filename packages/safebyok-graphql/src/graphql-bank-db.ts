@@ -1,8 +1,8 @@
 import type { AnyVariables, Client, CombinedError, OperationResult } from '@urql/core'
 import type * as Z from 'zod'
-import * as DB from 'safebyok/storage'
-import { BX } from 'safebyok/storage'
-import type { BankScope, BoxTidyAsk, GoodAct, GotAct, ListAct, OkAct, Tidied, WatchScope } from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
+import { BX } from 'safebyok-big/storage'
+import type { BankScope, BoxTidyAsk, GoodAct, GotAct, ListAct, OkAct, Tidied, WatchScope } from 'safebyok-big/storage'
 import { BankOperations } from './bank-operations'
 
 // == [Options]: GraphQLBankClient, GraphQLBankDBOpts, graphQLBankDBOpts

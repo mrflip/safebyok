@@ -1,4 +1,4 @@
-import { isVaultError, type Device } from 'safebyok'
+import { isVaultError, type Device } from 'safebyok-big'
 import { Messages } from '../helpers/messages'
 import { useBank, useBankSnapshot, useDevice } from '../hooks/hooks'
 import type { CreateVaultButtonProps } from '../shapes'

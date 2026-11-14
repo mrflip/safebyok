@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import type { Bank } from 'safebyok'
+import type { Bank } from 'safebyok-big'
 import { Messages } from '../src/helpers/messages'
 import { RevokePasskeyModal } from '../src/modals/revoke-passkey-modal'
 import * as TH from './test-helpers'

@@ -1,6 +1,6 @@
 import { useId } from 'react'
-import { BoxFields } from 'safebyok/dom'
-import { WhisperFieldAttributes } from 'safebyok/utils'
+import { BoxFields } from 'safebyok-big/dom'
+import { WhisperFieldAttributes } from 'safebyok-big/utils'
 import { Messages } from '../helpers/messages'
 import { useBoxIsShowing } from '../hooks/hooks'
 import { useRevealToggle } from '../hooks/reveal-toggle'

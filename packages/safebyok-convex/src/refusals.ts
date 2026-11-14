@@ -1,6 +1,6 @@
 /** Refusals that the host's safebyok functions send to the client as a `ConvexError`. The client rethrows each as a VaultError of the same kind. */
 
-import * as DB from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
 
 /** The refusal kinds a `ConvexError` from the host's safebyok functions may carry:
  * `identity_revoked` from the wrapper, and the kinds the core throws inside the component.

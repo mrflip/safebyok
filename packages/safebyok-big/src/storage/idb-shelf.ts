@@ -66,7 +66,7 @@ export function versionedShelfOf(spec: VersionedShelfSpec): UseStore {
   return made
 }
 
-// A test's backdoor, reached from `safebyok/testing` and never from `safebyok/storage`.
+// A test's backdoor, reached from `safebyok-big/testing` and never from `safebyok-big/storage`.
 /** For tests only: the next {@link versionedShelfOf} of the database `dbname` opens a connection of its own. */
 export function _cheat_forgetShelf(dbname: string): void { shelves.delete(dbname) }
 

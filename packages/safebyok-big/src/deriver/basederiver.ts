@@ -3,7 +3,7 @@ import { type KeyDeriverSpec, TestLabelPrefix, keyDeriverSpec } from './shapes'
 
 // == [KeyDeriver]: KeyDeriver, Argon2idKeyDeriver
 
-/** What `Device.make` accepts to make a key from a passphrase: `argon2idWebV1Deriver` from `safebyok/browser`, or your own. */
+/** What `Device.make` accepts to make a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
 export interface KeyDeriver {
   /** The name each wayin records for how its key was derived, so a later device derives it alike. */
   readonly key_deriver_label: string

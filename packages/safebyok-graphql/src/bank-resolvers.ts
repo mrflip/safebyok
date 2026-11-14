@@ -1,6 +1,6 @@
 import { GraphQLError, GraphQLScalarType, Kind, valueFromASTUntyped } from 'graphql'
-import * as DB from 'safebyok/storage'
-import { BX } from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
+import { BX } from 'safebyok-big/storage'
 
 // == [Types]: BankResolversOpts, BankFieldArgs, CrossingAnswer, CrossingNotice, BankFieldResolver, BankResolvers
 
@@ -96,7 +96,7 @@ type NoticedRow = BX.BankRow | BX.GateRecord | BX.VaultRow | BX.BoxRow
 // == [Resolvers]: bankResolvers
 
 const bankResolversOpts = DB.objCheck(({ custom, fn }) => ({
-  bankDB:    custom<DB.AdapterBankDB>(DB.isAdapterBankDB, 'Expected an AdapterBankDB from safebyok/storage'),
+  bankDB:    custom<DB.AdapterBankDB>(DB.isAdapterBankDB, 'Expected an AdapterBankDB from safebyok-big/storage'),
   getUserId: fn<BankResolversOpts<unknown>['getUserId']>(),
 }), 'bad_option')
 

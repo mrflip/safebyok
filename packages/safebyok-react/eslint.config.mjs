@@ -1,4 +1,4 @@
-// eslint.config.mjs -- the React binding's lint config, copied from the core's (packages/safebyok/).
+// eslint.config.mjs -- the React binding's lint config, copied from the core's (packages/safebyok-big/).
 // The core's is the authority on house style: where the two disagree, the core's is right and this
 // file has the bug. This file adds React's rules (hooks, JSX, accessibility) and lints .tsx files.
 //
@@ -432,7 +432,7 @@ export default defineConfig([
       // this the only way to satisfy the rule is to pad it with a token runtime assertion,
       // which tells the reader nothing about what the test is for. A helper of the tests' own
       // whose name begins `expect` asserts too, and counts as the test's assertion: as
-      // `expectRefusal` (safebyok/testing, called as `TH.expectRefusal` outside its own
+      // `expectRefusal` (safebyok-big/testing, called as `TH.expectRefusal` outside its own
       // module) asserts on the rejection it is handed.
       'vitest/expect-expect': ['error', {
         assertFunctionNames: ['expect*', 'TH.expect*'],

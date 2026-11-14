@@ -1,6 +1,6 @@
 /** The check of `mask`'s options. Imported as `UX`. */
 
-// Kept apart from the other shapes so that `safebyok/utils` carries no other validator.
+// Kept apart from the other shapes so that `safebyok-big/utils` carries no other validator.
 
 import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'

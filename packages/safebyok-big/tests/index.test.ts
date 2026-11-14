@@ -1,9 +1,9 @@
-/** The front door, `safebyok`: what a host imports from it. */
+/** The front door, `safebyok-big`: what a host imports from it. */
 
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import * as Front from '../src/index'
 
-describe("safebyok", () => {
+describe("safebyok-big", () => {
   it("exports each type its exported signatures name", () => {
     expectTypeOf<Front.DeviceOpts['bankDB']>().toEqualTypeOf<Front.BankDB>()
     expectTypeOf<Front.AdapterBankDB>().toExtend<Front.DeviceOpts['bankDB']>()

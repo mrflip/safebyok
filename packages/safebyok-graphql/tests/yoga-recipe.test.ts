@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
-import { BX } from 'safebyok/storage'
+import { BX } from 'safebyok-big/storage'
 import { PostgresBankDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import { GraphQLBankDB } from '../src/index'

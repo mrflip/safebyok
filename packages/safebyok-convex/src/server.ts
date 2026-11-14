@@ -3,7 +3,7 @@
 import { mutationGeneric, queryGeneric } from 'convex/server'
 import type { FunctionReference, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
 import { ConvexError } from 'convex/values'
-import * as DB from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
 import type { ComponentApi } from './component-api'
 import * as CVX from './component/validators'
 import * as Phrases from './phrases'

@@ -106,7 +106,7 @@ export function prfSaltShape(count: number): string { return `A passkey's salt i
 export const MinutesShape = "Expected a number of minutes, zero or more, fractions too (0.5 is thirty seconds), or Infinity"
 
 /** A `keyDeriver` left out, or no object. */
-export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok/browser'; elsewhere, your own, with a key_deriver_label, a salt_size of ${String(PassphraseSaltSize)} and a deriveKeyBytes function`
+export const KeyDeriverShape = `Expected a KeyDeriver: in a browser, argon2idWebV1Deriver from 'safebyok-big/browser'; elsewhere, your own, with a key_deriver_label, a salt_size of ${String(PassphraseSaltSize)} and a deriveKeyBytes function`
 
 /** A `logger` that is no object. */
 export const LoggerShape = "Expected a VaultLogger, with log, warn and error functions: leave it out for the default logger, or pass functions that do nothing to log nowhere"
@@ -118,7 +118,7 @@ export const KeyDeriverSpecShape = `Expected a keyDeriverSpec: algorithm 'argon2
 export function memoryPerLane(minKib: number): string { return `Expected at least ${String(minKib)} KiB of memory for each lane (parallelism)` }
 
 /** A `strengthChecker` that is no checker. */
-export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. Pass zxcvbnStrengthChecker from safebyok/browser, or your own (notes/configuration.md, Pluggable Passphrase Strength Checker)"
+export const StrengthCheckerShape = "Expected a function from the passphrase, and the vault's scope, to a verdict, { strong: true } or { strong: false, reason }, its load, if it carries one, a function too. Pass zxcvbnStrengthChecker from safebyok-big/browser, or your own (notes/configuration.md, Pluggable Passphrase Strength Checker)"
 // --
 
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
@@ -344,7 +344,7 @@ export function reservedDeriverLabel(prefix: string): string { return `Labels be
 export function suppliedSpecChanged(label: string): string { return `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.` }
 
 /** The warning logged when a device is made with a test deriver, whose label begins `test_`. */
-export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault has real secrets, open it with argon2idWebV1Deriver (from safebyok/browser), or another vetted Argon2id deriver."
+export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault has real secrets, open it with argon2idWebV1Deriver (from safebyok-big/browser), or another vetted Argon2id deriver."
 // --
 
 // == [The models' device and bank]: DeviceLetGo, GatesShape, vaultStoredDamaged, boxStoredDamaged

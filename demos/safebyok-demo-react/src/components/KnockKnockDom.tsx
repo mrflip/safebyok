@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { BoxFields } from 'safebyok/dom'
+import { BoxFields } from 'safebyok-big/dom'
 import { BoxWhisperField, useBox, useDevice, useVault } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
@@ -43,7 +43,7 @@ export const KnockKnockDom = () => {
   return (
     <section className="flow knock-knock" aria-labelledby={`${fieldId}-title`}>
       <h2 id={`${fieldId}-title`}>DOM form</h2>
-      <p className="quiet">Fields bound by the safebyok/dom export, so your key never passes through React.</p>
+      <p className="quiet">Fields bound by the safebyok-big/dom export, so your key never passes through React.</p>
       <div className="api-key-slot">
         <label htmlFor={fieldId}>Anthropic API key</label>
         {box === null

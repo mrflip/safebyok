@@ -7,15 +7,15 @@ import { Client, cacheExchange, makeErrorResult, mapExchange } from '@urql/core'
 import { executeExchange } from '@urql/exchange-execute'
 import type { Operation } from '@urql/core'
 import type { GraphQLSchema } from 'graphql'
-import type { AdapterBankDB, BankScope, Boxscope, BX, VaultScope } from 'safebyok/storage'
-import * as TH from 'safebyok/testing'
+import type { AdapterBankDB, BankScope, Boxscope, BX, VaultScope } from 'safebyok-big/storage'
+import * as TH from 'safebyok-big/testing'
 import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf } from 'safebyok-postgres'
 import type { PostgresBankDBOpts, PostgresListen } from 'safebyok-postgres'
 import { GraphQLBankDB } from '../src/index'
 import { BankSchemaSdl, bankResolvers } from '../src/server'
 
 // Re-export the core's test helpers, so a test here imports this one module as TH.
-export * from 'safebyok/testing'
+export * from 'safebyok-big/testing'
 
 // == [The database]: BootMillis, database, bootDatabaseFirst, emptyTables, storeOtherwise, listen
 

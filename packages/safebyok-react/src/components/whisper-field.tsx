@@ -1,5 +1,5 @@
 import { useId } from 'react'
-import { WhisperFieldAttributes } from 'safebyok/utils'
+import { WhisperFieldAttributes } from 'safebyok-big/utils'
 import { Messages } from '../helpers/messages'
 import { useRevealToggle } from '../hooks/reveal-toggle'
 import type { WhisperFieldProps } from '../shapes'

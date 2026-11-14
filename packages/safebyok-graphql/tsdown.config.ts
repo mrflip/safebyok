@@ -4,7 +4,7 @@ import { defineConfig } from 'tsdown'
 // `exports` generates package.json's entry points from the build output, adding the
 // `@safebyok/source` condition that the workspace's tsconfigs use. publint and attw check the
 // package as a consumer would see it, and fail the build on anything they find. There are two
-// entry points: `.` for the browser and `./server` for the server. `safebyok`, `graphql` and
+// entry points: `.` for the browser and `./server` for the server. `safebyok-big`, `graphql` and
 // `@urql/core` are peer dependencies and stay external, so this adapter uses the host's own copy
 // of safebyok (its BankDB and VaultError) and of graphql (its GraphQLError).
 export default defineConfig({

@@ -1,4 +1,4 @@
-/** The bankDB's adapter contract beside `AdapterBankDB`: its rows, asks, answers, classifier and wire checks. Exported from `safebyok/storage` as `BX`. */
+/** The bankDB's adapter contract beside `AdapterBankDB`: its rows, asks, answers, classifier and wire checks. Exported from `safebyok-big/storage` as `BX`. */
 
 export * from '../shapes/shapes-bankdb'
 export * from './bank-db'

@@ -1,8 +1,8 @@
 /** PostgresBankDB on PGlite: the battery every bankDB runs, plus tests of its Postgres-specific behavior. */
 
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import * as DB from 'safebyok/storage'
-import type { Notice } from 'safebyok/storage'
+import * as DB from 'safebyok-big/storage'
+import type { Notice } from 'safebyok-big/storage'
 import { PostgresBankDB, bankChannelOf } from '../src/index'
 import type { PostgresListen } from '../src/index'
 import * as BH from './bank-helpers'

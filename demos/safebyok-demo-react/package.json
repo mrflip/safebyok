@@ -20,7 +20,7 @@
     "@anthropic-ai/sdk": "^1.4.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "safebyok": "workspace:*",
+    "safebyok-big": "workspace:*",
     "safebyok-indexeddb": "workspace:*",
     "safebyok-react": "workspace:*"
   },
