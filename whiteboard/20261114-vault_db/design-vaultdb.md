@@ -58,12 +58,15 @@ The adapter checks proposed against cited when the ask is parsed, before anythin
 * `proposed.revtok` is new: not `cited.revtok`, and not void.
 * `proposed` is at the ask's scope, and its `label` is the last label of its `labelpath`.
 * `proposed.lifepath` ends in `/` + `proposed.lifeseq`.
-* `am: 'x'` exactly when `lifeseq` is odd, in both `proposed` and `cited`.
-* Live over live keeps `lifeseq` and `born_at`. Gone over live is `lifeseq + 1`. Live over gone is `lifeseq + 1`
-  too: a birth (over the shell) is 0, a rebirth is the tombstone's `lifeseq + 1`. Either has `born_at === written_at`.
+* `am: 'x'` exactly when the Thing's own lifeseq is odd, in both `proposed` and `cited`. A citation's own lifeseq is the
+  last of its `lifepath`: it carries no `lifeseq` of its own.
+* Live over live keeps `lifeseq`. Gone over live is `lifeseq + 1`. Live over gone is `lifeseq + 1` too: a birth
+  (over the shell) is 0, a rebirth is the tombstone's `lifeseq + 1`. Either has `born_at === written_at`.
 * A tombstone never goes over a tombstone.
 
-The store checks cited against actual, in the step that stores the record: the act tables below.
+The store checks cited against actual, in the step that stores the record: the act tables below. It also checks that
+live over live keeps the stored `born_at` (`bad_record`): a citation carries no `born_at`, so the check is against the
+Thing stored, not the caller's word.
 
 ## The two verbs
 
@@ -162,7 +165,7 @@ needed for these acts.
 type ThingScope = { userid, banklabel, labelpath }
 
 /** What a write cites of the Thing it expects, which the store compares with actual. */
-type ThingCited = Pick<Thing, 'revtok' | 'revseq' | 'am' | 'lifeseq' | 'lifepath' | 'born_at'>   // or the shell's
+type ThingCited = Pick<Thing, 'revtok' | 'revseq' | 'am' | 'lifepath'>   // just what the act tables compare; or the shell's
 
 type GetThingAsk = ThingScope & { op: 'get', ifAbsent: 'fail' | 'nil' }
 
