@@ -58,14 +58,16 @@
     "vitest": "^5.1.0",
     "zod": "^4.6.7"
   },
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.cts",
   "exports": {
     ".": {
       "@safebyok/source": "./src/index.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
+    },
+    "./core": {
+      "@safebyok/source": "./src/core.ts",
+      "import": "./dist/core.js",
+      "require": "./dist/core.cjs"
     },
     "./package.json": "./package.json"
   },
@@ -81,7 +83,21 @@
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
       },
+      "./core": {
+        "import": "./dist/core.js",
+        "require": "./dist/core.cjs"
+      },
       "./package.json": "./package.json"
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "typesVersions": {
+    "*": {
+      "core": [
+        "./dist/core.d.cts"
+      ]
     }
   }
 }
