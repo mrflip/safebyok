@@ -62,7 +62,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom, oneof }) => 
  * and closes when `whenConcluded` resolves. The gating keeps no cleartext between attempts.
  */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, gatingTok, user_id, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, user_id, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isLaunched, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
   /** A random token unique to this gating.
@@ -84,6 +84,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   readonly #concluded: Promise<Outcome.Outcome<Bank>>
   #conclude:     (outcome: Outcome.Outcome<Bank>) => void = () => undefined
   #outcome:      Outcome.Outcome<Bank> | null = null
+  #isLaunched    = false
   #isAttempting  = false
   #isLastAttempt = false
   // --
@@ -132,6 +133,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     // A gating concluded before its launch has nothing to ask: it rejects with its outcome, and never takes the device.
     if (this.#outcome !== null) { return Outcome.valOf(this.#outcome) }
     this.#device.attachGating(this)
+    this.#isLaunched = true
     if (this.#askUser !== null) { void this.#askHost(this.#askUser) }
     return Outcome.valOf(await this.#concluded)
   }
@@ -152,7 +154,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   /** Try what the user typed, resolving the outcome rather than throwing. Await one attempt before the next.
    * A refusal the user can correct, such as `wrong_passphrase`, leaves the gating open for another attempt.
    * Any other outcome concludes it. A passkey answer's PRF bytes are zeroed once handed in, except after a correctable
-   * refusal: then hand them in again, or zero them yourself.
+   * refusal: then hand them in again, or zero them yourself. An attempt before {@link launch} refuses `gating_unlaunched`.
    */
   attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome.Outcome<Bank>> {
     const refusal = this.#refusalOfAttempt()
@@ -168,6 +170,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   /** Why an attempt now would be refused, or null */
   #refusalOfAttempt(): Errors.VaultError | null {
     if (this.#outcome !== null) { return Throwers.gatingConcluded() }
+    if (! this.#isLaunched)     { return Throwers.gatingUnlaunched() }
     return this.#isAttempting ? Throwers.attemptInFlight() : null
   }
 

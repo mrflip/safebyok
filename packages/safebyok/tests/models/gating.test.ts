@@ -2,7 +2,7 @@
 
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
-import { Errors, SX } from 'safebyok-big/internals'
+import { Errors, Outcome, SX } from 'safebyok-big/internals'
 import type { Bank } from '../../src/models/bank'
 import { guardRequestCleartext } from '../../src/models/device'
 import { Gating, type GatingAttempt, type GatingOpts, birthBank } from '../../src/models/gating'
@@ -12,6 +12,13 @@ import * as TH from '../test-helpers'
 /** A gating of `birth_bank` on `opts.device`, or a fresh device, with no host dialog and an attempt that is never called, unless `opts` says otherwise. */
 function makeGating(opts: Partial<GatingOpts> = {}): Gating {
   return Gating.make({ gatingkind: 'birth_bank' }, { device: TH.makeDevice(), bank: null, askUser: null, attempt: neverAttempts, ...opts })
+}
+
+/** A {@link makeGating} gating, launched, its launch's outcome left to `whenConcluded`. */
+function launchedGating(opts: Partial<GatingOpts> = {}): Gating {
+  const gating = makeGating(opts)
+  void Outcome.outcomeOf(() => gating.launch())
+  return gating
 }
 
 /** An attempt no test here reaches. */
@@ -152,7 +159,7 @@ describe("gating.attempt(cleartexts)", () => {
   it("lands: hands the attempt the cleartexts, concludes good, and zeroes the passkey answer", async () => {
     const { bank, device } = await TH.buildBornBank()
     const attempt = attemptLanding(bank)
-    const gating = makeGating({ device, attempt })
+    const gating = launchedGating({ device, attempt })
     const cleartexts = cleartextsOf()
     expect(await TH.expectGood(gating.attempt(cleartexts))).to.equal(bank)
     expect(attempt).toHaveBeenCalledExactlyOnceWith(cleartexts)
@@ -170,7 +177,7 @@ describe("gating.attempt(cleartexts)", () => {
   for (const [refusal, blurb] of CorrectableCases) {
     it(`stays open after ${blurb}, its passkey answer unspent, and the next attempt lands`, async () => {
       const { bank, device } = await TH.buildBornBank()
-      const gating = makeGating({ device, attempt: attemptLanding(bank, refusal) })
+      const gating = launchedGating({ device, attempt: attemptLanding(bank, refusal) })
       const cleartexts = cleartextsOf()
       expect(await TH.expectBad(gating.attempt(cleartexts))).to.eq(refusal)
       expect(gating.isOpen).to.be.true
@@ -182,7 +189,7 @@ describe("gating.attempt(cleartexts)", () => {
 
   it("concludes on a refusal the user cannot correct, and zeroes the passkey answer", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const gating = makeGating({ device, attempt: attemptLanding(bank, new Errors.VaultError('gate_made_elsewhere', 'taken')) })
+    const gating = launchedGating({ device, attempt: attemptLanding(bank, new Errors.VaultError('gate_made_elsewhere', 'taken')) })
     const cleartexts = cleartextsOf()
     await TH.expectBad(gating.attempt(cleartexts), 'gate_made_elsewhere')
     expect(gating.isOpen).to.be.false
@@ -191,7 +198,7 @@ describe("gating.attempt(cleartexts)", () => {
 
   it("concludes on a throw that is not a refusal, as an unexpected error", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const gating = makeGating({ device, attempt: attemptLanding(bank, new TypeError('a bug')) })
+    const gating = launchedGating({ device, attempt: attemptLanding(bank, new TypeError('a bug')) })
     await TH.expectBad(gating.attempt(cleartextsOf()), 'unexpected_error')
     expect(gating.isOpen).to.be.false
   })
@@ -199,13 +206,27 @@ describe("gating.attempt(cleartexts)", () => {
   it("refuses a second attempt while one runs, zeroing its passkey answer, and the first lands", async () => {
     const { bank, device } = await TH.buildBornBank()
     const latch = TH.makeLatch()
-    const gating = makeGating({ device, attempt: async () => { await latch.pass(); return bank } })
+    const gating = launchedGating({ device, attempt: async () => { await latch.pass(); return bank } })
     const attempting = gating.attempt(cleartextsOf())
     const second = cleartextsOf()
     await TH.expectBad(gating.attempt(second), 'attempt_in_flight')
     expect(TH.isZeroed(second.passkeyClear.prfBytes)).to.be.true
     latch.release()
     await TH.expectGood(attempting)
+  })
+
+  it("refuses before the gating is launched, without attempting, and zeroes the passkey answer it was given", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const attempt = attemptLanding(bank)
+    const gating = makeGating({ device, attempt })
+    const cleartexts = cleartextsOf()
+    await TH.expectBad(gating.attempt(cleartexts), 'gating_unlaunched')
+    expect(attempt).not.toHaveBeenCalled()
+    expect(TH.isZeroed(cleartexts.passkeyClear.prfBytes)).to.be.true
+    expect(gating.isOpen).to.be.true
+    const launched = gating.launch()
+    await TH.expectGood(gating.attempt(cleartextsOf()))
+    expect(await launched).to.equal(bank)
   })
 
   it("refuses once concluded, without attempting, and zeroes the passkey answer it was given", async () => {
@@ -220,7 +241,7 @@ describe("gating.attempt(cleartexts)", () => {
 
   it("zeroes a passkey answer from another realm", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const gating = makeGating({ device, attempt: attemptLanding(bank) })
+    const gating = launchedGating({ device, attempt: attemptLanding(bank) })
     const prfBytes = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
     expect(prfBytes).to.not.be.instanceOf(Uint8Array)
     await TH.expectGood(gating.attempt({ passphraseClear: TH.TestPassphrase, passkeyClear: { ...TH.passkeyAnswerOf(), prfBytes } }))
@@ -237,7 +258,7 @@ describe("gating.attempt(cleartexts)", () => {
 
   it("keeps its outcome when reading the passkey answer to zero it throws", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const gating = makeGating({ device, attempt: attemptLanding(bank) })
+    const gating = launchedGating({ device, attempt: attemptLanding(bank) })
     const passkeyClear = { ...TH.passkeyAnswerOf(), get prfBytes(): Uint8Array { throw new Error(TH.TestPassphrase) } }
     expect(await TH.expectGood(gating.attempt({ passphraseClear: TH.TestPassphrase, passkeyClear }))).to.equal(bank)
   })
@@ -258,7 +279,7 @@ describe("gating.dismiss()", () => {
   it("lets an attempt under way run on, and its success concludes the gating", async () => {
     const { bank, device } = await TH.buildBornBank()
     const latch = TH.makeLatch()
-    const gating = makeGating({ device, attempt: async () => { await latch.pass(); return bank } })
+    const gating = launchedGating({ device, attempt: async () => { await latch.pass(); return bank } })
     const attempting = gating.attempt(cleartextsOf())
     gating.dismiss()
     expect(gating.isOpen).to.be.true
@@ -270,7 +291,7 @@ describe("gating.dismiss()", () => {
   it("makes an attempt under way the last: its correctable refusal concludes the gating", async () => {
     const { device } = await TH.buildBornBank()
     const latch = TH.makeLatch()
-    const gating = makeGating({ device, attempt: async () => { await latch.pass(); throw new Errors.VaultError('wrong_passphrase', 'not it') } })
+    const gating = launchedGating({ device, attempt: async () => { await latch.pass(); throw new Errors.VaultError('wrong_passphrase', 'not it') } })
     const cleartexts = cleartextsOf()
     const attempting = gating.attempt(cleartexts)
     gating.dismiss()
@@ -282,7 +303,7 @@ describe("gating.dismiss()", () => {
 
   it("changes nothing once the gating has concluded", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const gating = makeGating({ device, attempt: attemptLanding(bank) })
+    const gating = launchedGating({ device, attempt: attemptLanding(bank) })
     await TH.expectGood(gating.attempt(cleartextsOf()))
     gating.dismiss()
     gating.dismiss()
