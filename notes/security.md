@@ -41,6 +41,20 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, `packages/safebyok` (not `safebyok-big`), a box's seal binds the bank's stamp and the box's sparse fields, and no vault stamp.**
+  In `safebyok-big` a whisper's ctx bound the bank's stamp, the vault's stamp, then the box's sparse fields. The new core has no Vault: the ctx binds the bank's stamp, then what `BoxWhisperSealer.stampsOf` returns, the box row's sparse fields (`models/sealers.ts`, `Lease.seal` in `models/lease.ts`).
+  Those fields include `vault_tok` and `bank_tok`, so the life of the box's container is still bound through them. A future `lifepath` field is to replace `vault_tok` and `box_tok`.
+
+* 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, the lease is generic over a Sealer and refuses any sealer not defined in `models/sealers.ts`.**
+  A Sealer chooses the ctx purposes, the stamps, the codec (`encode`, `decode`) and the record fields; the lease only wraps a fresh key under the bankKey and ciphers (`Lease.seal`, `Lease.unseal`, `models/lease.ts`).
+  `isSealer` is an identity check against the module's singletons (today `BoxWhisperSealer`), run on every `seal` and `unseal`. A sealer from elsewhere would choose its own stamps and would see the cleartext in `encode` and `decode`; none is accepted.
+
+* 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, `Proving.buildLease(bank, gate)` builds the lease whole, so the bankKey crosses no method boundary.**
+  It unwraps the bankKey, wraps it under a fresh non-extractable leaseKey and passes the record to `Lease.make`, all in one method (`models/proving.ts`). `safebyok-big` had a separate `Lease.buildGranted(bank, bankKey, ...)` that received the naked bankKey.
+
+* 2026-11-14 (lean_gate, branch `20261114-lean_gate`): **In the new core, `Bank.unlockByProving(proved, cited = bank.maingate)` is public and takes a Proving.**
+  A Proving exists only inside a gating attempt: a Proving builder makes it from a cleartext, and it never leaves the attempt (`models/gating.ts`; `birthBank` stores the bank first, then unlocks, so a refused store leaves no lease). `Proving` is exported from the package as a type only (`src/index.ts`).
+
 * 2026-11-13 (bank_docs, branch `20261112-bank_docs`, sprint bank_world): **A bank has one gate, `maingate`, and its wayins wrap the one bankKey that wraps every boxKey in every vault of the bank.**
   A bank is the signed-in user's vaults in one app, scoped by `{ user_id, banklabel }`. Its one gate, `main`, is one gate row in the bankDB (`GateRecord`, fmt 4001), holding the bank's wayins: `main`, the passphrase, and `passkey0`, a passkey if one was added.
   Each wayin stores the bank's one random bankKey wrapped under that wayin's wayinKey (`bank_key_wayin_wrapped`; the passphraseKey from Argon2id, or the passkeyKey from the passkey's PRF answer via HKDF-SHA256).
