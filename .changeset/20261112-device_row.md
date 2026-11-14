@@ -1,7 +1,0 @@
----
-"safebyok-big": minor
-"safebyok-react": minor
-"safebyok-graphql": minor
----
-
-`device_id` is `device_tok`, and the deviceDB's "bank row" is the device row. **`device_tok`** is the `bank.device_tok` prop and the bank's snapshot field, the field of each wayin's header (the stored wayin, the GraphQL `device_tok` field and the `ciphertext` ctx it is bound into), and the field of the device row; `BankProvider` takes no `device_tok`, and `useDeviceId` is gone. **The device row:** `deviceDB.ensureCachedBank`, `forgetBank` and `listRawBanks` are `ensureCachedDevice`, `forgetDevice` and `listRawDevices` (each with its `try` form), the `BankRow` type and `bankRow` check are `DeviceRow` and `deviceRow`, a subclass's `doEnsureCachedBank`, `doForgetBank` and `doListBanks` are `doEnsureCachedDevice`, `doForgetDevice` and `doListDevices`, and `MemoryDeviceDB._cheat_bankRows` is `_cheat_deviceRows`. **Stored format:** a wayin written before has `device_id`, so it fails its check and its row reads as damaged. Renaming the field by hand would not save it: the field's name is in the wayin's ctx, and the ctx binds the bank's and gate's stamps since this release, so an old wayin's wrapped key would not unwrap anyway. An `IdbDeviceDB` keeps its device rows in a database of their own (`safebyok-<dbName>:devicerow-v002-001-001`): a device row written before is not found, so the device mints a new `device_tok`, and the old database stays in the browser unread until the host deletes it.
