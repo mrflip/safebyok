@@ -1,7 +1,7 @@
 {
   "name": "safebyok-postgres",
   "private": false,
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Postgres storage for safebyok: four tables holding bank, gate, vault and box rows, a column to each field, and the BankDB over them, through the driver you already use.",
   "keywords": [
     "safebyok",

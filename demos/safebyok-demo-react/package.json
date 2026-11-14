@@ -1,7 +1,7 @@
 {
   "name": "safebyok-demo-react",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Single-page React playground for the safebyok interface: a fake sign-in over a vault in this browser's IndexedDB. Never published.",
   "type": "module",
   "scripts": {
