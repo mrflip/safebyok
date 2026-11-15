@@ -71,7 +71,7 @@ export const Messages = {
   lockButton:        'Lock',
 } as const
 
-/** A phrase for what each kind of gating does, to finish a sentence such as "Could not ...". */
+/** A phrase for what each kind of gating does, to conclude a sentence such as "Could not ...". */
 export const Doing: Record<Gatingkind, string> = {
   build_bank:         'create your vault',
   unlock_bank:        'unlock your vault',

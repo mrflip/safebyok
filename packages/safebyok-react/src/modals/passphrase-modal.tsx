@@ -68,7 +68,7 @@ const UnlockForm = ({ gating, leaseMillis, passphraseUsername, passkeyRpId }: Pa
       blurb={Messages.unlockBlurb}
       submitWord={Messages.unlockButton}
       pendingWord={Messages.unlockingButton}
-      // React commits the action's setPasskeyGripe(null) only when the attempt finishes, so hide the
+      // React commits the action's setPasskeyGripe(null) only when the attempt concludes, so hide the
       // passkey's message as soon as the submit starts.
       gripeText={(isPending ? null : passkeyGripe) ?? gripe?.text ?? null}
       gripeId={gripeId}

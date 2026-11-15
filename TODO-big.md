@@ -517,7 +517,7 @@ vacate on `Storable` with `children()` would bring back per-thing ended state; t
 ### A storage read begun before a create can undo it
 
 From the contract sprint's `a_sec2` ([#206](https://github.com/mrflip/safebyok/pull/206)): a
-read of the vault props that began before this device's first unlock made the vault can finish
+read of the vault props that began before this device's first unlock made the vault can return
 after it, find no vault, and drop the new vault's key as if the vault were gone; the unlock is then
 refused with `vault_locked`, though the vault it made is stored, and the next read of the vault
 props finds it. The Coach (2026-10-21):
