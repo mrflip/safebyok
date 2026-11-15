@@ -112,6 +112,7 @@ const FamilyCases = [
   ["damaged_whisper",     "bad_news",  'a box stored damaged is reported to the user, who may remove it'],
   ["newer_format",        "bad_news",  'a vault a newer version wrote is reported to the user, who updates the app'],
   ["stale_write",         "condition", 'another device writing first is a normal part of syncing'],
+  ["stale_read",          "condition", 'storage behind what this device already held is normal for a lagging replica'],
   ["record_conflict",     "condition", 'storage and this device disagreeing about one revision is for the app to tell the user of; fetching again does not mend it'],
   ["identity_revoked",    "bad_news",  'a signed-out user signs in again'],
   ["storage_unavailable", "condition", 'unreachable storage is tried again shortly'],

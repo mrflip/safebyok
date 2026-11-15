@@ -21,7 +21,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   show a message, retry, or have the user free room. `bank_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
  *   `absent_box`, `absent_vault`, `absent_wayin`, `box_too_large`, `vault_full`,
- *   `stale_write`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
+ *   `stale_write`, `stale_read`, `record_conflict`, `storage_unavailable`, `storage_blocked`, `gate_made_elsewhere`,
  *   `vault_gone`, `vault_reborn`, `gating_concluded`, `attempt_in_flight`, `already_asking`, `dismissed`,
  *   `same_passphrase`, `camped`.
  * * **Bad news**: something the app is told whether or not the call was refused, and may show
@@ -57,6 +57,7 @@ export const refusalkindVals = [
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
   'unexpected_error',    // something threw that is no refusal: a bug, in safebyok or in a function the app handed it
   'stale_write',         // storage changed since this device read it, so the write was refused
+  'stale_read',          // storage answered with a revision older than one this device already held: a lagging replica or cache in front of storage, or a write storage lost; the newer record stays cached, and a later get asks again
   'record_conflict',     // storage answered what cannot be: one revision under two toks, a record of another vault_tok than this device has, a parent row failing its checks, a put that answered nothing; a fetch again is worth one try, and if it remains the system is fundamentally not working
   'identity_revoked',    // the storage backend no longer serves the user this vault was opened for: signed out, or another user signed in
   'storage_unavailable', // the storage backend could not be reached, or failed: a retry may mend it; its own error is the cause
@@ -106,6 +107,7 @@ export const RefusalFamilyForKind = {
   insecure_context:    'misuse',
   unexpected_error:    'misuse',
   stale_write:         'condition',
+  stale_read:          'condition',
   record_conflict:     'condition',
   identity_revoked:    'bad_news',
   storage_unavailable: 'condition',

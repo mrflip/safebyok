@@ -1,9 +1,16 @@
+// The ThingMinder is an exemplar at both of its ends. Its interface is the minder as we would design it for the layer in
+// front of it: scopes, records, acts and refusals, in our vocabulary. Its implementation shows TanStack Query used as
+// its authors intend: each need is met by the feature TanStack built for that job (query defaults, structural sharing,
+// invalidation, the error state, the cache's events), chosen because it fits, not because it was nearest to hand.
+// Where a ruling, a design note or this code seems to serve one end at the other's expense, report it rather than split
+// the difference.
+
 /** `ThingMinder`, which keeps one kind of Thing in one bank fresh in a TanStack Query cache. */
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { exactOptional } from 'zod'
-import { Errors, Outcome, SX, Validator } from 'safebyok-big/internals'
+import { Errors, Logger, Outcome, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
   type GetThingAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type WorldRecord,
@@ -153,10 +160,9 @@ export class ThingMinder {
     if (this.modelkind === 'bank') { this.#startVaultDBWatch() }
   }
 
-  // Trouble the watch meets goes nowhere until the minder handles errors.
-  /** Watch the bank: each notice goes to `#receive`. */
+  /** Watch the bank: each notice goes to `#receive`, and the watch's trouble to `#reportTrouble`. */
   #startVaultDBWatch(): void {
-    this.#unwatch = this.#vaultDB.watch(this.scope, (notice: ThingNotice) => { this.#receive(notice) }, noop)
+    this.#unwatch = this.#vaultDB.watch(this.scope, (notice: ThingNotice) => { this.#receive(notice) }, (news) => { this.#reportTrouble(news, 'watch') })
   }
 
   /** Stop minding, and remove this minder's entries and defaults from the cache. Reads refuse until `hello` is called again. */
@@ -195,7 +201,10 @@ export class ThingMinder {
     }
   }
 
-  /** Get the record `ask` names: the cached one if timely, else from the vaultDB. A get already under way is shared. */
+  /** Get the record `ask` names: the cached one if timely, else from the vaultDB. A get already under way is shared.
+   * Refuses `stale_read` where storage answers older than the record cached when the get began. That record stays cached, and no longer counts as timely.
+   * Refuses `disabled` where `goodbye` is called while it waits.
+   */
   async get(ask: GetThingAsk & { ifAbsent: 'nil' }, opts: MinderGetAskOpts = {}): Promise<DeliverableThing> {
     const checkedOpts = minderGetAskOpts.parse(opts)
     this.#demandReady()
@@ -222,12 +231,18 @@ export class ThingMinder {
     return this.#tsqFind(scoped)?.isStaleByTime(staleTime) ?? true
   }
 
-  /** Call `listener` with each event the cache reports of one of this minder's entries, and return the function that stops it. */
-  listen(listener: (event: TSQ.QueryCacheNotifyEvent) => void): () => void {
+  /** Call `listener` with a scope and the record now cached there, undefined once removed, each time the record or its standing changes.
+   * A record that lands is told even when it changes nothing. So is a get's refusal, or an invalidation, after which the record is no longer timely.
+   * Returns the function that stops it. What the listener throws goes to the default logger, the console unless the host set one, and stops nothing.
+   */
+  listen(listener: (scoped: ThingScope, record: DeliverableThing | undefined) => void): () => void {
     const checked = minderListener.parse(listener)
     const { keyPrefix } = this
     return this.#tsq.getQueryCache().subscribe((event) => {
-      if (TSQ.matchQuery({ queryKey: keyPrefix }, event.query)) { checked(event) }
+      if (! (isRecordEvent(event) && TSQ.matchQuery({ queryKey: keyPrefix }, event.query))) { return }
+      // The cache's events are typed loosely; an entry under this minder's prefix holds a record of its own.
+      const entry = event.query as TSQ.Query<DeliverableThing>
+      try { checked(this.#scopeOfKey(entry.queryKey), (event.type === 'removed') ? undefined : entry.state.data) } catch (err) { this.#reportTrouble(err, 'listen') }
     })
   }
   // --
@@ -242,7 +257,13 @@ export class ThingMinder {
 
   /** The record for `ask`'s scope, from the cache if timely within `staleTime`, else from the vaultDB. */
   async #doGet(ask: GetThingAsk & { ifAbsent: 'nil' }, opts: MinderGetAskOpts): Promise<DeliverableThing> {
-    const fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), ...opts })
+    let fetched: DeliverableThing
+    try {
+      fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), ...opts })
+    } catch (err) {
+      // TanStack cancels a get under way when goodbye removes its entry.
+      throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
+    }
     // A notice can land after the queryFn returns and before TanStack resolves the fetch with what it returned.
     return this.at(ask) ?? fetched
   }
@@ -308,9 +329,13 @@ export class ThingMinder {
     return {
       queryKey: this.queryKey(ask),
       queryFn:  async (): Promise<DeliverableThing> => {
+        // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
+        const prior  = this.at(ask)
         const answer = await this.#vaultDB.tryGetThing(ask)
         if (! answer.ok) { throw answer.err }
         const record = answer.val ?? this.#voidSentinelAt(ask)
+        // TanStack keeps the entry's record and its time, marks it invalidated, and holds the refusal as the entry's error.
+        if ((prior !== undefined) && (cmpRecords(prior, record) < 0)) { throw staleRead(ask) }
         TSQ.notifyManager.batch(() => {
           this.#routeWorld(answer.world)
           this.#doDeliverRecord(record)
@@ -354,7 +379,17 @@ export class ThingMinder {
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
   #demandReady(): void {
-    if (! this.#isReady) { throw new Errors.VaultError('disabled', Phrases.MinderNotStarted) }
+    if (! this.#isReady) { throw minderNotStarted() }
+  }
+
+  /** The scope of the cache entry at `queryKey`, one of this minder's. */
+  #scopeOfKey(queryKey: TSQ.QueryKey): ThingScope {
+    return { userid: this.userid, banklabel: this.banklabel, labelpath: queryKey.slice(3).join('/') }
+  }
+
+  /** Report `err`, which no caller is waiting to hear, to the console or the logger the host set as the default. */
+  #reportTrouble(err: unknown, oplabel: 'watch' | 'listen'): void {
+    Logger.DefaultLogger.error(Phrases.MinderTrouble, { oplabel: `ThingMinder.${oplabel}`, ...this.ties }, Logger.asError(err))
   }
   // --
 
@@ -375,7 +410,25 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: isVoidSentinel, gotAnswerOf, betterRecordOf, cmpRecords
+// == [Helpers]: minderNotStarted, staleRead, isRecordEvent, isVoidSentinel, gotAnswerOf, betterRecordOf, cmpRecords
+
+/** The refusal of a read on a minder that is not minding. */
+function minderNotStarted(): Errors.VaultError {
+  return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
+}
+
+/** The refusal of a get that storage answered older than the record cached when it began. */
+function staleRead(ask: GetThingAsk): Errors.VaultError {
+  return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
+}
+
+// A record lands (success), a get is refused or the entry invalidated (both leave the record untimely), or the entry
+// is removed. Adding an entry, a fetch starting, pausing or failing once, and the observers' bookkeeping change none.
+/** True for a cache event that changes an entry's record, or whether it is timely. */
+function isRecordEvent(event: TSQ.QueryCacheNotifyEvent): boolean {
+  if (event.type === 'removed') { return true }
+  return (event.type === 'updated') && ['success', 'error', 'invalidate'].includes(event.action.type)
+}
 
 /** True when `record` is a void sentinel: its revseq is the shell's -1. */
 function isVoidSentinel(record: DeliverableThing): record is VoidSentinel {

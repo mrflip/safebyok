@@ -1,9 +1,10 @@
 import * as TSQ from '@tanstack/query-core'
+import { Errors, Logger } from 'safebyok-big/internals'
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type MinderRoster, type TSQAnswer, ThingMinder, voidSentinelOf } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateThing, type GetThingAsk, type Thingkind, type WorldRecord, boxSparse, sparseOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetThingAsk, type ThingScope, type Thingkind, type WorldRecord, boxSparse, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -203,7 +204,7 @@ describe("ThingMinder.goodbye", () => {
     expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.deep.equal({})
   })
 
-  it("caches nothing that a get under way answers after it", async () => {
+  it("refuses a get under way disabled, and caches nothing it answers after", async () => {
     const vaultDB = new LateVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const { tsq, minder, bankMinder } = minderWorldOf(vaultDB)
@@ -212,7 +213,7 @@ describe("ThingMinder.goodbye", () => {
     minder.goodbye()
     bankMinder.goodbye()
     vaultDB.release()
-    await expect(getting).rejects.toThrow()
+    await TH.expectRefusal(getting, 'disabled')
     expect(tsq.getQueryCache().getAll()).to.have.lengthOf(0)
   })
 
@@ -417,13 +418,37 @@ describe("ThingMinder.get", () => {
     expect(await getting).to.deep.equal(gate)
   })
 
-  it("keeps the later record where storage goes back behind it", async () => {
+  const BackwardCases = [
+    [(vaultDB: MemoryVaultDB) => { vaultDB._cheat_things(TH.ThingBank).set(TH.GateScope.labelpath, TH.gateThingOf()) }, 'an older revision'],
+    [(vaultDB: MemoryVaultDB) => { vaultDB._cheat_things(TH.ThingBank).delete(TH.GateScope.labelpath) },             'nothing stored'],
+  ] as const
+  for (const [goBack, blurb] of BackwardCases) {
+    it(`refuses a get answered with ${blurb}, behind the record cached before it, and keeps that record untimely`, async () => {
+      const vaultDB = new MemoryVaultDB()
+      const gate1   = await storedGateOf(vaultDB, 1)
+      const { minder } = minderWorldOf(vaultDB)
+      await minder.get(GateAsk)
+      goBack(vaultDB)
+      await TH.expectRefusal(minder.get(GateAsk, { staleTime: 0 }), 'stale_read')
+      expect(minder.at(GateAsk)).to.deep.equal(gate1)
+      expect(minder.tryAt(GateAsk)).to.deep.include({ act: 'untimely', isTimely: false })
+      expect(minder.tryAt(GateAsk)).to.have.nested.property('lastErr.refusalkind', 'stale_read')
+      const asked = vi.spyOn(vaultDB, 'tryGetThing')
+      await TH.expectRefusal(minder.get(GateAsk), 'stale_read')
+      expect(asked.mock.calls).to.have.lengthOf(1)
+    })
+  }
+
+  it("makes a notice of a newer record timely again after a stale read", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate1   = await storedGateOf(vaultDB, 1)
-    const { minder } = minderWorldOf(vaultDB)
+    const { minder, receive } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
     vaultDB._cheat_things(TH.ThingBank).set(TH.GateScope.labelpath, TH.gateThingOf())
-    expect(await minder.get(GateAsk, { staleTime: 0 })).to.deep.equal(gate1)
+    await TH.expectRefusal(minder.get(GateAsk, { staleTime: 0 }), 'stale_read')
+    const gate2 = TH.nextGateOf(gate1)
+    receive(noticeOf(gate2))
+    expect(minder.tryAt(GateAsk)).to.deep.include({ act: 'gotlive', val: gate2, isTimely: true })
   })
 
   it("asks the vaultDB while the browser reports itself offline", async () => {
@@ -479,22 +504,77 @@ describe("ThingMinder.list", () => {
   })
 })
 
+/** A listener that records each scope and record it hears. */
+function listenerOf() { return vi.fn<(scoped: ThingScope, record: DeliverableThing | undefined) => void>() }
+
 describe("ThingMinder.listen", () => {
-  it("hears each event of the minder's own entries, until stopped", async () => {
+  it("hears the scope and the record of each of the minder's own entries, until stopped", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const { minder, boxMinder } = minderWorldOf(vaultDB)
-    const heard    = vi.fn<(event: TSQ.QueryCacheNotifyEvent) => void>()
+    const heard    = listenerOf()
     const unlisten = minder.listen(heard)
     await boxMinder.get(BoxAsk)
     expect(heard.mock.calls).to.have.lengthOf(0)
-    await minder.get(GateAsk)
-    const gateKey = minder.queryKey(TH.GateScope)
-    expect(heard.mock.calls.some(([event]) => TSQ.matchQuery({ queryKey: gateKey, exact: true }, event.query))).to.be.true
+    const gate = await minder.get(GateAsk)
+    expect(heard.mock.calls).to.deep.include([TH.GateScope, gate])
     unlisten()
     heard.mockClear()
     await minder.get(GateAsk, { staleTime: 0 })
     expect(heard.mock.calls).to.have.lengthOf(0)
+  })
+
+  it("hears nothing while a get waits, then the record it lands", async () => {
+    const vaultDB = new LateVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    const heard   = listenerOf()
+    minder.listen(heard)
+    const getting = minder.get(GateAsk)
+    await TH.eventually(() => vaultDB.isHolding)
+    expect(heard.mock.calls).to.have.lengthOf(0)
+    vaultDB.release()
+    await getting
+    expect(heard.mock.calls.at(-1)).to.deep.equal([TH.GateScope, gate])
+  })
+
+  it("hears a refused get, with the record still cached", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate1   = await storedGateOf(vaultDB, 1)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(GateAsk)
+    const heard = listenerOf()
+    minder.listen(heard)
+    vaultDB._cheat_things(TH.ThingBank).set(TH.GateScope.labelpath, TH.gateThingOf())
+    await TH.expectRefusal(minder.get(GateAsk, { staleTime: 0 }), 'stale_read')
+    expect(heard.mock.calls).to.deep.equal([[TH.GateScope, gate1]])
+  })
+
+  it("hears undefined once the entry is removed", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(GateAsk)
+    const heard = listenerOf()
+    minder.listen(heard)
+    minder.goodbye()
+    expect(heard.mock.calls).to.deep.equal([[TH.GateScope, undefined]])
+  })
+
+  it("reports what a listener throws to the default logger, and tells the listeners after it", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    const logger  = { log: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    const later   = listenerOf()
+    minder.listen(() => { throw new Error('listener broke') })
+    minder.listen(later)
+    Logger.setDefaultLogger(logger)
+    try {
+      await minder.get(GateAsk)
+    } finally { Logger.setDefaultLogger(null) }
+    expect(later.mock.calls).to.deep.include([TH.GateScope, gate])
+    expect(logger.error.mock.calls[0]?.[2]).to.have.property('message', 'listener broke')
   })
 
   it("refuses a listener that is not a function", () => {
@@ -537,6 +617,18 @@ describe("The bank minder's watch", () => {
     boxMinder.goodbye()
     receive(noticeOf(TH.boxThingOf()))
     expect(tsq.getQueryCache().findAll({ queryKey: boxMinder.keyPrefix })).to.have.lengthOf(0)
+  })
+
+  it("reports its trouble to the default logger", () => {
+    const vaultDB  = new MemoryVaultDB()
+    const watching = vi.spyOn(vaultDB, 'watch')
+    minderWorldOf(vaultDB)
+    const logger   = { log: vi.fn(), warn: vi.fn(), error: vi.fn() }
+    Logger.setDefaultLogger(logger)
+    try {
+      watching.mock.calls[0]?.[2](new Errors.VaultError('damaged_row', 'a row failed its checks'))
+    } finally { Logger.setDefaultLogger(null) }
+    expect(logger.error.mock.calls[0]?.[2]).to.have.property('refusalkind', 'damaged_row')
   })
 
   it("skips a Thing of a kind with no minder", () => {

@@ -6,7 +6,7 @@ import { exactOptional } from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type ThingWatchScope, type Thingkind, boxSparse, thingWatchScope } from '../storage/shapes-thing'
+import { type ThingScope, type ThingWatchScope, type Thingkind, boxSparse, thingWatchScope } from '../storage/shapes-thing'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
 
@@ -45,7 +45,7 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderAs
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn(), invalidateQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)
-  const minderListener   = fn<(event: TSQ.QueryCacheNotifyEvent) => void>()
+  const minderListener   = fn<(scoped: ThingScope, record: unknown) => void>()
   // Each option may be left out, and never given as undefined.
   const minderGetAskOpts = obj({ staleTime: exactOptional(uint) }).strict()
   const minderAskOpts    = minderGetAskOpts.extend({ ifStale: exactOptional(oneof(['get', 'refresh'])) }).strict()

@@ -96,13 +96,19 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, QueryClientExpected, MinderExpected, MinderOfOtherKind, GcTimeShape
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, MinderTrouble, QueryClientExpected, MinderExpected, MinderOfOtherKind, GcTimeShape
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
 
 /** A minder read before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it.'
+
+/** A get that storage answered older than the record the minder held when it began. */
+export const StaleRead = 'Storage answered with a revision older than one this device already held. The newer record stays cached, and a later get asks again.'
+
+/** Trouble a minder met with no caller to throw to: its watch's, or a listener's throw. */
+export const MinderTrouble = 'A ThingMinder met trouble with no caller to hand it to.'
 
 /** A minder handed something that is not a TanStack Query client. */
 export const QueryClientExpected = 'A ThingMinder is made with a QueryClient from @tanstack/query-core.'
