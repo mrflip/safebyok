@@ -65,7 +65,7 @@ export function isLabelpathOfKind(labelpath: string, modelkind: Thingkind): bool
 function isLabelpath(labelpath: string): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, Sealed, Sparse, BoxSparse, sparseOf, ShellCited, childShellCited
+// == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, StoredCited, Sealed, Wayins, Sparse, BoxSparse, sparseOf, ShellCited, childShellCited
 
 const LifeseqPattern       = /^[0-9a-v]{10}$/
 const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/

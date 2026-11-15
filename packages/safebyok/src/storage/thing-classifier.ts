@@ -226,7 +226,8 @@ function trackedEntryOf<RecordT extends Thing>(check: StoredCheck<RecordT>, scop
 // --
 
 // == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, classifyBirthBank
-// Each takes the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`.
+// Each takes the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
+// a birth takes the bank's three roots, and where it is born, reports the world its puts wrote.
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
 export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {
@@ -301,7 +302,7 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 // --
 
 // == [Steps]: unwrittenWriteOf, demandBornAtKept, demandPolicies, unwrittenBirthOf
-// The steps of the classifiers above, for a store that reaches part of the verdict itself to take in its own order.
+// The steps of the classifiers above, for a store that checks some preconditions itself to call in its own order.
 
 /** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope and the raw world. */
 export function unwrittenWriteOf(ask: WriteThingAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {

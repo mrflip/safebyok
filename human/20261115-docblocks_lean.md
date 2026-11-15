@@ -110,4 +110,5 @@ fell only from 679 to 674 doc-block lines. The longest blocks lost a clause or a
 
 Rebased onto PR #707, which rewrote much of `storage/`. Where #707 changed a member, its own doc block was kept: `Listener`
 (now `Watcher`), `demandPolicies` (now `policyRefusalOf`), `demandReplaceable` (removed), `BankRootsFetched` (moved),
-`MaxLabelsUnder` (a box has at most one label). The rewrites of those members listed above are gone.
+`MaxLabelsUnder` (a box has at most one label). A later commit (f0ba10b92) restored the pass's rewrites there, merged with #707's
+new facts, and brought #707's own new blocks into the same register.
