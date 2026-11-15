@@ -254,7 +254,7 @@ export const KindChecks = {
 export function kindChecksOf(labelpath: string): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
-// == [Asks]: AskChecks, GetThingAsk, ListThingsAsk, WriteThingAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: AskChecks, WorldPick, GetThingAsk, ListThingsAsk, WriteThingAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: string }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -279,19 +279,22 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
     /** The storage policies the write must keep, each over the Thing stored. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
+  const worldPick       = obj({ revseq: thingRecord.shape.revseq, lifeseq: thingRecord.shape.lifeseq }).strict()
+  const world           = worldPick.optional()
   return {
     thingOptions,
-    getThingAsk:     thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent }).strict()
+    worldPick,
+    getThingAsk:     thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent, world }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
-    listThingsAsk:   thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent }).strict()
+    listThingsAsk:   thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent, world }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
     writeThingAsk:   thingScope.extend({
-      op: oneof(['put', 'del']), modelkind, cited: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(),
+      op: oneof(['put', 'del']), modelkind, cited: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(), world,
     }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn)
       .refine(isDelFixed,     Phrases.DelFlagsFixed)
       .refine(isPolicyOwn,    Phrases.PolicyNotOwn),
-    birthBankAsk:    obj({ userid: user_id, banklabel: label, op: lit('birth'), bank: unk, gate: unk, root: unk }).strict(),
+    birthBankAsk:    obj({ userid: user_id, banklabel: label, op: lit('birth'), bank: unk, gate: unk, root: unk, world }).strict(),
     thingWatchScope,
     watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
   }
@@ -299,6 +302,10 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
 /** The check of a watch's scope, a bank, and of a watch's arguments. */
 export const { thingWatchScope, watchArgs } = AskChecks
 
+/** What an ask may carry of the world its sender holds: the bank's revseq and lifeseq. Where the answer's world differs, or the ask carries
+ * none, the vaultDB also tells its watches of the bank of that world.
+ */
+export type WorldPick       = Readonly<Z.infer<typeof AskChecks.worldPick>>
 /** An ask for the Thing at its scope. */
 export type GetThingAsk     = Readonly<Z.infer<typeof AskChecks.getThingAsk>>
 /** An ask for the children of the Thing at its scope. Its `ifAbsent` is the parent's. */
@@ -425,34 +432,36 @@ function bornAtNotNow(ask: WriteThingAsk): Errors.VaultError { return new Errors
 function testimonyMissing(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Ask builders]: GetAskArgs, ListAskArgs, PutAskArgs, DelAskArgs, getAskOf, listAskOf, putAskOf, delAskOf, scopeGiven, modelkindGiven
+// == [Ask builders]: GetAskArgs, ListAskArgs, PutAskArgs, DelAskArgs, getAskOf, listAskOf, putAskOf, delAskOf, scopeGiven, worldGiven, modelkindGiven
 // The one place an ask's flags are defaulted. A builder fills in the op, the modelkind and the default flags, and checks
 // nothing: what it was given that is wrong goes through as given, for the verb's checks to refuse in its answer.
 
 /** The storage policies a write names. */
 type ThingOptions = Readonly<Z.infer<typeof AskChecks.thingOptions>>
 
-/** The args of {@link getAskOf}: a Thing's scope, and its `ifAbsent` (default `'nil'`). */
-export type GetAskArgs  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent }>
-/** The args of {@link listAskOf}: the parent's scope, and its `ifAbsent` (default `'fail'`). */
-export type ListAskArgs = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent }>
-/** The args of {@link putAskOf}: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), and the storage policies. */
-export type PutAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions }>
-/** The args of {@link delAskOf}: the records. Its flags are fixed. */
-export type DelAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT }>
+/** The args of {@link getAskOf}: a Thing's scope, its `ifAbsent` (default `'nil'`), and the world its sender holds. */
+export type GetAskArgs  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, world?: WorldPick }>
+/** The args of {@link listAskOf}: the parent's scope, its `ifAbsent` (default `'fail'`), and the world its sender holds. */
+export type ListAskArgs = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, world?: WorldPick }>
+/** The args of {@link putAskOf}: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), the storage policies, and the world its sender holds. */
+export type PutAskArgs<RecordT extends Thing = Thing> = Readonly<{
+  cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions, world?: WorldPick,
+}>
+/** The args of {@link delAskOf}: the records, and the world its sender holds. Its flags are fixed. */
+export type DelAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, world?: WorldPick }>
 
 /** The get ask for the Thing at `args`'s scope. */
 export function getAskOf(args: GetAskArgs): GetThingAsk {
   if (! CX.isPlainBag(args)) { return args }
-  const { userid, banklabel, labelpath, ifAbsent = 'nil' } = args
-  return { userid, banklabel, labelpath, op: 'get', modelkind: modelkindGiven(labelpath), ifAbsent } as GetThingAsk
+  const { userid, banklabel, labelpath, ifAbsent = 'nil', world } = args
+  return { userid, banklabel, labelpath, op: 'get', modelkind: modelkindGiven(labelpath), ifAbsent, ...worldGiven(world) } as GetThingAsk
 }
 
 /** The list ask for the children of the Thing at `args`'s scope. */
 export function listAskOf(args: ListAskArgs): ListThingsAsk {
   if (! CX.isPlainBag(args)) { return args }
-  const { userid, banklabel, labelpath, ifAbsent = 'fail' } = args
-  return { userid, banklabel, labelpath, op: 'list', modelkind: modelkindGiven(labelpath), ifAbsent } as ListThingsAsk
+  const { userid, banklabel, labelpath, ifAbsent = 'fail', world } = args
+  return { userid, banklabel, labelpath, op: 'list', modelkind: modelkindGiven(labelpath), ifAbsent, ...worldGiven(world) } as ListThingsAsk
 }
 
 /** The put ask writing `args.record` over `args.cited`, at the record's scope. */
@@ -479,6 +488,9 @@ function scopeGiven(record: unknown): Partial<Record<keyof ThingScope, unknown>>
   return { userid, banklabel, labelpath }
 }
 
+/** The world pick given, as a field to spread into an ask: none when none is given. */
+function worldGiven(world: unknown): { world?: unknown } { return (world === undefined) ? {} : { world } }
+
 /** The modelkind `labelpath` starts with, or undefined when it is not a string. */
 function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typeof labelpath === 'string') ? modelkindOf(labelpath) : undefined }
 // --
@@ -504,6 +516,7 @@ export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label
     bank:      citedFields.optional(),
     gate:      citedFields.optional(),
     root:      citedFields.optional(),
+    world:     obj({ revseq: thingRecord.shape.revseq, lifeseq: thingRecord.shape.lifeseq }).optional(),
   }
 }, 'bad_option')
 

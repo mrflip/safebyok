@@ -51,6 +51,23 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
   })
 })
 
+describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
+  it("tells its watches of no world an ask's pick misses, made with pushesWorld: false", async () => {
+    const vaultDB = new MemoryVaultDB({ pushesWorld: false })
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const notices: unknown[] = []
+    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
+    await TH.expectGood(vaultDB.tryGetThing(TH.getAskAt('box')))
+    await TH.aWhile()
+    expect(notices).to.deep.equal([])
+  })
+
+  it("refuses an opt it does not know, or one of the wrong type", () => {
+    TH.expectSyncRefusal(() => new MemoryVaultDB({ pushesWorld: 'no' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => new MemoryVaultDB({ pushWorld: false } as never), 'bad_option')
+  })
+})
+
 describe("classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }

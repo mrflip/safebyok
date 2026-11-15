@@ -89,7 +89,9 @@ export interface VaultDB {
   putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT>
   /** The del ask writing the tombstone `args.record` over `args.cited`. */
   delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT>
-  /** Watch the Things of a bank, and return a function that stops the watch. `onBadNews` hears the trouble the watch meets, a Thing heard that fails its checks among it. */
+  /** Watch the Things of a bank, and return a function that stops the watch. `onBadNews` hears the trouble the watch meets, a Thing heard that fails its checks among it.
+   * Where a verb's answer carries a world other than its ask's `world` pick, or the ask has none, the watch also hears the bank, with that world.
+   */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }
 

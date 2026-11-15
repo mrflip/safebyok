@@ -3,7 +3,7 @@
 import { BW } from 'safebyok-big/testing'
 import {
   type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetThingAsk, type ListThingsAsk, type PutAskArgs, type Thing,
-  type ThingCited, type WriteAskOf, type WriteThingAsk,
+  type ThingCited, type WorldPick, type WriteAskOf, type WriteThingAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOf, lifeseqOfLifepath, listAskOf, putAskOf, seqOfLifeseq,
 } from '../../src/storage/shapes-thing'
 import { T0 } from './models-world'
@@ -33,6 +33,9 @@ export const Life0 = lifeseqOf(0)
 
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
 const FirstRevision = { am: 'a', revtok: 'rev-0', revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
+
+/** The world pick of the bank {@link bankThingOf} makes: an ask carrying it hears no push of that world. */
+export const BankPick: WorldPick = Object.freeze({ revseq: 0, lifeseq: Life0 })
 
 /** The bank Thing at revision 0 of life 0, with `overrides` laid over it. */
 export function bankThingOf(overrides: Partial<BankThing> = {}): BankThing {
