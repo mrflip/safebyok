@@ -57,3 +57,24 @@ Steps to create: storage restored from a backup, or two stores answering for one
 Reasoning for wontfix: storage is the ground truth, and the cache a copy. The store knows the record it holds, and
 refuses a write that cites another, so a conflict is found where it can be settled, not in the cache. Ruled by the Coach,
 2026-11-15, vault_minder.
+
+### The value in `tracked` of a missing or damaged record
+
+The return value in `tracked` of a missing or damaged record is undefined behavior.
+
+* current outcome: undefined. No store, adapter or caller checks for it, and none may: no guard, no null, no refusal,
+  and no test of the value.
+* alternatives:
+  - a sentinel for either case (null, a refusal kind, a left-out key): it extends the contract, so every caller must
+    then handle it, and the handling cascades into code that second-guesses the store.
+  - report it from `tracked`: a damaged row should already have refused, with `storage_issue` or a heavier error,
+    where it was read; a missing one is not this field's to report.
+* workaround: reload the page, or restart the system.
+
+Steps to reproduce: a device's ask carries `track` for the bank and its main gate, whose revisions it was sent, after
+the datastore has lost or damaged either row.
+
+Reasoning for wontfix: the device was sent revisions of both rows, so either case means storage has gone wrong
+underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
+Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
+`tracked` type and at `notifyTrackedRecords` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.

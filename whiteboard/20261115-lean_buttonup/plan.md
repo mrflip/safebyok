@@ -69,10 +69,6 @@ gate's write function*), overriding `classify*` where the store reached the verd
 
 ## Open
 
-* **`track` / `tracked` details**, built as defaults: keys by the main gate's actual labelpath (`gate`, one constant)
-  where the Coach wrote `'gate/main'`; a key with nothing stored or a damaged row is left out of `tracked`; an ask
-  with no `track` gets no `tracked`; `doNotifyTracked` is an adapter option, on by default.
-
 ## Settled, 2026-11-15
 
 * **The world push (T1): `track` / `tracked`.** Every answer carries its world (`WorldRecord | null`), as today. An
@@ -81,7 +77,9 @@ gate's write function*), overriding `classify*` where the store reached the verd
   `tracked`, each entry `'same'` where revseq and lifepath match, otherwise the full row (the bank's row alone); no
   null. Every response method ends in one `notifyTrackedRecords`, which returns unless `doNotifyTracked` is enabled,
   and otherwise notifies each entry that is not `'same'`. Bank revisions stay honest: a gate write does not revise
-  the bank, and there is no compound gate write.
+  the bank, and there is no compound gate write. The main gate's key is its labelpath, `gate`, in one constant. An ask
+  with no `track` gets no `tracked`. `doNotifyTracked` is on by default. A missing or damaged tracked row is undefined
+  behavior (notes/wontfix.md): no code handles it, pinned by a type-level test and a pointer comment.
 * **A friend** is the narrow set of an owner's attributes and callbacks that it hands a collaborator, a pick of the
   owner's interface where the names coincide (`gallant.md` *#record-then-opts*). Visibility does not define it, and
   is not changed for it; "Internal." in a doc block marks what is not for hosts.
