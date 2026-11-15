@@ -1,29 +1,22 @@
 import * as TSQ from '@tanstack/query-core'
-import { Errors } from 'safebyok-big/internals'
 import { describe, expect, it, vi } from 'vitest'
-import { DefaultQueryCacheOpts, type MinderBank } from '../../src/minding/shapes-minder'
-import { type DeliverableThing, type TSQAnswer, ThingMinder, VoidSentinel } from '../../src/minding/thing-minder'
+import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type QueryCacheOpts } from '../../src/minding/shapes-minder'
+import { type DeliverableThing, type MinderRoster, type TSQAnswer, ThingMinder, voidSentinelOf } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { GateThing, GetThingAsk } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetThingAsk, type Thingkind, type WorldRecord, boxSparse, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
 /** The ask that gets the main gate, as a minder takes it. */
 const GateAsk: GetThingAsk & { ifAbsent: 'nil' } = { op: 'get', modelkind: 'gate', ...TH.GateScope, ifAbsent: 'nil' }
+/** The ask that gets the bank, as a minder takes it. */
+const BankAsk: GetThingAsk & { ifAbsent: 'nil' } = { op: 'get', modelkind: 'bank', ...TH.BankScope, ifAbsent: 'nil' }
+/** The ask that gets the box under the root box, as a minder takes it. */
+const BoxAsk: GetThingAsk & { ifAbsent: 'nil' } = { op: 'get', modelkind: 'box', ...TH.BoxScope, ifAbsent: 'nil' }
 
-/** A bank as a minder reads it, enabled until the test says otherwise. */
-type FakeBank = Omit<MinderBank, 'isEnabled'> & { isEnabled: boolean }
-
-/** A bank of {@link TH.ThingBank}, enabled, under the default cache options. */
-function fakeBankOf(): FakeBank {
-  const bank: FakeBank = {
-    modelkind: 'bank', userid: TH.ThingBank.userid, banklabel: TH.ThingBank.banklabel, queryCacheOpts: DefaultQueryCacheOpts, isEnabled: true,
-    demandEnabled() {
-      if (! bank.isEnabled) { throw new Errors.VaultError('disabled', 'the bank is disabled') }
-      return bank as never
-    },
-  }
-  return bank
+/** A bank as a minder reads it: its scope, and its root box in life 0. */
+function fakeBankOf(): MinderFriend {
+  return { scope: { ...TH.ThingBank }, rootBox: sparseOf(TH.rootBoxOf()) }
 }
 
 /** A vaultDB whose gets read the store at once, and answer only when the test calls `release`. */
@@ -48,28 +41,35 @@ class DownVaultDB extends MemoryVaultDB {
   protected override doGetThing(): never { throw new Error('connection refused') }
 }
 
-/** A minder of gates, what it stands on, and a way to hand it a notice as its watch would. */
-interface MinderWorld<VaultDBT extends MemoryVaultDB> {
-  vaultDB: VaultDBT
-  tsq:     TSQ.QueryClient
-  bank:    FakeBank
-  minder:  ThingMinder
-  receive: (notice: ThingNotice) => void
+/** A minder of `modelkind` over `vaultDB` and `tsq`, handing Things on to `minders`. */
+function minderOf(modelkind: Thingkind, vaultDB: MemoryVaultDB, tsq: TSQ.QueryClient, minders: MinderRoster = {}, queryCacheOpts: Partial<QueryCacheOpts> = {}): ThingMinder {
+  return ThingMinder.make({ modelkind }, { vaultDB, tsq, queryCacheOpts, minders }, fakeBankOf())
 }
 
-/** A minder of gates over `vaultDB`, made, and started unless `isStarted` is false. */
+/** A bank's minders of its gate and of its boxes, the bank's minder that watches for them, what they stand on, and a way to hand the watch a notice. */
+interface MinderWorld<VaultDBT extends MemoryVaultDB> {
+  vaultDB:    VaultDBT
+  tsq:        TSQ.QueryClient
+  minder:     ThingMinder
+  boxMinder:  ThingMinder
+  bankMinder: ThingMinder
+  receive:    (notice: ThingNotice) => void
+}
+
+/** The minders of a bank over `vaultDB`, made, and started unless `isStarted` is false. `minder` is the gate's. */
 function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true } = {}): MinderWorld<VaultDBT> {
-  const tsq      = new TSQ.QueryClient()
-  const bank     = fakeBankOf()
-  const watching = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const minder   = ThingMinder.make({ modelkind: 'gate' }, { bank, vaultDB, tsq, onBadNews: vi.fn() })
-  if (isStarted) { minder.hello() }
+  const tsq        = new TSQ.QueryClient()
+  const watching   = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
+  const minder     = minderOf('gate', vaultDB, tsq)
+  const boxMinder  = minderOf('box', vaultDB, tsq)
+  const bankMinder = minderOf('bank', vaultDB, tsq, { gate: minder, box: boxMinder })
+  if (isStarted) { for (const each of [minder, boxMinder, bankMinder]) { each.hello() } }
   function receive(notice: ThingNotice): void {
     const watched = watching.mock.calls.at(-1)
-    if (! watched) { throw new Error('the minder is not watching') }
+    if (! watched) { throw new Error('the bank minder is not watching') }
     watched[1](notice)
   }
-  return { vaultDB, tsq, bank, minder, receive }
+  return { vaultDB, tsq, minder, boxMinder, bankMinder, receive }
 }
 
 /** A vaultDB holding the main gate at revision `revseq`, and the gate it holds. */
@@ -84,69 +84,99 @@ async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<Gat
   return gate
 }
 
-/** A watch notice of `gate`, as the vaultDB sends one. */
-function noticeOf(gate: GateThing): ThingNotice { return { ok: true, act: (gate.am === 'a') ? 'gotlive' : 'gotgone', val: gate, world: null } }
+/** A vaultDB holding a born bank and the box under its root box, and the box. */
+async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['val']> {
+  await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+  const box   = TH.boxThingOf()
+  const shell = voidSentinelOf(TH.BoxScope, TH.Life0)
+  await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(box, shell)))
+  return box
+}
 
-/** The revtok of what the minder holds for the main gate, or undefined for nothing or the Void Sentinel. */
+/** A watch notice of `thing`, as the vaultDB sends one, with `world` beside it. */
+function noticeOf(thing: ThingNotice['val'], world: WorldRecord | null = null): ThingNotice {
+  return { ok: true, act: (thing.am === 'a') ? 'gotlive' : 'gotgone', val: thing, world }
+}
+
+/** The revtok of what the minder holds for the main gate, or undefined for nothing or the void sentinel. */
 function revtokAt(minder: ThingMinder): string | undefined {
   const record: DeliverableThing | undefined = minder.at(GateAsk)
-  return ((record === undefined) || (record.revseq === VoidSentinel.revseq)) ? undefined : record.revtok
+  return ((record === undefined) || (record.revseq === -1)) ? undefined : record.revtok
 }
 
 /** The act of `answer`, a tryAt's answer. */
 function actOf(answer: TSQAnswer): string { return answer.act }
 
 describe("ThingMinder.make", () => {
-  const tsq     = new TSQ.QueryClient()
-  const vaultDB = new MemoryVaultDB()
+  const tsq        = new TSQ.QueryClient()
+  const vaultDB    = new MemoryVaultDB()
+  const gateMinder = minderOf('gate', vaultDB, tsq)
   const MakeCases = [
-    [{ modelkind: 'vault' }, {},                                                    'refuses a modelkind that is no kind of Thing'],
-    [{},                     { bank: { ...TH.ThingBank } },                         'refuses a bank that is no Bank'],
-    [{},                     { vaultDB: { tryGetThing: () => 1, watch: () => 1 } }, 'refuses a vaultDB without the brand'],
-    [{},                     { tsq: { query: 1 } },                                 'refuses a QueryClient without its methods'],
-    [{},                     { onBadNews: undefined },                              'refuses a missing onBadNews'],
+    [{ modelkind: 'vault' }, {},                                                    null,                'refuses a modelkind that is no kind of Thing'],
+    [{},                     {},                                                    { ...TH.ThingBank }, 'refuses a bank without its scope and root box'],
+    [{},                     { vaultDB: { tryGetThing: () => 1, watch: () => 1 } }, null,                'refuses a vaultDB without the brand'],
+    [{},                     { tsq: { query: 1 } },                                 null,                'refuses a QueryClient without its methods'],
+    [{},                     { queryCacheOpts: { networkMode: 'online' } },         null,                'refuses a networkMode, which no host sets'],
+    [{},                     { queryCacheOpts: { retry: 3 } },                      null,                'refuses a retry, which no host sets'],
+    [{},                     { queryCacheOpts: { staleTime: -1 } },                 null,                'refuses a negative staleTime'],
+    [{},                     { minders: { gate: {} } },                             null,                'refuses a minder that is no ThingMinder'],
+    [{},                     { minders: { box: gateMinder } },                      null,                'refuses a minder given for another kind'],
   ] as const
-  for (const [pinsOver, optsOver, blurb] of MakeCases) {
+  for (const [tiesOver, optsOver, bank, blurb] of MakeCases) {
     it(blurb, () => {
       // @ts-expect-error -- sloppy input is the point
-      TH.expectSyncRefusal(() => ThingMinder.make({ modelkind: 'gate', ...pinsOver }, { bank: fakeBankOf(), vaultDB, tsq, onBadNews: vi.fn(), ...optsOver }), 'bad_option')
+      TH.expectSyncRefusal(() => ThingMinder.make({ modelkind: 'gate', ...tiesOver }, { vaultDB, tsq, ...optsOver }, bank ?? fakeBankOf()), 'bad_option')
     })
   }
+
+  it("refuses a minder of another bank", () => {
+    const otherBank  = { scope: { ...TH.ThingBank, userid: 'u2' }, rootBox: { ...sparseOf(TH.rootBoxOf()), userid: 'u2' } }
+    const otherGates = ThingMinder.make({ modelkind: 'gate' }, { vaultDB, tsq }, otherBank)
+    TH.expectSyncRefusal(() => ThingMinder.make({ modelkind: 'bank' }, { vaultDB, tsq, minders: { gate: otherGates } }, fakeBankOf()), 'bad_option')
+  })
 
   it("takes its scope from the bank", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
     expect(minder.scope).to.deep.equal(TH.ThingBank)
-    expect(minder.pins).to.deep.equal({ ...TH.ThingBank, modelkind: 'gate' })
+    expect(minder.ties).to.deep.equal({ ...TH.ThingBank, modelkind: 'gate' })
   })
 })
 
 describe("ThingMinder.hello", () => {
-  it("sets the bank's cache options as the defaults of the minder's entries", () => {
+  it("sets the cache options, and those no host sets, as the defaults of the minder's entries", () => {
     const { tsq, minder } = minderWorldOf(new MemoryVaultDB())
-    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include(DefaultQueryCacheOpts)
+    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include({ ...DefaultQueryCacheOpts, ...FixedQueryCacheOpts })
+    expect(DefaultQueryCacheOpts.staleTime).to.eq(60 * 60 * 1000)
   })
 
-  it("watches the bank, and hands the watch its onBadNews", () => {
-    const vaultDB   = new MemoryVaultDB()
-    const watching  = vi.spyOn(vaultDB, 'watch')
-    const onBadNews = vi.fn()
-    const minder    = ThingMinder.make({ modelkind: 'gate' }, { bank: fakeBankOf(), vaultDB, tsq: new TSQ.QueryClient(), onBadNews })
+  it("sets the staleTime the minder was made with", () => {
+    const tsq    = new TSQ.QueryClient()
+    const minder = minderOf('gate', new MemoryVaultDB(), tsq, {}, { staleTime: 5 })
     minder.hello()
+    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include({ staleTime: 5, gcTime: Infinity, networkMode: 'always', retry: false })
+  })
+
+  it("watches the bank from the bank's minder alone", () => {
+    const vaultDB  = new MemoryVaultDB()
+    const watching = vi.spyOn(vaultDB, 'watch')
+    minderWorldOf(vaultDB)
     expect(watching.mock.calls).to.have.lengthOf(1)
     expect(watching.mock.calls[0]?.[0]).to.deep.equal(TH.ThingBank)
-    expect(watching.mock.calls[0]?.[2]).to.eq(onBadNews)
   })
 
-  it("refuses disabled where the bank is disabled", () => {
-    const { bank, minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
-    bank.isEnabled = false
-    TH.expectSyncRefusal(() => { minder.hello() }, 'disabled')
+  it("opens no second watch when called again", () => {
+    const vaultDB  = new MemoryVaultDB()
+    const watching = vi.spyOn(vaultDB, 'watch')
+    const { bankMinder } = minderWorldOf(vaultDB)
+    bankMinder.hello()
+    expect(watching.mock.calls).to.have.lengthOf(1)
   })
 
   it("comes before any read: until then, each refuses disabled", async () => {
-    const { minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
+    const { minder, boxMinder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
     await TH.expectBad(minder.tryAt(GateAsk), 'disabled')
     await TH.expectRefusal(minder.get(GateAsk), 'disabled')
+    await TH.expectRefusal(boxMinder.list(), 'disabled')
   })
 })
 
@@ -154,17 +184,45 @@ describe("ThingMinder.goodbye", () => {
   it("removes the minder's entries, stops watching, and refuses later reads", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate0   = await storedGateOf(vaultDB, 0)
-    const { tsq, minder } = minderWorldOf(vaultDB)
+    const { tsq, minder, bankMinder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
     minder.goodbye()
-    const entries = tsq.getQueryCache().findAll({ queryKey: minder.keyPrefix })
-    expect(entries).to.have.lengthOf(0)
+    bankMinder.goodbye()
+    expect(tsq.getQueryCache().findAll({ queryKey: minder.keyPrefix })).to.have.lengthOf(0)
     const gate1 = TH.nextGateOf(gate0)
     await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(gate0, gate1)))
     await TH.wakeupAtNextTick()
     expect(minder.at(GateAsk)).to.be.undefined
     await TH.expectBad(minder.tryAt(GateAsk), 'disabled')
     await TH.expectRefusal(minder.get(GateAsk), 'disabled')
+  })
+
+  it("removes the minder's defaults from the cache", () => {
+    const { tsq, minder } = minderWorldOf(new MemoryVaultDB())
+    minder.goodbye()
+    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.deep.equal({})
+  })
+
+  it("caches nothing that a get under way answers after it", async () => {
+    const vaultDB = new LateVaultDB()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const { tsq, minder, bankMinder } = minderWorldOf(vaultDB)
+    const getting = minder.get(GateAsk)
+    await TH.eventually(() => vaultDB.isHolding)
+    minder.goodbye()
+    bankMinder.goodbye()
+    vaultDB.release()
+    await expect(getting).rejects.toThrow()
+    expect(tsq.getQueryCache().getAll()).to.have.lengthOf(0)
+  })
+
+  it("lets hello start the minder again", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    minder.goodbye()
+    minder.hello()
+    expect(await minder.get(GateAsk)).to.deep.equal(gate)
   })
 })
 
@@ -215,10 +273,10 @@ describe("ThingMinder.tryAt", () => {
   })
 
   it("answers gotgone with a tombstone", () => {
-    const { minder, receive } = minderWorldOf(new MemoryVaultDB())
-    const tombstone = TH.gateThingOf({ am: 'x', revtok: 'rev-1', revseq: 1 })
+    const { boxMinder, receive } = minderWorldOf(new MemoryVaultDB())
+    const tombstone = TH.boxTombOf(TH.boxThingOf())
     receive(noticeOf(tombstone))
-    expect(minder.tryAt(GateAsk)).to.deep.include({ ok: true, act: 'gotgone', val: tombstone })
+    expect(boxMinder.tryAt(BoxAsk)).to.deep.include({ ok: true, act: 'gotgone', val: tombstone })
   })
 
   it("reads the cache alone under ifStale: 'get'", async () => {
@@ -274,12 +332,6 @@ describe("ThingMinder.tryAt", () => {
       await TH.expectBad(minder.tryAt(ask, opts), 'bad_option')
     })
   }
-
-  it("refuses disabled once the bank is disabled", async () => {
-    const { bank, minder } = minderWorldOf(new MemoryVaultDB())
-    bank.isEnabled = false
-    await TH.expectBad(minder.tryAt(GateAsk), 'disabled')
-  })
 })
 
 describe("ThingMinder.get", () => {
@@ -293,9 +345,21 @@ describe("ThingMinder.get", () => {
     expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
-  it("returns the Void Sentinel where nothing is stored", async () => {
+  it("returns a root's void sentinel where nothing is stored", async () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
-    expect(await minder.get(GateAsk)).to.deep.equal(VoidSentinel)
+    const voided = await minder.get(GateAsk)
+    expect(voided).to.deep.equal(voidSentinelOf(TH.GateScope, null))
+    expect(voided).to.deep.include({ ...TH.GateScope, label: 'gate', revseq: -1, am: 'x', lifeseq: '-1', lifepath: '-1' })
+  })
+
+  it("returns, for a box under the root box, its shell, which the box's birth cites", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const { boxMinder } = minderWorldOf(vaultDB)
+    const shell = await boxMinder.get(BoxAsk)
+    expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/-1` })
+    expect(boxSparse.safeParse(shell).success).to.be.true
+    const birth = TH.birthAskOf(TH.boxThingOf(), shell)
+    await TH.expectGood(vaultDB.tryWriteThing(birth))
   })
 
   it("asks the vaultDB once for two gets under way together", async () => {
@@ -316,6 +380,17 @@ describe("ThingMinder.get", () => {
     await minder.get(GateAsk)
     await minder.get(GateAsk, { staleTime: 0 })
     expect(asked.mock.calls).to.have.lengthOf(2)
+  })
+
+  it("caches the main gate of the world beside the record in the gate's minder", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const { gate } = TH.birthBankAskOf()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const { minder, bankMinder } = minderWorldOf(vaultDB)
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    expect(await bankMinder.get(BankAsk)).to.have.property('labelpath', 'bank')
+    expect(await minder.get(GateAsk)).to.deep.equal(gate)
+    expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
   it("returns a notice that lands during the get over the get's older answer", async () => {
@@ -377,6 +452,58 @@ describe("ThingMinder.get", () => {
   })
 })
 
+describe("ThingMinder.list", () => {
+  it("lists the boxes under the root box, and caches each sparse and stale", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box     = await storedBoxOf(vaultDB)
+    const { boxMinder } = minderWorldOf(vaultDB)
+    expect(await boxMinder.list()).to.deep.equal([TH.BoxScope.labelpath])
+    expect(boxMinder.at(BoxAsk)).to.deep.equal(sparseOf(box))
+    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.true
+    expect(await boxMinder.get(BoxAsk)).to.deep.equal(box)
+  })
+
+  it("leaves a box the cache holds whole as it is, and timely", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box     = await storedBoxOf(vaultDB)
+    const { boxMinder } = minderWorldOf(vaultDB)
+    await boxMinder.get(BoxAsk)
+    await boxMinder.list()
+    expect(boxMinder.at(BoxAsk)).to.deep.equal(box)
+    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.false
+  })
+
+  it("lists nothing under a root box not yet stored", async () => {
+    const { boxMinder } = minderWorldOf(new MemoryVaultDB())
+    expect(await boxMinder.list()).to.deep.equal([])
+  })
+})
+
+describe("ThingMinder.listen", () => {
+  it("hears each event of the minder's own entries, until stopped", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const { minder, boxMinder } = minderWorldOf(vaultDB)
+    const heard    = vi.fn<(event: TSQ.QueryCacheNotifyEvent) => void>()
+    const unlisten = minder.listen(heard)
+    await boxMinder.get(BoxAsk)
+    expect(heard.mock.calls).to.have.lengthOf(0)
+    await minder.get(GateAsk)
+    const gateKey = minder.queryKey(TH.GateScope)
+    expect(heard.mock.calls.some(([event]) => TSQ.matchQuery({ queryKey: gateKey, exact: true }, event.query))).to.be.true
+    unlisten()
+    heard.mockClear()
+    await minder.get(GateAsk, { staleTime: 0 })
+    expect(heard.mock.calls).to.have.lengthOf(0)
+  })
+
+  it("refuses a listener that is not a function", () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    // @ts-expect-error -- sloppy input is the point
+    TH.expectSyncRefusal(() => minder.listen(undefined), 'bad_option')
+  })
+})
+
 describe("ThingMinder.isStaleAt", () => {
   it("is true before any get, false after, and true past staleTime", async () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
@@ -387,8 +514,8 @@ describe("ThingMinder.isStaleAt", () => {
   })
 })
 
-describe("ThingMinder's watch", () => {
-  it("hands the cache each record written", async () => {
+describe("The bank minder's watch", () => {
+  it("hands the gate's minder each gate written", async () => {
     const vaultDB = new MemoryVaultDB()
     const { minder } = minderWorldOf(vaultDB)
     const gate = await storedGateOf(vaultDB, 0)
@@ -396,16 +523,36 @@ describe("ThingMinder's watch", () => {
     expect(minder.at(GateAsk)).to.deep.equal(gate)
   })
 
-  it("ignores a notice of another kind of Thing", () => {
-    const { tsq, receive } = minderWorldOf(new MemoryVaultDB())
-    receive(noticeOf(TH.gateThingOf({ labelpath: 'box/openai' })))
+  it("caches the bank and the main gate of a notice's world, and its box", () => {
+    const { minder, boxMinder, bankMinder, receive } = minderWorldOf(new MemoryVaultDB())
+    const [bank, gate, box] = [TH.bankThingOf(), TH.gateThingOf(), TH.boxThingOf()]
+    receive(noticeOf(box, { ...bank, maingate: gate }))
+    expect(bankMinder.at(BankAsk)).to.deep.equal(bank)
+    expect(minder.at(GateAsk)).to.deep.equal(gate)
+    expect(boxMinder.at(BoxAsk)).to.deep.equal(box)
+  })
+
+  it("skips a Thing whose minder is not minding", () => {
+    const { tsq, boxMinder, receive } = minderWorldOf(new MemoryVaultDB())
+    boxMinder.goodbye()
+    receive(noticeOf(TH.boxThingOf()))
+    expect(tsq.getQueryCache().findAll({ queryKey: boxMinder.keyPrefix })).to.have.lengthOf(0)
+  })
+
+  it("skips a Thing of a kind with no minder", () => {
+    const vaultDB    = new MemoryVaultDB()
+    const tsq        = new TSQ.QueryClient()
+    const watching   = vi.spyOn(vaultDB, 'watch')
+    const bankMinder = minderOf('bank', vaultDB, tsq)
+    bankMinder.hello()
+    watching.mock.calls[0]?.[1](noticeOf(TH.boxThingOf()))
     expect(tsq.getQueryCache().getAll()).to.have.lengthOf(0)
   })
 
   it("puts a record of a later life after one of a higher revseq", () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
     const oldLife = TH.gateThingOf({ lifeseq: '0000000000', lifepath: '0000000000', revtok: 'old-life', revseq: 3 })
-    const newLife = TH.gateThingOf({ lifeseq: '0000000001', lifepath: '0000000001', revtok: 'new-life', revseq: 0 })
+    const newLife = TH.gateThingOf({ lifeseq: '0000000002', lifepath: '0000000002', revtok: 'new-life', revseq: 0 })
     receive(noticeOf(oldLife))
     receive(noticeOf(newLife))
     expect(revtokAt(minder)).to.eq('new-life')
@@ -413,7 +560,7 @@ describe("ThingMinder's watch", () => {
     expect(revtokAt(minder)).to.eq('new-life')
   })
 
-  it("puts any record after the Void Sentinel", async () => {
+  it("puts any record after the void sentinel", async () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
     await minder.get(GateAsk)
     const gate = TH.gateThingOf()
@@ -435,11 +582,10 @@ describe("ThingMinder's watch", () => {
 })
 
 describe("ThingMinder keys", () => {
-  it("hold each label of a labelpath as a segment of its own", () => {
-    const { minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
-    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'gate', 'get', 'gate'])
-    const boxMinder = ThingMinder.make({ modelkind: 'box' }, { bank: fakeBankOf(), vaultDB: new MemoryVaultDB(), tsq: new TSQ.QueryClient(), onBadNews: vi.fn() })
-    expect(boxMinder.queryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', 'get', 'box', 'openai'])
-    expect(boxMinder.listingKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', 'list', 'box'])
+  it("name the modelkind once, and hold each label of a labelpath as a segment of its own", () => {
+    const { minder, boxMinder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
+    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'gate'])
+    expect(boxMinder.queryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', 'openai'])
+    expect(boxMinder.keyPrefix).to.deep.equal(['safebyok', 'u1', 'acme', 'box'])
   })
 })
