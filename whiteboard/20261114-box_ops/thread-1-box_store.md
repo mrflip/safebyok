@@ -32,7 +32,7 @@ PR's **Tests:** line (the rework: storage tests, tsc and eslint clean, then `pnp
   * Tests: `tests/storage/shapes-thing.test.ts`, `memory-vault-db.test.ts`, `adapter-vault-db.test.ts`;
     helpers in `tests/test-helpers/vaultdb-world.ts` build every ask through the builders.
   * design-vaultdb.md's labelpaths, lifepaths, invariants, gate CHECKs and asks brought up to date.
-* **Decisions taken**:
+* **Decisions made**:
   * Throwers live in `shapes-thing.ts`, not `src/throwers.ts`: the lean core has no throwers
     module of its own (it uses big's `Throwers`, frozen), and one would cycle through `loggableAskOf`.
   * Get/list builders strip fields; put/del pass strays through to the strict check, though a

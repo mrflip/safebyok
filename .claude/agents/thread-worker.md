@@ -139,7 +139,7 @@ The same facts, to different readers, at different altitudes.
   Branch `YYYYMMDD-<label>`, PR #N, stacked on #M. Proved: <commands and counts, or what is red and why>.
 
   * **Built**: what exists now that did not, and where.
-  * **Decisions taken**: choices the plan left open, with the reason.
+  * **Decisions made**: choices the plan left open, with the reason.
   * **Deviations**: where you departed from the plan or a document, and why.
   * **Discoveries**: what surprised you; what the next thread should know.
   * **For the Coach**: anything needing a human -- confirmations, judgment calls.

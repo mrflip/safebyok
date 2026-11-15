@@ -29,7 +29,7 @@ test, 661 tests green; `pnpm justify` at ready and after the review's rework (se
   * `core.ts`'s header corrected; exports in `core.ts`, `index.ts`, `storage.ts`.
   * design-gate.md and design-vaultdb.md brought up to date; notes/security.md amended (2026-11-14 entry).
 
-* **Decisions taken**
+* **Decisions made**
   * **`tryGetBox` and `ifAbsent`.** `'shell'` and the default both ask the store for `'nil'`; `'shell'` then fills in
     `#shellOf`. No storage change for it.
   * **The shell's times** are `SX.VoidTime`, as big's shell rows; thread 2's test shell uses T0.
