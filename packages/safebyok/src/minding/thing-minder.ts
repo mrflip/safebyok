@@ -10,7 +10,8 @@ import { type MinderAskOpts, type MinderBank, type MinderGetAskOpts, type QueryC
 
 // == [Answers]: VoidSentinel, TSQAnswer
 
-/** The cached record for a scope the vaultDB reported empty: the shell, which sorts below every Thing. */
+// give this all the fields it should have
+/** Dummy tombstone representing a void row. Cited as the prior record of a root (the bank, the main gate or the root box), it makes a proper revseq-0 birth record. A box under the root cites its own shell instead (`childShellCited`). */
 export const VoidSentinel = Object.freeze({ ...ShellCited, revseq: SX.VoidRevisionSeq })
 /** The type of {@link VoidSentinel}: the shell's fields, at revseq -1, and no scope. */
 export type VoidSentinel = typeof VoidSentinel
@@ -35,7 +36,7 @@ export type TSQAnswer = (GotAnswer & TSQEntryState) | BadAnswer
 
 /** Keeps one kind of Thing in one bank fresh in a TanStack Query cache. */
 export class ThingMinder {
-  // == [Props]: userid, banklabel, scope, modelkind, #bank, #vaultDB, #tsq, #onBadNews, #queryCacheOpts, #staleTime, #unwatch, #isReady
+  // == [Props]: userid, banklabel, scope, modelkind, #bank, #vaultDB, #tsq, #onBadNews, #queryCacheOpts, #staleTime, #recordChecker, #unwatch, #isReady
   readonly userid:    string
   readonly banklabel: string
   /** The bank this minder watches. */
@@ -47,6 +48,7 @@ export class ThingMinder {
   readonly #onBadNews:      (news: Errors.VaultError) => void
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   readonly #staleTime:      number
+  readonly #recordChecker:  typeof KindChecks[Thingkind]['record']
   #unwatch:  (() => void) | null = null
   /** True from `hello` until `goodbye`: the reads answer only then. */
   #isReady = false
@@ -71,6 +73,7 @@ export class ThingMinder {
     this.#queryCacheOpts = opts.bank.queryCacheOpts
     this.#staleTime      = opts.bank.queryCacheOpts.staleTime
     this.scope           = Object.freeze({ userid: this.userid, banklabel: this.banklabel })
+    this.#recordChecker  = KindChecks[this.modelkind].record
     Object.freeze(this)
   }
   // --
@@ -81,7 +84,7 @@ export class ThingMinder {
   hello(): void {
     this.#demandEnabled()
     this.#tsq.setQueryDefaults(this.keyPrefix, this.#queryCacheOpts)
-    this.#tsq.setQueryDefaults([...this.keyPrefix, 'get'], { structuralSharing: (prior: unknown, record: unknown) => betterRecordOf(prior, record, (held) => this.#isWholeRecord(held)) })
+    this.#tsq.setQueryDefaults([...this.keyPrefix, 'get'], { structuralSharing: (prior: unknown, record: unknown) => betterRecordOf(prior, record, (cached) => this.#isWholeRecord(cached)) })
     this.#startVaultDBWatch()
     this.#isReady = true
   }
@@ -141,7 +144,7 @@ export class ThingMinder {
   // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #tsqFind, #vacateTSQ
 
   // Its refusal lands in the entry, where the next tryAt finds it as `lastErr`.
-  /** Start a get of `ask`'s record without waiting on it. Nothing is fetched while the cached record is timely within `staleTime`. */
+  /** Initiate fetch of `ask`'s record, if it is stale, without waiting for the result. If a fetch is under way, it will use its result (not starting a new one). */
   #backgroundRefresh(ask: GetThingAsk & { ifAbsent: 'nil' }, opts: MinderGetAskOpts): void {
     void this.#doGet(ask, opts).catch(noop)
   }
@@ -177,16 +180,15 @@ export class ThingMinder {
   }
 
   // Invalidated, not refetched: the next get, or a listener's next look, fetches it whole.
-  /** Hand the cache `record`, a listed child, and mark its entry stale if the cached record is sparse. */
+  /** Cache sparse `record`. Unless the cache already has the whole record, mark it stale: the next get will fetch it whole. */
   #doDeliverSeed(record: Sparse<Thing>): void {
     this.#doDeliverRecord(record)
-    const held = this.at(record)
-    if ((held !== undefined) && (! this.#isWholeRecord(held))) {
+    if (! this.isWholeRecordAt(record)) {
       void this.#tsq.invalidateQueries({ queryKey: this.queryKey(record), exact: true, refetchType: 'none' })
     }
   }
 
-  /** Hand the cache `record` under its own key; an earlier record never replaces a later one. Skips a Thing of another modelkind. */
+  /** Send `record` to the cache. TSQ will use betterRecordOf to identify what, if anything, has changed. Skips a Thing of another modelkind. */
   #doDeliverRecord(record: Thing | Sparse<Thing>): void {
     if (! this.#isOurThing(record)) { return }
     this.#tsq.setQueryData(this.queryKey(record), record)
@@ -246,8 +248,13 @@ export class ThingMinder {
   }
 
   /** True when `record` passes its kind's record check, so it has its body. A sparse record does not. */
-  #isWholeRecord(record: DeliverableThing): boolean {
-    return KindChecks[this.modelkind].record.safeParse(record).success
+  #isWholeRecord(record: DeliverableThing | undefined): boolean {
+    return this.#recordChecker.safeParse(record).success
+  }
+
+  /** Internal. True when the record cached at `scoped` has its body: not sparse, not the void sentinel, and not missing. */
+  isWholeRecordAt(scoped: ThingScope): boolean {
+    return this.#isWholeRecord(this.at(scoped))
   }
 
   /** Demand that `rawAsk` is a get ask with `ifAbsent: 'nil'`, for this minder's bank and modelkind. Throws `bad_option`. */
@@ -300,7 +307,7 @@ function gotAnswerOf(ask: GetThingAsk, record: DeliverableThing | undefined, isT
 
 // Kept pure: TanStack also calls it on observers' results, and marks the entry fresh whichever record it keeps.
 /** The later of `prior` and `record`, by lifepath, then revseq. For the same revision, `record` wins only if it is whole and `prior` is not. */
-function betterRecordOf(prior: unknown, record: unknown, isWholeRecord: (held: DeliverableThing) => boolean): unknown {
+function betterRecordOf(prior: unknown, record: unknown, isWholeRecord: (cached: DeliverableThing) => boolean): unknown {
   if (prior === undefined) { return record }
   const [ante, post] = [prior as DeliverableThing, record as DeliverableThing]
   const cmp = cmpRecords(ante, post) || ((isWholeRecord(post) && ! isWholeRecord(ante)) ? 1 : 0)
