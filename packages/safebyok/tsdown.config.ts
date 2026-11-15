@@ -1,9 +1,10 @@
 import { defineConfig } from 'tsdown'
 
 // The lean core, built as safebyok-big is (its tsdown.config.ts says why each setting is there). Each entry is a subpath:
-// `safebyok`, the front door of what a host touches, `safebyok/core` and `safebyok/storage`.
+// `safebyok`, the front door of what a host touches, `safebyok/core` and `safebyok/storage`; and `safebyok/testing`,
+// the battery an adapter's tests run, built from tests/ and so named in an object beside the list.
 export default defineConfig({
-  entry:      ['src/index.ts', 'src/core.ts', 'src/storage.ts'],
+  entry:      ['src/index.ts', 'src/core.ts', 'src/storage.ts', { testing: 'tests/test-helpers.ts' }],
   format:     ['esm', 'cjs'],
   platform:   'neutral',
   target:     'es2022',
