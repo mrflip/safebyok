@@ -78,7 +78,7 @@ gate's write function*), overriding `classify*` where the store reached the verd
   null. Every response method ends in one `notifyTrackedRecords`, which returns unless `doNotifyTracked` is enabled,
   and otherwise notifies each entry that is not `'same'`. Bank revisions stay honest: a gate write does not revise
   the bank, and there is no compound gate write. The main gate's key is its labelpath, `gate`, in one constant. An ask
-  with no `track` gets no `tracked`. `doNotifyTracked` is on by default. A missing or damaged tracked row is undefined
+  with no `track` gets no `tracked`. `doNotifyTracked` is on by default. A missing or damaged tracked row is unspecified
   behavior (notes/wontfix.md): no code handles it, pinned by a type-level test and a pointer comment.
 * **A friend** is the narrow set of an owner's attributes and callbacks that it hands a collaborator, a pick of the
   owner's interface where the names coincide (`gallant.md` *#record-then-opts*). Visibility does not define it, and

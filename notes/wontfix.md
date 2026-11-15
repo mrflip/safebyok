@@ -60,9 +60,9 @@ refuses a write that cites another, so a conflict is found where it can be settl
 
 ### The value in `tracked` of a missing or damaged record
 
-The return value in `tracked` of a missing or damaged record is undefined behavior.
+The return value in `tracked` of a missing or damaged record is unspecified behavior.
 
-* current outcome: undefined. No store, adapter or caller checks for it, and none may: no guard, no null, no refusal,
+* current outcome: unspecified. No store, adapter or caller checks for it, and none may: no guard, no null, no refusal,
   and no test of the value.
 * alternatives:
   - a sentinel for either case (null, a refusal kind, a left-out key): it extends the contract, so every caller must
