@@ -10,13 +10,12 @@ import type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone, UnsealedOf } fr
 import { type BankScope, type BankStamp, type CitedGate, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import * as Phrases from '../phrases'
 import {
-  type BankThing, type BoxThing, type DelAskArgs, type GateThing, type LoggableAsk, type PutAskArgs, type Thing,
+  type BankRecord, type BankThing, type BoxThing, type DelAskArgs, type LoggableAsk, type PutAskArgs, type Thing,
   BankThingFormat, BoxThingFormat, ShellCited, ShellLifeseq, bankThing, boxSparse, boxThing, childShellCited, gateThing, lifeseqOf, loggableAskOf, sparseOf,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
-/** A bank's record: its Thing, with its main gate's Thing as `maingate` and its root box's sparse record as `rootBox`. */
-export type BankRecord = BankThing & { maingate: GateThing, rootBox: BoxSparse }
+export type { BankRecord } from '../storage/shapes-thing'
 
 /** What a new bank is made of: its stamp, and its main gate's dna. */
 export type BankDna = BankStamp & { maingate: GateDna }

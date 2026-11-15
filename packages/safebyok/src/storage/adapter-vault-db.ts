@@ -13,7 +13,10 @@ import type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
 } from './vault-db'
 
-// == [Answers]: answerOf
+// == [Answers]: Received, answerOf
+
+/** What a store's watch hands `receive`: a changed Thing, raw, and the bank as the store last read it. */
+export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
 /** A verb's answer from what its store reports: `record` as `val` when good, as `dbhas` when refused.
  * Throws `storage_issue` for a good act, other than `gotvoid`, that reports no Thing.
@@ -37,16 +40,17 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
  */
 export abstract class AdapterVaultDB implements VaultDB {
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
-  // A subclass's `do*` calls these. A store that reaches some of the verdict itself overrides them to read it.
+  // A subclass's `do*` calls these. A store that reaches some of the verdict itself overrides them to read it. Each
+  // takes the raw roots of the ask's bank, fetched in the same step, as its world.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
-  protected classifyGetThing(ask: GetThingAsk, raw: unknown): Actual<EX.GotAct> { return classifyGetThing(ask, raw) }
+  protected classifyGetThing(ask: GetThingAsk, raw: unknown, roots: BankRootsFetched): Actual<EX.GotAct> { return classifyGetThing(ask, raw, roots) }
 
   /** Classify a write against the raw Thing fetched at its scope, null for none, applying its storage policies. */
-  protected classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw) }
+  protected classifyWriteThing(ask: WriteThingAsk, raw: unknown, roots: BankRootsFetched): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw, roots) }
 
   /** Classify a listing against the raw parent and the raw Things one label under it. */
-  protected classifyListThings(ask: ListThingsAsk, fetched: ThingsFetched): ListThingsActual { return classifyListThings(ask, fetched) }
+  protected classifyListThings(ask: ListThingsAsk, fetched: ThingsFetched, roots: BankRootsFetched): ListThingsActual { return classifyListThings(ask, fetched, roots) }
 
   /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
   protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return classifyBirthBank(puts, fetched) }
@@ -116,14 +120,15 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** Watch the Things of a bank, and return a function that stops the watch ({@link VaultDB.watch}).
-   * A Thing heard that fails its checks, or is not of the bank, goes to `onBadNews` and not to `onNotice`.
+   * A Thing received that fails its checks, or is not of the bank, goes to `onBadNews` and not to `onNotice`; so does what `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     const { scope: bankScope } = watchArgs.parse({ scope, onNotice, onBadNews })
     return this.doWatch(bankScope, ({ record, world }) => {
       let val: Thing
       try { val = watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
-      onNotice({ ok: true, act: (val.am === 'a') ? 'gotlive' : 'gotgone', val, world })
+      // A notice handler that throws is a bug in the host's code, not trouble in storage.
+      try { onNotice({ ok: true, act: (val.am === 'a') ? 'gotlive' : 'gotgone', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     }, onBadNews)
   }
   // --
@@ -154,19 +159,21 @@ export abstract class AdapterVaultDB implements VaultDB {
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
   // fetched. A store that can run code of its own may run the whole step there.
 
-  /** In one step: fetch the Thing at `ask`'s scope, and return `this.classifyGetThing(ask, raw)`. */
+  /** In one step: fetch the Thing at `ask`'s scope and its bank's roots, and return `this.classifyGetThing(ask, raw, roots)`. */
   protected abstract doGetThing(ask: GetThingAsk): Helpers.Awaitable<Actual<EX.GotAct>>
-  /** In one step: fetch the Thing at `ask`'s scope, classify, and if the act is a write, write `ask.record` and report the Thing written. */
+  /** In one step: fetch the Thing at `ask`'s scope, classify, and if the act is a write, write `ask.record` and report the Thing written,
+   * with the world its bank's roots make after the write.
+   */
   protected abstract doWriteThing(ask: WriteThingAsk): Helpers.Awaitable<Actual<EX.PutAct | EX.DelAct>>
-  /** In one step: fetch the raw parent at `ask`'s scope and each raw Thing one label under it, and return `this.classifyListThings(ask, fetched)`. */
+  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's roots, and return `this.classifyListThings(ask, fetched, roots)`. */
   protected abstract doListThings(ask: ListThingsAsk): Helpers.Awaitable<ListThingsActual>
   /** In one step: fetch the raw bank, main gate and root box, return `this.classifyBirthBank(puts, fetched)`, and under `born` first
-   * write each put's record and report the three as written, checked by `writtenRootsOf`.
+   * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world they make.
    */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
-  /** Start a watch: call `hear` with each changed Thing, and `onBadNews` with trouble, whether or not it ends the watch.
-   * Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
+  /** Start a watch: call `receive` with each changed Thing, raw, and the bank as the store last read it, and `onBadNews` with
+   * trouble, whether or not it ends the watch. Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    */
-  protected doWatch(_scope: ThingWatchScope, _hear: (heard: Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
+  protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
   // --
 }

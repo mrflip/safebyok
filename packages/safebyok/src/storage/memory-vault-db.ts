@@ -1,24 +1,24 @@
 /** The vaultDB in memory. */
 
-import { type EX, Helpers } from 'safebyok-big/internals'
-import { AdapterVaultDB } from './adapter-vault-db'
-import type { BirthBankAsk, BirthPuts, GetThingAsk, ListThingsAsk, Thing, ThingScope, ThingWatchScope, WriteThingAsk } from './shapes-thing'
-import { type BankRootsFetched, isWriteAct, writtenRootsOf, writtenThingOf } from './thing-classifier'
+import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
+import { AdapterVaultDB, type Received } from './adapter-vault-db'
+import type { BankRecord, BirthBankAsk, BirthPuts, GetThingAsk, ListThingsAsk, Thing, ThingScope, ThingWatchScope, WriteThingAsk } from './shapes-thing'
+import { type BankRootsFetched, isWriteAct, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
-/** A watch: the bank it hears, and the function that hears each change. */
-type Listener = { scope: ThingWatchScope, hear: (heard: { record: unknown, world: null }) => void }
+/** A watch: the bank it watches, the function that receives each change, and the one that hears its trouble. */
+type Watcher = { scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void }
 
 /** A vaultDB kept in this tab's memory, gone when the tab closes. */
 export class MemoryVaultDB extends AdapterVaultDB {
-  // == [Props]: #banks, #listeners
+  // == [Props]: #banks, #watchers
 
   // Each bank's Things, by labelpath, so that a listing reads one bank's. The modelkind at the base of each labelpath keeps the kinds apart.
   readonly #banks = new Map<string, Map<string, unknown>>()
-  readonly #listeners = new Set<Listener>()
+  readonly #watchers = new Set<Watcher>()
   // --
 
-  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #tell
+  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #worldOf, #notify
 
   /** For tests: the Things stored in `scope`'s bank, by labelpath, to read or change in place. */
   _cheat_things(scope: ThingWatchScope): Map<string, unknown> { return this.#thingsOf(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
@@ -46,12 +46,17 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return structuredClone({ bank: things.get('bank') ?? null, gate: things.get('gate') ?? null, root: things.get('box') ?? null })
   }
 
-  // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it.
-  /** Notify each listener watching `thing`'s bank of it. */
-  #tell(thing: Thing): void {
-    for (const { scope, hear } of this.#listeners) {
+  /** The bank of `things` at `scope`, as it now stands. */
+  #worldOf(scope: ThingWatchScope, things: Map<string, unknown>): BankRecord | null { return worldOf(scope, this.#rootsOf(things)) }
+
+  // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
+  /** Notify each watcher of `thing`'s bank of it, and of the bank as `world`. */
+  #notify(thing: Thing, world: BankRecord | null): void {
+    for (const { scope, receive, onBadNews } of this.#watchers) {
       if ((scope.userid === thing.userid) && (scope.banklabel === thing.banklabel)) {
-        queueMicrotask(() => { hear({ record: structuredClone(thing), world: null }) })
+        queueMicrotask(() => {
+          try { receive({ record: structuredClone(thing), world: structuredClone(world) }) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)) }
+        })
       }
     }
   }
@@ -60,16 +65,18 @@ export class MemoryVaultDB extends AdapterVaultDB {
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
 
   protected doGetThing(ask: GetThingAsk): Actual<EX.GotAct> {
-    const raw = this.#thingsOf(ask).get(ask.labelpath) ?? null
-    return this.classifyGetThing(ask, structuredClone(raw))
+    const things = this.#thingsOf(ask)
+    return this.classifyGetThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#rootsOf(things))
   }
 
   protected doWriteThing(ask: WriteThingAsk): Actual<EX.PutAct | EX.DelAct> {
-    const actual = this.classifyWriteThing(ask, structuredClone(this.#thingsOf(ask).get(ask.labelpath) ?? null))
+    const things = this.#thingsOf(ask)
+    const actual = this.classifyWriteThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#rootsOf(things))
     if (! (actual.ok && isWriteAct(actual.act))) { return actual }
     const record = this.#write(ask, ask.record)
-    this.#tell(record)
-    return { ...actual, record }
+    const world  = this.#worldOf(ask, things)
+    this.#notify(record, world)
+    return { ...actual, world, record }
   }
 
   protected doListThings(ask: ListThingsAsk): ListThingsActual {
@@ -78,7 +85,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const children = [...things]
       .filter(([labelpath]) => labelpath.startsWith(under) && (! labelpath.includes('/', under.length)))
       .map(([labelpath, raw]) => ({ labelpath, raw: structuredClone(raw) }))
-    return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children })
+    return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children }, this.#rootsOf(things))
   }
 
   protected doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {
@@ -87,14 +94,15 @@ export class MemoryVaultDB extends AdapterVaultDB {
     if (! (actual.ok && (actual.act === 'born'))) { return actual }
     for (const { labelpath, record } of puts) { things.set(labelpath, structuredClone(record)) }
     const written = writtenRootsOf(puts, this.#rootsOf(things))
-    for (const thing of Object.values(written)) { this.#tell(thing) }
-    return { ...actual, things: written }
+    const world   = this.#worldOf(ask, things)
+    for (const thing of Object.values(written)) { this.#notify(thing, world) }
+    return { ...actual, world, things: written }
   }
 
-  protected override doWatch(scope: ThingWatchScope, hear: Listener['hear']): () => void {
-    const listener = { scope, hear }
-    this.#listeners.add(listener)
-    return () => { this.#listeners.delete(listener) }
+  protected override doWatch(scope: ThingWatchScope, receive: Watcher['receive'], onBadNews: Watcher['onBadNews']): () => void {
+    const watcher = { scope, receive, onBadNews }
+    this.#watchers.add(watcher)
+    return () => { this.#watchers.delete(watcher) }
   }
   // --
 }

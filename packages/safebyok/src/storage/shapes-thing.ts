@@ -46,8 +46,8 @@ export const GateThingFormat = 4101
 /** The `fmt` of a box's Thing: its own, so that it is never read as big's box row (5003). */
 export const BoxThingFormat = 5103
 
-/** How many labels each kind's labelpath has under its root: none under the bank, one under the main gate, any number under the root box. */
-const MaxLabelsUnder = { bank: 0, gate: 1, box: Infinity } as const satisfies Record<Thingkind, number>
+/** How many labels each kind's labelpath has under its root: none under the bank or the main gate, one under the root box. */
+const MaxLabelsUnder = { bank: 0, gate: 0, box: 1 } as const satisfies Record<Thingkind, number>
 
 /** The modelkind a sound labelpath starts with. */
 export function modelkindOf(labelpath: string): Thingkind { return labelpath.split('/', 1)[0] as Thingkind }
@@ -254,7 +254,7 @@ export const KindChecks = {
 export function kindChecksOf(labelpath: string): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
-// == [Asks]: AskChecks, GetThingAsk, ListThingsAsk, WriteThingAsk, BirthBankAsk, BankRoots, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: AskChecks, GetThingAsk, ListThingsAsk, WriteThingAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, bankRecordOf, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: string }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -328,6 +328,11 @@ export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAs
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope a watch hears: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof thingWatchScope>>
+/** A bank's record: its Thing, with its main gate's Thing as `maingate` and its root box's sparse record as `rootBox`. */
+export type BankRecord      = BankThing & { maingate: GateThing, rootBox: BoxSparse }
+
+/** The bank's record its three `roots` make. */
+export function bankRecordOf({ bank, gate, root }: BankRoots): BankRecord { return { ...bank, maingate: gate, rootBox: sparseOf(root) } }
 
 /** `ask`, checked, or throw `bad_option` */
 export function checkedGetThingAsk(ask: unknown): GetThingAsk { return AskChecks.getThingAsk.parse(ask) }

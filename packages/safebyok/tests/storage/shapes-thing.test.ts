@@ -63,10 +63,10 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
     ['bank',             'bank', true,  "the bank's root"],
     ['bank/main',        'bank', false, 'a label under bank'],
     ['gate',             'gate', true,  'the main gate'],
-    ['gate/second',      'gate', true,  'a further gate'],
-    ['gate/second/more', 'gate', false, 'two labels under gate'],
+    ['gate/second',      'gate', false, 'a label under gate'],
     ['box',              'box',  true,  'the root box'],
-    ['box/aa/bb/cc',     'box',  true,  'a box at any depth'],
+    ['box/openai',       'box',  true,  'a box under the root box'],
+    ['box/aa/bb',        'box',  false, 'two labels under box'],
     ['box/Main!',        'box',  false, 'a label that is not one'],
     ['box/',             'box',  false, 'an empty label'],
   ] as const
@@ -86,7 +86,7 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
 
 describe("checkedGetThingAsk(ask) and checkedListThingsAsk(ask)", () => {
   it("accepts an ask of each kind", () => {
-    for (const labelpath of ['bank', 'gate', 'gate/second', 'box', 'box/openai/v2']) {
+    for (const labelpath of ['bank', 'gate', 'box', 'box/openai']) {
       expect(checkedGetThingAsk(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
       expect(checkedListThingsAsk(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
     }
@@ -95,7 +95,7 @@ describe("checkedGetThingAsk(ask) and checkedListThingsAsk(ask)", () => {
   const BadGetCases = [
     [{ ...TH.getGateAskOf(), modelkind: 'box' },          'a modelkind not its labelpath\'s'],
     [{ ...TH.getGateAskOf(), labelpath: 'vault/main' },   'a labelpath of no kind of Thing'],
-    [{ ...TH.getGateAskOf(), labelpath: 'gate/a/b' },     'a labelpath past its kind\'s depth'],
+    [{ ...TH.getGateAskOf(), labelpath: 'gate/second' },  'a labelpath past its kind\'s depth'],
     [{ ...TH.getGateAskOf(), labelpath: 'gate/Main!' },   'a labelpath whose label is not one'],
     [{ ...TH.getGateAskOf(), labelpath: '/gate' },        'a labelpath with a leading /'],
     [{ ...TH.getGateAskOf(), ifAbsent: 'add' },           'a write flag'],
@@ -176,10 +176,8 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
     expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
   })
 
-  it("accepts the bank's and the root box's births, and a further gate's deletion", () => {
-    const second = TH.gateThingOf({ labelpath: 'gate/second', label: 'second', lifepath: `${Life0}/${Life0}` })
-    const secondGone = TH.nextOf(second, { am: 'x', lifeseq: lifeseqOf(1), lifepath: `${Life0}/${lifeseqOf(1)}` })
-    for (const ask of [TH.birthAskOf(TH.bankThingOf()), TH.birthAskOf(TH.rootBoxOf()), TH.delAskFor(second, secondGone)]) {
+  it("accepts the bank's and the root box's births", () => {
+    for (const ask of [TH.birthAskOf(TH.bankThingOf()), TH.birthAskOf(TH.rootBoxOf())]) {
       expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
     }
   })

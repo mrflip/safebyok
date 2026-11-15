@@ -6,8 +6,8 @@ import { BankRootsMissing, BornAtNotStored, ReplacedThingAmiss } from '../phrase
 import { PoliciedMeta, demandPolicies } from './policies'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type WriteThingAsk,
-  GateThingFormat, KindChecks, isLabelpathOfKind, kindChecksOf, sparseOf, thingScope,
+  type BankRecord, type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type WriteThingAsk,
+  GateThingFormat, KindChecks, bankRecordOf, isLabelpathOfKind, kindChecksOf, sparseOf, thingScope,
 } from './shapes-thing'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeOff
@@ -118,7 +118,7 @@ function isRefusedAct(act: string): act is EX.RefusedAct { return (EX.refusedAct
 export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 // --
 
-// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf
+// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf, BankRootsFetched, worldOf
 // A Thing that fails its kind's checks is damaged, and refuses `damaged_row`. One that is not an object, or a sound one
 // stored at another scope than the one asked for, means the store or its adapter is broken, and refuses `storage_issue`.
 
@@ -168,26 +168,43 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing 
   if (! scope.success) { throw Throwers.storageIssue() }
   return writtenThingOf(scope.data, raw)
 }
+
+/** What a store fetched of a bank's three roots: the raw bank, main gate and root box, each null for none. */
+export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown }>
+
+// A world is news, never the verdict: roots that fail their checks leave it null, and the step's answer stands.
+/** The bank at `bankScope` with its main gate and root box, from its raw `roots`; null where one is missing or fails its checks. */
+export function worldOf({ userid, banklabel }: ThingWatchScope, roots: BankRootsFetched): BankRecord | null {
+  try {
+    const bank = storedOf(KindChecks.bank.stored, { userid, banklabel, labelpath: 'bank' }, roots.bank)
+    const gate = storedOf(KindChecks.gate.stored, { userid, banklabel, labelpath: 'gate' }, roots.gate)
+    const root = storedOf(KindChecks.box.stored,  { userid, banklabel, labelpath: 'box' },  roots.root)
+    return ((bank === null) || (gate === null) || (root === null)) ? null : bankRecordOf({ bank, gate, root })
+  } catch { return null }
+}
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, demandReplaceable, ThingsFetched, classifyListThings, isChildLabelpath, BankRootsFetched, classifyBirthBank
+// == [Classifying]: classifyGetThing, classifyWriteThing, demandReplaceable, ThingsFetched, classifyListThings, isChildLabelpath, classifyBirthBank
+// Each takes the raw `roots` of the ask's bank, fetched in the same step, and reports them as its `world`.
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
-export function classifyGetThing(ask: GetThingAsk, raw: unknown): Actual<EX.GotAct> {
+export function classifyGetThing(ask: GetThingAsk, raw: unknown, roots: BankRootsFetched): Actual<EX.GotAct> {
   const stored = storedThingOf(ask, raw)
   const act    = getActOf(ask, stored)
-  return isRefusedAct(act) ? { ok: false, act, world: null, record: stored } : { ok: true, act, world: null, record: stored }
+  const world  = worldOf(ask, roots)
+  return isRefusedAct(act) ? { ok: false, act, world, record: stored } : { ok: true, act, world, record: stored }
 }
 
 /** Classify a write against the raw Thing a store fetched at its scope, null for none, and check its storage policies
- * where it would replace a live Thing. Under a write act, the store writes `ask.record`, and reports the Thing it wrote.
+ * where it would replace a live Thing. Under a write act, the store writes `ask.record`, and reports the Thing it wrote and the world after it.
  */
-export function classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.PutAct | EX.DelAct> {
+export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, roots: BankRootsFetched): Actual<EX.PutAct | EX.DelAct> {
   const stored = storedThingOf(ask, raw)
   const act    = writeActOf(ask, stored)
-  if (isRefusedAct(act))  { return { ok: false, act, world: null, record: stored } }
+  const world  = worldOf(ask, roots)
+  if (isRefusedAct(act))  { return { ok: false, act, world, record: stored } }
   if (act === 'replaced') { demandReplaceable(ask, stored) }
-  return { ok: true, act, world: null, record: stored }
+  return { ok: true, act, world, record: stored }
 }
 
 /** Throw unless `ask` may replace `stored`, the live Thing found: `bad_record` unless it keeps the born_at, and `gate_issue` where a storage policy refuses. */
@@ -206,13 +223,14 @@ export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Reado
 /** Classify a listing against what a store fetched for it: the parent's get act, the parent, its children of the parent's
  * live life in labelpath order, and the children that fail their checks.
  */
-export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, children }: ThingsFetched): ListThingsActual {
+export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, children }: ThingsFetched, roots: BankRootsFetched): ListThingsActual {
   const stored = storedThingOf(ask, rawParent)
   const act    = getActOf(ask, stored)
   const parent = (stored === null) ? null : sparseOf(stored)
-  if (isRefusedAct(act))  { return { ok: false, act, world: null, listed: [], parent, damaged_rows: [] } }
+  const world  = worldOf(ask, roots)
+  if (isRefusedAct(act))  { return { ok: false, act, world, listed: [], parent, damaged_rows: [] } }
   // A tombstone or none has no children.
-  if (stored?.am !== 'a') { return { ok: true, act, world: null, listed: [], parent, damaged_rows: [] } }
+  if (stored?.am !== 'a') { return { ok: true, act, world, listed: [], parent, damaged_rows: [] } }
   const { userid, banklabel } = ask
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${stored.lifepath}/`
@@ -224,7 +242,7 @@ export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, chil
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
   const listed = sortBy(living, [(thing) => thing.labelpath]).map((thing) => sparseOf(thing))
-  return { ok: true, act, world: null, listed, parent, damaged_rows }
+  return { ok: true, act, world, listed, parent, damaged_rows }
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
@@ -233,11 +251,8 @@ function isChildLabelpath(ask: ListThingsAsk, labelpath: string): boolean {
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind(labelpath, ask.modelkind)
 }
 
-/** What a store fetched for a bank's birth: the raw bank, main gate and root box, each null for none. */
-export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown }>
-
 /** Classify a bank's birth, by the three `puts` it amounts to, against the roots a store fetched. Under
- * `born`, `things` are the puts' records, which the store writes in one step and then reports as written; under `passed`,
+ * `born`, `things` and `world` are the puts' records, which the store writes in one step and then reports as written; under `passed`,
  * the roots stored.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
@@ -248,12 +263,13 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
   // The bank's put passes over a live bank, whose gate and root must be stored with it.
   if (putActOf(bankPut, bank) === 'passed') {
     if ((bank === null) || (gate === null) || (root === null)) { throw new Errors.VaultError('storage_issue', BankRootsMissing) }
-    return { ok: true, act: 'passed', world: null, things: { bank, gate, root } }
+    return { ok: true, act: 'passed', world: bankRecordOf({ bank, gate, root }), things: { bank, gate, root } }
   }
   for (const [put, stored] of [[bankPut, bank], [gatePut, gate], [rootPut, root]] as const) {
     const act = putActOf(put, stored)
-    if (isRefusedAct(act)) { return { ok: false, act, world: null, record: stored } }
+    if (isRefusedAct(act)) { return { ok: false, act, world: worldOf(bankPut, fetched), record: stored } }
   }
-  return { ok: true, act: 'born', world: null, things: { bank: bankPut.record, gate: gatePut.record, root: rootPut.record } }
+  const things = { bank: bankPut.record, gate: gatePut.record, root: rootPut.record }
+  return { ok: true, act: 'born', world: bankRecordOf(things), things }
 }
 // --
