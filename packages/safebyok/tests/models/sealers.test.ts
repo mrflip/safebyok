@@ -1,13 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BX } from 'safebyok-big/internals'
 import * as Sealers from '../../src/models/sealers'
-import { BoxWhisper } from '../../src/models/sealers'
+import { BoxTombstone, BoxWhisper } from '../../src/models/sealers'
+import * as Phrases from '../../src/phrases'
+import { boxSparse, boxThing, lifeseqOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-/** A live box ante at its first revision, as a seal over {@link TH.boxAnteOf}'s shell leaves it, without its sealed fields. */
-function liveAnte() { return BoxWhisper.nextRevisionOf(TH.boxAnteOf()) }
+/** Fake sealed whispers, tagged as a box's: the sealer checks only their shape and tags. */
+const Sealed = Object.freeze({ ...TH.FakeSealed, ...BoxWhisper.tags })
+const OtherSealed = Object.freeze({ ...Sealed, key_wrapped: TH.fakeCiphered('k2') })
+
+const Life0 = lifeseqOf(0)
+const Life1 = lifeseqOf(1)
+const Life2 = lifeseqOf(2)
+
+/** A live box at its first revision, as a seal over {@link TH.boxShellOf}'s shell leaves it, without its sealed whisper. */
+function liveNext() { return BoxWhisper.nextRevisionOf(TH.boxShellOf()) }
 
 describe("sealerkindVals", () => {
   it("names, for each kind, a frozen sealer exported under that name", () => {
@@ -19,73 +28,106 @@ describe("sealerkindVals", () => {
   })
 })
 
-describe("BoxWhisper", () => {
-  it("is frozen, its purposes too", () => {
+describe("BoxWhisper and BoxTombstone", () => {
+  it("are frozen, their purposes and tags too, and share all but their next revision", () => {
     expect(Object.isFrozen(BoxWhisper)).to.be.true
     expect(Object.isFrozen(BoxWhisper.purposes)).to.be.true
-    expect(BoxWhisper.purposes).to.deep.equal({ key: 'box_key_wrapped', cipher: 'whisper_ciphered' })
+    expect(Object.isFrozen(BoxWhisper.tags)).to.be.true
+    expect(BoxWhisper.purposes).to.deep.equal({ key: 'whisper_sealed.key_wrapped', cipher: 'whisper_sealed.ciphered' })
+    expect(BoxWhisper.tags).to.deep.equal({ codectag: 'json_v1', schematag: 'whisper_v1' })
+    expect({ ...BoxTombstone, nextRevisionOf: null }).to.deep.equal({ ...BoxWhisper, nextRevisionOf: null })
   })
 })
 
-describe("BoxWhisper.nextRevisionOf(ante)", () => {
-  it("starts a new life over a tombstone: a fresh box_tok, registered now, at the next revision", () => {
+describe("BoxWhisper.nextRevisionOf(prior)", () => {
+  it("starts the first life over the shell: born now, at revseq 0, keeping the shell's root lifeseq", () => {
     vi.setSystemTime(TH.T0 + 3)
-    const shell = TH.boxAnteOf()
+    const shell = TH.boxShellOf()
     const next = BoxWhisper.nextRevisionOf(shell)
-    expect(next).to.deep.include({ am: 'a', revision_seq: shell.revision_seq + 1, registered_at: TH.T0 + 3, written_at: TH.T0 + 3, sidecar: shell.sidecar })
-    expect(next.box_tok).to.not.eq(shell.box_tok)
-    expect(next.revision_tok).to.not.eq(shell.revision_tok)
+    expect(next).to.deep.include({ am: 'a', revseq: 0, lifeseq: Life0, lifepath: `${Life0}/${Life0}`, born_at: TH.T0 + 3, written_at: TH.T0 + 3, sidecar: shell.sidecar })
+    expect(next.revtok).to.not.eq(shell.revtok)
   })
 
   it("keeps a live box's life, at the next revision, written now", () => {
-    const live = liveAnte()
+    const live = liveNext()
     vi.setSystemTime(TH.T0 + 5)
     const next = BoxWhisper.nextRevisionOf(live)
-    expect(next).to.include({ box_tok: live.box_tok, registered_at: live.registered_at, revision_seq: live.revision_seq + 1, written_at: TH.T0 + 5, am: 'a' })
-    expect(next.revision_tok).to.not.eq(live.revision_tok)
+    expect(next).to.include({ lifeseq: live.lifeseq, lifepath: live.lifepath, born_at: live.born_at, revseq: live.revseq + 1, written_at: TH.T0 + 5, am: 'a' })
+    expect(next.revtok).to.not.eq(live.revtok)
   })
 
-  it("leaves the ante it was handed as it was", () => {
-    const shell = TH.boxAnteOf()
+  it("starts the next life over a tombstone: the next lifeseq, born now, the revseq still counting up", () => {
+    const tombstone = BoxTombstone.nextRevisionOf(liveNext())
+    vi.setSystemTime(TH.T0 + 7)
+    const next = BoxWhisper.nextRevisionOf({ ...tombstone, sidecar: { account: 'home' } })
+    expect(next).to.deep.include({ am: 'a', revseq: 2, lifeseq: Life2, lifepath: `${Life0}/${Life2}`, born_at: TH.T0 + 7, sidecar: { account: 'home' } })
+  })
+
+  it("leaves the prior it was handed as it was, and keeps none of a stored box's sealed whisper", () => {
+    const shell = TH.boxShellOf()
     const copy = structuredClone(shell)
     BoxWhisper.nextRevisionOf(shell)
     expect(shell).to.deep.equal(copy)
+    const stored = BoxWhisper.recordOf(liveNext(), Sealed)
+    const next = BoxWhisper.nextRevisionOf(stored)
+    expect(next).to.not.have.property('whisper_sealed')
   })
 
-  const AnteCases = [
-    [() => ({ ...TH.boxAnteOf(), whisper_ciphered: TH.fakeCiphered('w') }), 'an ante carrying a sealed field'],
-    [() => ({ ...TH.boxAnteOf(), am: 'd' }),                                'an ante of a damaged row'],
-    [() => ({ ...TH.boxAnteOf(), revision_seq: 1.5 }),                      'a revision_seq that is not an integer'],
-    [() => TH.omitting(TH.boxAnteOf(), 'box_tok'),                          'an ante with no box_tok'],
-    [() => null,                                                            'null'],
+  const PriorCases = [
+    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a prior of a damaged row'],
+    [() => ({ ...TH.boxShellOf(), revseq: 1.5 }),            'a revseq that is not an integer'],
+    [() => ({ ...TH.boxShellOf(), revtok: 'rev-1' }),        'half the shell: its revtok moved, its revseq and lifeseq not'],
+    [() => ({ ...TH.boxShellOf(), fmt: 5000 }),              'a prior of another fmt'],
+    [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a prior of another kind'],
+    [() => TH.omitting(TH.boxShellOf(), 'lifepath'),         'a prior with no lifepath'],
+    [() => TH.omitting(TH.boxShellOf(), 'sidecar'),          'a prior with no sidecar'],
+    [() => null,                                             'null'],
   ] as const
 
-  for (const [anteOf, blurb] of AnteCases) {
+  for (const [priorOf, blurb] of PriorCases) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => BoxWhisper.nextRevisionOf(anteOf() as never), 'bad_option')
+      TH.expectSyncRefusal(() => BoxWhisper.nextRevisionOf(priorOf() as never), 'bad_option')
     })
   }
 })
 
-describe("BoxWhisper.stampsOf(record)", () => {
-  it("is the box's sparse fields alone: no sidecar and no sealed field", () => {
-    const live = liveAnte()
-    const stamps = BoxWhisper.stampsOf(live)
-    expect(stamps).to.have.lengthOf(1)
-    expect(stamps[0]).to.deep.equal(BX.boxSparse.parse(live))
-    expect(stamps[0]).to.not.have.property('sidecar')
+describe("BoxTombstone.nextRevisionOf(prior)", () => {
+  it("makes the tombstone of a live box: its next revision, at the next lifeseq, written now, with no sidecar", () => {
+    const live = liveNext()
+    vi.setSystemTime(TH.T0 + 5)
+    const next = BoxTombstone.nextRevisionOf(live)
+    expect(next).to.include({ am: 'x', revseq: live.revseq + 1, lifeseq: Life1, lifepath: `${Life0}/${Life1}`, born_at: live.born_at, written_at: TH.T0 + 5 })
+    expect(next.revtok).to.not.eq(live.revtok)
+    expect(next).to.not.have.property('sidecar')
   })
 
-  it("is the same for a record and its ante", () => {
-    const live = liveAnte()
-    const record = BoxWhisper.recordOf(live, { keyWrapped: TH.fakeCiphered('k'), ciphered: TH.fakeCiphered('w') })
+  it("refuses a tombstone or the shell", () => {
+    const tombstone = BoxTombstone.nextRevisionOf(liveNext())
+    const err = TH.expectSyncRefusal(() => BoxTombstone.nextRevisionOf(tombstone), 'bad_option')
+    expect(TH.thrownText(err)).to.include(Phrases.TombstoneOfLiveOnly)
+    TH.expectSyncRefusal(() => BoxTombstone.nextRevisionOf(TH.boxShellOf()), 'bad_option')
+  })
+})
+
+describe("BoxWhisper.stampsOf(record)", () => {
+  it("is the box's Thing fields alone: no sidecar and no sealed whisper", () => {
+    const live = liveNext()
+    const stamps = BoxWhisper.stampsOf(live)
+    expect(stamps).to.have.lengthOf(1)
+    expect(stamps[0]).to.deep.equal(boxSparse.parse(live))
+    expect(Object.keys(stamps[0] ?? {})).to.have.members(['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'])
+  })
+
+  it("is the same for a record and its next revision without its seal", () => {
+    const live = liveNext()
+    const record = BoxWhisper.recordOf(live, Sealed)
     expect(BoxWhisper.stampsOf(record)).to.deep.equal(BoxWhisper.stampsOf(live))
-    expect(BoxWhisper.stampsOf(record)[0]).to.not.have.property('box_key_wrapped')
   })
 
   it("is the same whatever the sidecar", () => {
-    const live = liveAnte()
-    expect(BoxWhisper.stampsOf({ ...live, sidecar: { account: 'home' } })).to.deep.equal(BoxWhisper.stampsOf(live))
+    const live = liveNext()
+    const resided = { ...live, sidecar: { account: 'home' } }
+    expect(BoxWhisper.stampsOf(resided)).to.deep.equal(BoxWhisper.stampsOf(live))
   })
 })
 
@@ -133,24 +175,39 @@ describe("BoxWhisper.encode(cleartexts) and decode(text)", () => {
 })
 
 describe("BoxWhisper.sealedOf(record) and recordOf(next, sealed)", () => {
-  it("lays the sealed parts into the record, and picks them out again", () => {
-    const sealed = { keyWrapped: TH.fakeCiphered('k'), ciphered: TH.fakeCiphered('w') }
-    const record = BoxWhisper.recordOf(liveAnte(), sealed)
-    expect(record).to.deep.include({ box_key_wrapped: sealed.keyWrapped, whisper_ciphered: sealed.ciphered })
-    expect(BX.boxRecord.parse(record)).to.deep.equal(record)
-    expect(BoxWhisper.sealedOf(record)).to.deep.equal(sealed)
+  it("lays the sealed whisper into the record, and picks it out again", () => {
+    const record = BoxWhisper.recordOf(liveNext(), Sealed)
+    expect(record.whisper_sealed).to.deep.equal(Sealed)
+    expect(Object.isFrozen(record)).to.be.true
+    expect(boxThing.parse(record)).to.deep.equal(record)
+    expect(BoxWhisper.sealedOf(record)).to.deep.equal(Sealed)
   })
 
-  it("refuses to lay in sealed parts that are not ciphertexts", () => {
-    TH.expectSyncRefusal(() => BoxWhisper.recordOf(liveAnte(), { keyWrapped: 'k', ciphered: TH.fakeCiphered('w') } as never), 'bad_option')
+  it("lays a sealed empty whisper into a tombstone, and picks it out again", () => {
+    const record = BoxTombstone.recordOf(BoxTombstone.nextRevisionOf(liveNext()), OtherSealed)
+    expect(record).to.include({ am: 'x' })
+    expect(BoxTombstone.sealedOf(record)).to.deep.equal(OtherSealed)
   })
 
-  it("refuses to pick the sealed parts of a tombstone or of null", () => {
-    TH.expectSyncRefusal(() => BoxWhisper.sealedOf({ ...TH.boxAnteOf(), am: 'x' } as never), 'bad_option')
+  it("refuses to lay in a sealed whisper that is not ciphertexts and tags", () => {
+    TH.expectSyncRefusal(() => BoxWhisper.recordOf(liveNext(), { ...Sealed, key_wrapped: 'k' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => BoxWhisper.recordOf(liveNext(), TH.omitting(Sealed, 'codectag')), 'bad_option')
+  })
+
+  it("refuses to make a record of the shell", () => {
+    TH.expectSyncRefusal(() => BoxWhisper.recordOf(TH.boxShellOf(), Sealed), 'bad_option')
+  })
+
+  it("refuses 'damaged_whisper' for a sealed whisper of other tags, quoting none of it", () => {
+    for (const tags of [{ codectag: 'json_v2' }, { schematag: 'whisper_v2' }]) {
+      const record = BoxWhisper.recordOf(liveNext(), { ...Sealed, ...tags })
+      const err = TH.expectSyncRefusal(() => BoxWhisper.sealedOf(record), 'damaged_whisper')
+      expect(TH.thrownText(err)).to.not.include(Sealed.ciphered.ciphertext_b64)
+    }
+  })
+
+  it("refuses to pick the sealed whisper of the shell or of null", () => {
+    TH.expectSyncRefusal(() => BoxWhisper.sealedOf(TH.boxShellOf() as never), 'bad_option')
     TH.expectSyncRefusal(() => BoxWhisper.sealedOf(null as never), 'bad_option')
-  })
-
-  it("refuses to make a record of a tombstone ante", () => {
-    TH.expectSyncRefusal(() => BoxWhisper.recordOf({ ...TH.boxAnteOf(), am: 'x' }, { keyWrapped: TH.fakeCiphered('k'), ciphered: TH.fakeCiphered('w') }), 'bad_option')
   })
 })

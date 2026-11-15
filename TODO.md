@@ -12,4 +12,3 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
 
 * If a request has any kind of `world` error it must not send anything in `val` or `dbhas`
 
-* Seal must reject anything with revision < 0 (the void sentinel)

@@ -1,11 +1,13 @@
+import type * as Z from 'zod'
 import type { Consts } from 'safebyok-big/internals'
 import { BX, CX, Clock, Crypto, Errors, GX, Helpers, SX, Throwers, Validator } from 'safebyok-big/internals'
 import { Device } from './device'
 import { Gate, type GateDna } from './gate'
 import type { Lease } from './lease'
 import { Proving } from './proving'
-import type { BoxAnte, BoxCleartexts } from './sealers'
+import type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone, UnsealedOf } from './sealers'
 import { PutNotBuilt } from '../phrases'
+import { boxSparse, boxThing } from '../storage/shapes-thing'
 
 /** A bank's record: its row, with its main gate's record, of the same life, as `maingate`. */
 export type BankRecord = BX.BankRecord & { maingate: BX.GateRecord }
@@ -13,8 +15,8 @@ export type BankRecord = BX.BankRecord & { maingate: BX.GateRecord }
 /** What a new bank is made of: its stamp, and its main gate's dna. */
 export type BankDna = GX.BankStamp & { maingate: GateDna }
 
-/** A box unsealed: its record without the sealed fields, and its whisper. */
-export type BoxUnsealed = Omit<BX.BoxRecord, 'box_key_wrapped' | 'whisper_ciphered'> & BoxCleartexts
+/** A box unsealed: its record with its whisper in place of the sealed one. A tombstone's whisper is empty. */
+export type BoxUnsealed = UnsealedOf<BoxRecord | BoxTombstone, BoxCleartexts>
 
 /** How {@link Bank.put} meets a live bank already stored at its scope: `'fail'` refuses `camped`. */
 export interface BankPutOpts {
@@ -28,12 +30,13 @@ export interface BankOpts {
 }
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, of the proving an unlock is given, and of the bank a box claims. */
-const Checks = Validator.Checkers('bad_option', ({ obj, custom, user_id, banklabel, bank_tok }) => ({
+/** The checks of {@link Bank.make}'s arguments, of the proving an unlock is given, and of the boxes a box method is given. */
+const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => ({
   bankMakeArgs: obj({ record: BX.bankRecord.extend({ maingate: BX.gateRecord }), opts: obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device') }) }),
   proving:      custom<Proving>((val) => val instanceof Proving, 'Expected a Proving'),
-  boxOfBank:    obj({ user_id, banklabel, bank_tok }),
-}), [CX])
+  boxSparse,
+  boxThing,
+}))
 
 /** The signed-in user's bank on this device: its main gate, and its lease while unlocked.
  * Boxes are sealed and unsealed under the lease, which the bank keeps private.
@@ -152,29 +155,38 @@ export class Bank implements GX.BankStamp {
   }
   // --
 
-  // == [Boxes]: sealBox, unsealBox
+  // == [Boxes]: sealBox, tombstoneBox, unsealBox
 
-  /** The next revision of `ante`, its whisper sealed under this bank's key. Needs the bank unlocked.
-   * Over a tombstone, the box starts a new life.
+  /** The live box next after `prior`, its whisper sealed under this bank's key. Needs the bank unlocked.
+   * Over a live box it is the next revision; over a tombstone or the shell, the first revision of the next life.
+   * Only the Thing fields and the sidecar of `prior` are read, so a stored box spread with a new sidecar will do.
    */
-  async sealBox(ante: BoxAnte, cleartexts: BoxCleartexts): Promise<BX.BoxRecord> {
+  async sealBox(prior: BoxSparse & Pick<BoxRecord, 'sidecar'>, cleartexts: BoxCleartexts): Promise<BoxRecord> {
     const lease = this.#demandLease()
-    this.#demandOwnBox(ante)
-    return lease.seal('BoxWhisper', ante, cleartexts)
+    this.#demandBox(prior, Checks.boxSparse)
+    return lease.seal('BoxWhisper', prior, cleartexts)
   }
 
-  /** `box` with its whisper unsealed, and its sealed fields left out. Needs the bank unlocked. */
-  async unsealBox(box: BX.BoxRecord): Promise<BoxUnsealed> {
+  /** The tombstone of the live box `prior`, signed by an empty whisper sealed under this bank's key. Needs the bank unlocked. */
+  async tombstoneBox(prior: BoxSparse): Promise<BoxTombstone> {
     const lease = this.#demandLease()
-    const parsed = BX.boxRecord.parse(box)
-    this.#demandOwnBox(parsed)
-    const { whisper } = await lease.unseal('BoxWhisper', parsed)
-    const { box_key_wrapped: _keyWrapped, whisper_ciphered: _ciphered, ...unsealed } = parsed
-    return { ...unsealed, whisper }
+    this.#demandBox(prior, Checks.boxSparse)
+    return lease.seal('BoxTombstone', prior, { whisper: {} })
+  }
+
+  /** `box` with its whisper unsealed in place of the sealed one. Needs the bank unlocked.
+   * Unsealing authenticates the box, all but its sidecar: for a tombstone, whose whisper is empty, that is the check of its signature.
+   */
+  async unsealBox(box: BoxRecord | BoxTombstone): Promise<BoxUnsealed> {
+    const lease = this.#demandLease()
+    const parsed = this.#demandBox(box, Checks.boxThing)
+    const { whisper } = (parsed.am === 'a') ? await lease.unseal('BoxWhisper', parsed) : await lease.unseal('BoxTombstone', parsed)
+    const { whisper_sealed: _sealed, ...unsealed } = parsed
+    return Object.freeze({ ...unsealed, whisper })
   }
   // --
 
-  // == [Guards]: isEnabled, isLocked, isUnlocked, demandEnabled, demandOwnBox, demandLease
+  // == [Guards]: isEnabled, isLocked, isUnlocked, demandEnabled, demandBox, demandLease
 
   /** True while this bank's device is enabled. */
   get isEnabled(): boolean { return this.#device.isEnabled }
@@ -191,9 +203,10 @@ export class Bank implements GX.BankStamp {
     return this
   }
 
-  /** Throw `record_conflict` unless `box` claims this bank's scope and life */
-  #demandOwnBox(box: unknown): void {
-    Validator.checkedConsistent(Checks.boxOfBank.parse(box), this.stamp, { kind: 'record_conflict' })
+  /** `box`, parsed by `check`, or throw `record_conflict` unless it is of this bank's scope */
+  #demandBox<BoxT extends BoxSparse>(box: unknown, check: Z.ZodType<BoxT>): BoxT {
+    // The bank names its user `user_id`, and a box `userid`.
+    return Validator.checkedConsistent(check.parse(box), { userid: this.user_id, banklabel: this.banklabel }, { kind: 'record_conflict' })
   }
 
   /** The attached lease, or throw while locked */

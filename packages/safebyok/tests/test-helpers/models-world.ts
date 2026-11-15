@@ -1,5 +1,5 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
- * a bank born unlocked, a stub of the `bank.put` seam, box antes, a fake of the bank a lease hears, and the loudly named
+ * a bank born unlocked, a stub of the `bank.put` seam, a box's shell, a fake of the bank a lease hears, and the loudly named
  * backdoors that open a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
@@ -9,13 +9,14 @@
 
 import { type Mock, type MockInstance, afterEach, beforeEach, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
-import { BX, Consts, Crypto, GX, Strength } from 'safebyok-big/internals'
+import { Consts, Crypto, GX, SX, Strength } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
 import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/device'
 import { Lease, type LeaseBank } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
-import type { BoxAnte } from '../../src/models/sealers'
+import type { BoxRecord, BoxSparse } from '../../src/models/sealers'
+import { BoxThingFormat, ShellLifeseq, lifeseqOf } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 
 // == [Time]: T0, useFakeClock
@@ -30,7 +31,7 @@ export function useFakeClock(): void {
 }
 // --
 
-// == [The stamps]: WorldScope, WorldBankStamp, WorldGateStamp, WorldGate, WorldVaultTok
+// == [The stamps]: WorldScope, WorldBankStamp, WorldGateStamp, WorldGate
 
 /** The bank scope every builder here works in: `u1`'s bank `acme`. */
 export const WorldScope = Object.freeze({ user_id: 'u1', banklabel: 'acme' })
@@ -43,9 +44,6 @@ export const WorldGateStamp: GX.GateStamp = Object.freeze({ ...WorldScope, gatel
 
 /** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at a revision of its own. */
 export const WorldGate: GX.CitedGate = Object.freeze({ gatelabel: 'main', gate_tok: WorldGateStamp.gate_tok, revision_tok: 'gate-revision-tok-1' })
-
-/** The `vault_tok` a box record still carries in this layer. */
-export const WorldVaultTok = 'vault-tok-u1'
 // --
 
 // == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, makeDevice, passkeyAnswerOf
@@ -135,15 +133,23 @@ export function stubBankPut(answer: (bank: Bank) => Promise<Bank> = (bank) => Pr
 }
 // --
 
-// == [Boxes]: Whisper, boxAnteOf
+// == [Boxes]: Whisper, BoxShell, boxShellOf
 
 /** An obvious fake whisper, never a real one. */
 export const Whisper = Object.freeze({ apiKey: 'sk-test-0000' })
 
-/** A box ante in {@link WorldBankStamp}'s bank: the shell of `anthropic_api_key`, a tombstone at the void revision, with a sidecar, as `overrides` changes it. */
-export function boxAnteOf(overrides: Partial<BoxAnte> = {}): BoxAnte {
-  const shell = BX.shellBoxOf({ ...WorldScope, vaultlabel: 'main', boxlabel: 'anthropic_api_key', bank_tok: WorldBankStamp.bank_tok, vault_tok: WorldVaultTok })
-  return { ...shell, sidecar: { account: 'work' }, ...overrides }
+/** What a box's first seal starts from: the shell's Thing fields, with the sidecar to store. */
+export type BoxShell = BoxSparse & Pick<BoxRecord, 'sidecar'>
+
+/** The shell of the box `anthropic_api_key` in {@link WorldScope}'s bank, under life 0 of the root box, with a sidecar, as `overrides` changes it.
+ * A shell has no record, so its `born_at` and `written_at` are {@link T0}.
+ */
+export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
+  return {
+    userid: WorldScope.user_id, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
+    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: `${lifeseqOf(0)}/${ShellLifeseq}`,
+    born_at: T0, written_at: T0, sidecar: { account: 'work' }, ...overrides,
+  }
 }
 // --
 

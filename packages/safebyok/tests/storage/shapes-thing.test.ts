@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   type WriteThingAsk, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf,
-  isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, seqOfLifeseq, childShellCited, sparseOf,
+  isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, seqOfLifeseq, childShellCited, sparseOf, boxSparse,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -204,6 +204,8 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
     [TH.birthAskOf({ ...box, sidecar: undefined } as never, under),                  'sidecar',                  'a live box with no sidecar'],
     [TH.delAskFor(box, { ...tomb, sidecar: {} } as never),                           Unaccepted,                 'a tombstone with a sidecar'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, codectag: 1 } } as never, under), 'codectag', 'a box whose sealed whisper is misshapen'],
+    [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, schematag: 'Whisper v1' } }, under), 'schematag', 'a box whose schematag is not a label'],
+    [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, nonce: 'n' } } as never, under), Unaccepted, 'a box whose sealed whisper has a field no sealed part has'],
     [TH.birthAskOf({ ...TH.bankThingOf(), note: 'hi' } as never),                    Unaccepted,                 'a bank with a body'],
     [TH.birthAskOf(TH.rootBoxOf({ labelpath: 'box/root' })),                         Phrases.LabelNotLast,       'a root box at a child\'s labelpath'],
   ]
@@ -291,6 +293,37 @@ describe("sparseOf(record)", () => {
     const { sidecar: _sidecar, whisper_sealed: _sealed, ...thingFields } = TH.boxThingOf() as ReturnType<typeof TH.boxThingOf> & { sidecar: unknown }
     expect(sparseOf(TH.boxThingOf())).to.deep.equal(thingFields)
   })
+})
+
+describe("boxSparse", () => {
+  const shell = Object.freeze({
+    ...TH.ThingBank, labelpath: 'box/openai', label: 'openai', fmt: 5103, revtok: ShellCited.revtok, revseq: ShellCited.revseq, am: 'x',
+    lifeseq: ShellLifeseq, lifepath: `${Life0}/${ShellLifeseq}`, born_at: TH.T0, written_at: TH.T0,
+  })
+
+  it("takes a live box's, a tombstone's and the shell's Thing fields, stripping the body", () => {
+    const box = TH.boxThingOf()
+    expect(boxSparse.parse(box)).to.deep.equal(sparseOf(box))
+    const tomb = TH.boxTombOf(box)
+    expect(boxSparse.parse(tomb)).to.deep.equal(sparseOf(tomb))
+    expect(boxSparse.parse(shell)).to.deep.equal(shell)
+  })
+
+  const BadSparseCases = [
+    [{ ...shell, revseq: 0 },                                     Phrases.SparseHalfShell, 'half the shell: its revseq moved'],
+    [{ ...shell, revtok: 'rev-0' },                               Phrases.SparseHalfShell, 'half the shell: its revtok moved'],
+    [{ ...shell, lifeseq: Life0, lifepath: `${Life0}/${Life0}` }, Phrases.LifeseqParity,   'the shell made live in its lifeseq alone'],
+    [{ ...shell, lifeseq: Life0 },                                Phrases.LifeseqNotOwn,   'a lifeseq not the last of its lifepath'],
+    [{ ...shell, revseq: -2 },                                    'revseq',                'a revseq below the shell\'s'],
+    [{ ...shell, labelpath: 'gate/openai' },                      'labelpath',             'a Thing of another kind'],
+  ] as const
+
+  for (const [sparse, said, blurb] of BadSparseCases) {
+    it(`refuses ${blurb}`, () => {
+      const err = TH.expectSyncRefusal(() => boxSparse.parse(sparse), 'bad_record')
+      expect(err.message).to.include(said)
+    })
+  }
 })
 
 describe("loggableAskOf(ask)", () => {

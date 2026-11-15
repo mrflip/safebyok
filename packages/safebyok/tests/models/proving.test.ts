@@ -68,7 +68,7 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   const bank = TH.fakeLeaseBankOf()
   const sealer = await one.buildLease(bank, TH.WorldGate)
   const opener = await other.buildLease(bank, TH.WorldGate)
-  const sealed = await sealer.seal('BoxWhisper', TH.boxAnteOf(), { whisper: { apiKey: 'sk-test-5678' } })
+  const sealed = await sealer.seal('BoxWhisper', TH.boxShellOf(), { whisper: { apiKey: 'sk-test-5678' } })
   expect(await opener.unseal('BoxWhisper', sealed)).to.deep.equal({ whisper: { apiKey: 'sk-test-5678' } })
 }
 

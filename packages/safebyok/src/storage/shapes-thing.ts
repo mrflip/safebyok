@@ -62,7 +62,7 @@ export function isLabelpathOfKind(labelpath: string, modelkind: Thingkind): bool
 function isLabelpath(labelpath: string): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, Sparse, sparseOf, ShellCited, childShellCited
+// == [Thing]: thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, Sealed, Sparse, BoxSparse, sparseOf, ShellCited, childShellCited
 
 const LifeseqPattern       = /^[\da-v]{10}$/
 const LifepathPattern      = /^[\da-v]{10}(?:\/[\da-v]{10})*$/
@@ -95,7 +95,7 @@ function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
 }
 
 /** The checks of a Thing's fields, and of each kind as a Thing, as proposed and as cited. */
-export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
+export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
@@ -112,7 +112,16 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
   const thingRecord  = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
   const emptyBag     = obj({}).strict()
   // The store checks only the shape of a sealed part: what is inside is the sealer's.
-  const sealed       = obj({ key_wrapped: CX.ciphered, ciphered: CX.ciphered, codectag: str, schematag: str }).strict()
+  const sealed       = obj({
+    /** The part's own key, fresh for each seal, wrapped under the bankKey. */
+    key_wrapped:    CX.ciphered,
+    /** The cleartext, ciphered under the part's key. */
+    ciphered:       CX.ciphered,
+    /** How the cleartext was turned into text before it was ciphered. */
+    codectag:       label,
+    /** The tag for the schema of the cleartext. */
+    schematag:      label,
+  }).strict()
 
   // A stored record is strict: a field this version does not know is damage, or a newer format.
   const bankBase     = obj({
@@ -170,7 +179,22 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
   const boxCited     = obj({ ...exactPartialOf(boxLive.shape), ...thingCited.shape }).strict()
     .refine(isShellWhole,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
-  return { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited }
+
+  // A shape taken out of a record strips. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
+  const boxSparse    = obj({
+    ...thingRecord.shape,
+    labelpath:      boxLive.shape.labelpath,
+    fmt:            lit(BoxThingFormat),
+    revseq:         thingCited.shape.revseq,
+    lifeseq:        union([lifeseq, lit(ShellLifeseq)]),
+    lifepath:       thingCited.shape.lifepath,
+  })
+    .refine(isLabelLast,    Phrases.LabelNotLast)
+    .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
+    .refine(isLifepathDeep, Phrases.LifepathDepth)
+    .refine(isParityRight,  Phrases.LifeseqParity)
+    .refine(isShellWhole,   Phrases.SparseHalfShell)
+  return { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse }
 })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
@@ -187,6 +211,10 @@ export type GateThing    = Readonly<Z.infer<typeof gateThing>>
 export type BoxThing     = Readonly<Z.infer<typeof boxThing>>
 /** Any Thing stored in a vaultDB. */
 export type Thing        = BankThing | GateThing | BoxThing
+/** One sealed part of a record, at `<part>_sealed`: a fresh key wrapped under the bankKey, the cleartext ciphered under that key, and the tags its unseal reads. */
+export type Sealed       = Readonly<Z.infer<typeof sealed>>
+/** A box's Thing fields, without its body: live, a tombstone, or the shell. */
+export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
 
 /** A record's Thing fields, without its body: what a listing gives of each Thing. */
 export type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecord>
