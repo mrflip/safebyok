@@ -144,8 +144,8 @@ with this package for now.
 
 `safebyok_banks` has a row per bank, keyed by `user_id` and `banklabel`. `safebyok_gates` has a row
 per gate of a bank, keyed by those and `gatelabel`; today every bank has one, `main`, with the
-bank's wayins in `wayins`. `safebyok_vaults` has a row per vault, keyed by the bank's key and
-`vaultlabel`. `safebyok_boxes` has a row per box, keyed by the vault's key, the life of its vault
+bank's wayins in `wayins`. `safebyok_vaults` has a row per vault, keyed by the bank's primary key and
+`vaultlabel`. `safebyok_boxes` has a row per box, keyed by the vault's primary key, the life of its vault
 (`bank_tok` and `vault_tok`) and its `boxlabel`. Each field of a row is a column of its own. The
 labels, the tokens and `am` are `text`. `fmt`, `revision_seq` and `whisper_schema_version` are
 `integer`. The times, `registered_at` and `written_at`, are `bigint`, in UTC epoch milliseconds.

@@ -56,7 +56,7 @@ export const DeviceDBExpected = "Expected a DeviceDB: an instance of a class ext
 /** Anything but a Uint8Array, or one not `count` bytes long when a count is given. */
 export function bytesExpected(count?: number): string { return (count === undefined ? "Expected bytes, a Uint8Array" : `Expected ${String(count)} bytes, a Uint8Array`) }
 
-/** Anything but a leaseKey as `makeLeaseKey` makes one, where a lease record keeps its key. */
+/** Anything but a leaseKey as `makeLeaseKey` makes one, where a lease record keeps its leaseKey. */
 export const LeaseKeyExpected = "Expected a non-extractable AES-GCM CryptoKey for wrapKey and unwrapKey"
 
 /** Anything but a stamp a lease binds a seal to. */
@@ -220,10 +220,10 @@ export const AnswerNotAsSent = "Storage answered with a record other than the on
 /** Why cleartexts that hand in neither a passphrase nor a passkey's answer are refused. */
 export const CleartextMissing = "An attempt hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
 
-/** Why a passphrase whose key does not open the vault's passphrase wayin is refused. */
+/** Why a passphrase whose passphraseKey does not open the vault's passphrase wayin is refused. */
 export const WrongPassphrase = "That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged."
 
-/** Why a passkey's answer whose key does not open the vault's passkey wayin is refused. */
+/** Why a passkey's answer whose passkeyKey does not open the vault's passkey wayin is refused. */
 export const WrongPasskey = "That passkey answered, but its answer didn't unlock the vault: its stored way in may be damaged. Unlock with the passphrase; if that works, add the passkey again, which replaces it."
 
 /** Why a passkey's answer is refused by a vault that has no passkey wayin. */
@@ -265,7 +265,7 @@ export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key.
 /** Why this device's lease is not used, whether it was found damaged in the cache or failed to open while in force. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
-/** Why a whisper that will not open under the vault's key is refused. */
+/** Why a whisper that will not open under its boxKey is refused. */
 export const UndecipheredWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
 
 /** Why a whisper that opened but is no whisper this package knows is refused. */

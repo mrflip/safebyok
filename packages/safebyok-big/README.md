@@ -19,8 +19,8 @@ devices through a storage layer the host plugs in.
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
   no longer unlocks the bank, but the bankKey never changes, so a copy of the old gate row can still
   be unlocked with the old passphrase or passkey. Deleting a vault deletes its boxes but no key:
-  a copy of those boxes kept elsewhere still unseals under the bank's key. Only deleting the bank,
-  with `bank.delPrompt()`, removes the stored copies of its key.
+  a copy of those boxes kept elsewhere still unseals under the bankKey. Only deleting the bank,
+  with `bank.delPrompt()`, removes the stored copies of its bankKey.
 * **State is framework-agnostic.** `Device`, `Bank`, `Vault`, `Box`, the main gate
   (`bank.maingate`) and each listing (`bank.vaultListing`, `vault.boxListing`) have `subscribe` and
   `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore` accepts them. A

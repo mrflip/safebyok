@@ -197,7 +197,7 @@ export function describeDeviceDBBattery<DBT extends DeviceDB>(label: string, opt
     })
 
     describe("listLeases()", () => {
-      it("returns every stowed lease, oldest first, without its key", async () => {
+      it("returns every stowed lease, oldest first, without its leaseKey", async () => {
         const deviceDB = await fresh()
         await deviceDB.stow(await leaseRowOf({ banklabel: 'late', proved_at: T0 - Hour }))
         await deviceDB.stow(await leaseRowOf({ banklabel: 'early', proved_at: T0 - (3 * Hour) }))

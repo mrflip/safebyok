@@ -64,7 +64,7 @@ The ordering rules:
 
 1. The stamps (`listing.stampsOfBirth()`: the bank stamp and the gate stamp) come before any key: a wayin's ctx binds
    `[bankStamp, gateStamp]`, its purpose and its header, and a passkeyKey's HKDF `info` is that same ctx.
-2. A header comes before its key: a passphraseKey is derived from the header's salt.
+2. A header comes before its wayinKey: a passphraseKey is derived from the header's salt.
 3. The passphrase wayin comes before the passkey wayin: it is where the bankKey comes from.
 
 The lease is not an input. It is a second output of the same bankKey.

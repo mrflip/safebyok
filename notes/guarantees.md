@@ -326,7 +326,7 @@ the wayin's whole ctx as its `info`, derived non-extractable (`deriveWrappingKey
 wayinKey, is not a local: it is `Proving.#wayinKey`, private, for the proving's life, and no
 method returns it or a bankKey (`models/proving.ts`). Bytes refused before import: anything but
 32 bytes, 32 zero bytes, and shared memory. Checked by: `tests/models/proving.test.ts` (among them *the ctx a wayin is
-wrapped under* and *a passkey proving's key*), `tests/helpers/crypto.test.ts` (*deriveWrappingKey*),
+wrapped under* and *a passkey proving's passkeyKey*), `tests/helpers/crypto.test.ts` (*deriveWrappingKey*),
 `tests/models/gating.test.ts` (*gating.attempt*, among them *refuses a second attempt while one runs*, *concludes on a
 malformed attempt, with no passphrase in the refusal* and *zeroes a passkey answer from another realm*).
 
@@ -370,7 +370,7 @@ proof's lease is written over it or a host's `bank.autolock` locks it; a host th
 until then. `Lease.buildFromCache` never reaches a lease that is already attached, and `bank.autolock` reaches one only
 through its row, so it misses a lease that the deviceDB refused to cache, or whose row another page has forgotten or
 written over. Both go by the device's clock, as `Date.now()` reads it: setting the clock back delays them, and makes an
-expired row that is still on disk usable again. A record read back whose key is extractable, of another
+expired row that is still on disk usable again. A record read back whose leaseKey is extractable, of another
 algorithm, or for another use is treated as `damaged_lease` (`isLeaseKey`, `shapes-gateish.ts`). *Caveat:*
 non-extractable stops export, not use. Whoever has the handle in this page can unwrap the
 bankKey as an extractable key, and with it unseal every box of every vault of the bank. So the `DeviceDB`, which is host-pluggable and is handed every lease
@@ -437,10 +437,10 @@ bankKey (`Lease.#bankKey`, `damaged_lease`), and the unwrap and decipher of a wh
 it, so a bug in building the ctx is never reported as a wrong proof or a damaged box. Where no wrong key or
 altered record can explain a failure, a WebCrypto error is not caught where it is thrown: in sealing
 a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
-(`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`), making a proving's key (`importWrappingKeyBytes` in
+(`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`), making a proving's wayinKey (`importWrappingKeyBytes` in
 `passphraseKeyOf`, `deriveWrappingKey` in `PasskeyProving`'s static methods) or making a wayin or a lease from a proving
 (`Proving.buildWayin`, `Proving.buildLease`: `makeBankKey`, and the unwrap and wrap of a bankKey
-already proved). A proving's key, a grant or a wayin is made inside the gating's `outcomeOf`, which turns the error into
+already proved). A proving's wayinKey, a grant or a wayin is made inside the gating's `outcomeOf`, which turns the error into
 an `unexpected_error` with the DOMException as its `cause`. An error from a seal reaches the host as a throw
 from `putBox`, `box.put`, `putExposed`, `vault.boxListing.create` or the public `vault.sealStampedString` or `bank.sealWith`. From the
 `try*` forms of the first four, `outcomeOf` turns it into an `unexpected_error` with the DOMException as its `cause`.

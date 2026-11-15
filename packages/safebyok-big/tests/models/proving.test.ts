@@ -575,7 +575,7 @@ describe("the ctx a wayin is wrapped under", () => {
   }
 })
 
-describe("a passkey proving's key", () => {
+describe("a passkey proving's passkeyKey", () => {
   it("is HKDF over the PRF bytes, with the wayin's ctx as info", async () => {
     const answer = passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)

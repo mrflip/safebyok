@@ -222,7 +222,7 @@ is shaped around it.
 ### Which wayins a rotation keeps
 
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
-first matter said rotation "re-wraps the remaining wayins", but it can't: each wayin's key
+first matter said rotation "re-wraps the remaining wayins", but it can't: each wayin's wayinKey
 comes from a passphrase or a passkey touch the bank never keeps, and any shortcut would hand the
 new bankKey to the wayin being removed. So the design keeps only the wayins the user proves
 during the rotation and removes the rest -- which is also what locks out a lost phone's passkey,

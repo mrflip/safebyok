@@ -383,7 +383,7 @@ async function deleteEndedBoxes(db: DatabaseWriter, scope: BankScope, isEnded: (
 /** The {@link Life} of an ask or a record, without its other fields. */
 function lifeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life): Life { return { user_id, banklabel, vaultlabel, bank_tok, vault_tok } }
 
-/** A map key for `life`, among the lives of one bank. */
+/** The ckey of `life`, among the lives of one bank. */
 function ckeyOfLife({ vaultlabel, bank_tok, vault_tok }: Life): string { return DB.ckeyOf(vaultlabel, bank_tok, vault_tok) }
 
 /** The `bank_tok` of `bankRaw` when it is a live bank row, else null. */

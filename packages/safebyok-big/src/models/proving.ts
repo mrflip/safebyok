@@ -131,7 +131,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
 
   // == [Protected, for a subclass to call]: checkUnwraps
 
-  /** Throw `wrongCleartext()` unless this proving's key unwraps its stored wayin.
+  /** Throw `wrongCleartext()` unless this proving's wayinKey unwraps its stored wayin.
    * The bankKey unwrapped is non-extractable, and dropped at once (G3).
    */
   protected async checkUnwraps(wrongCleartext: () => VaultError): Promise<void> {

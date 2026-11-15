@@ -191,7 +191,7 @@ describe("wrap and unwrap", () => {
 /** Hex text to bytes, for a published test vector. */
 function hexBytes(hex: string) { return Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16)) }
 
-/** The info of a passkey wayin's key, for the header of the device `device_tok`. */
+/** The info of a passkey wayin's passkeyKey, for the header of the device `device_tok`. */
 function infoOf(device_tok: string) { return cipherCtx(vaultStamp, 'bank_key_passkey_wrapped', { ...header, device_tok }) }
 
 describe("deriveWrappingKey", () => {

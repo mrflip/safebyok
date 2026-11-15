@@ -70,7 +70,7 @@ export const PrfAnswerSize = 32
 
 /** The check of a passkey's answer: its credential's id, the salt it answered for, and its PRF bytes. No refusal quotes it, as its bytes are secret.
  * An answer already used is refused, as the gating that spent it zeroed its bytes: sealed again, it
- * would make a key anyone could rebuild.
+ * would make a passkeyKey anyone could rebuild.
  *
  * @example passkeyAnswer.parse(usedAnswer)  // throws: its bytes were zeroed at its first use
  */
@@ -215,7 +215,7 @@ export type Novel = typeof NOVEL
 export const LeaseFormat = 7003
 
 /** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey for `unwrapKey`, and at most `wrapKey` besides.
- * A cached lease whose key fails this was not written by this package, and is treated as damaged.
+ * A cached lease whose leaseKey fails this was not written by this package, and is treated as damaged.
  *
  * @example isLeaseKey(await makeBankKey())  // false: extractable
  */

@@ -86,7 +86,7 @@ describe("each ctx, byte for byte", () => {
     expect(await Crypto.unwrapKeyUnder(wayinKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })
 
-  it("binds a passkey wayin's wrap and its key to the bank's stamp, the gate's, the purpose and its whole header", async () => {
+  it("binds a passkey wayin's wrap and its passkeyKey to the bank's stamp, the gate's, the purpose and its whole header", async () => {
     const answer = TH.passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
     const { bank } = await TH.buildBornBank({ passkeyClear: answer })
