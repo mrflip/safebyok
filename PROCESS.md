@@ -32,7 +32,7 @@ sprint keeps to the same. The selective tests, not `pnpm justify`, serve a mid-w
 rebase and a reviewer's fixes (a reviewer proves what its fixes touch). Run `pnpm justify` after
 the rebase that prepares filing; if that turns up trouble, go back to the selective tests or to
 `pnpm justify`, as you judge the odds. Run it before a PR leaves draft: `scripts/file-thread`
-runs it as the gate.
+runs it, and pushes nothing unless it passes.
 
 Do not select by change with pnpm's `...[<base>]` filter: it selects the root when a root file
 changed, whose `test` runs every package again, and its packages run one at a time, each

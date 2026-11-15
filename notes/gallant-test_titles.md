@@ -87,7 +87,7 @@ The fault is a title that says "it", "one" or "its own" for a noun that only a s
 
 ## No citations `#no-citations`
 
-A date, a Coach, a gate code or a section tag in a title is history (`#purpose-not-path`). A `describe` names the
+A date, a Coach, a code like G4 or a section tag in a title is history (`#purpose-not-path`). A `describe` names the
 behaviour, and the ruling stays in the whiteboard.
 
 | Goofus | Gallant |

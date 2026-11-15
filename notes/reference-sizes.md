@@ -54,7 +54,7 @@ Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 2
   *Larger* row grows in two other ways. Each wrapped key is 512 bits, as an AES-256-SIV or HMAC-SHA-512 key would be:
   +43 bytes per wayin. The passphraseSalt is 32 bytes: +21 bytes. Both are overkill: RFC 9106 recommends a 16-byte
   Argon2 salt.
-* **Reading "two more wayins the size of a passphrase".** The gate check allows exactly one passphrase wayin and at
+* **Reading "two more wayins the size of a passphrase".** The gate record's check allows exactly one passphrase wayin and at
   most one passkey wayin. So the two extra passphrase wayins were added as extra gate fields after the check passed.
 
 ## Box rows
