@@ -69,17 +69,18 @@ gate's write function*), overriding `classify*` where the store reached the verd
 
 ## Open
 
-* **Does a gate write also revise the bank?** The pick is the world's own `{ revseq, lifeseq }`, the bank's fields. If
-  a gate write revises the bank too (gate_policies: "gate verbs are bank/gate puts"), the pick catches every change;
-  if not, it misses a passphrase change unless it carries `maingate`'s pair as well.
-* **How an answer says "unchanged".** Recommended: `world` absent when it matches the pick; `null` in the null cases
-  above; the `WorldRecord` when the pick is behind or ahead, or the ask carried none.
+* **A gate change as a bank change.** For the world pick to catch a gate change, a gate write must be a compound
+  write: the gate's put and the bank's next revision in one step, both built by the device, as `tryBirthBank` writes
+  three roots. Recommended as the rule for the gate verbs, in a later thread. Nothing writes the gate after its
+  birth until then. In reserve: asks carrying `track: [{ labelpath, revseq, lifepath }]` and answers `tracked`, a more
+  generous contract.
 
 ## Settled, 2026-11-15
 
-* **The world push (T1).** Each ask carries a pick of the world its sender holds, its lifeseq and revseq, never the
-  whole world. An answer carries the full `WorldRecord` only when the world has moved against the pick, and the
-  adapter then forwards it into the watch feed, unless a store option turns that off (GraphQL pushes itself).
+* **The world push (T1).** Every answer carries its world (`WorldRecord | null`), never left off. Each ask may
+  carry the world pick its sender holds, `{ revseq, lifeseq }` (the bank's fields), never the whole world. The
+  vaultDB compares the two, and where they differ (or the ask has no pick) the adapter pushes the world into the
+  watch feed, unless a store option turns that off (GraphQL pushes itself).
 * **A friend** is the narrow set of an owner's attributes and callbacks that it hands a collaborator, a pick of the
   owner's interface where the names coincide (`gallant.md` *#record-then-opts*). Visibility does not define it, and
   is not changed for it; "Internal." in a doc block marks what is not for hosts.
