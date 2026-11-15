@@ -8,14 +8,14 @@ import {
   type Thing, type ThingWatchScope, type WriteAskOf, type WriteThingAsk,
   birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf, watchArgs,
 } from './shapes-thing'
-import { type BankRootsFetched, type ThingsFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
+import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
 } from './vault-db'
 
 // == [Answers]: Received, answerOf
 
-/** What a store's watch hands `receive`: a changed Thing, raw, and the bank as the store last read it. */
+/** What a store's watch hands `receive`: a changed Thing, raw, and its bank's world as the store last read it. */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
 /** A verb's answer from what its store reports: `record` as `val` when good, as `dbhas` when refused.
@@ -41,16 +41,16 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
 export abstract class AdapterVaultDB implements VaultDB {
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
   // A subclass's `do*` calls these. A store that reaches some of the verdict itself overrides them to read it. Each
-  // takes the raw roots of the ask's bank, fetched in the same step, as its world.
+  // takes the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
-  protected classifyGetThing(ask: GetThingAsk, raw: unknown, roots: BankRootsFetched): Actual<EX.GotAct> { return classifyGetThing(ask, raw, roots) }
+  protected classifyGetThing(ask: GetThingAsk, raw: unknown, world: WorldFetched): Actual<EX.GotAct> { return classifyGetThing(ask, raw, world) }
 
   /** Classify a write against the raw Thing fetched at its scope, null for none, applying its storage policies. */
-  protected classifyWriteThing(ask: WriteThingAsk, raw: unknown, roots: BankRootsFetched): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw, roots) }
+  protected classifyWriteThing(ask: WriteThingAsk, raw: unknown, world: WorldFetched): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw, world) }
 
   /** Classify a listing against the raw parent and the raw Things one label under it. */
-  protected classifyListThings(ask: ListThingsAsk, fetched: ThingsFetched, roots: BankRootsFetched): ListThingsActual { return classifyListThings(ask, fetched, roots) }
+  protected classifyListThings(ask: ListThingsAsk, fetched: ThingsFetched, world: WorldFetched): ListThingsActual { return classifyListThings(ask, fetched, world) }
 
   /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
   protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return classifyBirthBank(puts, fetched) }
@@ -159,19 +159,19 @@ export abstract class AdapterVaultDB implements VaultDB {
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
   // fetched. A store that can run code of its own may run the whole step there.
 
-  /** In one step: fetch the Thing at `ask`'s scope and its bank's roots, and return `this.classifyGetThing(ask, raw, roots)`. */
+  /** In one step: fetch the Thing at `ask`'s scope and its bank's raw world, and return `this.classifyGetThing(ask, raw, world)`. */
   protected abstract doGetThing(ask: GetThingAsk): Helpers.Awaitable<Actual<EX.GotAct>>
   /** In one step: fetch the Thing at `ask`'s scope, classify, and if the act is a write, write `ask.record` and report the Thing written,
-   * with the world its bank's roots make after the write.
+   * with its bank's world after the write.
    */
   protected abstract doWriteThing(ask: WriteThingAsk): Helpers.Awaitable<Actual<EX.PutAct | EX.DelAct>>
-  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's roots, and return `this.classifyListThings(ask, fetched, roots)`. */
+  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw world, and return `this.classifyListThings(ask, fetched, world)`. */
   protected abstract doListThings(ask: ListThingsAsk): Helpers.Awaitable<ListThingsActual>
   /** In one step: fetch the raw bank, main gate and root box, return `this.classifyBirthBank(puts, fetched)`, and under `born` first
-   * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world they make.
+   * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world the bank and main gate make.
    */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
-  /** Start a watch: call `receive` with each changed Thing, raw, and the bank as the store last read it, and `onBadNews` with
+  /** Start a watch: call `receive` with each changed Thing, raw, and its bank's world as the store last read it, and `onBadNews` with
    * trouble, whether or not it ends the watch. Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    */
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }

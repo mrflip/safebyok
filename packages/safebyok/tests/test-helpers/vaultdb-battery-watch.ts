@@ -2,9 +2,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Errors } from 'safebyok-big/internals'
 import { aWhile, eventually, expectSyncRefusal } from 'safebyok-big/testing'
-import { type ThingWatchScope, bankRecordOf } from '../../src/storage/shapes-thing'
+import type { ThingWatchScope, WorldRecord } from '../../src/storage/shapes-thing'
 import type { ThingNotice, VaultDB } from '../../src/storage/vault-db'
-import { ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, rootBoxOf } from './vaultdb-world'
+import { ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 
 /** What a watch on `scope` hears: its notices, and its bad news. */
@@ -27,23 +27,23 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate, boxesBorn }: V
       expect(badNews).to.deep.equal([])
     })
 
-    it("hears each of a bank's roots at its birth, with the bank as world", async () => {
+    it("hears each of a bank's roots at its birth, with the bank and main gate as world", async () => {
       const vaultDB = await fresh()
       const { notices, badNews } = heardOf(vaultDB)
       await vaultDB.tryBirthBank(birthBankAskOf())
       await eventually(() => notices.length === 3)
-      const world = bankRecordOf({ bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf() })
+      const world: WorldRecord = { ...bankThingOf(), maingate: gateThingOf() }
       expect(notices.map(({ val }) => val.labelpath)).to.have.members(['bank', 'box', 'gate'])
       expect(notices.map((notice) => notice.world)).to.deep.equal([world, world, world])
       expect(badNews).to.deep.equal([])
     })
 
-    it("hears a box written in a born bank, with the bank as world", async () => {
+    it("hears a box written in a born bank, with the bank and main gate as world", async () => {
       const vaultDB = await bornBank()
       const { notices } = heardOf(vaultDB)
       const [box] = await boxesBorn(vaultDB, boxThingOf())
       await eventually(() => notices.length === 1)
-      expect(notices[0]).to.deep.equal({ ok: true, act: 'gotlive', val: box, world: bankRecordOf({ bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf() }) })
+      expect(notices[0]).to.deep.equal({ ok: true, act: 'gotlive', val: box, world: { ...bankThingOf(), maingate: gateThingOf() } })
     })
 
     it("hears nothing of another bank, nor of a refused write", async () => {

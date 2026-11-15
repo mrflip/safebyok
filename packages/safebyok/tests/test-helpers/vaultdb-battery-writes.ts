@@ -33,7 +33,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     it("refuses an ask for a labelpath of no kind of Thing, or past its kind's depth", async () => {
       const vaultDB = await fresh()
       await expectBad(vaultDB.tryGetThing({ ...getGateAskOf(), labelpath: 'vault/main' }), 'bad_option')
-      await expectBad(vaultDB.tryGetThing(getAskAt('gate/second')), 'bad_option')
+      await expectBad(vaultDB.tryGetThing(getAskAt('gate/a/b')), 'bad_option')
       await expectBad(vaultDB.tryGetThing(getAskAt('box/aa/deep')), 'bad_option')
     })
 

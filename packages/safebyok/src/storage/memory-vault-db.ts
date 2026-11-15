@@ -2,8 +2,8 @@
 
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
-import type { BankRecord, BirthBankAsk, BirthPuts, GetThingAsk, ListThingsAsk, Thing, ThingScope, ThingWatchScope, WriteThingAsk } from './shapes-thing'
-import { type BankRootsFetched, isWriteAct, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
+import type { BirthBankAsk, BirthPuts, GetThingAsk, ListThingsAsk, Thing, ThingScope, ThingWatchScope, WorldRecord, WriteThingAsk } from './shapes-thing'
+import { type BankRootsFetched, type WorldFetched, isWriteAct, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
 /** A watch: the bank it watches, the function that receives each change, and the one that hears its trouble. */
@@ -18,7 +18,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   readonly #watchers = new Set<Watcher>()
   // --
 
-  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #worldOf, #notify
+  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #worldFetchedOf, #worldOf, #notify
 
   /** For tests: the Things stored in `scope`'s bank, by labelpath, to read or change in place. */
   _cheat_things(scope: ThingWatchScope): Map<string, unknown> { return this.#thingsOf(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
@@ -46,12 +46,17 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return structuredClone({ bank: things.get('bank') ?? null, gate: things.get('gate') ?? null, root: things.get('box') ?? null })
   }
 
-  /** The bank of `things` at `scope`, as it now stands. */
-  #worldOf(scope: ThingWatchScope, things: Map<string, unknown>): BankRecord | null { return worldOf(scope, this.#rootsOf(things)) }
+  /** The raw bank and main gate of a bank's `things`, each a copy, or null for none. */
+  #worldFetchedOf(things: Map<string, unknown>): WorldFetched {
+    return structuredClone({ bank: things.get('bank') ?? null, maingate: things.get('gate') ?? null })
+  }
+
+  /** The world of the bank of `things` at `scope`, as it now stands. */
+  #worldOf(scope: ThingWatchScope, things: Map<string, unknown>): WorldRecord | null { return worldOf(scope, this.#worldFetchedOf(things)) }
 
   // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
   /** Notify each watcher of `thing`'s bank of it, and of the bank as `world`. */
-  #notify(thing: Thing, world: BankRecord | null): void {
+  #notify(thing: Thing, world: WorldRecord | null): void {
     for (const { scope, receive, onBadNews } of this.#watchers) {
       if ((scope.userid === thing.userid) && (scope.banklabel === thing.banklabel)) {
         queueMicrotask(() => {
@@ -66,12 +71,12 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doGetThing(ask: GetThingAsk): Actual<EX.GotAct> {
     const things = this.#thingsOf(ask)
-    return this.classifyGetThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#rootsOf(things))
+    return this.classifyGetThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things))
   }
 
   protected doWriteThing(ask: WriteThingAsk): Actual<EX.PutAct | EX.DelAct> {
     const things = this.#thingsOf(ask)
-    const actual = this.classifyWriteThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#rootsOf(things))
+    const actual = this.classifyWriteThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things))
     if (! (actual.ok && isWriteAct(actual.act))) { return actual }
     const record = this.#write(ask, ask.record)
     const world  = this.#worldOf(ask, things)
@@ -85,7 +90,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const children = [...things]
       .filter(([labelpath]) => labelpath.startsWith(under) && (! labelpath.includes('/', under.length)))
       .map(([labelpath, raw]) => ({ labelpath, raw: structuredClone(raw) }))
-    return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children }, this.#rootsOf(things))
+    return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children }, this.#worldFetchedOf(things))
   }
 
   protected doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {

@@ -241,6 +241,7 @@ describe("a tampered lease record", () => {
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                       'its wayinkind changed'],
     [(record: LeaseRecord) => ({ ...record, gate_revtok: 'gate-revision-tok-2' }),                         'its gate_revtok changed'],
     [(record: LeaseRecord) => ({ ...record, gate_lifeseq: lifeseqOf(1) }),                                 'its gate_lifeseq changed'],
+    [(record: LeaseRecord) => ({ ...record, gatelabelpath: 'gate/passkeys' }),                             'its gatelabelpath changed'],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }),          "another lease's leaseKey"],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],
   ] as const

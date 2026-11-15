@@ -2,7 +2,7 @@
 // stays behind the subpaths: `safebyok/core` keeps every class and the lease, proving and sealer machinery, and
 // `safebyok/storage` the vaultDB. What a host needs that
 // safebyok-big defines is re-exported from it, so that `VaultError` stays one class across both packages.
-export { Bank, type BankRecord, type BoxShell, type BoxUnsealed, type GetBoxAnswer, type GetBoxArgs } from './models/bank'
+export { Bank, type BankMakeRecord, type BankRecord, type BoxShell, type BoxUnsealed, type GetBoxAnswer, type GetBoxArgs } from './models/bank'
 export { DefaultLeaseMillis, Device, type DeviceOpts, type DeviceRecord } from './models/device'
 export type { Gate } from './models/gate'
 export { type AskUser, type CleartextsForGatingkind, type Gating, type GatingSnapshot, type Gatingkind, type RequestCleartext, gatingkindVals } from './models/gating'

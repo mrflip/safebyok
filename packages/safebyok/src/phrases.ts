@@ -15,7 +15,7 @@ export const GotOtherThanBox = 'A box get was answered with a Thing that is not 
 // == [Things]: the sentences of a Thing's checks, and of a vaultDB's asks
 
 /** A labelpath that is not a modelkind and then labels. */
-export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then labels, each after a '/': none under bank or gate, at most one under box."
+export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then labels, each after a '/': none under bank, at most one under gate or box."
 
 /** A record whose labelpath is another kind's. */
 export const LabelpathOfOtherKind = "A Thing's labelpath starts with its own modelkind."

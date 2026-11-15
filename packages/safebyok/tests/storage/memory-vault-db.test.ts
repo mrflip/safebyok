@@ -54,6 +54,6 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
 describe("classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    TH.expectSyncRefusal(() => classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [child] }, { bank: null, gate: null, root: null }), 'storage_issue')
+    TH.expectSyncRefusal(() => classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [child] }, { bank: null, maingate: null }), 'storage_issue')
   })
 })

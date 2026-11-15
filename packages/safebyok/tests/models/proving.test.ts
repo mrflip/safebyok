@@ -545,6 +545,7 @@ const StampCases = [
   [{ bank: { lifeseq: lifeseqOf(2) } },                                      'the stamp of another life of the bank'],
   [{ bank: { born_at: TH.T0 + 1 } },                                         'a bank stamp whose born_at moved'],
   [{ gate: { lifeseq: lifeseqOf(2) } },                                      'the stamp of another life of the gate'],
+  [{ gate: { labelpath: 'gate/passkeys' } },                                 'the stamp of a gate at another labelpath'],
   [{ gate: { born_at: TH.T0 + 1 } },                                         'a gate stamp whose born_at moved'],
 ] as const
 

@@ -100,7 +100,7 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
     it("refuses a parent past its kind's depth", async () => {
       const vaultDB = await bornBank()
       await expectBad(vaultDB.tryListThings(listAskAt('box/aa/deep')), 'bad_option')
-      await expectBad(vaultDB.tryListThings(listAskAt('gate/second')), 'bad_option')
+      await expectBad(vaultDB.tryListThings(listAskAt('gate/a/b')), 'bad_option')
     })
   })
 }
