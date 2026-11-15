@@ -168,6 +168,8 @@ null under `void` or wherever the store's answer is in doubt.
   one, and the same stored state under `ifAbsent: 'nil'` gives `val: []`. Under any other refusal it is null.
 * **`parent`** is the parent's sparse record, or null for none.
 * **Tombstones are listed**, `am: 'x'`, so that a cache learns of a delete from a listing.
+* **A gate is listed whole.** Gates are light, and a gate's timeliness matters more than a box's: only a box is
+  listed sparse.
 * **A child that fails its checks is listed in `damaged_rows`**, and the rest are listed as usual. A row stored
   outside the parent refuses `storage_issue`, because the store is broken.
 * **Descendants come later, in the same answer.** Labels are `[a-z0-9_]`, every byte of them above `/`, so labelpath

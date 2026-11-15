@@ -1,5 +1,6 @@
-// safebyok, the front door: what a host touches. Everything else stays behind the subpaths: `safebyok/core` keeps every
-// class and the lease, proving and sealer machinery, and `safebyok/storage` the vaultDB. What a host needs that
+// safebyok, the front door: what a host touches, and the ThingMinder the layers above the core build on. Everything else
+// stays behind the subpaths: `safebyok/core` keeps every class and the lease, proving and sealer machinery, and
+// `safebyok/storage` the vaultDB. What a host needs that
 // safebyok-big defines is re-exported from it, so that `VaultError` stays one class across both packages.
 export { Bank, type BankRecord, type BoxShell, type BoxUnsealed, type GetBoxAnswer, type GetBoxArgs } from './models/bank'
 export { DefaultLeaseMillis, Device, type DeviceOpts, type DeviceRecord } from './models/device'
@@ -10,6 +11,8 @@ export type { Wayin } from './models/wayin'
 export type { BankScope, BankStamp } from './models/stamps'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'
 export type { BoxThing, DelAskArgs, PutAskArgs } from './storage/shapes-thing'
+export { DefaultQueryCacheOpts, type MinderAskOpts, type MinderBank, type MinderGetAskOpts, type QueryCacheOpts } from './minding/shapes-minder'
+export { type DeliverableThing, type TSQAnswer, ThingMinder, VoidSentinel } from './minding/thing-minder'
 
 // From safebyok-big: its refusals, what a device is handed, and what a gating's dialog and a box carry.
 export { IsVaultError, VaultError, isVaultError, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'

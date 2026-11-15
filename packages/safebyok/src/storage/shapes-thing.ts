@@ -64,9 +64,9 @@ function isLabelpath(labelpath: string): boolean { return thingkindVals.some((mo
 
 // == [Thing]: thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, Sealed, Sparse, BoxSparse, sparseOf, ShellCited, childShellCited
 
-const LifeseqPattern       = /^[\da-v]{10}$/
-const LifepathPattern      = /^[\da-v]{10}(?:\/[\da-v]{10})*$/
-const ShellLifepathPattern = /^(?:[\da-v]{10}\/)*-1$/
+const LifeseqPattern       = /^[0-9a-v]{10}$/
+const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/
+const ShellLifepathPattern = /^(?:[0-9a-v]{10}\/)*-1$/
 
 type Labelled = { labelpath: string, label: string }
 type Lived    = { lifepath: string, am: string }

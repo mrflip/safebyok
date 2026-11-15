@@ -1,6 +1,6 @@
 ---
 name: restacker
-description: Restack a set of GitHub PRs into one linear chain so merging the top merges the rest — clean rebases first, tests once at the tip, force-push only with named leases. Use for any restack, never a hand-briefed worker; it rewrites and force-pushes branches.
+description: Restack a set of GitHub PRs into one linear chain so merging the top merges the rest — clean rebases first, tests once at the tip, force-push only with named leases. Use it to assemble or redo a stack of several PRs, never a hand-briefed worker; it rewrites and force-pushes branches. One branch rebased onto main or onto another PR is a plain `git rebase`, not this skill.
 argument-hint: "[PR numbers / ignore list / ordering, e.g. '40 45 46, ignore 52, restack 61 first']"
 ---
 

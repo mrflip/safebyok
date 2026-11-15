@@ -78,6 +78,13 @@ describe("AdapterVaultDB, a step that throws", () => {
   })
 })
 
+describe("AdapterVaultDB.tryGetThing(ask), a store that reports oddly", () => {
+  it("refuses a good get that reports no Thing, other than gotvoid, as a broken store", async () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, record: null }))
+    await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+  })
+})
+
 describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => {
   it("refuses a good write that reports no Thing as a broken store", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'born', world: null, record: null }))
@@ -93,6 +100,6 @@ describe("AdapterVaultDB.watch(scope, onNotice)", () => {
     vaultDB.hear?.({ record: { ...TH.gateThingOf(), wayins: {} }, world: null })
     vaultDB.hear?.({ record: 'not a Thing', world: null })
     vaultDB.hear?.({ record: TH.gateThingOf(), world: null })
-    expect(notices).to.deep.equal([{ act: 'gotlive', val: TH.gateThingOf(), world: null }])
+    expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: TH.gateThingOf(), world: null }])
   })
 })
