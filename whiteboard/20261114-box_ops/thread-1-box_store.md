@@ -1,6 +1,6 @@
 # Thread 1: box_store (2026-11-15)
 
-Branch `20261115-box_store`, PR #TBD, base `main` (the box_ops plan commits ride in it). Proved: in
+Branch `20261115-box_store`, PR [#701](https://github.com/mrflip/safebyok/pull/701), base `main` (the box_ops plan commits ride in it). Proved: in
 `packages/safebyok`, vitest 607 passed, `tsc --noEmit` clean, eslint clean; `pnpm justify` at ready.
 
 * **Built** (`packages/safebyok/src/storage/`, design-boxops.md *Building it* item 1):
