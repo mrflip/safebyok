@@ -118,8 +118,8 @@ async delBox(boxlabel, opts = {}) {
 
 ## Don't bounce between classes `#no-bouncing`
 
-If a call goes A to B to A to B, one of them wants the other's data. Give the work to whoever uses the result, and let the
-data arrive the way it already arrives.
+If a call goes A to B to A to B, one of them wants what the other has. Give the work to whoever uses the result, and let
+what it needs arrive the way it already arrives.
 
 **Goofus:** the vault asks its listing to fetch a list the listing doesn't use, carries it across, and hands it to a child
 that the same listing had to construct.

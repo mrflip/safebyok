@@ -307,7 +307,7 @@ has.
 * **A boundary belongs to the export, not the caller.** An export checks every time, an internal
   caller included; one function with one behaviour beats a checked public twin and an unchecked
   private one. Inside the package, don't re-check what was checked where it entered.
-* **Clear intent at the door, clean data inside.** An entrypoint accepts a host's plain way of
+* **Clear intent at the door, clean values inside.** An entrypoint accepts a host's plain way of
   saying a thing and fills in defaults in the schema. What it keeps, and every stored field, is
   bounded: `leaseHours: Infinity` becomes the longest finite window.
 * **Not Zod's job**: rules about state ("the vault is locked"), which are control flow; rules
@@ -396,8 +396,8 @@ validator splits it into its parts before checking them.
   `gate_epoch`, so its stamp has it.
 * **A reference to another thing's part keeps a flat field, named as in the owner**: a lease's
   `gate_epoch` names the gate it was granted under, as a foreign key would.
-* **What one atomic step reads travels together**, its halves apart until checked, so damaged
-  data cannot collide with its own fields: `{ world, boxes }` (`BoxesFetched`). Checked, it
+* **What one atomic step reads travels together**, its halves apart until checked, so a damaged
+  row cannot collide with its own fields: `{ world, boxes }` (`BoxesFetched`). Checked, it
   is the thing it describes, written out where it is used: a vault's record and its box listing
   are a vault, `VaultRecord & { boxes: readonly BoxSparse[] }`.
 
@@ -567,7 +567,7 @@ tested, in proportion to what it does and what a caller could get wrong.
 * **No real secret in a test, fixture or example**: generate one, or use an obvious fake that
   validates.
 * **Test an entrypoint with sloppy input**: that is its job. Code past the validation boundary is
-  entitled to clean data.
+  entitled to clean input.
 * **A test's way past the API has a loud `_cheat_` name**, for what it returns (`_cheat_central`,
   `_cheat_clock`), on a test-world subclass or a test-facing adapter such as the memory DBs, never
   a coined verb that could pass for the API (`keptOf`). On a class that has keys, prefer a

@@ -199,7 +199,7 @@ export type ModalFormProps = {
   /** A muted line under the live region, saying how long an unlock lasts. */
   footnote?:      string | undefined
   formRef?:       Ref<HTMLFormElement> | undefined
-  /** The form's action, called with the form's data at each submit. */
+  /** The form's action, called with the form's fields at each submit. */
   action:         (form: FormData) => void
   /** Called after React clears the fields following an attempt. */
   onReset?:       (() => void) | undefined

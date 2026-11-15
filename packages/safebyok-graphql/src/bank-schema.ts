@@ -177,7 +177,7 @@ type SafebyokBankScope {
 
 # Answers
 
-"""What an answer carries of its ask: its op, address and policies, and the revisions of its rows, never a record's payload. A field is null when the ask did not have it."""
+"""What an answer carries of its ask: its op, address and policies, and the revisions of its rows, never a whole record. A field is null when the ask did not have it."""
 type SafebyokAsk {
   op:         String
   user_id:    String

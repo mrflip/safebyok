@@ -126,7 +126,7 @@ export class FakeDeployment<Host extends FakeHost> {
     return client
   }
 
-  /** Return the backend, acting as `subject`, to set up or inspect stored data directly.
+  /** Return the backend, acting as `subject`, to set up or inspect stored rows directly.
    * A change made this way is not pushed to watchers: use `arrange` for that.
    */
   as(subject: string | null): ReturnType<Host['createTest']> {

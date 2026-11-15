@@ -243,8 +243,8 @@ function refusalOf(oplabel: string, thrown: unknown): VaultError {
 }
 
 /** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message. */
-function refusalOfCrossed(data: unknown): VaultError {
-  const crossed = safebyokErrorData.parse(data)
+function refusalOfCrossed(val: unknown): VaultError {
+  const crossed = safebyokErrorData.parse(val)
   if (crossed.kind === 'identity_revoked') { return DB.identityRevoked() }
   return new DB.VaultError(crossed.kind, crossed.message)
 }

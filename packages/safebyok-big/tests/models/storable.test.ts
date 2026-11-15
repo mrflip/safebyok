@@ -357,7 +357,7 @@ describe("Storable put guards: ensurePuttable, demandPuttable", () => {
     TH.expectSyncRefusal(() => box.demandPuttable(Both), 'bank_locked')
   })
 
-  it("demandPuttable under ifPresent 'fail' refuses a whole record, saying its data would be recycled", () => {
+  it("demandPuttable under ifPresent 'fail' refuses a whole record, saying a record is already present", () => {
     const box = boxListingOf(world.mw).deliverRecord(fullBoxRecord())
     const err = TH.expectSyncRefusal(() => box.demandPuttable({ ...fullBoxRecord() }, { ifPresent: 'fail' }))
     expect(err.message).to.eq(Phrases.RecordForNewBox)

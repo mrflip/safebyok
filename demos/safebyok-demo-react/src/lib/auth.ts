@@ -17,7 +17,7 @@ export type Auth = {
   subscribe: (listener: () => void) => () => void
   /** Sign in as `userlabel`, creating the account on first sight. */
   signIn(userlabel: string): Promise<Session>
-  /** End the session on this device. Touches no server-side data. */
+  /** End the session on this device. Touches nothing on the server. */
   signOut(): void
   /** Delete the signed-in account's row and end the session. Vault rows are the caller's to clean up first. */
   deleteAccount(): Promise<void>

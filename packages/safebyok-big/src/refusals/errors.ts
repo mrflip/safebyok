@@ -143,7 +143,7 @@ export type RefusalMeta = {
   oplabel?:      string
   /** A bankDB's refusal: what happened, when it is not said by the refusalkind alone. */
   act?:          BadAct
-  /** A bankDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a record's payload. */
+  /** A bankDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a whole record. */
   ask?:          Readonly<Record<string, unknown>>
 }
 

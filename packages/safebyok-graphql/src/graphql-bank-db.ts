@@ -237,7 +237,7 @@ export class GraphQLBankDB implements BX.BankDB {
         end(troubleOf(result.error))
         return
       }
-      // When a stream over fetch closes, its final result repeats the previous notice's data. Do not deliver it twice.
+      // When a stream over fetch closes, its final result repeats the previous notice. Do not deliver it twice.
       const refusal = (result.data === heardData) ? null : hearNotice(result, onNotice)
       heardData = result.data
       if (refusal !== null) {
@@ -319,7 +319,7 @@ function statusOf(response: unknown): number | null {
   return Number.isSafeInteger(status) ? status as number : null
 }
 
-/** The error code on `thrown`, such as ECONNREFUSED, or null. Only an all-caps identifier is accepted, so it cannot quote data. */
+/** The error code on `thrown`, such as ECONNREFUSED, or null. Only an all-caps identifier is accepted, so it cannot quote anything else. */
 function codeOf(thrown: unknown): string | null {
   const code: unknown = (typeof thrown === 'object') && (thrown !== null) && ('code' in thrown) ? thrown.code : null
   return (typeof code === 'string') && /^[A-Z][A-Z0-9_]{0,39}$/.test(code) ? code : null

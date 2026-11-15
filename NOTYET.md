@@ -8,7 +8,7 @@ implementation.
   what is written next. Vault-key rotation does the cryptography (not yet built; its design was
   removed on 2026-10-18 for a different plan); what waits is the UX, a device list, and, if the Coach
   wants rotation not to sign every other device out, a key pair per wayin (`TODO-big.md`, *Which wayins
-  a rotation keeps*). The data it needs goes
+  a rotation keeps*). The field it needs goes
   in with rotation: a random `device_tok` per bank per device, recorded on every wayin it adds.
   * **What we record now.** `device_tok` is random, minted per bank per device, never derived from
     the device; the backend can already link a user's vaults by `user_id`. That reading follows
@@ -19,7 +19,7 @@ implementation.
     needs some label a person recognizes. Decide before building it: a label the user types (what
     they chose to say, stored in the clear on the server, or encrypted under the bankKey so the
     server never sees it), a label taken from the platform (model name, user agent: the kind of
-    data the fingerprinting rules care about), or none (the device list shows when each was added
+    device detail the fingerprinting rules care about), or none (the device list shows when each was added
     and last used). Encrypting a user-typed label inside the vault is the likely answer; check it
     against the host app's privacy review, which owns what its users are told.
 

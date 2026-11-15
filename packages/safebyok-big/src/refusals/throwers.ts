@@ -10,7 +10,7 @@
 // A thrower's name, its kind and its phrase's name agree; the phrase is of a piece with the kind, mirroring, containing or
 // eliding its words; and all three read naturally at the call site. A caller passes what it has on hand and trusts the
 // thrower to sanitize and cherry-pick. A name carries no "error" or "refusal", ends in "issue" at a loss, and is
-// empathetic and frank to the person who trusted us with their data, and readable to the coder. Reuse is welcome, never
+// empathetic and frank to the person who trusted us with their secrets, and readable to the coder. Reuse is welcome, never
 // forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged.
 //
 // A refusal's `meta` has what reads at a glance, and an adapter may hand a bag of its own beside the cause: props to

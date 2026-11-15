@@ -19,7 +19,7 @@ const WhisperCases = [
   [true,                              false,  'a bare boolean'],
   [["a", "b"],                        false,  'an array'],
   [null,                              false,  'a bare null: emptying a box is delBox\'s job'],
-  [() => 'nope',                      false,  'a function is not data'],
+  [() => 'nope',                      false,  'a function is not a JSON value'],
   [new Date(),                        false,  'a Date would silently flatten to {}'],
   [new Map([["a", 1]]),               false,  'a Map would silently flatten to {}'],
   [{ when: new Date() },              false,  'a class instance hiding inside an object'],
@@ -132,7 +132,7 @@ const SidecarCases = [
   [["a", "b"],                        false,  'an array'],
   [{ when: new Date() },              false,  'a Date would silently flatten to {}'],
   [{ count: NaN },             false,  'NaN would silently become null'],
-  [() => 'nope',                      false,  'a function is not data'],
+  [() => 'nope',                      false,  'a function is not a JSON value'],
 ] as const
 
 describe("sidecar", () => {

@@ -86,7 +86,7 @@ A listing answers, for each box it lists, what a get of that box would answer in
 
 Precedence, first match wins, for a box:
 
-1. Request shape, before any operation: `bad_record` (an unknown op or flag, or a malformed scope or payload, or next seq not prior seq + 1, or next `revision_tok` equal to the expected one, or a half-shell expected revision, or a life token changed or kept against C7 or C8, or a record that would be stored damaged, C13).
+1. Request shape, before any operation: `bad_record` (an unknown op or flag, or a malformed scope or record, or next seq not prior seq + 1, or next `revision_tok` equal to the expected one, or a half-shell expected revision, or a life token changed or kept against C7 or C8, or a record that would be stored damaged, C13).
 2. Vault damaged: thrown, as `damaged_vault`.
 3. Vault void: no vault row stops at `vault_void`. Box ops never create a vault.
 4. Vault life: a vault tombstone stops at `vault_gone`, whatever its `vault_tok`. A live vault under another `vault_tok` than the request's stops at `vault_reborn`. Box ops never compare the vault's revision.

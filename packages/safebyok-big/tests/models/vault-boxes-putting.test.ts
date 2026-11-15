@@ -226,7 +226,7 @@ describe("a void instance, then a put: no beginWatch, no fetch", () => {
 })
 
 describe("vault.putBox over a live box", () => {
-  it("under ifPresent 'fail', refuses a whole record, saying its data would be recycled, and puts nothing", async () => {
+  it("under ifPresent 'fail', refuses a whole record, saying a record is already present, and puts nothing", async () => {
     const { vault, boxrows, tryPutBox } = await makeWorldWithBox()
     tryPutBox.mockClear()
     const err = await TH.expectRefusal(vault.putBox(boxrows.get(boxlabel) as never, { ifPresent: 'fail' }))

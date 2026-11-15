@@ -347,7 +347,7 @@ export type BoxPutAsk = Extract<BoxAsk, { op: 'put' }>
 /** A `delBox` ask: the box's scope under its vault's life, the tombstone to write, and the expected row. */
 export type BoxDelAsk = Extract<BoxAsk, { op: 'del' }>
 
-// A record is a stored row, payload and all: an answer and a refusal carry only its meta, as they may reach a log.
+// A record is a whole stored row: an answer and a refusal carry only its meta, as they may reach a log.
 /** The check of what a bankDB answer and its refusal carry of an ask: its fields, but of its rows only their revision, `am` and toks.
  * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
  */

@@ -124,7 +124,7 @@ export const StrengthCheckerShape = "Expected a function from the passphrase, an
 // == [Refusals]: unknownFields, moreFailures, WhisperShape, fieldsDisagree, BagNotObject, WhisperBagShape
 
 /** An object with `count` fields it does not accept, and the `fieldnames` it does.
- * The refused fields are not named, as a name may be the caller's data.
+ * The refused fields are not named, as a name may be secret.
  */
 export function unknownFields(count: number, fieldnames: readonly string[]): string {
   const refused = count === 1 ? 'There is a field it does not accept (its name is not repeated)' : `There are ${String(count)} fields it does not accept (their names are not repeated)`

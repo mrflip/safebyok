@@ -4,9 +4,9 @@ import * as TH from './test-helpers'
 
 describe("convexRefusalOf", () => {
   it("hands back the data of the ConvexError the operation refused with", async () => {
-    const data = { kind: 'identity_revoked' }
-    const refusal = await TH.convexRefusalOf(Promise.reject(new ConvexError(data)))
-    expect(refusal).to.deep.equal(data)
+    const crossed = { kind: 'identity_revoked' }
+    const refusal = await TH.convexRefusalOf(Promise.reject(new ConvexError(crossed)))
+    expect(refusal).to.deep.equal(crossed)
   })
 
   it("reads a refusal from the host's functions", async () => {

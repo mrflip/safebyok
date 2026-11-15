@@ -124,7 +124,7 @@ the ask runs before anything is read.
 
 Every operation returns a typed object with the same fields as its verb's `try*` answer: `ok`, `act`,
 `val`, `parent` (the row above the one asked for), `dbhas`, `ask` and `err`. `ask` carries the
-call's address, policies and row revisions, never a record's payload. Rows are typed: a bank row, a
+call's address, policies and row revisions, never a whole record. Rows are typed: a bank row, a
 gate row and a vault row each have a type of their own, and a live box row and a box tombstone are
 each a member of a union. A box's sidecar, a damaged row, a refusal's meta and a gate row's empty
 `auth`, `sigs` and `meta` are `SafebyokJson`, carried whole. A gate without a passkey wayin crosses

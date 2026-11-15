@@ -17,8 +17,8 @@ const ErrorDataCases = [
 ] as const
 
 describe("isSafebyokErrorData", () => {
-  for (const [data, expected, blurb] of ErrorDataCases) {
-    it(`answers ${String(expected)} for ${blurb}`, () => { expect(isSafebyokErrorData(data)).to.eq(expected) })
+  for (const [val, expected, blurb] of ErrorDataCases) {
+    it(`answers ${String(expected)} for ${blurb}`, () => { expect(isSafebyokErrorData(val)).to.eq(expected) })
   }
 })
 
