@@ -49,7 +49,7 @@ export const BoxThingFormat = 5103
 /** Where the main gate is stored in its bank, and its key in a `track`. */
 export const MainGateLabelpath = 'gate'
 
-/** How many labels each kind's labelpath has under its root: none under the bank, one under the main gate or the root box. */
+/** The most labels a labelpath of each kind has after its modelkind: none for the bank, one for a gate or a box. */
 const MaxLabelsUnder = { bank: 0, gate: 1, box: 1 } as const satisfies Record<Thingkind, number>
 
 /** The modelkind a sound labelpath starts with. */
@@ -97,7 +97,7 @@ function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
   return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifeseqOfLifepath(lifepath) === ShellLifeseq))
 }
 
-/** The checks of a Thing's fields, and of each kind as a Thing, as proposed and as cited. */
+/** The checks of a Thing's fields, of each kind of Thing and its citation, and of what a write reads of the Thing stored. */
 export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
@@ -212,7 +212,7 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
 export type ThingScope   = Readonly<Z.infer<typeof thingScope>>
 /** A write's citation of the Thing it expects to find: its revision, life and liveness, the only fields the store compares. The shell may be cited. */
 export type ThingCited   = Readonly<Z.infer<typeof thingCited>>
-/** What a write reads of the Thing stored at its scope: its scope, what the act tables compare, and the born_at a replace keeps. */
+/** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace keeps. */
 export type StoredCited  = Readonly<Z.infer<typeof storedCited>>
 /** The fields every kind of Thing has, which the store reads. The rest of a record is its body. */
 export type ThingRecord  = Readonly<Z.infer<typeof thingRecord>>
@@ -312,7 +312,7 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
 /** The checks of a watch's scope (a bank) and of its arguments. */
 export const { thingWatchScope, watchArgs } = AskChecks
 
-/** The revseq and lifepath an ask's sender holds of its bank and of its main gate. The answer's `tracked` says which of the two it holds as stored. */
+/** The revseq and lifepath the ask's sender has of its bank and of its main gate. The answer's `tracked` says, for each, whether it is still the one stored. */
 export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>
 /** An ask for the Thing at its scope. */
 export type GetThingAsk     = Readonly<Z.infer<typeof AskChecks.getThingAsk>>
@@ -343,12 +343,12 @@ export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAs
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof thingWatchScope>>
-/** A bank's record: its Thing, as stored. */
+/** A bank's record: its Thing. */
 export type BankRecord      = BankThing
-/** The world a vaultDB answers beside a Thing: its bank's record, with its main gate's Thing as `maingate`. */
+/** The `world` of a vaultDB answer: the bank's record, with its main gate's Thing as `maingate`. */
 export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
 // Unspecified for a missing or damaged row: notes/wontfix.md.
-/** What an answer says of each Thing its ask tracks: `'same'` where it is stored at the revseq and lifepath tracked, else as stored. */
+/** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same' }>
 
 /** Check a get `ask`, throwing `bad_option`, and return it typed. */

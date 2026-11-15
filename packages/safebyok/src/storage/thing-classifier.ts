@@ -141,7 +141,7 @@ function writtenOf<RecordT extends object>(check: StoredCheck<RecordT>, { userid
 
 const StoredCitedCheck = storedCited.refusingAs('damaged_row')
 
-/** What a write reads of the Thing stored at `scope`, checked, or null for none: just what its preconditions compare, the rest unread. */
+/** The part of the Thing stored at `scope` that a write's preconditions compare, checked, or null for none. The rest of the Thing is not read. */
 export function storedCitedOf(scope: ThingScope, raw: unknown): StoredCited | null { return storedOf(StoredCitedCheck, scope, raw) }
 
 /** The Thing stored at `scope`, checked, or null for none. */
@@ -175,10 +175,10 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing 
   return writtenThingOf(scope.data, raw)
 }
 
-/** What a store fetched of a bank's three roots: the raw bank, main gate and root box, each null for none, and its {@link TrackedFetched}. */
+/** The raw bank, main gate and root box a store fetched for a bank's birth, each null for none, and its {@link TrackedFetched}. */
 export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked?: TrackedFetched }>
 
-/** What a store fetched of a bank's world: the raw bank and main gate, each null for none, and its {@link TrackedFetched}. */
+/** The raw bank and main gate a store fetched for an ask's bank, each null for none, and its {@link TrackedFetched}. */
 export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
 
 // A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
@@ -196,10 +196,10 @@ export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFe
 // The store compares what an ask tracks with the bank and main gate it fetched, in the step that fetched them. The adapter
 // checks each row the store reports in place of 'same'.
 
-/** What a store reports of the bank and main gate an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
+/** A store's report on the bank and main gate an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
 export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown }> | null
 
-/** What a store that compares in TypeScript reports of `track`, against the raw bank and main gate it fetched. */
+/** The {@link TrackedFetched} report of `track` against the raw bank and main gate a store fetched, for a store that compares in TypeScript. */
 export function trackedFetchedOf(track: Track | undefined, { bank, maingate }: WorldFetched): TrackedFetched {
   if (track === undefined) { return null }
   return { bank: trackedRawOf(track.bank, bank), [MainGateLabelpath]: trackedRawOf(track[MainGateLabelpath], maingate) }
@@ -210,7 +210,7 @@ function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
   return (CX.isPlainBag(raw) && (raw['revseq'] === pair.revseq) && (raw['lifepath'] === pair.lifepath)) ? 'same' : raw
 }
 
-/** The answer's `tracked`, as a field to spread into it, from what the store reports for the bank at `bankScope`: none for an ask that tracks nothing. */
+/** The answer's `tracked`, checked, as a field to spread into it, from the store's report for the bank at `bankScope`: none for an ask that tracks nothing. */
 export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched | undefined): { tracked?: Tracked } {
   if ((fetched === null) || (fetched === undefined)) { return {} }
   return { tracked: {
@@ -237,9 +237,9 @@ export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: W
   return isRefusedAct(act) ? { ok: false, act, world, record: stored, ...beside } : { ok: true, act, world, record: stored, ...beside }
 }
 
-/** Classify a write against the raw Thing a store fetched at its scope, null for none, and check its storage policies
- * where it would replace a live Thing. Under a write act, `record` is `ask.record`, which the store writes, then reports
- * the Thing it wrote and the world after it.
+/** Classify a write against the raw Thing a store fetched at its scope, null for none.
+ * Where the write would replace a live Thing, it also checks the born_at and the storage policies. Under a write act, `record`
+ * is `ask.record`: the store writes it, then reports the Thing it wrote and the world after the write.
  */
 export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
   const stored = storedCitedOf(ask, raw)
@@ -287,9 +287,9 @@ function isChildLabelpath(ask: ListThingsAsk, labelpath: string): boolean {
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind(labelpath, ask.modelkind)
 }
 
-/** Classify a bank's birth, by the three `puts` it amounts to, against the roots a store fetched. Under
- * `born`, `things` and `world` are the puts' records, which the store writes in one step and then reports as written, with any `tracked`
- * read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
+/** Classify a bank's birth, by its three `puts`, against the raw roots a store fetched.
+ * Under `born`, `things` and `world` are made of the puts' records, for the store to write in one step. The store then reports
+ * them as written, with any `tracked` read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
   const unwritten = unwrittenBirthOf(puts, fetched)
@@ -319,15 +319,15 @@ export function demandBornAtKept(ask: WriteThingAsk, stored: StoredCited | null,
 
 const StoredWayinsCheck = storedWayins.refusingAs('damaged_row')
 
-/** Throw `gate_issue` where a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only the gate has storage policies. */
+/** Throw `gate_issue` if a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only a gate's writes name storage policies. */
 export function demandPolicies(ask: WriteThingAsk, raw: unknown): void {
   if ((ask.modelkind !== 'gate') || ((ask.options?.policies.length ?? 0) === 0)) { return }
   const why = policyRefusalOf(ask, StoredWayinsCheck.parse(raw).wayins)
   if (why !== null) { throw gateIssue(storedThingOf(ask, raw), why) }
 }
 
-/** The answer to a birth the roots a store fetched leave unwritten, or null where the act tables let it write: `passed`
- * over a live bank, with the roots stored, or the first root's refusal.
+/** The answer to a birth the fetched roots pass or refuse, or null if the act tables let it write.
+ * Over a live bank the answer is `passed`, with the three roots stored. Otherwise it is the first root's refusal.
  */
 export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual | null {
   const [bankPut, gatePut, rootPut] = puts

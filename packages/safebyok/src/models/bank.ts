@@ -17,7 +17,7 @@ import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsA
 
 export type { BankRecord, WorldRecord } from '../storage/shapes-thing'
 
-/** What {@link Bank.make} is given: the bank's world, with its root box's sparse record as `rootBox`. */
+/** The record {@link Bank.make} and {@link Bank.birth} take: the bank's Thing, with its main gate's Thing as `maingate` and its root box's sparse record as `rootBox`. */
 export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: BoxSparse }>
 
 /** The dna of a new bank: its stamp, and its main gate's dna. */

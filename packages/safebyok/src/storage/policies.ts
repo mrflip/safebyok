@@ -11,7 +11,7 @@ import type { GateThing, GateWriteAsk, Thing, Wayins } from './shapes-thing'
 /** The `cited` of a gate write ask. */
 type GateCited = GateWriteAsk['cited']
 
-/** Each storage policy: what it demands of a gate write's records and of the wayins stored, and why it refuses, or null where it allows. */
+/** The storage policies, each a check of a gate write against the wayins stored. Each returns why it refuses, or null to allow the write. */
 const GatePolicies = {
   /** The record replaces the passphrase wayin the gating proved against, and nothing else. */
   replace_passphrase(cited: GateCited, record: GateThing, stored: Wayins): string | null {
@@ -35,7 +35,7 @@ const GatePolicies = {
   },
 } as const satisfies Record<EX.StoragePolicy, (cited: GateCited, record: GateThing, stored: Wayins) => string | null>
 
-/** Why the first storage policy `ask` names refuses it over the wayins stored, or null where each allows it. */
+/** Check `ask` against each storage policy it names, over the wayins stored. Returns why the first to refuse it does, or null if each allows it. */
 export function policyRefusalOf({ cited, record, options }: GateWriteAsk, stored: Wayins): string | null {
   const policies = options?.policies ?? []
   for (const policy of policies) {

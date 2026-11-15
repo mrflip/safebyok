@@ -7,7 +7,7 @@ import { type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsAsk
 import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
-/** A watch: the bank it watches, the function that receives each change, and the one called with its trouble. */
+/** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
 type Watcher = { scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void }
 
 /** A vaultDB kept in this tab's memory, gone when the tab closes. */
