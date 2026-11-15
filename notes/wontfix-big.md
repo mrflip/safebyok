@@ -104,7 +104,7 @@ not as a settled ruling, and check it against the current design before relying 
   the value exposed when it is called, before its hydrate. An `unexpose` that runs during the put's awaits changes nothing about what is sealed:
   the value read at the call is stored, and the instance keeps none.
 * 2026-11-05 (the Coach's brief for the fields, now `BoxFields` in `safebyok/dom`: "a race gets a row"): **a `box.expose()` crossing the last unbind.** An `expose` in flight when the
-  last field unbinds completes after the `unexpose`, so the whisper stays exposed with no field to tie it to, until the host unexposes or the box is
+  last field unbinds resolves after the `unexpose`, so the whisper stays exposed with no field to tie it to, until the host unexposes or the box is
   swept, vacated or deleted. Also: **a `fields.put()` crossing an edit:** it reads the fields when called, so what is typed during the put's awaits is
   not in that put, and stays in the element for the next.
 * 2026-11-06 (a review of #505, the Coach: "add the row"): **two copies of `safebyok/dom` in one page.** `BoxFields.of` keeps one `BoxFields` per box

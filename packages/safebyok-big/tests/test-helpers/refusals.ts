@@ -128,7 +128,7 @@ export function expectSyncRefusal(attempt: () => unknown, refusalkind?: Refusalk
  * entrypoint refuses a caller who forgot a required option, which `exactOptionalPropertyTypes`
  * otherwise lets a test write only with a cast.
  *
- * @param bag - A complete bag of options.
+ * @param bag - A whole bag of options.
  * @param ckey - The field to leave out.
  * @returns A copy of `bag` without that field.
  */
