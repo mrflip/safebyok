@@ -23,7 +23,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   /** For tests: the Things stored in `scope`'s bank, by labelpath, to read or change in place. */
   _cheat_things(scope: ThingWatchScope): Map<string, unknown> { return this.#thingsOf(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
 
-  /** The map key of the bank at `scope`. */
+  /** The ckey of the bank at `scope`, in `#banks`. */
   static ckeyOf({ userid, banklabel }: ThingWatchScope): string { return Helpers.ckeyOf(userid, banklabel) }
 
   /** The Things of `scope`'s bank, by labelpath. */

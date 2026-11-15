@@ -6,7 +6,7 @@ import type { ThingNotice } from '../../src/storage/vault-db'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 
-/** A vaultDB holding the main gate as `stored`, written there by a birth. */
+/** A vaultDB with the main gate stored as `stored`, written there by a birth. */
 async function vaultDBWith(stored: GateThing = TH.gateThingOf()): Promise<MemoryVaultDB> {
   const vaultDB = new MemoryVaultDB()
   await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(stored)))
@@ -64,7 +64,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), the plain path", () => {
     expect(answer).to.deep.include({ ok: true, act: 'replaced', val: next })
   })
 
-  it("takes a citation of no more than ThingCited names", async () => {
+  it("accepts a citation of no more than ThingCited names", async () => {
     const stored = TH.gateThingOf()
     const vaultDB = await vaultDBWith(stored)
     const { revtok, revseq, am, lifepath } = stored
@@ -165,7 +165,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), under a storage policy", () => {
     await TH.expectBad(vaultDB.tryWriteThing(ask), 'gate_issue')
   })
 
-  it("applies no policy to a birth", async () => {
+  it("checks no policy on a birth", async () => {
     const ask = { ...TH.birthAskOf(), options: { policies: ['revoke_passkey' as const] } }
     expect(await new MemoryVaultDB().tryWriteThing(ask)).to.deep.include({ ok: true, act: 'born' })
   })
@@ -224,7 +224,7 @@ describe("MemoryVaultDB.watch(scope, onNotice)", () => {
   })
 })
 
-/** A vaultDB holding a bank born with its three roots. */
+/** A vaultDB with a bank born with its three roots. */
 async function bornBank(): Promise<MemoryVaultDB> {
   const vaultDB = new MemoryVaultDB()
   await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
@@ -249,7 +249,7 @@ async function listedAt(vaultDB: MemoryVaultDB, labelpath: string): Promise<unkn
   return TH.expectGood(vaultDB.tryListThings(ask))
 }
 
-/** The Thing `vaultDB` holds at `labelpath`, or throw. */
+/** The Thing stored in `vaultDB` at `labelpath`, or throw. */
 async function gotAt(vaultDB: MemoryVaultDB, labelpath: string): Promise<unknown> {
   const ask = TH.getAskAt(labelpath)
   return TH.expectGood(vaultDB.tryGetThing(ask))
@@ -439,7 +439,7 @@ describe("MemoryVaultDB.tryBirthBank(ask)", () => {
 })
 
 describe("MemoryVaultDB's ask builders", () => {
-  it("build asks its verbs take", async () => {
+  it("build asks its verbs accept", async () => {
     const vaultDB = await bornBank()
     const box = TH.boxThingOf()
     const putAsk = vaultDB.putAsk({ cited: childShellCited(TH.Life0), record: box })

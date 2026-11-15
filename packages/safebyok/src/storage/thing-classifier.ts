@@ -181,7 +181,7 @@ export function classifyGetThing(ask: GetThingAsk, raw: unknown): Actual<EX.GotA
   return isRefusedAct(act) ? { ok: false, act, world: null, record: stored } : { ok: true, act, world: null, record: stored }
 }
 
-/** Classify a write against the raw Thing a store fetched at its scope, null for none, and apply its storage policies
+/** Classify a write against the raw Thing a store fetched at its scope, null for none, and check its storage policies
  * where it would replace a live Thing. Under a write act, the store writes `ask.record`, and reports the Thing it wrote.
  */
 export function classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.PutAct | EX.DelAct> {

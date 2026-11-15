@@ -142,7 +142,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
-  // fetched. A store that can run code of its own may take the whole step there.
+  // fetched. A store that can run code of its own may run the whole step there.
 
   /** In one step: fetch the Thing at `ask`'s scope, and return `this.classifyGetThing(ask, raw)`. */
   protected abstract doGetThing(ask: GetThingAsk): Helpers.Awaitable<Actual<EX.GotAct>>

@@ -7,7 +7,7 @@ import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 
 const { Life0 } = TH
-/** What a strict check says of a field it does not take, which it never names. */
+/** What a strict check says of a field it does not accept, which it never names. */
 const Unaccepted = 'There is a field it does not accept'
 
 describe("lifeseqOf(seq) and seqOfLifeseq(lifeseq)", () => {
@@ -16,7 +16,7 @@ describe("lifeseqOf(seq) and seqOfLifeseq(lifeseq)", () => {
     [1,              "0000000001",  'life 1, its deletion'],
     [31,             "000000000v",  'the last one-digit life'],
     [32,             "0000000010",  'the first two-digit life'],
-    [(32 ** 10) - 1, "vvvvvvvvvv",  'the last life ten digits hold'],
+    [(32 ** 10) - 1, "vvvvvvvvvv",  'the last life ten digits can name'],
   ] as const
 
   for (const [seq, lifeseq, blurb] of LifeseqCases) {
@@ -45,7 +45,7 @@ describe("lifeseqOfLifepath(lifepath)", () => {
 })
 
 describe("isGoneLifeseq(lifeseq)", () => {
-  it("holds of odd lives, the shell's among them", () => {
+  it("is true of odd lives, the shell's among them", () => {
     expect([ShellLifeseq, lifeseqOf(0), lifeseqOf(1), lifeseqOf(32), lifeseqOf(33)].map((lifeseq) => isGoneLifeseq(lifeseq))).to.deep.equal([true, false, true, false, true])
   })
 })
@@ -72,7 +72,7 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
   ] as const
 
   for (const [labelpath, modelkind, isKind, blurb] of LabelpathCases) {
-    it(`${isKind ? 'takes' : 'refuses'} ${blurb}`, () => {
+    it(`${isKind ? 'accepts' : 'refuses'} ${blurb}`, () => {
       expect(modelkindOf(labelpath)).to.eq(modelkind)
       expect(isLabelpathOfKind(labelpath, modelkind)).to.eq(isKind)
     })
@@ -85,7 +85,7 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
 })
 
 describe("checkedGetThingAsk(ask) and checkedListThingsAsk(ask)", () => {
-  it("takes an ask of each kind", () => {
+  it("accepts an ask of each kind", () => {
     for (const labelpath of ['bank', 'gate', 'gate/second', 'box', 'box/openai/v2']) {
       expect(checkedGetThingAsk(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
       expect(checkedListThingsAsk(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
@@ -100,7 +100,7 @@ describe("checkedGetThingAsk(ask) and checkedListThingsAsk(ask)", () => {
     [{ ...TH.getGateAskOf(), labelpath: '/gate' },        'a labelpath with a leading /'],
     [{ ...TH.getGateAskOf(), ifAbsent: 'add' },           'a write flag'],
     [{ ...TH.getGateAskOf(), op: 'list' },                'another op'],
-    [{ ...TH.getGateAskOf(), extra: 1 },                  'a field it does not take'],
+    [{ ...TH.getGateAskOf(), extra: 1 },                  'a field it does not accept'],
   ] as const
 
   for (const [ask, blurb] of BadGetCases) {
@@ -118,7 +118,7 @@ describe("checkedWriteThingAsk(ask), of the main gate", () => {
   // The helper builds an ask of any kind: this one is the gate's.
   const good   = TH.replaceAskOf(stored, next)
 
-  it("takes a birth and a replacement", () => {
+  it("accepts a birth and a replacement", () => {
     expect(checkedWriteThingAsk(TH.birthAskOf())).to.deep.equal(TH.birthAskOf())
     expect(checkedWriteThingAsk(good)).to.deep.equal(good)
   })
@@ -165,13 +165,13 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
   const tomb  = TH.boxTombOf(box)
   const under = childShellCited(Life0)
 
-  it("takes a box's birth under its parent's life, its deletion, and its rebirth", () => {
+  it("accepts a box's birth under its parent's life, its deletion, and its rebirth", () => {
     for (const ask of [TH.birthAskOf(box, under), TH.delAskFor(box, tomb), TH.replaceAskOf(tomb, TH.boxRebornOf(tomb))]) {
       expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
     }
   })
 
-  it("takes the bank's and the root box's births, and a further gate's deletion", () => {
+  it("accepts the bank's and the root box's births, and a further gate's deletion", () => {
     const second = TH.gateThingOf({ labelpath: 'gate/second', label: 'second', lifepath: `${Life0}/${Life0}` })
     const secondGone = TH.nextOf(second, { am: 'x', lifeseq: lifeseqOf(1), lifepath: `${Life0}/${lifeseqOf(1)}` })
     for (const ask of [TH.birthAskOf(TH.bankThingOf()), TH.birthAskOf(TH.rootBoxOf()), TH.delAskFor(second, secondGone)]) {
@@ -224,7 +224,7 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
 })
 
 describe("checkedBirthBankAsk(ask)", () => {
-  it("takes a bank's three roots", () => { expect(checkedBirthBankAsk(TH.birthBankAskOf())).to.deep.equal(TH.birthBankAskOf()) })
+  it("accepts a bank's three roots", () => { expect(checkedBirthBankAsk(TH.birthBankAskOf())).to.deep.equal(TH.birthBankAskOf()) })
 
   it("refuses a root at another root's labelpath", () => {
     const err = TH.expectSyncRefusal(() => checkedBirthBankAsk(TH.birthBankAskOf({ root: TH.boxThingOf() })), 'bad_record')
@@ -238,7 +238,7 @@ describe("checkedBirthBankAsk(ask)", () => {
     expect(err.message).to.include(Phrases.OpNotOfRecord)
   })
 
-  it("refuses a field it does not take, and a root of another bank", () => {
+  it("refuses a field it does not accept, and a root of another bank", () => {
     TH.expectSyncRefusal(() => checkedBirthBankAsk({ ...TH.birthBankAskOf(), extra: 1 }), 'bad_option')
     TH.expectSyncRefusal(() => checkedBirthBankAsk(TH.birthBankAskOf({ gate: TH.gateThingOf({ banklabel: 'other' }) })), 'bad_record')
   })
@@ -271,7 +271,7 @@ describe("the ask builders", () => {
     expect(delAskOf({ cited: box, record: tomb, ifAbsent: 'add' } as never)).to.deep.include({ ifAbsent: 'fail', ifPresent: 'repl' })
   })
 
-  it("pass what they do not take through, for the verb's checks to refuse", () => {
+  it("pass through what they do not accept, for the verb's checks to refuse", () => {
     const tomb = TH.boxTombOf(box)
     TH.expectSyncRefusal(() => checkedWriteThingAsk(delAskOf({ cited: box, record: tomb, options: { policies: [] } } as never)), 'bad_option')
     TH.expectSyncRefusal(() => checkedWriteThingAsk(putAskOf({ cited: box, record: box, extra: 1 } as never)), 'bad_option')

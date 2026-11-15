@@ -32,7 +32,7 @@ const GatePolicies = {
   },
 } as const satisfies Record<EX.StoragePolicy, (cited: GateCited, record: GateThing, stored: GateThing) => void>
 
-/** Apply each storage policy `ask` names to the gate stored. Throws `gate_issue` at the first that refuses. */
+/** Check `ask` against each storage policy it names, over the gate stored. Throws `gate_issue` at the first that refuses. */
 export function demandPolicies({ cited, record, options }: GateWriteAsk, stored: GateThing): void {
   const policies = options?.policies ?? []
   for (const policy of policies) { GatePolicies[policy](cited, record, stored) }

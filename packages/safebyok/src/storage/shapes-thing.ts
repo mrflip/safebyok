@@ -1,4 +1,4 @@
-/** The shapes of a Thing, the record a vaultDB stores every kind as, and of the asks a vaultDB takes. */
+/** The shapes of a Thing, the record every kind is stored as in a vaultDB, and of the asks a vaultDB is asked. */
 
 import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
@@ -185,7 +185,7 @@ export type BankThing    = Readonly<Z.infer<typeof bankThing>>
 export type GateThing    = Readonly<Z.infer<typeof gateThing>>
 /** A box, as a Thing: live, with its sidecar and sealed whisper, or a tombstone, with a sealed empty whisper. */
 export type BoxThing     = Readonly<Z.infer<typeof boxThing>>
-/** Any Thing a vaultDB stores. */
+/** Any Thing stored in a vaultDB. */
 export type Thing        = BankThing | GateThing | BoxThing
 
 /** A record's Thing fields, without its body: what a listing gives of each Thing. */
@@ -209,7 +209,7 @@ export function childShellCited(parentLifepath: string): ThingCited {
 
 // == [Each kind's checks]: KindChecks, kindChecksOf
 
-/** The checks of each kind of Thing a vaultDB stores: the record proposed, cited and stored, and the storage policies it may name. */
+/** The checks of each kind of Thing stored in a vaultDB: the record proposed, cited and stored, and the storage policies it may name. */
 export const KindChecks = {
   bank: { record: bankThing, cited: bankCited, stored: bankThing.refusingAs('damaged_row'), policies: [] },
   gate: { record: gateThing, cited: gateCited, stored: gateThing.refusingAs('damaged_row'), policies: EX.storagePolicyVals },
@@ -279,7 +279,7 @@ export type GateWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'gate', cited: 
 export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: CitedOf<BoxThing>,  record: BoxThing }>
 /** An ask to write `record` over the Thing it `cited`: `put` a live record, or `del` with a tombstone.
  * `cited` carries what {@link ThingCited} names, which the store compares with the Thing stored. Any other field of the
- * record it carries is read only by a storage policy that takes it as testimony. Its `modelkind` narrows its records.
+ * record it carries is read only by a storage policy, as testimony. Its `modelkind` narrows its records.
  */
 export type WriteThingAsk = BankWriteAsk | GateWriteAsk | BoxWriteAsk
 /** The write ask of `RecordT`'s kind. */
@@ -392,13 +392,13 @@ function testimonyMissing(ask: WriteThingAsk): Errors.VaultError { return new Er
 /** The storage policies a write names. */
 type ThingOptions = Readonly<Z.infer<typeof AskChecks.thingOptions>>
 
-/** What {@link getAskOf} takes: a Thing's scope, and its `ifAbsent` (default `'nil'`). */
+/** The args of {@link getAskOf}: a Thing's scope, and its `ifAbsent` (default `'nil'`). */
 export type GetAskArgs  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent }>
-/** What {@link listAskOf} takes: the parent's scope, and its `ifAbsent` (default `'fail'`). */
+/** The args of {@link listAskOf}: the parent's scope, and its `ifAbsent` (default `'fail'`). */
 export type ListAskArgs = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent }>
-/** What {@link putAskOf} takes: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), and the storage policies. */
+/** The args of {@link putAskOf}: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), and the storage policies. */
 export type PutAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions }>
-/** What {@link delAskOf} takes: the records. Its flags are fixed. */
+/** The args of {@link delAskOf}: the records. Its flags are fixed. */
 export type DelAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT }>
 
 /** The get ask for the Thing at `args`'s scope. */
@@ -420,7 +420,7 @@ export function putAskOf<RecordT extends Thing>(args: PutAskArgs<RecordT>): Writ
   if (! CX.isPlainBag(args)) { return args }
   const { ifAbsent = 'add', ifPresent = 'repl', ...given } = args
   const scope = scopeGiven(args.record)
-  // A field the put does not take goes through, for the verb's strict check to refuse.
+  // A field the put does not accept goes through, for the verb's strict check to refuse.
   return { ...given, ...scope, op: 'put', modelkind: modelkindGiven(scope.labelpath), ifAbsent, ifPresent } as unknown as WriteAskOf<RecordT>
 }
 
@@ -428,7 +428,7 @@ export function putAskOf<RecordT extends Thing>(args: PutAskArgs<RecordT>): Writ
 export function delAskOf<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT> {
   if (! CX.isPlainBag(args)) { return args }
   const scope = scopeGiven(args.record)
-  // A field the del does not take goes through, for the verb's strict check to refuse.
+  // A field the del does not accept goes through, for the verb's strict check to refuse.
   return { ...args, ...scope, op: 'del', modelkind: modelkindGiven(scope.labelpath), ifAbsent: 'fail', ifPresent: 'repl' } as unknown as WriteAskOf<RecordT>
 }
 

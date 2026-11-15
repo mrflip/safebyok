@@ -8,12 +8,12 @@ import type {
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
 
-// `world` will hold the bank's Thing, read in the same step as the Thing asked for, once the Bank is a Thing. Other
+// `world` will be the bank's Thing, read in the same step as the Thing asked for, once the Bank is a Thing. Other
 // fields earn their own place on the answer.
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, and the loggable part of its `ask`. */
 export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: null, val: ValT }
 
-/** A vaultDB verb's refused answer: its `err`, its `act`, what the store holds as `dbhas`, and the loggable part of its `ask`. */
+/** A vaultDB verb's refused answer: its `err`, its `act`, what is stored as `dbhas`, and the loggable part of its `ask`. */
 export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: EX.BadAct, world: null, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
@@ -46,7 +46,7 @@ export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'act' |
 
 // == [What a store reports]: Actual, ListThingsActual, BirthBankActual
 
-/** What a store reports of one atomic step: the act, and the Thing it holds as `record`, which the adapter places on the
+/** What a store reports of one atomic step: the act, and the Thing stored as `record`, which the adapter places on the
  * answer as `val` when good, as `dbhas` when refused. After a write, `record` is the Thing as the store reports writing it.
  */
 export type Actual<ActT extends EX.GoodAct> =
