@@ -66,7 +66,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     })
   })
 
-  describe("an answer arriving past the listing's end", () => {
+  describe("an answer delivered past the listing's end", () => {
     it("refuses without receiving its world, even when the answer is a refusal", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willGet(() => {
@@ -169,7 +169,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(listing.snapshot).to.deep.equal([])
     })
 
-    it("builds the same instance at the void revision however often it arrives", () => {
+    it("builds the same instance at the void revision however often it is delivered", () => {
       const listing = boxListingOf(world.mw)
       const box = listing.deliverRecord(shell())
       expect(listing.deliverRecord(shell())).to.eq(box)
@@ -200,7 +200,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(box.revision_seq).to.eq(3)
     })
 
-    it("makes each scope's instance once, however it arrives: a build, a fetch, a put, a del, a notice", async () => {
+    it("makes each scope's instance once, however it is delivered: a build, a fetch, a put, a del, a notice", async () => {
       const made = vi.spyOn(TestableBoxListing.prototype as unknown as { makeThing: () => TestableBox }, 'makeThing')
       try {
         const listing = boxListingOf(world.mw)

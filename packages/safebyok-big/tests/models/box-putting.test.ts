@@ -150,7 +150,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2 })
   })
 
-  it("refuses 'stale_write' when a newer revision arrives during the seal", async () => {
+  it("refuses 'stale_write' when a newer revision is delivered during the seal", async () => {
     const rival = fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-rival' })
     const listing = fakeSealBoxListingOf(world.mw, {}, () => { world.mw.seedPut(rival); box.listing.deliverRecord(rival) })
     const box = listing.deliverRecord(fullBoxRecord())

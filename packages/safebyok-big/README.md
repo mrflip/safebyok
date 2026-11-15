@@ -126,8 +126,8 @@ Easy to get wrong:
   be built. `browserOpts` supplies `zxcvbnStrengthChecker`, whose dictionary loads at `device.ensureBank()`.
 * The core sets no timers. Call `bank.autolock()` after `ensureBank` and on a timer of your own.
 * `vault.beginWatch()` lists a vault's boxes and starts watching them. Until you call it,
-  `vault.boxListing` is empty and nothing is watched, so a change made on another device does not
-  arrive until the next `vault.beginWatch()`.
+  `vault.boxListing` is empty and nothing is watched, so a change made on another device is not
+  delivered until the next `vault.beginWatch()`.
 * `device.vacate()` is sign-out. It disables the device and its bank, then removes this bank's
   cached leases and its device row from the deviceDB. It does not touch the bankDB, and it resolves
   once each removal has been tried. The next device's `ensureBank` for that user gets a new

@@ -369,7 +369,7 @@ first; maintainability beats speed unless something is shown slow.
 ### A gate row landing between a gate verb's write and its lease grant
 
 From the bank_world sprint's thread 8c ([#673](https://github.com/mrflip/safebyok/pull/673)): a gate
-row that arrives after a gate verb has written its row and before the gating grants its lease leaves
+row that is delivered after a gate verb has written its row and before the gating grants its lease leaves
 the lease citing a superseded `gate_revision_tok`, so the next unlock asks the user to prove again.
 The direction is safe. The Coach (2026-11-12): "yes TODO not this sprint", with two questions. If
 the lease is handled only during align, after the newest gate version has been adopted, is there an
@@ -381,7 +381,7 @@ issue? (The Coach thinks so.) Should the lease row in the deviceDB be written by
 From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second
 review): a device learns that another deleted the bank, or changed its gate, only when the row reaches it (by a
 watch or its next fetch). A device already unlocked stays unlocked across another device's gate verb, by design;
-a bank's tombstone, once it arrives, ends its Bank and forgets its lease. The Coach (2026-10-19):
+a bank's tombstone, once it is delivered, ends its Bank and forgets its lease. The Coach (2026-10-19):
 "cross device invalidation should be done by a proper mechanism that is coming, where each device
 authenticates a token when it joins or creates a vault." Not to be built piecemeal ahead of it: the
 design question is the token, what storage checks it against, and how a deletion revokes it.

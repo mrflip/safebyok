@@ -170,7 +170,7 @@ describe("gate.replacePassphrasePrompt()", () => {
     await proveBy(bank, Passphrase)
   })
 
-  it("leases citing the gate row it wrote, not a newer one that arrived meanwhile", async () => {
+  it("leases citing the gate row it wrote, not a newer one that was delivered meanwhile", async () => {
     const { bank, bankDB, deviceDB, demandStoredGate, putGateBehindOurBack } = await makeBornVault()
     const commit = bankDB.tryPutGate.bind(bankDB)
     let written = ''
@@ -226,7 +226,7 @@ describe("gate.replacePassphrasePrompt()", () => {
     expect(await device.ensureBank()).to.include({ bank_tok: storedBankNow()?.bank_tok, isLocked: true })
   })
 
-  it("refuses 'stale_write' when a gate row arrives during the proving", async () => {
+  it("refuses 'stale_write' when a gate row is delivered during the proving", async () => {
     let born: Born | null = null
     const crossing: StrengthChecker = async () => {
       if (born !== null) {

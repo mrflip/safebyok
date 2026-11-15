@@ -221,7 +221,7 @@ async function unlockBank(bank: Bank, cleartexts: unknown, unlockByProving: Unlo
   return unlockByProving(bank, proved)
 }
 
-// Each gate change grants a lease to the bank citing the gate row it wrote, not a newer one that arrived meanwhile. The
+// Each gate change grants a lease to the bank citing the gate row it wrote, not a newer one that was delivered meanwhile. The
 // old lease stays in force for the moments between: the bankKey did not change.
 
 /** Replace the passphrase of `bank`, proved by the current one. */

@@ -422,7 +422,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: revoked, unrevoked: 0, device: bank.device })
   })
 
-  it("ignores a revocation that arrives after a sweep", async () => {
+  it("ignores a revocation that is delivered after a sweep", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const onLifecycle = vi.fn(DefaultOnLifecycle)

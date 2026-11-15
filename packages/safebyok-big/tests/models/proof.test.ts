@@ -468,7 +468,7 @@ describe("the proof", () => {
     await ticks(1)
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key'])
 
-    // A BankDB with no watch, or a watch ended: nothing arrives until the host says hello to the vault again, on its own timer.
+    // A BankDB with no watch, or a watch ended: nothing is delivered until the host says hello to the vault again, on its own timer.
     vault.boxListing.goodbye()
     await phoneVault.putBox({ ...ApiKey, boxlabel: 'gemini_api_key' })
     await ticks(1)

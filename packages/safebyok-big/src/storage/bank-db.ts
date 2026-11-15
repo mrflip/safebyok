@@ -157,7 +157,7 @@ export interface BankDB {
   tryTidyGone(ask: BoxTidyAsk): Promise<TidyGoneAnswer>
   /** Watch a bank or a vault: call `onNotice` with each changed row, and `onBadNews` with trouble in the watch.
    * A bank's watch hears its bank, gate, vault and box rows; a vault's, its vault row and its box rows.
-   * Returns a function that stops the watch. Notices are best effort: never count on one arriving.
+   * Returns a function that stops the watch. Notices are best effort: never count on one being delivered.
    * After bad news, the watch may go on or may have ended.
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void

@@ -54,12 +54,12 @@ export function changeCounter() {
  */
 export function makeLatch() {
   const opened = deferred()
-  const arrived = deferred()
+  const reached = deferred()
   const pass = async () => {
-    arrived.resolve()
+    reached.resolve()
     await opened.promise
   }
-  return { pass, reached: arrived.promise, release: opened.resolve }
+  return { pass, reached: reached.promise, release: opened.resolve }
 }
 
 /** The names of `Target`'s methods that return a promise. */

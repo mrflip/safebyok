@@ -89,10 +89,10 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
   was postponed that sprint (thread 7's review).
 * When `create`'s put answer loses to a delete and a new life, `create` returns another vault; thread 10's `#runBirth` ended this.
 * A `lock()` during the `ensureTimely` in `delBox`'s path for no box in memory lets the tombstone be written for a vault that is by then locked (thread 9's review).
-* If an instance arrives during `putBox`'s `ensureTimely`, the birth reaches `demandNotHeld`, which refuses with `bad_option` (thread 9's review).
+* If an instance is enlisted during `putBox`'s `ensureTimely`, the birth reaches `demandNotHeld`, which refuses with `bad_option` (thread 9's review).
 * A second `attempt` with the same answer, made while the first is running, zeroes the bytes in use, so the first refuses with `bad_option` (thread 10's review).
-* A tombstone or sparse record that arrives during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
-* A tombstone or discard that arrives between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
+* A tombstone or sparse record that is delivered during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
+* A tombstone or discard that is delivered between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
 * A gate verb refused with `vault_gone` or `vault_reborn` delivers nothing, so the Vault still reports present until its next fetch, box answer or notice (thread 11's review).
 * When two `hello`s cross, the last one answered sets the stage (thread 12).
 * A record changed between `getBank` and the watch's start isn't seen until the next fetch (thread 12).

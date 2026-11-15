@@ -536,7 +536,7 @@ nothing stored                                   nothing written; no cascade; 'v
 Repeated deletes do not advance the revision. Whoever repeats a delete may not have the current token, having lost the
 first answer. Advancing the revision would wake every device's watch for nothing, and could cause a rebirth that has that
 tombstone as its `expected` to be refused. The package does not retry: a repeat is the host calling the verb again,
-which its Vault allows until the tombstone arrives. After that `vault.del()` finds the vault absent.
+which its Vault allows until the tombstone is delivered. After that `vault.del()` finds the vault absent.
 
 A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or `absent_vault` or `vault_gone`). The damaged_row field will contain a generated tombstone if one is found with that scope *and vault_tok*, null otherwise. In both cases the value is forensic: do not instantiate, do not deliver. (Discovering a row is exceptionally unlikely as they were to have been transactionally removed with the vault deletion. `bank.doctor()` will establish comfort if needed)
 

@@ -117,7 +117,7 @@ F1 is checked on entry and again once the parent is delivered. N1 to F2 are read
 A Vault object stands for its scope through its lives, as a Box and a Gate do, so a vault listing adopts where a box
 listing does (R2). A Bank object is one life of the bank: it adopts the row of another life as any instance does, and
 answers nothing more. A bank built again is a new Bank, in a new bank listing, which the device makes at its next
-`ensureBank` once the Bank it has no longer answers. A row of an earlier life that arrives late is `older` (R1) at any listing, since the seq at a scope goes on
+`ensureBank` once the Bank it has no longer answers. A row of an earlier life that is delivered late is `older` (R1) at any listing, since the seq at a scope goes on
 across a rebirth (`notes/answer-contract.md`, *Writing*).
 
 The impossible are one kind, `record_conflict` (N2, F4 to F6): storage and this device disagree about the history of
@@ -152,7 +152,7 @@ The vault row beside a box answer:
 | W3  | a live row of this `vault_tok`, newer           | live   | R2     | has the parent                                                                             | the answer's own act |
 
 B2 is how this device learns from a gate or vault answer alone that its bank's life is over, and W2 from a box answer
-alone that its vault's is. A tombstone carries a life token of its own, so a deletion always arrives as B2 or W2. The
+alone that its vault's is. A tombstone carries a life token of its own, so a deletion is always delivered as B2 or W2. The
 Bank of that life drops its lease at once, so it never stays unlocked until the next `ensureBank`; a Box kept from a
 vault's ended life refuses `disabled` from then on, since its listing's `vault_tok` is no longer its vault's.
 

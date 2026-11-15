@@ -415,10 +415,10 @@ describe("storable.hydrate(opts): timeliness after a fetch", () => {
 
 // --
 
-// == [Rebirth, sentences]: a deletion arriving again after a put, phrases.ts
+// == [Rebirth, sentences]: a deletion delivered again after a put, phrases.ts
 
 describe("storable.listing.deliverRecord(rcvd): after a put over a deleted box", () => {
-  it("keeps a rebirth when the old deletion arrives again", async () => {
+  it("keeps a rebirth when the old deletion is delivered again", async () => {
     const gone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' })
     world.mw.seedPut(gone)
     const box = fakeSealBoxListingOf(world.mw).deliverRecord(gone)

@@ -1,4 +1,4 @@
-/** WX: the answers of a bankDB as they cross a wire, each absent field arriving as null, parse back to the answers its verbs return. */
+/** WX: the answers of a bankDB as they cross a wire, each absent field received as null, parse back to the answers its verbs return. */
 
 import { describe, expect, it } from 'vitest'
 import * as WX from '../../src/shapes/shapes-bank-answers'
