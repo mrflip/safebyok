@@ -1,7 +1,13 @@
 # Thread 3: box_bank (2026-11-15)
 
 Branch `20261115-box_bank`, PR [#704](https://github.com/mrflip/safebyok/pull/704), stacked on [#703](https://github.com/mrflip/safebyok/pull/703) (`20261115-box_seal`). Proved: `safebyok` lint, typecheck and
-test, 660 tests green; `pnpm justify` at ready (see the PR's **Tests:** line).
+test, 661 tests green; `pnpm justify` at ready and after the review's rework (see the PR's **Tests:** line).
+
+* **Rework after the Coach's review**: the enabled check above; `tryGetBox` returns, not throws, its impossible
+  branch (storage answered a non-box) as an `unexpected_error` BadAnswer (`Phrases.GotOtherThanBox`, `dbhas` the
+  row, untested as impossible); gallant's `#impossible-is-a-crash` is now `#impossible-is-a-broken-system`, with the
+  Coach's opening paragraph. `#demandBox` is left as it was, while its root-lifeseq check is settled. The Gate on its
+  Thing, `bank.put` and the birth through `tryBirthBank` go to thread 4.
 
 * **Built** (design-boxops.md *Building it* item 3)
   * `models/stamps.ts`, new: `bankScope`, `bankStamp` (`{ userid, banklabel, lifeseq, born_at }`), `stampedGate`,
@@ -30,7 +36,9 @@ test, 660 tests green; `pnpm justify` at ready (see the PR's **Tests:** line).
   * **The shell is given only one label under the root box**: a deeper box's shell needs its parent's lifepath.
   * **`tryPutBox` accepts the whole `PutAskArgs<BoxThing>`** (flags too), not just `{ cited, record }`: the builder
     already fills them.
-  * **The sugar does not demand an enabled device**: it holds nothing secret, and a lock does not stop a listing.
+  * **The sugar checks the device is enabled first** (the Coach's review): a disabled device answers a BadAnswer whose
+    err is `Throwers.deviceDisabled()`, the thrower `Device.sweep` uses (its `#endCause` is private), with
+    `act: 'unclassified_storing'`. One test, for `tryPutBox`. The vaultDB itself does not check.
   * **The flows test births the bank by `tryBirthBank`** with the born bank's Thing, `gateThingOf()` and the root
     box with a fake `whisper_sealed`: nothing seals the root box yet (`makeRecord`'s root box is a placeholder).
 
@@ -38,8 +46,6 @@ test, 660 tests green; `pnpm justify` at ready (see the PR's **Tests:** line).
   * **`boxCited` accepts the shell's lifeseq** (`storage/shapes-thing.ts`). The design's flow cites the whole shell
     `tryGetBox` gives (`tryPutBox({ cited: prior, record })`), and the cited check refused its lifeseq `-1`. Only the
     box's cited check changed; the bank's and gate's are cited only as `ShellCited`.
-  * **`tryGetBox` throws `unexpected_error`** (`Phrases.GotOtherThanBox`) if the store answers a non-box under the box
-    modelkind: an impossible branch, against the doc's "never throws".
   * **`Phrases.PutNotBuilt` reworded**: it said "This layer stores nothing", untrue once the bank stores its boxes.
   * **Exports beyond the design**: core: `BoxShell`, `GetBoxAnswer`, `GetBoxArgs`, the stamps module, `VaultDB`,
     `isVaultDB`; index: those types plus `BadAnswer`, `GoodAnswer`, `ListThingsAnswer`, `WriteThingAnswer`,
