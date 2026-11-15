@@ -1,7 +1,7 @@
 # Thread 2: minder_buttonup (2026-11-15)
 
-Branch `20261115-minder_buttonup`, PR #PRNUM (draft), stacked on #708 (doc blocks), which is stacked on #707. The
-branch's first commit, 52b29f8fc, is the Coach's hand edit to `thing-minder.ts`, kept. Proved: PROOF.
+Branch `20261115-minder_buttonup`, PR [#709](https://github.com/mrflip/safebyok/pull/709) (draft), stacked on #708 (doc blocks), which is stacked on #707. The
+branch's first commit, 52b29f8fc, is the Coach's hand edit to `thing-minder.ts`, kept. Proved: `pnpm --filter safebyok` lint, typecheck and test (783 tests, 62 of them the minder's); `pnpm justify` after the catch-up.
 
 **Blocked on one item**, which the orchestrator asked to see before it is built: *storage going backward is not served
 as fresh* (complete.md, *safebyok/cached*). The proposal is in `thread-2-storage_backward.md`, for whoever builds
