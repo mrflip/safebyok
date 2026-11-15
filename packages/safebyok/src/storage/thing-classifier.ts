@@ -15,10 +15,10 @@ import {
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
-/** A write ask, as the tables read it: its flags, and what its two records cite. */
+/** A write ask reduced to what the act tables read: its flags, and the citations in its `cited` and `record`. */
 type WriteCmpAsk = Pick<WriteThingAsk, 'op' | 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
 
-/** What is stored at a scope: no Thing, a tombstone, or a live Thing. */
+/** A scope's stored Thing, by liveness: none (`void`), a tombstone (`gone`), or a live Thing. */
 type Presence = 'void' | 'gone' | 'live'
 
 /** The presence of `stored`, `'void'` for null. */
@@ -43,14 +43,14 @@ type RevtokCmp = 'birth' | '=next' | 'eq' | 'neq'
  */
 type RevseqCmp = 'birth' | 'eq' | 'stale' | 'ahead'
 
-/** The stored revtok compared with the ask's, as {@link RevtokCmp} reads. */
+/** Compare the stored revtok with the ask's: see {@link RevtokCmp}. */
 function revtokCmpOf({ cited, record }: WriteCmpAsk, stored: ThingCited | null): RevtokCmp {
   if (stored === null)                 { return (cited.revtok === SX.VoidRevisionTok) ? 'birth' : 'neq' }
   if (stored.revtok === record.revtok) { return '=next' }
   return (stored.revtok === cited.revtok) ? 'eq' : 'neq'
 }
 
-/** The ask's cited revseq compared with the stored one, as {@link RevseqCmp} reads. */
+/** Compare the ask's cited revseq with the stored one: see {@link RevseqCmp}. */
 function revseqCmpOf({ cited }: WriteCmpAsk, stored: ThingCited | null): RevseqCmp {
   if (cited.revseq === SX.VoidRevisionSeq) { return 'birth' }
   if (stored === null)                        { return 'ahead' }
@@ -150,7 +150,7 @@ export function storedThingOf(scope: ThingScope, raw: unknown): Thing | null { r
 /** The Thing the store reports writing at `scope`, checked. */
 export function writtenThingOf(scope: ThingScope, raw: unknown): Thing { return writtenOf<Thing>(kindChecksOf(scope.labelpath).stored, scope, raw) }
 
-/** The bank's three roots the store reports writing for a birth's `puts`, checked. */
+/** The three roots the store reports writing for a birth's `puts`, checked. */
 export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
   return {
     bank: writtenOf(KindChecks.bank.stored, bankPut, written.bank),
@@ -166,7 +166,7 @@ function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
   return parsed.success ? Validator.checkedConsistent(parsed.data, scope, RowOfOtherScope) : null
 }
 
-/** The Thing a watch on `bankScope` heard, checked. */
+/** The Thing in a notice from a watch on `bankScope`, checked. */
 export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   // The labelpath is the record's own; the bank is the watch's, so that a Thing of another bank refuses.
@@ -252,11 +252,11 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, worldFetche
   return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
 }
 
-/** What a store fetched for a listing: the raw parent, null for none, and each raw Thing one label under it, with its labelpath. */
+/** The raw rows a store fetched for a listing: the parent (null for none), and each child one label under it, with its labelpath. */
 export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: string, raw: unknown }>[] }>
 
-/** Classify a listing against what a store fetched for it: the parent's get act, the parent, its children of the parent's
- * live life in labelpath order, and the children that fail their checks.
+/** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the parent, the children of its live life in labelpath order,
+ * and the children that fail their checks.
  */
 export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
   const stored = storedThingOf(ask, rawParent)
@@ -289,7 +289,7 @@ function isChildLabelpath(ask: ListThingsAsk, labelpath: string): boolean {
 
 /** Classify a bank's birth, by the three `puts` it amounts to, against the roots a store fetched. Under
  * `born`, `things` and `world` are the puts' records, which the store writes in one step and then reports as written, with any `tracked`
- * as read after it; otherwise as {@link unwrittenBirthOf} reads.
+ * read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
   const unwritten = unwrittenBirthOf(puts, fetched)

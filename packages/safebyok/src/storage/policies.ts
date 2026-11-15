@@ -8,7 +8,7 @@ import type { GateThing, GateWriteAsk, Thing, Wayins } from './shapes-thing'
 // Each runs once the put table has found the write would replace the live gate. Each line is one row of its policy's table
 // in notes/storage-policies.md, in the same order, less big's registered_at row: every live-over-live write keeps its born_at.
 
-/** What a gate write cites. */
+/** The `cited` of a gate write ask. */
 type GateCited = GateWriteAsk['cited']
 
 /** Each storage policy: what it demands of a gate write's records and of the wayins stored, and why it refuses, or null where it allows. */
@@ -46,7 +46,7 @@ export function policyRefusalOf({ cited, record, options }: GateWriteAsk, stored
 }
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
-/** The meta of a refusal of a write the put table would let replace the Thing stored. */
+/** Refusal meta with act `policied`, for a write the put table allows but a storage policy or the born_at check refuses. */
 export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
 
 /** A `gate_issue` refusal of a write over `stored`, saying `why`. */

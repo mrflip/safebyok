@@ -1,4 +1,4 @@
-/** `AdapterVaultDB`, the base class a store extends by writing its `do*` calls. */
+/** The `AdapterVaultDB` base class: a store extends it by writing the `do*` calls. */
 
 import { noop } from 'es-toolkit'
 import type * as Z from 'zod'
@@ -31,8 +31,8 @@ export type AdapterVaultDBOpts = Readonly<Z.infer<typeof adapterVaultDBOpts>>
 /** A watch, as the adapter keeps it: its bank, and what it does with each Thing received. */
 type Feed = { scope: ThingWatchScope, receive: (received: Received) => void }
 
-/** A verb's answer from what its store reports: `record` as `val` when good, as `dbhas` when refused.
- * Throws `storage_issue` for a good act, other than `gotvoid`, that reports no Thing.
+/** The answer a verb gives for its store's report: `record` becomes `val` when good, `dbhas` when refused.
+ * Throws `storage_issue` if a good report other than `gotvoid` has no Thing.
  */
 function answerOf(actual: Actual<EX.GotAct>, oplabel: string, loggableAsk: LoggableAsk): GetThingAnswer
 function answerOf(actual: Actual<EX.PutAct | EX.DelAct>, oplabel: string, loggableAsk: LoggableAsk): WriteThingAnswer
@@ -54,7 +54,7 @@ function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked
 
 /** The base class of a vaultDB that keeps its Things in a datastore: a subclass writes the `do*` calls, each one atomic step.
  * It checks each ask, and classifies what a `do*` call fetches by the act tables in notes/answer-contract.md. It tells its watches of each
- * Thing an answer's `tracked` reports other than as `'same'`, unless made with `doNotifyTracked: false`.
+ * Thing in an answer's `tracked` that is not `'same'`, unless made with `doNotifyTracked: false`.
  */
 export abstract class AdapterVaultDB implements VaultDB {
   // == [Props]: #doNotifyTracked, #feeds
@@ -143,7 +143,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parent: null, damaged_rows: [] } }
   }
 
-  /** Write a new bank's bank, main gate and root box, where no bank is stored ({@link VaultDB.tryBirthBank}). */
+  /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored ({@link VaultDB.tryBirthBank}). */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     try {
       const checked     = checkedBirthBankAsk(ask)
@@ -198,8 +198,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Failures]: answerForThrown
 
   // All the error treatment of the verbs is here, and it has its own try/catch, so a verb never throws.
-  /** The refused answer for a verb that threw: a refusal as it is, anything else as `storage_unavailable`.
-   * Its act is the one the refusal names in its meta, if any, else `unclassified_storing`.
+  /** The refused answer for a verb that threw. A refusal is kept, and anything else becomes `storage_unavailable`.
+   * Its act is the one in the refusal's meta, else `unclassified_storing`.
    * Override it to tell one of your datastore's errors from another.
    */
   protected answerForThrown(thrown: unknown, oplabel: string, ask: unknown): BadAnswer {

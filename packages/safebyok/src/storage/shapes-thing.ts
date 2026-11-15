@@ -1,4 +1,4 @@
-/** The shapes of a Thing, the record every kind is stored as in a vaultDB, and of the asks a vaultDB is asked. */
+/** The shapes of a Thing, the record every kind is stored as in a vaultDB, and of the asks a vaultDB is given. */
 
 import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
@@ -11,12 +11,12 @@ import * as Phrases from '../phrases'
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10
 
-/** The shell's lifeseq, life -1: never stored, so the one lifeseq that is not 10 digits. */
+/** The shell's lifeseq, for life -1. It is never stored, and is the only lifeseq that is not 10 digits long. */
 export const ShellLifeseq = '-1'
 /** A root's shell lifepath: the shell's lifeseq alone. */
 export const ShellLifepath = ShellLifeseq
 
-/** The lifeseq of life `seq`: its base-32 digits, `0-9a-v`, padded to 10, so that lifeseqs sort as their lives do. */
+/** The lifeseq of life `seq`: its base-32 digits (`0-9a-v`) padded to 10, which sort in the order of the lives. */
 export function lifeseqOf(seq: number): string { return seq.toString(32).padStart(LifeseqDigits, '0') }
 
 /** The life `lifeseq` names: -1 for the shell's. */
@@ -39,11 +39,11 @@ export const thingkindVals = ['bank', 'gate', 'box'] as const satisfies readonly
 /** A kind of Thing, one of {@link thingkindVals}. */
 export type Thingkind = typeof thingkindVals[number]
 
-/** The `fmt` of the bank's Thing: its own, so that it is never read as big's bank row (3001). */
+/** The `fmt` of the bank's Thing, distinct from big's bank row (3001). */
 export const BankThingFormat = 3101
-/** The `fmt` of a gate's Thing: its own, so that it is never read as big's gate row (4001). */
+/** The `fmt` of a gate's Thing, distinct from big's gate row (4001). */
 export const GateThingFormat = 4101
-/** The `fmt` of a box's Thing: its own, so that it is never read as big's box row (5003). */
+/** The `fmt` of a box's Thing, distinct from big's box row (5003). */
 export const BoxThingFormat = 5103
 
 /** Where the main gate is stored in its bank, and its key in a `track`. */
@@ -55,7 +55,7 @@ const MaxLabelsUnder = { bank: 0, gate: 1, box: 1 } as const satisfies Record<Th
 /** The modelkind a sound labelpath starts with. */
 export function modelkindOf(labelpath: string): Thingkind { return labelpath.split('/', 1)[0] as Thingkind }
 
-/** True when `labelpath` is one of `modelkind`'s: the modelkind, then as many labels as the kind nests, each after a `/`. */
+/** True when `labelpath` is `modelkind` followed by at most as many valid labels as that kind nests, each after a `/`. */
 export function isLabelpathOfKind(labelpath: string, modelkind: Thingkind): boolean {
   const [head, ...labels] = labelpath.split('/')
   return (head === modelkind) && (labels.length <= MaxLabelsUnder[modelkind]) && labels.every((label) => Validator.Kit.label.safeParse(label).success)
@@ -75,7 +75,7 @@ type Labelled = { labelpath: string, label: string }
 type Lived    = { lifepath: string, am: string }
 type Revised  = { revtok: string, revseq: number, lifepath: string }
 
-/** True when a Thing's label is the last segment of its labelpath, a root's its modelkind. */
+/** True when a Thing's label is the last segment of its labelpath. A root's label is its modelkind. */
 function isLabelLast({ labelpath, label }: Labelled): boolean { return labelpath.slice(labelpath.lastIndexOf('/') + 1) === label }
 /** True when a Thing's lifeseq is the last of its lifepath. */
 function isLifeseqOwn({ lifepath, lifeseq }: Lived & { lifeseq: string }): boolean { return lifeseqOfLifepath(lifepath) === lifeseq }
@@ -83,9 +83,9 @@ function isLifeseqOwn({ lifepath, lifeseq }: Lived & { lifeseq: string }): boole
 function isLifepathDeep({ lifepath, labelpath }: Lived & Labelled): boolean { return lifepath.split('/').length === labelpath.split('/').length }
 /** True when a Thing's own lifeseq is odd exactly when it is a tombstone. */
 function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === isGoneLifeseq(lifeseqOfLifepath(lifepath)) }
-/** True unless the Thing is the main gate, deleted: the main gate is never deleted. */
+/** True unless the Thing is a deleted main gate. */
 function isMainGateLive({ labelpath, am }: Lived & Labelled): boolean { return (labelpath !== MainGateLabelpath) || (am === 'a') }
-/** The fields of `shape`, each optional but never undefined, as `Partial` reads them under exactOptionalPropertyTypes. */
+/** The fields of `shape`, each optional: it may be omitted, but not undefined. */
 function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> } {
   // Object.fromEntries loses the fieldnames' types: the cast restores them.
   return Object.fromEntries(Object.entries(shape).map(([fieldname, check]) => [fieldname, exactOptional(check)])) as { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> }
@@ -210,7 +210,7 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof thingScope>>
-/** What a write cites of the Thing it expects to find, the shell's included: its revision, its life and its liveness, just what the store compares. */
+/** A write's citation of the Thing it expects to find: its revision, life and liveness, the only fields the store compares. The shell may be cited. */
 export type ThingCited   = Readonly<Z.infer<typeof thingCited>>
 /** What a write reads of the Thing stored at its scope: its scope, what the act tables compare, and the born_at a replace keeps. */
 export type StoredCited  = Readonly<Z.infer<typeof storedCited>>
@@ -231,20 +231,20 @@ export type Wayins       = Readonly<Z.infer<typeof wayins>>
 /** A box's Thing fields, without its body: live, a tombstone, or the shell. */
 export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
 
-/** A record's Thing fields, without its body: what a listing gives of each Thing. */
+/** A record's Thing fields, without its body: what a listing returns for each Thing. */
 export type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecord>
 
 const ThingFieldnames = Object.keys(thingRecord.shape) as (keyof ThingRecord)[]
 
-/** `record`'s Thing fields, without its body. */
+/** The Thing fields of `record`, without its body. */
 export function sparseOf<RecordT extends Thing>(record: RecordT): Sparse<RecordT> { return pick(record, ThingFieldnames) }
 
-/** What a root's birth cites: the shell, the void sentinel for no Thing stored. */
+/** The citation for a root's birth: the shell, the void sentinel for no Thing stored. */
 export const ShellCited: ThingCited = Object.freeze({
   revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: ShellLifepath,
 })
 
-/** What the birth of a child of the Thing at `parentLifepath` cites: the shell, at the parent's lifepath then `-1`. */
+/** The citation for the birth of a child of the Thing at `parentLifepath`: the shell, at the parent's lifepath then `-1`. */
 export function childShellCited(parentLifepath: string): ThingCited {
   return Object.freeze({ ...ShellCited, lifepath: `${parentLifepath}/${ShellLifeseq}` })
 }
@@ -259,7 +259,7 @@ export const KindChecks = {
   box:  { record: boxThing,  cited: boxCited,  stored: boxThing.refusingAs('damaged_row'),  policies: [] },
 } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, policies: readonly EX.StoragePolicy[] }>
 
-/** The checks of the kind of Thing at `labelpath`, a sound one. */
+/** The checks for the kind of Thing at `labelpath`, which must be sound. */
 export function kindChecksOf(labelpath: string): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
@@ -309,7 +309,7 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
     watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
   }
 })
-/** The check of a watch's scope, a bank, and of a watch's arguments. */
+/** The checks of a watch's scope (a bank) and of its arguments. */
 export const { thingWatchScope, watchArgs } = AskChecks
 
 /** The revseq and lifepath an ask's sender holds of its bank and of its main gate. The answer's `tracked` says which of the two it holds as stored. */
@@ -318,7 +318,7 @@ export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>
 export type GetThingAsk     = Readonly<Z.infer<typeof AskChecks.getThingAsk>>
 /** An ask for the children of the Thing at its scope. Its `ifAbsent` is the parent's. */
 export type ListThingsAsk   = Readonly<Z.infer<typeof AskChecks.listThingsAsk>>
-/** What a write cites of a Thing of `RecordT`'s kind: what {@link ThingCited} names, and any other of its fields. */
+/** A write's citation of a Thing of `RecordT`'s kind: {@link ThingCited}, and optionally any other of its fields. */
 export type CitedOf<RecordT extends Thing> = ThingCited & Partial<Omit<RecordT, keyof ThingCited>>
 /** The flags of a write ask, its modelkind and records aside. */
 type WriteAskFlags = Readonly<Omit<Z.infer<typeof AskChecks.writeThingAsk>, 'modelkind' | 'cited' | 'record'>>
@@ -328,9 +328,9 @@ export type BankWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'bank', cited: 
 export type GateWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'gate', cited: CitedOf<GateThing>, record: GateThing }>
 /** A write ask of a box: see {@link WriteThingAsk}. */
 export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: CitedOf<BoxThing>,  record: BoxThing }>
-/** An ask to write `record` over the Thing it `cited`: `put` a live record, or `del` with a tombstone.
- * `cited` carries what {@link ThingCited} names, which the store compares with the Thing stored. Any other field of the
- * record it carries is read only by a storage policy, as testimony. Its `modelkind` narrows its records.
+/** An ask to write `record` over the Thing it `cited`: a `put` of a live record, or a `del` with a tombstone.
+ * The store compares the {@link ThingCited} fields of `cited` with the Thing stored. Any other field of `cited` is read only by a storage policy, as testimony.
+ * `modelkind` says which kind of Thing both are.
  */
 export type WriteThingAsk = BankWriteAsk | GateWriteAsk | BoxWriteAsk
 /** The write ask of `RecordT`'s kind. */
@@ -339,9 +339,9 @@ export type WriteAskOf<RecordT extends Thing> = Extract<WriteThingAsk, { record:
 export type BankRoots       = Readonly<{ bank: BankThing, gate: GateThing, root: BoxThing }>
 /** An ask to write a new bank's first Things in one step: the bank, its main gate and its root box. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots> & BankRoots>
-/** The puts a bank's birth amounts to, one for each of its roots. */
+/** The three puts of a bank's birth, one for each root. */
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
-/** The scope a watch hears: a bank. */
+/** The scope of a watch: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof thingWatchScope>>
 /** A bank's record: its Thing, as stored. */
 export type BankRecord      = BankThing
@@ -351,13 +351,13 @@ export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
 /** What an answer says of each Thing its ask tracks: `'same'` where it is stored at the revseq and lifepath tracked, else as stored. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same' }>
 
-/** `ask`, checked, or throw `bad_option` */
+/** Check a get `ask`, throwing `bad_option`, and return it typed. */
 export function checkedGetThingAsk(ask: unknown): GetThingAsk { return AskChecks.getThingAsk.parse(ask) }
 
-/** `ask`, checked, or throw `bad_option` */
+/** Check a list `ask`, throwing `bad_option`, and return it typed. */
 export function checkedListThingsAsk(ask: unknown): ListThingsAsk { return AskChecks.listThingsAsk.parse(ask) }
 
-/** `ask`, with its records checked by their kind and against each other, or throw `bad_option` or `bad_record` */
+/** Check a write `ask`, and its records by their kind and against each other, throwing `bad_option` or `bad_record`. Returns it typed. */
 export function checkedWriteThingAsk(ask: unknown): WriteThingAsk {
   const checked = withRecordsChecked(AskChecks.writeThingAsk.parse(ask))
   if ((checked.op === 'put') !== (checked.record.am === 'a')) { throw opNotOfRecord(checked) }
@@ -365,14 +365,14 @@ export function checkedWriteThingAsk(ask: unknown): WriteThingAsk {
   return checked
 }
 
-/** `ask`, its flags checked, with its records checked by the kind its modelkind names. */
+/** Check the records of `ask` by the kind its modelkind names. Its flags are already checked. */
 function withRecordsChecked({ cited, record, ...flags }: Z.infer<typeof AskChecks.writeThingAsk>): WriteThingAsk {
   if (flags.modelkind === 'bank') { return { ...flags, modelkind: 'bank', cited: bankCited.parse(cited), record: bankThing.parse(record) } }
   if (flags.modelkind === 'gate') { return { ...flags, modelkind: 'gate', cited: gateCited.parse(cited), record: gateThing.parse(record) } }
   return { ...flags, modelkind: 'box', cited: boxCited.parse(cited), record: boxThing.parse(record) }
 }
 
-/** `ask`, with each of its three records checked as the put {@link birthPutsOf} makes of it, or throw `bad_option` or `bad_record` */
+/** Check a birth `ask`: each of its three records, as the put {@link birthPutsOf} makes of it. Throws `bad_option` or `bad_record`, and returns it typed. */
 export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
   const parsed  = AskChecks.birthBankAsk.parse(ask)
   const checked = { ...parsed, bank: bankThing.parse(parsed.bank), gate: gateThing.parse(parsed.gate), root: boxThing.parse(parsed.root) }
@@ -380,8 +380,8 @@ export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
   return checked
 }
 
-/** The puts a bank's birth amounts to: each root, written over the shell at its kind's root.
- * The bank's put passes over a live bank; the gate's and the root's refuse over a live Thing.
+/** The three puts of a bank's birth, each writing a root over the shell.
+ * The bank's put returns a live bank (`passed`). The gate's and the root's put refuse over a live Thing.
  */
 export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAsk): BirthPuts {
   const flags = { userid, banklabel, op: 'put', ifAbsent: 'add', ifPresent: 'fail' } as const
@@ -392,7 +392,7 @@ export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAs
   ]
 }
 
-/** Refuse a write whose record does not follow from the one it cites. */
+/** Refuse a write whose record does not follow from the Thing it cites. */
 function checkWriteInvariants(ask: WriteThingAsk): void {
   const { cited, record, userid, banklabel, labelpath } = ask
   if (record.revseq !== cited.revseq + 1)                                                           { throw revseqNotNext(ask) }
@@ -509,7 +509,7 @@ function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typ
 // == [Loggable asks]: loggableAsk, LoggableAsk, loggableAskOf
 
 /** The part of an ask that is safe to log: its scope, its flags, and what each record cites, never a gate's wayins.
- * Each field is optional, so that a refusal of an ask that is not whole carries what of it was sound.
+ * Each field is optional, so a refusal of a malformed ask still carries the sound part of it.
  */
 export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => {
   const citedFields = thingCited.partial()
@@ -535,7 +535,7 @@ export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label
 /** The part of a vaultDB ask that is safe to log. */
 export type LoggableAsk = Readonly<Z.infer<typeof loggableAsk>>
 
-/** The loggable part of `ask`, or nothing for an ask that will not parse. */
+/** The loggable part of `ask`, or `{}` for an ask that does not parse. */
 export function loggableAskOf(ask: unknown): LoggableAsk {
   const parsed = loggableAsk.safeParse(ask)
   return parsed.success ? parsed.data : {}
