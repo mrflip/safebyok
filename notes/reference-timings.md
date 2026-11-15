@@ -44,7 +44,7 @@ and several have changed since. Each figure is the median of 20 runs, or of 5 fo
   on 2026-11-03, `Proving.attempt` (through `gate.attemptProof`), `makeLease`, `tryPutLease`, `tryGetLease` and
   `tryDelLease`.
 
-## Crossings raised
+## Crossings found
 
 One sentence each. The goal is that nothing crosses a `lock()`, and that we get there with simple code analyzed in
 context, not by fine-tuning each of these.
@@ -71,7 +71,7 @@ called while the new lease is made.
 * A refused stow in `cacheAsCacheCan` does not reject: the verb resolves with the vault unlocked, and the refusal goes to
   `onBadNews`.
 
-## Crossings the sprint's threads raised
+## Crossings the sprint's threads found
 
 Copied from `unrace-progress.md` at the sprint's end. The names are as they were when each was found (`tidy` is now
 `bank.autolock`).

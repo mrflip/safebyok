@@ -32,11 +32,11 @@ const alertText = () => screen.getByRole('alert').textContent
 
 describe("ReplacePassphraseModal", () => {
   it("replaces the passphrase, naming the user and the vault, and the gating concludes", async () => {
-    const { world, raising } = await shownFor()
+    const { world, starting } = await shownFor()
     expect(screen.getByText(Messages.changeTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     await TH.submitReplacement(TH.Passphrase, NextPassphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(await starting).to.include({ ok: true })
     expect(await unlocksWith(world, NextPassphrase)).to.be.true
     expect(await unlocksWith(world, TH.Passphrase)).to.be.false
   })
@@ -93,9 +93,9 @@ describe("ReplacePassphraseModal", () => {
   })
 
   it("dismisses the gating on Cancel", async () => {
-    const { world, raising } = await shownFor()
+    const { world, starting } = await shownFor()
     fireEvent.click(screen.getByText(Messages.cancelButton))
-    expect(await raising).to.include({ ok: false })
+    expect(await starting).to.include({ ok: false })
     expect(await unlocksWith(world, TH.Passphrase)).to.be.true
   })
 })

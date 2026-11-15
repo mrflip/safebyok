@@ -34,7 +34,7 @@ export async function eventually(check: () => boolean): Promise<void> {
 /** A listener for a BankDB's `subscribe`, and a count of how often it was called, kept for a test
  * to look at.
  *
- * @returns `onChange`, to subscribe with; `heard`, whose `count` it raises.
+ * @returns `onChange`, to subscribe with; `heard`, whose `count` it increments.
  */
 export function changeCounter() {
   const heard = { count: 0 }

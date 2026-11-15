@@ -113,7 +113,7 @@ export default defineConfig([
     // removed (context.getFilename). Pin the version until the plugin catches up.
     // As of 2026-10-16 neither plugin has a release that declares eslint 10 support: eslint-plugin-react
     // 7.37.5 allows up to ^9.7 and eslint-plugin-jsx-a11y 6.10.2 up to ^9, so `pnpm peers check`
-    // reports both as unmet. Both work under eslint 10 here. Raise them when either releases.
+    // reports both as unmet. Both work under eslint 10 here. Upgrade them when either releases.
     settings: { react: { version: '19.3' } },
     rules: {
       'react-hooks/exhaustive-deps': 'error',

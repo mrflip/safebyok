@@ -542,7 +542,7 @@ Since the restyle moved the core to classic Zod (#274), small entry points bundl
 handful of checks: the mask entry grew from about 6 to 25 kB brotlied, and fastkey's WASM deriver from 16
 to 35 kB. Inside an app that loads the Bank, Zod is shared and costs nothing more. Using
 `zod/mini` selectively, in those entries alone, could slim them. The Coach (2026-10-26): if it
-raised the standard bundle (an app loading the Bank) overall, it is not worth it.
+enlarged the standard bundle (an app loading the Bank) overall, it is not worth it.
 
 ## The react lifecycle
 

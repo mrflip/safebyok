@@ -36,10 +36,10 @@ const refusingAttempts = (gating: Gating, err: unknown) => TH.attemptsOf(gating)
 
 describe("PasskeyUnlockButton", () => {
   it("unlocks the vault with the passkey the user touches", async () => {
-    const { gating, raising } = await passkeyedUnlock()
+    const { gating, starting } = await passkeyedUnlock()
     buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    expect(await raising).to.include({ ok: true })
+    expect(await starting).to.include({ ok: true })
   })
 
   it("is not there in a browser without WebAuthn, nor for a vault with no passkey", async () => {
@@ -123,14 +123,14 @@ describe("PasskeyUnlockButton", () => {
   })
 
   it("tries a passkey the user touched while an Activity hid it", async () => {
-    const { gating, authenticator, raising } = await passkeyedUnlock()
+    const { gating, authenticator, starting } = await passkeyedUnlock()
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
     const { ui, rerender } = buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    expect(await raising).to.include({ ok: true })
+    expect(await starting).to.include({ ok: true })
   })
 })
 
@@ -143,12 +143,12 @@ const dialogFor = async () => {
 
 describe("PassphraseModal, for a vault with a passkey", () => {
   it("offers the passkey first, with the focus, and closes unlocked when it is used", async () => {
-    const { raising } = await dialogFor()
+    const { starting } = await dialogFor()
     const button = screen.getByText(Messages.passkeyButton)
     expect(document.activeElement).to.equal(button)
     expect(button.compareDocumentPosition(screen.getByPlaceholderText('vault passphrase')) & Node.DOCUMENT_POSITION_FOLLOWING).to.not.equal(0)
     fireEvent.click(button)
-    expect(await raising).to.include({ ok: true })
+    expect(await starting).to.include({ ok: true })
   })
 
   it("accepts no press while a passphrase attempt runs", async () => {

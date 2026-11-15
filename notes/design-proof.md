@@ -567,7 +567,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 
 ## Areas of Concern
 
-Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
+Surprises from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
 
 * **The gating family:** `#concluded`, `#outcome` and their flags. "same family of design smells around gating". See `whiteboard/20261102-newdesign/unrace-gating-prompt.md`.
 * **The cache and the forget on one control path:** `lease.cacheAsCacheCan()` before the align in `bank.#attachLease`, the forget before the first await in `bank.#revokeLease`. "that sounds dangerous".

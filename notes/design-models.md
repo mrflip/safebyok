@@ -372,7 +372,7 @@ The entrypoints, left as they were: they are not yet laid out in the columns abo
 
 ## Areas of Concern
 
-Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
+Surprises from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
 
 * **Reflective installs:** `tattoo`, `adorn`, `decorate`. "only part of that is purposeful".
 * **Fire-and-forget:** one `void` async IIFE and ten `void` calls, on error and notification paths. "invesrigate after sprint not good".
