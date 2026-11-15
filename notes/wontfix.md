@@ -7,6 +7,12 @@ what we decided, and this file for what we decided not to decide.
 Each entry is a heading naming the case, then its current outcome, the alternatives (a line on why each plausible one
 will not work), the workaround, the steps to reproduce it, and the reasoning. Add one at the end, with who ruled and when.
 
+An entry covers the case its heading names, and nothing like it. Rarity alone never earns an entry: what earns one is
+what the fix would cost against the Values, such as a retry or a lock in a primitive's critical path, a new state, or a
+check outside its owner. Each entry's reasoning names that cost. Where a new case meets every reason an entry gives, as
+strictly as the case it names, amend that entry: widen its heading and steps, and say so in your report. Where it meets
+them only in part, and above all where its fix is cheap, it is a defect: fix it, or bring it to a Coach.
+
 ### A birth over a deleted bank refuses `stale` when another device built the bank again first
 
 * current outcome: `tryBirthBank` refuses `stale` and writes nothing. Until a birth cites the bank it found, as big's
