@@ -266,12 +266,21 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       await expectBad(vaultDB.tryWriteThing(ask as never), 'bad_option')
     })
 
-    it("refuses a damaged box as damaged, to a get and to a write", async () => {
+    it("refuses a damaged box as damaged, to a get", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
       await expectBad(vaultDB.tryGetThing(getAskAt(box.labelpath)), 'damaged_row')
-      const ask = replaceAskOf(box, nextOf(box))
-      await expectBad(vaultDB.tryWriteThing(ask), 'damaged_row')
+    })
+
+    // A store that checks only in the statement that writes compares the rows' revisions, not their shapes, so it may
+    // write over a damaged row the write cites exactly. Either way, the box stored after is one that passes its checks.
+    it("refuses a write citing a damaged box as damaged, or replaces it", async () => {
+      const vaultDB = await fresh()
+      await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
+      const next   = nextOf(box)
+      const answer = await vaultDB.tryWriteThing(replaceAskOf(box, next))
+      const outcome = answer.ok ? { act: answer.act, val: answer.val, stored: await gotAt(vaultDB, box.labelpath) } : { refusalkind: answer.err.refusalkind }
+      expect([{ act: 'replaced', val: next, stored: next }, { refusalkind: 'damaged_row' }]).to.deep.include(outcome)
     })
   })
 

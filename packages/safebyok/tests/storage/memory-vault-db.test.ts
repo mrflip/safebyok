@@ -36,6 +36,14 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     })
   }
 
+  it("refuses a write citing a damaged box as damaged: its classifier checks before it writes", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box = TH.boxThingOf()
+    vaultDB._cheat_things(TH.ThingBank).set(box.labelpath, { ...box, whisper_sealed: {} })
+    const ask = TH.replaceAskOf(box, TH.nextOf(box))
+    await TH.expectBad(vaultDB.tryWriteThing(ask), 'damaged_row')
+  })
+
   it("refuses a listed child filed at another scope as a broken store", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
