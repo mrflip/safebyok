@@ -59,7 +59,7 @@ function revseqCmpOf({ cited }: WriteCmpAsk, stored: ThingCited | null): RevseqC
 }
 
 // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
-/** True when a Thing is stored, and the one cited differs from it in its life or its liveness. */
+/** True when a Thing is stored and differs from the cited one in its life or its liveness. */
 function isLifeOff({ cited }: WriteCmpAsk, stored: ThingCited | null): boolean {
   return (stored !== null) && ((stored.lifepath !== cited.lifepath) || (stored.am !== cited.am))
 }
