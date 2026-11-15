@@ -1,7 +1,8 @@
 # Thread 1: vaultdb_battery (2026-11-15)
 
 Branch `20261115-vaultdb_battery`, PR #707 (draft), on main. Proved: `pnpm justify` green after the catch-up
-(safebyok 766 tests, safebyok-postgres 327, the battery on PGlite among them).
+(safebyok 766 tests, safebyok-postgres 327, the battery on PGlite among them); since then the RLS and REVOKE
+commit, proved by the package's lint, typecheck and its vault file (87 tests).
 
 ## Why Postgres redoes the classifier's work
 
@@ -53,6 +54,8 @@ in the SQL's comments, not tested.
   * Tracked is read after a write, beside the world; a born birth's tracked comes from the store, not the classifier
     (the roots are missing before the write).
   * `'gate'` is hard-coded in the SQL, as `safebyok_world` already was.
+  * As the bank layer does, the three tables keep row-level security on with no policy, and the writing functions
+    are revoked from PUBLIC: only the owning role reaches them. `notes/security.md` has the boundary entry.
   * `PostgresVaultDB` is not exported yet; `safebyok` is a devDependency of `safebyok-postgres`, with one
     `eslint-disable-next-line import-x/no-extraneous-dependencies` on its import.
 * **Deviations**:
@@ -69,13 +72,11 @@ in the SQL's comments, not tested.
   * **A write over a damaged box it cites exactly**: Postgres replaces it, since the writing statement compares
     revisions, not shapes; memory refuses `damaged_row`, since its classifier checks before it writes. The battery
     accepts either, and each store's own file pins its outcome. A get refuses the damaged row in both.
-  * A tracked write can notify a Thing twice, the store's own notice and the tracked one; the watch cases accept
-    duplicates.
+  * A tracked write can notify a Thing twice; the watch cases accept duplicates.
   * `safebyok-postgres`'s tests run against `safebyok`'s **built** dist: build it first, or use the package's
     `test` script, which builds dependencies.
 * **For the Coach**:
   * The wontfix entry the pointer comments name lives on `20261113-crypt_plan` (b3f16776b), not on main or here.
-  * Whether a box birth should check that its parent is live; nothing does now, and the plan says nothing brings a
-    parent to life.
+  * Whether a box birth should check that its parent is live; nothing does now.
   * The world a write answers is read just after the write, in the same transaction but a later statement, so under
     READ COMMITTED another writer's commit may land between.
