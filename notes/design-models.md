@@ -27,7 +27,7 @@ Removed from the interface, and so absent from every table: every `cleartexts` p
 * ⚠️ ok=expected:
 * 👌 ok=success (general)
 * 📗 ok=read
-* 👍 ok=modified: modification was successfully transactionally applied, no changes since last update
+* 👍 ok=modified: modification was successfully committed, no changes since last update
 * 💸 decrypted: whisper is authenticated against the bankKey of the bank's lease, the boxKey, the bank, vault and box stamps, and its non-sidecar metadata
 * 🫆 encrypted: whisper cannot be decrypted without the device, and is prohibitively difficult to decrypt even with it.
 * 🛵 sidecar:

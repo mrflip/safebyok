@@ -55,7 +55,7 @@ The shell row stands for a void, and a request over a void cites it as the expec
 
 Revision tokens are minted fresh at every write, delete included: a `revision_tok` names one exact row version. Life tokens (`vault_tok`, `box_tok`) change when the row is created and when it is deleted. If the expected and proposed revision tokens are the same, the request refuses `bad_record`. The proposed revision travels unencrypted as well as sealed, so that it can be stored and compared.
 
-The proposed revision is checked first: if the proposed *next* revision token matches the one already stored, as if the modification were already applied, the act is `retcon` (below). Otherwise the expected revision is compared with the stored one, and the same comparison runs at both levels:
+The proposed revision is checked first: if the proposed *next* revision token matches the one already stored, as if the modification were already committed, the act is `retcon` (below). Otherwise the expected revision is compared with the stored one, and the same comparison runs at both levels:
 
 | Expected seq vs stored seq | Expected Token eq       | Expected Token neq  |
 | -------------------------- | ----------------------- | ------------------- |
