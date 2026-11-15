@@ -6,7 +6,7 @@ import { thingRecord } from '../storage/shapes-thing'
 
 // == [The bank's stamps]: bankScope, bankStamp, stampedGate, BankScope, BankStamp, StampedGate
 
-/** The checks of a bank's scope and stamp, and of a gate as a stored wayin's proving takes it.
+/** The checks of a bank's scope and stamp, and of a gate as a stored wayin's proving accepts it.
  * Anything carrying a stamp's fields passes, such as a Bank or its Thing, and the rest is dropped.
  */
 export const { bankScope, bankStamp, stampedGate } = Validator.Checkers('bad_option', ({ obj }) => {
@@ -22,7 +22,7 @@ export const { bankScope, bankStamp, stampedGate } = Validator.Checkers('bad_opt
 export type BankScope   = Z.infer<typeof bankScope>
 /** A bank's stamp: its scope, and the lifeseq and `born_at` of its life. Every ctx under the bank binds it first. */
 export type BankStamp   = Z.infer<typeof bankStamp>
-/** A gate as a stored wayin's proving takes it: its bank's stamp, its own stamp, and its wayins. */
+/** A gate as a stored wayin's proving accepts it: its bank's stamp, its own stamp, and its wayins. */
 export type StampedGate = Z.infer<typeof stampedGate>
 // --
 

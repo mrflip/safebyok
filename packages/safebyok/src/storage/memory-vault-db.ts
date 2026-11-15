@@ -34,7 +34,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return things
   }
 
-  /** Store `record` at `scope`, and return it as read back, checked. */
+  /** Write `record` at `scope`, and return it as read back, checked. */
   #write(scope: ThingScope, record: Thing): Thing {
     const things = this.#thingsOf(scope)
     things.set(scope.labelpath, structuredClone(record))

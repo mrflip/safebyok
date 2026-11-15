@@ -140,7 +140,7 @@ export function stubBankPut(answer: (bank: Bank) => Promise<Bank> = (bank) => Pr
 /** An obvious fake whisper, never a real one. */
 export const Whisper = Object.freeze({ apiKey: 'sk-test-0000' })
 
-/** What a box's first seal starts from: the shell's Thing fields, with the sidecar to store. */
+/** What a box's first seal starts from: the shell's Thing fields, with the sidecar to put. */
 export type BoxShell = BoxSparse & Pick<BoxRecord, 'sidecar'>
 
 /** The shell of the box `anthropic_api_key` in {@link WorldScope}'s bank, under life 0 of the root box, with a sidecar, as `overrides` changes it.

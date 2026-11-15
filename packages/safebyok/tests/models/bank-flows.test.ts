@@ -6,7 +6,7 @@ import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-/** The labelpath of the box the flows store. */
+/** The labelpath of the box the flows put. */
 const Openai = 'box/openai'
 
 /** A {@link TH.buildBornBank} bank, unlocked, whose bank, main gate and root box are born in its device's MemoryVaultDB. */
@@ -24,7 +24,7 @@ async function priorOf(bank: Bank): Promise<BoxThing | BoxShell> {
   return got.val
 }
 
-/** Unseal what `bank` has stored at {@link Openai}, a box or a tombstone. */
+/** Unseal what `bank` has put at {@link Openai}, a box or a tombstone. */
 async function unsealedAt(bank: Bank): Promise<BoxUnsealed> {
   const got = await bank.tryGetBox({ labelpath: Openai })
   if (! got.ok || got.val === null) { throw new Error('nothing stored') }
@@ -43,7 +43,7 @@ async function bumpApicalls(bank: Bank): Promise<BoxRecord> {
 }
 
 describe("the box flows, through a bank and its MemoryVaultDB", () => {
-  it("lists no boxes under the root box the bank holds, before any is put", async () => {
+  it("lists no boxes under the bank's root box, before any is put", async () => {
     const bank = await storedBank()
     const listed = await bank.tryListBoxes()
     expect(listed).to.include({ ok: true, act: 'gotlive' })

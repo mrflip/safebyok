@@ -39,7 +39,7 @@ export class Gate implements GX.GateStamp {
   /** The token of this gate's life. No gate verb changes it. */
   declare readonly gate_tok:      string
   declare readonly registered_at: number
-  // The gate is still big's row, whose `bank_tok` now holds its bank's lifeseq, until the gate moves onto its Thing.
+  // The gate is still big's row, whose `bank_tok` now has its bank's lifeseq, until the gate moves onto its Thing.
   /** The lifeseq of the life of its bank this gate belongs to. */
   declare readonly bank_tok:      string
 

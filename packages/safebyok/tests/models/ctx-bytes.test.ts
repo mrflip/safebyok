@@ -27,13 +27,13 @@ const LeaseStampFields = ['fmt', ...BankStampFields, 'gatelabel', 'gate_tok', 'g
 const BoxStampFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'] as const
 const SealTagFields = ['codectag', 'schematag'] as const
 
-/** The JSON text of a box's tags, as each ctx of its seal holds them last. */
+/** The JSON text of a box's tags, as each ctx of its seal ends with them. */
 const BoxTagsText = '{"codectag":"json_v1","schematag":"whisper_v1"}'
 
 /** What a bankKey is unwrapped as only to see that a wrap unwraps. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 /** What a part key is unwrapped as. */
-const DecryptUsage = { extractable: false, usage: ['decrypt'] } as const
+const DecipherUsage = { extractable: false, usage: ['decrypt'] } as const
 
 /** `val` changed, keeping its type: a number one more, a string with a letter added. */
 function changed(val: unknown): unknown { return ((typeof val === 'number') ? val + 1 : `${String(val)}x`) }
@@ -155,8 +155,8 @@ describe("each ctx binds every field of its stamps", () => {
   it("keeps a box shut under no tags", async () => {
     const { box, boxStamp, bankKey } = await sealedWorld()
     const { key_wrapped } = box.whisper_sealed
-    await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped'), DecryptUsage)).rejects.toThrow()
-    await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped', BoxWhisper.tags), DecryptUsage)).resolves.toBeInstanceOf(CryptoKey)
+    await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped'), DecipherUsage)).rejects.toThrow()
+    await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped', BoxWhisper.tags), DecipherUsage)).resolves.toBeInstanceOf(CryptoKey)
   })
 
   for (const fieldname of BankStampFields) {

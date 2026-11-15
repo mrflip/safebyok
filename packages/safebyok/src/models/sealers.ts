@@ -19,12 +19,12 @@ export interface SealPurposes {
   cipher: string
 }
 
-/** `RecordT` with each part `CleartextsT` names sealed, at `<part>_sealed`. A union is taken member by member. */
+/** `RecordT` with each part `CleartextsT` names sealed, at `<part>_sealed`. A union is mapped member by member. */
 export type SealedOf<RecordT, CleartextsT> = RecordT extends unknown
   ? Omit<RecordT, keyof CleartextsT> & { readonly [PartT in keyof CleartextsT & string as `${PartT}_sealed`]: Sealed }
   : never
 
-/** `RecordT` with each `<part>_sealed` that `CleartextsT` names unsealed, at `<part>`. A union is taken member by member. */
+/** `RecordT` with each `<part>_sealed` that `CleartextsT` names unsealed, at `<part>`. A union is mapped member by member. */
 export type UnsealedOf<RecordT, CleartextsT> = RecordT extends unknown
   ? Omit<RecordT, `${keyof CleartextsT & string}_sealed`> & CleartextsT
   : never
