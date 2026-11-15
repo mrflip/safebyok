@@ -126,9 +126,9 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   stay in-process so `pnpm justify` needs no Docker.
 * **A schema snapshot test for `format`.** Ruled 2026-10-16
   ([#115](https://github.com/mrflip/safebyok/pull/115)): any change to what a stored record may
-  contain -- a field, a shape, or a range a check accepts -- bumps `format`. A test renders each
+  contain -- a field, a shape, or a range a check accepts -- increments `format`. A test renders each
   stored schema with Zod's own `toJSONSchema`, keyed by its `format` literal, and fails with
-  "bump `format`" when a schema changes under the same literal, so a loosened check (`.min(1)`
+  "increment `format`" when a schema changes under the same literal, so a loosened check (`.min(1)`
   to `.min(0)`) cannot ship unmarked.
 
 * **`ShelfBankDB`, a base for key-value databases.** Declined for the store-base sprint, ruled
@@ -242,7 +242,7 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 epoch was one below the vault props'. `trust_lines` (2026-10-21) removed `vault_key_epoch` from every record, and
 storage's comparison of a box's epoch against the vault props', on the Coach's ruling: the bankKey
 never changes until rotation is built, a vault made anew has a new `vault_tok`, which already
-voids every box, and a bank built anew has a new bankKey. Rotation adds an epoch back, with its own format bump, when it is built.
+voids every box, and a bank built anew has a new bankKey. Rotation adds an epoch back, with its own format increment, when it is built.
 
 ### "tombstone vaults; decide if the vault_tok is a check -- the labels are meant to be the primary key"
 

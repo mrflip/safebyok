@@ -51,7 +51,7 @@ export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, 
 
   let session: Session | null = getSession()
   const listeners = new Set<() => void>()
-  const bump = () => { listeners.forEach((listener) => { listener() }) }
+  const notify = () => { listeners.forEach((listener) => { listener() }) }
 
   function getSession(): Session | null {
     const text = deviceStorage.get(sessionCkey)
@@ -84,14 +84,14 @@ export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, 
       if (existing === null) { dbStorage.put(ckey, JSON.stringify(account)) }
       session = { user_id: account.user_id, userlabel: account.userlabel }
       deviceStorage.put(sessionCkey, JSON.stringify(session))
-      bump()
+      notify()
       return Promise.resolve(session)
     },
 
     signOut: () => {
       session = null
       deviceStorage.del(sessionCkey)
-      bump()
+      notify()
     },
 
     deleteAccount: () => {
@@ -99,7 +99,7 @@ export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, 
       dbStorage.del(accountCkey(session.userlabel))
       session = null
       deviceStorage.del(sessionCkey)
-      bump()
+      notify()
       return Promise.resolve()
     },
   }
