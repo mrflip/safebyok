@@ -1,7 +1,7 @@
 # Thread 1: box_store (2026-11-15)
 
-Branch `20261115-box_store`, PR [#701](https://github.com/mrflip/safebyok/pull/701), base `main` (the box_ops plan commits ride in it). Proved: in
-`packages/safebyok`, vitest 607 passed, `tsc --noEmit` clean, eslint clean; `pnpm justify` at ready.
+Branch `20261115-box_store`, PR [#701](https://github.com/mrflip/safebyok/pull/701), base `main` (the box_ops plan commits ride in it). Proved: `pnpm justify`
+green after the catch-up (lint, typecheck, build; tests 5,839 passed, 607 of them in `safebyok`).
 
 * **Built** (`packages/safebyok/src/storage/`, design-boxops.md *Building it* item 1):
   * Roots: the bank at `bank`, the main gate at `gate`, the root box at `box`; further gates at
