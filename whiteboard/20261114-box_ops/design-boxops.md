@@ -367,6 +367,11 @@ delete  const record  = await bank.tombstoneBox(prior)
 8. **The bank's stamp binds its lifeseq, not a random `bank_tok`.** Each life of a bank has a new bankKey, so a wrap
    from an earlier life opens only to that life's key. What the random token added: a wrap never opens in another life,
    even where storage loses the bank row and a bank is born again at the same lifeseq. In TODO.md.
+9. **A birth's `passed` does not check that the gate and root box are of the bank's life.** Big's build checked the gate
+   row's `bank_tok` against the bank's. A root's lifepath carries none of the bank's lifeseq, so the check cannot be
+   written here.
+10. **A main gate or root box stored with no bank refuses the birth.** Big wrote a new gate over one unchecked. Here
+    each root is a put citing the shell, and the put table refuses it, so someone has to mend the store by hand.
 
 ## Guarantees abandoned
 
