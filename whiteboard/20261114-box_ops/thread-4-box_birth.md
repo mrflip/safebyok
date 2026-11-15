@@ -14,8 +14,8 @@ orchestrator. Proved: `safebyok` typecheck, lint and test, 680 tests green after
     `{ userid, banklabel, labelpath, lifeseq, born_at }` (`stamps.ts`, with `citedGate`).
   * `Bank extends BaseThing`. `bank.put(args)` builds its ask with `putAsk` and calls `tryWriteThing`, checking
     `device.endCause` first.
-  * Birth: `Bank.makeUnborn(record, opts)` returns `{ bank, friend }`. The gating attempt calls `friend.tryBirth(proved)`.
-    `#tryBirth`:
+  * Birth: the gating attempt calls `Bank.birth(record, { device, vaultDB, proving })`, which makes the bank, calls its
+    private `#tryBirth`, and throws a refusal, or `gate_made_elsewhere` where the stored bank is another's. `#tryBirth`:
     1. builds the lease;
     2. seals the root box's first revision (an empty whisper) over the shell that `Bank.makeRecord` now gives;
     3. calls `vaultDB.tryBirthBank` once.
@@ -46,8 +46,8 @@ orchestrator. Proved: `safebyok` typecheck, lint and test, 680 tests green after
   * **"Null where empty"** is read as: `wayins.passkey0` is required and nullable, in records and in the birth ask.
   * **Ruling 1's wreckage goes in `rows.dbhas`, not `meta`.** `RefusalMeta` is closed and big is frozen, and a gate row
     has wrapped bankKeys, which `rows` (non-enumerable) keeps out of logs. `meta` carries `ask` and `act`.
-  * **The friend is a frozen bag** with the one callback `tryBirth`, handed out beside the bank by `makeUnborn`. `Bank.make`
-    stays plain.
+  * **`Bank.birth` replaced `makeUnborn` and its friend bag**, at the Coach's review: a friend is handed down into `make`,
+    never out of a factory. `Bank.make` stays plain.
   * **The passkey answer cannot be reused:** `device.test`'s `gate_made_elsewhere` case pre-births with
     `TH.buildBornBank({ device })`, because a dialog's passkey answer is spent once.
 
@@ -70,6 +70,5 @@ orchestrator. Proved: `safebyok` typecheck, lint and test, 680 tests green after
   * `wayinCtxOf` lives in `wayin.ts`, not `proving.ts`.
 
 * **For the Coach**
-  * **The friend bag's shape** (`makeUnborn` → `{ bank, friend }`). Recommendation: keep it.
-  * **`rows` over `meta` for ruling 1.** Recommendation: keep it; widening `RefusalMeta` means touching frozen big.
-  * **A lost birth answer is refused, not passed**, as above. Recommendation: a row; no change in this thread.
+  * **`rows` over `meta` for ruling 1.** Ruled: `rows` is fine.
+  * **A lost birth answer is refused, not passed**, as above. Ruled correct; no change.
