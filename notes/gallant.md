@@ -19,7 +19,7 @@ Contents:
 
 * **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`, `#lede-first`
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#chain-guards`, `#no-second-ensure`
-* **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-crash`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
+* **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-broken-system`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`, `#callee-parses`
 * **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`, `#record-then-opts`, `#stamp-is-a-getter`
 * **Words:** `#purpose-not-path`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`, `#a-helper-gets-a-phrase`, `#its-name-is-its-doc`
@@ -510,12 +510,14 @@ passphrase dialog and a KDF that could only fail.
 
 *Status: Fixed.*
 
-## The impossible is one line `#impossible-is-a-crash`
+## The impossible is one line `#impossible-is-a-broken-system`
 
-A branch the types force and only a broken system reaches is one line: `throw`. If it wants a second line, stop and flag it.
-Never `!` or a cast, which is what a host's own bankDB adapter gets to crash through. No row, no FIXME, and no reviewer asking
-for more. What makes this safe is failing closed before anything changes, not proving the branch never runs. The test: if you
-can name a *correct* system that reaches the state, it isn't this case.
+A branch the types force and only a broken system reaches pulls the fire alarm in one line: `unexpected_error`, never a
+refusal a caller might recover from. Don't dig into the records to explain it. A method that answers rather than throws, a
+`try` method, returns it as the answer's err; any other method throws it. If it wants a second line, stop and flag it. Never
+`!` or a cast, which is what a host's own adapter gets to crash through. No row, no FIXME, and no reviewer asking for more.
+What makes this safe is failing closed before anything changes, not proving the branch never runs. The test: if you can name
+a *correct* system that reaches the state, it isn't this case.
 
 **Goofus:** `putDraft` exists to narrow `ThingT | null`, with a refusal that claims nothing is stored.
 
