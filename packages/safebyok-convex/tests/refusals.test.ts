@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { refusalkindVals } from 'safebyok-big/storage'
-import { safebyokErrorKindVals, isSafebyokErrorData } from '../src/refusals'
+import { safebyokErrorKindVals, isSafebyokRefusal } from '../src/refusals'
 
-const ErrorDataCases = [
+const RefusalCases = [
   [{ kind: "identity_revoked" },                     true,   'an identity_revoked refusal'],
   [{ kind: "identity_revoked", message: "Sign in" }, true,   'an identity_revoked refusal carrying more than its kind'],
   [{ kind: "bad_record", message: "Not next." },     true,   "a refusal of the core's checks, with its sentence"],
@@ -16,9 +16,9 @@ const ErrorDataCases = [
   [undefined,                                        false,  'nothing at all'],
 ] as const
 
-describe("isSafebyokErrorData", () => {
-  for (const [val, expected, blurb] of ErrorDataCases) {
-    it(`answers ${String(expected)} for ${blurb}`, () => { expect(isSafebyokErrorData(val)).to.eq(expected) })
+describe("isSafebyokRefusal", () => {
+  for (const [val, expected, blurb] of RefusalCases) {
+    it(`answers ${String(expected)} for ${blurb}`, () => { expect(isSafebyokRefusal(val)).to.eq(expected) })
   }
 })
 

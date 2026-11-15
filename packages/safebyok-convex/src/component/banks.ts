@@ -6,7 +6,7 @@ import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, TableNames } from './_generated/dataModel'
 import { sentenceKindVals } from '../refusals'
-import type { SafebyokErrorData } from '../refusals'
+import type { SafebyokRefusal } from '../refusals'
 import * as Tallies from './tallies'
 import type { BoxDocGiven, Budget, Life } from './tallies'
 import * as CVX from './validators'
@@ -301,7 +301,7 @@ function crossingOf(thrown: unknown): unknown {
   if (! DB.isVaultError(thrown)) { return thrown }
   const { refusalkind: kind, message } = thrown
   const sentenceKind = sentenceKindVals.find((crossed) => crossed === kind)
-  return (sentenceKind === undefined) ? thrown : new ConvexError<SafebyokErrorData>({ kind: sentenceKind, message })
+  return (sentenceKind === undefined) ? thrown : new ConvexError<SafebyokRefusal>({ kind: sentenceKind, message })
 }
 
 // `replaced` means a live gate row was found, so `stored.gate` is set.

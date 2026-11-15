@@ -2,7 +2,7 @@ import { anyApi, defineSchema } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import { convexTest, defineTestApp } from 'convex-test'
 import { SafebyokBankComponent } from '../src/server'
-import type { GetUserId, SafebyokBankApi, SafebyokErrorData } from '../src/server'
+import type { GetUserId, SafebyokBankApi, SafebyokRefusal } from '../src/server'
 import { modules, register, schema } from '../src/test'
 
 // Re-export the core's test helpers, so a test here can star-import this one module as TH.
@@ -30,11 +30,11 @@ export function bankHostWith(getUserId: GetUserId) {
 }
 
 /** Return the `data` of the ConvexError that `operation` rejects with. Fails the test if `operation` resolves. */
-export async function convexRefusalOf(operation: Promise<unknown>): Promise<SafebyokErrorData> {
+export async function convexRefusalOf(operation: Promise<unknown>): Promise<SafebyokRefusal> {
   try {
     await operation
   } catch (err) {
-    if (err instanceof ConvexError) { return err.data as SafebyokErrorData }
+    if (err instanceof ConvexError) { return err.data as SafebyokRefusal }
     throw err
   }
   throw new Error('the call was not refused')
