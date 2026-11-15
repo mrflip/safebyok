@@ -1,11 +1,10 @@
-/** The device: its options, the host's functions it wraps, its sweep, and the birth of its bank through a gating, over a stubbed `bank.put`. */
+/** The device: its options, the host's functions it wraps, its sweep, and the birth of its bank through a gating, over its MemoryVaultDB. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { DefaultLeaseMillis, Device, guardRequestCleartext } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
-import { PutNotBuilt } from '../../src/phrases'
 import * as TH from '../test-helpers'
 
 /** A host's dialog that types `passphrases` into the gating it is shown, one attempt each, until one lands, keeping each outcome. */
@@ -199,7 +198,6 @@ describe("device.sweep()", () => {
   })
 
   it("lets an attempt under way finish as the gating's last, and no bank unlocks on the swept device", async () => {
-    TH.stubBankPut()
     const latch = TH.makeLatch()
     const keyDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => {
       await latch.pass()
@@ -227,7 +225,6 @@ describe("device.sweep()", () => {
 
 describe("device.birthBankPrompt()", () => {
   it("resolves an unlocked bank whose main gate has the wayins the dialog's attempt typed, and zeroes the passkey answer", async () => {
-    TH.stubBankPut()
     const dialog = typingDialog(TH.TestPassphrase)
     const device = TH.makeDevice({}, { requestCleartext: dialog.requestCleartext })
     const bank = await device.birthBankPrompt()
@@ -242,63 +239,55 @@ describe("device.birthBankPrompt()", () => {
     expect(whisper).to.deep.equal(TH.Whisper)
   })
 
-  it("puts the bank, refusing a live one at its scope, before it unlocks", async () => {
-    const put = TH.stubBankPut()
+  it("births the bank in its vaultDB before it unlocks", async () => {
     const device = TH.makeDevice({}, { requestCleartext: typingDialog(TH.TestPassphrase).requestCleartext })
+    const births = TH.spyBirths(device)
     const bank = await device.birthBankPrompt()
-    expect(put.spy).toHaveBeenCalledExactlyOnceWith({ ifPresent: 'fail' })
-    expect(put.banks).to.deep.equal([bank])
-    expect(put.lockedAtPuts).to.deep.equal([true])
+    expect(births.tryBirthBank).toHaveBeenCalledOnce()
+    expect(births.banks).to.deep.equal([bank])
+    expect(births.lockedAtBirths).to.deep.equal([true])
   })
 
   it("concludes the gating with a refusal when a live bank is stored at its scope, leaving no lease", async () => {
-    const put = TH.stubBankPut(() => Promise.reject(new Errors.VaultError('camped', 'a bank is stored here')))
     const dialog = typingDialog(TH.TestPassphrase)
     const device = TH.makeDevice({}, { requestCleartext: dialog.requestCleartext })
+    await TH.buildBornBank({ device })
+    const births = TH.spyBirths(device)
     const err = await TH.expectRefusal(device.birthBankPrompt(), 'gate_made_elsewhere')
     expect(err.message).to.match(/another device/)
     expect(dialog.outcomes).to.have.lengthOf(1)
     await TH.expectBad(dialog.outcomes[0] as never, 'gate_made_elsewhere')
-    expect(put.banks[0]!.isLocked).to.be.true
+    expect(births.banks[0]!.isLocked).to.be.true
     expect(device.openGating).to.be.null
   })
 
-  it("concludes the gating with any other refusal of the put, as it came", async () => {
+  it("concludes the gating with any refusal of the vaultDB, as it came", async () => {
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
-    const put = TH.stubBankPut(() => Promise.reject(refusal))
     const device = TH.makeDevice({}, { requestCleartext: typingDialog(TH.TestPassphrase).requestCleartext })
+    const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
     expect(await TH.expectRefusal(device.birthBankPrompt(), 'storage_unavailable')).to.eq(refusal)
-    expect(put.banks[0]!.isLocked).to.be.true
-  })
-
-  it("concludes the gating with the put's refusal in this layer, which puts nothing", async () => {
-    const dialog = typingDialog(TH.TestPassphrase)
-    const device = TH.makeDevice({}, { requestCleartext: dialog.requestCleartext })
-    const err = await TH.expectRefusal(device.birthBankPrompt(), 'unexpected_error')
-    expect(err.message).to.eq(PutNotBuilt)
-    expect(dialog.outcomes).to.have.lengthOf(1)
+    expect(births.banks[0]!.isLocked).to.be.true
   })
 
   it("stays open after a weak passphrase, its passkey answer unspent, and the next attempt lands", async () => {
-    const put = TH.stubBankPut()
     const dialog = typingDialog('weak', TH.TestPassphrase)
     const device = TH.makeDevice({}, { strengthChecker, requestCleartext: dialog.requestCleartext })
+    const births = TH.spyBirths(device)
     const bank = await device.birthBankPrompt()
     await TH.expectBad(dialog.outcomes[0] as never, 'weak_passphrase')
     expect(TH.isZeroed(dialog.passkeyClears[0]!.prfBytes)).to.be.false
     expect(bank.isUnlocked).to.be.true
-    expect(put.spy).toHaveBeenCalledTimes(1)
+    expect(births.tryBirthBank).toHaveBeenCalledTimes(1)
   })
 
   it("concludes 'dismissed' when the dialog closes after weak passphrases alone", async () => {
-    const put = TH.stubBankPut()
     const device = TH.makeDevice({}, { strengthChecker, requestCleartext: typingDialog('weak', 'weak').requestCleartext })
+    const births = TH.spyBirths(device)
     await TH.expectRefusal(device.birthBankPrompt(), 'dismissed')
-    expect(put.spy).not.toHaveBeenCalled()
+    expect(births.tryBirthBank).not.toHaveBeenCalled()
   })
 
   it("waits, with no host dialog, for an attempt on the device's open gating", async () => {
-    TH.stubBankPut()
     const device = TH.makeDevice()
     const prompting = device.birthBankPrompt()
     const gating = device.openGating!

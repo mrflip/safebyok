@@ -95,7 +95,7 @@ function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
 }
 
 /** The checks of a Thing's fields, and of each kind as a Thing, as proposed and as cited. */
-export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
+export const { thingScope, thingCited, thingRecord, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
@@ -122,6 +122,8 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
     /** The tag for the schema of the cleartext. */
     schematag:      label,
   }).strict()
+  // A record has no optional part: a gate with no passkey has `passkey0: null`.
+  const wayins       = obj({ main: BX.wayins.shape.main, passkey0: BX.wayins.shape.passkey0.unwrap().nullable() }).strict()
 
   // A stored record is strict: a field this version does not know is damage, or a newer format.
   const bankBase     = obj({
@@ -134,7 +136,7 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
     ...thingRecord.shape,
     labelpath:      labelpath.refine((given) => isLabelpathOfKind(given, 'gate'), Phrases.LabelpathOfOtherKind),
     fmt:            lit(GateThingFormat),
-    wayins:         BX.wayins,
+    wayins,
     /** Reserved: always empty, and read by nothing. */
     auth:           emptyBag,
     /** Reserved: always empty, and read by nothing. */
@@ -196,7 +198,7 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
     .refine(isShellWhole,   Phrases.SparseHalfShell)
-  return { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse }
+  return { thingScope, thingCited, thingRecord, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse }
 })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
@@ -215,6 +217,8 @@ export type BoxThing     = Readonly<Z.infer<typeof boxThing>>
 export type Thing        = BankThing | GateThing | BoxThing
 /** One sealed part of a record, at `<part>_sealed`: a fresh key wrapped under the bankKey, the cleartext ciphered under that key, and the tags its unseal reads. */
 export type Sealed       = Readonly<Z.infer<typeof sealed>>
+/** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin or null for none. */
+export type Wayins       = Readonly<Z.infer<typeof wayins>>
 /** A box's Thing fields, without its body: live, a tombstone, or the shell. */
 export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
 

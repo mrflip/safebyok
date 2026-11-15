@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { Errors } from 'safebyok-big/internals'
 import type { Bank, BoxShell, BoxUnsealed } from '../../src/models/bank'
 import type { BoxRecord } from '../../src/models/sealers'
 import { type BoxThing, ShellLifeseq, lifeseqOf } from '../../src/storage/shapes-thing'
@@ -11,9 +12,7 @@ const Openai = 'box/openai'
 
 /** A {@link TH.buildBornBank} bank, unlocked, whose bank, main gate and root box are born in its device's MemoryVaultDB. */
 async function storedBank(): Promise<Bank> {
-  const { bank, record: { maingate: _maingate, rootBox, ...bankThing } } = await TH.buildBornBank()
-  const birth = await bank.device.vaultDB.tryBirthBank({ ...bank.scope, op: 'birth', bank: bankThing, gate: TH.gateThingOf(), root: TH.rootBoxOf(rootBox) })
-  expect(birth).to.include({ ok: true, act: 'born' })
+  const { bank } = await TH.buildBornBank()
   return bank
 }
 
@@ -97,7 +96,7 @@ describe("the bank's box methods refuse, never throwing", () => {
     bank.device.sweep()
     const answer = await bank.tryPutBox({ cited: prior, record })
     await TH.expectBad(answer, 'disabled')
-    expect(answer).to.include({ dbhas: null })
+    expect(answer).to.include({ dbhas: null, err: bank.device.endCause })
     const got = await bank.device.vaultDB.tryGetThing(bank.device.vaultDB.getAsk({ ...bank.scope, labelpath: Openai }))
     expect(got).to.include({ ok: true, val: null })
   })
@@ -112,6 +111,29 @@ describe("the bank's box methods refuse, never throwing", () => {
     const bank = await storedBank()
     const got = await bank.tryGetBox({ labelpath: 'gate' })
     expect(got.ok).to.equal(false)
+  })
+
+  it("tryGetBox answers each of its refusals on a disabled device with the device's one refusal", async () => {
+    const bank = await storedBank()
+    bank.device.sweep()
+    const one = await bank.tryGetBox({ labelpath: Openai })
+    const two = await bank.tryListBoxes()
+    expect(one.ok || one.err).to.equal(bank.device.endCause)
+    expect(two.ok || two.err).to.equal(bank.device.endCause)
+  })
+
+  // A vaultDB that answers a gate to a box's get is broken: its row reaches the refusal's rows, never its message or meta.
+  it("tryGetBox refuses a row the vaultDB answers that is not a box, as a storage issue", async () => {
+    const bank = await storedBank()
+    const { vaultDB } = bank.device
+    const gate = TH.gateThingOf()
+    vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve({ ok: true, ask, act: 'gotlive', world: null, val: gate }))
+    const got = await bank.tryGetBox({ labelpath: Openai })
+    expect(got).to.include({ ok: false, act: 'unclassified_storing', dbhas: null })
+    if (got.ok) { return }
+    expect(got.err.refusalkind).to.eq('storage_issue')
+    expect(Errors.rowsOfRefusal(got.err).dbhas).to.equal(gate)
+    expect(JSON.stringify(got.err)).to.not.include('ciphertext_b64')
   })
 
   it("tryPutBox refuses a record of another bank, and writes nothing", async () => {

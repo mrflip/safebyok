@@ -1,5 +1,5 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
- * a bank born unlocked, a stub of the `bank.put` seam, a box's shell, a fake of the bank a lease hears, and the loudly named
+ * a bank born unlocked, a spy on births, a box's shell, a fake of the bank a lease hears, and the loudly named
  * backdoors that unwrap a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
@@ -16,10 +16,12 @@ import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/dev
 import { Lease, type LeaseBank } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { BoxRecord, BoxSparse } from '../../src/models/sealers'
-import type { BankStamp, LeaseRecord } from '../../src/models/stamps'
+import type { BankStamp, CitedGate, GateStamp, LeaseRecord } from '../../src/models/stamps'
 import { BoxThingFormat, ShellLifeseq, lifeseqOf } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import type { BirthBankAsk } from '../../src/storage/shapes-thing'
+import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
 
 // == [Time]: T0, useFakeClock
 
@@ -41,11 +43,11 @@ export const WorldScope = Object.freeze({ user_id: 'u1', banklabel: 'acme' })
 /** The stamp of the bank every builder here makes things in: its first life, born at {@link T0}. */
 export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user_id, banklabel: WorldScope.banklabel, lifeseq: lifeseqOf(0), born_at: T0 })
 
-/** The stamp of {@link WorldBankStamp}'s `main` gate, registered at {@link T0}. */
-export const WorldGateStamp: GX.GateStamp = Object.freeze({ ...WorldScope, gatelabel: 'main', gate_tok: 'gate-tok-u1', registered_at: T0 })
+/** The stamp of {@link WorldBankStamp}'s main gate: its first life, born at {@link T0}. */
+export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
 
 /** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at a revision of its own. */
-export const WorldGate: GX.CitedGate = Object.freeze({ gatelabel: 'main', gate_tok: WorldGateStamp.gate_tok, revision_tok: 'gate-revision-tok-1' })
+export const WorldGate: CitedGate = Object.freeze({ ...WorldGateStamp, revtok: 'gate-revision-tok-1' })
 // --
 
 // == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, makeDevice, passkeyAnswerOf
@@ -100,38 +102,46 @@ export interface BornBank {
   proving: PassphraseProving
 }
 
-/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, made as a birth makes it, and unlocked by its passphrase's proving. Nothing is put. */
+/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB as a birth makes it, and so unlocked by its passphrase's proving. */
 export async function buildBornBank({ passkeyClear, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
   const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, device)
   const passkeyProving = passkeyClear && await PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, passkeyClear, device)
   const main = await proving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(proving) ?? null
   const record = Bank.makeRecord({ ...WorldBankStamp, maingate: { ...WorldGateStamp, wayins: { main, passkey0 } } })
-  const bank = Bank.make(record, { device, vaultDB: device.vaultDB })
-  await bank.unlockByProving(proving)
+  const { bank, friend } = Bank.makeUnborn(record, { device, vaultDB: device.vaultDB })
+  const born = await friend.tryBirth(proving)
+  if (! born.ok) { throw born.err }
   return { device, bank, record, proving }
 }
 // --
 
-// == [The put seam]: BankPutStub, stubBankPut
+// == [Births]: BirthSpy, spyBirths
 
-/** A spy on `Bank.prototype.put`, beside each bank it was called on and whether that bank was locked then, in call order. */
-export interface BankPutStub {
-  spy:          MockInstance<Bank['put']>
-  banks:        Bank[]
-  lockedAtPuts: boolean[]
+/** What {@link spyBirths} saw, in call order: each bank `Bank.makeUnborn` made, and whether the bank was locked as its birth reached the vaultDB. */
+export interface BirthSpy {
+  banks:          Bank[]
+  tryBirthBank:   MockInstance<VaultDB['tryBirthBank']>
+  lockedAtBirths: boolean[]
 }
 
-/** Stub `bank.put`, the seam the layer above fills, to answer each put by `answer`: by default, as stored. Vitest restores it before the next test. */
-export function stubBankPut(answer: (bank: Bank) => Promise<Bank> = (bank) => Promise.resolve(bank)): BankPutStub {
+/** Spy on each birth on `device`: the banks made unborn, and the device's vaultDB's `tryBirthBank`, which `answer` answers in its place where given. Vitest restores both before the next test. */
+export function spyBirths(device: Device, answer?: (ask: BirthBankAsk) => Promise<BirthBankAnswer>): BirthSpy {
   const banks: Bank[] = []
-  const lockedAtPuts: boolean[] = []
-  const spy = vi.spyOn(Bank.prototype, 'put').mockImplementation(function (this: Bank) {
-    banks.push(this)
-    lockedAtPuts.push(this.isLocked)
-    return answer(this)
+  const lockedAtBirths: boolean[] = []
+  const makeUnborn = Bank.makeUnborn.bind(Bank)
+  vi.spyOn(Bank, 'makeUnborn').mockImplementation((record, opts) => {
+    const made = makeUnborn(record, opts)
+    banks.push(made.bank)
+    return made
   })
-  return { spy, banks, lockedAtPuts }
+  const { vaultDB } = device
+  const tryBirthBank = vaultDB.tryBirthBank.bind(vaultDB)
+  const spy = vi.spyOn(vaultDB, 'tryBirthBank').mockImplementation((ask) => {
+    lockedAtBirths.push(banks.at(-1)!.isLocked)
+    return answer ? answer(ask) : tryBirthBank(ask)
+  })
+  return { banks, tryBirthBank: spy, lockedAtBirths }
 }
 // --
 
@@ -157,16 +167,17 @@ export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
 
 // == [Leases]: FakeLeaseBank, fakeLeaseBankOf, _cheat_grantedLease
 
-/** A fake of a bank as a lease hears it: its stamp, and a spy for `lock`. */
+/** A fake of a bank as a lease hears it: its stamp, a spy for `lock`, and an enabled check that always passes. */
 export type FakeLeaseBank = LeaseBank & { lock: Mock<() => void> }
 
 /** A {@link FakeLeaseBank} of {@link WorldBankStamp}, as `overrides` moves it. */
 export function fakeLeaseBankOf(overrides: Partial<BankStamp> = {}): FakeLeaseBank {
-  return { stamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>() } as unknown as FakeLeaseBank
+  const bank = { stamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => bank }
+  return bank as unknown as FakeLeaseBank
 }
 
 /** A test backdoor: a lease `proving` builds on `bank` citing `gate`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
-export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GX.CitedGate = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
+export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: CitedGate = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
   const lease = await proving.buildLease(bank, gate)
   const [record] = make.mock.calls.at(-1)!
@@ -190,7 +201,7 @@ export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
  * It exists only so a test can show two wayins have one bankKey, or read what a seal is bound to; no model hands out a bankKey.
  * Rejects with WebCrypto's error when the wayin will not unwrap.
  */
-export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GX.GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
+export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(bank, gate, header)
   async function wayinKeyOf(): Promise<CryptoKey> {

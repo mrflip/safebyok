@@ -1,11 +1,13 @@
 import type { Consts } from 'safebyok-big/internals'
-import { BX, CX, Clock, GX, Helpers, SX, Throwers, Validator } from 'safebyok-big/internals'
+import { Crypto, Throwers, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
-import { type BankStamp, bankStamp } from './stamps'
+import { BaseThing } from './base-thing'
+import { type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import { Wayin } from './wayin'
+import { type GateThing, type ThingScope, type Wayins, GateThingFormat, gateThing, thingScope } from '../storage/shapes-thing'
 
-/** What a new gate is made of: its stamp, and its wayins. */
-export type GateDna = GX.GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
+/** What a new main gate is made of: its stamp, and its wayins. */
+export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
 
 /** What a gate is given of its bank: its stamp. */
 export type GateBank = Pick<Bank, 'stamp'>
@@ -20,48 +22,27 @@ export interface GateOpts {
 /** The checks of {@link Gate.make}'s and {@link Gate.makeRecord}'s arguments. */
 const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => {
   const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
-  const wayins = obj({ main: wayin, passkey0: wayin.nullable() })
   return {
-    gateMakeArgs:   obj({ record: BX.gateRecord, opts: obj({ bank: obj({ stamp: bankStamp }) }) }),
-    makeRecordArgs: obj({ bankStamp, dna: obj({ wayins }) }),
+    gateMakeArgs:   obj({ record: gateThing, opts: obj({ bank: obj({ stamp: bankStamp }) }) }),
+    makeRecordArgs: gateStamp.extend({ wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),
   }
 })
 
 /** One revision of a bank's gate: its passphrase wayin, and its passkey wayin if it has one.
  * A gate verb makes the next revision as a new Gate; this one never changes.
  */
-export class Gate implements GX.GateStamp {
-  // == [Props]: user_id, banklabel, gatelabel, gate_tok, registered_at, bank_tok, #bank, #record, #main, #passkey0
-
-  declare readonly user_id:       string
-  declare readonly banklabel:     string
-  declare readonly gatelabel:     GX.GateStamp['gatelabel']
-  /** The token of this gate's life. No gate verb changes it. */
-  declare readonly gate_tok:      string
-  declare readonly registered_at: number
-  // The gate is still big's row, whose `bank_tok` now has its bank's lifeseq, until the gate moves onto its Thing.
-  /** The lifeseq of the life of its bank this gate belongs to. */
-  declare readonly bank_tok:      string
+export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements GateStamp {
+  // == [Props]: #bank, #main, #passkey0
 
   readonly #bank:     GateBank
-  readonly #record:   BX.GateRecord
   readonly #main:     Wayin
   readonly #passkey0: Wayin | null
   // --
 
-  // == [Getters]: revision_tok, revision_seq, written_at, wayins, main, passkey0, scope, stamp, bankStamp
-
-  /** The revision this gate is: every gate verb makes a new one. */
-  get revision_tok(): string { return this.#record.revision_tok }
-
-  /** The sequence number of the revision in hand, counting from 0 at its birth. */
-  get revision_seq(): number { return this.#record.revision_seq }
-
-  /** When the revision in hand was written, in epoch milliseconds. */
-  get written_at(): number { return this.#record.written_at }
+  // == [Getters]: wayins, main, passkey0, scope, stamp, bankStamp
 
   /** The wayin records, frozen. */
-  get wayins(): BX.Wayins { return this.#record.wayins }
+  get wayins(): Wayins { return this.pickle().wayins }
 
   /** The passphrase wayin. */
   get main(): Wayin { return this.#main }
@@ -69,11 +50,11 @@ export class Gate implements GX.GateStamp {
   /** The passkey wayin, or null if the gate has none. */
   get passkey0(): Wayin | null { return this.#passkey0 }
 
-  /** This gate's scope: its bank's, and its `gatelabel`. */
-  get scope(): CX.GateScope { return CX.gateScope.parse(this) }
+  /** This gate's scope: its bank's, and its `labelpath`. */
+  get scope(): ThingScope { return thingScope.parse(this) }
 
   /** This gate's stamp, fixed for its life. A wayin's wrapped bankKey is bound to it. */
-  get stamp(): GX.GateStamp { return GX.gateStamp.parse(this) }
+  get stamp(): GateStamp { return gateStamp.parse(this) }
 
   /** The stamp of this gate's bank. A wayin's wrapped bankKey is bound to it, and to the gate's own `stamp`. */
   get bankStamp(): BankStamp { return this.#bank.stamp }
@@ -81,35 +62,32 @@ export class Gate implements GX.GateStamp {
 
   // == [Construction]: make, constructor, makeRecord
 
-  /** The gate of `record`, which must be of `opts.bank`. */
-  static make(record: BX.GateRecord, opts: GateOpts): Gate { return new Gate(record, opts) }
-
-  private constructor(record: BX.GateRecord, opts: GateOpts) {
+  /** The gate of `record`, which must be of `opts.bank`'s scope. */
+  static make(record: GateThing, opts: GateOpts): Gate {
     const { record: parsed, opts: checked } = Checks.gateMakeArgs.parse({ record, opts })
-    // The gate's row names its user `user_id`, and its bank's lifeseq `bank_tok`.
-    Validator.checkedConsistent({ userid: parsed.user_id, banklabel: parsed.banklabel, lifeseq: parsed.bank_tok }, checked.bank.stamp, { kind: 'record_conflict' })
+    // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
+    Validator.checkedConsistent(parsed, bankScope.parse(checked.bank.stamp), { kind: 'record_conflict' })
+    return new Gate(parsed, opts)
+  }
+
+  private constructor(parsed: GateThing, opts: GateOpts) {
+    const main = Wayin.make(parsed.wayins.main)
+    const passkey0 = (parsed.wayins.passkey0 === null) ? null : Wayin.make(parsed.wayins.passkey0)
+    super({ ...parsed, wayins: wayinsOf(main, passkey0) })
     this.#bank = opts.bank
-    this.#main = Wayin.make(parsed.wayins.main)
-    this.#passkey0 = parsed.wayins.passkey0 === undefined ? null : Wayin.make(parsed.wayins.passkey0)
-    this.#record = Object.freeze({ ...parsed, wayins: wayinsOf(this.#main, this.#passkey0) })
-    Helpers.tattoo(this, { ...GX.gateStamp.parse(parsed), bank_tok: parsed.bank_tok }, { configurable: false })
+    this.#main = main
+    this.#passkey0 = passkey0
     Object.freeze(this)
   }
 
-  /** The first record of a new gate of the bank stamped `bankStamp`, made of `dna`. */
-  static makeRecord(bankStamp: BankStamp, dna: GateDna): BX.GateRecord {
-    const { bankStamp: checkedBank, dna: { wayins } } = Checks.makeRecordArgs.parse({ bankStamp, dna })
-    return BX.gateRecord.parse({
-      ...GX.gateStamp.parse(dna), fmt: BX.GateFormat, ...SX.nextRevisionOf(SX.VoidRevision, Clock.nowMillis()), am: 'a',
-      bank_tok: checkedBank.lifeseq, wayins: wayinsOf(wayins.main, wayins.passkey0), auth: {}, sigs: {}, meta: {},
+  /** The first record of a new main gate, made of `dna`: a root, born when its stamp says. */
+  static makeRecord(dna: GateDna): GateThing {
+    const { wayins, ...stamp } = Checks.makeRecordArgs.parse(dna)
+    return gateThing.parse({
+      ...stamp, label: stamp.labelpath, fmt: GateThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a',
+      lifepath: stamp.lifeseq, written_at: stamp.born_at, wayins: wayinsOf(wayins.main, wayins.passkey0), auth: {}, sigs: {}, meta: {},
     })
   }
-  // --
-
-  // == [Methods]: pickle
-
-  /** This gate's row, as a frozen plain {@link BX.GateRecord}. */
-  pickle(): BX.GateRecord { return this.#record }
   // --
 
   // == [Guards]: demandPasskeyAddable
@@ -127,8 +105,8 @@ export class Gate implements GX.GateStamp {
 // == [Helpers]: wayinsOf
 
 // A Wayin's pickle is typed as either kind; the gate record's parse checks each is the kind its label wants.
-/** The frozen wayin records of `main` and, if given, `passkey0`. */
-function wayinsOf(main: Wayin, passkey0: Wayin | null): BX.Wayins {
-  return Object.freeze({ main: main.pickle(), ...(passkey0 && { passkey0: passkey0.pickle() }) }) as BX.Wayins
+/** The frozen wayin records of `main` and `passkey0`, null for none. */
+function wayinsOf(main: Wayin, passkey0: Wayin | null): Wayins {
+  return Object.freeze({ main: main.pickle(), passkey0: passkey0?.pickle() ?? null }) as Wayins
 }
 // --

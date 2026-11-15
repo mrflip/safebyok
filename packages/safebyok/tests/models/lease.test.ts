@@ -9,9 +9,9 @@ import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gatelabel', 'gate_tok', 'gate_revision_tok', 'proved_at', 'wayinkind']
+const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gatelabelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind']
 
-const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gatelabel: 'main', gate_tok: TH.WorldGate.gate_tok, gate_revision_tok: TH.WorldGate.revision_tok, proved_at: TH.T0, wayinkind: 'passphrase' }
+const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gatelabelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: TH.WorldGate.revtok, proved_at: TH.T0, wayinkind: 'passphrase' }
 
 const Cleartexts = Object.freeze({ whisper: TH.Whisper })
 
@@ -90,10 +90,12 @@ describe("Lease.make(record, { bank })", () => {
     })
   }
 
-  it("refuses a bank with no lock, one with no stamp, and no opts at all", async () => {
+  it("refuses a bank with no lock, one with no stamp, one with no enabled check, and no opts at all", async () => {
     const { record } = await leaseWorld()
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: { stamp: TH.WorldBankStamp } } as never), 'bad_option')
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: { lock: vi.fn() } } as never), 'bad_option')
+    const { isEnabled: _isEnabled, demandEnabled: _demandEnabled, ...unchecked } = TH.fakeLeaseBankOf()
+    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), lock: undefined } } as never), 'bad_option')
+    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), stamp: undefined } } as never), 'bad_option')
+    TH.expectSyncRefusal(() => Lease.make(record, { bank: unchecked } as never), 'bad_option')
     TH.expectSyncRefusal(() => Lease.make(record, undefined as never), 'bad_option')
   })
 })
@@ -185,12 +187,61 @@ describe("lease.evict() and isEvicted", () => {
   })
 })
 
+/** A lease on a bank born on a device of its own, beside the bank and device. */
+async function bornLeaseWorld() {
+  const { bank, device, proving } = await TH.buildBornBank()
+  const { lease } = await TH._cheat_grantedLease(proving, bank)
+  return { bank, device, lease }
+}
+
+describe("lease.isEnabled and lease.demandEnabled(), over its bank's device", () => {
+  it("is enabled while in force on an enabled device, and not once evicted", async () => {
+    const { lease } = await bornLeaseWorld()
+    expect(lease.isEnabled).to.be.true
+    expect(lease.demandEnabled()).to.equal(lease)
+    lease.evict()
+    expect(lease.isEnabled).to.be.false
+    TH.expectSyncRefusal(() => lease.demandEnabled(), 'bank_locked')
+  })
+
+  it("is not enabled once its device is swept, though not evicted, and throws the device's refusal before 'bank_locked'", async () => {
+    const { device, lease } = await bornLeaseWorld()
+    device.sweep()
+    expect([lease.isEnabled, lease.isEvicted]).to.deep.equal([false, false])
+    const swept = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
+    lease.evict()
+    const sweptAndEvicted = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
+    expect([swept, sweptAndEvicted]).to.deep.equal([device.endCause, device.endCause])
+  })
+
+  it("refuses a seal and an unseal with the device's refusal once the device is swept", async () => {
+    const { device, lease } = await bornLeaseWorld()
+    const sealed = await lease.seal('BoxWhisper', TH.boxShellOf(), Cleartexts)
+    device.sweep()
+    const shell = TH.boxShellOf()
+    expect(await TH.expectRefusal(lease.seal('BoxWhisper', shell, Cleartexts), 'disabled')).to.equal(device.endCause)
+    expect(await TH.expectRefusal(lease.unseal('BoxWhisper', sealed), 'disabled')).to.equal(device.endCause)
+  })
+
+  // As a lock refuses a seal or an unseal under way, so does a sweep.
+  it("refuses a seal and an unseal already under way when the device is swept as they run", async () => {
+    const { device, lease } = await bornLeaseWorld()
+    const sealed = await lease.seal('BoxWhisper', TH.boxShellOf(), Cleartexts)
+    const sealing = TH.expectRefusal(lease.seal('BoxWhisper', TH.boxShellOf(), Cleartexts), 'disabled')
+    const unsealing = TH.expectRefusal(lease.unseal('BoxWhisper', sealed), 'disabled')
+    device.sweep()
+    expect(await sealing).to.equal(device.endCause)
+    expect(await unsealing).to.equal(device.endCause)
+  })
+})
+
 describe("a tampered lease record", () => {
   const TamperCases = [
     [(record: LeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                            'its proved_at moved'],
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                       'its wayinkind changed'],
-    [(record: LeaseRecord) => ({ ...record, gate_revision_tok: 'gate-revision-tok-2' }),                   'its gate_revision_tok changed'],
-    [(record: LeaseRecord) => ({ ...record, gate_tok: 'gate-tok-reborn' }),                                'its gate_tok changed'],
+    [(record: LeaseRecord) => ({ ...record, gate_revtok: 'gate-revision-tok-2' }),                         'its gate_revtok changed'],
+    [(record: LeaseRecord) => ({ ...record, gate_lifeseq: lifeseqOf(1) }),                                 'its gate_lifeseq changed'],
+    [(record: LeaseRecord) => ({ ...record, gatelabelpath: 'gate/passkeys' }),                             'its gatelabelpath changed'],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }),          "another lease's leaseKey"],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],
   ] as const

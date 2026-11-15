@@ -20,7 +20,7 @@ export const RootScope = Object.freeze({ ...ThingBank, labelpath: 'box' })
 export const BoxScope  = Object.freeze({ ...ThingBank, labelpath: 'box/openai' })
 
 /** The main gate's wayins: its passphrase wayin alone, its ciphertext fake. */
-export const MainOnly = Object.freeze({ main: BW.mainWayin })
+export const MainOnly = Object.freeze({ main: BW.mainWayin, passkey0: null })
 /** The main gate's wayins with a passkey wayin beside its passphrase wayin. */
 export const WithPasskey = Object.freeze({ main: BW.mainWayin, passkey0: BW.passkey0Wayin })
 

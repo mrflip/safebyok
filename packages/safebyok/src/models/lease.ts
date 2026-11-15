@@ -5,8 +5,8 @@ import type { Bank } from './bank'
 import * as Sealers from './sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from './stamps'
 
-/** What a lease is given of its bank: its stamp, and its lock, called when the bankKey will not unwrap. */
-export type LeaseBank = Pick<Bank, 'stamp' | 'lock'>
+/** What a lease is given of its bank: its stamp; its lock, called when the bankKey will not unwrap; and whether its device is enabled. */
+export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
 /** The sealer of kind `KindT`, in `sealers.ts`. */
 type SealerOf<KindT extends Sealers.Sealerkind> = Sealers.SealerKinds[KindT]
@@ -27,8 +27,8 @@ export interface LeaseOpts {
 
 // Defined here, not with the shapes: it names a model class.
 /** The checks of {@link Lease.make}'s arguments, and of the sealerkind a seal or unseal is given. */
-const Checks = Validator.Checkers('bad_option', ({ obj, fn, oneof }) => {
-  const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>() })
+const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, oneof }) => {
+  const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() })
   return {
     leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank }) }),
     sealerkind:    oneof(Sealers.sealerkindVals),
@@ -39,20 +39,24 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, oneof }) => {
  * The bankKey stays wrapped under a non-extractable leaseKey. Each seal or unseal unwraps it for that call alone, and nothing hands it out.
  * What is sealed, and how, is the sealer's in `sealers.ts`, named by its kind: the lease knows nothing of boxes.
  * A lease whose bankKey will not unwrap refuses `damaged_lease`, and its bank locks.
+ * Once evicted, or once its bank's device is swept, it refuses every seal and unseal, one in flight included.
  */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gatelabel, gate_tok, gate_revision_tok, proved_at, wayinkind, #bank, #record, stamp, toJSON
+  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gatelabelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #bank, #record, stamp, toJSON
 
-  declare readonly fmt:               LeaseStamp['fmt']
-  declare readonly userid:            string
-  declare readonly banklabel:         string
-  declare readonly lifeseq:           string
-  declare readonly born_at:           number
-  declare readonly gatelabel:         LeaseStamp['gatelabel']
-  declare readonly gate_tok:          string
-  declare readonly gate_revision_tok: string
-  declare readonly proved_at:         number
-  declare readonly wayinkind:         EX.Wayinkind
+  declare readonly fmt:           LeaseStamp['fmt']
+  declare readonly userid:        string
+  declare readonly banklabel:     string
+  declare readonly lifeseq:       string
+  declare readonly born_at:       number
+  /** The labelpath of the gate the lease was granted under. */
+  declare readonly gatelabelpath: string
+  /** The lifeseq of that gate's life. */
+  declare readonly gate_lifeseq:  string
+  /** The revision of that gate the lease was granted under. */
+  declare readonly gate_revtok:   string
+  declare readonly proved_at:     number
+  declare readonly wayinkind:     EX.Wayinkind
 
   readonly #bank: LeaseBank
 
@@ -116,7 +120,7 @@ export class Lease implements LeaseStamp {
     const bytes = new TextEncoder().encode(text)
     try {
       const ciphered = await Crypto.cipherBytes(partKey, bytes, this.#ctxOf(stamps, purposes.cipher, tags))
-      this.#demandRecord()
+      this.demandEnabled()
       return { key_wrapped, ciphered, ...tags }
     } finally {
       bytes.fill(0)
@@ -138,7 +142,7 @@ export class Lease implements LeaseStamp {
       throw Throwers.undecipheredWhisper()
     }
     try {
-      this.#demandRecord()
+      this.demandEnabled()
       return new TextDecoder().decode(bytes)
     } finally {
       bytes.fill(0)
@@ -152,7 +156,9 @@ export class Lease implements LeaseStamp {
 
   /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing keeps it between calls. */
   async #bankKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
-    const { lease_key, bank_key_lease_wrapped } = this.#demandRecord()
+    this.demandEnabled()
+    // demandEnabled refuses an evicted lease, whose record is null.
+    const { lease_key, bank_key_lease_wrapped } = this.#record!
     const ctx = Crypto.cipherCtx([this.#bank.stamp, this.stamp], 'bank_key_lease_wrapped')
     // Only this WebCrypto call is trapped: its rejection is how a damaged lease is learned.
     try {
@@ -166,15 +172,19 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Guards]: isEvicted, demandRecord
+  // == [Guards]: isEvicted, isEnabled, demandEnabled
 
   /** True once this lease's keys are dropped. */
   get isEvicted(): boolean { return this.#record === null }
 
-  /** The record, or throw once this lease is evicted */
-  #demandRecord(): LeaseRecord {
+  /** True while this lease is not evicted and its bank's device is enabled. */
+  get isEnabled(): boolean { return (this.#record !== null) && this.#bank.isEnabled }
+
+  /** Throw the device's refusal once it is swept, or `bank_locked` once this lease is evicted. */
+  demandEnabled(): this {
+    this.#bank.demandEnabled()
     if (this.#record === null) { throw Throwers.leaseNotInForce() }
-    return this.#record
+    return this
   }
   // --
 
