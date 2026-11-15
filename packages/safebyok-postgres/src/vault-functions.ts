@@ -11,10 +11,12 @@ function writeFunctionOf({ kind, table, body, policied }: WriteFunctionSpec): st
   const columns       = ['fmt', 'am', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', ...body]
   const policiesArg   = policied ? ', policies text[]' : ''
   const policiesOut   = policied ? ', policies_ok boolean' : ''
-  const policiesCheck = 'safebyok_gate_policies_ok(policies, stored.wayins, cited.wayins, proposed.wayins)'
+  // The checks whose verdicts a refusal reports: each is the Thing stored's to fail, where the act tables find a write.
+  const bornAtCheck   = '((stored.am <> proposed.am) OR (stored.born_at = proposed.born_at))'
+  const policiesCheck = '((stored.am <> proposed.am) OR safebyok_gate_policies_ok(policies, stored.wayins, cited.wayins, proposed.wayins))'
   return `
 CREATE OR REPLACE FUNCTION safebyok_write_${kind}(proposed_record jsonb, cited_record jsonb${policiesArg})
-RETURNS TABLE (ok boolean, thing jsonb, world jsonb, lifeseq_ok boolean${policiesOut})
+RETURNS TABLE (ok boolean, thing jsonb, world jsonb, born_at_ok boolean${policiesOut})
 LANGUAGE plpgsql AS $$
 DECLARE
   proposed ${table} := jsonb_populate_record(NULL::${table}, proposed_record);
@@ -30,7 +32,7 @@ BEGIN
       AND  (proposed.born_at = proposed.written_at)
       AND  safebyok_lifeseq_ok(NULL, NULL, proposed.lifeseq, proposed.am)
       AND  safebyok_lifepath_kept(cited.lifepath, proposed.lifepath)
-    ON CONFLICT DO NOTHING
+    ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
     RETURNING safebyok_thing_record(to_jsonb(stored)) INTO thing;
   ELSE
     UPDATE ${table} AS stored
@@ -44,16 +46,18 @@ BEGIN
       AND  (stored.revtok  <> proposed.revtok)
       AND  (stored.fmt      = proposed.fmt)
       AND  ((stored.am = 'a') OR (proposed.am = 'a'))                                -- no tombstone over a tombstone
-      AND  ((stored.am <> proposed.am) OR (stored.born_at = proposed.born_at))       -- a live Thing keeps its born_at
+      AND  ${bornAtCheck}                                                            -- a live Thing keeps its born_at
       AND  ((stored.am = 'a') OR (proposed.born_at = proposed.written_at))           -- a rebirth is born when written
       AND  safebyok_lifeseq_ok(stored.lifeseq, stored.am, proposed.lifeseq, proposed.am)
       AND  safebyok_lifepath_kept(stored.lifepath, proposed.lifepath)${policied ? `
-      AND  ${policiesCheck}` : ''}
+      AND  ${policiesCheck}                                                          -- a live gate meets its storage policies` : ''}
     RETURNING safebyok_thing_record(to_jsonb(stored)) INTO thing;
   END IF;
 
   IF FOUND THEN
-    ok := true;  lifeseq_ok := true;${policied ? '  policies_ok := true;' : ''}
+    ok := true;  born_at_ok := true;${policied ? '  policies_ok := true;' : ''}
+    -- The world after the write, in a statement of its own: a statement does not see what it writes itself. Another
+    -- write may land between the two, so at worst this reads a newer world, which a receiver orders by its revisions.
     world := safebyok_world(proposed.userid, proposed.banklabel);
     PERFORM safebyok_tell_thing(thing, world);
     RETURN NEXT;  RETURN;
@@ -61,10 +65,10 @@ BEGIN
 
   ok := false;
   SELECT (SELECT safebyok_thing_record(to_jsonb(stored))),
-         COALESCE(safebyok_lifeseq_ok(stored.lifeseq, stored.am, proposed.lifeseq, proposed.am), false)${policied ? `,
-         COALESCE(${policiesCheck}, false)` : ''},
+         COALESCE(${bornAtCheck}, true)${policied ? `,
+         COALESCE(${policiesCheck}, true)` : ''},
          safebyok_world(proposed.userid, proposed.banklabel)
-  INTO   thing, lifeseq_ok${policied ? ', policies_ok' : ''}, world
+  INTO   thing, born_at_ok${policied ? ', policies_ok' : ''}, world
   FROM   (SELECT) AS one
   LEFT JOIN ${table} AS stored
     ON   ((stored.userid, stored.banklabel, stored.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath));
@@ -242,7 +246,7 @@ ${writeFunctionOf({ kind: 'box', table: 'safebyok_box_things', body: ['sidecar',
 
 -- Store a bank's three roots, its bank, main gate and root box, where none of the three is stored. One statement writes
 -- all three or none. Two births racing for one bank both pass the check that none is stored; the one that commits second
--- fails on the primary key, and stores nothing.
+-- stores nothing, and answers what the first stored.
 -- Returns whether it stored them (ok), and the three rows as they now stand, each null for none.
 CREATE OR REPLACE FUNCTION safebyok_birth_roots(bank_record jsonb, gate_record jsonb, root_record jsonb)
 RETURNS TABLE (ok boolean, bank jsonb, gate jsonb, root jsonb)
@@ -267,11 +271,17 @@ BEGIN
       AND  NOT EXISTS (SELECT FROM safebyok_gate_things AS stored WHERE (stored.userid, stored.banklabel, stored.labelpath) = (new_bank.userid, new_bank.banklabel, 'gate'))
       AND  NOT EXISTS (SELECT FROM safebyok_box_things  AS stored WHERE (stored.userid, stored.banklabel, stored.labelpath) = (new_bank.userid, new_bank.banklabel, 'box'))
   ), banked AS (
-    INSERT INTO safebyok_bank_things AS stored SELECT (new_bank).* FROM unborn RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
+    INSERT INTO safebyok_bank_things AS stored SELECT (new_bank).* FROM unborn
+    ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
+    RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
   ), gated AS (
-    INSERT INTO safebyok_gate_things AS stored SELECT (new_gate).* FROM unborn RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
+    INSERT INTO safebyok_gate_things AS stored SELECT (new_gate).* FROM unborn
+    ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
+    RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
   ), rooted AS (
-    INSERT INTO safebyok_box_things  AS stored SELECT (new_root).* FROM unborn RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
+    INSERT INTO safebyok_box_things  AS stored SELECT (new_root).* FROM unborn
+    ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
+    RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
   )
   SELECT (SELECT written FROM banked), (SELECT written FROM gated), (SELECT written FROM rooted)
   INTO   bank, gate, root;

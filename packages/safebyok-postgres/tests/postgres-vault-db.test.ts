@@ -96,12 +96,19 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     expect(notices).to.deep.equal([])
   })
 
-  it("writes over a damaged box the write cites exactly: it compares revisions in the write, not shapes", async () => {
-    const vaultDB = await makeVaultDB()
-    const box = VT.boxThingOf()
-    await rowsOf().plant({ ...VT.ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
-    const next = VT.nextOf(box)
-    expect(await vaultDB.tryWriteThing(VT.replaceAskOf(box, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
+  it("reports, called past the adapter, the verdict of each check of the gate stored that refused its write", async () => {
+    await makeVaultDB()
+    const db = await database()
+    const gate = VT.gateThingOf()
+    await plant(VT.GateScope, gate)
+    const write = 'SELECT ok, born_at_ok, policies_ok FROM safebyok_write_gate($1::text::jsonb, $2::text::jsonb, $3::text[])'
+    const moved = VT.nextGateOf(gate, { born_at: gate.born_at + 1 })
+    const added = VT.nextGateOf(gate)
+    const cases = [[moved, [], { ok: false, born_at_ok: false, policies_ok: true }], [added, ['add_passkey'], { ok: false, born_at_ok: true, policies_ok: false }]] as const
+    for (const [record, policies, verdicts] of cases) {
+      const { rows } = await db.query(write, [JSON.stringify(record), JSON.stringify(gate), policies])
+      expect(rows).to.deep.equal([verdicts])
+    }
   })
 
   it("refuses in its write function, called past the adapter, a write citing a revision not stored, and one that skips a life", async () => {

@@ -222,6 +222,17 @@ export abstract class AdapterVaultDB implements VaultDB {
   // fetched. A store that can run code of its own may run the whole step there. For an ask that carries `track`, the step
   // also compares it with the bank and main gate the world is read from, and reports that as the world's `tracked`
   // (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
+  //
+  // A write checks only its preconditions of the Thing stored: the revision cited, the born_at a live Thing keeps, and the
+  // storage policies it names (`classifyWriteThing` reads no more). Where several refusals apply at once, any one of them
+  // may be the answer: all else equal the likelier is preferred, and `damaged_row` is the least likely, but no code is
+  // written to rank them. The record carries every field, so a store may write it by replacing the Thing stored whole.
+  //
+  // A store that makes the checks in the statement that writes reports, beside a refusal, the Thing as it now stands and a
+  // verdict for each check of the Thing stored that the act tables cannot name. It then answers in this order: the act
+  // tables over the Thing read back (`storedCitedOf`, `writeActOf`), answering any act but a write with `unwrittenWriteOf`;
+  // under a write act, each failed verdict's own refusal (`demandBornAtKept`, `demandPolicies`); and `storage_issue` where
+  // no verdict explains the refusal. A birth answers with `unwrittenBirthOf`, or `storage_issue` where it finds a write.
 
   /** In one step: fetch the Thing at `ask`'s scope and its bank's raw world, and return `this.classifyGetThing(ask, raw, world)`. */
   protected abstract doGetThing(ask: GetThingAsk): Helpers.Awaitable<Actual<EX.GotAct>>

@@ -5,7 +5,8 @@ import { type EX, type Errors, Throwers, Validator } from 'safebyok-big/internal
 import {
   type Actual, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsActual,
   type ListThingsAsk, type Received, type ThingScope, type ThingWatchScope, type ThingsFetched, type Track, type TrackedFetched, type WorldFetched,
-  type WriteThingAsk, AdapterVaultDB, ShellCited, isWriteAct, modelkindOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf,
+  type WriteThingAsk, AdapterVaultDB, ShellCited, demandBornAtKept, demandPolicies, isWriteAct, modelkindOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
+  unwrittenWriteOf, worldOf, writeActOf, writtenRootsOf, writtenThingOf,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, unlistenOnceListening } from './postgres-bank-db'
 import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vault-queries'
@@ -132,15 +133,21 @@ export class PostgresVaultDB extends AdapterVaultDB {
     }
     const policies = (ask.modelkind === 'gate') ? [ask.options?.policies ?? []] : []
     const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), trackParam(ask.track), ...policies]
-    // Whether it stored the record, the Thing as it now stands, the raw world, and how it compares with the track.
-    const written  = await this.#firstRow<FetchedThing & { ok: boolean }>(WriteThingSql[ask.modelkind], params)
+    // Whether it stored the record, the Thing as it now stands, the raw world, how it compares with the track, and the verdicts
+    // of the checks the act tables cannot name: the stored born_at kept, and the storage policies met (the gate's alone). Each
+    // verdict is true where its check does not apply.
+    const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, policies_ok?: boolean }>(WriteThingSql[ask.modelkind], params)
     if (written.ok) {
       return { ok: true, act: writtenActOf(ask), world: worldOf(ask, written.world), ...trackedFieldOf(ask, written.tracked), record: writtenThingOf(ask, written.thing) }
     }
-    const actual = this.classifyWriteThing(ask, written.thing, { ...written.world, tracked: written.tracked })
-    // The store refused a write the classifier would make: the two disagree, so neither can be trusted.
-    if (actual.ok && isWriteAct(actual.act)) { throw Throwers.storageIssue() }
-    return actual
+    // The store wrote nothing. The act tables say why, of the revision cited; where they find a write, a verdict names the check it failed.
+    const stored = storedCitedOf(ask, written.thing)
+    const act    = writeActOf(ask, stored)
+    if (! isWriteAct(act))             { return unwrittenWriteOf(ask, act, written.thing, { ...written.world, tracked: written.tracked }) }
+    if (! written.born_at_ok)          { demandBornAtKept(ask, stored, written.thing) }
+    if (written.policies_ok === false) { demandPolicies(ask, written.thing) }
+    // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.
+    throw Throwers.storageIssue()
   }
 
   protected async doListThings(ask: ListThingsAsk): Promise<ListThingsActual> {
@@ -158,10 +165,10 @@ export class PostgresVaultDB extends AdapterVaultDB {
       const things = writtenRootsOf(puts, written)
       return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, ...trackedFieldOf(ask, written.tracked), things }
     }
-    const actual = this.classifyBirthBank(puts, written)
-    // The store refused a birth the classifier would make: the two disagree, so neither can be trusted.
-    if (actual.ok && (actual.act === 'born')) { throw Throwers.storageIssue() }
-    return actual
+    // The store refused. The act tables name why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
+    const unwritten = unwrittenBirthOf(puts, written)
+    if (unwritten === null) { throw Throwers.storageIssue() }
+    return unwritten
   }
 
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void): () => void {

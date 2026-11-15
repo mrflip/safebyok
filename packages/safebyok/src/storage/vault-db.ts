@@ -76,7 +76,14 @@ export type BirthBankActual =
 export interface VaultDB {
   /** The Thing at `ask`'s scope. */
   tryGetThing(ask: GetThingAsk): Promise<GetThingAnswer>
-  /** Write `ask.record` over the Thing `ask.cited`, if that is the Thing stored. */
+  /** Write `ask.record` over the Thing `ask.cited`, if that is the Thing stored.
+   * - A write whose preconditions hold (the exact revision cited, the storage policies it names, the born_at of a live Thing kept)
+   *   carries its record forward. Nothing else of the Thing stored is checked.
+   * - Where several refusals apply at once, the answer is one of them, but which is unspecified, and may differ between stores
+   *   and between versions. A Thing stored too damaged to check the preconditions against may refuse `damaged_row`,
+   *   `storage_issue`, or the failed precondition's own refusal.
+   * - The record carries every field, so a store may write it by replacing the Thing stored whole.
+   */
   tryWriteThing(ask: WriteThingAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope. */
   tryListThings(ask: ListThingsAsk): Promise<ListThingsAnswer>

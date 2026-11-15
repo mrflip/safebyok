@@ -244,13 +244,12 @@ export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: W
 export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
   const stored = storedCitedOf(ask, raw)
   const act    = writeActOf(ask, stored)
-  if (isRefusedAct(act))  { return refusedWriteOf(ask, act, raw, worldFetched) }
+  if (! isWriteAct(act))  { return unwrittenWriteOf(ask, act, raw, worldFetched) }
   if (act === 'replaced') {
     demandBornAtKept(ask, stored, raw)
     demandPolicies(ask, raw)
   }
-  const record = isWriteAct(act) ? ask.record : storedThingOf(ask, raw)
-  return { ok: true, act, world: worldOf(ask, worldFetched), record, ...trackedFieldOf(ask, worldFetched.tracked) }
+  return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
 }
 
 /** What a store fetched for a listing: the raw parent, null for none, and each raw Thing one label under it, with its labelpath. */
@@ -301,12 +300,15 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 }
 // --
 
-// == [Steps]: refusedWriteOf, demandBornAtKept, demandPolicies, unwrittenBirthOf
+// == [Steps]: unwrittenWriteOf, demandBornAtKept, demandPolicies, unwrittenBirthOf
 // The steps of the classifiers above, for a store that reaches part of the verdict itself to take in its own order.
 
-/** The answer to a write the act tables refuse, from the raw Thing a store fetched at its scope and the raw world. */
-export function refusedWriteOf(ask: WriteThingAsk, act: EX.RefusedAct, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
-  return { ok: false, act, world: worldOf(ask, worldFetched), record: storedThingOf(ask, raw), ...trackedFieldOf(ask, worldFetched.tracked) }
+/** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope and the raw world. */
+export function unwrittenWriteOf(ask: WriteThingAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
+  const record = storedThingOf(ask, raw)
+  const world  = worldOf(ask, worldFetched)
+  const beside = trackedFieldOf(ask, worldFetched.tracked)
+  return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
 }
 
 /** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces: `stored`, read from `raw`. */
