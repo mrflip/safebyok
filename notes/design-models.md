@@ -35,7 +35,7 @@ Removed from the interface, and so absent from every table: every `cleartexts` p
 * 🥶 frozen: object's public properties cannot be modified, or new ones added, for its lifetime
 * 📣 subscribed: full records are pushed when they change.
 * 1️⃣ one-at-a-time: overlapping callers wait on single request and share its result
-* 💾  saved
+* 💾  put
 * ❎ deleted
 * 🟰 no change
 * 📸 snapshot: frozen pojo with public props for subscribers

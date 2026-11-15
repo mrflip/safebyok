@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok-big'
 import type { MemoryBankDB } from 'safebyok-big/storage'
 import { useBox } from 'safebyok-react'
-import { ApiKeyVaultlabel, DomApiKeyBoxlabel } from '../../src/lib/saved-api-key'
+import { ApiKeyVaultlabel, DomApiKeyBoxlabel } from '../../src/lib/api-key'
 import { KnockKnockDom } from '../../src/components/KnockKnockDom'
 import * as TH from '../test-helpers'
 
@@ -32,7 +32,7 @@ const addKey = async () => {
   return await apiKeyField()
 }
 
-/** Add a key box, type the fake key into its field, and save it. */
+/** Add a key box, type the fake key into its field, and put it. */
 const saveKey = async () => {
   const field = await addKey()
   fireEvent.change(field, { target: { value: FakeApiKey } })
@@ -74,7 +74,7 @@ describe("KnockKnockDom", () => {
     expect(await screen.findByText('Saved.')).to.not.be.null
   })
 
-  it("saves what was typed, encrypted, never putting it in the page's markup", async () => {
+  it("puts what was typed, encrypted, never putting it in the page's markup", async () => {
     const { bankDB } = await renderFlow()
     await saveKey()
     expect(document.body.outerHTML).to.not.contain(FakeApiKey)
@@ -83,7 +83,7 @@ describe("KnockKnockDom", () => {
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
-  it("hides the field on Done, and offers to edit the saved key", async () => {
+  it("hides the field on Done, and offers to edit the put key", async () => {
     await renderFlow()
     const field = await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -103,7 +103,7 @@ describe("KnockKnockDom", () => {
     expect(screen.queryByText('Saved.')).to.be.null
   })
 
-  it("knocks with the saved key, and shows Claude's punchline", async () => {
+  it("knocks with the put key, and shows Claude's punchline", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -113,7 +113,7 @@ describe("KnockKnockDom", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("knocks with the saved key after an unsaved edit and a lock", async () => {
+  it("knocks with the put key after an edit not yet put and a lock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -127,7 +127,7 @@ describe("KnockKnockDom", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("knocks with the saved key while the box is veiled", async () => {
+  it("knocks with the put key while the box is veiled", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await TH.renderInBank(<><KnockKnockDom /><BoxVeiler /><TH.VaultProbe /></>)
@@ -152,7 +152,7 @@ describe("KnockKnockDom", () => {
     expect(screen.queryByRole('button', { name: 'Save' })).to.be.null
   })
 
-  it("asks for the key at a knock before one is saved, sending nothing", async () => {
+  it("asks for the key at a knock before one is put, sending nothing", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()

@@ -189,10 +189,10 @@ export const NotExposed = "This box has no whisper exposed: call box.expose() fi
 /** Why `BoxFields.of` refuses what is not a box. */
 export const BoxExpected = "BoxFields.of accepts a Box, as vault.getBox answers one."
 
-/** Why saving a box's fields is refused while they show a blank. */
+/** Why putting a box's fields is refused while they show a blank. */
 export const PuttingVeiledFields = "This box's whisper is veiled, so its fields have no whisper to put: call box.unveil() first."
 
-/** Why saving a box's fields is refused with none to read. */
+/** Why putting a box's fields is refused with none to read. */
 export const NoFieldsBound = "This box has no field bound, so there is nothing to put: bind one with BoxFields.of(box).bind(path), or call box.putExposed()."
 
 /** Why a record stored under the revision_seq in hand, but another revision_tok, is not adopted. */

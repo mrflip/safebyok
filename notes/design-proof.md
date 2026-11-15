@@ -553,7 +553,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an
   override from the inside is one the customer cannot.
 * `ifPresent` is customer-facing, and `putVault` and `putBox` accept it alike in `PutOpts`, with `ifAbsent` ('add' or
-  'fail'). Only `repl` saves, and only within the live row's own life: at its revision under another `vault_tok` or
+  'fail'). Only `repl` puts, and only within the live row's own life: at its revision under another `vault_tok` or
   `box_tok` it refuses `camped`. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`;
   `get` answers the live row in place of the request, `passed`. `isVaultPutAllowed(ante, record, opts)` and
   `isBoxPutAllowed(ante, record, opts)` decide inside each adapter's transaction.

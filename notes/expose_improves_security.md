@@ -36,9 +36,9 @@ function TokenField({ box }) {
     input.current.value = whisper.Credentials.SessionToken    // and again for every other field
   }
   useEffect(() => box.subscribe(() => {
-    if (box.isLocked) { input.current.value = '' }   // an unsaved edit is gone
+    if (box.isLocked) { input.current.value = '' }   // an edit not yet put is gone
   }), [box])
-  const save = async () => {
+  const put = async () => {
     const whisper = await box.extractWhisper()                // a put replaces: fetch what the form lacks
     await box.put({ whisper: merge(whisper, { Credentials: { SessionToken: input.current.value } }) })
   }
@@ -48,7 +48,7 @@ function TokenField({ box }) {
 
 **What it gives up:**
 
-* **Unsaved edits at a lock.** Keeping them needs a copy, which is what this design set out to avoid.
+* **Edits not yet put, at a lock.** Keeping them needs a copy, which is what this design set out to avoid.
 * **Anything derived from the value.** Validating while typing, a dirty flag, or disabling Save while
   the field is empty each read `.value` into a variable.
 * **Controlled components.** Anything that drives an input through its `value` prop is out, including
@@ -131,7 +131,7 @@ function useAwsForm(box: Box) {
         Credentials: { ...real.Credentials, ...patch.Credentials },
       })
     },
-    save: () => box.put({ whisper: real }),                   // real, never view: a mask is a valid whisper
+    put: () => box.put({ whisper: real }),                   // real, never view: a mask is a valid whisper
   }
 }
 ```
@@ -151,13 +151,13 @@ function useAwsForm(box: Box) {
     id:     whisper.Credentials?.AccessKeyId ?? '',
     token:  whisper.Credentials?.SessionToken ?? '',
     edit:   (patch) => box.patchWhisper(patch),
-    save:   () => box.putExposed(),
+    put:    () => box.putExposed(),
   }
 }
 ```
 
 The fields read blank when the whisper won't show, because a bag has no fields. The host never keeps
-the value in state, writes no lock branch, and has nothing to get wrong at save: `putExposed` is given
+the value in state, writes no lock branch, and has nothing to get wrong at the put: `putExposed` is given
 no whisper, and a bag refuses at `put`. What's left to get right is one line, the `unexpose`, and
 without it the exposure lasts until a sweep. Call `box.expose()` from a button after mount, because
 StrictMode's simulated unmount would otherwise unexpose it.

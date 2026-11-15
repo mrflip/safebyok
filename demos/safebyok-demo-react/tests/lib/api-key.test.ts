@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { Device, MemoryDeviceDB, type Vault } from 'safebyok-big'
 import { MemoryBankDB } from 'safebyok-big/storage'
 import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
-import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../../src/lib/saved-api-key'
+import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractApiKey } from '../../src/lib/api-key'
 
 const Boxlabel = 'anthropic_api_key_test'
-const FakeApiKey = 'sk-ant-fake-saved-key'
+const FakeApiKey = 'sk-ant-fake-put-key'
 
 /** Make a device on in-memory storage, its bank not yet brought up. Its dialog answers at once with the right passphrase. */
 const makeDevice = () => (
@@ -26,38 +26,38 @@ const makeVault = async (): Promise<Vault> => {
 /** Put `whisper` in the `Boxlabel` box of `vault`. */
 const putWhisper = async (vault: Vault, whisper: object) => { await vault.putBox({ boxlabel: Boxlabel, whisper }) }
 
-describe("extractSavedApiKey", () => {
+describe("extractApiKey", () => {
   it("returns null for no vault", async () => {
-    expect(await extractSavedApiKey(null, Boxlabel)).to.be.null
+    expect(await extractApiKey(null, Boxlabel)).to.be.null
   })
 
   it("returns null for a boxlabel with no box", async () => {
-    expect(await extractSavedApiKey(await makeVault(), Boxlabel)).to.be.null
+    expect(await extractApiKey(await makeVault(), Boxlabel)).to.be.null
   })
 
   it("returns null for an empty apiKey", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: '' })
-    expect(await extractSavedApiKey(vault, Boxlabel)).to.be.null
+    expect(await extractApiKey(vault, Boxlabel)).to.be.null
   })
 
   it("returns null for an apiKey that is not a string", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: 42 })
-    expect(await extractSavedApiKey(vault, Boxlabel)).to.be.null
+    expect(await extractApiKey(vault, Boxlabel)).to.be.null
   })
 
-  it("returns the saved key", async () => {
+  it("returns the put key", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: FakeApiKey })
-    expect(await extractSavedApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
+    expect(await extractApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
   })
 
-  it("unlocks a locked bank to return the saved key", async () => {
+  it("unlocks a locked bank to return the put key", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: FakeApiKey })
     vault.bank.lock()
-    expect(await extractSavedApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
+    expect(await extractApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
   })
 })
 
@@ -68,7 +68,7 @@ describe("ensureApiKeyBoxExposed", () => {
     expect(box.whisper).to.deep.equal({})
   })
 
-  it("exposes the box where one is saved, and shows its key", async () => {
+  it("exposes the box where one is put, and shows its key", async () => {
     const device = makeDevice()
     const bank = await device.ensureBank()
     const vault = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })

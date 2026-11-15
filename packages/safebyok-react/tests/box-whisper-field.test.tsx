@@ -66,7 +66,7 @@ describe("BoxWhisperField", () => {
     expect(box.isShowing).to.be.true
   })
 
-  it("saves an edit through BoxFields.put", async () => {
+  it("puts an edit through BoxFields.put", async () => {
     // BoxWhisperField @example 1
     const { box } = await boxOfWorld()
     render(<BoxWhisperField box={box} path="apiKey" aria-label="Anthropic API key" />)

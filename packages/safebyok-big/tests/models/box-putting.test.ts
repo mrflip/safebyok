@@ -159,14 +159,14 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     expect(box.revision_tok).to.eq('rev-rival')
   })
 
-  it("refuses 'camped' with ifPresent 'fail' over a live record, saving nothing", async () => {
+  it("refuses 'camped' with ifPresent 'fail' over a live record, putting nothing", async () => {
     const box = builtOf(fullBoxRecord())
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fail', ...asBuilt }), 'camped')
     expect(box.revision_seq).to.eq(1)
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-a1', revision_seq: 1 })
   })
 
-  it("with ifPresent 'get' over a live record, returns the box unchanged and saves nothing", async () => {
+  it("with ifPresent 'get' over a live record, returns the box unchanged and puts nothing", async () => {
     const box = builtOf(fullBoxRecord())
     await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'get', ...asBuilt })).resolves.to.eq(box)
     expect(box.revision_seq).to.eq(1)

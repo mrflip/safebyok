@@ -3,7 +3,7 @@ import { BoxFields } from 'safebyok-big/dom'
 import { BoxWhisperField, useBox, useDevice, useVault } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
-import { ApiKeyVaultlabel, DomApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
+import { ApiKeyVaultlabel, DomApiKeyBoxlabel, ensureApiKeyBoxExposed, extractApiKey } from '../lib/api-key'
 import { KnockForm } from './KnockForm'
 
 /** The DOM form: a knock-knock machine whose API key field is filled and read by safebyok itself, so the key never passes through React. */
@@ -14,14 +14,14 @@ export const KnockKnockDom = () => {
   const isShowing = useIsShowing(box)
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
-  const [isSaved, setIsSaved] = useState(false)
+  const [isPut, setIsPut] = useState(false)
   // A key is read once the bank is up; the Edit button brings the bank up itself, building it where none is.
   const isReady = (stage === 'absent') || (stage === 'present')
 
   /** Run a button's action, and show the error message unless the user cancelled. */
   const perform = async (work: () => unknown) => {
     setGripe(null)
-    setIsSaved(false)
+    setIsPut(false)
     try {
       await work()
     } catch (err) {
@@ -32,10 +32,10 @@ export const KnockKnockDom = () => {
   // The dialogs that build or unlock the vault open from this click.
   const edit = () => perform(async () => { if (device !== null) { await ensureApiKeyBoxExposed(device, DomApiKeyBoxlabel) } })
 
-  const save = () => perform(async () => {
+  const putKey = () => perform(async () => {
     if (box === null) { return }
     await BoxFields.of(box).put()
-    setIsSaved(true)
+    setIsPut(true)
   })
 
   const done = () => perform(() => box?.unexpose())
@@ -54,15 +54,15 @@ export const KnockKnockDom = () => {
         {isShowing && (box !== null)
           ? (
             <>
-              <button type="button" onClick={() => { void save() }}>Save</button>
+              <button type="button" onClick={() => { void putKey() }}>Save</button>
               <button type="button" onClick={() => { void done() }}>Done</button>
             </>
           )
           : <button type="button" disabled={device === null} onClick={() => { void edit() }}>{box === null ? 'Add key' : 'Edit key'}</button>}
-        {isSaved && <span className="quiet">Saved.</span>}
+        {isPut && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm extractApiKey={() => extractSavedApiKey(vault, DomApiKeyBoxlabel)} isReady={isReady} />
+      <KnockForm extractApiKey={() => extractApiKey(vault, DomApiKeyBoxlabel)} isReady={isReady} />
     </section>
   )
 }

@@ -6,7 +6,7 @@ import { Bank } from 'safebyok-big'
 import type { MemoryBankDB } from 'safebyok-big/storage'
 import { useBox } from 'safebyok-react'
 import { useIsShowing } from '../../src/hooks/useIsShowing'
-import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel } from '../../src/lib/saved-api-key'
+import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel } from '../../src/lib/api-key'
 import { KnockKnockToolkit } from '../../src/components/KnockKnockToolkit'
 import { KnockKnockDom } from '../../src/components/KnockKnockDom'
 import * as TH from '../test-helpers'
@@ -37,7 +37,7 @@ const addKey = async () => {
   return apiKeyField()
 }
 
-/** Add a key box, type the fake key into its field, and save it. */
+/** Add a key box, type the fake key into its field, and put it. */
 const saveKey = async () => {
   const field = await addKey()
   fireEvent.change(field, { target: { value: FakeApiKey } })
@@ -77,7 +77,7 @@ describe("KnockKnockToolkit", () => {
     expect(field.value).to.eq(FakeApiKey)
   })
 
-  it("saves what was typed, encrypted", async () => {
+  it("puts what was typed, encrypted", async () => {
     const { bankDB } = await renderFlow()
     await saveKey()
     const boxrows = storedBoxRows(bankDB)
@@ -85,7 +85,7 @@ describe("KnockKnockToolkit", () => {
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
-  it("shows the saved key again on Edit key after Done", async () => {
+  it("shows the put key again on Edit key after Done", async () => {
     await renderFlow()
     const field = await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -114,7 +114,7 @@ describe("KnockKnockToolkit", () => {
     await waitFor(() => { expect(screen.getByTestId('showing').textContent).to.eq('hidden') })
   })
 
-  it("knocks with the saved key", async () => {
+  it("knocks with the put key", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -124,7 +124,7 @@ describe("KnockKnockToolkit", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("knocks with the saved key, not an unsaved edit", async () => {
+  it("knocks with the put key, not an edit not yet put", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -136,7 +136,7 @@ describe("KnockKnockToolkit", () => {
     expect(field.value).to.eq('sk-ant-unsaved-edit')
   })
 
-  it("knocks with the saved key after an unsaved edit and a lock", async () => {
+  it("knocks with the put key after an edit not yet put and a lock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -150,7 +150,7 @@ describe("KnockKnockToolkit", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("asks for the key at a knock before one is saved", async () => {
+  it("asks for the key at a knock before one is put", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()

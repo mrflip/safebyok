@@ -56,9 +56,9 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
     expect([...wasmBytes]).to.deep.equal([...nobleBytes])
   })
 
-  // The saved value came from calling hash-wasm's argon2id directly, and agrees with noble's argon2idAsync. Its parameters are the spec's:
+  // The known value came from calling hash-wasm's argon2id directly, and agrees with noble's argon2idAsync. Its parameters are the spec's:
   // memorySize 65_536, 3 iterations, 1 lane and 32 bytes, with the passphrase and saltOf(16) below. The core's browser.test.ts checks its own deriver against the same value.
-  it("derives the saved value for one fixed passphrase and salt, at the supplied spec's cost", { timeout: 60_000 }, async () => {
+  it("derives the known value for one fixed passphrase and salt, at the supplied spec's cost", { timeout: 60_000 }, async () => {
     const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
     expect(hexOf(wasmBytes)).to.eq(SavedHex)
   })
