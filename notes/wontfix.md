@@ -1,6 +1,6 @@
 # Won't fix
 
-Behaviour the new core, `packages/safebyok`, leaves undefined on purpose: cases a host can reach, whose outcome we do
+Behaviour the new core, `packages/safebyok`, leaves unspecified on purpose: cases a host can reach, whose outcome we do
 not promise, test or design for. `notes/wontfix-big.md` is safebyok-big's. A reviewer reads `notes/security.md` for
 what we decided, and this file for what we decided not to decide.
 

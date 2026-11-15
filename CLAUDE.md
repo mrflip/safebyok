@@ -118,7 +118,7 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
   (`human/README.md`).
 * `notes/` -- durable notes. A decision a security reviewer should see goes into
   `notes/security.md` through a `sonnet` subagent (the file's header says how); don't read it
-  yourself. `notes/wontfix.md`: behaviour the new core leaves undefined on purpose (`notes/wontfix-big.md`, safebyok-big's). `notes/guarantees-big.md`: where
+  yourself. `notes/wontfix.md`: behaviour the new core leaves unspecified on purpose (`notes/wontfix-big.md`, safebyok-big's). `notes/guarantees-big.md`: where
   secret material lives in `safebyok-big`, as guarantees. **Before changing a file
   `notes/guarantees-big.md` names under *Where the guarantees are kept*, read its *The guarantees*
   section, and check the change against it.** The new core may cite a guarantee by number where it
