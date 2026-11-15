@@ -1,6 +1,6 @@
 # Thread 3: box_bank (2026-11-15)
 
-Branch `20261115-box_bank`, PR #TBD, stacked on #703 (`20261115-box_seal`). Proved: `safebyok` lint, typecheck and
+Branch `20261115-box_bank`, PR [#704](https://github.com/mrflip/safebyok/pull/704), stacked on [#703](https://github.com/mrflip/safebyok/pull/703) (`20261115-box_seal`). Proved: `safebyok` lint, typecheck and
 test, 660 tests green; `pnpm justify` at ready (see the PR's **Tests:** line).
 
 * **Built** (design-boxops.md *Building it* item 3)
