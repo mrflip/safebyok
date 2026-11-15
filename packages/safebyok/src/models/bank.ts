@@ -43,13 +43,10 @@ export interface BankOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
-/** What {@link Bank.makeUnborn} hands back beside the bank: its birth, for the gating attempt underway to try. */
-export type BirthFriend = Readonly<{
-  /** Store the bank, its main gate and its root box, sealed under a lease built from `proved`, where no bank is stored.
-   * Where the bank's own Things land, the bank is unlocked under that lease. Throws where the lease will not build or the root box will not seal.
-   */
-  tryBirth: (proved: Proving) => Promise<BirthBankAnswer>
-}>
+/** What {@link Bank.birth} is given besides its record: the bank's opts, and the proving of its main gate built in the gating attempt underway. */
+export interface BirthOpts extends BankOpts {
+  proving: Proving
+}
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Bank.make}'s arguments, of the proving `unlockByProving` is given, and of the boxes a box method is given. */
@@ -112,7 +109,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
   // --
 
-  // == [Construction]: make, makeUnborn, constructor, mintStamps, makeRecord
+  // == [Construction]: make, birth, constructor, mintStamps, makeRecord
 
   /** The bank of `record`, with its main gate and root box, on `opts.device`, putting its boxes in `opts.vaultDB`. */
   static make(record: BankRecord, opts: BankOpts): Bank {
@@ -124,10 +121,17 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return new Bank(parsed, { maingate, rootBox }, checked)
   }
 
-  /** The bank of `record`, not yet stored, and its {@link BirthFriend}, to try its birth with. */
-  static makeUnborn(record: BankRecord, opts: BankOpts): { bank: Bank, friend: BirthFriend } {
-    const bank = this.make(record, opts)
-    return { bank, friend: Object.freeze({ tryBirth: (proved: Proving) => bank.#tryBirth(proved) }) }
+  /** The bank of `record`, put with its main gate and root box where no bank is stored, and unlocked under a lease built from `opts.proving`.
+   * Refuses `gate_made_elsewhere` where another bank is stored at its scope.
+   */
+  static async birth(record: BankRecord, opts: BirthOpts): Promise<Bank> {
+    const { proving, ...bankOpts } = opts
+    const bank = this.make(record, bankOpts)
+    const born = await bank.#tryBirth(proving)
+    if (! born.ok) { throw born.err }
+    // The user must hear that their passphrase was not set: the bank stored is another's.
+    if (born.val.bank.revtok !== bank.revtok) { throw Throwers.gateMadeElsewhere() }
+    return bank
   }
 
   private constructor(parsed: BankThing, { maingate, rootBox }: Pick<BankRecord, 'maingate' | 'rootBox'>, opts: BankOpts & { queryCacheOpts: QueryCacheOpts }) {
@@ -177,7 +181,9 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   // == [The birth]: tryBirth
 
-  /** Store this bank, its main gate and its root box, sealed under a lease built from `proved`. See {@link BirthFriend}. */
+  /** Write this bank, its main gate and its root box, sealed under a lease built from `proved`, where no bank is stored.
+   * Where the bank's own Things land, the bank is unlocked under that lease.
+   */
   async #tryBirth(proved: Proving): Promise<BirthBankAnswer> {
     const ask = { ...this.scope, op: 'birth' } as const
     const { endCause } = this.#device

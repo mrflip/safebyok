@@ -6,6 +6,7 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
 import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxSparse, boxThing, lifeseqOf } from '../../src/storage/shapes-thing'
+import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -22,11 +23,11 @@ const Life3 = lifeseqOf(3)
 /** A stored proving of `bank`'s main gate, by {@link TH.TestPassphrase}. */
 function storedProvingOf(bank: Bank): Promise<PassphraseProving> { return PassphraseProving.buildStored(bank.maingate, TH.TestPassphrase, bank.device) }
 
-/** A bank of {@link TH.WorldBankStamp} made unborn on `device` as a birth makes it, beside its friend, its record and its passphrase's proving. */
-async function unbornBankOf(device = TH.makeDevice()) {
+/** What a birth on `device` is given, as the gating attempt makes it: the record of a bank of {@link TH.WorldBankStamp}, and opts with its passphrase's proving. */
+async function birthArgsOf(device = TH.makeDevice()) {
   const proving = await PassphraseProving.buildNovel(TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase, device)
   const record = Bank.makeRecord({ ...TH.WorldBankStamp, maingate: { ...TH.WorldGateStamp, wayins: { main: await proving.buildWayin(NOVEL), passkey0: null } } })
-  return { device, proving, record, ...Bank.makeUnborn(record, { device, vaultDB: device.vaultDB }) }
+  return { device, record, opts: { device, vaultDB: device.vaultDB, proving } }
 }
 
 describe("Bank.mintStamps(scope)", () => {
@@ -582,22 +583,18 @@ describe("bank.put(args)", () => {
   })
 })
 
-describe("the birth, through Bank.makeUnborn(record, opts)'s friend", () => {
-  it("makes a locked bank, beside a frozen friend whose tryBirth is the birth", async () => {
-    const { bank, friend } = await unbornBankOf()
-    expect(bank.isLocked).to.be.true
-    expect(Object.keys(friend)).to.deep.equal(['tryBirth'])
-    expect(Object.isFrozen(friend)).to.be.true
-  })
-
+describe("Bank.birth(record, opts)", () => {
   it("births the bank, its main gate and its root box sealed under a new lease, and unlocks under that lease", async () => {
-    const { bank, friend, proving } = await unbornBankOf()
-    const answer = await friend.tryBirth(proving)
+    const { device, record, opts } = await birthArgsOf()
+    const births = TH.spyBirths(device)
+    const bank = await Bank.birth(record, opts)
+    const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
     expect(answer).to.include({ ok: true, act: 'born' })
     if (! answer.ok) { throw answer.err }
     expect(answer.val.bank).to.deep.equal(bank.pickle())
     expect(answer.val.gate).to.deep.equal(bank.maingate.pickle())
     expect(answer.val.root).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0 })
+    expect(births.lockedAtBirths).to.deep.equal([true])
     expect(bank.rootBox).to.deep.equal(boxSparse.parse(answer.val.root))
     expect(bank.isUnlocked).to.be.true
     expect(await bank.unsealBox(answer.val.root)).to.deep.include({ whisper: {} })
@@ -605,60 +602,64 @@ describe("the birth, through Bank.makeUnborn(record, opts)'s friend", () => {
 
   // The vaultDB answers retcon, not passed, to a birth it stored already; passed on this bank is a vaultDB's answer alone.
   it("unlocks where the vaultDB passes on this same bank, taking the root box it answers", async () => {
-    const { device, bank, friend, proving } = await unbornBankOf()
+    const { device, record, opts } = await birthArgsOf()
     const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
-    vi.spyOn(device.vaultDB, 'tryBirthBank').mockImplementation(async (ask) => {
+    const births = TH.spyBirths(device, async (ask) => {
       const born = await tryBirthBank(ask)
       return born.ok ? { ...born, act: 'passed' } : born
     })
-    const answer = await friend.tryBirth(proving)
+    const bank = await Bank.birth(record, opts)
+    const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
     expect(answer).to.include({ ok: true, act: 'passed' })
     expect(bank.isUnlocked).to.be.true
     expect(bank.rootBox).to.deep.equal(answer.ok && boxSparse.parse(answer.val.root))
   })
 
-  it("stays locked where the vaultDB passes on another bank, answering it as stored", async () => {
-    const { device, bank: first, friend: firstFriend, proving } = await unbornBankOf()
-    await firstFriend.tryBirth(proving)
-    const { bank, friend, proving: theirs } = await unbornBankOf(device)
+  it("refuses gate_made_elsewhere where the vaultDB passes on another bank, leaving its own bank locked", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    await Bank.birth(record, opts)
+    const theirs = await birthArgsOf(device)
+    const births = TH.spyBirths(device)
     const evict = vi.spyOn(Lease.prototype, 'evict')
-    const answer = await friend.tryBirth(theirs)
-    expect(answer).to.include({ ok: true, act: 'passed' })
-    expect(answer.ok && answer.val.bank.revtok).to.eq(first.revtok)
-    expect(bank.isLocked).to.be.true
-    expect(bank.rootBox).to.include({ revtok: SX.VoidRevisionTok })
+    await TH.expectRefusal(Bank.birth(theirs.record, theirs.opts), 'gate_made_elsewhere')
+    expect(await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)).to.include({ ok: true, act: 'passed' })
+    expect(births.banks[0]!.isLocked).to.be.true
+    expect(births.banks[0]!.rootBox).to.include({ revtok: SX.VoidRevisionTok })
     expect(evict).toHaveBeenCalledTimes(1)
   })
 
-  it("answers the vaultDB's refusal as it came, evicting the new lease and staying locked", async () => {
-    const { device, bank, friend, proving } = await unbornBankOf()
+  it("throws the vaultDB's refusal as it came, evicting the new lease and leaving the bank locked", async () => {
+    const { device, record, opts } = await birthArgsOf()
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
-    vi.spyOn(device.vaultDB, 'tryBirthBank').mockImplementation((ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
+    const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
     const evict = vi.spyOn(Lease.prototype, 'evict')
-    const answer = await friend.tryBirth(proving)
-    expect(answer).to.include({ ok: false, err: refusal })
-    expect(bank.isLocked).to.be.true
+    expect(await TH.expectRefusal(Bank.birth(record, opts))).to.equal(refusal)
+    expect(births.banks[0]!.isLocked).to.be.true
     expect(evict).toHaveBeenCalledTimes(1)
   })
 
-  it("answers the device's refusal on a swept device, building no lease and writing nothing", async () => {
-    const { device, friend, proving } = await unbornBankOf()
+  it("refuses bad_option where opts has no proving", async () => {
+    const { record, opts } = await birthArgsOf()
+    await TH.expectRefusal(Bank.birth(record, { ...opts, proving: {} as Proving }), 'bad_option')
+  })
+
+  it("throws the device's refusal on a swept device, building no lease and writing nothing", async () => {
+    const { device, record, opts } = await birthArgsOf()
     const make = vi.spyOn(Lease, 'make')
     const tryBirthBank = vi.spyOn(device.vaultDB, 'tryBirthBank')
     device.sweep()
-    const answer = await friend.tryBirth(proving)
-    expect(answer).to.include({ ok: false, dbhas: null, err: device.endCause })
+    expect(await TH.expectRefusal(Bank.birth(record, opts), 'disabled')).to.equal(device.endCause)
     expect(make).not.toHaveBeenCalled()
     expect(tryBirthBank).not.toHaveBeenCalled()
   })
 
   it("throws the device's refusal where the device is swept as the birth runs, writing nothing", async () => {
-    const { device, bank, friend, proving } = await unbornBankOf()
-    const tryBirthBank = vi.spyOn(device.vaultDB, 'tryBirthBank')
-    const trying = friend.tryBirth(proving)
+    const { device, record, opts } = await birthArgsOf()
+    const births = TH.spyBirths(device)
+    const birthing = Bank.birth(record, opts)
     device.sweep()
-    expect(await TH.expectRefusal(trying, 'disabled')).to.equal(device.endCause)
-    expect(tryBirthBank).not.toHaveBeenCalled()
-    expect(bank.isLocked).to.be.true
+    expect(await TH.expectRefusal(birthing, 'disabled')).to.equal(device.endCause)
+    expect(births.tryBirthBank).not.toHaveBeenCalled()
+    expect(births.banks[0]!.isLocked).to.be.true
   })
 })

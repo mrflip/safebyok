@@ -109,30 +109,28 @@ export async function buildBornBank({ passkeyClear, device = makeDevice() }: Bor
   const main = await proving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(proving) ?? null
   const record = Bank.makeRecord({ ...WorldBankStamp, maingate: { ...WorldGateStamp, wayins: { main, passkey0 } } })
-  const { bank, friend } = Bank.makeUnborn(record, { device, vaultDB: device.vaultDB })
-  const born = await friend.tryBirth(proving)
-  if (! born.ok) { throw born.err }
+  const bank = await Bank.birth(record, { device, vaultDB: device.vaultDB, proving })
   return { device, bank, record, proving }
 }
 // --
 
 // == [Births]: BirthSpy, spyBirths
 
-/** What {@link spyBirths} saw, in call order: each bank `Bank.makeUnborn` made, and whether the bank was locked as its birth reached the vaultDB. */
+/** What {@link spyBirths} saw, in call order: each bank `Bank.make` made, and whether the bank was locked as its birth reached the vaultDB. */
 export interface BirthSpy {
   banks:          Bank[]
   tryBirthBank:   MockInstance<VaultDB['tryBirthBank']>
   lockedAtBirths: boolean[]
 }
 
-/** Spy on each birth on `device`: the banks made unborn, and the device's vaultDB's `tryBirthBank`, which `answer` answers in its place where given. Vitest restores both before the next test. */
+/** Spy on each birth on `device`: the banks made, and the device's vaultDB's `tryBirthBank`, which `answer` answers in its place where given. Vitest restores both before the next test. */
 export function spyBirths(device: Device, answer?: (ask: BirthBankAsk) => Promise<BirthBankAnswer>): BirthSpy {
   const banks: Bank[] = []
   const lockedAtBirths: boolean[] = []
-  const makeUnborn = Bank.makeUnborn.bind(Bank)
-  vi.spyOn(Bank, 'makeUnborn').mockImplementation((record, opts) => {
-    const made = makeUnborn(record, opts)
-    banks.push(made.bank)
+  const make = Bank.make.bind(Bank)
+  vi.spyOn(Bank, 'make').mockImplementation((record, opts) => {
+    const made = make(record, opts)
+    banks.push(made)
     return made
   })
   const { vaultDB } = device

@@ -234,13 +234,7 @@ export async function birthBank(device: Device, cleartexts: unknown): Promise<Ba
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const bankRecord = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins: { main, passkey0 } } })
-  const { bank, friend } = Bank.makeUnborn(bankRecord, { device, vaultDB: device.vaultDB })
-
-  const born = await friend.tryBirth(passphraseProving)
-  if (! born.ok) { throw born.err }
-  // The user must hear that their passphrase was not set: the bank stored is another's.
-  if (born.val.bank.revtok !== bank.revtok) { throw Throwers.gateMadeElsewhere() }
-  return bank
+  return Bank.birth(bankRecord, { device, vaultDB: device.vaultDB, proving: passphraseProving })
 }
 // --
 
