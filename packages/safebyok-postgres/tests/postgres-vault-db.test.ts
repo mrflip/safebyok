@@ -118,6 +118,15 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     }
   })
 
+  it("keeps its tables and writing functions from every role but their owner", async () => {
+    const db = await database()
+    const { rows: tables } = await db.query("SELECT relname, relrowsecurity FROM pg_class WHERE relname LIKE 'safebyok\\_%' AND relkind = 'r' ORDER BY relname")
+    expect(tables).to.deep.equal(['safebyok_bank_things', 'safebyok_box_things', 'safebyok_gate_things'].map((relname) => ({ relname, relrowsecurity: true })))
+    const writers = ['safebyok_write_bank(jsonb, jsonb)', 'safebyok_write_gate(jsonb, jsonb, text[])', 'safebyok_write_box(jsonb, jsonb)', 'safebyok_birth_roots(jsonb, jsonb, jsonb)', 'safebyok_tell_thing(jsonb, jsonb)']
+    const { rows: grants } = await db.query("SELECT bool_or(has_function_privilege('public', writer, 'EXECUTE')) AS any FROM unnest($1::text[]) AS writer", [writers])
+    expect(grants).to.deep.equal([{ any: false }])
+  })
+
   it("refuses a client, listen or opt it cannot use", async () => {
     const client = await database()
     const unusable = [{}, { client: {} }, { client, listen: 'yes' }, { client, doNotifyTracked: 'no' }, { client, pushWorld: true }]

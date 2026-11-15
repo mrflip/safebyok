@@ -68,4 +68,10 @@ CREATE TABLE IF NOT EXISTS safebyok_box_things (${ThingColumns}
   CHECK ((am = 'a') = (sidecar IS NOT NULL)),
   CHECK (COALESCE(jsonb_typeof(sidecar), 'object') = 'object' AND jsonb_typeof(whisper_sealed) = 'object')
 );
+
+-- Row-level security is on, with no policy. The role that owns the tables, which your server
+-- connects as, can reach every row. No other role can reach any, including Supabase's Data API roles.
+ALTER TABLE safebyok_bank_things ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safebyok_gate_things ENABLE ROW LEVEL SECURITY;
+ALTER TABLE safebyok_box_things  ENABLE ROW LEVEL SECURITY;
 `

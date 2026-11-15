@@ -298,4 +298,11 @@ BEGIN
   INTO bank, gate, root;
   RETURN NEXT;
 END $$;
+
+REVOKE ALL ON FUNCTION safebyok_thing_record(jsonb)                   FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_tell_thing(jsonb, jsonb)              FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_write_bank(jsonb, jsonb)              FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_write_gate(jsonb, jsonb, text[])      FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_write_box(jsonb, jsonb)               FROM PUBLIC;
+REVOKE ALL ON FUNCTION safebyok_birth_roots(jsonb, jsonb, jsonb)      FROM PUBLIC;
 `
