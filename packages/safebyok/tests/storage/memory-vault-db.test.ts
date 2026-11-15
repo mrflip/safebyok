@@ -141,14 +141,14 @@ describe("MemoryVaultDB.tryWriteThing(ask), under a storage policy", () => {
 
   it("replaces the passphrase wayin the gating proved against", async () => {
     const vaultDB = await vaultDBWith(stored)
-    const ask = TH.replaceAskOf(stored, TH.nextGateOf(stored, { wayins: { main: TH.BW.otherMainWayin } }), { policies: ['replace_passphrase'] })
+    const ask = TH.replaceAskOf(stored, TH.nextGateOf(stored, { wayins: { main: TH.BW.otherMainWayin, passkey0: null } }), { policies: ['replace_passphrase'] })
     expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'replaced' })
   })
 
   it("refuses to replace a passphrase wayin other than the one proved against", async () => {
     const vaultDB = await vaultDBWith(stored)
-    const cited = { ...stored, wayins: { main: TH.BW.otherMainWayin } }
-    const ask = TH.replaceAskOf(cited, TH.nextGateOf(stored, { wayins: { main: TH.BW.otherMainWayin } }), { policies: ['replace_passphrase'] })
+    const cited = { ...stored, wayins: { main: TH.BW.otherMainWayin, passkey0: null } }
+    const ask = TH.replaceAskOf(cited, TH.nextGateOf(stored, { wayins: { main: TH.BW.otherMainWayin, passkey0: null } }), { policies: ['replace_passphrase'] })
     const answer = await vaultDB.tryWriteThing(ask)
     await TH.expectBad(Promise.resolve(answer), 'gate_issue')
     expect(answer).to.deep.include({ act: 'policied', dbhas: stored })

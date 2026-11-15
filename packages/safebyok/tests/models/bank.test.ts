@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { BX, Errors } from 'safebyok-big/internals'
+import { Crypto, Errors, SX } from 'safebyok-big/internals'
 import { Bank, type BankRecord } from '../../src/models/bank'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
-import { PutNotBuilt } from '../../src/phrases'
-import { BankThingFormat, BoxThingFormat, boxSparse, boxThing, lifeseqOf } from '../../src/storage/shapes-thing'
+import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxSparse, boxThing, lifeseqOf } from '../../src/storage/shapes-thing'
+import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -23,19 +23,26 @@ const Life3 = lifeseqOf(3)
 /** A stored proving of `bank`'s main gate, by {@link TH.TestPassphrase}. */
 function storedProvingOf(bank: Bank): Promise<PassphraseProving> { return PassphraseProving.buildStored(bank.maingate, TH.TestPassphrase, bank.device) }
 
+/** What a birth on `device` is given, as the gating attempt makes it: the record of a bank of {@link TH.WorldBankStamp}, and opts with its passphrase's proving. */
+async function birthArgsOf(device = TH.makeDevice()) {
+  const proving = await PassphraseProving.buildNovel(TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase, device)
+  const record = Bank.makeRecord({ ...TH.WorldBankStamp, maingate: { ...TH.WorldGateStamp, wayins: { main: await proving.buildWayin(NOVEL), passkey0: null } } })
+  return { device, record, opts: { device, vaultDB: device.vaultDB, proving } }
+}
+
 describe("Bank.mintStamps(scope)", () => {
   it("mints the stamp of the bank's first life and its main gate's, of the scope, born now", () => {
     const { bankStamp, gateStamp } = Bank.mintStamps(TH.WorldScope)
     expect(bankStamp).to.deep.equal({ ...TH.ThingBank, lifeseq: Life0, born_at: TH.T0 })
-    expect(gateStamp).to.include({ ...TH.WorldScope, gatelabel: 'main', registered_at: TH.T0 })
-    expect(Object.keys(gateStamp)).to.have.members(['user_id', 'banklabel', 'gatelabel', 'gate_tok', 'registered_at'])
+    expect(gateStamp).to.deep.equal({ ...TH.ThingBank, labelpath: 'gate', lifeseq: Life0, born_at: TH.T0 })
   })
 
-  it("mints a fresh gate_tok on every call, and the bank's first lifeseq each time", () => {
+  it("mints the first lifeseqs on every call, born when it is called", () => {
     const one = Bank.mintStamps(TH.WorldScope)
+    vi.setSystemTime(TH.T0 + 5)
     const two = Bank.mintStamps(TH.WorldScope)
-    expect(one.gateStamp.gate_tok).to.not.eq(two.gateStamp.gate_tok)
-    expect([one.bankStamp.lifeseq, two.bankStamp.lifeseq]).to.deep.equal([Life0, Life0])
+    expect([one.bankStamp.lifeseq, two.bankStamp.lifeseq, one.gateStamp.lifeseq, two.gateStamp.lifeseq]).to.deep.equal([Life0, Life0, Life0, Life0])
+    expect([two.bankStamp.born_at, two.gateStamp.born_at]).to.deep.equal([TH.T0 + 5, TH.T0 + 5])
   })
 
   it("takes the scope of anything that has one, such as a device", () => {
@@ -61,16 +68,16 @@ describe("Bank.makeRecord(dna)", () => {
   it("is the bank's Thing at its first revision, of its stamp, with its main gate's first record and its root box's", async () => {
     const { record, bank } = await TH.buildBornBank()
     expect(record).to.include({ ...TH.WorldBankStamp, labelpath: 'bank', label: 'bank', fmt: BankThingFormat, revseq: 0, am: 'a', lifepath: Life0, written_at: TH.T0 })
-    expect(record.maingate).to.include({ ...TH.WorldGateStamp, fmt: BX.GateFormat, revision_seq: 0, bank_tok: Life0 })
-    expect(record.maingate.wayins.main).to.deep.equal(bank.maingate.main.pickle())
+    expect(record.maingate).to.include({ ...TH.WorldGateStamp, label: 'gate', fmt: GateThingFormat, revseq: 0, am: 'a', lifepath: Life0, written_at: TH.T0 })
+    expect(record.maingate.wayins).to.deep.equal({ main: bank.maingate.main.pickle(), passkey0: null })
     expect(Object.keys(record)).to.have.members([...BankFields, 'maingate', 'rootBox'])
   })
 
-  it("makes the root box the first revision of its first life, born when the bank is, its revtok its own", async () => {
-    const { record } = await TH.buildBornBank()
-    expect(record.rootBox).to.include({ ...TH.RootScope, label: 'box', fmt: BoxThingFormat, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0, written_at: TH.T0 })
-    expect(record.rootBox.revtok).to.not.eq(record.revtok)
-    expect(boxSparse.parse(record.rootBox)).to.deep.equal(record.rootBox)
+  it("makes the root box its shell, which the birth seals as the first revision of its first life", async () => {
+    const { record, bank } = await TH.buildBornBank()
+    expect(record.rootBox).to.deep.equal({ ...TH.RootScope, label: 'box', fmt: BoxThingFormat, ...ShellCited, lifeseq: ShellLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime })
+    expect(bank.rootBox).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0, written_at: TH.T0 })
+    expect(boxSparse.parse(bank.rootBox)).to.deep.equal(bank.rootBox)
   })
 
   it("refuses a dna with no main gate, a malformed one, or none at all", async () => {
@@ -114,9 +121,9 @@ describe("Bank.make(record, { device, vaultDB })", () => {
     expect(Object.isFrozen(pickle)).to.be.true
   })
 
-  it("shows its stamp alone, frozen, and serializes no wrapped bankKey", async () => {
+  it("shows its Thing fields alone, frozen, and serializes no wrapped bankKey", async () => {
     const { bank } = await TH.buildBornBank()
-    expect(Object.keys(bank)).to.have.members(['userid', 'banklabel', 'lifeseq', 'born_at'])
+    expect(Object.keys(bank)).to.have.members(BankFields)
     expect(Object.isFrozen(bank)).to.be.true
     expect(() => { (bank as { lifeseq: string }).lifeseq = Life2 }).to.throw(TypeError)
     expect(JSON.stringify(bank)).to.not.include('ciphertext_b64')
@@ -158,9 +165,16 @@ describe("Bank.make(record, { device, vaultDB })", () => {
     })
   }
 
-  it("refuses a main gate of another life of the bank", async () => {
+  it("refuses a main gate of another bank", async () => {
     const { record, device } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Bank.make({ ...record, maingate: { ...record.maingate, bank_tok: Life2 } }, { device, vaultDB: device.vaultDB }), 'record_conflict')
+    TH.expectSyncRefusal(() => Bank.make({ ...record, maingate: { ...record.maingate, banklabel: 'work' } }, { device, vaultDB: device.vaultDB }), 'record_conflict')
+  })
+
+  // A gate's life is its own: a main gate born again stands in the bank's life it was born in.
+  it("accepts a main gate of a later life of its own", async () => {
+    const { record, device } = await TH.buildBornBank()
+    const bank = Bank.make({ ...record, maingate: { ...record.maingate, lifeseq: Life2, lifepath: Life2 } }, { device, vaultDB: device.vaultDB })
+    expect(bank.maingate.lifeseq).to.eq(Life2)
   })
 
   const OtherRootCases = [
@@ -197,14 +211,14 @@ describe("bank.unlockByProving(proved, cited) and bank.lock()", () => {
     const make = vi.spyOn(Lease, 'make')
     expect(await bank.unlockByProving(await storedProvingOf(bank))).to.equal(bank)
     expect(bank.isUnlocked).to.be.true
-    expect(make.mock.calls[0]![0]).to.include({ gate_tok: bank.maingate.gate_tok, gate_revision_tok: bank.maingate.revision_tok, wayinkind: 'passphrase', proved_at: TH.T0 })
+    expect(make.mock.calls[0]![0]).to.include({ gatelabelpath: 'gate', gate_lifeseq: Life0, gate_revtok: bank.maingate.revtok, wayinkind: 'passphrase', proved_at: TH.T0 })
   })
 
   it("cites the gate revision it is given", async () => {
     const { bank } = await TH.buildBornBank()
     const make = vi.spyOn(Lease, 'make')
-    await bank.unlockByProving(await storedProvingOf(bank), { ...TH.WorldGate, revision_tok: 'gate-revision-tok-9' })
-    expect(make.mock.calls[0]![0]).to.include({ gate_revision_tok: 'gate-revision-tok-9' })
+    await bank.unlockByProving(await storedProvingOf(bank), { ...TH.WorldGate, revtok: 'gate-revision-tok-9' })
+    expect(make.mock.calls[0]![0]).to.include({ gate_revtok: 'gate-revision-tok-9' })
   })
 
   it("evicts the lease an unlock replaces", async () => {
@@ -530,11 +544,122 @@ describe("bank.tombstoneBox(prior), and the unseal of a tombstone", () => {
   }
 })
 
-describe("bank.put(opts)", () => {
-  it("rejects in this layer, which stores nothing", async () => {
+/** The revision of `bank`'s Thing after the one in hand, written a millisecond later. */
+function nextBankThingOf(bank: Bank) {
+  return { ...bank.pickle(), revtok: Crypto.randomId(), revseq: bank.revseq + 1, written_at: bank.written_at + 1 }
+}
+
+describe("bank.put(args)", () => {
+  it("writes the bank's next revision, answering it as stored, and leaves the bank in hand as it was", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const record = nextBankThingOf(bank)
+    expect(await bank.put({ cited: bank.pickle(), record })).to.deep.equal(record)
+    expect(bank.revtok).to.not.eq(record.revtok)
+    const got = await device.vaultDB.tryGetThing(device.vaultDB.getAsk({ ...bank.scope, labelpath: 'bank' }))
+    expect(got).to.deep.include({ ok: true, val: record })
+  })
+
+  it("throws the vaultDB's refusal, as for a revision it does not cite", async () => {
     const { bank } = await TH.buildBornBank()
-    const err = await TH.expectRefusal(bank.put({ ifPresent: 'fail' }), 'unexpected_error')
-    expect(err.message).to.eq(PutNotBuilt)
+    await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), revtok: 'rev-stale' }, record: nextBankThingOf(bank) }))
+    expect(await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })).to.include({ revseq: 1 })
+  })
+
+  it("refuses a record of another bank, writing nothing", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const record = { ...nextBankThingOf(bank), banklabel: 'work' }
+    await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), banklabel: 'work' }, record }))
+    const got = await device.vaultDB.tryGetThing(device.vaultDB.getAsk({ ...bank.scope, labelpath: 'bank' }))
+    expect(got).to.deep.include({ ok: true, val: bank.pickle() })
+  })
+
+  it("refuses on a swept device, before it reaches the vaultDB", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
+    device.sweep()
+    const err = await TH.expectRefusal(bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) }), 'disabled')
+    expect(err).to.equal(device.endCause)
+    expect(tryWriteThing).not.toHaveBeenCalled()
   })
 })
 
+describe("Bank.birth(record, opts)", () => {
+  it("births the bank, its main gate and its root box sealed under a new lease, and unlocks under that lease", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    const births = TH.spyBirths(device)
+    const bank = await Bank.birth(record, opts)
+    const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
+    expect(answer).to.include({ ok: true, act: 'born' })
+    if (! answer.ok) { throw answer.err }
+    expect(answer.val.bank).to.deep.equal(bank.pickle())
+    expect(answer.val.gate).to.deep.equal(bank.maingate.pickle())
+    expect(answer.val.root).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0 })
+    expect(births.lockedAtBirths).to.deep.equal([true])
+    expect(bank.rootBox).to.deep.equal(boxSparse.parse(answer.val.root))
+    expect(bank.isUnlocked).to.be.true
+    expect(await bank.unsealBox(answer.val.root)).to.deep.include({ whisper: {} })
+  })
+
+  // The vaultDB answers retcon, not passed, to a birth it stored already; passed on this bank is a vaultDB's answer alone.
+  it("unlocks where the vaultDB passes on this same bank, taking the root box it answers", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
+    const births = TH.spyBirths(device, async (ask) => {
+      const born = await tryBirthBank(ask)
+      return born.ok ? { ...born, act: 'passed' } : born
+    })
+    const bank = await Bank.birth(record, opts)
+    const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
+    expect(answer).to.include({ ok: true, act: 'passed' })
+    expect(bank.isUnlocked).to.be.true
+    expect(bank.rootBox).to.deep.equal(answer.ok && boxSparse.parse(answer.val.root))
+  })
+
+  it("refuses gate_made_elsewhere where the vaultDB passes on another bank, leaving its own bank locked", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    await Bank.birth(record, opts)
+    const theirs = await birthArgsOf(device)
+    const births = TH.spyBirths(device)
+    const evict = vi.spyOn(Lease.prototype, 'evict')
+    await TH.expectRefusal(Bank.birth(theirs.record, theirs.opts), 'gate_made_elsewhere')
+    expect(await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)).to.include({ ok: true, act: 'passed' })
+    expect(births.banks[0]!.isLocked).to.be.true
+    expect(births.banks[0]!.rootBox).to.include({ revtok: SX.VoidRevisionTok })
+    expect(evict).toHaveBeenCalledTimes(1)
+  })
+
+  it("throws the vaultDB's refusal as it came, evicting the new lease and leaving the bank locked", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
+    const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
+    const evict = vi.spyOn(Lease.prototype, 'evict')
+    expect(await TH.expectRefusal(Bank.birth(record, opts))).to.equal(refusal)
+    expect(births.banks[0]!.isLocked).to.be.true
+    expect(evict).toHaveBeenCalledTimes(1)
+  })
+
+  it("refuses bad_option where opts has no proving", async () => {
+    const { record, opts } = await birthArgsOf()
+    await TH.expectRefusal(Bank.birth(record, { ...opts, proving: {} as Proving }), 'bad_option')
+  })
+
+  it("throws the device's refusal on a swept device, building no lease and writing nothing", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    const make = vi.spyOn(Lease, 'make')
+    const tryBirthBank = vi.spyOn(device.vaultDB, 'tryBirthBank')
+    device.sweep()
+    expect(await TH.expectRefusal(Bank.birth(record, opts), 'disabled')).to.equal(device.endCause)
+    expect(make).not.toHaveBeenCalled()
+    expect(tryBirthBank).not.toHaveBeenCalled()
+  })
+
+  it("throws the device's refusal where the device is swept as the birth runs, writing nothing", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    const births = TH.spyBirths(device)
+    const birthing = Bank.birth(record, opts)
+    device.sweep()
+    expect(await TH.expectRefusal(birthing, 'disabled')).to.equal(device.endCause)
+    expect(births.tryBirthBank).not.toHaveBeenCalled()
+    expect(births.banks[0]!.isLocked).to.be.true
+  })
+})

@@ -147,10 +147,13 @@ export class Device {
   }
   // --
 
-  // == [Guards]: isEnabled, demandEnabled
+  // == [Guards]: isEnabled, endCause, demandEnabled
 
   /** True from `Device.make` until a sweep, and never again. */
   get isEnabled(): boolean { return this.#endCause === null }
+
+  /** Why a sweep disabled this device, the one refusal every call on it then meets; null while it is enabled. */
+  get endCause(): Errors.VaultError | null { return this.#endCause }
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {

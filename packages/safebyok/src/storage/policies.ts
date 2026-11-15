@@ -20,14 +20,14 @@ const GatePolicies = {
   },
   /** The record adds a passkey wayin to a gate that has none, and changes nothing else. */
   add_passkey(_cited: GateCited, record: GateThing, stored: GateThing): void {
-    if (stored.wayins.passkey0 !== undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyStored) }
-    if (record.wayins.passkey0 === undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyNotAdded) }
+    if (stored.wayins.passkey0 !== null)                                              { throw gateIssue(stored, BigPhrases.PasskeyStored) }
+    if (record.wayins.passkey0 === null)                                              { throw gateIssue(stored, BigPhrases.PasskeyNotAdded) }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0']))) { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
   /** The record removes the gate's passkey wayin, and changes nothing else. */
   revoke_passkey(_cited: GateCited, record: GateThing, stored: GateThing): void {
-    if (stored.wayins.passkey0 === undefined)                                         { throw gateIssue(stored, BigPhrases.NoPasskeyStored) }
-    if (record.wayins.passkey0 !== undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyNotRevoked) }
+    if (stored.wayins.passkey0 === null)                                              { throw gateIssue(stored, BigPhrases.NoPasskeyStored) }
+    if (record.wayins.passkey0 !== null)                                              { throw gateIssue(stored, BigPhrases.PasskeyNotRevoked) }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0']))) { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
 } as const satisfies Record<EX.StoragePolicy, (cited: GateCited, record: GateThing, stored: GateThing) => void>

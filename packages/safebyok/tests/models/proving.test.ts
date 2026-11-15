@@ -132,8 +132,8 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", ()
     [() => ({ bank: { ...TH.WorldBankStamp, lifeseq: undefined } }),                            'a bank stamp with no lifeseq'],
     [() => ({ bank: { ...TH.WorldBankStamp, born_at: 'yesterday' } }),                          'a bank stamp whose born_at is not epoch millis'],
     [() => ({ bank: null }),                                                                    'no bank stamp at all'],
-    [() => ({ gate: { ...TH.WorldGateStamp, gate_tok: undefined } }),                           'a gate stamp with no gate_tok'],
-    [() => ({ gate: { ...TH.WorldGateStamp, gatelabel: 'other' } }),                            'a gate stamp of a gatelabel no gate has'],
+    [() => ({ gate: { ...TH.WorldGateStamp, lifeseq: undefined } }),                            'a gate stamp with no lifeseq'],
+    [() => ({ gate: TH.omitting(TH.WorldGateStamp, 'labelpath') }),                              'a gate stamp with no labelpath'],
     [() => ({ gate: null }),                                                                    'no gate stamp at all'],
     [() => ({ passphraseClear: 42 }),                                                           'a passphrase that is not a string'],
   ] as const
@@ -487,7 +487,7 @@ describe("proving.buildWayin(source)", () => {
   it("binds the wayin to its bank and its gate: under another's stamp it will not unwrap", async () => {
     const { wayin } = await novelWithWayin()
     await expect(TH._cheat_bankKeyBytesOf({ ...TH.WorldBankStamp, lifeseq: lifeseqOf(2) }, TH.WorldGateStamp, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
-    await expect(TH._cheat_bankKeyBytesOf(TH.WorldBankStamp, { ...TH.WorldGateStamp, gate_tok: 'gate-tok-other' }, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
+    await expect(TH._cheat_bankKeyBytesOf(TH.WorldBankStamp, { ...TH.WorldGateStamp, lifeseq: lifeseqOf(2) }, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
   })
 
   const SourceCases = [
@@ -511,7 +511,7 @@ describe("proving.buildWayin(source)", () => {
 
   const OtherSourceCases = [
     [{ bank: { lifeseq: lifeseqOf(2) } },      'another life of the bank'],
-    [{ gate: { gate_tok: 'gate-tok-other' } }, 'another life of the gate'],
+    [{ gate: { lifeseq: lifeseqOf(2) } },      'another life of the gate'],
   ] as const
 
   for (const [moves, blurb] of OtherSourceCases) {
@@ -540,12 +540,13 @@ describe("proving.buildWayin(source)", () => {
 })
 
 const StampCases = [
-  [{ bank: { userid: 'u2' }, gate: { user_id: 'u2' } },                      'the stamps of another user'],
+  [{ bank: { userid: 'u2' }, gate: { userid: 'u2' } },                       'the stamps of another user'],
   [{ bank: { banklabel: 'acme_other' }, gate: { banklabel: 'acme_other' } }, 'the stamps of another bank'],
   [{ bank: { lifeseq: lifeseqOf(2) } },                                      'the stamp of another life of the bank'],
   [{ bank: { born_at: TH.T0 + 1 } },                                         'a bank stamp whose born_at moved'],
-  [{ gate: { gate_tok: 'gate-tok-other' } },                                 'the stamp of another life of the gate'],
-  [{ gate: { registered_at: TH.T0 + 1 } },                                   'a gate stamp whose registered_at moved'],
+  [{ gate: { lifeseq: lifeseqOf(2) } },                                      'the stamp of another life of the gate'],
+  [{ gate: { labelpath: 'gate/passkeys' } },                                 'the stamp of a gate at another labelpath'],
+  [{ gate: { born_at: TH.T0 + 1 } },                                         'a gate stamp whose born_at moved'],
 ] as const
 
 const HeaderCases = [
@@ -569,7 +570,7 @@ describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of HeaderCases) {
     it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
-      const moved = gateOf({ ...gate.pickle(), wayins: { main: { ...gate.wayins.main, ...altered } } })
+      const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, main: { ...gate.wayins.main, ...altered } } })
       await TH.expectRefusal(PassphraseProving.buildStored(moved, TH.TestPassphrase, TH.provingDeviceOf()), 'wrong_passphrase')
     })
 
@@ -598,7 +599,7 @@ describe("a passkey proving's passkeyKey", () => {
     const proving = await novelPasskey(answer)
     const { bank_key_wayin_wrapped: wrapped } = await proving.buildWayin(NOVEL)
     const ctx = Crypto.cipherCtx([TH.WorldBankStamp, TH.WorldGateStamp], 'bank_key_passkey_wrapped', proving.header)
-    const otherGateInfo = Crypto.cipherCtx([TH.WorldBankStamp, { ...TH.WorldGateStamp, gate_tok: 'gate-tok-other' }], 'bank_key_passkey_wrapped', proving.header)
+    const otherGateInfo = Crypto.cipherCtx([TH.WorldBankStamp, { ...TH.WorldGateStamp, lifeseq: lifeseqOf(2) }], 'bank_key_passkey_wrapped', proving.header)
     const passkeyKey = await Crypto.deriveWrappingKey(prfBytes, otherGateInfo)
     await expect(Crypto.unwrapKeyUnder(passkeyKey, wrapped, ctx, CheckUsage)).rejects.toThrow()
   })
@@ -615,7 +616,7 @@ describe("proving.buildLease(bank, gate)", () => {
     const bank = TH.fakeLeaseBankOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(bank, gate)
-    expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gatelabel: 'main', gate_tok: gate.gate_tok, gate_revision_tok: gate.revision_tok, proved_at: TH.T0, wayinkind: 'passkey' })
+    expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gatelabelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
     expect(lease.isEvicted).to.be.false
     expect(bank.lock).not.toHaveBeenCalled()
   })
@@ -623,8 +624,8 @@ describe("proving.buildLease(bank, gate)", () => {
   it("records the revision of the gate cited", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    const lease = await proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, revision_tok: 'gate-revision-tok-5' })
-    expect(lease.gate_revision_tok).to.eq('gate-revision-tok-5')
+    const lease = await proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, revtok: 'gate-revision-tok-5' })
+    expect(lease.gate_revtok).to.eq('gate-revision-tok-5')
   })
 
   it("builds leases over one bankKey from both provings", async () => {
@@ -653,14 +654,14 @@ describe("proving.buildLease(bank, gate)", () => {
   it("refuses to cite another life of the gate proved", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    const err = await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, gate_tok: 'gate-tok-other' }))
+    const err = await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, lifeseq: lifeseqOf(2) }))
     expect(err.message).to.eq(Phrases.LeaseOfOtherGate)
   })
 
-  it("refuses a gate cited with no revision_tok, or none at all, and a bank with no lock", async () => {
+  it("refuses a gate cited with no revtok, or none at all, and a bank with no lock", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), TH.omitting(TH.WorldGate, 'revision_tok')))
+    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), TH.omitting(TH.WorldGate, 'revtok')))
     await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), undefined as never))
     await TH.expectRefusal(proving.buildLease({ stamp: TH.WorldBankStamp } as never, TH.WorldGate))
   })

@@ -23,7 +23,7 @@ typecheck and test, 641 tests green; `pnpm justify` at ready.
     seal's binding and the `bank_tok` loosening. The file's header says to amend an entry that covers the same
     mechanism in place.
 
-* **Decisions taken**
+* **Decisions made**
   * **Who binds the tags.** The lease binds them, as cipherCtx's visible header after the purpose, the house
     construction a wayin uses. The lease writes the `Sealed`, so it binds what it writes. `sealedOf` pins the stored
     tags to the sealer's, so a seal under another codec refuses `damaged_whisper` before any WebCrypto call.
