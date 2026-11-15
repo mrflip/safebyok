@@ -161,7 +161,7 @@ export type PasskeyUnlockButtonProps = {
   /** The relying-party id the passkey was created under. Defaults to the page's own domain. */
   rpId?:       string | undefined
   /** True to focus the button when it first renders. */
-  takesFocus?: boolean | undefined
+  isAutoFocused?: boolean | undefined
 }
 
 /** CreateVaultButton's props: the vaultlabel of the vault it creates. */

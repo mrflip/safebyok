@@ -21,7 +21,7 @@ export const offersPasskey = (gating: AnyGating): boolean => (
   passkeysAvailable() && gating.passkeyHeader?.wayinkind === 'passkey'
 )
 
-const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButtonProps) => {
+const PasskeyPress = ({ gating, onGripe, rpId, isAutoFocused }: PasskeyUnlockButtonProps) => {
   const [isAsking, startAsking] = useTransition()
   // `pending` is false when the button is outside a form, as in a host's own dialog.
   const { pending: isFormPending } = useFormStatus()
@@ -53,7 +53,7 @@ const PasskeyPress = ({ gating, onGripe, rpId, takesFocus }: PasskeyUnlockButton
   return (
     // Use aria-disabled, not disabled: a disabled button loses focus, and the user loses their place in the dialog.
     // eslint-disable-next-line jsx-a11y/no-autofocus -- used only where a dialog offers the passkey first: the WAI-ARIA dialog pattern moves focus to a dialog's first control
-    <button type="button" autoFocus={takesFocus} aria-disabled={isAsking || isFormPending} onClick={press}>
+    <button type="button" autoFocus={isAutoFocused} aria-disabled={isAsking || isFormPending} onClick={press}>
       {Messages.passkeyButton}
     </button>
   )

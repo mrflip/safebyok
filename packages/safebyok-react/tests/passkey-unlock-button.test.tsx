@@ -20,7 +20,7 @@ const passkeyedUnlock = async () => {
 }
 
 /** Render the button for `gating`. Returns the gripes it passed to `onGripe`, and the errors React reported. */
-const buttonFor = (gating: Gating<'unlock_bank'>, extra: { takesFocus?: boolean } = {}) => {
+const buttonFor = (gating: Gating<'unlock_bank'>, extra: { isAutoFocused?: boolean } = {}) => {
   const gripes: (string | null)[] = []
   const ui = <PasskeyUnlockButton gating={gating} onGripe={(gripe) => { gripes.push(gripe) }} {...extra} />
   return { ...TH.renderReporting(ui), ui, gripes }
@@ -64,7 +64,7 @@ describe("PasskeyUnlockButton", () => {
 
   it("stays focusable while the browser asks", async () => {
     const { gating, authenticator } = await passkeyedUnlock()
-    buttonFor(gating, { takesFocus: true })
+    buttonFor(gating, { isAutoFocused: true })
     const button = screen.getByText(Messages.passkeyButton)
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
@@ -81,9 +81,9 @@ describe("PasskeyUnlockButton", () => {
     expect(authenticator.calls.get).to.have.lengthOf(1)
   })
 
-  it("takes the focus when asked to", async () => {
+  it("focuses itself when asked to", async () => {
     const { gating } = await passkeyedUnlock()
-    buttonFor(gating, { takesFocus: true })
+    buttonFor(gating, { isAutoFocused: true })
     expect(document.activeElement).to.equal(screen.getByText(Messages.passkeyButton))
   })
 
