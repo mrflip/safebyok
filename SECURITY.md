@@ -54,7 +54,7 @@ that breaks that promise is in scope, for example:
 * weak or predictable randomness, or a key derivation weaker than the published keyDeriverSpec;
 * a published package whose files do not match this repository's source.
 
-`notes/guarantees.md` states, value by value, where secret material may exist, in what form, for
+`notes/guarantees-big.md` states, value by value, where secret material may exist, in what form, for
 how long, and which code may have it. Anything that shows one of those guarantees broken is in
 scope.
 

@@ -261,5 +261,5 @@ and `safebyok-graphql` are the adapters.
 
 * [tests/models/proof.test.ts](tests/models/proof.test.ts): a host takes a device and its bank through its whole
   lifecycle, and every step asserts what its components render. This is the real usage guide.
-* [notes/guarantees.md](../../notes/guarantees.md): where secret material lives.
+* [notes/guarantees-big.md](../../notes/guarantees-big.md): where secret material lives.
 * [notes/configuration.md](../../notes/configuration.md): choosing a strength checker.

@@ -1006,7 +1006,8 @@ demandPromptable(): this { return this.demandEnabled().demandPresent() }        
 A `make` is given `(recordish, livepropsAndOpts)`, or `(recordish, livepropsAndOpts, friend)`. The first argument is the
 record, give or take a few fields. The second carries what comes out of band: the live objects the thing reaches (its
 device, its bank) and its options. Each is shaped like a pick of the class's interface, so both parts duck as the thing.
-A friend means something specific, a bag of callbacks into its owner's private state, and goes in neither: only third.
+A friend is the narrow set of an owner's attributes and callbacks that it hands a collaborator. It is a pick of the owner's
+interface where the names coincide, so the owner can duck for it, and it goes in neither of the first two: only third.
 
 **Goofus:** the friend comes first, and a flag rides along beside the record.
 

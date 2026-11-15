@@ -41,7 +41,7 @@ sprint directory on in full, since workers read it from theirs.
   likely touches; its **levels**, where they differ from the defaults; **what it depends on**;
   your **look-ahead**; and its **size**. Set a thread's levels as the Coach suggests or directs,
   or as you judge: `sonnet` and a `low` review for a small, mechanical thread, a `high` review
-  on `opus` (the reviewer's pin is `sonnet`) for one that touches what `notes/guarantees.md`
+  on `opus` (the reviewer's pin is `sonnet`) for one that touches what `notes/guarantees-big.md`
   covers; a lower effort for a mechanical change, a higher one where the work turns on judgment
   or on finding a cause; an `opus` style pass where the thread is mostly naming or vocabulary. Revise a later thread's levels as the earlier ones
   teach, and say so in its gloss. Read the whole request before writing any of this, because
