@@ -346,7 +346,7 @@ describe("box.listing.deliverRecord(rcvd): registered_at, and a record of anothe
 })
 // --
 
-// == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and put accept a duckish
+// == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; put accepts a duckish
 
 describe("Box and Storable entries: arguments checked before any demand", () => {
   const whisper = { apiKey: 'sk-test-0000' }

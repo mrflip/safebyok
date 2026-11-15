@@ -280,10 +280,10 @@ describe("Storable snapshot and subscription", () => {
       const listener = vi.fn()
       box.subscribe(listener)
       await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
-      const afterEdit = listener.mock.calls.length
-      expect(afterEdit).to.be.greaterThan(0)
+      const afterPut = listener.mock.calls.length
+      expect(afterPut).to.be.greaterThan(0)
       await box.del(box.scope)
-      expect(listener.mock.calls.length).to.be.greaterThan(afterEdit)
+      expect(listener.mock.calls.length).to.be.greaterThan(afterPut)
       expect(box.getSnapshot().isPresent).to.be.false
     })
   })

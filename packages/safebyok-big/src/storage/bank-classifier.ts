@@ -250,7 +250,7 @@ export function writtenBoxOf(boxQuery: BoxQuery, boxRaw: unknown): BoxRow {
 /** True when the act tells the caller to write the ask's record. */
 export function isWriteAct(act: BoxAct | VaultAct | ParentBankAct): act is WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 
-/** True when the act creates a row, or re-creates a deleted one. */
+/** True when the act is `born` or `reborn`. */
 export function isBirthAct(act: BoxAct | VaultAct): boolean { return (act === 'born') || (act === 'reborn') }
 
 /** True when the act makes a good answer: the record is stored, or the stored row is returned. */

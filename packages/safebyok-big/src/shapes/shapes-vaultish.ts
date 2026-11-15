@@ -277,7 +277,7 @@ export interface BoxSnapshot extends Boxscope {
 
 // == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, BoxHalves, BoxPatchParsed, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
-/** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
+/** Both halves of a box, the whisper and the sidecar: what every put of a box names, and what it seals. */
 export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
 
 /** True where a patch names a half of its box. */

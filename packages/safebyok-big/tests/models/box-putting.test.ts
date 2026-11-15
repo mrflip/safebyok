@@ -15,7 +15,7 @@ function builtOf(record: Fetched<BoxRecord, BoxSparse>, listing: TestableBoxList
   return listing.deliverRecord(record)
 }
 
-// == [Rebirth]: an edit over a box gone or damaged
+// == [Rebirth]: a put over a box gone or damaged
 
 describe("box.put(patch): rebirth over a tombstone", () => {
   const TombstoneCases = [
@@ -123,7 +123,7 @@ const asBuilt = { maxMillisSinceRefresh: Infinity, maxParentMillis: Infinity } a
 
 describe("box.put: the versioned replace, with or without ifPresent 'repl'", () => {
   for (const opts of [{}, { ifPresent: 'repl' }] as const) {
-    it(`refuses 'stale_write' for a box that changed in storage, and updates the box to the stored revision, with opts ${JSON.stringify(opts)}`, async () => {
+    it(`refuses 'stale_write' for a box that changed in storage, and adopts the stored revision, with opts ${JSON.stringify(opts)}`, async () => {
       const box = builtOf(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
       world.mw.clearCalls()
@@ -189,7 +189,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
   })
 })
 
-// == [A whisper and a sidecar on every update]: put, expose, veil
+// == [A whisper and a sidecar on every put]: put, expose, veil
 
 describe("box.put(patch): a patch naming a half", () => {
   const PatchCases = [

@@ -601,6 +601,6 @@ export function fakeSealBoxListingOf(mw: ModelsWorld, overrides: BoxListingOverr
 
 // == [Dna]: boxDnaOf
 
-/** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them. */
+/** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every put of a box names both, and `overrides` laid over them. */
 export function boxDnaOf(scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna { return { ...scope, whisper: { apiKey: 'sk-test-0000' }, sidecar: {}, ...overrides } }
 // --

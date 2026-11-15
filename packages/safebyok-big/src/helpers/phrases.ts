@@ -174,11 +174,11 @@ export const PartialLoad = "The record in hand is not full, so it cannot be open
 /** Why a bank or a gate is never put or deleted as a vault or a box is. */
 export const WrittenByOwnVerbs = "A bank's row and its gate's are written only by the bank's own verbs, so nothing was stored: build or change the bank through its prompts, and delete it, gate and all, with bank.del() or bank.delPrompt()."
 
-/** Why an update of a box naming neither its whisper nor its sidecar writes nothing. */
-export const PatchNamesNeitherHalf = "This update names neither a whisper nor a sidecar, so there is nothing to write."
+/** Why a put of a box naming neither its whisper nor its sidecar writes nothing. */
+export const PatchNamesNeitherHalf = "This put names neither a whisper nor a sidecar, so there is nothing to write."
 
-/** Why an update of a box whose patch names another's scope writes nothing. */
-export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This update names another ${fieldnames.join(' and ')} than its own, so nothing was written: update the one it names, which listing.at(scope) answers.`
+/** Why a put of a box whose patch names another's scope writes nothing. */
+export const patchOfOtherScope = (fieldnames: readonly string[]): string => `This put names another ${fieldnames.join(' and ')} than its own, so nothing was written: update the one it names, which listing.at(scope) answers.`
 
 /** Why the stand-in a box returns for a whisper it will not show is refused where a whisper is wanted. */
 export const WhisperedIsNoWhisper = "That is what a box shows for a whisper it will not show, as it is encrypted, locked or veiled. It is not a whisper: expose and unlock one first, or call box.putExposed()."

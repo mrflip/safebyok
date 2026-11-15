@@ -194,7 +194,7 @@ const isExpectedWhole  = ({ expected }: Expecting): boolean => (expected.revisio
 // A request and its record share only the address fields, so they agree when the record is at the request's address.
 const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => isConsistent(record, asked)
 
-/** True when a record's `lifeTok` is that of the live row it replaces, or a new one when it creates or deletes the row. */
+/** True when a record's `lifeTok` is that of the live row it replaces, or a new one when it is a birth or a deletion. */
 function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am, recordAm: EX.Am): boolean {
   if ((expectedAm === 'a') && (recordAm === 'a')) { return lifeTok === expectedLifeTok }
   return (lifeTok !== expectedLifeTok) && (lifeTok !== SX.VoidLifeTok)

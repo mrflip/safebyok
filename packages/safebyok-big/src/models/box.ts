@@ -207,7 +207,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
    *   - `'add'`  -- put it as a new life of the box, its whisper and sidecar `{}` where left out (default)
    *   - `'fail'` -- refuse `absent_box`
    *
-   * Refuses `stale_write` when storage has a newer revision. The box then has that revision: edit from it.
+   * Refuses `stale_write` when storage has a newer revision. The box then has that revision: put from it.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     demandGood(await this.tryPut(patch, opts))
@@ -220,7 +220,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxParentMillis } = VX.boxPutOpts.parse(opts)
       await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxParentMillis })
       const given = this.demandPuttable(patch, { ifPresent })
-      const { record, expected } = await this.#editAndSeal(given)
+      const { record, expected } = await this.#nextSealedOf(given)
       this.demandPuttable(patch, { ifPresent })
       return await this.listing.tryPut(record, { expected, ifAbsent, ifPresent })
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
@@ -237,7 +237,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
   /** The next record for `patch`, sealed but not yet put, with the row it is put over. */
-  async #editAndSeal({ whisper, sidecar }: BoxPatchParsed): Promise<{ record: BoxRecord, expected: BoxSparse }> {
+  async #nextSealedOf({ whisper, sidecar }: BoxPatchParsed): Promise<{ record: BoxRecord, expected: BoxSparse }> {
     const expected = this.central
     const written_at = nowMillis()
     const next = { ...expected, ...SX.nextRevisionOf(expected, written_at), am: 'a' as const }
