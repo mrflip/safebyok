@@ -191,7 +191,7 @@ export type ModalFormProps = {
   /** False to keep the submit button disabled. */
   isSubmittable?: boolean | undefined
   /** True to focus Cancel when the dialog opens, as for a confirmation with no fields. Otherwise the first control takes focus. */
-  cancelTakesFocus?: boolean | undefined
+  isCancelAutoFocused?: boolean | undefined
   /** The message for the live region, or null for none. */
   gripeText:      string | null
   /** The live region's id. */
