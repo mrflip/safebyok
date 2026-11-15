@@ -1,8 +1,9 @@
 /** What each wrap and cipher is bound to, byte for byte, and that a change to any field of a stamp keeps it shut. */
 
 import { describe, expect, it } from 'vitest'
-import { Crypto, GX } from 'safebyok-big/internals'
+import { Crypto } from 'safebyok-big/internals'
 import { type BoxRecord, BoxWhisper } from '../../src/models/sealers'
+import { LeaseFormat, type LeaseRecord } from '../../src/models/stamps'
 import { lifeseqOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
@@ -15,12 +16,12 @@ function textBytes(text: string): Uint8Array { return new TextEncoder().encode(t
 const WhisperText = '{"apiKey":"sk-test-0000"}'
 
 /** The JSON text of {@link TH.WorldBankStamp}, as every ctx under the bank holds it first: its keys sorted. */
-const BankStampText = `{"bank_tok":"bank-tok-u1","banklabel":"acme","registered_at":${String(TH.T0)},"user_id":"u1"}`
+const BankStampText = `{"banklabel":"acme","born_at":${String(TH.T0)},"lifeseq":"0000000000","userid":"u1"}`
 
 /** The JSON text of {@link TH.WorldGateStamp}, as each wayin's ctx holds it after the bank's. */
 const GateStampText = `{"banklabel":"acme","gate_tok":"gate-tok-u1","gatelabel":"main","registered_at":${String(TH.T0)},"user_id":"u1"}`
 
-const BankStampFields = ['user_id', 'banklabel', 'bank_tok', 'registered_at'] as const
+const BankStampFields = ['userid', 'banklabel', 'lifeseq', 'born_at'] as const
 const GateStampFields = ['user_id', 'banklabel', 'gatelabel', 'gate_tok', 'registered_at'] as const
 const LeaseStampFields = ['fmt', ...BankStampFields, 'gatelabel', 'gate_tok', 'gate_revision_tok', 'proved_at', 'wayinkind'] as const
 const BoxStampFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'] as const
@@ -53,7 +54,7 @@ async function openByHand(bankKey: CryptoKey, box: BoxRecord, bankStamp: Crypto.
 }
 
 /** A lease's record, built by a born bank's passphrase proving on a fake bank of {@link TH.WorldBankStamp}. */
-async function leaseRecordOf(): Promise<GX.LeaseRecord> {
+async function leaseRecordOf(): Promise<LeaseRecord> {
   const { proving } = await TH.buildBornBank()
   const { record } = await TH._cheat_grantedLease(proving, TH.fakeLeaseBankOf())
   return record
@@ -97,7 +98,7 @@ describe("each ctx, byte for byte", () => {
 
   it("binds a lease's wrap of the bankKey to the bank's stamp and its own", async () => {
     const record = await leaseRecordOf()
-    const leaseText = `{"bank_tok":"bank-tok-u1","banklabel":"acme","fmt":${String(GX.LeaseFormat)},"gate_revision_tok":"${TH.WorldGate.revision_tok}","gate_tok":"gate-tok-u1","gatelabel":"main","proved_at":${String(TH.T0)},"registered_at":${String(TH.T0)},"user_id":"u1","wayinkind":"passphrase"}`
+    const leaseText = `{"banklabel":"acme","born_at":${String(TH.T0)},"fmt":${String(LeaseFormat)},"gate_revision_tok":"${TH.WorldGate.revision_tok}","gate_tok":"gate-tok-u1","gatelabel":"main","lifeseq":"0000000000","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
     const ctx = textBytes(`[${BankStampText},${leaseText},"bank_key_lease_wrapped"]`)
     expect(await Crypto.unwrapKeyUnder(record.lease_key, record.bank_key_lease_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })

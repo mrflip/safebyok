@@ -30,7 +30,7 @@ describe("Gate.makeRecord(bankStamp, dna)", () => {
   it("is a gate row at its first revision, of the stamps, with the wayins handed", async () => {
     const wayins = await wayinsOf()
     const record = Gate.makeRecord(TH.WorldBankStamp, { ...TH.WorldGateStamp, wayins })
-    expect(record).to.include({ ...TH.WorldGateStamp, fmt: BX.GateFormat, revision_seq: 0, written_at: TH.T0, am: 'a', bank_tok: TH.WorldBankStamp.bank_tok })
+    expect(record).to.include({ ...TH.WorldGateStamp, fmt: BX.GateFormat, revision_seq: 0, written_at: TH.T0, am: 'a', bank_tok: TH.WorldBankStamp.lifeseq })
     expect(record.wayins).to.deep.equal({ main: wayins.main.pickle() })
     expect(record).to.deep.include({ auth: {}, sigs: {}, meta: {} })
     const gate = Gate.make(record, { bank: WorldBank })
@@ -66,9 +66,9 @@ describe("Gate.makeRecord(bankStamp, dna)", () => {
     })
   }
 
-  it("refuses a bank stamp with no bank_tok", async () => {
+  it("refuses a bank stamp with no lifeseq", async () => {
     const wayins = await wayinsOf()
-    TH.expectSyncRefusal(() => Gate.makeRecord(TH.omitting(TH.WorldBankStamp, 'bank_tok'), { ...TH.WorldGateStamp, wayins }), 'bad_option')
+    TH.expectSyncRefusal(() => Gate.makeRecord(TH.omitting(TH.WorldBankStamp, 'lifeseq'), { ...TH.WorldGateStamp, wayins }), 'bad_option')
   })
 })
 

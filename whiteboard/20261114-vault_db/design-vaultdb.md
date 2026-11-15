@@ -506,6 +506,8 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
   A further gate, at `gate/<label>`, can take one.
 * The main gate is a root: its `lifepath` is its lifeseq alone, and its write checks the gate alone. Its Thing has a
   `fmt` of its own, 4101, so that it is never read as big's gate row (4001).
+* The bank's stamp already binds its `lifeseq` in place of `bank_tok` (design-boxops.md, thread 3). Until the gate
+  moves, big's gate row keeps its `bank_tok` field, holding the bank's lifeseq.
 
 ## Open questions
 
@@ -516,6 +518,10 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
 * Built in `packages/safebyok`, exported as `safebyok/storage`: the Thing's shapes (`shapes-thing.ts`), the classifier
   (`thing-classifier.ts`), `vault-db.ts`, `adapter-vault-db.ts` and `memory-vault-db.ts`, for the bank, gate and box
   kinds, with `tryListThings` and `tryBirthBank` (design-boxops.md, thread 1).
+* The Bank model is on the bank's Thing, holding its root box and a VaultDB, and stores its boxes through it:
+  `tryListBoxes`, `tryGetBox`, `tryPutBox`, `tryDelBox` (design-boxops.md, thread 3). A box's citation may be the
+  whole shell `tryGetBox` gives, the shell's lifeseq included. A bank's birth still stores it through the `bank.put`
+  seam, not `tryBirthBank`.
 * Postgres is the design above, not built.
 * The Gate model still holds big's `GateRecord`: moving it onto the gate's Thing, and the lease's stamp off `gate_tok`,
   is the next step.

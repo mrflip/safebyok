@@ -3,12 +3,14 @@ import type { Deriver } from 'safebyok-big/internals'
 import { CX, Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
+import type { StampedGate } from '../../src/models/stamps'
 import { Wayin } from '../../src/models/wayin'
+import { lifeseqOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const WorldScope = CX.bankScope.parse(TH.WorldBankStamp)
+const WorldScope = CX.bankScope.parse(TH.WorldScope)
 
 /** A key deriver scripted to hand back anything at all, to try what a proving makes of it. */
 function deriverHanding(handBack: () => unknown): Deriver.KeyDeriver {
@@ -52,7 +54,7 @@ async function gateWithPassphrase(): Promise<Gate> {
 function gateOf(record: unknown): Gate { return Gate.make(record as never, { bank: { stamp: TH.WorldBankStamp } }) }
 
 /** What a proving of `gate` is handed, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
-function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): GX.StampedGate {
+function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): StampedGate {
   return { bankStamp: { ...TH.WorldBankStamp, ...moves.bank }, stamp: { ...TH.WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 
@@ -127,8 +129,8 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", ()
     [() => ({ device: TH.provingDeviceOf({ device_tok: '' }) }),                                'a device with an empty device_tok'],
     [() => ({ device: { ...TH.provingDeviceOf(), keyDeriver: TH.testDeriver } }),               "a device with the host's bare keyDeriver"],
     [() => ({ device: { ...TH.provingDeviceOf(), strengthChecker: TH.anyStrengthChecker } }),   "a device with the host's bare strengthChecker"],
-    [() => ({ bank: { ...TH.WorldBankStamp, bank_tok: undefined } }),                           'a bank stamp with no bank_tok'],
-    [() => ({ bank: { ...TH.WorldBankStamp, registered_at: 'yesterday' } }),                    'a bank stamp whose registered_at is not epoch millis'],
+    [() => ({ bank: { ...TH.WorldBankStamp, lifeseq: undefined } }),                            'a bank stamp with no lifeseq'],
+    [() => ({ bank: { ...TH.WorldBankStamp, born_at: 'yesterday' } }),                          'a bank stamp whose born_at is not epoch millis'],
     [() => ({ bank: null }),                                                                    'no bank stamp at all'],
     [() => ({ gate: { ...TH.WorldGateStamp, gate_tok: undefined } }),                           'a gate stamp with no gate_tok'],
     [() => ({ gate: { ...TH.WorldGateStamp, gatelabel: 'other' } }),                            'a gate stamp of a gatelabel no gate has'],
@@ -484,7 +486,7 @@ describe("proving.buildWayin(source)", () => {
 
   it("binds the wayin to its bank and its gate: under another's stamp it will not open", async () => {
     const { wayin } = await novelWithWayin()
-    await expect(TH._cheat_bankKeyBytesOf({ ...TH.WorldBankStamp, bank_tok: 'bank-tok-other' }, TH.WorldGateStamp, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
+    await expect(TH._cheat_bankKeyBytesOf({ ...TH.WorldBankStamp, lifeseq: lifeseqOf(2) }, TH.WorldGateStamp, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
     await expect(TH._cheat_bankKeyBytesOf(TH.WorldBankStamp, { ...TH.WorldGateStamp, gate_tok: 'gate-tok-other' }, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
   })
 
@@ -508,7 +510,7 @@ describe("proving.buildWayin(source)", () => {
   })
 
   const OtherSourceCases = [
-    [{ bank: { bank_tok: 'bank-tok-other' } }, 'another life of the bank'],
+    [{ bank: { lifeseq: lifeseqOf(2) } },      'another life of the bank'],
     [{ gate: { gate_tok: 'gate-tok-other' } }, 'another life of the gate'],
   ] as const
 
@@ -538,10 +540,10 @@ describe("proving.buildWayin(source)", () => {
 })
 
 const StampCases = [
-  [{ bank: { user_id: 'u2' }, gate: { user_id: 'u2' } },                     'the stamps of another user'],
+  [{ bank: { userid: 'u2' }, gate: { user_id: 'u2' } },                      'the stamps of another user'],
   [{ bank: { banklabel: 'acme_other' }, gate: { banklabel: 'acme_other' } }, 'the stamps of another bank'],
-  [{ bank: { bank_tok: 'bank-tok-other' } },                                 'the stamp of another life of the bank'],
-  [{ bank: { registered_at: TH.T0 + 1 } },                                   'a bank stamp whose registered_at moved'],
+  [{ bank: { lifeseq: lifeseqOf(2) } },                                      'the stamp of another life of the bank'],
+  [{ bank: { born_at: TH.T0 + 1 } },                                         'a bank stamp whose born_at moved'],
   [{ gate: { gate_tok: 'gate-tok-other' } },                                 'the stamp of another life of the gate'],
   [{ gate: { registered_at: TH.T0 + 1 } },                                   'a gate stamp whose registered_at moved'],
 ] as const
@@ -634,8 +636,8 @@ describe("proving.buildLease(bank, gate)", () => {
   })
 
   const OtherBankCases = [
-    [{ bank_tok: 'bank-tok-other' },   'another life of the bank'],
-    [{ user_id: 'u2' },                "another user's bank"],
+    [{ lifeseq: lifeseqOf(2) },        'another life of the bank'],
+    [{ userid: 'u2' },                 "another user's bank"],
     [{ banklabel: 'work' },            'another bank of the same user'],
   ] as const
 

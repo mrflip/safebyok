@@ -1,7 +1,8 @@
 # Lean gate: what each class needs for three flows
 
 Thread `20261114-lean_gate`, worktree `/workspace/byok-lean_gate`. The new `safebyok` holds Device, Bank, Gate,
-Gating, Wayin, Proving and Lease, with no VaultDB (big's BankDB) or deviceDB methods. Each class is made by
+Gating, Wayin, Proving and Lease, with no deviceDB methods. The bank is given a VaultDB and stores its boxes through
+it (design-boxops.md, *Light sugar on the bank*). Each class is made by
 `.make(recordish, livepropsAndOpts)` (`notes/gallant.md`, `#record-then-opts`): the record give or take a few fields,
 then the live objects and options that come out of band, such as `{ device }`. Helpers, shapes and throwers come from `safebyok-big/internals`, so
 `VaultError` stays one class across both packages.
@@ -85,7 +86,8 @@ bank.unsealBox(box)              → { ...box without its sealed fields, whisper
 
 | Signature | |
 |---|---|
-| `static make(record: DeviceRecord, opts: DeviceOpts): Device` | `DeviceOpts` takes `requestCleartext?` |
+| `static make(record: DeviceRecord, opts: DeviceOpts): Device` | `DeviceOpts` takes `vaultDB` and `requestCleartext?` |
+| `vaultDB`: the VaultDB each bank born on the device is given | |
 | `birthBankPrompt(): Promise<Bank>` | |
 | `#askUser: AskUser \| null`, made by `guardRequestCleartext(requestCleartext)` | |
 | `attachGating(gating)`, `detachGating()`, `demandEnabled()`, `isEnabled`, `sweep()` | |
@@ -95,14 +97,16 @@ bank.unsealBox(box)              → { ...box without its sealed fields, whisper
 
 | Signature | |
 |---|---|
-| `static make(record: BankRecord, { device }): Bank`, the record holding its `maingate` | |
-| `scope`, `stamp`: getters | |
+| `static make(record: BankRecord, { device, vaultDB }): Bank`, the record holding its `maingate` and `rootBox` | |
+| `scope`, `stamp` (`userid`, `banklabel`, `lifeseq`, `born_at`), `rootBox`: getters | |
 | `static mintStamps(scope): { bankStamp, gateStamp }` | |
 | `static makeRecord(dna: BankDna): BankRecord`, its `maingate` made by `Gate.makeRecord` | |
 | `unlockByProving(proved: Proving, cited: CitedGate = this.maingate): Promise<this>` | |
 | `#attachLease(lease: Lease): void` | private |
-| `unsealBox(box: BoxRecord): Promise<BoxUnsealed>` | refuses `record_conflict` for a box of another bank |
-| `sealBox(ante: BoxAnte, { whisper }): Promise<BoxRecord>` | the same |
+| `unsealBox(box: BoxRecord \| BoxTombstone): Promise<BoxUnsealed>` | refuses `record_conflict` for a box of another bank, or of another life of the root box |
+| `sealBox(prior: BoxSparse & { sidecar }, { whisper }): Promise<BoxRecord>` | the same |
+| `tombstoneBox(prior: BoxSparse): Promise<BoxTombstone>` | the same |
+| `tryListBoxes()`, `tryGetBox({ labelpath, ifAbsent })`, `tryPutBox({ cited, record })`, `tryDelBox({ cited, record })` | through its VaultDB, never throwing |
 | `put({ ifPresent }): Promise<this>` | assumed: a seam here |
 | `lock(): this`, `maingate`, `isLocked`, `isUnlocked` | |
 
@@ -172,5 +176,7 @@ Directions this work leans, not rules.
 * The relocation is [#696](https://github.com/mrflip/safebyok/pull/696); this thread stacks on it.
 * Built, in `packages/safebyok`, exported as `safebyok/core`: the seven classes and `sealers.ts`, the three flows end to end, with tests ported from
   big's DB-free cases.
-* `BoxRecord` is still big's, with `vault_tok` and `box_tok`: `lifepath` waits on its definition. The box seal binds
-  the bank's stamp, then the box's sparse fields; it no longer binds a vault stamp.
+* A box is a Thing (design-boxops.md). The box seal binds the bank's stamp, then the box's sparse fields; it no
+  longer binds a vault stamp.
+* The bank is on its Thing, with its root box and its VaultDB. Its stamp binds its `lifeseq` where it bound
+  `bank_tok`. The gate is still big's row, whose `bank_tok` now holds its bank's lifeseq.

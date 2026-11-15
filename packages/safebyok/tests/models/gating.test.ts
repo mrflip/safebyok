@@ -363,11 +363,11 @@ describe("birthBank(device, cleartexts)", () => {
     const device = TH.makeDevice()
     const bank = await birthBank(device, { passphraseClear: TH.TestPassphrase })
     expect(bank.isUnlocked).to.be.true
-    expect(bank.scope).to.deep.equal(TH.WorldScope)
+    expect(bank.scope).to.deep.equal(TH.ThingBank)
     expect(bank.device).to.equal(device)
     expect(bank.maingate.main.wayinkind).to.eq('passphrase')
     expect(bank.maingate.passkey0).to.be.null
-    expect(bank.revision_seq).to.eq(0)
+    expect(bank.revseq).to.eq(0)
     expect(put.banks).to.deep.equal([bank])
   })
 
@@ -388,12 +388,14 @@ describe("birthBank(device, cleartexts)", () => {
     expect(await TH._cheat_bankKeyBytesOf(bank.stamp, bank.maingate.stamp, bank.maingate.passkey0!, { prfBytes })).to.deep.equal(viaPassphrase)
   })
 
-  it("mints a new life for each birth", async () => {
+  // A birth reads nothing stored, so every bank it makes is in its first life.
+  it("mints a new main gate and revision for each birth, in the bank's first life", async () => {
     TH.stubBankPut()
     const device = TH.makeDevice()
     const one = await birthBank(device, { passphraseClear: TH.TestPassphrase })
     const two = await birthBank(device, { passphraseClear: TH.TestPassphrase })
-    expect(one.bank_tok).to.not.eq(two.bank_tok)
+    expect([one.lifeseq, two.lifeseq]).to.deep.equal([TH.Life0, TH.Life0])
+    expect(one.revtok).to.not.eq(two.revtok)
     expect(one.maingate.gate_tok).to.not.eq(two.maingate.gate_tok)
   })
 
@@ -464,6 +466,7 @@ describe("birthBank(device, cleartexts)", () => {
   it("births a bank whose record is a first revision, never a shell", async () => {
     const put = TH.stubBankPut()
     await birthBank(TH.makeDevice(), { passphraseClear: TH.TestPassphrase })
-    expect(put.banks[0]!.revision_tok).to.not.eq(SX.VoidRevisionTok)
+    expect(put.banks[0]!.revtok).to.not.eq(SX.VoidRevisionTok)
+    expect(put.banks[0]!.revseq).to.eq(0)
   })
 })

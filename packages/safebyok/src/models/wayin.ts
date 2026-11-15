@@ -1,6 +1,7 @@
 import type * as Z from 'zod'
 import type { Consts, CX, EX } from 'safebyok-big/internals'
 import { Crypto, GX, Helpers } from 'safebyok-big/internals'
+import { type BankStamp, bankStamp } from './stamps'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
@@ -13,11 +14,11 @@ export const PurposeForWayinkind = Object.freeze({
 /** Serialized name/value pairs bound into a wayin's wrapped bankKey as cryptographic context.
  * They are the bank's stamp, the gate's stamp, the wayin's purpose and its header.
  * The bankKey cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
- * key. With any change to them, such as another `user_id` or a forged `registered_at`, it will not unwrap.
+ * key. With any change to them, such as another `userid` or a forged `born_at`, it will not unwrap.
  */
-export function wayinCtxOf(bank: GX.BankStamp, gate: GX.GateStamp, header: GX.WayinHeader): Uint8Array {
+export function wayinCtxOf(bank: BankStamp, gate: GX.GateStamp, header: GX.WayinHeader): Uint8Array {
   const checked = GX.wayinHeader.parse(header)
-  return Crypto.cipherCtx([GX.bankStamp.parse(bank), GX.gateStamp.parse(gate)], PurposeForWayinkind[checked.wayinkind], checked)
+  return Crypto.cipherCtx([bankStamp.parse(bank), GX.gateStamp.parse(gate)], PurposeForWayinkind[checked.wayinkind], checked)
 }
 // --
 

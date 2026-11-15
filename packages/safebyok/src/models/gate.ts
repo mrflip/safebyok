@@ -1,6 +1,7 @@
 import type { Consts } from 'safebyok-big/internals'
 import { BX, CX, Clock, GX, Helpers, SX, Throwers, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
+import { type BankStamp, bankStamp } from './stamps'
 import { Wayin } from './wayin'
 
 /** What a new gate is made of: its stamp, and its wayins. */
@@ -21,8 +22,8 @@ const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => {
   const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
   const wayins = obj({ main: wayin, passkey0: wayin.nullable() })
   return {
-    gateMakeArgs:   obj({ record: BX.gateRecord, opts: obj({ bank: obj({ stamp: GX.bankStamp }) }) }),
-    makeRecordArgs: obj({ bankStamp: GX.bankStamp, dna: obj({ wayins }) }),
+    gateMakeArgs:   obj({ record: BX.gateRecord, opts: obj({ bank: obj({ stamp: bankStamp }) }) }),
+    makeRecordArgs: obj({ bankStamp, dna: obj({ wayins }) }),
   }
 })
 
@@ -38,7 +39,8 @@ export class Gate implements GX.GateStamp {
   /** The token of this gate's life. No gate verb changes it. */
   declare readonly gate_tok:      string
   declare readonly registered_at: number
-  /** Which life of its bank this gate belongs to. */
+  // The gate is still big's row, whose `bank_tok` now holds its bank's lifeseq, until the gate moves onto its Thing.
+  /** The lifeseq of the life of its bank this gate belongs to. */
   declare readonly bank_tok:      string
 
   readonly #bank:     GateBank
@@ -74,7 +76,7 @@ export class Gate implements GX.GateStamp {
   get stamp(): GX.GateStamp { return GX.gateStamp.parse(this) }
 
   /** The stamp of this gate's bank. A wayin's wrapped bankKey is bound to it, and to the gate's own `stamp`. */
-  get bankStamp(): GX.BankStamp { return this.#bank.stamp }
+  get bankStamp(): BankStamp { return this.#bank.stamp }
   // --
 
   // == [Construction]: make, constructor, makeRecord
@@ -84,7 +86,8 @@ export class Gate implements GX.GateStamp {
 
   private constructor(record: BX.GateRecord, opts: GateOpts) {
     const { record: parsed, opts: checked } = Checks.gateMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent({ ...CX.bankScope.parse(parsed), bank_tok: parsed.bank_tok }, checked.bank.stamp, { kind: 'record_conflict' })
+    // The gate's row names its user `user_id`, and its bank's lifeseq `bank_tok`.
+    Validator.checkedConsistent({ userid: parsed.user_id, banklabel: parsed.banklabel, lifeseq: parsed.bank_tok }, checked.bank.stamp, { kind: 'record_conflict' })
     this.#bank = opts.bank
     this.#main = Wayin.make(parsed.wayins.main)
     this.#passkey0 = parsed.wayins.passkey0 === undefined ? null : Wayin.make(parsed.wayins.passkey0)
@@ -94,11 +97,11 @@ export class Gate implements GX.GateStamp {
   }
 
   /** The first record of a new gate of the bank stamped `bankStamp`, made of `dna`. */
-  static makeRecord(bankStamp: GX.BankStamp, dna: GateDna): BX.GateRecord {
+  static makeRecord(bankStamp: BankStamp, dna: GateDna): BX.GateRecord {
     const { bankStamp: checkedBank, dna: { wayins } } = Checks.makeRecordArgs.parse({ bankStamp, dna })
     return BX.gateRecord.parse({
       ...GX.gateStamp.parse(dna), fmt: BX.GateFormat, ...SX.nextRevisionOf(SX.VoidRevision, Clock.nowMillis()), am: 'a',
-      bank_tok: checkedBank.bank_tok, wayins: wayinsOf(wayins.main, wayins.passkey0), auth: {}, sigs: {}, meta: {},
+      bank_tok: checkedBank.lifeseq, wayins: wayinsOf(wayins.main, wayins.passkey0), auth: {}, sigs: {}, meta: {},
     })
   }
   // --

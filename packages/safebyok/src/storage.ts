@@ -10,7 +10,7 @@ export {
   seqOfLifeseq, sparseOf, thingkindVals,
 } from './storage/shapes-thing'
 export { type BankRootsFetched, type ThingsFetched, isWriteAct, writtenRootsOf, writtenThingOf } from './storage/thing-classifier'
-export type {
-  Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, DamagedThing, GetThingAnswer, GoodAnswer, ListThingsActual, ListThingsAnswer,
-  ListedBeside, ThingNotice, VaultDB, WriteThingAnswer,
+export {
+  type Actual, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
+  type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'

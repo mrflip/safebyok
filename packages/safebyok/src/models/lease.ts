@@ -1,8 +1,9 @@
 import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
-import { Crypto, GX, Helpers, Throwers, Validator } from 'safebyok-big/internals'
+import { Crypto, Helpers, Throwers, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import * as Sealers from './sealers'
+import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from './stamps'
 
 /** What a lease is given of its bank: its stamp, and its lock, called when the bankKey will not unwrap. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock'>
@@ -27,9 +28,9 @@ export interface LeaseOpts {
 // Defined here, not with the shapes: it names a model class.
 /** The checks of {@link Lease.make}'s arguments, and of the sealerkind a seal or unseal is given. */
 const Checks = Validator.Checkers('bad_option', ({ obj, fn, oneof }) => {
-  const bank = obj({ stamp: GX.bankStamp, lock: fn<() => unknown>() })
+  const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>() })
   return {
-    leaseMakeArgs: obj({ record: GX.leaseRecord, opts: obj({ bank }) }),
+    leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank }) }),
     sealerkind:    oneof(Sealers.sealerkindVals),
   }
 })
@@ -39,15 +40,15 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, oneof }) => {
  * What is sealed, and how, is the sealer's in `sealers.ts`, named by its kind: the lease knows nothing of boxes.
  * A lease whose bankKey will not unwrap refuses `damaged_lease`, and its bank locks.
  */
-export class Lease implements GX.LeaseStamp {
-  // == [Props]: fmt, user_id, banklabel, bank_tok, registered_at, gatelabel, gate_tok, gate_revision_tok, proved_at, wayinkind, #bank, #record, stamp, toJSON
+export class Lease implements LeaseStamp {
+  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gatelabel, gate_tok, gate_revision_tok, proved_at, wayinkind, #bank, #record, stamp, toJSON
 
-  declare readonly fmt:               GX.LeaseStamp['fmt']
-  declare readonly user_id:           string
+  declare readonly fmt:               LeaseStamp['fmt']
+  declare readonly userid:            string
   declare readonly banklabel:         string
-  declare readonly bank_tok:          string
-  declare readonly registered_at:     number
-  declare readonly gatelabel:         GX.LeaseStamp['gatelabel']
+  declare readonly lifeseq:           string
+  declare readonly born_at:           number
+  declare readonly gatelabel:         LeaseStamp['gatelabel']
   declare readonly gate_tok:          string
   declare readonly gate_revision_tok: string
   declare readonly proved_at:         number
@@ -56,25 +57,25 @@ export class Lease implements GX.LeaseStamp {
   readonly #bank: LeaseBank
 
   /** The record, with the leaseKey and the wrapped bankKey; null once evicted. */
-  #record: GX.LeaseRecord | null
+  #record: LeaseRecord | null
 
   /** This lease's stamp: its record without the key material. Every ctx under the lease binds it after the bank's. */
-  get stamp(): GX.LeaseStamp { return GX.leaseStamp.parse(this) }
+  get stamp(): LeaseStamp { return leaseStamp.parse(this) }
 
-  /** This lease's {@link GX.LeaseSparse}, which has no key material. */
-  toJSON(): GX.LeaseSparse { return this.stamp }
+  /** This lease's {@link LeaseSparse}, which has no key material. */
+  toJSON(): LeaseSparse { return this.stamp }
   // --
 
   // == [Construction]: make, constructor
 
   /** The lease of `record`, granted to `opts.bank`, which must be the bank `record` is stamped with. */
-  static make(record: Z.input<typeof GX.leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
+  static make(record: Z.input<typeof leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
-  private constructor(record: Z.input<typeof GX.leaseRecord>, opts: LeaseOpts) {
+  private constructor(record: Z.input<typeof leaseRecord>, opts: LeaseOpts) {
     const { record: parsed, opts: checked } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(GX.bankStamp.parse(parsed), checked.bank.stamp, { kind: 'damaged_lease' })
+    Validator.checkedConsistent(bankStamp.parse(parsed), checked.bank.stamp, { kind: 'damaged_lease' })
     this.#record = parsed
-    Helpers.tattoo(this, GX.leaseStamp.parse(parsed), { configurable: false })
+    Helpers.tattoo(this, leaseStamp.parse(parsed), { configurable: false })
     this.#bank = opts.bank
     Object.freeze(this)
   }
@@ -171,7 +172,7 @@ export class Lease implements GX.LeaseStamp {
   get isEvicted(): boolean { return this.#record === null }
 
   /** The record, or throw once this lease is evicted */
-  #demandRecord(): GX.LeaseRecord {
+  #demandRecord(): LeaseRecord {
     if (this.#record === null) { throw Throwers.leaseNotInForce() }
     return this.#record
   }
