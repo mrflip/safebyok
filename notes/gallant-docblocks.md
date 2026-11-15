@@ -928,9 +928,9 @@ Gallant:
     // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it.
 
 Goofus: "keeps its delete waiting": the delete is blocked
-    // The old databases are deleted unread and never awaited: a tab still keeping one open keeps its delete waiting (notes/wontfix.md).
+    // The old databases are deleted unread and never awaited: a tab still keeping one open keeps its delete waiting (notes/wontfix-big.md).
 Gallant:
-    // The old databases are deleted unread and never awaited: a tab that still has one open blocks its delete (notes/wontfix.md).
+    // The old databases are deleted unread and never awaited: a tab that still has one open blocks its delete (notes/wontfix-big.md).
 
 Goofus: "The wipe is hygiene": housekeeping is the word the reader knows
     // The wipe is hygiene, so a browser that cannot list them keeps its older versioned ones rather than failing the vault.

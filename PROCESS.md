@@ -241,6 +241,6 @@ The toolchain: TypeScript, Vitest, ESLint, tsdown.
 * **`notes/security.md`** -- a decision a security reviewer should look at, in a sentence or two,
   dated. Add one when you make such a decision, in the same PR, through a subagent (the file's
   header says how): the file is long, and building needs none of it.
-* **`notes/wontfix.md`** -- behaviour the package leaves undefined on purpose, dated, with the
-  ruling that put it there.
+* **`notes/wontfix.md`** -- behaviour the new core leaves undefined on purpose, one entry per case, in the
+  file's own form. `notes/wontfix-big.md` is safebyok-big's, dated, with the ruling that put each there.
 * **Doc blocks** -- what a caller needs, and nothing about how the code came to be.

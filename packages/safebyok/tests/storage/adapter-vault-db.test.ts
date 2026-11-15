@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { type EX, Errors } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
-import type { GetThingAsk, ThingWatchScope, WriteThingAsk } from '../../src/storage/shapes-thing'
-import type { Actual, ThingNotice } from '../../src/storage/vault-db'
+import type { BirthBankAsk, GetThingAsk, ListThingsAsk, ThingWatchScope, WriteThingAsk } from '../../src/storage/shapes-thing'
+import type { Actual, BirthBankActual, ListThingsActual, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
 type Hear = (heard: { record: unknown, world: null }) => void
@@ -20,6 +20,8 @@ class ScriptedVaultDB extends AdapterVaultDB {
 
   protected doGetThing(_ask: GetThingAsk): Actual<EX.GotAct> { return this.step() as Actual<EX.GotAct> }
   protected doWriteThing(_ask: WriteThingAsk): Actual<EX.PutAct | EX.DelAct> { return this.step() as Actual<EX.PutAct | EX.DelAct> }
+  protected doListThings(_ask: ListThingsAsk): ListThingsActual { return this.step() as unknown as ListThingsActual }
+  protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.step() as unknown as BirthBankActual }
   protected override doWatch(_scope: ThingWatchScope, hear: Hear, _onBadNews: (news: Errors.VaultError) => void): () => void {
     this.hear = hear
     return () => { this.hear = null }
@@ -50,6 +52,22 @@ describe("AdapterVaultDB, a step that throws", () => {
     const err = await TH.expectBad(Promise.resolve(answer), 'unexpected_error')
     expect(err.message).to.eq(AnswerNotMade)
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
+  })
+
+  it("answers a listing that throws with no children, no parent and no damaged rows", async () => {
+    const vaultDB = new ScriptedVaultDB(() => { throw new Error('connection reset') })
+    const answer = await vaultDB.tryListThings(TH.listAskAt('box'))
+    await TH.expectBad(Promise.resolve(answer), 'storage_unavailable')
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: null, parent: null, damaged_rows: [] })
+  })
+
+  it("answers a bank's birth that throws with its verb", async () => {
+    const vaultDB = new ScriptedVaultDB(() => { throw new Error('connection reset') })
+    const answer = await vaultDB.tryBirthBank(TH.birthBankAskOf())
+    const err = await TH.expectBad(Promise.resolve(answer), 'storage_unavailable')
+    expect(err.meta).to.deep.include({ oplabel: 'birthBank' })
+    expect(answer).to.deep.include({ act: 'unclassified_storing', dbhas: null })
+    expect(answer.ask).to.deep.include({ op: 'birth', ...TH.ThingBank })
   })
 
   it("never throws for an ask it cannot look at", async () => {

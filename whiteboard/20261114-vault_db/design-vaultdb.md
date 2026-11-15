@@ -18,10 +18,10 @@ the body. Everything else in the record is the **body**, which the store carries
 | ------------ | ------------------------------------------------------------------------------------------------------ | ----------------------- |
 | `userid`     | the user, smushed as the other scope fields are                                                        | `user_id`               |
 | `banklabel`  | the bank, under the user                                                                               | `banklabel`             |
-| `labelpath`  | where the Thing sits under the bank: its modelkind, then `/`-joined labels; the analog of `vaultlabel/boxlabel` | `gate/main` |
+| `labelpath`  | where the Thing sits under the bank: its modelkind, then `/`-joined labels; the analog of `vaultlabel/boxlabel` | `gate`      |
 | `label`      | the last label of `labelpath`: the analog of `boxlabel`                                                | `gatelabel`             |
 | `fmt`        | the kind and its format, as today (`GateFormat`, `BoxFormat`, ...)                                     | `fmt`                   |
-| `lifepath`   | `/`, then the `lifeseq` of each Thing from the root down to its own, joined by `/`; the analog of `vault_tok/box_tok`, made sequential | `gate_tok` |
+| `lifepath`   | the `lifeseq` of each Thing from the root down to its own, one per segment of `labelpath`, joined by `/`; the analog of `vault_tok/box_tok`, made sequential | `gate_tok` |
 | `lifeseq`    | which life of the Thing at this scope: an integer, as 10 base-32 digits                                | `gate_tok`              |
 | `revtok`     | the revision's token                                                                                   | `revision_tok`          |
 | `revseq`     | the revision's number, up by one at every write                                                        | `revision_seq`          |
@@ -29,12 +29,13 @@ the body. Everything else in the record is the **body**, which the store carries
 | `written_at` | when this revision was written; on a tombstone, when it was deleted                                    | `written_at`            |
 | `am`         | `'a'` live, `'x'` gone                                                                                 | `am`                    |
 
-* **A `labelpath` starts with its modelkind**: `bank/<label>`, `gate/main`, `box/<vaultlabel>/<boxlabel>`. No
-  Thing is stored at a root. The bank owns its gates and boxes, but it is a Thing among them, not a node above them:
-  it has no listing or lifecycle of theirs, and never ducks as a gate or a box.
-* **Each bank has exactly one gate, labelled `main`**, which is never deleted and holds the passphrase wayin labelled
-  `main`. More gates per bank come later. The bank's own `label` is open (below); the gate's `main` and the bank's
-  label do not tie to each other.
+* **A `labelpath` is its modelkind, then zero or more labels**, joined by `/`: `bank`, `gate`, `gate/<label>`, `box`,
+  `box/openai`. A Thing whose labelpath is its modelkind alone is the **root** of its kind, and its label is its
+  modelkind. The bank owns its gates and boxes, but it is a Thing among them, not a node above them: it has no listing
+  or lifecycle of theirs, and never ducks as a gate or a box.
+* **Each kind's root**: the bank at `bank`, the main gate at `gate`, the root box at `box`. The main gate is never
+  deleted and holds the passphrase wayin labelled `main`. Further gates sit at `gate/<label>`, one level under it;
+  boxes nest to any depth. design-boxops.md has the kinds and their checks.
 * **`lifeseq`** is `n.toString(32).padStart(10, '0')`: digits `0-9a-v`, which sort as the numbers do, up to
   `32**10 - 1`, inside a safe integer. Because 32 is even, the even/odd parity of the number is the parity of its last digit,
   so a store can check it without decoding (Postgres: `right(lifeseq, 1) IN ('1','3',...,'v')`).
@@ -42,8 +43,10 @@ the body. Everything else in the record is the **body**, which the store carries
   void. So the first Thing stored is at `revseq` 0 and `lifeseq` 0; its deletion is life 1, a rebirth life 2. Nothing
   is ever stored with a negative seq. The shell is never stored, so its `lifeseq` is the one that is not 10 digits:
   the string `'-1'`, odd like every tombstone's.
-* **For now every Thing is written at depth 1**, so its `lifepath` is `/<its lifeseq>`. Deeper Things, whose
-  `lifepath` carries the lifeseqs above them, come with the tree.
+* **A `lifepath` has one lifeseq for each segment of the `labelpath`**, with no leading `/`. A root's is its own
+  lifeseq alone; a box under the root box has `<root's lifeseq>/<lifeseq>`. A shell's lifepath is its parent's, then
+  `/-1`, and a root's shell has `-1`. So a Thing's lifepath starts with its parent's, and the Things under an earlier
+  life of a parent are not its children.
 * **A `lifeseq` is not unique across devices, as a random life token was.** Two devices birthing at one scope both
   mint life 0. Only one write lands; the other is refused (`camped` or `stale`).
 * **The body stays flat in the record**, as big's records are: a gate's `wayins`, `auth`, `sigs`, `meta`; a box's
@@ -57,7 +60,9 @@ The adapter checks proposed against cited when the ask is parsed, before anythin
 * `proposed.revseq === cited.revseq + 1`.
 * `proposed.revtok` is new: not `cited.revtok`, and not void.
 * `proposed` is at the ask's scope, and its `label` is the last label of its `labelpath`.
-* `proposed.lifepath` ends in `/` + `proposed.lifeseq`.
+* `proposed.lifepath`'s last lifeseq is `proposed.lifeseq`, and it has one lifeseq per segment of the `labelpath`.
+* `proposed.lifepath` keeps the leading lifeseqs of the lifepath it cites. That they are the parent's current life is
+  not checked: that is "the row above's life", below.
 * `am: 'x'` exactly when the Thing's own lifeseq is odd, in both `proposed` and `cited`. A citation's own lifeseq is the
   last of its `lifepath`: it carries no `lifeseq` of its own.
 * Live over live keeps `lifeseq`. Gone over live is `lifeseq + 1`. Live over gone is `lifeseq + 1` too: a birth
@@ -152,7 +157,7 @@ has its lifeseq counterpart:
 | the ask's `isLifeTokPlaced`: the expected tok over a live row, a new one on a birth or deletion | `gate_tok`, `vault_tok`, `box_tok`, `bank_tok` | the ask's `lifeseq` check: the same lifeseq while `am` stays, one more when it flips |
 | the classifier's `isLifeOff`: the expected life against the stored one | the row's own life tok | `lifepath` and `am`, cited against stored |
 | Postgres's `gate_tok = expected.gate_tok` | the row's own life tok | `stored.lifepath = cited.lifepath` |
-| the row above's life: `bank_reborn`, `vault_reborn`, a box keyed under its vault's life | `bank_tok`, `vault_tok` on the row below | the lifepath's leading lifeseqs: waits for depth 2 |
+| the row above's life: `bank_reborn`, `vault_reborn`, a box keyed under its vault's life | `bank_tok`, `vault_tok` on the row below | the lifepath's leading lifeseqs: kept from the citation, not yet checked against the parent (design-boxops.md's parentage TODO) |
 | the seal's binding of the box's life, and `nextRevisionOf` minting a new tok over a tombstone | `box_tok` | the box's `lifepath`: waits on `BoxRecord` taking it |
 
 `lifeseq` is ordered, so the classifier could also tell a life that is behind from one that clashes. It is not
@@ -167,10 +172,12 @@ type ThingScope = { userid, banklabel, labelpath }
 /** What a write cites of the Thing it expects, which the store compares with actual. */
 type ThingCited = Pick<Thing, 'revtok' | 'revseq' | 'am' | 'lifepath'>   // just what the act tables compare; or the shell's
 
-type GetThingAsk = ThingScope & { op: 'get', ifAbsent: 'fail' | 'nil' }
+// Every ask names the modelkind its labelpath starts with; design-boxops.md has the list and birth asks.
+type GetThingAsk = ThingScope & { op: 'get', modelkind, ifAbsent: 'fail' | 'nil' }
 
 type WriteThingAsk<RecordT extends Thing> = ThingScope & {
-  op:        'write'
+  op:        'put' | 'del'          // a del's ifAbsent 'fail' and ifPresent 'repl' are fixed
+  modelkind: RecordT's modelkind
   cited:     ThingCited & Partial<RecordT>   // plus what a named policy takes as testimony of the old version
   record:    RecordT                // proposed
   ifAbsent:  'add' | 'fail'
@@ -366,12 +373,12 @@ CREATE TABLE IF NOT EXISTS safebyok_gates (
   CHECK (am IN ('a', 'x') AND revseq >= 0 AND born_at <= written_at),
   CHECK (lifeseq ~ '^[0-9a-v]{10}$'),
   CHECK ((am = 'x') = (right(lifeseq, 1) IN ('1','3','5','7','9','b','d','f','h','j','l','n','p','r','t','v'))),
-  CHECK (right(lifepath, 11) = '/' || lifeseq),
-  CHECK (right(labelpath, length(label) + 1) = '/' || label),
+  CHECK (lifeseq = substring(lifepath from '[^/]*$')),
+  CHECK (label = substring(labelpath from '[^/]*$')),
+  CHECK (array_length(string_to_array(lifepath, '/'), 1) = array_length(string_to_array(labelpath, '/'), 1)),
   -- The gate's own:
-  CHECK (labelpath = 'gate/' || label),
-  CHECK (label <> 'main' OR am = 'a'),          -- the main gate is never deleted
-  CHECK (lifepath = '/' || lifeseq),            -- depth 1, for now
+  CHECK (labelpath IN ('gate', 'gate/' || label)),
+  CHECK (labelpath <> 'gate' OR am = 'a'),      -- the main gate is never deleted
   CHECK (COALESCE(
         jsonb_typeof(wayins->'main') = 'object'
     AND COALESCE(jsonb_typeof(wayins->'passkey0'), 'object') = 'object'
@@ -486,8 +493,8 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
 * **Storage policies** become named functions over the kind's columns, one per policy (`safebyok_add_passkey_ok`),
   gathered by `safebyok_gate_policies_ok`.
 * **The box cap** becomes `safebyok_capacity_ok`, a count of live boxes under a `labelpath` prefix. It stays soft.
-* **The compound write.** Big's `buildBank` stores a bank and its main gate in one step. A `writeThing` stores one Thing.
-  That is the Bank–Gate intertwingling, left for later.
+* **The compound write.** Big's `buildBank` stores a bank and its main gate in one step. A `writeThing` stores one
+  Thing; `tryBirthBank` stores the bank, its main gate and its root box in one call (design-boxops.md).
 
 ## Gate first
 
@@ -495,20 +502,20 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
   `lifeseq` and `lifepath`, and `registered_at` to `born_at`. This is a change to `BX.GateRecord`, so the gate's
   shapes come over into the new core rather than staying big's.
 * `gate.put({ policies })` is a `writeThing` with `options.policies`, under #698's policies, applied as above.
-* The main gate is never deleted: the adapter refuses its tombstone, and the table's CHECK repeats it. A later gate
-  can take one without a change to the store.
-* The gate is written at depth 1: its `lifepath` is `/<lifeseq>`, and its write checks the gate alone.
-* For now the store takes only the main gate: `label` `main`, always live. Its Thing has a `fmt` of its own, 4101,
-  so that it is never read as big's gate row (4001).
+* The main gate, at `gate`, is never deleted: the adapter refuses its tombstone, and the table's CHECK repeats it.
+  A further gate, at `gate/<label>`, can take one.
+* The main gate is a root: its `lifepath` is its lifeseq alone, and its write checks the gate alone. Its Thing has a
+  `fmt` of its own, 4101, so that it is never read as big's gate row (4001).
 
 ## Open questions
 
-* **The bank's `label`**: its banklabel, so `bank/<banklabel>`, or `main`, so `bank/main`?
+* **The bank's `label`**: settled as `bank`, at labelpath `bank`, by the roots of design-boxops.md.
 
 ## Where things stand
 
 * Built in `packages/safebyok`, exported as `safebyok/storage`: the Thing's shapes (`shapes-thing.ts`), the classifier
-  (`thing-classifier.ts`), `vault-db.ts`, `adapter-vault-db.ts` and `memory-vault-db.ts`, for the main gate.
+  (`thing-classifier.ts`), `vault-db.ts`, `adapter-vault-db.ts` and `memory-vault-db.ts`, for the bank, gate and box
+  kinds, with `tryListThings` and `tryBirthBank` (design-boxops.md, thread 1).
 * Postgres is the design above, not built.
 * The Gate model still holds big's `GateRecord`: moving it onto the gate's Thing, and the lease's stamp off `gate_tok`,
   is the next step.

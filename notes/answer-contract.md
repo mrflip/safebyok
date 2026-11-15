@@ -90,7 +90,7 @@ Precedence, first match wins, for a box:
 2. Vault damaged: thrown, as `damaged_vault`.
 3. Vault void: no vault row stops at `vault_void`. Box ops never create a vault.
 4. Vault life: a vault tombstone stops at `vault_gone`, whatever its `vault_tok`. A live vault under another `vault_tok` than the request's stops at `vault_reborn`. Box ops never compare the vault's revision.
-5. Box damaged: every op throws `damaged_row`. The library does not delete such a row: the customer clears it with their own datastore's tools (`notes/wontfix.md`).
+5. Box damaged: every op throws `damaged_row`. The library does not delete such a row: the customer clears it with their own datastore's tools (`notes/wontfix-big.md`).
 6. Box under the proposed revision token: `retcon`.
 7. Box revision: the expected revision is not the stored one. Refuses `ahead`, `forked`, `clash` or `stale`. A token match whose cited life token or state is not the stored one is a clash too (C14).
    1. Exception: a stale put with `ifPresent=get` that meets a live row returns that row, with act `passed`. Stale here is the shell cited against a row, or an earlier seq under another token.

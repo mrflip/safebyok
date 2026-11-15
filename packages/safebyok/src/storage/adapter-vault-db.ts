@@ -3,9 +3,15 @@
 import { noop } from 'es-toolkit'
 import { EX, Errors, Outcome, Throwers, type Helpers } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../phrases'
-import { type GetThingAsk, type ThingWatchScope, type WriteThingAsk, checkedGetThingAsk, checkedWriteThingAsk, loggableAskOf, thingWatchScope } from './shapes-thing'
-import { classifyGetThing, classifyWriteThing, noticedThingOf } from './thing-classifier'
-import type { Actual, BadAnswer, GetThingAnswer, ThingNotice, VaultDB, WriteThingAnswer } from './vault-db'
+import {
+  type BirthBankAsk, type BirthPuts, type DelAskArgs, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type PutAskArgs, type Thing,
+  type ThingWatchScope, type WriteAskOf, type WriteThingAsk,
+  birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf, thingWatchScope,
+} from './shapes-thing'
+import { type BankRootsFetched, type ThingsFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, noticedThingOf } from './thing-classifier'
+import type {
+  Actual, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
+} from './vault-db'
 
 /** Drop bad news unheard. */
 function noBadNews(_news: Errors.VaultError): void { /* unheard */ }
@@ -14,7 +20,7 @@ function noBadNews(_news: Errors.VaultError): void { /* unheard */ }
  * It checks each ask, and classifies what a `do*` call fetches by the act tables in notes/answer-contract.md.
  */
 export abstract class AdapterVaultDB implements VaultDB {
-  // == [Classifying]: classifyGetThing, classifyWriteThing
+  // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
   // A subclass's `do*` calls these. A store that reaches some of the verdict itself overrides them to read it.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
@@ -22,9 +28,30 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Classify a write against the raw Thing fetched at its scope, null for none, applying its storage policies. */
   protected classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw) }
+
+  /** Classify a listing against the raw parent and the raw Things one label under it. */
+  protected classifyListThings(ask: ListThingsAsk, fetched: ThingsFetched): ListThingsActual { return classifyListThings(ask, fetched) }
+
+  /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
+  protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return classifyBirthBank(puts, fetched) }
   // --
 
-  // == [Verbs]: tryGetThing, tryWriteThing, watch
+  // == [Ask builders]: getAsk, listAsk, putAsk, delAsk
+
+  /** The get ask for the Thing at `args`'s scope ({@link VaultDB.getAsk}). */
+  getAsk(args: GetAskArgs): GetThingAsk { return getAskOf(args) }
+
+  /** The list ask for the children of the Thing at `args`'s scope ({@link VaultDB.listAsk}). */
+  listAsk(args: ListAskArgs): ListThingsAsk { return listAskOf(args) }
+
+  /** The put ask writing `args.record` over `args.cited` ({@link VaultDB.putAsk}). */
+  putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT> { return putAskOf(args) }
+
+  /** The del ask writing the tombstone `args.record` over `args.cited` ({@link VaultDB.delAsk}). */
+  delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT> { return delAskOf(args) }
+  // --
+
+  // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, watch
   // Each verb's body is the plain path. Every throw in it lands in `answerForThrown`.
 
   /** The Thing at `ask`'s scope ({@link VaultDB.tryGetThing}). */
@@ -55,6 +82,31 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
   }
 
+  /** The children of the Thing at `ask`'s scope ({@link VaultDB.tryListThings}). */
+  async tryListThings(ask: ListThingsAsk): Promise<ListThingsAnswer> {
+    try {
+      const checked     = checkedListThingsAsk(ask)
+      const loggableAsk = loggableAskOf(checked)
+      const actual      = await this.doListThings(checked)
+      const beside      = { parent: actual.parent, damaged_rows: actual.damaged_rows }
+      if (actual.ok) { return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, ...beside, val: actual.listed } }
+      const err = Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk })
+      return { ok: false, ask: loggableAsk, act: actual.act, world: actual.world, ...beside, dbhas: actual.listed, err }
+    } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parent: null, damaged_rows: [] } }
+  }
+
+  /** Write a new bank's bank, main gate and root box, where no bank is stored ({@link VaultDB.tryBirthBank}). */
+  async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
+    try {
+      const checked     = checkedBirthBankAsk(ask)
+      const loggableAsk = loggableAskOf(checked)
+      const actual      = await this.doBirthBank(checked, birthPutsOf(checked))
+      if (actual.ok) { return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: actual.things } }
+      const err = Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk })
+      return { ok: false, ask: loggableAsk, act: actual.act, world: actual.world, dbhas: actual.record, err }
+    } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
+  }
+
   /** Watch the Things of a bank, and return a function that stops the watch ({@link VaultDB.watch}).
    * A Thing heard that fails its checks is dropped unheard.
    */
@@ -71,6 +123,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // All the error treatment of the verbs is here, and it has its own try/catch, so a verb never throws.
   /** The refused answer for a verb that threw: a refusal as it is, anything else as `storage_unavailable`.
+   * Its act is the one the refusal names in its meta, if any, else `unclassified_storing`.
    * Override it to tell one of your datastore's errors from another.
    */
   protected answerForThrown(thrown: unknown, oplabel: string, ask: unknown): BadAnswer {
@@ -79,22 +132,28 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk = loggableAskOf(ask)
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
       const dbhas = noticedThingOf(Errors.rowsOfRefusal(err).dbhas ?? null)
-      return { ok: false, ask: loggableAsk, act: 'unclassified_storing', world: null, dbhas, err }
+      return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
       return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: new Errors.VaultError('unexpected_error', AnswerNotMade) }
     }
   }
   // --
 
-  // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doWatch
+  // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
-  // fetched. A store that can run code of its own may take the whole step there.
+  // fetched. A store that can run code of its own may run the whole step there.
 
   /** In one step: fetch the Thing at `ask`'s scope, and return `this.classifyGetThing(ask, raw)`. */
   protected abstract doGetThing(ask: GetThingAsk): Helpers.Awaitable<Actual<EX.GotAct>>
   /** In one step: fetch the Thing at `ask`'s scope, classify, and if the act is a write, write `ask.record` and report the Thing written. */
   protected abstract doWriteThing(ask: WriteThingAsk): Helpers.Awaitable<Actual<EX.PutAct | EX.DelAct>>
+  /** In one step: fetch the raw parent at `ask`'s scope and each raw Thing one label under it, and return `this.classifyListThings(ask, fetched)`. */
+  protected abstract doListThings(ask: ListThingsAsk): Helpers.Awaitable<ListThingsActual>
+  /** In one step: fetch the raw bank, main gate and root box, return `this.classifyBirthBank(puts, fetched)`, and under `born` first
+   * write each put's record and report the three as written, checked by `writtenRootsOf`.
+   */
+  protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
   /** Start a watch: call `hear` with each changed Thing, and `onBadNews` with trouble, whether or not it ends the watch.
    * Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    */

@@ -6,25 +6,31 @@ export const PutNotBuilt = 'This layer stores nothing: the layer above puts the 
 // == [Things]: the sentences of a Thing's checks, and of a vaultDB's asks
 
 /** A labelpath that is not a modelkind and then labels. */
-export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then one or more labels, each after a '/'."
+export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then labels, each after a '/': none under bank, at most one under gate, any number under box."
+
+/** A record whose labelpath is another kind's. */
+export const LabelpathOfOtherKind = "A Thing's labelpath starts with its own modelkind."
 
 /** A lifeseq that is not 10 base-32 digits. */
 export const LifeseqShape = "A lifeseq is 10 base-32 digits, 0-9 and a-v."
 
 /** A lifepath that is not lifeseqs, each after a '/'. */
-export const LifepathShape = "A lifepath is one or more lifeseqs, each after a '/'."
+export const LifepathShape = "A lifepath is one or more lifeseqs, joined by '/'."
 
 /** A Thing whose label is not its labelpath's last. */
-export const LabelNotLast = "A Thing's label is the last label of its labelpath."
+export const LabelNotLast = "A Thing's label is the last segment of its labelpath: a root's is its modelkind."
 
-/** A Thing written or cited below depth 1. */
-export const LifepathNotOwn = "A lifepath is one lifeseq after a '/', the Thing's own: Things are written at depth 1 for now."
+/** A Thing whose lifeseq is not its lifepath's last. */
+export const LifeseqNotOwn = "A Thing's lifeseq is the last of its lifepath."
+
+/** A Thing whose lifepath and labelpath have different depths. */
+export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segment of its labelpath."
 
 /** A Thing whose am and lifeseq disagree. */
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
 /** A citation that is half the shell. */
-export const CitedHalfShell = "What a write cites is the shell, at revseq -1, lifeseq '-1' and the void revtok, in all three or in none."
+export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-1' and the void revtok, in all three or in none."
 
 /** A write whose revseq does not follow. */
 export const RevseqNotNext = "A write's record must have the revseq one past the cited one's."
@@ -37,6 +43,9 @@ export const RecordOfOtherScope = "A write's record is at the scope its ask name
 
 /** A write of a tombstone over a tombstone. */
 export const TombstoneOverTombstone = "A tombstone is never written over a tombstone."
+
+/** A write whose record moves the lifeseqs above its own. */
+export const LifepathNotKept = "A write's record keeps the leading lifeseqs of the lifepath it cites: only the last, its own, may change."
 
 /** A write whose lifeseq does not follow. */
 export const LifeseqNotNext = "A write's record keeps the cited lifeseq when am stays, and has the next one when am flips."
@@ -53,8 +62,23 @@ export const MainGateDeleted = "The main gate is never deleted: its record is al
 /** A policy that needs testimony the citation lacks. */
 export const TestimonyMissing = "The replace_passphrase policy reads the cited gate's wayins: cite them."
 
-/** A write of a kind this vaultDB does not store yet. */
-export const ThingkindNotStored = "This vaultDB stores the main gate only, for now: a bank or a box is not yet a Thing it takes."
+/** An ask whose modelkind is not its labelpath's. */
+export const ModelkindNotOwn = "An ask's modelkind is the first segment of its labelpath."
+
+/** A write whose op does not match its record. */
+export const OpNotOfRecord = "A put writes a live record (am: 'a'), and a del a tombstone (am: 'x')."
+
+/** A del that changes its fixed flags. */
+export const DelFlagsFixed = "A del's flags are fixed, ifAbsent 'fail' and ifPresent 'repl', and it names no storage policy."
+
+/** A write naming a storage policy its kind lacks. */
+export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank and a box have none."
+
+/** A live bank stored without one of its roots. */
+export const BankRootsMissing = "A live bank is stored without its main gate or its root box: the store needs mending by hand."
+
+/** A replace classified over no Thing stored, or over one of another kind: the classifier is broken. */
+export const ReplacedThingAmiss = "A write classified as a replace found no live Thing of its kind stored: this is a bug in safebyok."
 
 /** The last resort of a vaultDB's error handler. */
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."

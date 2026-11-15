@@ -57,7 +57,7 @@ export function versionedShelfOf(spec: VersionedShelfSpec): UseStore {
   const made: UseStore = async (txMode, callback) => {
     if (! isWiped) {
       isWiped = true
-      // The old databases are deleted unread and never awaited: a tab that still has one open blocks its delete (notes/wontfix.md).
+      // The old databases are deleted unread and never awaited: a tab that still has one open blocks its delete (notes/wontfix-big.md).
       void wipeOlderDBs(checked)
     }
     return await shelf(txMode, callback)
