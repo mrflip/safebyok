@@ -70,7 +70,7 @@ sidecar is laid beside it, unsealed, so that your server may read it and change 
 server should read but must not change unnoticed goes in both: the sidecar's copy for the server, the
 whisper's for your app, which compares the two once the box is unsealed to see what changed.
 
-| A field kept in       | Server-readable | Server-writable | Authenticated                      |
+| A field kept in       | Unencrypted     | Server-writable | Authenticated                      |
 |-----------------------|-----------------|-----------------|------------------------------------|
 | the whisper           | no              | no              | yes                                |
 | both, copied          | yes             | up to you       | yes: compare to see what changed   |

@@ -139,7 +139,7 @@ is checked as an empty bag, and nothing reads them. The box's stamp is its spars
 (`boxStampOf`, `models/box.ts`). A field a host wants readable in storage and authenticated is kept
 in both the whisper and the sidecar, and the host compares the two once the box is unsealed:
 
-| A field kept in       | Server-readable | Server-writable | Authenticated                      |
+| A field kept in       | Unencrypted     | Server-writable | Authenticated                      |
 |-----------------------|-----------------|-----------------|------------------------------------|
 | the whisper           | no              | no              | yes                                |
 | both, copied          | yes             | up to the host  | yes: compare to see what changed   |
@@ -179,9 +179,9 @@ attempt is done (`attemptThenZero`).
 
 ## The secret values
 
-Eight values are secret. Everything else safebyok writes or shows is public, or *visible*:
+Eight values are secret. Everything else safebyok writes or shows is *visible*:
 readable wherever it is stored, authenticated by the ctx that binds it, and never secret. A box's
-sidecar is public and unauthenticated.
+sidecar is unencrypted and unauthenticated.
 
 | Value | Form | Where it may exist | For how long | Who touches it |
 |---|---|---|---|---|
