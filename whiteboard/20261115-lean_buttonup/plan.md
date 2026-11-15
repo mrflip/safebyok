@@ -8,8 +8,9 @@ was learned and built. Three threads, each its own worktree and PR, cut from ori
 * **T1 `vaultdb_battery`**, background, a thread-worker on Opus. The vaultDB's verbs done well for the bank, gate and
   box Things, a battery any store can run, and `PostgresVaultDB` passing it beside the memory store.
 * **T2 `minder_buttonup`**, interactive with the Coach. C1-C4 of the review, the friend, the cache options shut, the
-  external watch with `receive`, the bank minder routing gates and boxes on, the box listing. Waits on the Coach's
-  hand edit to `thing-minder.ts` and on the doc-block branch (`20261115-docblocks_lean`, unpushed) landing first.
+  external watch with `receive`, the bank minder routing gates and boxes on, the box listing. Stacked: main, then T1
+  (#707), then the doc-block branch (`20261115-docblocks_lean`), then T2, with the Coach's `thing-minder.ts` edits
+  swept in. The Coach gave the go, 2026-11-15.
 * **T3 `bank_box_errors`**, marked, later. The error handling of Bank's box verbs: paranoid and spaghettified
   (`disabledAnswerOf` five times, the `otherThanBox` check that cannot fire, `answer.val as BankThing`). The classifier
   tidy follows T1, once the battery makes it safe.
@@ -62,6 +63,21 @@ So Postgres decides, and returns its verdicts with the row: whether it stored th
 and each named check on that row. The adapter's classifier then names the act from those (design-vaultdb.md, *The
 gate's write function*), overriding `classify*` where the store reached the verdict itself.
 
+## T1: rework, 2026-11-15
+
+* **Postgres is the exemplar of a store that decides.** The adapter reads the store's verdict columns: the act table
+  over the row as it now stands names revision refusals, and where it says write but the store refused, a verdict
+  names why; `storage_issue` only where none does. The classifier's steps are plain functions such an adapter calls in
+  its own order, no callbacks. Convex follows it, with the same names. `mayWrite` decides in TypeScript whether to call
+  the write function, from the op flags; the function then decides on the preconditions alone.
+* **A write whose preconditions hold carries forward**, and nothing else of the prior row is checked. Of several errors
+  at once, which one is reported is unspecified and unstable across versions and adapters; no code ranks them. A
+  write's proposed record carries every field, so an adapter may replace the prior row whole. No wontfix, and no
+  `damaged_row` for a damaged body.
+* **The birth race is fixed**: `ON CONFLICT DO NOTHING` on the roots' inserts, with a running comment, so the loser
+  answers what the winner stored.
+* **The world after a write** is read by a later statement in the same function call, documented in the SQL.
+
 ## T1: not in it
 
 * The minder (T2), Bank's box verbs (T3), the classifier tidy (after T1).
@@ -88,7 +104,9 @@ gate's write function*), overriding `classify*` where the store reached the verd
   drift file records the new guarantee that the design never depends on a remote subscription protocol.
 * **"ties"** replaces "pins": the fields that must agree between a thing and what it is bound to. Renamed in T2.
 * **`DeliverableThing` stays**: the type of the delivery chain, not of the cache.
-* **For T2**, from the Coach's review of `thing-minder.ts`: `VoidSentinel` cites well only for a root, so a box under
-  the root needs its own shell ("give this all the fields it should have"). The kind check in `#doDeliverRecord`
+* **For T2**, from the Coach's review of `thing-minder.ts`: `VoidSentinel` becomes a whole tombstone, with every field
+  a tombstone has ("give this all the fields it should have"), which changes `isVoidSentinel`, `gotAnswerOf` and box
+  citing; a box under the root cites its own shell. The fingerpaint's other edits are carried out in the base checkout
+  and swept into T2: the record checker fetched once, `isWholeRecordAt`. The kind check in `#doDeliverRecord`
   moves to the bank minder's `receive`, which routes gates and boxes on. The friend is `Pick<Bank, 'scope'>` for now,
   and `onBadNews` is removed until something calls it.
