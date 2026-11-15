@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS safebyok_banks (
   CHECK (am IN ('a', 'x'))
 );
 
--- wayins has the bank's passphrase wayin under main, and its passkey wayin under passkey0 when it has one.
+-- wayins holds the bank's passphrase wayin under main, and its passkey wayin under passkey0 when it has one.
 -- auth, sigs and meta are kept for later, and are always empty.
 CREATE TABLE IF NOT EXISTS safebyok_gates (
   user_id       text    NOT NULL,
