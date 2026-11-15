@@ -11,6 +11,7 @@ import { describeVaultDBLists } from './vaultdb-battery-lists'
 import { describeVaultDBBirths } from './vaultdb-battery-births'
 import { describeVaultDBWatch } from './vaultdb-battery-watch'
 import { describeVaultDBWorld } from './vaultdb-battery-world'
+import { describeVaultDBTracked } from './vaultdb-battery-tracked'
 
 // == [The hooks a vaultDB hands the battery]: VaultDBRowCheats, VaultDBBatteryOpts
 
@@ -24,7 +25,7 @@ export type VaultDBRowCheats = {
 
 /** What a vaultDB hands {@link describeVaultDBBattery}: how to make one, and the backdoor to what it stores. */
 export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
-  /** A fresh, empty vaultDB. */
+  /** A fresh, empty vaultDB. A store may empty one database for each it makes: a case uses only the vaultDB it made last. */
   makeVaultDB:   () => Helpers.Awaitable<DBT>
   /** The backdoor to a vaultDB's stored Things. */
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
@@ -99,6 +100,7 @@ export function describeVaultDBBattery<DBT extends VaultDB>(label: string, opts:
     describeVaultDBLists(world)
     describeVaultDBBirths(world)
     describeVaultDBWorld(world)
+    describeVaultDBTracked(world)
     if (world.watches) { describeVaultDBWatch(world) }
   })
 }

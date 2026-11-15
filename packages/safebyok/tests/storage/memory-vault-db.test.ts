@@ -52,19 +52,20 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
 })
 
 describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
-  it("tells its watches of no world an ask's pick misses, made with pushesWorld: false", async () => {
-    const vaultDB = new MemoryVaultDB({ pushesWorld: false })
+  it("answers tracked but tells its watches nothing of it, made with doNotifyTracked: false", async () => {
+    const vaultDB = new MemoryVaultDB({ doNotifyTracked: false })
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     const notices: unknown[] = []
     vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
-    await TH.expectGood(vaultDB.tryGetThing(TH.getAskAt('box')))
+    const track = TH.trackOf(TH.bankThingOf({ revseq: 3 }), TH.gateThingOf())
+    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box'), track })).to.deep.include({ tracked: { bank: TH.bankThingOf(), gate: 'same' } })
     await TH.aWhile()
     expect(notices).to.deep.equal([])
   })
 
   it("refuses an opt it does not know, or one of the wrong type", () => {
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ pushesWorld: 'no' } as never), 'bad_option')
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ pushWorld: false } as never), 'bad_option')
+    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTracked: 'no' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTrack: false } as never), 'bad_option')
   })
 })
 

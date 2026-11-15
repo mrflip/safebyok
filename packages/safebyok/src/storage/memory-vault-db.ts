@@ -2,8 +2,9 @@
 
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
-import type { BirthBankAsk, BirthPuts, GetThingAsk, ListThingsAsk, Thing, ThingScope, ThingWatchScope, WorldRecord, WriteThingAsk } from './shapes-thing'
-import { type BankRootsFetched, type WorldFetched, isWriteAct, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
+import { type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingScope, type ThingWatchScope, type Track, type Tracked, type WorldRecord,
+  type WriteThingAsk, MainGateLabelpath } from './shapes-thing'
+import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
 /** A watch: the bank it watches, the function that receives each change, and the one that hears its trouble. */
@@ -18,7 +19,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   readonly #watchers = new Set<Watcher>()
   // --
 
-  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #worldFetchedOf, #worldOf, #notify
+  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #worldFetchedOf, #worldAfter, #notify
 
   /** For tests: the Things stored in `scope`'s bank, by labelpath, to read or change in place. */
   _cheat_things(scope: ThingWatchScope): Map<string, unknown> { return this.#thingsOf(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
@@ -41,18 +42,23 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return writtenThingOf(scope, structuredClone(things.get(scope.labelpath)))
   }
 
-  /** The raw roots of a bank's `things`, each a copy, or null for none. */
-  #rootsOf(things: Map<string, unknown>): BankRootsFetched {
-    return structuredClone({ bank: things.get('bank') ?? null, gate: things.get('gate') ?? null, root: things.get('box') ?? null })
+  /** The raw roots of a bank's `things`, each a copy, or null for none, and how its bank and main gate compare with `track`. */
+  #rootsOf(things: Map<string, unknown>, track: Track | undefined): BankRootsFetched {
+    const { maingate: gate, ...fetched } = this.#worldFetchedOf(things, track)
+    return { ...fetched, gate, root: structuredClone(things.get('box') ?? null) }
   }
 
-  /** The raw bank and main gate of a bank's `things`, each a copy, or null for none. */
-  #worldFetchedOf(things: Map<string, unknown>): WorldFetched {
-    return structuredClone({ bank: things.get('bank') ?? null, maingate: things.get('gate') ?? null })
+  /** The raw bank and main gate of a bank's `things`, each a copy, or null for none, and how they compare with `track`. */
+  #worldFetchedOf(things: Map<string, unknown>, track: Track | undefined): WorldFetched {
+    const fetched = structuredClone({ bank: things.get('bank') ?? null, maingate: things.get(MainGateLabelpath) ?? null })
+    return { ...fetched, tracked: trackedFetchedOf(track, fetched) }
   }
 
-  /** The world of the bank of `things` at `scope`, as it now stands. */
-  #worldOf(scope: ThingWatchScope, things: Map<string, unknown>): WorldRecord | null { return worldOf(scope, this.#worldFetchedOf(things)) }
+  /** The world of the bank of `things` at `scope`, as it now stands, and its `tracked` for `track`. */
+  #worldAfter(scope: ThingWatchScope, things: Map<string, unknown>, track: Track | undefined): { world: WorldRecord | null, tracked?: Tracked } {
+    const fetched = this.#worldFetchedOf(things, track)
+    return { world: worldOf(scope, fetched), ...trackedFieldOf(scope, fetched.tracked) }
+  }
 
   // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
   /** Notify each watcher of `thing`'s bank of it, and of the bank as `world`. */
@@ -71,17 +77,17 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   protected doGetThing(ask: GetThingAsk): Actual<EX.GotAct> {
     const things = this.#thingsOf(ask)
-    return this.classifyGetThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things))
+    return this.classifyGetThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things, ask.track))
   }
 
   protected doWriteThing(ask: WriteThingAsk): Actual<EX.PutAct | EX.DelAct> {
     const things = this.#thingsOf(ask)
-    const actual = this.classifyWriteThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things))
+    const actual = this.classifyWriteThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things, ask.track))
     if (! (actual.ok && isWriteAct(actual.act))) { return actual }
     const record = this.#write(ask, ask.record)
-    const world  = this.#worldOf(ask, things)
-    this.#notify(record, world)
-    return { ...actual, world, record }
+    const after  = this.#worldAfter(ask, things, ask.track)
+    this.#notify(record, after.world)
+    return { ...actual, ...after, record }
   }
 
   protected doListThings(ask: ListThingsAsk): ListThingsActual {
@@ -90,18 +96,18 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const children = [...things]
       .filter(([labelpath]) => labelpath.startsWith(under) && (! labelpath.includes('/', under.length)))
       .map(([labelpath, raw]) => ({ labelpath, raw: structuredClone(raw) }))
-    return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children }, this.#worldFetchedOf(things))
+    return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children }, this.#worldFetchedOf(things, ask.track))
   }
 
   protected doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {
     const things = this.#thingsOf(ask)
-    const actual = this.classifyBirthBank(puts, this.#rootsOf(things))
+    const actual = this.classifyBirthBank(puts, this.#rootsOf(things, ask.track))
     if (! (actual.ok && (actual.act === 'born'))) { return actual }
     for (const { labelpath, record } of puts) { things.set(labelpath, structuredClone(record)) }
-    const written = writtenRootsOf(puts, this.#rootsOf(things))
-    const world   = this.#worldOf(ask, things)
-    for (const thing of Object.values(written)) { this.#notify(thing, world) }
-    return { ...actual, world, things: written }
+    const written = writtenRootsOf(puts, this.#rootsOf(things, undefined))
+    const after   = this.#worldAfter(ask, things, ask.track)
+    for (const thing of Object.values(written)) { this.#notify(thing, after.world) }
+    return { ...actual, ...after, things: written }
   }
 
   protected override doWatch(scope: ThingWatchScope, receive: Watcher['receive'], onBadNews: Watcher['onBadNews']): () => void {

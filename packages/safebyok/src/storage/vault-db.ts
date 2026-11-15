@@ -3,21 +3,22 @@
 import type { EX, Errors } from 'safebyok-big/internals'
 import type {
   BankRoots, BirthBankAsk, GetAskArgs, GetThingAsk, ListAskArgs, ListThingsAsk, LoggableAsk, PutAskArgs, DelAskArgs, Sparse, Thing,
-  ThingScope, ThingWatchScope, WorldRecord, WriteAskOf, WriteThingAsk,
+  ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAskOf, WriteThingAsk,
 } from './shapes-thing'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, its bank's `world`, and the loggable part of its `ask`.
  * `world` is the bank and its main gate as the step left them, read in that step: null where no bank is stored, where either fails its checks, or where the step threw.
+ * `tracked`, only for an ask that tracks, compares the same two with what the ask tracks.
  */
-export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, val: ValT }
+export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, tracked?: Tracked, val: ValT }
 
 /** Every act a refused answer carries: big's, and `policied` for a write that a storage policy, or the kept born_at, refuses where the put table would replace. */
 export type BadAct = EX.BadAct | 'policied'
 
 /** A vaultDB verb's refused answer: its `err`, its `act`, what is stored as `dbhas`, its bank's `world`, and the loggable part of its `ask`. */
-export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, dbhas: DbhasT, err: Errors.VaultError }
+export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, tracked?: Tracked, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
@@ -49,24 +50,24 @@ export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'ok' | 
 
 // == [What a store reports]: Actual, ListThingsActual, BirthBankActual
 
-/** What a store reports of one atomic step: the act, the bank's world as the step left it, and the Thing stored as `record`, which the adapter
+/** What a store reports of one atomic step: the act, the bank's world as the step left it and its `tracked`, and the Thing stored as `record`, which the adapter
  * places on the answer as `val` when good, as `dbhas` when refused. After a write, `record` is the Thing as the store reports writing it.
  * Refused, it carries the refused act and no error: the adapter makes the error from the act.
  */
 export type Actual<ActT extends EX.GoodAct> =
-  | { ok: true,  act: ActT,           world: WorldRecord | null, record: Thing | null }
-  | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, record: Thing | null }
+  | { ok: true,  act: ActT,           world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
+  | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
 
 /** What a store reports of a listing: the parent's act, the children `listed`, the parent, and the children that failed their checks. */
-export type ListThingsActual = Readonly<{ world: WorldRecord | null, listed: Sparse<Thing>[] } & ListedBeside & (
+export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: Tracked, listed: Sparse<Thing>[] } & ListedBeside & (
   | { ok: true,  act: EX.GotAct }
   | { ok: false, act: EX.RefusedAct }
 )>
 
 /** What a store reports of a bank's birth: the three roots, written or found, or the refusal of the first that refuses with the Thing it found. */
 export type BirthBankActual =
-  | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, things: BankRoots }
-  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, record: Thing | null }
+  | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, tracked?: Tracked, things: BankRoots }
+  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
 // --
 
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
@@ -90,7 +91,7 @@ export interface VaultDB {
   /** The del ask writing the tombstone `args.record` over `args.cited`. */
   delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT>
   /** Watch the Things of a bank, and return a function that stops the watch. `onBadNews` hears the trouble the watch meets, a Thing heard that fails its checks among it.
-   * Where a verb's answer carries a world other than its ask's `world` pick, or the ask has none, the watch also hears the bank, with that world.
+   * It also hears each Thing a verb's answer reports in its `tracked` other than as `'same'`.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }

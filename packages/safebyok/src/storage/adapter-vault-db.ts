@@ -1,12 +1,12 @@
 /** `AdapterVaultDB`, the base class a store extends by writing its `do*` calls. */
 
-import { noop, omit } from 'es-toolkit'
+import { noop } from 'es-toolkit'
 import type * as Z from 'zod'
 import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../phrases'
 import {
   type BirthBankAsk, type BirthPuts, type DelAskArgs, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type LoggableAsk, type PutAskArgs,
-  type Thing, type ThingWatchScope, type WorldPick, type WorldRecord, type WriteAskOf, type WriteThingAsk,
+  type Thing, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAskOf, type WriteThingAsk,
   birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf, watchArgs,
 } from './shapes-thing'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
@@ -14,15 +14,15 @@ import type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
 } from './vault-db'
 
-// == [Answers]: Received, AdapterVaultDBOpts, answerOf, isWorldPicked
+// == [Answers]: Received, AdapterVaultDBOpts, answerOf
 
 /** What a store's watch hands `receive`: a changed Thing, raw, and its bank's world as the store last read it. */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
 /** The check of what a vaultDB that extends {@link AdapterVaultDB} is made with. */
 const adapterVaultDBOpts = Validator.Checker(({ obj, bool }) => obj({
-  /** False for a store that tells its own watches of a world an ask's pick missed: see {@link AdapterVaultDB}. Default true. */
-  pushesWorld: bool.optional(),
+  /** False to tell no watch of what an answer's `tracked` reports: see {@link AdapterVaultDB.notifyTrackedRecords}. Default true. */
+  doNotifyTracked: bool.optional(),
 }).strict(), 'bad_option')
 
 /** What a vaultDB that extends {@link AdapterVaultDB} is made with. */
@@ -38,35 +38,34 @@ function answerOf(actual: Actual<EX.GotAct>, oplabel: string, loggableAsk: Logga
 function answerOf(actual: Actual<EX.PutAct | EX.DelAct>, oplabel: string, loggableAsk: LoggableAsk): WriteThingAnswer
 function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<Thing | null, EX.GoodAct> {
   const { world, record } = actual
+  const beside = trackedFieldOf(actual)
   if (! actual.ok) {
     const err = Throwers.actRefused('vault', actual.act, { oplabel, ask: loggableAsk })
-    return { ok: false, ask: loggableAsk, act: actual.act, world, dbhas: record, err }
+    return { ok: false, ask: loggableAsk, act: actual.act, world, ...beside, dbhas: record, err }
   }
   // Every good act but gotvoid finds or writes a Thing: a store that reports none is broken.
   if ((record === null) && (actual.act !== 'gotvoid')) { throw Throwers.storageIssue() }
-  return { ok: true, ask: loggableAsk, act: actual.act, world, val: record }
+  return { ok: true, ask: loggableAsk, act: actual.act, world, ...beside, val: record }
 }
 
-/** True when `pick` names the revision and life of `world`'s bank. */
-function isWorldPicked(pick: WorldPick | undefined, world: WorldRecord): boolean {
-  return (pick?.revseq === world.revseq) && (pick.lifeseq === world.lifeseq)
-}
+/** The `tracked` a store reports, as a field to spread into an answer: none where it reports none. */
+function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked } { return (tracked === undefined) ? {} : { tracked } }
 // --
 
 /** The base class of a vaultDB that keeps its Things in a datastore: a subclass writes the `do*` calls, each one atomic step.
- * It checks each ask, and classifies what a `do*` call fetches by the act tables in notes/answer-contract.md. Where an answer's world is not
- * the one its ask picks, it tells each of its watches of that bank of the world, as a notice of the bank, unless made with `pushesWorld: false`.
+ * It checks each ask, and classifies what a `do*` call fetches by the act tables in notes/answer-contract.md. It tells its watches of each
+ * Thing an answer's `tracked` reports other than as `'same'`, unless made with `doNotifyTracked: false`.
  */
 export abstract class AdapterVaultDB implements VaultDB {
-  // == [Props]: #pushesWorld, #feeds
+  // == [Props]: #doNotifyTracked, #feeds
 
-  readonly #pushesWorld: boolean
+  readonly #doNotifyTracked: boolean
   readonly #feeds = new Set<Feed>()
 
   /** Throws `bad_option` for opts it does not know. */
   constructor(opts: AdapterVaultDBOpts = {}) {
-    const { pushesWorld = true } = adapterVaultDBOpts.parse(opts)
-    this.#pushesWorld = pushesWorld
+    const { doNotifyTracked = true } = adapterVaultDBOpts.parse(opts)
+    this.#doNotifyTracked = doNotifyTracked
   }
   // --
 
@@ -111,8 +110,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       const checked     = checkedGetThingAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doGetThing(checked) // has act and ok, but no err yet
-      this.#pushWorld(checked, actual.world)
-      return answerOf(actual, 'getThing', loggableAsk)
+      const answer      = answerOf(actual, 'getThing', loggableAsk)
+      this.notifyTrackedRecords(checked, answer)
+      return answer
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
   }
 
@@ -122,8 +122,9 @@ export abstract class AdapterVaultDB implements VaultDB {
       const checked     = checkedWriteThingAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doWriteThing(checked) // has act and ok, but no err yet
-      this.#pushWorld(checked, actual.world)
-      return answerOf(actual, 'writeThing', loggableAsk)
+      const answer      = answerOf(actual, 'writeThing', loggableAsk)
+      this.notifyTrackedRecords(checked, answer)
+      return answer
     } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
   }
 
@@ -133,11 +134,12 @@ export abstract class AdapterVaultDB implements VaultDB {
       const checked     = checkedListThingsAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doListThings(checked)
-      this.#pushWorld(checked, actual.world)
-      const beside      = { parent: actual.parent, damaged_rows: actual.damaged_rows }
-      if (actual.ok) { return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, ...beside, val: actual.listed } }
-      const err = Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk })
-      return { ok: false, ask: loggableAsk, act: actual.act, world: actual.world, ...beside, dbhas: actual.listed, err }
+      const beside      = { world: actual.world, ...trackedFieldOf(actual), parent: actual.parent, damaged_rows: actual.damaged_rows }
+      const answer: ListThingsAnswer = actual.ok
+        ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.listed }
+        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.listed, err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
+      this.notifyTrackedRecords(checked, answer)
+      return answer
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parent: null, damaged_rows: [] } }
   }
 
@@ -147,10 +149,12 @@ export abstract class AdapterVaultDB implements VaultDB {
       const checked     = checkedBirthBankAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doBirthBank(checked, birthPutsOf(checked))
-      this.#pushWorld(checked, actual.world)
-      if (actual.ok) { return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: actual.things } }
-      const err = Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk })
-      return { ok: false, ask: loggableAsk, act: actual.act, world: actual.world, dbhas: actual.record, err }
+      const beside      = { world: actual.world, ...trackedFieldOf(actual) }
+      const answer: BirthBankAnswer = actual.ok
+        ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.things }
+        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk }) }
+      this.notifyTrackedRecords(checked, answer)
+      return answer
     } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
   }
 
@@ -171,17 +175,21 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
   // --
 
-  // == [The world push]: #pushWorld
+  // == [Tracked]: notifyTrackedRecords
 
-  // A null world is never pushed: a notice carries a Thing, and a null world has no bank to carry. Each feed is called on a later
-  // microtask, so nothing it does runs inside the verb.
-  /** Tell each watch of `ask`'s bank of `world`, as a notice of its bank, where `ask` picks another world or none. */
-  #pushWorld(ask: { userid: string, banklabel: string, world?: WorldPick | undefined }, world: WorldRecord | null): void {
-    if ((world === null) || (! this.#pushesWorld) || isWorldPicked(ask.world, world)) { return }
-    const bank = omit(world, ['maingate'])
-    for (const { scope, receive } of this.#feeds) {
-      if ((scope.userid === ask.userid) && (scope.banklabel === ask.banklabel)) {
-        queueMicrotask(() => { receive({ record: structuredClone(bank), world: structuredClone(world) }) })
+  // Each verb calls it last, on the answer it returns. Each watch hears on a later microtask, so nothing it does runs inside the verb.
+  /** Tell each watch of the bank at `bankScope` of each Thing `answer.tracked` reports other than as `'same'`, with `answer.world`.
+   * Does nothing for a vaultDB made with `doNotifyTracked: false`.
+   */
+  protected notifyTrackedRecords(bankScope: ThingWatchScope, { world, tracked }: { world: WorldRecord | null, tracked?: Tracked }): void {
+    if ((tracked === undefined) || (! this.#doNotifyTracked)) { return }
+    // Unspecified for a missing or damaged row: notes/wontfix.md.
+    for (const record of Object.values(tracked)) {
+      if (record === 'same') { continue }
+      for (const { scope, receive } of this.#feeds) {
+        if ((scope.userid === bankScope.userid) && (scope.banklabel === bankScope.banklabel)) {
+          queueMicrotask(() => { receive({ record: structuredClone(record), world: structuredClone(world) }) })
+        }
       }
     }
   }
@@ -211,7 +219,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
-  // fetched. A store that can run code of its own may run the whole step there.
+  // fetched. A store that can run code of its own may run the whole step there. For an ask that carries `track`, the step
+  // also compares it with the bank and main gate the world is read from, and reports that as the world's `tracked`
+  // (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
 
   /** In one step: fetch the Thing at `ask`'s scope and its bank's raw world, and return `this.classifyGetThing(ask, raw, world)`. */
   protected abstract doGetThing(ask: GetThingAsk): Helpers.Awaitable<Actual<EX.GotAct>>

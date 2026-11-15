@@ -6,8 +6,9 @@ import { BankRootsMissing, BornAtNotStored, ReplacedThingAmiss } from '../phrase
 import { PoliciedMeta, demandPolicies } from './policies'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type WorldRecord, type WriteThingAsk,
-  GateThingFormat, KindChecks, isLabelpathOfKind, kindChecksOf, sparseOf, thingScope,
+  type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track, type Tracked,
+  type WorldRecord, type WriteThingAsk,
+  GateThingFormat, KindChecks, MainGateLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, thingScope,
 } from './shapes-thing'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeOff
@@ -169,20 +170,53 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing 
   return writtenThingOf(scope.data, raw)
 }
 
-/** What a store fetched of a bank's three roots: the raw bank, main gate and root box, each null for none. */
-export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown }>
+/** What a store fetched of a bank's three roots: the raw bank, main gate and root box, each null for none, and its {@link TrackedFetched}. */
+export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked?: TrackedFetched }>
 
-/** What a store fetched of a bank's world: the raw bank and main gate, each null for none. */
-export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown }>
+/** What a store fetched of a bank's world: the raw bank and main gate, each null for none, and its {@link TrackedFetched}. */
+export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
 
 // A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
 /** The world of the bank at `bankScope`, from its raw `fetched` bank and main gate; null where either is missing or fails its checks. */
 export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFetched): WorldRecord | null {
   try {
     const bank     = storedOf(KindChecks.bank.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank)
-    const maingate = storedOf(KindChecks.gate.stored, { userid, banklabel, labelpath: 'gate' }, fetched.maingate)
+    const maingate = storedOf(KindChecks.gate.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched.maingate)
     return ((bank === null) || (maingate === null)) ? null : { ...bank, maingate }
   } catch { return null }
+}
+// --
+
+// == [Tracked]: TrackedFetched, trackedFetchedOf, trackedFieldOf, trackedEntryOf
+// The store compares what an ask tracks with the bank and main gate it fetched, in the step that fetched them. The adapter
+// checks each row the store reports in place of 'same'.
+
+/** What a store reports of the bank and main gate an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
+export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown }> | null
+
+/** What a store that compares in TypeScript reports of `track`, against the raw bank and main gate it fetched. */
+export function trackedFetchedOf(track: Track | undefined, { bank, maingate }: WorldFetched): TrackedFetched {
+  if (track === undefined) { return null }
+  return { bank: trackedRawOf(track.bank, bank), [MainGateLabelpath]: trackedRawOf(track[MainGateLabelpath], maingate) }
+}
+
+/** `'same'` where `raw` has the revseq and lifepath of `pair`, else `raw`. */
+function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
+  return (CX.isPlainBag(raw) && (raw['revseq'] === pair.revseq) && (raw['lifepath'] === pair.lifepath)) ? 'same' : raw
+}
+
+/** The answer's `tracked`, as a field to spread into it, from what the store reports for the bank at `bankScope`: none for an ask that tracks nothing. */
+export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched | undefined): { tracked?: Tracked } {
+  if ((fetched === null) || (fetched === undefined)) { return {} }
+  return { tracked: {
+    bank:                 trackedEntryOf(KindChecks.bank.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
+    [MainGateLabelpath]:  trackedEntryOf(KindChecks.gate.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched[MainGateLabelpath]),
+  } }
+}
+
+/** `'same'`, or the Thing at `scope` checked by `check`. */
+function trackedEntryOf<RecordT extends Thing>(check: StoredCheck<RecordT>, scope: ThingScope, raw: unknown): RecordT | 'same' {
+  return (raw === 'same') ? 'same' : writtenOf(check, scope, raw)
 }
 // --
 
@@ -194,7 +228,8 @@ export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: W
   const stored = storedThingOf(ask, raw)
   const act    = getActOf(ask, stored)
   const world  = worldOf(ask, worldFetched)
-  return isRefusedAct(act) ? { ok: false, act, world, record: stored } : { ok: true, act, world, record: stored }
+  const beside = trackedFieldOf(ask, worldFetched.tracked)
+  return isRefusedAct(act) ? { ok: false, act, world, record: stored, ...beside } : { ok: true, act, world, record: stored, ...beside }
 }
 
 /** Classify a write against the raw Thing a store fetched at its scope, null for none, and check its storage policies
@@ -204,9 +239,10 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, worldFetche
   const stored = storedThingOf(ask, raw)
   const act    = writeActOf(ask, stored)
   const world  = worldOf(ask, worldFetched)
-  if (isRefusedAct(act))  { return { ok: false, act, world, record: stored } }
+  const beside = trackedFieldOf(ask, worldFetched.tracked)
+  if (isRefusedAct(act))  { return { ok: false, act, world, record: stored, ...beside } }
   if (act === 'replaced') { demandReplaceable(ask, stored) }
-  return { ok: true, act, world, record: stored }
+  return { ok: true, act, world, record: stored, ...beside }
 }
 
 /** Throw unless `ask` may replace `stored`, the live Thing found: `bad_record` unless it keeps the born_at, and `gate_issue` where a storage policy refuses. */
@@ -230,9 +266,10 @@ export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, chil
   const act    = getActOf(ask, stored)
   const parent = (stored === null) ? null : sparseOf(stored)
   const world  = worldOf(ask, worldFetched)
-  if (isRefusedAct(act))  { return { ok: false, act, world, listed: [], parent, damaged_rows: [] } }
+  const beside = trackedFieldOf(ask, worldFetched.tracked)
+  if (isRefusedAct(act))  { return { ok: false, act, world, listed: [], parent, damaged_rows: [], ...beside } }
   // A tombstone or none has no children.
-  if (stored?.am !== 'a') { return { ok: true, act, world, listed: [], parent, damaged_rows: [] } }
+  if (stored?.am !== 'a') { return { ok: true, act, world, listed: [], parent, damaged_rows: [], ...beside } }
   const { userid, banklabel } = ask
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${stored.lifepath}/`
@@ -244,7 +281,7 @@ export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, chil
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
   const listed = sortBy(living, [(thing) => thing.labelpath]).map((thing) => sparseOf(thing))
-  return { ok: true, act, world, listed, parent, damaged_rows }
+  return { ok: true, act, world, listed, parent, damaged_rows, ...beside }
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
@@ -254,8 +291,8 @@ function isChildLabelpath(ask: ListThingsAsk, labelpath: string): boolean {
 }
 
 /** Classify a bank's birth, by the three `puts` it amounts to, against the roots a store fetched. Under
- * `born`, `things` and `world` are the puts' records, which the store writes in one step and then reports as written; under `passed`,
- * the roots stored.
+ * `born`, `things` and `world` are the puts' records, which the store writes in one step and then reports as written, with any `tracked`
+ * as read after it; under `passed`, the roots stored.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
   const [bankPut, gatePut, rootPut] = puts
@@ -265,11 +302,13 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
   // The bank's put passes over a live bank, whose gate and root must be stored with it.
   if (putActOf(bankPut, bank) === 'passed') {
     if ((bank === null) || (gate === null) || (root === null)) { throw new Errors.VaultError('storage_issue', BankRootsMissing) }
-    return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, things: { bank, gate, root } }
+    return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, things: { bank, gate, root }, ...trackedFieldOf(bankPut, fetched.tracked) }
   }
   for (const [put, stored] of [[bankPut, bank], [gatePut, gate], [rootPut, root]] as const) {
     const act = putActOf(put, stored)
-    if (isRefusedAct(act)) { return { ok: false, act, world: worldOf(bankPut, { bank: fetched.bank, maingate: fetched.gate }), record: stored } }
+    if (isRefusedAct(act)) {
+      return { ok: false, act, world: worldOf(bankPut, { bank: fetched.bank, maingate: fetched.gate }), record: stored, ...trackedFieldOf(bankPut, fetched.tracked) }
+    }
   }
   const things = { bank: bankPut.record, gate: gatePut.record, root: rootPut.record }
   return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, things }
