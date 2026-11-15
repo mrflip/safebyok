@@ -265,7 +265,7 @@ export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key.
 /** Why this device's lease is not used, whether it was found damaged in the cache or failed to unwrap while in force. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
-/** Why a whisper that will not decipher under its boxKey is refused. */
+/** Why a box that will not unseal under the bankKey is refused. */
 export const UndecipheredWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
 
 /** Why a whisper that deciphered but is no whisper this package knows is refused. */

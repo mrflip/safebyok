@@ -166,7 +166,7 @@ export function notExposed(): VaultError { return new VaultError('bad_option', P
 /** A `damaged_lease` refusal: this device's lease will not unwrap the bankKey. */
 export function damagedLease(): VaultError { return new VaultError('damaged_lease', Phrases.DamagedLease) }
 
-/** A `damaged_whisper` refusal: the whisper would not decipher under its boxKey. */
+/** A `damaged_whisper` refusal: the box would not unseal under the bankKey. */
 export function undecipheredWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecipheredWhisper) }
 
 /** A `bank_locked` refusal: this lease is out of force. */

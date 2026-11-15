@@ -4,7 +4,7 @@
 # labels each `queue` so Mergify lands them as one merge commit apiece (.mergify.yml, PROCESS.md,
 # *The history we keep*). Reports the stack and labels nothing unless given --apply.
 #
-# The pull requests to merge can be given as numbers, or as any text that contains them, such as the
+# The pull requests to queue can be given as numbers, or as any text that contains them, such as the
 # stack line of a PR's body pasted whole: every run of digits in it is a number. Their order there
 # does not matter, the script finds the order itself.
 #
