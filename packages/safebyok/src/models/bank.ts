@@ -10,7 +10,7 @@ import { type BankScope, type BankStamp, bankScope, bankStamp } from './stamps'
 import * as Phrases from '../phrases'
 import {
   type BankThing, type BoxThing, type DelAskArgs, type PutAskArgs,
-  BankThingFormat, BoxThingFormat, ShellLifeseq, bankThing, boxSparse, boxThing, childShellCited, lifeseqOf,
+  BankThingFormat, BoxThingFormat, ShellLifeseq, bankThing, boxSparse, boxThing, childShellCited, lifeseqOf, loggableAskOf,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
@@ -224,11 +224,14 @@ export class Bank implements BankStamp {
   // --
 
   // == [Boxes in the vaultDB]: tryListBoxes, tryGetBox, tryPutBox, tryDelBox, shellOf
-  // Each fills in the bank's scope and the box modelkind, so that what is not this bank's box refuses. None throws.
+  // Each fills in the bank's scope and the box modelkind, so that what is not this bank's box refuses. None throws:
+  // while the device is disabled, each answers with its refusal.
 
   /** The boxes directly under the root box, tombstones among them, with the root box as `parent`. */
   tryListBoxes(): Promise<ListThingsAnswer> {
-    return this.#vaultDB.tryListThings(this.#vaultDB.listAsk({ ...this.scope, labelpath: 'box' }))
+    const ask = this.#vaultDB.listAsk({ ...this.scope, labelpath: 'box' })
+    if (! this.isEnabled) { return Promise.resolve({ ...disabledAnswerOf(ask), parent: null, damaged_rows: [] }) }
+    return this.#vaultDB.tryListThings(ask)
   }
 
   /** The box at `args.labelpath`. Where none is stored, `ifAbsent: 'shell'` gives its shell, for its first revision to be sealed over and cite. */
@@ -236,21 +239,27 @@ export class Bank implements BankStamp {
   tryGetBox(args: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | null>>
   async tryGetBox(args: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
     const { ifAbsent, ...given } = { ...args }
-    const answer = await this.#vaultDB.tryGetThing({ ...this.#vaultDB.getAsk({ ...given, ...this.scope, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' })
+    const ask = { ...this.#vaultDB.getAsk({ ...given, ...this.scope, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
+    if (! this.isEnabled) { return disabledAnswerOf(ask) }
+    const answer = await this.#vaultDB.tryGetThing(ask)
     if (! answer.ok) { return answer }
     if (answer.val === null) { return { ...answer, val: (ifAbsent === 'shell') ? this.#shellOf(given.labelpath) : null } }
-    if (answer.val.fmt !== BoxThingFormat) { throw new Errors.VaultError('unexpected_error', Phrases.GotOtherThanBox) }
+    if (answer.val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: answer.val, err: new Errors.VaultError('unexpected_error', Phrases.GotOtherThanBox) } }
     return { ...answer, val: answer.val }
   }
 
   /** Write the live box `args.record` over `args.cited`, the box stored at its scope, or its shell. */
   tryPutBox(args: PutAskArgs<BoxThing>): Promise<WriteThingAnswer> {
-    return this.#vaultDB.tryWriteThing({ ...this.#vaultDB.putAsk(args), ...this.scope, modelkind: 'box' })
+    const ask = { ...this.#vaultDB.putAsk(args), ...this.scope, modelkind: 'box' } as const
+    if (! this.isEnabled) { return Promise.resolve(disabledAnswerOf(ask)) }
+    return this.#vaultDB.tryWriteThing(ask)
   }
 
   /** Write the tombstone `args.record` over `args.cited`, the live box stored at its scope. */
   tryDelBox(args: DelAskArgs<BoxThing>): Promise<WriteThingAnswer> {
-    return this.#vaultDB.tryWriteThing({ ...this.#vaultDB.delAsk(args), ...this.scope, modelkind: 'box' })
+    const ask = { ...this.#vaultDB.delAsk(args), ...this.scope, modelkind: 'box' } as const
+    if (! this.isEnabled) { return Promise.resolve(disabledAnswerOf(ask)) }
+    return this.#vaultDB.tryWriteThing(ask)
   }
 
   // Only a child of the root box has its shell here: a deeper box's lifepath needs its parent's.
@@ -297,4 +306,9 @@ export class Bank implements BankStamp {
 
   /** Always `'bank'`: marks this model for a {@link Consts.Modelkind} check. */
   get modelkind(): 'bank' { return 'bank' satisfies Consts.Modelkind }
+}
+
+/** The refused answer to `ask` while the bank's device is disabled, with the device's refusal as its err. */
+function disabledAnswerOf(ask: unknown): BadAnswer<null> {
+  return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Throwers.deviceDisabled() }
 }

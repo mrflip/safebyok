@@ -90,6 +90,18 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
 })
 
 describe("the bank's box methods refuse, never throwing", () => {
+  it("tryPutBox answers the device's refusal while it is disabled, and writes nothing", async () => {
+    const bank = await storedBank()
+    const prior = await priorOf(bank)
+    const record = await bank.sealBox({ ...prior, sidecar: {} }, { whisper: TH.Whisper })
+    bank.device.sweep()
+    const answer = await bank.tryPutBox({ cited: prior, record })
+    await TH.expectBad(answer, 'disabled')
+    expect(answer).to.include({ dbhas: null })
+    const got = await bank.device.vaultDB.tryGetThing(bank.device.vaultDB.getAsk({ ...bank.scope, labelpath: Openai }))
+    expect(got).to.include({ ok: true, val: null })
+  })
+
   it("tryGetBox answers null for a box not stored, by default", async () => {
     const bank = await storedBank()
     const got = await bank.tryGetBox({ labelpath: Openai })
