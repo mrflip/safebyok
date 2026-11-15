@@ -246,7 +246,8 @@ ${writeFunctionOf({ kind: 'box', table: 'safebyok_box_things', body: ['sidecar',
 
 -- Store a bank's three roots, its bank, main gate and root box, where none of the three is stored. One statement writes
 -- all three or none. Two births racing for one bank both pass the check that none is stored; the one that commits second
--- stores nothing, and answers what the first stored.
+-- stores no bank, so it stores nothing, and answers what the first stored. The gate and root box are stored only beside a
+-- bank stored by the same statement: where another writer stored either first, the statement fails whole.
 -- Returns whether it stored them (ok), and the three rows as they now stand, each null for none.
 CREATE OR REPLACE FUNCTION safebyok_birth_roots(bank_record jsonb, gate_record jsonb, root_record jsonb)
 RETURNS TABLE (ok boolean, bank jsonb, gate jsonb, root jsonb)
@@ -275,12 +276,10 @@ BEGIN
     ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
     RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
   ), gated AS (
-    INSERT INTO safebyok_gate_things AS stored SELECT (new_gate).* FROM unborn
-    ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
+    INSERT INTO safebyok_gate_things AS stored SELECT (new_gate).* FROM banked  -- only once the bank is stored; a conflict here fails the whole statement
     RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
   ), rooted AS (
-    INSERT INTO safebyok_box_things  AS stored SELECT (new_root).* FROM unborn
-    ON CONFLICT DO NOTHING  -- variation approved for birth calls: a birth is an ensure, so a conflict is the present case, which the read below answers
+    INSERT INTO safebyok_box_things  AS stored SELECT (new_root).* FROM banked  -- only once the bank is stored; a conflict here fails the whole statement
     RETURNING safebyok_thing_record(to_jsonb(stored)) AS written
   )
   SELECT (SELECT written FROM banked), (SELECT written FROM gated), (SELECT written FROM rooted)
