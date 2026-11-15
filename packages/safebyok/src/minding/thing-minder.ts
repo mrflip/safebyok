@@ -15,7 +15,7 @@ export const VoidSentinel = Object.freeze({ ...ShellCited, revseq: SX.VoidRevisi
 /** The type of {@link VoidSentinel}: the shell's fields, at revseq -1, and no scope. */
 export type VoidSentinel = typeof VoidSentinel
 
-/** A cached record: a Thing, whole or sparse, or the void sentinel. */
+/** A record on its way to the cache: a Thing, whole or sparse, or the void sentinel for a scope where storage holds nothing. */
 export type DeliverableThing = Thing | Sparse<Thing> | VoidSentinel
 
 // `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
