@@ -41,7 +41,7 @@ describe("proving.buildWayin", () => {
 })
 
 describe("bank.ensureUnlocked, bank.unlock and bank.lock()", () => {
-  it("ensureUnlocked shows no dialog for an unlocked bank, where unlock always asks for proof", async () => {
+  it("ensureUnlocked shows no dialog for an unlocked bank, where unlock always asks for cleartext", async () => {
     const { bank, dialog } = await makeBornVault()
     const asked = vi.fn()
     dialog.requestCleartext = asked
@@ -51,7 +51,7 @@ describe("bank.ensureUnlocked, bank.unlock and bank.lock()", () => {
     expect(asked).toHaveBeenCalledOnce()
   })
 
-  it("only ensureUnlocked uses the cached lease, where unlock still asks for proof", async () => {
+  it("only ensureUnlocked uses the cached lease, where unlock still asks for cleartext", async () => {
     const asked = vi.fn()
     const born = await makeBornVault(byPassphrase(Passphrase), { requestCleartext: asked })
     const { bank } = await nextSessionOf(born)
@@ -144,7 +144,7 @@ describe("vault.sealStampedString and vault.unsealStampedString", () => {
   })
 })
 
-describe("Unlocking, by proof or by the cached lease", () => {
+describe("Unlocking, by a gating or by the cached lease", () => {
   it("attaches the new lease and caches it over the old one", async () => {
     const { bank, deviceDB, advance } = await makeBornVault()
     const bornRow = deviceDB.cachedNow() as { proved_at: number }
@@ -240,7 +240,7 @@ describe("The cached lease, used only by ensureUnlocked", () => {
     expect(deviceDB.forget).toHaveBeenCalledOnce()
   })
 
-  it("is reported as bad news when its row is not a valid lease, and the user is asked for proof", async () => {
+  it("is reported as bad news when its row is not a valid lease, and the user is asked for cleartext", async () => {
     const born = await makeBornVault()
     const { deviceDB, badnews } = born
     const cached = deviceDB.cachedNow() as Record<string, unknown>

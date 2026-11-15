@@ -271,7 +271,7 @@ describe("the proof", () => {
     expect(dialog.shown).to.deep.equal([])
   })
 
-  it("bank.autolock locks a vault past its autolock duration, and a page opened later asks for a proof", async () => {
+  it("bank.autolock locks a vault past its autolock duration, and a page opened later asks for cleartext", async () => {
     const { world, device, bank, dialog } = await buildHost()
     const page = mountPage(device, bank)
     page.expectRenders({ device: ['ready'], bank: ['unlocked'], vaults: ['main'] })

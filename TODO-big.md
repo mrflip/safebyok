@@ -161,7 +161,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the bank on this device
   (`bank.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
-  bankDB: `bank.delPrompt()` asks for a proof, and `vault.del()` needs the bank unlocked.
+  bankDB: `bank.delPrompt()` asks for cleartext, and `vault.del()` needs the bank unlocked.
 
 * **The names' byte-size refusals are unreachable.** Since the restyle (#273) names are short
   labels, so their share of the vault's byte check and of `box_too_large` cannot be reached from
@@ -258,7 +258,7 @@ stays a check or the labels alone identify the vault.
 `packages/safebyok-big/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
 that has been sent returns or is refused as storage decides; a call still at a step before its write refuses with
 `bank_locked`; a read that would return a whisper refuses; and locking and unlocking each do their own work, in order,
-so a lock that lands during the proof of an `unlock_bank` gating leaves the bank unlocked. Still open, from the scenarios that
+so a lock that lands during an `unlock_bank` gating's attempt leaves the bank unlocked. Still open, from the scenarios that
 `softlock_gone` (2026-10-19) listed:
 
 * **The DeviceDB throws when a lock forgets the lease**: `bank.lock()` locks in memory at once, and a refused forget

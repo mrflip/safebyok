@@ -14,7 +14,7 @@ Removed from the interface, and so absent from every table: every `cleartexts` p
 * ☑️ sparse: record is listed but **not** full
 * 📥 staged: uncommitted whole record, returned and not kept anywhere
 * 📌 present: record is known, as full or sparse (not tombstoned or void)
-* 🔐 locked: no lease attached to the bank, and its cached row forgotten. Impossible to unseal until next proof
+* 🔐 locked: no lease attached to the bank, and its cached row forgotten. Impossible to unseal until the next gating
 * 🎬 unlocked: the bank was unlocked for critical period (see individual doc)
 * ❌ vacated: the device disabled, its bank locked, every lease of the bank scope cached on the device forgotten, and its device row; all calls refused
 * 🧹 swept: the device disabled and its bank locked; all calls refused; like vacated but the cached lease and device row not deleted

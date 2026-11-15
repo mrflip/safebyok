@@ -65,7 +65,7 @@ export abstract class DeviceDB {
   /** Non-throwing form of {@link forget}. */
   tryForget(asked: LeaseQuery): Promise<Outcome<void>> { return outcomeOf(() => this.forget(asked)) }
 
-  /** Every lease stowed on this device, oldest proof first.
+  /** Every lease stowed on this device, earliest `proved_at` first.
    * A row that fails its checks is left out: {@link listRawLeases} has it.
    */
   async listLeases(): Promise<LeaseDated[]> {

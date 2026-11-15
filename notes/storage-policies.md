@@ -39,7 +39,7 @@ and the stored gate row as `dbhas`, and nothing is stored.
 | RP2 | the expected row's `main` wayin is the stored `main`: the wayin the gating proved against has not been modified | `ProvedWayinMoved` |
 | RP3 | every wayin of the record but `main` is the stored row's | `OtherWayinMoved` |
 
-RP2 is the only demand of a proof, and it proves little: a caller can copy the stored `main`. It is where a later
+RP2 is the only demand on what the gating proved, and it proves little: a caller can copy the stored `main`. It is where a later
 version can check a change countersigned against the proving wayin. The other two policies need no RP2: their RP3
 already demands that the record's `main` is the stored one.
 

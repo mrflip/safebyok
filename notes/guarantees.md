@@ -365,8 +365,8 @@ a row cached on this device whose expiry has passed. `bank.autolock`, which only
 for the expiry and locks the bank once it has passed, and `bank.lock()` forgets the row; a refused peek or a damaged row
 is told as bad news, and nothing locks. `Lease.buildFromCache`, when `bank.ensureUnlocked` reads the cache, declines to
 load such a row (`isPastAutolock`): it leaves the row in place and throws nothing, so `ensureUnlocked` proceeds as it does
-with no row, and asks for a proof. **An expired row stays on disk**, with the leaseKey handle and the wrapped bankKey in it, until the next
-proof's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it
+with no row, and asks for cleartext. **An expired row stays on disk**, with the leaseKey handle and the wrapped bankKey in it, until the next
+gating's lease is written over it or a host's `bank.autolock` locks it; a host that never calls `bank.autolock` keeps it
 until then. `Lease.buildFromCache` never reaches a lease that is already attached, and `bank.autolock` reaches one only
 through its row, so it misses a lease that the deviceDB refused to cache, or whose row another page has forgotten or
 written over. Both go by the device's clock, as `Date.now()` reads it: setting the clock back delays them, and makes an
@@ -434,7 +434,7 @@ failure that a wrong key or an altered record explains is caught and replaced, a
 kept: the unwrap that proves a wayin (`Proving.checkUnwraps`, `wrongCleartext`), the unwrap of a lease's
 bankKey (`Lease.#bankKey`, `damaged_lease`), and the unwrap and decipher of a whisper
 (`Lease.#decipherSealed`, `damaged_whisper`). Each such catch covers only WebCrypto calls, with their ctx built before
-it, so a bug in building the ctx is never reported as a wrong proof or a damaged box. Where no wrong key or
+it, so a bug in building the ctx is never reported as a wrong passphrase or passkey, or as a damaged box. Where no wrong key or
 altered record can explain a failure, a WebCrypto error is not caught where it is thrown: in sealing
 a whisper (`Lease.sealWith`: `makeBoxKey`, `wrapKeyUnder`, `cipherBytes`), granting a lease
 (`Lease.buildGranted`: `makeLeaseKey`, `wrapKeyUnder`), making a proving's wayinKey (`importWrappingKeyBytes` in

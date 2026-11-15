@@ -162,7 +162,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [Concluding]: dismiss, endAsking, concludeOnce
 
-  /** Close this gating without a proof.
+  /** Close this gating without the user's cleartext.
    * It concludes `dismissed`, or, if an attempt is under way, with that attempt's outcome.
    */
   dismiss(): void { this.#endAsking(gatingDismissed()) }

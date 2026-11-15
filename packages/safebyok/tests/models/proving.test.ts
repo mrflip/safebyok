@@ -610,7 +610,7 @@ describe("proving.buildLease(bank, gate)", () => {
     await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), TH.WorldGate))
   })
 
-  it("builds a lease on the bank that cites the gate, and records the proof time and the wayinkind", async () => {
+  it("builds a lease on the bank that cites the gate, and records its proved_at and the wayinkind", async () => {
     const { gate, answerOf } = await gateWithBoth()
     const bank = TH.fakeLeaseBankOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())

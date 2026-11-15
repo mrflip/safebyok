@@ -217,7 +217,7 @@ it from the cache. This requires the deviceDB to apply calls in the order they w
 that the forget is written after the stow. The stow is awaited before `align`, because a listener may call
 `lock()`. So the attach needs no compare, and no second forget.
 
-**A `lock()` that crosses a gate change** does not stay in effect, as with unlocking: the proof shows that this
+**A `lock()` that crosses a gate change** does not stay in effect, as with unlocking: the proving shows that this
 user may have the bank unlocked. Each of the three gate changes ends in `#unlockByProving`, which gives the bank a
 lease for a full term citing the gate row that was written.
 
@@ -290,7 +290,7 @@ not a second field.
 | `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease granted, none cached by this call                                              |
 | `ensureVault`    | A Vault listed, the only one of its scope, this device's or another's                                                                                                                     | Nothing stored; has only what the answer delivered                                                   |
 | A gate change    | The gate row at its next revision. Unlocked citing that row, a fresh lease of full term, whatever lock came before or crossed                                                              | Nothing stored, unless the answer was lost; the lease as it was                                      |
-| del_bank         | The bank's tombstone stored, its gate, vaults and boxes deleted; the Bank locked and disabled, its cached lease forgotten                                                                  | Nothing stored, unless the answer was lost; the Bank as it was, but locked if the proof passed       |
+| del_bank         | The bank's tombstone stored, its gate, vaults and boxes deleted; the Bank locked and disabled, its cached lease forgotten                                                                  | Nothing stored, unless the answer was lost; the Bank as it was, but locked if the cleartext proved the gate       |
 | `vault.del`      | A tombstone stored under a new `vault_tok`, its box rows deleted; the Vault tombstoned, still listed; the bank as it was                                                                  | Nothing stored, unless the answer was lost; the Vault as it was                                      |
 | `gating.attempt` | At most one under way; its gate read once; no cleartext kept                                                                                                                              | The same; correctable: the gating still open; any other: settled                                     |
 

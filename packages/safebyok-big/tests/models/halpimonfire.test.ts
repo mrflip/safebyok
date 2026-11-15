@@ -1,4 +1,4 @@
-/** A `lock()` crossing a put, the proof of an `unlock_bank` gating or a box verb. What can reject a gate change after its record is stored is in `vault-gate.test.ts`. */
+/** A `lock()` crossing a put, an `unlock_bank` gating's attempt or a box verb. What can reject a gate change after its record is stored is in `vault-gate.test.ts`. */
 
 import { ENCRYPTED } from '../../src/helpers/consts'
 import { describe, expect, it, vi } from 'vitest'

@@ -63,7 +63,7 @@ called while the new lease is made.
   `disabled`. From then on the new passphrase unlocks the vault, and the next `hello` lists the row.
 * A crypto failure in `proved.buildLease`, which the test stages with a mock: the verb rejects with the failure. The vault has
   the new gate and the old lease, and it stays unlocked and able to seal. Its cached row is of the old epoch, so the next
-  session asks for a proof.
+  session asks for cleartext.
 * Only **a birth** can have `demandReadyToAttach` refuse after a tombstone or a sweep crosses it. It refuses with `vault_gone`
   or `disabled`, and the new lease is vacated. A gate change cannot reach that refusal. The tombstone or sweep drops the
   vault's lease, `#renewLease` sees that it was forgotten and leaves the new lease unattached, and the verb *resolves*,

@@ -604,7 +604,7 @@ describe("proving.buildLease(friend, gate)", () => {
     await TH.expectRefusal(proving.buildLease(fakeLeaseFriendOf(), WorldGate))
   })
 
-  it("grants an uncached lease that cites the gate, and records the proof time and the wayinkind", async () => {
+  it("grants an uncached lease that cites the gate, and records its proved_at and the wayinkind", async () => {
     const { gate, answerOf } = await gateWithBoth()
     const friend = fakeLeaseFriendOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
