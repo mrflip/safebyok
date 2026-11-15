@@ -177,7 +177,7 @@ export type FakeVault = {
   ensureTimely(maxMillis?: number): Promise<unknown>
 }
 
-/** How {@link makeModelsWorld} starts the world. */
+/** How {@link makeModelsWorld} builds the world. */
 export type ModelsWorldOpts = {
   /** The clock's first reading; {@link T0}. */
   now?:         number
