@@ -27,9 +27,9 @@ describe("a lock() called during a put", () => {
     const record = fullBoxRecord()
     world.mw.seedPut(record)
     const box = boxListingOf(world.mw).deliverRecord(record)
-    world.mw.willPut(({ record: sent }) => {
+    world.mw.willPut(({ record: asked }) => {
       world.mw.setLocked(true)
-      return world.mw.answerOf(box.scope, sent)
+      return world.mw.answerOf(box.scope, asked)
     })
     await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true

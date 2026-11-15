@@ -54,9 +54,9 @@ describe("bank.tryProbe", () => {
     const report = await TH.expectGood(bank.tryProbe({ whisper: { token: 'sk-test-0000' } }))
     const said = JSON.stringify(report)
     expect(said).to.not.include('sk-test-0000')
-    const sent = await put.mock.results[0]?.value as { val: { whisper_ciphered: { ciphertext_b64: string }, box_key_wrapped: { ciphertext_b64: string } } }
-    expect(said).to.not.include(sent.val.whisper_ciphered.ciphertext_b64)
-    expect(said).to.not.include(sent.val.box_key_wrapped.ciphertext_b64)
+    const putAnswer = await put.mock.results[0]?.value as { val: { whisper_ciphered: { ciphertext_b64: string }, box_key_wrapped: { ciphertext_b64: string } } }
+    expect(said).to.not.include(putAnswer.val.whisper_ciphered.ciphertext_b64)
+    expect(said).to.not.include(putAnswer.val.box_key_wrapped.ciphertext_b64)
     expect(said).to.not.include(bank.maingate.wayins.main.bank_key_wayin_wrapped.ciphertext_b64)
   })
 

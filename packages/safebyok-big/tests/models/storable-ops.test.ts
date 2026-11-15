@@ -210,9 +210,9 @@ describe("storable.put(patch): seal, then put", () => {
     })
     let resolved = false
     const putting = (async () => {
-      const sent = await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+      const result = await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
       resolved = true
-      return sent
+      return result
     })()
     await vi.advanceTimersByTimeAsync(0)
     const [put] = world.mw.callsOf('put')
@@ -277,7 +277,7 @@ describe("storable.del()", () => {
     expect(world.mw.callsOf('del')[0]?.expectedRevisionTok).to.equal(revision_tok)
   })
 
-  it("sends a delete of a deleted thing expecting its tombstone, which the bankDB refuses", async () => {
+  it("asks for a del of a deleted thing expecting its tombstone, which the bankDB refuses", async () => {
     const { box } = timelyBoxOf()
     await box.del(box.scope)
     const tombstone = box._cheat_central

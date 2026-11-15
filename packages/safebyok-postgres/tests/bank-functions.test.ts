@@ -30,7 +30,7 @@ async function builtBankDB() {
   return bankDB
 }
 
-/** Collect the notices sent on the battery user's channel until the test ends. */
+/** Collect the notices notified on the battery user's channel until the test ends. */
 async function hearing(): Promise<unknown[]> {
   const told: unknown[] = []
   const unlisten = await BH.listen(bankChannelOf(BW.bankScope.user_id), (text) => { told.push(JSON.parse(text)) })

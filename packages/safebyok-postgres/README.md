@@ -79,14 +79,14 @@ A missing table or privilege (SQLSTATE class `42`) is a setup fault, refused wit
 
 ## Hearing other writes
 
-Each write sends a notification on its user's channel, `bankChannelOf(user_id)`, which is
+Each write notifies on its user's channel, `bankChannelOf(user_id)`, which is
 `safebyok_` followed by the user_id, as it commits. The database function `safebyok_tell` builds it:
 a JSON object with the written row's address under `at`, the row under `row`, and the row above it
 under `parent`: a gate's or a vault's bank row, a box's vault row. A box's address carries its
 vault's life, `bank_tok` and `vault_tok`. Postgres refuses a notification of 8,000 bytes or more.
 A notification that is too large drops the row above first, then the row, and the listener fetches
-what is stored at the address. Deleting a bank sends one notification, of its tombstone: the gate,
-vault and box rows deleted with it send none. `listen(channel, onNotify)` passes the text of each
+what is stored at the address. Deleting a bank notifies once, of its tombstone: the gate,
+vault and box rows deleted with it notify none. `listen(channel, onNotify)` passes the text of each
 notification on that channel to `onNotify`, unchanged, and returns a function that stops listening.
 A watch hears a box with its vault's row as its parent, or with a null parent when the vault row did
 not fit. A bank or gate row is heard only by a watch of the whole bank. Any role that can connect to the database can `LISTEN` on a channel, and so can read the
@@ -136,7 +136,7 @@ but takes its turn behind the statements already queued.
 
 **A user_id whose channel passes 63 bytes cannot write.** A channel is a Postgres identifier, at
 most 63 bytes, so a user_id of more than 54 characters (a user_id is ASCII, a byte a character, and
-a percent-encoded character is three) makes every write that would send a notice fail with
+a percent-encoded character is three) makes every write that would notify fail with
 `storage_unavailable`, its cause Postgres's `channel name too long`. Keep user_ids to 54 characters
 with this package for now.
 

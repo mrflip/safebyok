@@ -102,7 +102,7 @@ describe("PostgresBankDB's watch", () => {
     })
   })
 
-  it("passes over a notification on its channel that no write of ours sent", async () => {
+  it("passes over a notification on its channel that no write of ours made", async () => {
     const bankDB = await BH.makeBankDB()
     await bankDB.buildBank(BW.bankBuildAskOf())
     const notices = watching(bankDB)

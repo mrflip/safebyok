@@ -749,7 +749,7 @@ describe("the gate listing's putGate", () => {
   const MovedDevice = '00000000-0000-4000-8000-0000000000d2'
   const Passkey0 = { ...TH.passkeyWayin, wayinlabel: 'passkey0' as const }
 
-  it("sends the next revision with the new wayins, its gate_tok and bank_tok kept, under the policy given", async () => {
+  it("puts the next revision with the new wayins, its gate_tok and bank_tok kept, under the policy given", async () => {
     const { bank, bankDB } = await makeBornVault()
     const ante = bank.maingate.pickle()
     const main = { ...ante.wayins.main, device_tok: MovedDevice }
@@ -792,7 +792,7 @@ describe("the gate listing's putGate", () => {
     expect(bank.maingate.pickle()).to.deep.equal(ante)
   })
 
-  it("refuses an answer that is not the record it sent", async () => {
+  it("refuses an answer that is not the record it put", async () => {
     const { bank, bankDB } = await makeBornVault()
     const commit = bankDB.tryPutGate.bind(bankDB)
     vi.spyOn(bankDB, 'tryPutGate').mockImplementationOnce(async (ask) => {

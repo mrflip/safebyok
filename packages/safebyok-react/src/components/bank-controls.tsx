@@ -49,7 +49,7 @@ export function CreateVaultButton({ vaultlabel }: Readonly<CreateVaultButtonProp
   )
 }
 
-/** Send `err` to `device`'s `onBadNews`, unless it is the user dismissing a dialog. */
+/** Tell `device`'s `onBadNews` of `err`, unless it is the user dismissing a dialog. */
 function tellUnlessDismissed(device: Device, err: unknown): void {
   if (! isVaultError(err, 'dismissed')) { device.tellBadNews([err]) }
 }

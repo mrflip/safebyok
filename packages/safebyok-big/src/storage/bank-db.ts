@@ -51,7 +51,7 @@ export type ListBoxesAnswer         = Answer<BoxesListed, ListAct, VaultRow>
 /** The answer to `tidyGone`, with the bank's scope as `parent`. */
 export type TidyGoneAnswer          = Answer<Tidied, 'tidied', BankScope>
 
-/** A changed row reported by a watch, with its `parent`. A bank row's parent is `main`; another row's is the row above it, or null if storage sent none. */
+/** A changed row reported by a watch, with its `parent`. A bank row's parent is `main`; another row's is the row above it, or null if storage reported none. */
 export type Notice = { act: 'gotlive' | 'gotgone', val: BankRow | GateRecord | VaultRow | BoxRow, parent: BankRow | VaultRow | typeof BankTop | null }
 
 /** A good answer with `val`, keeping `answer`'s act, parent and ask. Throws the refusal of a bad `answer`. */

@@ -27,7 +27,7 @@ import type { StoredGateRows } from '../helpers/policies'
 
 // == [Rows from storage]: Heard
 // A row's notice may come without the row above it: that row changes rarely, and has notices of its own.
-/** A change reported by storage's watch: a bank, gate, vault or box row, and the row above it if storage sent one. */
+/** A change reported by storage's watch: a bank, gate, vault or box row, and the row above it if storage reported one. */
 export type Heard = { row: unknown, parent?: unknown }
 // --
 

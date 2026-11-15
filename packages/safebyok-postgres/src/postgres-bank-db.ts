@@ -49,7 +49,7 @@ const bankChannelOfArgs = DB.Checker(({ user_id }) => user_id, 'bad_option')
 /** Return the notification channel for `user_id`'s writes: the channel a `PostgresListen` subscribes to. */
 export function bankChannelOf(user_id: string): string { return channelOf(bankChannelOfArgs.parse(user_id, { where: 'bankChannelOf' })) }
 
-// Postgres identifiers are at most 63 bytes. A user_id whose channel name is longer cannot be notified, so a write that would send a notice for it fails.
+// Postgres identifiers are at most 63 bytes. A user_id whose channel name is longer cannot be notified, so a write that would notify for it fails.
 /** The notification channel for `user_id`. */
 function channelOf(user_id: string): string { return `safebyok_${user_id}` }
 
@@ -72,10 +72,10 @@ const toldWhere = DB.objCheck(({ user_id, banklabel, str }) => ({
 
 /** Parse a notification's text into a {@link Told}, or return null if it is not one of our notices. */
 function toldOf(text: string): Told | null {
-  const sent = jsonOrNull(text) as { at?: unknown, row?: unknown, parent?: unknown } | null
-  const where = toldWhere.safeParse(sent?.at)
-  if ((sent === null) || (! where.success)) { return null }
-  const { row, parent } = sent
+  const told = jsonOrNull(text) as { at?: unknown, row?: unknown, parent?: unknown } | null
+  const where = toldWhere.safeParse(told?.at)
+  if ((told === null) || (! where.success)) { return null }
+  const { row, parent } = told
   if (row === undefined) { return where.data }
   return { ...where.data, heard: (parent === undefined) ? { row } : { row, parent } }
 }

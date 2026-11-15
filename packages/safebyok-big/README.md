@@ -138,7 +138,7 @@ Easy to get wrong:
 * **A swept or vacated device cannot be used again.** From the moment you call `device.sweep()` or
   `device.vacate()`, `device.isEnabled` is permanently false, `device.bank` is null, `ensureBank`,
   `ensureVault` and `vaultAt` refuse with `disabled`, and the device stops calling your functions:
-  the events and refusals it would have sent them go to `DefaultOnLifecycle` and `DefaultOnBadNews`
+  the events and refusals it would have delivered them go to `DefaultOnLifecycle` and `DefaultOnBadNews`
   instead. The only exception is a vacate's
   cleanup, which still reports what it could not remove to your `onLifecycle` and `onBadNews`.
 * **A revoked identity vacates the device**, whatever your handlers do. When your storage adapter

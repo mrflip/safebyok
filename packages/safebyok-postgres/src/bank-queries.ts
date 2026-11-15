@@ -42,7 +42,7 @@ export const GetGateWithBankSql = `
 
 // == [A bank's or a gate's write]: BirthBankSql, ReviseBankSql, PutGateSql
 // Each calls a function in `bank-functions.ts`, which checks the record against the stored rows and writes it.
-// It returns one row: `ok`, `act`, `bank`, `gate` and `presence`. When it writes the record, it also sends the notices.
+// It returns one row: `ok`, `act`, `bank`, `gate` and `presence`. When it writes the record, it also notifies of the write.
 // The bank functions are given the bank record, its main gate record (null for a delBank), then the row the ask expects,
 // each as JSON text. The gate function is given the gate record, then the row the ask expects, then the ask's policies.
 
