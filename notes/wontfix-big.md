@@ -98,7 +98,7 @@ not as a settled ruling, and check it against the current design before relying 
   `_cheat_clock`. A device clock that jumps or runs backward is undefined behaviour.
 * 2026-11-05 (the Coach, on `box.put` returning `this`): **a box discarded while its own `put` is in flight returns itself, not the instance listed.**
   A box listing never replaces a box it lists, so `put` returns the instance it was called on. Only a `box.vacate()` or `box.sweep()`, or a
-  `boxListing.hello` that finds the box damaged, empties its scope, and only if it runs during the put's `doTryPut`. The delivery then lists a new
+  `boxListing.hello` that finds the box damaged, removes the box from the listing, and only if it runs during the put's `doTryPut`. The delivery then lists a new
   instance. The caller has the discarded one, which refuses `disabled` from then on, and the listing returns the new one.
 * 2026-11-05 (the Coach's brief for `box.putExposed`: "a race gets a row"): **a `box.unexpose()` crossing a `box.putExposed()`.** `putExposed` reads
   the value exposed when it is called, before its hydrate. An `unexpose` that runs during the put's awaits changes nothing about what is sealed:

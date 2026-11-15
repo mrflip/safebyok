@@ -98,7 +98,7 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
 * A record changed between `getBank` and the watch's start isn't seen until the next fetch (thread 12).
 * A listed live vault whose row is void in `getBank` stays listed until its next fetch (thread 12).
 * A lease in force whose cache row was never written, or was forgotten by another page's `tidy`, isn't found by `tidy`, so the vault stays unlocked past autolock: a lease that should be dropped is kept (thread 12 and its review; a Coach's row).
-* A birth that is past the enter key when `bank.vacate` runs still returns, and caches its lease after the vacate: a lease that should be dropped is kept (thread 12's review).
+* A birth that is past the enter key when `bank.vacate` runs still succeeds, and caches its lease after the vacate: a lease that should be dropped is kept (thread 12's review).
 * A swept `hello` that returns late marks a fresh listing `refused` (thread 12).
 * A `getBank` or plugin load that never returns blocks `tidy`: a lease that should be dropped is kept (thread 12's rework).
 * A `hello` that crosses `bank.vacate` marks the emptied listing `ready`, which reopens the false prompt; found by reading (thread 12's rework and second review).

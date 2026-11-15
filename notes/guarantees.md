@@ -84,7 +84,7 @@ tick, that its bank is enabled (the `Gating` constructor reads `bank.maingate`, 
 read it live, so a sweep or a vacate of the device, which sets it before either returns, disables them all at once. The
 disable then calls the bank's `lock()`, whose `align` reaches every thing below the bank: a Bank aligns its gate listing and
 vault listing, a listing each thing it keeps, present or deleted, and a Vault the box listing in hand, which, once the
-vault has adopted a row of another life (a vault's tombstone is a life of its own), finds itself disabled and is let go. The bank's `lock()` drops its lease before it aligns, and a Box that is no longer enabled drops its exposed
+vault's life has ended (a vault's tombstone is a life of its own), finds itself disabled and is let go. The bank's `lock()` drops its lease before it aligns, and a Box that is no longer enabled drops its exposed
 whisper as it is aligned (G4, *Open items* 1). A lock, a bank tombstone, and a vault's or a bank's other life reach the
 things below through the same `align`. `onLifecycle` is wrapped in `Device`'s constructor too, by `guardOnLifecycle`. It
 is given a `DeviceEvent`: a bag with what happened (a refusal, an outcome or a count), the live `Device`, and the live
@@ -131,8 +131,8 @@ contains it: the bank's stamp (scope, `bank_tok`, `registered_at`) in every ctx;
 `gate_tok`, `registered_at`) for a wayin, the lease's own for a lease, and the vault's (`vaultlabel`, `vault_tok`,
 `registered_at`) and the box's for a box's two ciphertexts. It names a purpose string unique to
 the kind of field, and the record's own visible header or stamp, a wayin's header with its `wayinlabel`. So a wrap or a
-ciphertext moved to another bank, gate, wayin, vault, box, lease or purpose does not decrypt, and a visible field altered in
-storage (a box's time or revision, a salt, a lease's `proved_at`) makes its record refuse to decrypt. A box's
+ciphertext moved to another bank, gate, wayin, vault, box, lease or purpose does not unwrap or decipher, and a visible field altered in
+storage (a box's time or revision, a salt, a lease's `proved_at`) makes its record refuse to unseal or unwrap. A box's
 sidecar is the one unencrypted field of a box that no ctx binds, so that the server may change it: a sidecar
 altered in storage leaves the whisper deciphering. The gate row's `auth`, `sigs` and `meta` are bound by no ctx either: each
 is checked as an empty bag, and nothing reads them. The box's stamp is its sparse fields alone
@@ -192,7 +192,7 @@ sidecar is unencrypted and unauthenticated.
 | bankKey | `CryptoKey` | locals only; stored only wrapped | one method | `Proving`, `Lease` |
 | boxKey | `CryptoKey` | locals only; stored only wrapped | one cipher or decipher | `Lease` |
 | leaseKey | `CryptoKey`, non-extractable, never bytes | a `LeaseRecord`: in `Lease.#record`, through the `DeviceDB` as a `LeaseRow`, and at rest in the device database, one row per bank | the lease | `Lease`, `Proving.buildLease`; the `DeviceDB` stows it opaque |
-| whisper | the host's JSON object; then its JSON text, which passes from box to lease; and the UTF-8 bytes, which only the lease makes | the host's value, going in and coming out; the text, as a string in arguments and locals, which cannot be zeroed (G6); the bytes, as locals in the `Lease`, zeroed; the value, on a `Box` from `expose` until `unexpose`, the device's sweep or vacate, the box's delete, or its vault or bank deleted or adopting a row of another life (a lock or a veil keeps it; *Open items*, 1) | one seal or open, except for that exposed value | `Box`, the Bank's seal verbs, `Lease` |
+| whisper | the host's JSON object; then its JSON text, which passes from box to lease; and the UTF-8 bytes, which only the lease makes | the host's value, going in and coming out; the text, as a string in arguments and locals, which cannot be zeroed (G6); the bytes, as locals in the `Lease`, zeroed; the value, on a `Box` from `expose` until `unexpose`, the device's sweep or vacate, the box's delete, or its vault or bank deleted or reborn (a lock or a veil keeps it; *Open items*, 1) | one seal or open, except for that exposed value | `Box`, the Bank's seal verbs, `Lease` |
 
 Not secret, by design: every salt (`salt_b64`, `prf_salt_b64`), a passkey's `credential_id`,
 `device_tok`, `key_deriver_label`, every label and `user_id` (a scope name; a host that treats its
@@ -534,7 +534,7 @@ listed here, has no counterpart in the core.
 
 1. **The exposed whisper** (`src/models/box.ts`, `Box.expose` and `box.whisper`) is a whisper
    kept on the instance. That is a new form of a secret, which G7 says this note names first. The core's `Box` has
-   it, as a plain object the host may edit, from `expose` until the host calls `box.unexpose()`, the device is swept or vacated, the box is deleted, or its vault or bank is deleted or adopts a row of another life.
+   it, as a plain object the host may edit, from `expose` until the host calls `box.unexpose()`, the device is swept or vacated, the box is deleted, or its vault or bank is deleted or reborn.
    A lock and `box.veil()` keep it; while the box is locked or veiled, a frozen bag marked `Whispered` is returned in its place (`'locked'`, `'veiled'`), so neither removes it from
    memory. `unexpose` is the call that removes it. A bag, or a copy of one, is refused at a put, so it can never replace the secret. Forging the mark
    only gets a put refused. `BoxFields` (`src/dom/box-fields.ts`, the `safebyok/dom` entry) writes a leaf of it to an element's `value`, through

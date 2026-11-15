@@ -256,7 +256,7 @@ stays a check or the labels alone identify the vault.
 ### Lock timing vs. work in flight: what is left of the policy
 
 `packages/safebyok-big/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
-that has been sent returns or is refused as storage decides; a call still at a step before its write refuses with
+that has been sent succeeds or is refused as storage decides; a call still at a step before its write refuses with
 `bank_locked`; a read that would return a whisper refuses; and locking and unlocking each do their own work, in order,
 so a lock that lands during an `unlock_bank` gating's attempt leaves the bank unlocked. Still open, from the scenarios that
 `softlock_gone` (2026-10-19) listed:
