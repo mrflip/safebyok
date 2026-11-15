@@ -12,11 +12,11 @@ const WeekMillis = 7 * 24 * 60 * MinuteMillis
 /** A strength checker that calls any passphrase under 12 characters weak. */
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
-/** Open a gating with `start`, and render it in a PassphraseModal. */
-const shownFor = async (start: Parameters<typeof TH.openGatingOf>[1], opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
+/** Open a gating with `launch`, and render it in a PassphraseModal. */
+const shownFor = async (launch: Parameters<typeof TH.openGatingOf>[1], opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }
-  const opened = await TH.openGatingOf(world, start, opts.bankOpts)
+  const opened = await TH.openGatingOf(world, launch, opts.bankOpts)
   return { ...opened, ...render(<PassphraseModal gating={TH.passphraseGatingOf(opened.gating)} leaseMillis={opts.leaseMillis} />) }
 }
 
@@ -28,11 +28,11 @@ const submitButton = (word: string) => screen.getByText<HTMLButtonElement>(word)
 
 describe("PassphraseModal, building a vault", () => {
   it("chooses the first passphrase, naming the user and the vault", async () => {
-    const { starting } = await shownFor(TH.building)
+    const { launching } = await shownFor(TH.building)
     expect(screen.getByText(Messages.chooseTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     await TH.submitNewPassphrase(TH.Passphrase)
-    expect(await starting).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("gives its two fields distinct names for password managers", async () => {
@@ -100,13 +100,13 @@ describe("PassphraseModal, building a vault", () => {
 
 describe("PassphraseModal, unlocking a vault", () => {
   it("shows a wrong passphrase in place, the gating still open, and concludes on the right one", async () => {
-    const { gating, starting } = await shownFor(TH.unlocking, { built: true })
+    const { gating, launching } = await shownFor(TH.unlocking, { built: true })
     expect(screen.getByText(Messages.unlockTitle)).to.exist
     TH.submitPassphrase('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
     TH.submitPassphrase(TH.Passphrase)
-    expect(await starting).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("after a wrong passphrase empties the field, marks it invalid and gives it the focus", async () => {
@@ -170,9 +170,9 @@ describe("PassphraseModal, unlocking a vault", () => {
 
   for (const [how, closeIt] of CloseCases) {
     it(`dismisses the gating on ${how}, the dialog staying up until the gating's owner takes it down`, async () => {
-      const { starting } = await shownFor(TH.unlocking, { built: true })
+      const { launching } = await shownFor(TH.unlocking, { built: true })
       closeIt()
-      expect(await starting).to.include({ ok: false })
+      expect(await launching).to.include({ ok: false })
       expect(screen.getByRole<HTMLDialogElement>('dialog').open).to.be.true
     })
   }
@@ -208,9 +208,9 @@ describe("PassphraseModal's footnote", () => {
     [TH.unlocking, ForeverMillis, Messages.staysUnlocked,                  'says an endless lease stays unlocked'],
   ] as const
 
-  for (const [start, leaseMillis, footnote, blurb] of FootnoteCases) {
+  for (const [launch, leaseMillis, footnote, blurb] of FootnoteCases) {
     it(blurb, async () => {
-      await shownFor(start, { built: start === TH.unlocking, leaseMillis })
+      await shownFor(launch, { built: launch === TH.unlocking, leaseMillis })
       expect(screen.getByText(footnote)).to.exist
     })
   }

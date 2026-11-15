@@ -24,10 +24,10 @@ const alertText = () => screen.getByRole('alert').textContent
 
 describe("AddPasskeyModal", () => {
   it("adds a passkey named for the app and the user", async () => {
-    const { bank, gating, starting, authenticator } = await shownFor()
+    const { bank, gating, launching, authenticator } = await shownFor()
     expect(screen.getByText(Messages.addPasskeyTitle)).to.exist
     TH.submitPasskeyAdd(TH.Passphrase)
-    expect(await starting).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
     expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[0])
     const [call] = authenticator.calls.create
     expect(call?.publicKey?.rp.name).to.equal(gating.banklabel)
@@ -35,13 +35,13 @@ describe("AddPasskeyModal", () => {
   })
 
   it("shows a wrong passphrase in place, adding nothing, and adds a passkey made anew on the right one", async () => {
-    const { bank, gating, starting, authenticator } = await shownFor()
+    const { bank, gating, launching, authenticator } = await shownFor()
     TH.submitPasskeyAdd('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
     expect(passkeyOf(bank)).to.be.null
     TH.submitPasskeyAdd(TH.Passphrase)
-    expect(await starting).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
     expect(passkeyOf(bank)).to.equal(authenticator.credentialIds()[1])
   })
 
@@ -82,20 +82,20 @@ describe("AddPasskeyModal", () => {
   })
 
   it("dismisses the gating on Cancel, and the vault has no passkey", async () => {
-    const { bank, starting } = await shownFor()
+    const { bank, launching } = await shownFor()
     fireEvent.click(screen.getByText('Cancel'))
-    expect(await starting).to.include({ ok: false })
+    expect(await launching).to.include({ ok: false })
     expect(passkeyOf(bank)).to.be.null
   })
 
   it("adds a passkey the user made while an Activity hid the dialog: the press authorized it", async () => {
-    const { starting, ui, rerender, authenticator } = await shownFor()
+    const { launching, ui, rerender, authenticator } = await shownFor()
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
     TH.submitPasskeyAdd(TH.Passphrase)
     await waitFor(() => { expect(authenticator.calls.create).to.have.lengthOf(1) })
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    expect(await starting).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 })

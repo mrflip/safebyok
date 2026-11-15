@@ -267,22 +267,22 @@ describe("unlocking with a passkey, end to end", () => {
     const world = TH.makeBankWorld()
     const { vault } = await TH.makeBankWithVault(world)
     await TH.addPasskeyTo(world, vault, await createPasskey(TH.PasskeyMaking))
-    const { gating, starting } = await TH.openGatingOf(world, TH.unlocking)
+    const { gating, launching } = await TH.openGatingOf(world, TH.unlocking)
     const passkeyClear = await askPasskey(gating.passkeyHeader)
     if (passkeyClear === null) { throw new Error('dismissed') }
     expect(await TH.gatingOfKind(gating, 'unlock_bank').attempt({ passkeyClear })).to.include({ ok: true })
-    expect(await starting).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("an add_passkey gating accepts the passphrase and createPasskey's answer in one attempt", async () => {
     TH.installFakeAuthenticator()
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
-    const { gating, starting } = await TH.openGatingOf(world, TH.addingPasskey)
+    const { gating, launching } = await TH.openGatingOf(world, TH.addingPasskey)
     const passkeyClear = await createPasskey(TH.PasskeyMaking)
     if (passkeyClear === null) { throw new Error('dismissed') }
     expect(await TH.gatingOfKind(gating, 'add_passkey').attempt({ passphraseClear: TH.Passphrase, passkeyClear })).to.include({ ok: true })
-    expect(await starting).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
     expect(passkeyClear.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 })
