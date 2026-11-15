@@ -11,6 +11,6 @@ export {
 } from './storage/shapes-thing'
 export { type BankRootsFetched, type ThingsFetched, isWriteAct, writtenRootsOf, writtenThingOf } from './storage/thing-classifier'
 export {
-  type Actual, type Answer, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
+  type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
   type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'

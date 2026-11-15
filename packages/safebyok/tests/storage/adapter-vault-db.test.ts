@@ -92,14 +92,31 @@ describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => 
   })
 })
 
-describe("AdapterVaultDB.watch(scope, onNotice)", () => {
-  it("hears a sound Thing, and drops one that fails its checks unheard", () => {
+describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
+  it("hears a sound Thing, and tells onBadNews of one that fails its checks", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
     const notices: ThingNotice[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) })
+    const badNews: Errors.VaultError[] = []
+    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
     vaultDB.hear?.({ record: { ...TH.gateThingOf(), wayins: {} }, world: null })
     vaultDB.hear?.({ record: 'not a Thing', world: null })
     vaultDB.hear?.({ record: TH.gateThingOf(), world: null })
     expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: TH.gateThingOf(), world: null }])
+    expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row', 'storage_issue'])
+  })
+
+  it("tells onBadNews of a Thing of another bank, and does not hear it", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
+    const notices: ThingNotice[] = []
+    const badNews: Errors.VaultError[] = []
+    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
+    vaultDB.hear?.({ record: TH.gateThingOf({ banklabel: 'other' }), world: null })
+    expect(notices).to.deep.equal([])
+    expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['storage_issue'])
+  })
+
+  it("refuses a watch with no onBadNews", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
+    TH.expectSyncRefusal(() => vaultDB.watch(TH.ThingBank, () => undefined, undefined as never), 'bad_option')
   })
 })

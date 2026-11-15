@@ -6,15 +6,18 @@ import type {
   ThingScope, ThingWatchScope, WriteAskOf, WriteThingAsk,
 } from './shapes-thing'
 
-// == [Answers]: GoodAnswer, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
 
 // `world` will be the bank's Thing, read in the same step as the Thing asked for, once the Bank is a Thing. Other
 // fields earn their own place on the answer.
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, and the loggable part of its `ask`. */
 export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: null, val: ValT }
 
+/** Every act a refused answer carries: big's, and `policied` for a write that a storage policy, or the kept born_at, refuses where the put table would replace. */
+export type BadAct = EX.BadAct | 'policied'
+
 /** A vaultDB verb's refused answer: its `err`, its `act`, what is stored as `dbhas`, and the loggable part of its `ask`. */
-export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: EX.BadAct, world: null, dbhas: DbhasT, err: Errors.VaultError }
+export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: null, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
@@ -48,6 +51,7 @@ export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'ok' | 
 
 /** What a store reports of one atomic step: the act, and the Thing stored as `record`, which the adapter places on the
  * answer as `val` when good, as `dbhas` when refused. After a write, `record` is the Thing as the store reports writing it.
+ * Refused, it carries the refused act and no error: the adapter makes the error from the act.
  */
 export type Actual<ActT extends EX.GoodAct> =
   | { ok: true,  act: ActT,           world: null, record: Thing | null }
@@ -85,8 +89,8 @@ export interface VaultDB {
   putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT>
   /** The del ask writing the tombstone `args.record` over `args.cited`. */
   delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT>
-  /** Watch the Things of a bank, and return a function that stops the watch. */
-  watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews?: (news: Errors.VaultError) => void): () => void
+  /** Watch the Things of a bank, and return a function that stops the watch. `onBadNews` hears the trouble the watch meets, a Thing heard that fails its checks among it. */
+  watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }
 
 /** The members a vaultDB answers with a function. */
