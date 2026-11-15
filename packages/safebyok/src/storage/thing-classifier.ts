@@ -3,10 +3,10 @@
 import { sortBy } from 'es-toolkit'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
 import { BankRootsMissing, BornAtNotStored, ReplacedThingAmiss } from '../phrases'
-import { demandPolicies } from './policies'
+import { PoliciedMeta, demandPolicies } from './policies'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingCited, type ThingScope, type WriteThingAsk,
+  type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type WriteThingAsk,
   GateThingFormat, KindChecks, isLabelpathOfKind, kindChecksOf, sparseOf, thingScope,
 } from './shapes-thing'
 
@@ -118,7 +118,7 @@ function isRefusedAct(act: string): act is EX.RefusedAct { return (EX.refusedAct
 export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 // --
 
-// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, noticedThingOf
+// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf
 // A Thing that fails its kind's checks is damaged, and refuses `damaged_row`. One that is not an object, or a sound one
 // stored at another scope than the one asked for, means the store or its adapter is broken, and refuses `storage_issue`.
 
@@ -160,15 +160,13 @@ function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
   return parsed.success ? Validator.checkedConsistent(parsed.data, scope, RowOfOtherScope) : null
 }
 
-/** The Thing a watch heard, checked, or null for one that fails its checks. */
-export function noticedThingOf(raw: unknown): Thing | null {
-  const scope = thingScope.safeParse(raw)
-  if (! scope.success) { return null }
-  try {
-    return writtenThingOf(scope.data, raw)
-  } catch {
-    return null
-  }
+/** The Thing a watch on `bankScope` heard, checked. */
+export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing {
+  if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
+  // The labelpath is the record's own; the bank is the watch's, so that a Thing of another bank refuses.
+  const scope = thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
+  if (! scope.success) { throw Throwers.storageIssue() }
+  return writtenThingOf(scope.data, raw)
 }
 // --
 
@@ -195,7 +193,7 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.
 /** Throw unless `ask` may replace `stored`, the live Thing found: `bad_record` unless it keeps the born_at, and `gate_issue` where a storage policy refuses. */
 function demandReplaceable(ask: WriteThingAsk, stored: Thing | null): void {
   if (stored === null)                       { throw new Errors.VaultError('unexpected_error', ReplacedThingAmiss) }
-  if (ask.record.born_at !== stored.born_at) { throw new Errors.VaultError('bad_record', BornAtNotStored, { rows: { dbhas: stored } }) }
+  if (ask.record.born_at !== stored.born_at) { throw new Errors.VaultError('bad_record', BornAtNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta }) }
   // The gate alone has storage policies.
   if (ask.modelkind !== 'gate')              { return }
   if (stored.fmt !== GateThingFormat)        { throw new Errors.VaultError('unexpected_error', ReplacedThingAmiss) }

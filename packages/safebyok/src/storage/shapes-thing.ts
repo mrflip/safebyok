@@ -267,10 +267,11 @@ function isPolicyOwn({ modelkind, options }: Flagged): boolean {
   return (options?.policies ?? []).every((policy) => owned.includes(policy))
 }
 
-/** The checks of a vaultDB ask, its records aside, and of a watch's scope. */
-const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof, label, user_id }) => {
-  const modelkind    = oneof(thingkindVals)
-  const thingOptions = obj({
+/** The checks of a vaultDB ask, its records aside, and of a watch's scope and handlers. */
+const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
+  const modelkind       = oneof(thingkindVals)
+  const thingWatchScope = thingScope.pick({ userid: true, banklabel: true })
+  const thingOptions    = obj({
     /** The storage policies the write must keep, each over the Thing stored. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
@@ -287,11 +288,12 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
       .refine(isDelFixed,     Phrases.DelFlagsFixed)
       .refine(isPolicyOwn,    Phrases.PolicyNotOwn),
     birthBankAsk:    obj({ userid: user_id, banklabel: label, op: lit('birth'), bank: unk, gate: unk, root: unk }).strict(),
-    thingWatchScope: thingScope.pick({ userid: true, banklabel: true }),
+    thingWatchScope,
+    watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
   }
 })
-/** The check of a watch's scope: a bank. */
-export const { thingWatchScope } = AskChecks
+/** The check of a watch's scope, a bank, and of a watch's arguments. */
+export const { thingWatchScope, watchArgs } = AskChecks
 
 /** An ask for the Thing at its scope. */
 export type GetThingAsk     = Readonly<Z.infer<typeof AskChecks.getThingAsk>>

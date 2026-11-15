@@ -38,8 +38,12 @@ export function demandPolicies({ cited, record, options }: GateWriteAsk, stored:
   for (const policy of policies) { GatePolicies[policy](cited, record, stored) }
 }
 
+// Big types a refusal's meta.act as its own BadAct, which has no `policied`.
+/** The meta of a refusal of a write the put table would let replace the Thing stored. */
+export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
+
 /** A `gate_issue` refusal of a write over `stored`, saying `why`. */
 function gateIssue(stored: GateThing, why: string): Errors.VaultError {
-  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored } })
+  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
 }
 // --

@@ -4,17 +4,33 @@ import { noop } from 'es-toolkit'
 import { EX, Errors, Outcome, Throwers, type Helpers } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../phrases'
 import {
-  type BirthBankAsk, type BirthPuts, type DelAskArgs, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type PutAskArgs, type Thing,
-  type ThingWatchScope, type WriteAskOf, type WriteThingAsk,
-  birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf, thingWatchScope,
+  type BirthBankAsk, type BirthPuts, type DelAskArgs, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type LoggableAsk, type PutAskArgs,
+  type Thing, type ThingWatchScope, type WriteAskOf, type WriteThingAsk,
+  birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf, watchArgs,
 } from './shapes-thing'
-import { type BankRootsFetched, type ThingsFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, noticedThingOf } from './thing-classifier'
+import { type BankRootsFetched, type ThingsFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
-  Actual, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
+  Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
 } from './vault-db'
 
-/** Drop bad news unheard. */
-function noBadNews(_news: Errors.VaultError): void { /* unheard */ }
+// == [Answers]: answerOf
+
+/** A verb's answer from what its store reports: `record` as `val` when good, as `dbhas` when refused.
+ * Throws `storage_issue` for a good act, other than `gotvoid`, that reports no Thing.
+ */
+function answerOf(actual: Actual<EX.GotAct>, oplabel: string, loggableAsk: LoggableAsk): GetThingAnswer
+function answerOf(actual: Actual<EX.PutAct | EX.DelAct>, oplabel: string, loggableAsk: LoggableAsk): WriteThingAnswer
+function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<Thing | null, EX.GoodAct> {
+  const { world, record } = actual
+  if (! actual.ok) {
+    const err = Throwers.actRefused('vault', actual.act, { oplabel, ask: loggableAsk })
+    return { ok: false, ask: loggableAsk, act: actual.act, world, dbhas: record, err }
+  }
+  // Every good act but gotvoid finds or writes a Thing: a store that reports none is broken.
+  if ((record === null) && (actual.act !== 'gotvoid')) { throw Throwers.storageIssue() }
+  return { ok: true, ask: loggableAsk, act: actual.act, world, val: record }
+}
+// --
 
 /** The base class of a vaultDB that keeps its Things in a datastore: a subclass writes the `do*` calls, each one atomic step.
  * It checks each ask, and classifies what a `do*` call fetches by the act tables in notes/answer-contract.md.
@@ -59,15 +75,8 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const checked     = checkedGetThingAsk(ask)
       const loggableAsk = loggableAskOf(checked)
-      const actual      = await this.doGetThing(checked)
-      if (actual.ok) {
-        if (actual.act === 'gotvoid') { return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: null } }
-        // A get that found a Thing has it. A store that reports none is broken.
-        if (actual.record === null) { throw Throwers.storageIssue() }
-        return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: actual.record }
-      }
-      const err = Throwers.actRefused('vault', actual.act, { oplabel: 'getThing', ask: loggableAsk })
-      return { ok: false, ask: loggableAsk, act: actual.act, world: actual.world, dbhas: actual.record, err }
+      const actual      = await this.doGetThing(checked) // has act and ok, but no err yet
+      return answerOf(actual, 'getThing', loggableAsk)
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
   }
 
@@ -76,14 +85,8 @@ export abstract class AdapterVaultDB implements VaultDB {
     try {
       const checked     = checkedWriteThingAsk(ask)
       const loggableAsk = loggableAskOf(checked)
-      const actual      = await this.doWriteThing(checked)
-      if (! actual.ok) {
-        const err = Throwers.actRefused('vault', actual.act, { oplabel: 'writeThing', ask: loggableAsk })
-        return { ok: false, ask: loggableAsk, act: actual.act, world: actual.world, dbhas: actual.record, err }
-      }
-      // A good write has a Thing: the one written, or under `passed` the live one found. A store that reports none is broken.
-      if (actual.record === null) { throw Throwers.storageIssue() }
-      return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: actual.record }
+      const actual      = await this.doWriteThing(checked) // has act and ok, but no err yet
+      return answerOf(actual, 'writeThing', loggableAsk)
     } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
   }
 
@@ -113,12 +116,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** Watch the Things of a bank, and return a function that stops the watch ({@link VaultDB.watch}).
-   * A Thing heard that fails its checks is dropped unheard.
+   * A Thing heard that fails its checks, or is not of the bank, goes to `onBadNews` and not to `onNotice`.
    */
-  watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void = noBadNews): () => void {
-    return this.doWatch(thingWatchScope.parse(scope), ({ record, world }) => {
-      const val = noticedThingOf(record)
-      if (val === null) { return }
+  watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
+    const { scope: bankScope } = watchArgs.parse({ scope, onNotice, onBadNews })
+    return this.doWatch(bankScope, ({ record, world }) => {
+      let val: Thing
+      try { val = watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       onNotice({ ok: true, act: (val.am === 'a') ? 'gotlive' : 'gotgone', val, world })
     }, onBadNews)
   }
@@ -136,7 +140,8 @@ export abstract class AdapterVaultDB implements VaultDB {
       const err         = Outcome.storageRefusalOf(thrown)
       const loggableAsk = loggableAskOf(ask)
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
-      const dbhas = noticedThingOf(Errors.rowsOfRefusal(err).dbhas ?? null)
+      // Only the classifier sets rows.dbhas, to a Thing it has checked.
+      const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as Thing | null
       return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
       return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: new Errors.VaultError('unexpected_error', AnswerNotMade) }

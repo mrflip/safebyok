@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { Errors } from 'safebyok-big/internals'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type BoxThing, type GateThing, type Thing, ShellCited, childShellCited, lifeseqOf, sparseOf } from '../../src/storage/shapes-thing'
 import { classifyListThings } from '../../src/storage/thing-classifier'
@@ -118,7 +119,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), refused by the act tables", () => {
     const answer = await vaultDB.tryWriteThing(TH.replaceAskOf(stored, TH.nextGateOf(stored, { born_at: TH.T0 + 1 })))
     const err = await TH.expectBad(Promise.resolve(answer), 'bad_record')
     expect(err.message).to.include(Phrases.BornAtNotStored)
-    expect(answer).to.deep.include({ dbhas: stored })
+    expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
   })
 
   it("refuses a write over nothing under ifAbsent 'fail'", async () => {
@@ -150,7 +151,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), under a storage policy", () => {
     const ask = TH.replaceAskOf(cited, TH.nextGateOf(stored, { wayins: { main: TH.BW.otherMainWayin } }), { policies: ['replace_passphrase'] })
     const answer = await vaultDB.tryWriteThing(ask)
     await TH.expectBad(Promise.resolve(answer), 'gate_issue')
-    expect(answer).to.deep.include({ dbhas: stored })
+    expect(answer).to.deep.include({ act: 'policied', dbhas: stored })
   })
 
   it("adds a passkey wayin to a gate that has none", async () => {
@@ -189,38 +190,44 @@ describe("MemoryVaultDB, a Thing stored that fails its checks", () => {
   }
 })
 
-describe("MemoryVaultDB.watch(scope, onNotice)", () => {
+describe("MemoryVaultDB.watch(scope, onNotice, onBadNews)", () => {
   it("hears each Thing written in the bank, after the write", async () => {
     const vaultDB = new MemoryVaultDB()
     const notices: ThingNotice[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) })
+    const badNews: Errors.VaultError[] = []
+    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
     await vaultDB.tryWriteThing(TH.birthAskOf())
     await TH.eventually(() => notices.length === 1)
     expect(notices[0]).to.deep.equal({ ok: true, act: 'gotlive', val: TH.gateThingOf(), world: null })
+    expect(badNews).to.deep.equal([])
   })
 
   it("hears nothing of another bank, nor of a refused write", async () => {
     const vaultDB = await vaultDBWith()
     const notices: ThingNotice[] = []
-    vaultDB.watch({ ...TH.ThingBank, banklabel: 'other' }, (notice) => { notices.push(notice) })
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) })
+    const badNews: Errors.VaultError[] = []
+    vaultDB.watch({ ...TH.ThingBank, banklabel: 'other' }, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
+    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
     await vaultDB.tryWriteThing(TH.birthAskOf(TH.gateThingOf({ revtok: 'rev-other' })))
     await TH.aWhile()
     expect(notices).to.have.lengthOf(0)
+    expect(badNews).to.deep.equal([])
   })
 
   it("hears nothing once stopped", async () => {
     const vaultDB = new MemoryVaultDB()
     const notices: ThingNotice[] = []
-    const stop = vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) })
+    const badNews: Errors.VaultError[] = []
+    const stop = vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
     stop()
     await vaultDB.tryWriteThing(TH.birthAskOf())
     await TH.aWhile()
     expect(notices).to.have.lengthOf(0)
+    expect(badNews).to.deep.equal([])
   })
 
   it("refuses a scope that is not a bank's", () => {
-    TH.expectSyncRefusal(() => new MemoryVaultDB().watch({ userid: 'u1' } as never, () => undefined), 'bad_option')
+    TH.expectSyncRefusal(() => new MemoryVaultDB().watch({ userid: 'u1' } as never, () => undefined, () => undefined), 'bad_option')
   })
 })
 
@@ -386,13 +393,15 @@ describe("MemoryVaultDB.tryBirthBank(ask)", () => {
   it("writes the bank, its main gate and its root box, answering with them, and is heard of each", async () => {
     const vaultDB = new MemoryVaultDB()
     const notices: ThingNotice[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) })
+    const badNews: Errors.VaultError[] = []
+    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
     const roots = { bank: TH.bankThingOf(), gate: TH.gateThingOf(), root: TH.rootBoxOf() }
     expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: true, act: 'born', val: roots })
     expect(await gotAt(vaultDB, 'bank')).to.deep.equal(roots.bank)
     expect(await gotAt(vaultDB, 'gate')).to.deep.equal(roots.gate)
     expect(await gotAt(vaultDB, 'box')).to.deep.equal(roots.root)
     await TH.eventually(() => notices.length === 3)
+    expect(badNews).to.deep.equal([])
   })
 
   it("passes the roots stored back, writing nothing, where the bank is live", async () => {
