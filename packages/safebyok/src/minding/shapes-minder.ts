@@ -15,15 +15,15 @@ import { type VaultDB, isVaultDB } from '../storage/vault-db'
 export interface QueryCacheOpts {
   /** How long a record stays timely, in milliseconds. */
   staleTime:   number
-  /** How long an entry no one listens to stays in the cache, in milliseconds, before it is removed; `Infinity` keeps it until `goodbye`. */
+  /** How long an entry no one listens to stays in the cache, in milliseconds. `Infinity` keeps it until `goodbye`. */
   gcTime:      number
-  /** `'always'` runs a get offline too, where it fails; TanStack's own default, `'online'`, waits for the network. */
+  /** TanStack's `networkMode`. `'always'` runs a get even when offline, where it fails. TanStack's own default, `'online'`, waits for the network. */
   networkMode: 'online' | 'always' | 'offlineFirst'
-  /** How many times a failed get is tried again by TanStack Query. */
+  /** How many times TanStack Query retries a failed get. */
   retry:       number
 }
 
-/** The {@link QueryCacheOpts} used where none are given: an hour timely, kept until `goodbye`, gets run offline, none retried. */
+/** The default {@link QueryCacheOpts}: records stay timely an hour, entries stay until `goodbye`, gets run even offline, and none is retried. */
 export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ staleTime: 60 * 60 * 1000, gcTime: Infinity, networkMode: 'always', retry: 0 })
 
 // A timer longer than this fires at once, in every JavaScript runtime, and TanStack Query passes gcTime to one as it is.
@@ -62,10 +62,14 @@ export const { queryCacheOpts, thingPins, minderMakeArgs, minderAskOpts, minderG
 
 /** A get's options: `staleTime` overrides the minder's own. */
 export type MinderGetAskOpts = Z.input<typeof minderGetAskOpts>
-/** A `tryAt`'s options: `staleTime` overrides the minder's own; under `ifStale: 'get'` the cache alone is read, and under `'refresh'` a stale or vacant record is also fetched in the background. */
+/** `tryAt`'s options:
+ * - `staleTime`          -- overrides the minder's own
+ * - `ifStale: 'get'`     -- read the cache alone (default)
+ * - `ifStale: 'refresh'` -- also fetch a stale or vacant record in the background
+ */
 export type MinderAskOpts    = Z.input<typeof minderAskOpts>
-/** What a minder reads of its bank: its scope, the cache options its minders take, and whether it is enabled. */
+/** The part of {@link Bank} a minder uses: its scope, its `queryCacheOpts`, and whether it is enabled. */
 export type MinderBank       = Pick<Bank, 'modelkind' | 'userid' | 'banklabel' | 'queryCacheOpts' | 'isEnabled' | 'demandEnabled'>
-/** What a minder is pinned to: its user, its bank and its modelkind. */
+/** The user, bank and modelkind a minder is pinned to. */
 export type ThingPins        = Readonly<Z.infer<typeof thingPins>>
 // --
