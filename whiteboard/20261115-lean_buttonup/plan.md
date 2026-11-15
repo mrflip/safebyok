@@ -65,21 +65,20 @@ gate's write function*), overriding `classify*` where the store reached the verd
 ## T1: not in it
 
 * The minder (T2), Bank's box verbs (T3), the classifier tidy (after T1).
-* **Pushing a changed `world` into the watch feed.** The vaultDB notifies of a bank or main gate that changed, and a
-  host such as GraphQL turns that off and pushes itself. What counts is whether the sender thinks it changed, not the
-  server, judged by the world's lifeseq and revseq. Open: which reading (see *Open*).
 * Trees, gates beyond the main gate, bringing a parent to life.
 
 ## Open
 
-* **The world push: who judges, by the world's lifeseq and revseq?**
-  - (A) The device's `AdapterVaultDB` remembers the world it last saw per bank, and notifies when an answer's world
-    is later.
-  - (B) Each ask carries the world its sender holds, and the store's step compares, so the answer's act says whether
-    the world moved, which decides the dispatch.
+* **The world pick's shape.** Recommended: a pair per record, `{ bank: { lifeseq, revseq }, maingate: { lifeseq,
+  revseq } }`, since a passphrase change revises the main gate and not the bank.
+* **How an answer says "unchanged".** Recommended: `world` absent when it matches the pick; `null` in the null cases
+  above; the `WorldRecord` when the pick is behind or ahead, or the ask carried none.
 
 ## Settled, 2026-11-15
 
+* **The world push (T1).** Each ask carries a pick of the world its sender holds, its lifeseq and revseq, never the
+  whole world. An answer carries the full `WorldRecord` only when the world has moved against the pick, and the
+  adapter then forwards it into the watch feed, unless a store option turns that off (GraphQL pushes itself).
 * **A friend** is the narrow set of an owner's attributes and callbacks that it hands a collaborator, a pick of the
   owner's interface where the names coincide (`gallant.md` *#record-then-opts*). Visibility does not define it, and
   is not changed for it; "Internal." in a doc block marks what is not for hosts.
