@@ -69,18 +69,19 @@ gate's write function*), overriding `classify*` where the store reached the verd
 
 ## Open
 
-* **A gate change as a bank change.** For the world pick to catch a gate change, a gate write must be a compound
-  write: the gate's put and the bank's next revision in one step, both built by the device, as `tryBirthBank` writes
-  three roots. Recommended as the rule for the gate verbs, in a later thread. Nothing writes the gate after its
-  birth until then. In reserve: asks carrying `track: [{ labelpath, revseq, lifepath }]` and answers `tracked`, a more
-  generous contract.
+* **`track` / `tracked` details**, built as defaults: keys by the main gate's actual labelpath (`gate`, one constant)
+  where the Coach wrote `'gate/main'`; a key with nothing stored or a damaged row is left out of `tracked`; an ask
+  with no `track` gets no `tracked`; `doNotifyTracked` is an adapter option, on by default.
 
 ## Settled, 2026-11-15
 
-* **The world push (T1).** Every answer carries its world (`WorldRecord | null`), never left off. Each ask may
-  carry the world pick its sender holds, `{ revseq, lifeseq }` (the bank's fields), never the whole world. The
-  vaultDB compares the two, and where they differ (or the ask has no pick) the adapter pushes the world into the
-  watch feed, unless a store option turns that off (GraphQL pushes itself).
+* **The world push (T1): `track` / `tracked`.** Every answer carries its world (`WorldRecord | null`), as today. An
+  ask may carry `track: { bank: { revseq, lifepath }, <main gate>: { revseq, lifepath } }`, exactly two fixed keys,
+  hard-coded in the stores' queries: not a general mechanism, and nothing fetches other records. The answer carries
+  `tracked`, each entry `'same'` where revseq and lifepath match, otherwise the full row (the bank's row alone); no
+  null. Every response method ends in one `notifyTrackedRecords`, which returns unless `doNotifyTracked` is enabled,
+  and otherwise notifies each entry that is not `'same'`. Bank revisions stay honest: a gate write does not revise
+  the bank, and there is no compound gate write.
 * **A friend** is the narrow set of an owner's attributes and callbacks that it hands a collaborator, a pick of the
   owner's interface where the names coincide (`gallant.md` *#record-then-opts*). Visibility does not define it, and
   is not changed for it; "Internal." in a doc block marks what is not for hosts.
