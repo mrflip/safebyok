@@ -77,6 +77,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "@tanstack/query-core": "^5.107.1",
     "es-toolkit": "^1.53.1",
     "safebyok-big": "workspace:*"
   },
