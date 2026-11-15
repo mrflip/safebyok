@@ -44,7 +44,7 @@ Every request has one shape, whatever its op: the op, the address of the row ask
 
 Each box request names its vault's life token (`vault_tok`), never the vault's revision. Each vault put or del names the vault's revision.
 
-Each modification (put or del) also names:
+Each put or del also names:
 
 - the row it expects to find: its revision (token, seq), its life token, and whether it is live
 - a next proposed revision (token, seq+1) for the box
@@ -55,7 +55,7 @@ The shell row stands for a void, and a request over a void cites it as the expec
 
 Revision tokens are minted fresh at every write, delete included: a `revision_tok` names one exact row version. Life tokens (`vault_tok`, `box_tok`) change when the row is created and when it is deleted. If the expected and proposed revision tokens are the same, the request refuses `bad_record`. The proposed revision travels unencrypted as well as sealed, so that it can be stored and compared.
 
-The proposed revision is checked first: if the proposed *next* revision token matches the one already stored, as if the modification were already committed, the act is `retcon` (below). Otherwise the expected revision is compared with the stored one, and the same comparison runs at both levels:
+The proposed revision is checked first: if the proposed *next* revision token matches the one already stored, as if the put or del were already committed, the act is `retcon` (below). Otherwise the expected revision is compared with the stored one, and the same comparison runs at both levels:
 
 | Expected seq vs stored seq | Expected Token eq       | Expected Token neq  |
 | -------------------------- | ----------------------- | ------------------- |
@@ -483,7 +483,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - The seq goes on across a rebirth: a reborn row is stored at its tombstone's seq + 1. So the seq at a scope never falls, whatever the life, and a device can tell a row of an earlier life from a row of a later one by its seq (`notes/deliver-contract.md`). Only delRaw, which returns a scope to void, ends this.
 - born, reborn and delete write the proposed `box_tok`, which differs from the stored row's. Replace leaves `box_tok` unchanged.
 - delete writes a tombstone (state gone, no value, the proposed `revision_tok`, seq + 1, the proposed `box_tok`) and never removes the row. Only delRaw removes rows.
-- Every successful modification, delete included, writes a new revision. Deleting a tombstone refuses (`dubdel`) and leaves the revision unchanged.
+- Every successful put or del writes a new revision. Deleting a tombstone refuses (`dubdel`) and leaves the revision unchanged.
 - Vault delete sets state gone, writes a new revision (the proposed `revision_tok`, seq + 1) and writes the proposed `vault_tok`, which differs from the stored row's. Afterwards, no box op under that `vault_scope` returns a live box until the vault has been re-created.
 - Vault delete removes every box of that vault life (box.`vault_tok` = the deleted `vault_tok`), in the same atomic unit where the datastore can. Where it can't, those boxes stay inaccessible (C6) until tidyBoxes removes them, and are never fetched again once the vault is re-created (C5).
 - Vault re-create writes the proposed `vault_tok`, which differs from the tombstone's, with seq = stored seq + 1.
