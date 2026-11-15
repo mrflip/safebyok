@@ -8,6 +8,7 @@ export type { BoxSparse, Sealed } from '../storage/shapes-thing'
 
 /** The kinds of sealer: the sealer of kind `K` is the export `K` below. */
 export const sealerkindVals = ['BoxWhisper', 'BoxTombstone'] as const satisfies readonly (keyof SealerKinds)[]
+/** A kind of sealer, one of {@link sealerkindVals}. */
 export type Sealerkind = typeof sealerkindVals[number]
 
 /** The tags a sealed part carries in the clear, which its seal binds. */
@@ -29,13 +30,13 @@ export type UnsealedOf<RecordT, CleartextsT> = RecordT extends unknown
   ? Omit<RecordT, `${keyof CleartextsT & string}_sealed`> & CleartextsT
   : never
 
-/** What a lease needs to know to seal one part of a record, so that the lease itself knows nothing of the record.
- * `PriorT` is what the seal starts from, `NextT` the next revision without its sealed part, `RecordT` the record with it.
+/** The interface a lease seals one part of a record through, so the lease itself knows nothing of the record.
+ * `PriorT` is the revision sealed after, `NextT` the next revision without its sealed part, `RecordT` the record with it.
  */
 export interface Sealer<PriorT, NextT, RecordT, CleartextsT> {
   /** The next revision after `prior`, still without its sealed part. */
   nextRevisionOf(prior: PriorT): NextT
-  /** What the seal of `record` is bound to, after the bank's stamp. A change to any of it refuses the unseal. */
+  /** The stamps the seal of `record` is bound to, after the bank's stamp. A change to any of them refuses the unseal. */
   stampsOf(record: NextT | RecordT): readonly Crypto.CipherCtxRecord[]
   /** The tags each seal carries. */
   readonly tags: SealTags
@@ -47,7 +48,7 @@ export interface Sealer<PriorT, NextT, RecordT, CleartextsT> {
   decode(text: string): CleartextsT
   /** The sealed part of `record`, refusing as damaged when its tags are not this sealer's. */
   sealedOf(record: RecordT): Sealed
-  /** `next` with `sealed` laid in, checked. */
+  /** `next` with `sealed` added, checked. */
   recordOf(next: NextT, sealed: Sealed): RecordT
 }
 
@@ -60,13 +61,13 @@ export interface SealerKinds {
 
 // == [A box's whisper]: BoxRecord, BoxTombstone, BoxCleartexts, BoxWhisper
 
-/** A live box as stored: its Thing fields, its sidecar and its sealed whisper. */
+/** A live box: its Thing fields, its sidecar and its sealed whisper. */
 export type BoxRecord = Extract<BoxThing, { am: 'a' }>
 
-/** A deleted box as stored: its Thing fields and a sealed empty whisper, which signs it. */
+/** A deleted box: its Thing fields and a sealed empty whisper, which signs it. */
 export type BoxTombstone = Extract<BoxThing, { am: 'x' }>
 
-/** What a box seals: its whisper. */
+/** The cleartexts of a box: its whisper. */
 export interface BoxCleartexts {
   whisper: CX.Whisper
 }
@@ -84,7 +85,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj }) => ({
 }))
 
 /** Seals a box's whisper, bound to its Thing fields and its tags. Its sidecar stays in the clear.
- * Over a live box it makes the next revision; over a tombstone or the shell, the first revision of the next life.
+ * Over a live box it makes the next revision. Over a tombstone or the shell, it makes the first revision of the next life.
  */
 export const BoxWhisper = Object.freeze({
   nextRevisionOf: boxWhisperOf,
@@ -113,7 +114,7 @@ export const BoxWhisper = Object.freeze({
   },
 }) satisfies SealerKinds['BoxWhisper']
 
-/** Seals the empty whisper of a box's tombstone, which signs it. It makes the tombstone of a live box, and refuses a tombstone or the shell. */
+/** Seals the empty whisper that signs a box's tombstone. It makes the tombstone of a live box, and refuses a tombstone or the shell. */
 export const BoxTombstone: SealerKinds['BoxTombstone'] = Object.freeze({ ...BoxWhisper, nextRevisionOf: boxTombstoneOf })
 // --
 

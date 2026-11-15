@@ -1,4 +1,4 @@
-/** The stamps a bank binds into every ctx under it, and the lease's stamp and record that carry it. */
+/** The bank and gate stamps that every ctx under a bank binds, and the lease's stamp and record. */
 
 import type * as Z from 'zod'
 import { CX, GX, Phrases, Validator } from 'safebyok-big/internals'
@@ -6,8 +6,8 @@ import { thingRecord, wayins } from '../storage/shapes-thing'
 
 // == [The stamps]: bankScope, bankStamp, gateStamp, citedGate, stampedGate, BankScope, BankStamp, GateStamp, CitedGate, StampedGate
 
-/** The checks of a bank's scope and stamp, of a gate's stamp and citation, and of a gate as a stored wayin's proving accepts it.
- * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and the rest is dropped.
+/** The checks of a bank's scope and stamp, a gate's stamp and citation, and a {@link StampedGate}.
+ * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
  */
 export const { bankScope, bankStamp, gateStamp, citedGate, stampedGate } = Validator.Checkers('bad_option', ({ obj }) => {
   const bankStamp = thingRecord.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
@@ -27,15 +27,15 @@ export type BankScope   = Z.infer<typeof bankScope>
 export type BankStamp   = Z.infer<typeof bankStamp>
 /** A gate's stamp: its scope, and the lifeseq and `born_at` of its life. A wayin's wrapped bankKey is bound to it. */
 export type GateStamp   = Z.infer<typeof gateStamp>
-/** A gate's stamp and the revision in hand: what a lease is granted under. */
+/** A gate's stamp and its revision's `revtok`: the gate a lease is granted under. */
 export type CitedGate   = Z.infer<typeof citedGate>
-/** A gate as a stored wayin's proving accepts it: its bank's stamp, its own stamp, and its wayins. */
+/** A gate's stamp, its bank's stamp, and its wayins: what a proving of a stored wayin takes. */
 export type StampedGate = Z.infer<typeof stampedGate>
 // --
 
 // == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, LeaseStamp, LeaseSparse, LeaseRecord
 
-/** The `fmt` a lease carries, as `Lease` checks it. */
+/** The `fmt` a lease carries. */
 export const LeaseFormat = 7102
 
 /** The checks of a lease's stamp and its record.
@@ -55,10 +55,10 @@ export const { leaseStamp, leaseRecord } = Validator.Checkers('bad_record', ({ o
   return { leaseStamp, leaseRecord }
 }, [CX])
 
-/** A lease's stamp, as {@link leaseStamp} checks it. */
+/** A lease's stamp: see {@link leaseStamp}. */
 export type LeaseStamp  = Z.infer<typeof leaseStamp>
 /** The parts of a lease that are safe to show: its {@link LeaseStamp}. */
 export type LeaseSparse = LeaseStamp
-/** A lease's record, as a device caches it: its stamp, its leaseKey handle, and the bankKey wrapped under it. */
+/** A lease's record: its stamp, its leaseKey handle, and the bankKey wrapped under it. */
 export type LeaseRecord = Z.infer<typeof leaseRecord>
 // --

@@ -8,23 +8,23 @@ import { type VaultDB, isVaultDB } from '../storage/vault-db'
 
 // == [Given to a device]: DefaultLeaseMillis, DeviceRecord, DeviceOpts
 
-/** How long a lease lasts where the host names no `autolockMinutes`: fourteen days. */
+/** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 
-/** What a device is: the bank scope it serves, and its token there. */
+/** A device's record: the bank scope it serves, and its token there. */
 export type DeviceRecord = Pick<SX.DeviceRow, 'user_id' | 'banklabel' | 'device_tok'>
 
-/** What a host hands {@link Device.make} besides the device's record. */
+/** The options of {@link Device.make}, beside the device's record. */
 export interface DeviceOpts {
   /** Where this device's banks are stored: each bank made on it is given this vaultDB. */
   vaultDB:          VaultDB
-  /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
+  /** Makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
   keyDeriver:       Deriver.KeyDeriver
   /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak. */
   strengthChecker?: Strength.StrengthChecker | undefined
-  /** Where the device reports what it has no caller to throw to: the default logger, the console, when left out. */
+  /** Where the device reports what it has no caller to throw to. Default: the console. */
   logger?:          Logger.VaultLogger | undefined
-  /** How long a lease lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
+  /** How long a lease lasts on this device, in minutes. `Infinity` lasts until locked. Default: 14 days. */
   autolockMinutes?: number | undefined
   /** Shows the host's dialog for each gating. Without one, the host renders the device's `openGating` itself. */
   requestCleartext?: RequestCleartext | undefined
@@ -47,7 +47,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom, user_id, ban
 }), [CX])
 // --
 
-/** The signed-in user's presence on this browser for one bank scope: the host's functions, guarded, and the one gating open.
+/** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and at most one open gating.
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
@@ -55,7 +55,7 @@ export class Device {
 
   declare readonly user_id:    string
   declare readonly banklabel:  string
-  /** This device's token in its bank scope, which each wayin it builds records. */
+  /** This device's token in its bank scope, recorded in each wayin it builds. */
   declare readonly device_tok: string
   /** Where this device's banks are stored. */
   readonly vaultDB:            VaultDB
@@ -68,7 +68,7 @@ export class Device {
   /** The host's dialog, guarded, or null to leave the host to render `openGating` itself. */
   readonly #askUser: AskUser | null
   #openGating: Gating | null = null
-  /** Why a sweep disabled the device; null while it is enabled. */
+  /** Why a sweep disabled the device, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
 
   /** This device's scope and token, for `JSON.stringify`. */
@@ -92,7 +92,7 @@ export class Device {
 
   // == [Construction]: make, constructor
 
-  /** A device for the bank scope and token in `record`, with the host's functions in `opts`, wrapped. Nothing is fetched or stored. */
+  /** Make a device for the bank scope and token in `record`, guarding the host's functions in `opts`. Nothing is fetched or stored. */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
@@ -112,8 +112,8 @@ export class Device {
 
   // == [Prompts]: birthBankPrompt
 
-  /** Ask the user for a new passphrase, and a passkey if they like, and birth this device's bank with them.
-   * Resolves the bank, stored and unlocked, once an attempt lands. The layer above asks only where no bank is stored.
+  /** Ask the user for a new passphrase and optional passkey, and birth this device's bank with them. Resolves the unlocked bank.
+   * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
    */
   async birthBankPrompt(): Promise<Bank> {
     const gating = Gating.make({ gatingkind: 'birth_bank' }, { device: this, bank: null, askUser: this.#askUser, attempt: (cleartexts) => birthBank(this, cleartexts) })
@@ -141,7 +141,7 @@ export class Device {
     this.#openGating = gating
   }
 
-  /** Detach `gating`, once it has concluded, if it is the one open. */
+  /** Detach `gating` if it is this device's open gating. */
   detachGating(gating: Gating): void {
     if (this.#openGating === gating) { this.#openGating = null }
   }
@@ -152,7 +152,7 @@ export class Device {
   /** True from `Device.make` until a sweep, and never again. */
   get isEnabled(): boolean { return this.#endCause === null }
 
-  /** Why a sweep disabled this device, the one refusal every call on it then meets; null while it is enabled. */
+  /** The refusal every call on this device meets after a sweep, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#endCause }
 
   /** Throw unless {@link isEnabled}. */
@@ -169,7 +169,7 @@ export class Device {
 // == [Helpers]: guardRequestCleartext, millisOf, checkSecureContext
 
 // What the dialog throws is dropped: it may quote what the user typed.
-/** Guard the host's `requestCleartext`: the guard resolves true once the host's resolves, and false on a throw, which it drops. */
+/** Guard the host's `requestCleartext`: the guard resolves true when the host's resolves, and false when it throws, dropping the throw. */
 export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUser {
   const host = Checks.requestCleartext.parse(requestCleartext, { where: 'requestCleartext' })
   return Consts.brandGuarded(async (gating: Gating): Promise<boolean> => {
@@ -183,7 +183,7 @@ export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUs
 }
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
-/** `minutes` in milliseconds, or `fallback` where none is given */
+/** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
 function millisOf(minutes: number | undefined, fallback: number): number { return (minutes === undefined ? fallback : Math.min(Math.round(minutes * Consts.MinuteMillis), Consts.ForeverMillis)) }
 
 /** Refuse to run outside a secure context, where WebCrypto is missing */

@@ -3,13 +3,13 @@ import { type Thing, type ThingRecord, sparseOf } from '../storage/shapes-thing'
 
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
 // subclass declares its own: `make(record, opts[, friend])`, which parses what it is given.
-/** A model of a stored Thing: one revision of it, its Thing fields shown as read-only props, its record kept private.
+/** A model of one revision of a stored Thing: its Thing fields are read-only props, and its record is private.
  * A subclass parses its record before calling `super`, and freezes itself last.
  */
 export abstract class BaseThing<RecordT extends Thing, ScopeT, StampT> implements ThingRecord {
   // == [Props]: userid, banklabel, labelpath, label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am, #record
 
-  /** The user's id; with `banklabel` and `labelpath`, where this Thing is stored. */
+  /** The user's id. With `banklabel` and `labelpath`, it says where this Thing is stored. */
   declare readonly userid:     string
   declare readonly banklabel:  string
   declare readonly labelpath:  string
@@ -18,14 +18,14 @@ export abstract class BaseThing<RecordT extends Thing, ScopeT, StampT> implement
   declare readonly fmt:        number
   /** The lifeseqs of this Thing's life and of each life above it, root first. */
   declare readonly lifepath:   string
-  /** This Thing's life: one born again has the next. */
+  /** This Thing's life, as a lifeseq. A Thing born again has the next. */
   declare readonly lifeseq:    string
-  /** The revision in hand: every write makes a new one. */
+  /** This revision's token. Every write makes a new one. */
   declare readonly revtok:     string
-  /** The sequence number of the revision in hand, counting from 0 at its birth. */
+  /** This revision's sequence number, 0 at the Thing's birth. */
   declare readonly revseq:     number
   declare readonly born_at:    number
-  /** When the revision in hand was written, in epoch milliseconds. */
+  /** When this revision was written, in epoch milliseconds. */
   declare readonly written_at: number
   /** `'a'` while live, `'x'` for a tombstone. */
   declare readonly am:         ThingRecord['am']
@@ -43,10 +43,10 @@ export abstract class BaseThing<RecordT extends Thing, ScopeT, StampT> implement
 
   // == [Shapes]: scope, stamp, pickle
 
-  /** This Thing's scope, as its kind is addressed. */
+  /** This Thing's scope, in the form its kind uses. */
   abstract get scope(): ScopeT
 
-  /** What every ctx under this Thing binds: the fields fixed for its life. */
+  /** This Thing's stamp: the fields fixed for its life, which every ctx under it binds. */
   abstract get stamp(): StampT
 
   /** This Thing's record, frozen. */
