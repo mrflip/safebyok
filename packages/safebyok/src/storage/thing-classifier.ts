@@ -1,17 +1,20 @@
 /** Classify a vaultDB ask against the Thing stored, by big's act tables in `notes/answer-contract.md`. */
 
-import { isEqual, omit } from 'es-toolkit'
+import { isEqual, omit, sortBy } from 'es-toolkit'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers } from 'safebyok-big/internals'
-import { BornAtNotStored } from '../phrases'
-import type { Actual } from './vault-db'
-import { type GetThingAsk, type GateThing, type Thing, type ThingCited, type ThingScope, type WriteThingAsk, kindChecksOf, thingScope } from './shapes-thing'
+import { BankRootsMissing, BornAtNotStored } from '../phrases'
+import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
+import {
+  type BankRoots, type BirthBankAsk, type GetThingAsk, type GateThing, type ListThingsAsk, type Thing, type ThingCited, type ThingScope, type WriteThingAsk,
+  birthPutsOf, isKindLabelpath, kindChecksOf, sparseOf, thingScope,
+} from './shapes-thing'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeOff
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
 /** A write ask, as the tables read it: its flags, and what its two records cite. */
-type WriteCmpAsk = Pick<WriteThingAsk, 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
+type WriteCmpAsk = Pick<WriteThingAsk, 'op' | 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
 
 /** What is stored at a scope: no Thing, a tombstone, or a live Thing. */
 type Presence = 'void' | 'gone' | 'live'
@@ -102,9 +105,9 @@ function delActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.DelAct | EX.R
   return (presence === 'gone') ? 'dubdel' : 'deleted'
 }
 
-/** Classify a write: by the put table for a live record, by the del table for a tombstone. */
+/** Classify a write: a put by the put table, a del by the del table. */
 function writeActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.PutAct | EX.DelAct | EX.RefusedAct {
-  return (ask.record.am === 'a') ? putActOf(ask, stored) : delActOf(ask, stored)
+  return (ask.op === 'put') ? putActOf(ask, stored) : delActOf(ask, stored)
 }
 
 /** True when `act` refuses the ask. */
@@ -143,7 +146,7 @@ export function noticedThingOf(raw: unknown): Thing | null {
 }
 // --
 
-// == [Classifying]: classifyGetThing, classifyWriteThing, demandBornAtKept
+// == [Classifying]: classifyGetThing, classifyWriteThing, demandBornAtKept, ThingsFetched, classifyListThings, isChildLabelpath, BankRootsFetched, classifyBirthBank
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
 export function classifyGetThing(ask: GetThingAsk, raw: unknown): Actual<EX.GotAct> {
@@ -162,7 +165,8 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.
   // `replaced` means a live Thing was found.
   if (act === 'replaced') {
     demandBornAtKept(ask.record, stored!)
-    demandPolicies(ask, stored!)
+    // The gate alone has storage policies, and the stored Thing is of the ask's kind.
+    if (ask.modelkind === 'gate') { demandPolicies(ask, stored as GateThing) }
   }
   return { ok: true, act, world: null, record: stored }
 }
@@ -171,35 +175,98 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown): Actual<EX.
 function demandBornAtKept(record: Thing, stored: Thing): void {
   if (record.born_at !== stored.born_at) { throw new Errors.VaultError('bad_record', BornAtNotStored, { rows: { dbhas: stored } }) }
 }
+
+/** What a store fetched for a listing: the raw parent, null for none, and each raw Thing one label under it, with its labelpath. */
+export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: string, raw: unknown }>[] }>
+
+/** Classify a listing against what a store fetched for it: the parent's get act, the parent, its children of the parent's
+ * live life in labelpath order, and the children that fail their checks.
+ */
+export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, children }: ThingsFetched): ListThingsActual {
+  const { userid, banklabel } = ask
+  const stored       = storedThingOf(ask, rawParent)
+  const act          = getActOf(ask, stored)
+  const sound: Thing[] = []
+  const damaged_rows: DamagedThing[] = []
+  for (const { labelpath, raw } of children) {
+    if (! isChildLabelpath(ask, labelpath)) { throw new Errors.VaultError('storage_issue', BigPhrases.rowOfOtherAddress(['labelpath'])) }
+    try {
+      sound.push(writtenThingOf({ userid, banklabel, labelpath }, raw))
+    } catch (err) {
+      if (! (Errors.isVaultError(err) && (err.refusalkind === 'damaged_row'))) { throw err }
+      damaged_rows.push({ userid, banklabel, labelpath, am: 'd' })
+    }
+  }
+  // A child hangs off its parent's live lifepath: a tombstone or none has no children, and an earlier life's are not its.
+  const lifepathUnder = (stored?.am === 'a') ? `${stored.lifepath}/` : null
+  const living = (lifepathUnder === null) ? [] : sound.filter((thing) => thing.lifepath.startsWith(lifepathUnder))
+  const listed = sortBy(living, [(thing) => thing.labelpath]).map((thing) => sparseOf(thing))
+  const parent = (stored === null) ? null : sparseOf(stored)
+  return isRefusedAct(act)
+    ? { ok: false, act, world: null, listed, parent, damaged_rows }
+    : { ok: true,  act, world: null, listed, parent, damaged_rows }
+}
+
+/** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
+function isChildLabelpath(ask: ListThingsAsk, labelpath: string): boolean {
+  const label = labelpath.slice(ask.labelpath.length + 1)
+  return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isKindLabelpath(ask.modelkind, labelpath)
+}
+
+/** What a store fetched for a bank's birth: the raw bank, main gate and root box, each null for none. */
+export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown }>
+
+/** Classify a bank's birth against the roots a store fetched. Under `born`, `things` are the ask's records, which the store
+ * writes in one step and then reports as written; under `passed`, the roots stored.
+ */
+export function classifyBirthBank(ask: BirthBankAsk, fetched: BankRootsFetched): BirthBankActual {
+  const [bankPut, gatePut, rootPut] = birthPutsOf(ask)
+  const bank = storedThingOf(bankPut, fetched.bank)
+  const gate = storedThingOf(gatePut, fetched.gate)
+  const root = storedThingOf(rootPut, fetched.root)
+  // Each is checked by the kind its labelpath names, so each is of the kind its root is.
+  if (bank?.am === 'a') {
+    if ((gate === null) || (root === null)) { throw new Errors.VaultError('storage_issue', BankRootsMissing) }
+    return { ok: true, act: 'passed', world: null, things: { bank, gate, root } as BankRoots }
+  }
+  for (const [put, stored] of [[bankPut, bank], [gatePut, gate], [rootPut, root]] as const) {
+    const act = putActOf(put, stored)
+    if (isRefusedAct(act)) { return { ok: false, act, world: null, record: stored } }
+  }
+  return { ok: true, act: 'born', world: null, things: { bank: ask.bank, gate: ask.gate, root: ask.root } }
+}
 // --
 
 // == [Policies]: GatePolicies, demandPolicies, gateIssue
 // Each runs once the put table has found the write would replace the live gate. Each line is one row of its policy's table
 // in notes/storage-policies.md, in the same order, less big's registered_at row: every live-over-live write keeps its born_at.
 
+/** What a gate write cites. */
+type GateCited = WriteThingAsk<GateThing>['cited']
+
 /** Each storage policy: what it demands of a gate write's records and of the gate stored, throwing `gate_issue` where it refuses. */
 const GatePolicies = {
   /** The record replaces the passphrase wayin the gating proved against, and nothing else. */
-  replace_passphrase(cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing): void {
+  replace_passphrase(cited: GateCited, record: GateThing, stored: GateThing): void {
     if (! isEqual(cited.wayins?.main, stored.wayins.main))                            { throw gateIssue(stored, BigPhrases.ProvedWayinMoved) }
     if (! isEqual(omit(record.wayins, ['main']), omit(stored.wayins, ['main'])))       { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
   /** The record adds a passkey wayin to a gate that has none, and changes nothing else. */
-  add_passkey(_cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing): void {
+  add_passkey(_cited: GateCited, record: GateThing, stored: GateThing): void {
     if (stored.wayins.passkey0 !== undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyStored) }
     if (record.wayins.passkey0 === undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyNotAdded) }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0']))) { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
   /** The record removes the gate's passkey wayin, and changes nothing else. */
-  revoke_passkey(_cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing): void {
+  revoke_passkey(_cited: GateCited, record: GateThing, stored: GateThing): void {
     if (stored.wayins.passkey0 === undefined)                                         { throw gateIssue(stored, BigPhrases.NoPasskeyStored) }
     if (record.wayins.passkey0 !== undefined)                                         { throw gateIssue(stored, BigPhrases.PasskeyNotRevoked) }
     if (! isEqual(omit(record.wayins, ['passkey0']), omit(stored.wayins, ['passkey0']))) { throw gateIssue(stored, BigPhrases.OtherWayinMoved) }
   },
-} as const satisfies Record<EX.StoragePolicy, (cited: WriteThingAsk['cited'], record: GateThing, stored: GateThing) => void>
+} as const satisfies Record<EX.StoragePolicy, (cited: GateCited, record: GateThing, stored: GateThing) => void>
 
 /** Apply each storage policy `ask` names to the gate stored. Throws `gate_issue` at the first that refuses. */
-function demandPolicies({ cited, record, options }: WriteThingAsk, stored: GateThing): void {
+function demandPolicies({ cited, record, options }: WriteThingAsk<GateThing>, stored: GateThing): void {
   const policies = options?.policies ?? []
   for (const policy of policies) { GatePolicies[policy](cited, record, stored) }
 }
