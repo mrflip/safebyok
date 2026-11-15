@@ -32,6 +32,12 @@ export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tomb
 /** A citation that is half the shell. */
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-1' and the void revtok, in all three or in none."
 
+/** A sparse record that is half the shell. */
+export const SparseHalfShell = "A sparse record is the shell, at revseq -1, a lifeseq of '-1' and the void revtok, in all three or in none."
+
+/** A tombstone asked of a tombstone or the shell. */
+export const TombstoneOfLiveOnly = "Only a live box has a tombstone: a tombstone or the shell has none."
+
 /** A write whose revseq does not follow. */
 export const RevseqNotNext = "A write's record must have the revseq one past the cited one's."
 
