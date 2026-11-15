@@ -101,3 +101,18 @@ export const ReplacedThingAmiss = "A write classified as a replace found no live
 /** The last resort of a vaultDB's error handler. */
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
+
+// == [Minding]: BankExpected, MinderNotStarted, QueryClientExpected, GcTimeShape
+
+/** A minder made without a bank. */
+export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
+
+/** A minder read before `hello`, or after `goodbye`. */
+export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it.'
+
+/** A minder handed something that is not a TanStack Query client. */
+export const QueryClientExpected = 'A ThingMinder is made with a QueryClient from @tanstack/query-core.'
+
+/** A gcTime a timer cannot wait. */
+export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2147483647 (about 24.8 days): a longer timer fires at once.'
+// --

@@ -1,6 +1,7 @@
 import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
 import { BX, CX, Clock, Crypto, Errors, GX, Helpers, SX, Throwers, Validator } from 'safebyok-big/internals'
+import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../minding/shapes-minder'
 import { Device } from './device'
 import { Gate, type GateDna } from './gate'
 import type { Lease } from './lease'
@@ -43,15 +44,21 @@ export interface BankOpts {
   device:  Device
   /** Where the bank's boxes are stored. */
   vaultDB: VaultDB
+  /** The defaults this bank's minders set on their TanStack Query cache entries; each missing field is taken from {@link DefaultQueryCacheOpts}. */
+  queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Bank.make}'s arguments, of the proving `unlockByProving` is given, and of the boxes a box method is given. */
-const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => ({
+const Checks = Validator.Checkers('bad_option', ({ obj, custom, orDefault }) => ({
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
     record: obj({ maingate: BX.gateRecord, rootBox: boxSparse }).loose(),
-    opts:   obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device'), vaultDB: custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected) }),
+    opts:   obj({
+      device:         custom<Device>((val) => val instanceof Device, 'Expected a Device'),
+      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
+    }),
   }),
   bankThing,
   proving: custom<Proving>((val) => val instanceof Proving, 'Expected a Proving'),
@@ -63,7 +70,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => ({
  * Boxes are sealed and unsealed under the lease, which the bank keeps private, and stored in its vaultDB.
  */
 export class Bank implements BankStamp {
-  // == [Props]: userid, banklabel, lifeseq, born_at, #device, #vaultDB, #record, #maingate, #rootBox, #lease
+  // == [Props]: userid, banklabel, lifeseq, born_at, #device, #vaultDB, #queryCacheOpts, #record, #maingate, #rootBox, #lease
 
   /** The user's id; with `banklabel`, this bank's scope. */
   declare readonly userid:    string
@@ -74,6 +81,7 @@ export class Bank implements BankStamp {
 
   readonly #device:   Device
   readonly #vaultDB:  VaultDB
+  readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   readonly #record:   BankThing
   readonly #maingate: Gate
   readonly #rootBox:  BoxSparse
@@ -82,7 +90,7 @@ export class Bank implements BankStamp {
   #lease: Lease | null = null
   // --
 
-  // == [Getters]: device, device_tok, scope, stamp, maingate, rootBox, revtok, revseq, written_at
+  // == [Getters]: device, device_tok, scope, stamp, maingate, rootBox, queryCacheOpts, revtok, revseq, written_at
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
@@ -102,6 +110,9 @@ export class Bank implements BankStamp {
   /** The root box's sparse record, as the bank was made with it. Every box of this bank is under it. */
   get rootBox(): BoxSparse { return this.#rootBox }
 
+  /** The defaults this bank's minders set on their TanStack Query cache entries. */
+  get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
+
   /** The revision of the bank's Thing in hand. */
   get revtok(): string { return this.#record.revtok }
 
@@ -118,13 +129,14 @@ export class Bank implements BankStamp {
   static make(record: BankRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankRecord, opts: BankOpts) {
-    const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB } } = Checks.bankMakeArgs.parse({ record, opts })
+    const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB, queryCacheOpts: cacheOpts } } = Checks.bankMakeArgs.parse({ record, opts })
     const parsed = Checks.bankThing.parse(rest)
     // The device names its user `user_id`, and the bank's Thing `userid`.
     Validator.checkedConsistent({ user_id: parsed.userid, banklabel: parsed.banklabel }, device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
     this.#device = device
     this.#vaultDB = vaultDB
+    this.#queryCacheOpts = Object.freeze(cacheOpts)
     this.#record = Object.freeze(parsed)
     this.#rootBox = Object.freeze(rootBox)
     Helpers.tattoo(this, bankStamp.parse(parsed), { configurable: false })
