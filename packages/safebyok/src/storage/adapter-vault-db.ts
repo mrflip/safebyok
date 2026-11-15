@@ -60,7 +60,12 @@ export abstract class AdapterVaultDB implements VaultDB {
       const checked     = checkedGetThingAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doGetThing(checked)
-      if (actual.ok) { return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: actual.record } }
+      if (actual.ok) {
+        if (actual.act === 'gotvoid') { return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: null } }
+        // A get that found a Thing has it. A store that reports none is broken.
+        if (actual.record === null) { throw Throwers.storageIssue() }
+        return { ok: true, ask: loggableAsk, act: actual.act, world: actual.world, val: actual.record }
+      }
       const err = Throwers.actRefused('vault', actual.act, { oplabel: 'getThing', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: actual.act, world: actual.world, dbhas: actual.record, err }
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
@@ -114,7 +119,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     return this.doWatch(thingWatchScope.parse(scope), ({ record, world }) => {
       const val = noticedThingOf(record)
       if (val === null) { return }
-      onNotice({ act: (val.am === 'a') ? 'gotlive' : 'gotgone', val, world })
+      onNotice({ ok: true, act: (val.am === 'a') ? 'gotlive' : 'gotgone', val, world })
     }, onBadNews)
   }
   // --

@@ -196,7 +196,7 @@ describe("MemoryVaultDB.watch(scope, onNotice)", () => {
     vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) })
     await vaultDB.tryWriteThing(TH.birthAskOf())
     await TH.eventually(() => notices.length === 1)
-    expect(notices[0]).to.deep.equal({ act: 'gotlive', val: TH.gateThingOf(), world: null })
+    expect(notices[0]).to.deep.equal({ ok: true, act: 'gotlive', val: TH.gateThingOf(), world: null })
   })
 
   it("hears nothing of another bank, nor of a refused write", async () => {

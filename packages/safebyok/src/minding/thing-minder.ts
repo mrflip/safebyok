@@ -5,7 +5,7 @@ import { noop } from 'es-toolkit'
 import { Errors, Outcome, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type GetThingAsk, type ListThingsAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, KindChecks, ShellCited, checkedGetThingAsk, loggableAskOf, modelkindOf } from '../storage/shapes-thing'
-import type { BadAnswer, GoodAnswer, ThingNotice, VaultDB } from '../storage/vault-db'
+import type { BadAnswer, GetThingAnswer, GoodAnswer, ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import { type MinderAskOpts, type MinderBank, type MinderGetAskOpts, type QueryCacheOpts, type ThingPins, minderAskOpts, minderGetAskOpts, minderMakeArgs, thingPins } from './shapes-minder'
 
 // == [Answers]: VoidSentinel, TSQAnswer
@@ -91,7 +91,7 @@ export class ThingMinder {
   /** Watch the bank, handing the cache what each notice says is stored, and `onBadNews` the trouble the watch reports. */
   #startVaultDBWatch(): void {
     this.#unwatch = this.#vaultDB.watch(this.scope, (notice: ThingNotice) => {
-      this.#doDeliverRecord(notice.val)
+      this.#deliver(notice)
     }, this.#onBadNews)
   }
 
@@ -171,7 +171,13 @@ export class ThingMinder {
   }
   // --
 
-  // == [VaultDB->Minder Delivery]: #doDeliverSeed, #doDeliverRecord
+  // == [VaultDB->Minder Delivery]: #deliver, #doDeliverSeed, #doDeliverRecord
+
+  /** Hand the cache the Thing `answer` says is stored: a good answer's `val`, or a refusal's `dbhas`. */
+  #deliver(answer: ThingNotice | GetThingAnswer | WriteThingAnswer): void {
+    const record = answer.ok ? answer.val : answer.dbhas
+    if (record !== null) { this.#doDeliverRecord(record) }
+  }
 
   // Invalidated, not refetched: the next get, or a listener's next look, fetches it whole.
   /** Hand the cache `record`, a listed child, and mark its entry stale where it now holds a sparse record. */

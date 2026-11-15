@@ -85,7 +85,7 @@ async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<Gat
 }
 
 /** A watch notice of `gate`, as the vaultDB sends one. */
-function noticeOf(gate: GateThing): ThingNotice { return { act: (gate.am === 'a') ? 'gotlive' : 'gotgone', val: gate, world: null } }
+function noticeOf(gate: GateThing): ThingNotice { return { ok: true, act: (gate.am === 'a') ? 'gotlive' : 'gotgone', val: gate, world: null } }
 
 /** The revtok of what the minder holds for the main gate, or undefined for nothing or the Void Sentinel. */
 function revtokAt(minder: ThingMinder): string | undefined {

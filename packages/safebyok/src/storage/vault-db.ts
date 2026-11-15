@@ -19,8 +19,8 @@ export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, ac
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
 
-/** The answer to `tryGetThing`: the Thing stored, live or a tombstone, or null for none. */
-export type GetThingAnswer   = Answer<Thing | null, EX.GotAct>
+/** The answer to `tryGetThing`: the Thing stored, live or a tombstone, under `gotlive` or `gotgone`, or null under `gotvoid`. */
+export type GetThingAnswer   = GoodAnswer<Thing, 'gotlive' | 'gotgone'> | GoodAnswer<null, 'gotvoid'> | BadAnswer
 /** The answer to `tryWriteThing`: the Thing as the store reports writing it, or under `passed` the live one found. */
 export type WriteThingAnswer = Answer<Thing, EX.PutAct | EX.DelAct>
 
@@ -41,7 +41,7 @@ export type ListThingsAnswer<RecordT extends Thing = Thing> =
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
 /** A Thing a watch saw change, as a get would answer it. */
-export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'act' | 'val' | 'world'>
+export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val' | 'world'>
 // --
 
 // == [What a store reports]: Actual, ListThingsActual, BirthBankActual
