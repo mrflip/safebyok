@@ -105,3 +105,9 @@ fell only from 679 to 674 doc-block lines. The longest blocks lost a clause or a
 6. `ThingMinder.#tsqListAskOf` is unused (`// @ts-expect-error -- unread until tryList`): dead code until `tryList` exists.
 7. `src/index.ts`'s header comment says "the front door" (a named slop trope in `notes/gallant-docblocks.md`), and its line wrapping is broken mid-sentence ("`safebyok/storage` the vaultDB. What a host needs that / safebyok-big defines ..."). It is a `//` comment, so I left it.
 8. The base checkout `/workspace/byok` has an uncommitted change to `packages/safebyok/src/minding/thing-minder.ts`. The worktree was cut from the commit and does not have it, so my doc edits to that file may conflict with it.
+
+## After the rebase onto #707 (2026-11-15)
+
+Rebased onto PR #707, which rewrote much of `storage/`. Where #707 changed a member, its own doc block was kept: `Listener`
+(now `Watcher`), `demandPolicies` (now `policyRefusalOf`), `demandReplaceable` (removed), `BankRootsFetched` (moved),
+`MaxLabelsUnder` (a box has at most one label). The rewrites of those members listed above are gone.
