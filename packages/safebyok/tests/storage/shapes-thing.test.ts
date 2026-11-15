@@ -171,6 +171,11 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
     }
   })
 
+  it("accepts a box's birth citing its whole shell, as a bank gives it", () => {
+    const ask = TH.birthAskOf(box, TH.boxShellOf({ labelpath: box.labelpath, label: box.label }))
+    expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
+  })
+
   it("accepts the bank's and the root box's births, and a further gate's deletion", () => {
     const second = TH.gateThingOf({ labelpath: 'gate/second', label: 'second', lifepath: `${Life0}/${Life0}` })
     const secondGone = TH.nextOf(second, { am: 'x', lifeseq: lifeseqOf(1), lifepath: `${Life0}/${lifeseqOf(1)}` })

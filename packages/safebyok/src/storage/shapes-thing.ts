@@ -176,7 +176,9 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
   const gateCited    = obj({ ...exactPartialOf(gateBase.shape), ...thingCited.shape }).strict()
     .refine(isShellWhole,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
-  const boxCited     = obj({ ...exactPartialOf(boxLive.shape), ...thingCited.shape }).strict()
+  // A box's shell, as a bank gives it, carries the shell's lifeseq.
+  const lifeseqOrShell = union([lifeseq, lit(ShellLifeseq)])
+  const boxCited     = obj({ ...exactPartialOf(boxLive.shape), lifeseq: exactOptional(lifeseqOrShell), ...thingCited.shape }).strict()
     .refine(isShellWhole,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
@@ -186,7 +188,7 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
     labelpath:      boxLive.shape.labelpath,
     fmt:            lit(BoxThingFormat),
     revseq:         thingCited.shape.revseq,
-    lifeseq:        union([lifeseq, lit(ShellLifeseq)]),
+    lifeseq:        lifeseqOrShell,
     lifepath:       thingCited.shape.lifepath,
   })
     .refine(isLabelLast,    Phrases.LabelNotLast)
