@@ -224,7 +224,7 @@ export class ConvexBankDB extends DB.AdapterBankDB {
 /** Convex's size limit for one document, in bytes. */
 const ConvexDocumentSize = 1_048_576
 
-// Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
+// Accepts a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `thunk`, converting anything it throws into a safebyok refusal. */
 async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): Promise<ValT> {
   try {

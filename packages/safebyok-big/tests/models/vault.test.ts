@@ -37,7 +37,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     expect(listing.recordOf(vault)).to.deep.equal(demandStored())
   })
 
-  it("refuses a device in place of its bank, and an option it does not take", async () => {
+  it("refuses a device in place of its bank, and an option it does not accept", async () => {
     const born = await makeBornVault()
     const { bank } = born
     const { bankDB, maxMillisSinceRefresh } = listingOptsOf(born)

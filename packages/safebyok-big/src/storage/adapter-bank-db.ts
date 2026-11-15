@@ -325,7 +325,7 @@ export abstract class AdapterBankDB implements BankDB {
   // Each is one atomic step: fetch the rows the classifier needs, classify them, and when `isWriteAct(act)` is true, store
   // the record sent and return the row the datastore reports storing in place of the one fetched, checked by the bank
   // classifier's `writtenBankOf`, `writtenGateOf`, `writtenVaultOf` or `writtenBoxOf`. A store that can run code of its own
-  // may take the whole step there.
+  // may run the whole step there.
 
   /** In one step: fetch the bank row, its `main` gate row and every vault row of the bank, and return `this.classifyEnsureBank(ask, fetched)`. */
   protected abstract doEnsureBank(ask: BankEnsureAsk): Awaitable<BankEnsureStored>

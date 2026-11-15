@@ -202,7 +202,7 @@ export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseSto
   }
 })
 
-/** A gate as a stored wayin's proving takes it: its bank's stamp, its own stamp, and its wayins. */
+/** A gate as a stored wayin's proving is given it: its bank's stamp, its own stamp, and its wayins. */
 export type StampedGate = Z.infer<typeof stampedGate>
 
 /** What `Proving.buildWayin` is passed for a wayin over a bankKey made new: the type of `NOVEL`. */
@@ -360,7 +360,7 @@ export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
   askUser:         custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
-/** What an attempt takes, by the kind of gating. */
+/** What an attempt is given, by the kind of gating. */
 export type CleartextsForGatingkind = {
   build_bank:         Z.input<typeof bankBuildCleartexts>
   unlock_bank:        Z.input<typeof bankUnlockCleartexts>

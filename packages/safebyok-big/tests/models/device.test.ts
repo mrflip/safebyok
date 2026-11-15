@@ -74,7 +74,7 @@ describe("Device.make", () => {
     TH.expectSyncRefusal(() => makeBankWorld().deviceOn({ gates: gates as never }), 'bad_option')
   })
 
-  it("takes a fraction of a minute to the nearest millisecond, and Infinity as ForeverMillis", () => {
+  it("rounds a fraction of a minute to the nearest millisecond, and turns Infinity into ForeverMillis", () => {
     const device = makeBankWorld().deviceOn({ autolockMinutes: 1 / 7, boxRefreshMinutes: 0.000025 })
     expect([device.leaseMillis, device.boxRefreshMillis]).to.deep.equal([8571, 2])
     expect(makeBankWorld().deviceOn({ autolockMinutes: Infinity }).leaseMillis).to.eq(ForeverMillis)

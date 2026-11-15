@@ -23,7 +23,7 @@ The op is get, put or del. Vault ops use the same three on the vault row.
   - `repl` -- replaces it
   - `get` -- returns it unchanged (`passed`)
   - `fail` -- refuses (`camped`)
-- del takes no flags.
+- del has no flags.
 - **`vault_tok`, `box_tok`**: unguessable random strings the device mints, so a token names one life of the row. A new one is minted when the row is created (over void or a tombstone) and again when it is deleted, so a tombstone carries a token of its own. A write over a live row that leaves it live keeps the token. Separately, every write (create, update, delete) gives the row a new revision: a fresh `revision_tok` and `revision_seq + 1`. A box records its vault's `vault_tok` but never the vault's revision, and a vault write never touches its boxes' revisions. The token columns in the tables compare revision tokens.
 - The `b_tok` column:
   - `eq` -- the stored token is the one you cited
@@ -74,7 +74,7 @@ It is a refusal: this request wrote nothing, and the row stored under its propos
 
 ### Soft caps
 
-A bankDB may cap how many box rows a vault life has, live and tombstone together, and refuse with `vault_full` a put that would add one. Only a `born` adds a row. A put over a box's own tombstone (`reborn`), a replace and a del reuse the row already there, so none of them is refused for the cap, and deleting a box frees no room. A vault created anew starts its life with no box rows. The cap is soft. The count behind it is not taken transactionally and is not guaranteed accurate: on some datastores an exact count would mean a lock on every writer. So a vault life may come to have more box rows than its cap, and a put may refuse a little under it. Where the cap's check falls among the other checks is not promised either: a put that would refuse for another reason may refuse `vault_full` instead, or the other way around. A host that requires a hard cap installs, and migrates, triggers of its own in its datastore.
+A bankDB may cap how many box rows a vault life has, live and tombstone together, and refuse with `vault_full` a put that would add one. Only a `born` adds a row. A put over a box's own tombstone (`reborn`), a replace and a del reuse the row already there, so none of them is refused for the cap, and deleting a box frees no room. A vault created anew starts its life with no box rows. The cap is soft. The count behind it is not made transactionally and is not guaranteed accurate: on some datastores an exact count would mean a lock on every writer. So a vault life may come to have more box rows than its cap, and a put may refuse a little under it. Where the cap's check falls among the other checks is not promised either: a put that would refuse for another reason may refuse `vault_full` instead, or the other way around. A host that requires a hard cap installs, and migrates, triggers of its own in its datastore.
 
 The adapter counts the vault life's box rows just before it writes a new box row, and the classifier returns `vault_full` when that count is at the cap. A write already made is never refused for the cap, whatever the count is afterwards. The cap's place among the other refusals is not promised (*Operational Checks*).
 
@@ -422,7 +422,7 @@ overwrites one.
 
 Three roles take part in every call, and each rule below names the one it binds.
 
-- **bankDB**: the core's `BankDB`, the interface a model calls. It checks the request's shape before anything is fetched (`bad_record`), and it answers: `act`, `val`, `parent`, `dbhas`. It owns the **classifier**, the shared pure function that takes the request and the rows fetched, returns the `act`, and says what to write, if anything. Every judgment in the tables above is the classifier's.
+- **bankDB**: the core's `BankDB`, the interface a model calls. It checks the request's shape before anything is fetched (`bad_record`), and it answers: `act`, `val`, `parent`, `dbhas`. It owns the **classifier**, the shared pure function that is given the request and the rows fetched, returns the `act`, and says what to write, if anything. Every judgment in the tables above is the classifier's.
 - **adapter**: the package that carries a bankDB call to one kind of datastore. It opens the atomic unit, fetches the rows, passes them to the classifier, writes what the classifier says to write, and returns the rows: as fetched, and each row it wrote as the datastore reports storing it. It judges nothing.
 - **datastore**: the engine that stores the vault and box rows: Postgres, IndexedDB, a host's backend. It must offer a unique key per scope, and an atomic unit that spans a fetch and a write. It may also enforce these same invariants and checks a second time, with constraints, foreign keys or stored procedures. That is allowed but never required. It decides no outcome in the tables, and its details are outside this note.
 
@@ -490,7 +490,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - Vault replace stores the proposed revision and leaves `vault_tok` unchanged.
 - No write copies a new `vault_tok` onto existing boxes. A foreign key from (box.`vault_scope`, box.`vault_tok`) to the vault, where declared, never cascades updates.
 - A put or del writes at most once (C15): once its proposed revision is stored, or its expected revision is no longer the stored one, it writes nothing.
-- A put that would be `born` may refuse `vault_full` under the bankDB's soft cap, which counts the vault life's box rows, tombstones among them. The count is an estimate, taken outside any lock, and the check may run at any point in the atomic unit (*Soft caps*).
+- A put that would be `born` may refuse `vault_full` under the bankDB's soft cap, which counts the vault life's box rows, tombstones among them. The count is an estimate, made outside any lock, and the check may run at any point in the atomic unit (*Soft caps*).
 - A refusal never writes.
 
 ### Responding

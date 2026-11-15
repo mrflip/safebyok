@@ -30,7 +30,7 @@ function passkeyRecord(overrides: Record<string, unknown> = {}): Record<string, 
 }
 
 describe("Wayin.make(record)", () => {
-  it("takes a wayin record of either kind", () => {
+  it("accepts a wayin record of either kind", () => {
     expect(Wayin.make(passphraseRecord() as never).wayinkind).to.eq('passphrase')
     expect(Wayin.make(passkeyRecord() as never).wayinkind).to.eq('passkey')
   })

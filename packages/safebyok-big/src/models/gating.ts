@@ -85,7 +85,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     Object.freeze(this)
   }
 
-  // The package exports Gating as a type only: these take the bank's unlockByProving, which a gating hands a proving.
+  // The package exports Gating as a type only: these are given the bank's unlockByProving, which a gating hands a proving.
   /** Ask the user to prove they may make the `gatingkind` change to `bank`, make it, and resolve the bank. */
   static async launchOn(bank: Bank, gatingkind: BankGatingkind, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
     const checked = GX.gatingLaunchOnArgs.parse({ gatingkind, bank, unlockByProving, askUser })

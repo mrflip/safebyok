@@ -21,7 +21,7 @@ Many entries, one chute: once an answer or a record has entered, nothing downstr
 | the bankDB's watch                                   | `deliverNotice`: its parent, then `deliverRecord`           |
 | `Bank.receiveParent`, `Vault.receiveParent`, `BoxListing.#shellFor` | `deliverRecord(record)`                      |
 
-`deliverAnswer` takes an answer in four steps, each with one job:
+`deliverAnswer` delivers an answer in four steps, each with one job:
 
 1. **The parent.** The row above, beside the answer, is delivered first: a bank row to the bank, a vault row to the
    vault listing (*The parent*, below).
@@ -60,7 +60,7 @@ Each test compares the record received (`rcvd`) with the record of the instance 
 | L5  | At one `revision_seq` there is one row: one `revision_tok`, one life token, live or gone.                                                   | F4 to F6                          |
 | L6  | An instance whose record is gone leaves the listing's list (its snapshot), and is kept at its scope only to judge later rows against and to receive a new life. It drops what it has: a box its exposed whisper; a vault the box listing of its live life; a bank its lease, and it is disabled for good and no longer the device's. | `receiveRecord` of a tombstone    |
 | L7  | A change to the listing's list is followed by one new snapshot, and its listeners are told once; a delivery that leaves the list as it was tells none. | `doDeliverRecord`                 |
-| L8  | Nothing is received under a bank that is not enabled (the device is disabled, or the bank is no longer the device's), nor at a box listing whose vault has taken another life. | F1 |
+| L8  | Nothing is received under a bank that is not enabled (the device is disabled, or the bank is no longer the device's), nor at a box listing whose vault has adopted a row of another life. | F1 |
 | L9  | An instance is marked refreshed only when storage answered a record not older than its own, and its record is then *whole*.                 | every `mod` but `older`           |
 
 ## What an answer carries
@@ -96,7 +96,7 @@ First match wins. F and N2 rows refuse; every other row is a plan of `making` an
 
 | #   | when                                                                                        | `making` | `mod`   | the instance afterwards                                                                |
 | --- | ------------------------------------------------------------------------------------------- | -------- | ------- | -------------------------------------------------------------------------------------- |
-| F1  | the listing is not enabled: its bank is not, or the parent ended it; at a box listing, its vault has taken another life |  |  | throws `disabled`                                                    |
+| F1  | the listing is not enabled: its bank is not, or the parent ended it; at a box listing, its vault has adopted a row of another life |  |  | throws `disabled`                                                    |
 | N1  | `rcvd` is `null`, `kept` is `none`                                                          |          |         | nothing to deliver                                                                     |
 | N2  | `rcvd` is `null`, `kept` is *live*                                                          |          |         | throws `record_conflict` (`nothingStoredWhereLive`)                                    |
 | N3  | `rcvd` is `null`, `kept` is `gone`                                                          | `listed` | `same`  | as it was, marked refreshed                                                            |
@@ -115,7 +115,7 @@ F1 is checked on entry and again once the parent is delivered. N1 to F2 are read
 `recordDeliveringOf`, the one table every entry shares.
 
 A Vault object stands for its scope through its lives, as a Box and a Gate do, so a vault listing adopts where a box
-listing does (R2). A Bank object is one life of the bank: it takes the row of another life as any instance does, and
+listing does (R2). A Bank object is one life of the bank: it adopts the row of another life as any instance does, and
 answers nothing more. A bank built again is a new Bank, in a new bank listing, which the device makes at its next
 `ensureBank` once the Bank it has no longer answers. A row of an earlier life that arrives late is `older` (R1) at any listing, since the seq at a scope goes on
 across a rebirth (`notes/answer-contract.md`, *Writing*).

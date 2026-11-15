@@ -91,7 +91,7 @@ describe("BX.boxRecord and BX.boxSparse", () => {
       expect(BX.boxSparse.parse({ ...sparse, extra: 1 })).to.deep.equal(sparse)
     })
 
-    it("takes its fields from a Box", () => {
+    it("picks its fields from a Box", () => {
       const box = boxListingOf(mw).deliverRecord(full)
       expect(BX.boxSparse.parse(box)).to.deep.equal(sparse)
     })

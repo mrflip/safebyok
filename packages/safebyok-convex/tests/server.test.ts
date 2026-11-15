@@ -107,7 +107,7 @@ describe("SafebyokBankComponent.api, with the host's getUserId", () => {
     [() => Promise.resolve(null),      'treats a null user id as no one'],
     [() => Promise.resolve(undefined), 'treats an undefined user id as no one'],
     [() => Promise.resolve(''),        'treats an empty user id as no one'],
-    [() => null,                       'takes a getUserId that answers synchronously'],
+    [() => null,                       'accepts a getUserId that answers synchronously'],
   ] as const
 
   for (const [getUserId, blurb] of SignedOutCases) {

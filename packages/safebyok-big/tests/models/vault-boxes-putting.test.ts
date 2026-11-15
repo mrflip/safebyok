@@ -29,13 +29,13 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     expect(tryPutBox).toHaveBeenCalledOnce()
   })
 
-  it("takes a sidecar of {} where left out", async () => {
+  it("puts a sidecar of {} where left out", async () => {
     const { vault } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper })
     expect(box.sidecar).to.deep.equal({})
   })
 
-  it("takes a whisper of {} where left out, and it opens under a real seal", async () => {
+  it("puts a whisper of {} where left out, and it opens under a real seal", async () => {
     const { vault, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
@@ -132,7 +132,7 @@ describe("a void instance, then a put: no beginWatch, no fetch", () => {
     expect(tryGetBox).not.toHaveBeenCalled()
   })
 
-  it("with a sidecar alone, writes an empty whisper at seq 0, and the same instance takes a whisper after", async () => {
+  it("with a sidecar alone, writes an empty whisper at seq 0, and the same instance accepts a whisper after", async () => {
     const { vault, tryGetBox } = await makeWorld()
     const shell = vault.boxListing.puttable({ ...vault.scope, boxlabel })
     await expect(shell.put({ sidecar: Sidecar })).resolves.to.eq(shell)

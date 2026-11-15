@@ -84,7 +84,7 @@ Hand `bankDB` to the core, as its README's *A host* shows.
   deleting a box frees no room. Like every bankDB's, it is a soft cap. This adapter currently enforces it exactly,
   since each put is counted in the mutation that stores it, but do not rely on that. A replacement, a delete, and a
   box put again over its own tombstone are never refused for it.
-* **`maxRecordSizeEst`**, optional, as every bankDB takes it: 5,600 bytes if left out, at most Convex's 1 MiB document.
+* **`maxRecordSizeEst`**, optional, as every bankDB accepts it: 5,600 bytes if left out, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the bank once the Convex client is authenticated (in React, once
 `useConvexAuth()` says so): a call made before then refuses as `identity_revoked`.
@@ -168,7 +168,7 @@ const host = app.defineModules({ safebyokBank: new SafebyokBankComponent(app.com
 ## Testing your own client code
 
 `safebyok-convex/testing` is a Convex deployment in memory that the real Convex clients reach over
-a fake WebSocket. `fakeDeployment(host)` takes a host like the one above.
+a fake WebSocket. `fakeDeployment(host)` accepts a host like the one above.
 
 ```ts
 import { ConvexBankDB } from 'safebyok-convex'

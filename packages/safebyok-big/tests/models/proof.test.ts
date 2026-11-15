@@ -29,7 +29,7 @@ afterEach(expectNoBadNews)
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
-/** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React takes them, painting `view`.
+/** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React accepts them, painting `view`.
  * A listener told with nothing new, or a snapshot that changed with no listener told, fails the next `expectRenders`.
  */
 function mountComponent<SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) {
@@ -476,7 +476,7 @@ describe("the proof", () => {
     await vault.beginWatch()
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key, gemini_api_key'])
 
-    // It replaces the passphrase: this device stays unlocked and hears the new gate; a later unlock takes the new passphrase.
+    // It replaces the passphrase: this device stays unlocked and hears the new gate; a later unlock accepts the new passphrase.
     phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
     await phoneBank.maingate.replacePassphrasePrompt()
     await ticks(1)

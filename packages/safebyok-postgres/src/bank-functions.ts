@@ -10,8 +10,8 @@ export const BankFunctionsSql = `-- safebyok-postgres: the functions PostgresBan
 -- function for every gate verb.
 -- A function never overwrites a row whose fmt differs from the record's, and never stores a row under a row above
 -- whose fmt is not this version's. A row in a later format is one this version of safebyok cannot read.
--- Each write function takes the record to store and the row the caller expects, both as JSON. The bank functions
--- also take the bank's main gate record, and the box functions the cap on box rows.
+-- Each write function is given the record to store and the row the caller expects, both as JSON. The bank functions
+-- are also given the bank's main gate record, and the box functions the cap on box rows.
 --
 -- A gate, vault or box write reads the row above it without a lock. This is on purpose: a lock on the row above would
 -- make every writer under one bank or vault wait its turn, to guard against a rare race. Three things follow.
@@ -20,7 +20,7 @@ export const BankFunctionsSql = `-- safebyok-postgres: the functions PostgresBan
 --   tidyGone, or the end of its bank's life, deletes it.
 -- - A box write counts the vault life's box rows without a lock, so writers racing to add their first box may pass the
 --   cap together. The cap is soft, and tidyGone does not trim it.
--- - The foreign key of a new gate, vault or box row takes a key-share lock on its bank row, which no write to the bank
+-- - The foreign key of a new gate, vault or box row acquires a key-share lock on its bank row, which no write to the bank
 --   row waits on.
 -- Each statement sees what was committed when it started. So when nothing is stored, the rows returned are the rows
 -- as they stand after any wait on another writer.
@@ -306,7 +306,7 @@ END $$;
 
 -- Store a box's first record, if no box row exists at its address in its vault's life, its vault is live in that
 -- life, and the life has room under the cap. The cap counts every box row of the vault life, live or tombstone.
--- boxcount is that count, taken without a lock. expected_row is not read.
+-- boxcount is that count, made without a lock. expected_row is not read.
 CREATE OR REPLACE FUNCTION safebyok_birth_box(new_record jsonb, expected_row jsonb, maxboxes integer)
 RETURNS TABLE (ok boolean, act text, parent jsonb, box jsonb, presence text, boxcount integer)
 LANGUAGE plpgsql AS $$
@@ -349,7 +349,7 @@ END $$;
 -- Store a box's next record over the expected row, live or a tombstone: a replace, a del, or a put over a tombstone.
 -- The record is stored only if the stored row has the expected revision_tok, am and box_tok, the record's
 -- revision_seq is one past the row's, and the vault is live in the box's life. A tombstone never replaces a tombstone.
--- It adds no box row, so the cap does not apply. It takes maxboxes only so that both box functions take the same
+-- It adds no box row, so the cap does not apply. It is given maxboxes only so that both box functions have the same
 -- arguments, and does not read it.
 CREATE OR REPLACE FUNCTION safebyok_revise_box(new_record jsonb, expected_row jsonb, maxboxes integer)
 RETURNS TABLE (ok boolean, act text, parent jsonb, box jsonb, presence text)

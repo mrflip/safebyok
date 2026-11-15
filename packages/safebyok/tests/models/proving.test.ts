@@ -205,7 +205,7 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", ()
     expect(TH.isZeroed(short) && TH.isZeroed(long)).to.be.true
   })
 
-  it("takes key bytes handed back as a view into a larger buffer, zeroing that view alone", async () => {
+  it("accepts key bytes handed back as a view into a larger buffer, zeroing that view alone", async () => {
     const buffer = new Uint8Array(48).fill(9)
     buffer.set(Crypto.randomBytes(32), 8)
     await novelOverHanded(() => buffer.subarray(8, 40))
@@ -356,7 +356,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
     expect(Consts.isGuarded({ ...guarded })).to.be.false
   })
 
-  it("takes any label a host chooses that fits the interface", async () => {
+  it("accepts any label a host chooses that fits the interface", async () => {
     const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf' })
     const proving = await novelPassphrase({ ...TH.provingDeviceOf(), keyDeriver: guarded })
     const wayin = await proving.buildWayin(NOVEL)

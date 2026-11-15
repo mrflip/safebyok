@@ -12,7 +12,7 @@ import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
 describe("wayinkind", () => {
-  it("takes each kind of wayin, and refuses any other", () => {
+  it("accepts each kind of wayin, and refuses any other", () => {
     expect(GX.wayinkind.safeParse('passkey').success).to.be.true
     expect(GX.wayinkind.parse('passphrase')).to.eq('passphrase')
     TH.expectSyncRefusal(() => GX.wayinkind.parse('hunter2'))
@@ -22,7 +22,7 @@ describe("wayinkind", () => {
 describe("guardedLogger", () => {
   const bare = { log: () => undefined, warn: () => undefined, error: () => undefined }
 
-  it("takes a logger parseLogger guarded", () => {
+  it("accepts a logger parseLogger guarded", () => {
     const guarded = parseLogger(bare)
     expect(GX.guardedLogger.parse(guarded)).to.eq(guarded)
   })
@@ -95,7 +95,7 @@ describe("passkeyAnswer", () => {
     expect(checked.prfBytes).to.eq(answer.prfBytes)
   })
 
-  it("takes bytes made in another realm, an iframe's or a test's jsdom, judging them by their tag", async () => {
+  it("accepts bytes made in another realm, an iframe's or a test's jsdom, judging them by their tag", async () => {
     const answer = await TH.passkeyOf('laptop')
     const foreign = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
     expect(foreign instanceof Uint8Array).to.be.false
@@ -128,7 +128,7 @@ describe("passkeyAnswer", () => {
 })
 
 describe("freshPasskeyAnswer", () => {
-  it("takes a passkey's answer over a fresh salt", async () => {
+  it("accepts a passkey's answer over a fresh salt", async () => {
     const answer = await TH.passkeyOf('laptop')
     expect(GX.freshPasskeyAnswer.parse(answer)).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
   })

@@ -134,7 +134,7 @@ export function makeDeviceDB() {
 }
 export type FakeDeviceDB = ReturnType<typeof makeDeviceDB>
 
-/** What a test may say of a {@link makeVaultWorld} world: the host's own functions and logger, as `Device.make` takes them. */
+/** What a test may say of a {@link makeVaultWorld} world: the host's own functions and logger, as `Device.make` accepts them. */
 export type VaultWorldGiven = {
   keyDeriver?:       KeyDeriver | undefined
   strengthChecker?:  StrengthChecker | undefined

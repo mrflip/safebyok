@@ -18,7 +18,7 @@ export const capacity = zodOutputToConvex(DB.capacity)
 
 // == [Arguments]: askArgs, putBoxArgs, watchRowsArgs
 
-/** The arguments of a bankDB function that takes only an ask. */
+/** The arguments of a bankDB function whose only argument is an ask. */
 export const askArgs = { ask: v.any() }
 
 /** The arguments of `putBox`: its ask, and an optional soft cap on the vault life's box rows, tombstones included. */

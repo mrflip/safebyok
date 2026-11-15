@@ -258,7 +258,7 @@ describe("box.put checks its patch before it checks the lock", () => {
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("takes only the whisper and sidecar from a full patch, ignoring other fields", async () => {
+  it("uses only the whisper and sidecar from a full patch, ignoring other fields", async () => {
     const box = builtOf(fullBoxRecord())
     await box.put({ ...fullBoxRecord(), sidecar: { note: 'new' }, whisper: { apiKey: 'sk-test-0001' }, box_key_wrapped: undefined })
     expect(box._cheat_central).to.include({ revision_seq: 2, am: 'a' })

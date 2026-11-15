@@ -225,7 +225,7 @@ const ScopeCases = [
 ] as const
 
 describe("bankedVaultScope", () => {
-  it("takes a vaultlabel alone, or the names a Vault object carries, leaving the rest", () => {
+  it("accepts a vaultlabel alone, or the names a Vault object carries, leaving the rest", () => {
     expect(CX.bankedVaultScope.parse({ vaultlabel: 'main' })).to.deep.equal({ vaultlabel: 'main' })
     expect(CX.bankedVaultScope.parse({ ...scope, vault_tok: 'tok', lock: () => null })).to.deep.equal(scope)
   })
@@ -259,7 +259,7 @@ const SaltCases = [
 
 describe("CX.salt_b64", () => {
   for (const [candidate, expected, blurb] of SaltCases) {
-    it(`${expected ? 'takes' : 'refuses'} ${blurb}`, () => { expect(CX.salt_b64.safeParse(candidate).success).to.eq(expected) })
+    it(`${expected ? 'accepts' : 'refuses'} ${blurb}`, () => { expect(CX.salt_b64.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("refuses with the sentence that says what a passphrase salt is", () => {

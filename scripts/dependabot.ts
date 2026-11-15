@@ -71,7 +71,7 @@ export function changesetText(changes: readonly RuntimeDepChange[]): string | un
   if (changes.length === 0) { return undefined }
   const pkgnames = [...new Set(changes.map((change) => change.pkgname))]
   const badName = pkgnames.find((pkgname) => ! PackageName.test(pkgname))
-  if (badName !== undefined) { throw new Error('dependabot: a package name is not one npm would take; no changeset written.') }
+  if (badName !== undefined) { throw new Error('dependabot: a package name is not one npm would accept; no changeset written.') }
   const frontmatter = pkgnames.map((pkgname) => `"${pkgname}": patch`).join('\n')
   const lines = changes.map((change) => {
     const ante = change.ante === undefined ? '(none)' : `\`${plain(change.ante)}\``

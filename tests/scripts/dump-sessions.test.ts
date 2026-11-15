@@ -43,7 +43,7 @@ describe('scripts/dump-sessions.sh', () => {
     })
   })
 
-  it('takes the session records it names, and says what it wrote', () => {
+  it('archives the session records it names, and says what it wrote', () => {
     plant(home, '.claude/projects/-workspace-byok/abc.jsonl')
     plant(home, '.claude/projects/-workspace-byok/abc/subagents/agent-1.jsonl')
     plant(home, '.claude/file-history/abc/snapshot')
@@ -92,7 +92,7 @@ describe('scripts/dump-sessions.sh', () => {
     expect(dumpFilenames()).toHaveLength(1)
   })
 
-  it('starts a later dump from where the last one ended, taking only what changed since', async () => {
+  it('starts a later dump from where the last one ended, archiving only what changed since', async () => {
     plant(home, '.claude/projects/old.jsonl')
     run()
     // The stamps are whole seconds: the next change must fall in a later one.
@@ -112,7 +112,7 @@ describe('scripts/dump-sessions.sh', () => {
     const volume = volumeOf(dumpFilenames()[0]!)
     const later = path.join(dumps, `session-dump-${volume}-19700101T000000Z-20991231T000000Z.tar.gz`)
     writeFileSync(later, '')
-    // After that dump's end, everything here counts as already taken.
+    // After that dump's end, everything here counts as already dumped.
     expect(run()).toContain('no dump written')
   })
 

@@ -1,6 +1,6 @@
 # safebyok-fastkey
 
-A [safebyok](../safebyok) key deriver that runs Argon2id through WebAssembly. It takes the same
+A [safebyok](../safebyok) key deriver that runs Argon2id through WebAssembly. It accepts the same
 keyDeriverSpecs and labels as the core's pure-JavaScript deriver, derives the same bytes, and runs
 about four times faster.
 

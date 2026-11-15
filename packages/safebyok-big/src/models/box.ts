@@ -81,7 +81,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this.#exposed
   }
 
-  // Taken in the order `whisper` picks its bag.
+  // Listed in the order `whisper` picks its bag.
   /** Whether {@link whisper} shows the whisper, or why it does not:
    * - `'unexposed'` -- nothing is exposed, whether or not the bank is locked
    * - `'locked'`    -- exposed, but hidden while the bank is locked
@@ -365,7 +365,7 @@ function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
 // The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still opens.
 /** The full record of `base`, with `sidecar` in the clear and `whisper` sealed through `vault`.
  * The whisper is ciphered, as JSON text, under a fresh boxKey. Both are bound to the stamps of the box, its vault and
- * its bank: they open only for this revision of this box, unchanged. Only the sparse fields of `base` are taken.
+ * its bank: they open only for this revision of this box, unchanged. Only the sparse fields of `base` are used.
  */
 async function sealedRecordOf(vault: Pick<Vault, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> {
   const sparse = BX.boxSparse.parse(base)

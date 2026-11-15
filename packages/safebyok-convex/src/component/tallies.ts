@@ -58,7 +58,7 @@ export function tidyBudget(): Budget { return { count: MaxTidiedBoxes, size: Max
 /** True once `budget` is spent. */
 export function isSpent({ count, size }: Budget): boolean { return (count <= 0) || (size <= 0) }
 
-/** Take one document of `size` bytes from `budget`. */
+/** Spend one document of `size` bytes from `budget`. */
 export function spend(budget: Budget, size: number): void {
   budget.count -= 1
   budget.size -= size

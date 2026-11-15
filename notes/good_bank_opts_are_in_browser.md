@@ -1,6 +1,6 @@
 # The good device options are in `safebyok/browser`, on purpose
 
-`Device.make` takes its `keyDeriver`, `deviceDB` and `strengthChecker` from the host, and gives none
+`Device.make` is given its `keyDeriver`, `deviceDB` and `strengthChecker` by the host, and gives none
 of them a working default. The strength checker's default refuses every passphrase. Good choices
 for a browser (a pinned Argon2id deriver, an IndexedDB deviceDB and the zxcvbn checker) come from a
 subpath of the core, `safebyok/browser`, in one bag: `...browserOpts()`.

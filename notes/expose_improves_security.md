@@ -53,7 +53,7 @@ function TokenField({ box }) {
   the field is empty each read `.value` into a variable.
 * **Controlled components.** Anything that drives an input through its `value` prop is out, including
   most form libraries' default mode.
-* **Hand styling, in part.** A ref-bound `<input>` takes `className` and CSS like any other, and we
+* **Hand styling, in part.** A ref-bound `<input>` accepts `className` and CSS like any other, and we
   ship no styles in any version. The hand work falls on design-system controls that watch `value` for
   a floating label, a character count or a clear button. We haven't tried this against a particular
   library.
@@ -157,7 +157,7 @@ function useAwsForm(box: Box) {
 ```
 
 The fields read blank when the whisper won't show, because a bag has no fields. The host never keeps
-the value in state, writes no lock branch, and has nothing to get wrong at save: `putExposed` takes
+the value in state, writes no lock branch, and has nothing to get wrong at save: `putExposed` is given
 no whisper, and a bag refuses at `put`. What's left to get right is one line, the `unexpose`, and
 without it the exposure lasts until a sweep. Call `box.expose()` from a button after mount, because
 StrictMode's simulated unmount would otherwise unexpose it.

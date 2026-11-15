@@ -263,13 +263,13 @@ export type ModelsWorld = {
   boxscope(boxlabel: string): Boxscope
 }
 
-/** A queue of scripted answers: `take` the next, if any. */
+/** A queue of scripted answers: `dequeue` the next, if any. */
 class Script<CallT> {
   readonly #queue: Scripted<CallT>[] = []
 
   push(...answers: readonly Scripted<CallT>[]): void { this.#queue.push(...answers) }
 
-  take(call: CallT): { scripted: boolean, answer: unknown } {
+  dequeue(call: CallT): { scripted: boolean, answer: unknown } {
     if (this.#queue.length === 0) { return { scripted: false, answer: undefined } }
     const next = this.#queue.shift()
     return { scripted: true, answer: typeof next === 'function' ? next(call) : next }
@@ -299,7 +299,7 @@ export class TestableBankDB extends MemoryBankDB {
   override async tryGetBox(ask: BoxGetAsk) {
     const scope = CX.boxscope.parse(ask)
     this.#calls.push({ verb: 'get', scope, expectedRevisionTok: expectedTokOf(ask.expected) })
-    const { scripted, answer } = this.scripts.get.take({ scope })
+    const { scripted, answer } = this.scripts.get.dequeue({ scope })
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryBankDB['tryGetBox']>>) : super.tryGetBox(ask)
   }
 
@@ -308,7 +308,7 @@ export class TestableBankDB extends MemoryBankDB {
     const { record, expected, ifAbsent, ifPresent } = ask
     const call: PutCall = { record, expectedRevisionTok: expectedTokOf(expected), ifAbsent, ifPresent }
     this.#calls.push({ verb: 'put', ...call })
-    const { scripted, answer } = this.scripts.put.take(call)
+    const { scripted, answer } = this.scripts.put.dequeue(call)
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryBankDB['tryPutBox']>>) : super.tryPutBox(ask)
   }
 
@@ -316,7 +316,7 @@ export class TestableBankDB extends MemoryBankDB {
   override async tryDelBox(ask: BoxDelAsk) {
     const call: DelCall = { scope: CX.boxscope.parse(ask), expectedRevisionTok: expectedTokOf(ask.expected), tombstone: ask.record }
     this.#calls.push({ verb: 'del', ...call })
-    const { scripted, answer } = this.scripts.del.take(call)
+    const { scripted, answer } = this.scripts.del.dequeue(call)
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryBankDB['tryDelBox']>>) : super.tryDelBox(ask)
   }
 
@@ -429,7 +429,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     receiveParent:    (parent) => { calls.push({ verb: 'receiveParent', parent }) },
     ensureTimely: async (maxMillis) => {
       calls.push({ verb: 'ensureTimely', maxMillis })
-      const { scripted, answer } = ensureTimelyScript.take(maxMillis)
+      const { scripted, answer } = ensureTimelyScript.dequeue(maxMillis)
       if (scripted) { await answer }
       return world
     },

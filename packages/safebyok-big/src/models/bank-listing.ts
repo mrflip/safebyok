@@ -96,7 +96,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
 
   protected receiveParent(): void { /* no row sits above a bank */ }
 
-  protected demandOfLife(): void { /* a device takes a bank of any life */ }
+  protected demandOfLife(): void { /* a device accepts a bank of any life */ }
 
   protected scopepathOf(scope: BankScope): string {
     return ['bank', scope.user_id, scope.banklabel].join('^')
@@ -122,7 +122,7 @@ export class BankListing extends Listing<BankScope, BankRecord, BankSparse, Bank
 
   protected doTryPut(): never { throw writtenByOwnVerbs() }
 
-  // A bank's del takes its gates, vaults and boxes with it.
+  // A bank's del deletes its gates, vaults and boxes with it.
   protected tombstoneOver(expected: BankSparse): DelTombstone<BankSparse> {
     return { ...expected, ...SX.nextRevisionOf(expected, nowMillis()), am: 'x', bank_tok: makeLifeTok() }
   }

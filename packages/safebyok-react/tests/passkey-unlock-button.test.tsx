@@ -151,7 +151,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
     expect(await raising).to.include({ ok: true })
   })
 
-  it("takes no press while a passphrase attempt runs", async () => {
+  it("accepts no press while a passphrase attempt runs", async () => {
     const { gating, authenticator } = await dialogFor()
     const running = TH.makePending()
     TH.attemptsOf(gating).mockImplementation(async () => {

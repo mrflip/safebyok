@@ -7,7 +7,7 @@ import { type KeyDeriverSpec, TestLabelPrefix, keyDeriverSpec } from './shapes'
 export interface KeyDeriver {
   /** The name each wayin records for how its key was derived, so a later device derives it alike. */
   readonly key_deriver_label: string
-  /** How many bytes of salt each derivation takes: {@link PassphraseSaltSize}, for every deriver. */
+  /** How many bytes of salt each derivation uses: {@link PassphraseSaltSize}, for every deriver. */
   readonly salt_size:        typeof PassphraseSaltSize
   /** The name of the derivation algorithm, as the supplied derivers carry it (`argon2id`). */
   readonly algorithm?:        string | undefined

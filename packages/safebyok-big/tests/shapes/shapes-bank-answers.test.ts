@@ -97,7 +97,7 @@ describe("WX's answer checks", () => {
     expect(parsed.dbhas).to.deep.equal(gateAt())
   })
 
-  it("takes a damaged box row only under damaged_rows", async () => {
+  it("accepts a damaged box row only under damaged_rows", async () => {
     const bankDB = await bankDBWithBox()
     const listed = crossed(await bankDB.tryListBoxes(boxListAsk)) as { val: { boxes: unknown[], damaged_rows: unknown[] } }
     const damaged = { ...boxQuery, boxlabel: 'Not A Label', am: 'd' }

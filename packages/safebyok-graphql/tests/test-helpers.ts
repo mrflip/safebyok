@@ -161,7 +161,7 @@ export async function makeBankDB(opts: BX.AdapterBankDBOpts & { maxBoxes?: numbe
 /** Return the server behind a bankDB that makeBankDB or makeTwin made. */
 function serverOf(bankDB: GraphQLBankDB): { schema: GraphQLSchema, adapter: PostgresBankDB } {
   const server = serversOf.get(bankDB)
-  if (server === undefined) { throw new Error('This takes a bankDB makeBankDB or makeTwin made') }
+  if (server === undefined) { throw new Error('This needs a bankDB makeBankDB or makeTwin made') }
   return server
 }
 

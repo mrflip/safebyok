@@ -105,7 +105,7 @@ async function makeBankDB(opts: BX.AdapterBankDBOpts & { maxBoxes?: number } = {
 /** Return the route and the server's bankDB behind a browser that makeBankDB or makeTwin made. */
 function serverOf(bankDB: GraphQLBankDB): { route: Route, adapter: PostgresBankDB } {
   const server = serversOf.get(bankDB)
-  if (server === undefined) { throw new Error('This takes a browser makeBankDB or makeTwin made') }
+  if (server === undefined) { throw new Error('This needs a browser makeBankDB or makeTwin made') }
   return server
 }
 

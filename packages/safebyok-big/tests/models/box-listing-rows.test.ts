@@ -54,7 +54,7 @@ describe("BoxListing: an absent box", () => {
       expect(box._cheat_central).to.deep.equal(gone())
     })
 
-    it("takes the world of the answer before it refuses", async () => {
+    it("receives the world of the answer before it refuses", async () => {
       world.mw.willGet(world.mw.answerOf(scope(), null, 'a world'))
       await TH.expectRefusal(boxListingOf(world.mw).get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
       expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', parent: 'a world' }])
@@ -83,7 +83,7 @@ describe("BoxListing: an absent box", () => {
         expect(listing.at(scope())?.am).to.eq(am)
       })
 
-      it(`takes a ${form} box that was listed alive out of the snapshot, then refuses 'absent_box'`, async () => {
+      it(`removes a ${form} box that was listed alive from the snapshot, then refuses 'absent_box'`, async () => {
         const listing = boxListingOf(world.mw)
         const box = listing.deliverRecord(fullBoxRecord())
         seedTombstone()

@@ -60,7 +60,7 @@ export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok,
  */
 export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
 
-/** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */
+/** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver is given beside the passphrase. */
 export type PassphraseSalt = Z.infer<typeof salt_b64>
 
 /** A passkey wayin's prfSalt, its `prf_salt_b64`: base64url text of the {@link PasskeySaltSize} random bytes the authenticator's PRF is asked over. */
@@ -167,7 +167,7 @@ export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
 
-/** The check of the scope a bank's calls take to name a vault: its `vaultlabel`, and optionally the bank's `user_id` and `banklabel`.
+/** The check of the scope a bank's calls are given to name a vault: its `vaultlabel`, and optionally the bank's `user_id` and `banklabel`.
  * Anything carrying those names passes, such as a Vault or its snapshot, and the rest is dropped. A
  * bankDB or deviceDB in it refuses, as each goes to `Device.make`.
  *

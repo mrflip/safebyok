@@ -103,7 +103,7 @@ function schemaDriftOf(schema: GraphQLSchema): string[] {
     ...AnswerChecks.flatMap(([fieldname, check]) => driftOf(check, rootFieldOf(schema, fieldname).type, fieldname)),
     ...InputChecks.flatMap(([fieldname, argname, check]) => {
       const arg = rootFieldOf(schema, fieldname).args.find((each) => each.name === argname)
-      if (! arg) { throw new Error(`the schema's ${fieldname} takes no ${argname}`) }
+      if (! arg) { throw new Error(`the schema's ${fieldname} has no ${argname}`) }
       return driftOf(check, arg.type, `${fieldname}(${argname})`)
     }),
   ]
@@ -185,7 +185,7 @@ describe("BankSchemaSdl", () => {
     expect(schemaDriftOf(shorted).join('\n')).to.include('options')
   })
 
-  it("takes a gate put's policy as one of the storage policies, and no other", () => {
+  it("accepts a gate put's policy as one of the storage policies, and no other", () => {
     const policyEnum = buildSchema(BankSchemaSdl).getType('SafebyokStoragePolicy')
     const policies = isEnumType(policyEnum) ? policyEnum.getValues().map((policy) => policy.value as unknown) : null
     expect(policies).to.deep.equal([...storagePolicyVals])

@@ -204,7 +204,7 @@ export const PassphraseField = ({ ref, fieldname, fieldlabel, advice, invalidBy,
         />
         {reveal.button(fieldId)}
       </span>
-      {/* Rendered whenever the field takes advice, even while the advice is empty, so a screen reader announces each new message politely. */}
+      {/* Rendered whenever the field accepts advice, even while the advice is empty, so a screen reader announces each new message politely. */}
       {advice !== undefined && <p className="quiet" id={adviceId} role="status">{advice}</p>}
       <div role="status">{isCapsOn && <p className="quiet">{Messages.capsLockOn}</p>}</div>
     </>

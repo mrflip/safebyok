@@ -115,7 +115,7 @@ container's workspace that the Mac shares. They are gitignored, but one left in 
 is emptying, during a rebase or a `git worktree remove`, keeps the folder from being deleted. Run
 this script in the worktree first.
 
-It takes no arguments. It clears the worktree that contains the current directory, and nothing
+It accepts no arguments. It clears the worktree that contains the current directory, and nothing
 else: not the main checkout from a linked worktree, not a sibling, and not a worktree nested inside
 this one. It deletes only a regular file named exactly `.DS_Store` that git ignores, so a tracked
 one stays, and what git sees never changes. It follows no symlink, never crosses into another
@@ -144,10 +144,10 @@ which ages them out by `cleanupPeriodDays`. Task output and scratchpads live in 
 rebuild erases: run this before a rebuild.
 
 A dump's name, `session-dump-<volume born>-<from>-<to>.tar.gz`, gives its range. Each run starts
-where the newest dump of this volume ended, and takes what changed since, so a run that finds
-nothing writes nothing. A transcript that is still growing is taken whole again next time, so to
-read a session, take its file from the newest dump that contains it. Deleting the newest dump makes
-the next run take its range again. Deleting an older one loses that range.
+where the newest dump of this volume ended, and archives what changed since, so a run that finds
+nothing writes nothing. A transcript that is still growing is archived whole again next time, so to
+read a session, extract its file from the newest dump that contains it. Deleting the newest dump makes
+the next run archive its range again. Deleting an older one loses that range.
 
 To find a session's files and unpack them where they cannot overwrite the live ones:
 

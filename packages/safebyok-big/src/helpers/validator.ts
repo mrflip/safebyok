@@ -73,7 +73,7 @@ export type Merged<SourcesT extends readonly object[]> =
  * `.catchall()`, puts each failing key in the path. Judge such an object whole, with `custom`.
  *
  * Each validator also has `refusingAs(kind)`, the same validator refusing `kind` instead, so that one
- * tier can take another's validator rather than list its fields twice (`SX.vaultRow.refusingAs('record_conflict')`).
+ * tier can reuse another's validator rather than list its fields twice (`SX.vaultRow.refusingAs('record_conflict')`).
  * A validator of an object also has `parseConsistent(val, other, refusal?)`, which parses `val` and then
  * checks it as {@link checkedConsistent} does, refusing with `kind` or with the `refusal` given.
  *
@@ -102,7 +102,7 @@ export function Checkers<ValsT extends Record<string, Z.ZodType>, const SourcesT
 }
 
 /** Make one validator: `build` is given the kit and returns a schema, returned with a `parse` that throws a VaultError of `kind`.
- * `kind` defaults to `'bad_record'`. It refuses, and takes `sources`, as a {@link Checkers} call does.
+ * `kind` defaults to `'bad_record'`. It refuses, and accepts `sources`, as a {@link Checkers} call does.
  *
  * @example
  *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
@@ -151,7 +151,7 @@ export const objStrict = <ShapeT extends Z.ZodRawShape, const SourcesT extends r
 ): Refusing<Z.ZodObject<ShapeT>> => objCheck(build, { refusalkind: refusalkindOf(opts), extras: 'strict' }, sources)
 
 /** Make one validator of an object that drops, unread, any field `build` does not return.
- * Use it to take a shape out of whatever carries it. `opts` is the kind it refuses (default
+ * Use it to parse a shape out of whatever carries it. `opts` is the kind it refuses (default
  * `'bad_record'`), or a {@link RefusalOpts}.
  *
  * @example
@@ -177,7 +177,7 @@ export type AssertEqual<A, B> = Z.core.util.AssertEqual<A, B>
 export type CheckerInput<SchemaT extends Z.ZodType> = Z.input<SchemaT>
 
 /** A validator, as {@link Checkers}, {@link Checker} and {@link objCheck} return it.
- * It is its schema, with a `parse` that takes a {@link Story}, `refusingAs`, and for an object, `parseConsistent`.
+ * It is its schema, with a `parse` that accepts a {@link Story}, `refusingAs`, and for an object, `parseConsistent`.
  */
 export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
   /** Parse `val`, or throw the call's kind with a message framed by `story`. */
@@ -343,7 +343,7 @@ export interface Story extends Z.infer<typeof Checks.story> {}
 
 /** {@link objCheck} options:
  * - `refusalkind`      -- the kind thrown (default: `'bad_record'`)
- * - `extras: 'strict'` -- refuse a field the object does not take (default)
+ * - `extras: 'strict'` -- refuse a field the object does not define (default)
  * - `extras: 'strip'`  -- drop it unread
  */
 export interface ObjCheckOpts extends Z.input<typeof Checks.objCheckOpts> {}

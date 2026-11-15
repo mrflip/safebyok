@@ -21,7 +21,7 @@ propose the exception.
 * **Validators are reached through a namespace**, tests included: a `src/shapes/` module is
   star-imported under the short name its header gives (`import * as CX from
   '../shapes/shapes-core'`, then `CX.bankScope.parse(opts)`), and its types are imported by name.
-  A file that imports many validators by name grows a list that churns, and takes names its locals
+  A file that imports many validators by name grows a list that churns, and uses up names its locals
   want (`vaultRecord`, `whisper`); one that needs one or two may name them. Outside the core, a
   file that reaches many star-imports `safebyok` as `Safebyok`, and an adapter star-imports
   `safebyok/storage` as `DB` (`DB.vaultRow`).
@@ -266,7 +266,7 @@ two apart, so this is kept by hand.
   ```
 
 * **Parallel construction shows in the whitespace.** Align it into columns: values in an object
-  literal, rows of an example table. When one line takes fields out and the next puts the same
+  literal, rows of an example table. When one line pulls fields out and the next puts the same
   fields back, pad so the field lists start in the same column (the example in *Build for
   maintenance*): what was extracted and what is injected is obvious at a glance, and a field
   dropped or swapped stands out.
@@ -329,7 +329,7 @@ has.
 * **Frame a refusal of a host's options in the parse**, `parse(opts, { where, advice })`, not in a
   catch that rethrows. Never `Z.config`: it is the host's Zod too.
 
-**Strict or strip.** A shape taken out of whatever carries it (a scope, a stamp, a sparse shape)
+**Strict or strip.** A shape parsed out of whatever carries it (a scope, a stamp, a sparse shape)
 strips, so a Vault object, its record or its snapshot passes as any of them, and destructuring the
 parsed output sanitizes it. Three things are strict: a bag of options a person typed, where
 stripping would quietly drop a misspelt option; a stored record, where a field this version does
@@ -363,7 +363,7 @@ validator splits it into its parts before checking them.
   built from each other with `pick`, `omit`, `partial` and `extend`, never written twice. A record
   is one object schema, not a union of variants: an optional part is a nullable field.
 * **Use each shape's name for what it means, even where two are one type.** `LeaseSparse =
-  LeaseStamp` is fine; a log line or a listing takes a `LeaseSparse`, and a ctx a `LeaseStamp`.
+  LeaseStamp` is fine; a log line or a listing is given a `LeaseSparse`, and a ctx a `LeaseStamp`.
 * **A part's shapes nest as the part does.** A record that has parts has them in every shape: the
   gate's sparse shape contains each wayin's sparse shape, never a flat pick of their fields.
 * **A class names the shapes it passes for**: `class Lease implements LeaseStamp`. The compiler
@@ -406,7 +406,7 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
 
 ## Crossings, spreading and logging
 
-* **Take a part out by parsing or destructuring, never by spreading the thing.** A spread copies
+* **Pull a part out by parsing or destructuring, never by spreading the thing.** A spread copies
   only own enumerable fields: a getter on the prototype is lost while TypeScript types it as
   present, and every other own field comes along. The linter refuses a spread of a class instance
   (`no-misused-spread`). When a caller wants a thing's fields as plain data, a getter returns a
@@ -451,7 +451,7 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
 
 ## Order comes from an explicit list
 
-Anything stored, hashed or bound into a ctx takes its order from an explicit list (the array a
+Anything stored, hashed or bound into a ctx gets its order from an explicit list (the array a
 maker joins, the tuple its inverse checks) or from a canonical encoding that sorts keys
 (`stableJsonify`, as `cipherCtx` uses), not from an object's key order as it happens to fall:
 Zod's output order is undocumented, and JavaScript puts integer-like keys first.

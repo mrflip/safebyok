@@ -119,7 +119,7 @@ describe("PassphraseModal, unlocking a vault", () => {
     expect(document.activeElement).to.equal(typedIn)
   })
 
-  it("says what it is doing and takes no second submit while an attempt runs", async () => {
+  it("says what it is doing and accepts no second submit while an attempt runs", async () => {
     const { gating } = await shownFor(TH.unlocking, { built: true })
     const running = TH.makePending()
     const attempts = TH.attemptsOf(gating).mockImplementation(async () => {

@@ -279,13 +279,13 @@ describe("box.listing.deliverRecord(rcvd): registered_at, and a record of anothe
     expect(box.revision_seq).to.eq(2)
   })
 
-  it("takes registered_at and box_tok from a record of another life received over a listed tombstone", () => {
+  it("adopts registered_at and box_tok from a record of another life received over a listed tombstone", () => {
     const box = builtOf(tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' }))
     box.listing.deliverRecord(fullBoxRecord({ revision_seq: 3, revision_tok: 'rev-b3', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
     expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', vault_tok: 'vault-tok-u1', revision_seq: 3 })
   })
 
-  it("takes registered_at and box_tok from a newer record of another life received over a box listed alive", () => {
+  it("adopts registered_at and box_tok from a newer record of another life received over a box listed alive", () => {
     const box = builtOf(fullBoxRecord())
     box.listing.deliverRecord(fullBoxRecord({ revision_seq: 4, revision_tok: 'rev-b4', box_tok: 'box-tok-b', registered_at: T0 + 7 }))
     expect(box).to.include({ registered_at: T0 + 7, box_tok: 'box-tok-b', revision_seq: 4 })
@@ -346,7 +346,7 @@ describe("box.listing.deliverRecord(rcvd): registered_at, and a record of anothe
 })
 // --
 
-// == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and put take a duckish
+// == [Arguments first]: every entry of Box and Storable checks its arguments before any guard; edit and put accept a duckish
 
 describe("Box and Storable entries: arguments checked before any demand", () => {
   const whisper = { apiKey: 'sk-test-0000' }
@@ -421,7 +421,7 @@ describe("Box and Storable entries: arguments checked before any demand", () => 
     } as const
   }
 
-  it("takes { ...record, whisper, sidecar } and puts the next revision over the cached one", async () => {
+  it("accepts { ...record, whisper, sidecar } and puts the next revision over the cached one", async () => {
     const record = fullBoxRecord()
     world.mw.seedPut(record)
     const box = builtOf(record)

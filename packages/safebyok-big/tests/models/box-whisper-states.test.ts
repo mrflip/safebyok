@@ -253,7 +253,7 @@ describe("box.putExposed", () => {
     expect(box.whisper).to.eq(exposed)
   })
 
-  it("takes a sidecar, and keeps the current one if given none", async () => {
+  it("accepts a sidecar, and keeps the current one if given none", async () => {
     const box = await showingOf()
     await box.putExposed({ sidecar: { note: 'new' } })
     expect(box.sidecar).to.deep.equal({ note: 'new' })

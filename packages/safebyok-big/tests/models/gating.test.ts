@@ -36,7 +36,7 @@ function makeDialog() {
   }
 }
 
-// Compiles only while every member of AnyGating takes the same cleartexts: a host's dialog need not narrow to attempt.
+// Compiles only while every member of AnyGating accepts the same cleartexts: a host's dialog need not narrow to attempt.
 /** A host's dialog that attempts {@link Passphrase}, never narrowing on the gating's kind. */
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 

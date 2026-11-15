@@ -126,7 +126,7 @@ describe("Checkers", () => {
     expect(err.cause).to.be.undefined
   })
 
-  it("names an unknown field's place by its path, never its name, and says when an object takes no fields", () => {
+  it("names an unknown field's place by its path, never its name, and says when an object accepts no fields", () => {
     const { strictBag, outer } = Checkers('bad_option', ({ obj }) => {
       const strictBag = obj({}).strict()
       return { strictBag, outer: obj({ inner: strictBag }) }
@@ -360,7 +360,7 @@ describe("objCheck", () => {
     }
   })
 
-  it("takes a kind and a module of validators", () => {
+  it("accepts a kind and a module of validators", () => {
     const outer = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
     expect(outer.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
     TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_option')
@@ -381,7 +381,7 @@ describe("objStrict", () => {
     TH.expectSyncRefusal(() => objStrict(bankScopeOf, { refusalkind: 'bad_option' }).parse({ ...scope }), 'bad_option')
   })
 
-  it("takes a kind and a module of validators", () => {
+  it("accepts a kind and a module of validators", () => {
     const outer = objStrict(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
     expect(outer.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
     TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_option')
@@ -498,7 +498,7 @@ describe("Kit", () => {
     expect(Kit.user_id.safeParse('auth0|x').success).to.be.true
   })
 
-  it("hands out fn, taking any function, a method, an async one and a class included, and nothing else", () => {
+  it("hands out fn, accepting any function, a method, an async one and a class included, and nothing else", () => {
     const clockNow = Kit.fn<() => number>()
     for (const candidate of [() => 1, async () => { await Promise.resolve(); return 1 }, Date.now, Map]) {
       expect(clockNow.safeParse(candidate).success).to.be.true

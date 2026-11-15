@@ -15,7 +15,7 @@ import type { BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRecord, BankRow, BoxA
 import type { BankEnsured, BoxesListed } from './bank-db'
 
 // == [Rows and presence]: Meta, presenceVals, Presence, presenceOf, RecordAsk, PutAsk
-// Each function below takes the ask first, and the row stored second, null for none.
+// Each function below is given the ask first, and the row stored second, null for none.
 
 /** The fields of a row, stored or expected, that the tables compare: its revision, its liveness, and the life toks it carries. */
 type Meta = Readonly<{ revision_tok: string, revision_seq: number, am: EX.Am, bank_tok?: string, gate_tok?: string, vault_tok?: string, box_tok?: string }>

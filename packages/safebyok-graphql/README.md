@@ -8,7 +8,7 @@ safebyok's bankDB over [GraphQL](https://graphql.org), in two halves:
   own), and returns that verb's answer, for the signed-in user's bank only.
 * **In the browser**, `safebyok-graphql`: **`new GraphQLBankDB({ client })`**, the bankDB over
   your app's [urql](https://commerce.nearform.com/open-source/urql/) Client.
-  It takes the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the bankDB
+  It is given the Client alone. Limits such as `maxBoxes` and `maxRecordSizeEst` are set on the bankDB
   your server hosts and hands to `bankResolvers`. The browser half sets none.
 
 **Deploy the two halves together.** The browser half sends the documents the server half's schema
@@ -117,7 +117,7 @@ your resolvers tidies the signed-in user's bank.
 
 The bankDB the resolvers call checks what it is sent, as the browser's bankDB checks it before
 sending, so a caller that skips those checks, or is not a browser at all, is refused the same.
-Each verb that takes an ask hands the bankDB's verb the ask as it came, and that verb's own check of
+Each verb that is given an ask hands the bankDB's verb the ask as it came, and that verb's own check of
 the ask runs before anything is read.
 
 ## What crosses the wire
@@ -131,11 +131,11 @@ each a member of a union. A box's sidecar, a damaged row, a refusal's meta and a
 with a null `passkey0`, which the browser half reads as none. Times are `SafebyokEpochMillis`,
 integer UTC epoch milliseconds beyond the range of GraphQL's 32-bit `Int`.
 
-A verb that stores a row, or gets one, takes one argument, `ask`: an input whose fields are those of
+A verb that stores a row, or gets one, has one argument, `ask`: an input whose fields are those of
 the core's ask (`op`, the address, the `bank_tok` or `vault_tok` of the life it is made under,
 `ifAbsent` and `ifPresent`, the row it `expected`, read as that row's revision, `am` and tokens, the
 `record` to store, a build's `gate`, and a gate put's `options`, which name its storage policy).
-A gate change is `safebyokPutGate`, whichever change it is: its `options.policies` says which. `ensureBank`, `listBoxes` and `tidyGone` take their scope as typed arguments. So your
+A gate change is `safebyokPutGate`, whichever change it is: its `options.policies` says which. `ensureBank`, `listBoxes` and `tidyGone` are given their scope as typed arguments. So your
 logs and allowlists see whose bank each operation reaches. Every name the schema adds begins
 `safebyok` or `Safebyok`, to sit beside your own. `BankOperations` has the documents
 `GraphQLBankDB` sends, for a server that allows only the operations it knows.
@@ -156,6 +156,6 @@ checks refuse, is `unexpected_error`: a server out of step with this copy of saf
 The tests run in-process, with no database or GraphQL server to stand up. The battery runs over a
 `GraphQLBankDB` whose urql Client executes against the resolvers, over a `PostgresBankDB` on
 [PGlite](https://pglite.dev), with a second Client as another device. It runs again through Yoga
-over fetch, as in the recipe. A drift test checks every type the schema sends or takes against the core check
+over fetch, as in the recipe. A drift test checks every type the schema sends or receives against the core check
 that reads it. Before running `vitest` by hand, run `pnpm build:deps`: the tests read
 the core and `safebyok-postgres` from their `dist/`.

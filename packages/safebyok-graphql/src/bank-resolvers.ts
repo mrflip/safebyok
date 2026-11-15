@@ -49,7 +49,7 @@ export type CrossingNotice = {
   err:    BX.CrossedErr | null
 }
 
-/** The resolver for one query or mutation field, taking the standard GraphQL resolver arguments. */
+/** The resolver for one query or mutation field, given the standard GraphQL resolver arguments. */
 export type BankFieldResolver<ContextT, FieldnameT extends keyof BankFieldArgs> = (
   parent: unknown, args: BankFieldArgs[FieldnameT], context: ContextT,
 ) => Promise<CrossingAnswer>

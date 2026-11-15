@@ -339,7 +339,7 @@ describe("BankSchemaSdl", () => {
     for (const fieldname of rootFields) { expect(fieldname).to.match(/^safebyok[A-Z]/) }
   })
 
-  it("takes every operation a client sends", () => {
+  it("accepts every operation a client sends", () => {
     for (const document of Object.values(BankOperations)) { expect(validate(schema, parse(document))).to.deep.eq([]) }
   })
 

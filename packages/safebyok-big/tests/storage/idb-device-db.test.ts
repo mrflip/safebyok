@@ -73,7 +73,7 @@ TH.describeDeviceDBBattery("IdbDeviceDB", {
 })
 
 describe("IdbDeviceDB's options", () => {
-  it("takes a dbName, or none", () => {
+  it("accepts a dbName, or none", () => {
     expect(new IdbDeviceDB({ dbName: 'mine' })).to.be.instanceOf(IdbDeviceDB)
     expect(idbDeviceDB()).to.be.instanceOf(IdbDeviceDB)
   })

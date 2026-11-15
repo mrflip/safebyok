@@ -72,7 +72,7 @@ describe("bank.tryProbe", () => {
     expect(bank.vaultAt({ vaultlabel: 'home' })?.boxListing.things.map((listed) => listed.boxlabel)).to.deep.equal(['box1'])
   })
 
-  it("takes the labels, whisper and sidecar it is given", async () => {
+  it("puts the labels, whisper and sidecar it is given", async () => {
     const { bank } = await makeBankWithVault()
     const report = await TH.expectGood(bank.tryProbe({ vaultlabel: 'main', boxlabel: 'trial', whisper: { token: 'sk-test-0000' }, sidecar: { kind: 'trial' } }))
     expect(report.put.val).to.include({ vaultlabel: 'main', boxlabel: 'trial' })

@@ -37,7 +37,7 @@ const SloppyMakingCases = [
   // the bag itself:
   [undefined,                                                        'no options at all'],
   ["Acme",                                                           'a string in place of the options'],
-  [{ ...Making, rpId: "example.com" },                               "a field the options do not take, as askPasskey's rpId"],
+  [{ ...Making, rpId: "example.com" },                               "a field the options do not accept, as askPasskey's rpId"],
   // the relying party and the user:
   [{ ...Making, rp: undefined },                                     'no relying party'],
   [{ ...Making, rp: { name: "" } },                                  'a relying party with a blank name'],
@@ -274,7 +274,7 @@ describe("a passkey unlock, end to end", () => {
     expect(await raising).to.include({ ok: true })
   })
 
-  it("an add_passkey gating takes the passphrase and createPasskey's answer in one attempt", async () => {
+  it("an add_passkey gating accepts the passphrase and createPasskey's answer in one attempt", async () => {
     TH.installFakeAuthenticator()
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)

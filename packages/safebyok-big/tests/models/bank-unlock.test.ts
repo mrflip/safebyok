@@ -145,7 +145,7 @@ describe("vault.sealStampedString and vault.unsealStampedString", () => {
 })
 
 describe("An unlock, by proof or by the cached lease", () => {
-  it("takes the new lease and caches it over the old one", async () => {
+  it("attaches the new lease and caches it over the old one", async () => {
     const { bank, deviceDB, advance } = await makeBornVault()
     const bornRow = deviceDB.cachedNow() as { proved_at: number }
     advance(1)

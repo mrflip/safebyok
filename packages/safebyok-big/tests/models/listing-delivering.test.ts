@@ -41,7 +41,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(outcome.err).to.eq(err)
     })
 
-    it("takes the world of a good answer", async () => {
+    it("receives the world of a good answer", async () => {
       world.mw.seedPut(fullBoxRecord())
       world.mw.willGet(world.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
       await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0 })
@@ -323,7 +323,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
     expect(listing.things).to.deep.equal([])
   })
 
-  it("takes a record of the scope asked, however the answer's scope object was made", async () => {
+  it("accepts a record of the scope asked, however the answer's scope object was made", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willGet(world.mw.answerOf({ ...scopeOf('asked_box') }, fullBoxRecord({ boxlabel: 'asked_box' })))
     await expect(listing.get(scopeOf('asked_box'), { maxMillisSinceRefresh: 0 })).resolves.to.be.instanceOf(Box)

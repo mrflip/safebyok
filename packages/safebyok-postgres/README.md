@@ -68,7 +68,7 @@ const bankDB = new PostgresBankDB({ client: pgClientOf(pool) })
   past it is refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault
   made anew starts at zero. The cap is exact at moderate write rates. A strict cap would take concurrency machinery this
   package does not add.
-* **`maxRecordSizeEst`**, optional, as every bankDB takes it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
+* **`maxRecordSizeEst`**, optional, as every bankDB accepts it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
 
 `PostgresBankDB` writes what it is handed under the scope it is handed. **Your route decides who
 may reach which bank**: check the signed-in user before a request reaches the bankDB, and build
@@ -174,13 +174,13 @@ connect and LISTEN: this package grants nothing and creates no role or policy.
 Each write is one conditional `INSERT` or `UPDATE`, which takes effect only if the stored row still
 has the revision the write expects at that moment. A vault write reads its bank row,
 and a box write its vault row, without a lock, so writers under one bank do not wait for each other.
-A new row's foreign key takes a share lock on its bank row, which waits only on a `DELETE` of that
+A new row's foreign key acquires a share lock on its bank row, which waits only on a `DELETE` of that
 row. Two things follow:
 
 * A vault or box written while its bank or vault is deleted or built anew may land in the life that
   has ended. No read returns it, and `tidyGone`, or the bank built anew, deletes it. Until then the
   row stays, and it keeps a `DELETE` of its bank row refused. This is accepted: safebyok may later
-  offer advice, or functions, that take locks for tighter atomicity under the same contract. If you
+  offer advice, or functions, that acquire locks for tighter atomicity under the same contract. If you
   write boxes heavily under vaults that get deleted and are not written again, call `tidyGone` now
   and then.
 * The box cap is soft. Writers racing to add their first box can pass it together, and `tidyGone`

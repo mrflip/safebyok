@@ -23,7 +23,7 @@ devices through a storage layer the host plugs in.
   with `bank.delPrompt()`, removes the stored copies of its key.
 * **State is framework-agnostic.** `Device`, `Bank`, `Vault`, `Box`, the main gate
   (`bank.maingate`) and each listing (`bank.vaultListing`, `vault.boxListing`) have `subscribe` and
-  `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore` takes them. A
+  `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore` accepts them. A
   snapshot is the same object until something changes, shows only its own thing's state (a
   listing's is its labels), and never contains a whisper. It is plain data, except for the device's
   `openGating`, which is the live gating your dialog calls.

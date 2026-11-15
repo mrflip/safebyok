@@ -141,7 +141,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 
 * **A test that reads the Postgres README's route recipe.** From #252's review (the Coach took
   the Rec, 2026-10-22): the route recipe in `safebyok-postgres`'s README and the route its tests
-  run are hand-kept copies, so the copy a host takes can drift from the one tested. Have the test
+  run are hand-kept copies, so the copy a host copies can drift from the one tested. Have the test
   read the README's code blocks and run those.
 * **The Postgres README should not offer a hand-written route server.** The Coach (2026-10-22):
   instead of one, point to (a) the GraphQL client (`safebyok-graphql`) and (b) an AI
@@ -263,7 +263,7 @@ so a lock that lands during an unlock's proof leaves the bank unlocked. Still op
 
 * **The DeviceDB throws when a lock forgets the lease**: `bank.lock()` locks in memory at once, and a refused forget
   is announced as `lease_revoke_failed`, on which `DefaultOnLifecycle` vacates the device. A host whose
-  `onLifecycle` does less leaves the lease row on disk, and the next Bank on this device takes it up
+  `onLifecycle` does less leaves the lease row on disk, and the next Bank on this device attaches it
   (`Lease.buildFromCache`). Decide whether a lease a lock failed to forget is marked, or the next unlock asks first.
 * **A sign-out with an unlock in flight in another tab**: harmless today, because a lease is scoped
   by the bank's scope, the user id included.
@@ -405,8 +405,8 @@ how an adopted capacity ages, since a hello's listing recounts it.
 
 ### The stamp, not the scope, as a BankDB request's parameter
 
-The Coach (2026-10-22): each BankDB verb takes the scope and an expectation beside it; a verb
-could instead take the whole stamp (`bankStamp`, `gateStamp`, `vaultStamp`: the scope, its life's tok and
+The Coach (2026-10-22): each BankDB verb is given the scope and an expectation beside it; a verb
+could instead be given the whole stamp (`bankStamp`, `gateStamp`, `vaultStamp`: the scope, its life's tok and
 `registered_at`). Also send
 the authenticated immutable fields with puts and reads, so that a server can refuse early what the
 ctx would refuse late. Decide with the wire shapes (`safebyok-graphql`, the Postgres route), since
@@ -458,7 +458,7 @@ tab's copy of the gate, the gate is refreshed and the lease is used. A lease car
 ### A fetch that meets a damaged row, and edge cases generally
 
 A `fetch` that meets a damaged row refuses with `damaged_row` and leaves the listed instance in place, whereas a listing that meets a
-damaged row vacates the instance (#618). Making the two agree would put a branch in `deliver`, which takes renames and deletions only. The Coach (2026-11-10): "I hate how much of
+damaged row vacates the instance (#618). Making the two agree would put a branch in `deliver`, which handles renames and deletions only. The Coach (2026-11-10): "I hate how much of
 our code is given over to these edge cases. TODO it, there's got to be a better way." Look for the design that makes the listing's damaged-row,
 absent and gone cases a single case instead of a branch each.
 
@@ -495,7 +495,7 @@ logging, key derivation and passkey recipes have no new home either, and describ
 ### A size budget, when we want one
 
 `size-limit`, its `.size-limit.json` and `pnpm size:budget` were removed on 2026-11-09 as a distraction (the Coach: "we can add it later"). The removal
-also took out the CI step and the per-thread budget rule in `PROCESS.md`.
+also removed the CI step and the per-thread budget rule in `PROCESS.md`.
 
 ### Gates visible to hosts, and things that stand for their scope while the Bank is remade
 

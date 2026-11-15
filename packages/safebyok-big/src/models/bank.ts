@@ -346,7 +346,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   override get isEnabled(): boolean { return super.isEnabled && this.isPresent }
 
   // A tombstone carries a life token of its own, and a bank built again elsewhere another: either ends this Bank's life,
-  // and takes it out of its listing's list.
+  // and removes it from its listing's list.
   /** True when the record in hand is a live row of this Bank's life. */
   override get isPresent(): boolean { return super.isPresent && (this.central.bank_tok === this.bank_tok) }
 

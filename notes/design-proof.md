@@ -284,7 +284,7 @@ not a second field.
 | `bank.lock`      | No lease attached; the forget called after every stow called; the bank, its gate and vault listings, each vault, box listing and box aligned                                              | Never throws: a refused forget is announced `lease_revoke_failed` after it returns                   |
 | `device.sweep`   | The device and its bank disabled; no lease attached, the cached row left; the watches stopped; its open gating dismissed                                                                 | Never throws                                                                                          |
 | `device.vacate`  | As sweep; each lease of the bank scope cached on this device, and the device row, forgotten or announced as not; `vacated` told                                                          | Never rejects                                                                                         |
-| `box.put`        | The record kept is what it put, or newer; snapshot and cache aligned                                                                                                                      | Nothing stored; on `stale_write` or `camped`, the stored record taken in                             |
+| `box.put`        | The record kept is what it put, or newer; snapshot and cache aligned                                                                                                                      | Nothing stored; on `stale_write` or `camped`, the stored record adopted                             |
 | `attachLease`    | Attached and in force; cached as the cache can; the bank and everything under it aligned                                                                                                 | Past a discard: refused, nothing cached                                                              |
 | build_bank       | A Bank listed, the only one of its scope: unlocked, or locked by a `lock()` after the attach                                                                                              | Nothing stored; has only what the answer delivered. Another won: `gate_made_elsewhere`, its Bank listed, locked |
 | `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease granted, none cached by this call                                              |
@@ -395,7 +395,7 @@ each gate change's act, past its provings
   `expected`. Anything the watch delivers during the attempt therefore makes the put refuse: a passkey revoked elsewhere is
   not brought back, and a passphrase replaced elsewhere is not overwritten.
 * **A write made after the timeliness request.** The put refuses with 'stale_write'. The gating concludes with
-  that refusal, and the gate has by then taken in the stored record. Nothing retries; a host may call
+  that refusal, and the gate has by then adopted the stored record. Nothing retries; a host may call
   the verb again.
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, citing the older gate revision, is forgotten at its next session (Decided).
@@ -552,7 +552,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 * `adopt` ignores a record older by `revision_seq`.
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an
   override from the inside is one the customer cannot.
-* `ifPresent` is customer-facing, and `putVault` and `putBox` take it alike in `PutOpts`, with `ifAbsent` ('add' or
+* `ifPresent` is customer-facing, and `putVault` and `putBox` accept it alike in `PutOpts`, with `ifAbsent` ('add' or
   'fail'). Only `repl` saves, and only within the live row's own life: at its revision under another `vault_tok` or
   `box_tok` it refuses `camped`. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`;
   `get` answers the live row in place of the request, `passed`. `isVaultPutAllowed(ante, record, opts)` and

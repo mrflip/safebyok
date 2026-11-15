@@ -123,7 +123,7 @@ TH.describeBankDBBattery("IdbBankDB", {
 })
 
 describe("IdbBankDB's options", () => {
-  it("takes a dbName and the AdapterBankDB's own options", () => {
+  it("accepts a dbName and the AdapterBankDB's own options", () => {
     expect(new IdbBankDB({ dbName: 'mine', maxRecordSizeEst: 1000 })).to.be.instanceOf(IdbBankDB)
     expect(idbBankDB()).to.be.instanceOf(IdbBankDB)
   })

@@ -338,8 +338,8 @@ describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
     [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   'tryGet of a stored record'],
     [(box: TestableBox) => box.tryHydrate(),                                                 'tryHydrate of a timely record'],
-    [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage takes'],
-    [(box: TestableBox) => box.tryDel(box.scope),                                                     'tryDel that storage takes'],
+    [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage accepts'],
+    [(box: TestableBox) => box.tryDel(box.scope),                                                     'tryDel that storage accepts'],
   ] as const
   for (const [tryVerb, blurb] of GoodCases) {
     it(`resolves a good outcome with the thing: ${blurb}`, async () => {

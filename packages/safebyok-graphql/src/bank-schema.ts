@@ -3,7 +3,7 @@ import { leftoverVals, refusalkindVals, storagePolicyVals } from 'safebyok-big/s
 // Each operation is one bankDB verb. It returns what the verb's `try*` form returns, as a typed
 // object with any refusal in its `err` field. A GraphQL error is left for what GraphQL itself
 // rejects, such as a client and server whose schemas differ. A verb that stores a row, or gets one,
-// takes its ask as one input whose fields are the ask's; ensureBank, listBoxes and tidyGone take
+// is given its ask as one input whose fields are the ask's; ensureBank, listBoxes and tidyGone are given
 // their scope as separate arguments, so a host's logs and allowlists show whose bank each request
 // reaches. Four things are untyped JSON: a sidecar (the app's own object), a damaged row (it failed
 // validation), a refusal's meta (the few fields a server sends), and a gate's `auth`, `sigs` and

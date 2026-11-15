@@ -102,7 +102,7 @@ const SameBytesCases = [
   [{ memory_kib: 1024, parallelism: 8 },                 "correct horse battery staple",  'eight lanes'],
   [{},                                                   "pässwörd mit Umlaut und 🔑",    'a passphrase past ASCII, encoded as UTF-8'],
   [{},                                                   "word ".repeat(40),              'a passphrase longer than one BLAKE2b block'],
-  [{},                                                   " ",                             'a passphrase of one space, which a deriver takes as it is'],
+  [{},                                                   " ",                             'a passphrase of one space, which a deriver accepts as it is'],
   [{},                                                   "half a \u{D83D} key",           'a lone surrogate, which each encodes as U+FFFD'],
 ] as const
 
@@ -133,7 +133,7 @@ describe("makeArgon2idWasmDeriver", () => {
     expect(deriver).to.be.frozen
   })
 
-  it("takes a spec of the host's own, under its own label", () => {
+  it("accepts a spec of the host's own, under its own label", () => {
     const deriver = makeArgon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
     expect(deriver.key_deriver_label).to.eq('acme_argon2id_v1')
     expect(deriver.memory_kib).to.eq(131_072)

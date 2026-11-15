@@ -324,7 +324,7 @@ while IFS=$'\t' read -r verdict where branch note; do
   printf '%s\t%s\t%s\t%s\n' "$verdict" "$where" "$branch" "$note"
 done < "${scratch}/trees" > "${scratch}/swept-trees"
 if [[ -e "${scratch}/skip-prune" ]]; then
-  # git worktree prune takes every registration whose directory is missing, a branch with work
+  # git worktree prune removes every registration whose directory is missing, a branch with work
   # in it as readily as any (a directory that merely cannot be seen from here looks the same).
   printf 'held\tgit worktree prune\t-\t%s\n' "not run: a worktree whose directory is missing has a branch checked out that is not finished (above)" >> "${scratch}/swept-trees"
 elif [[ "$apply" == yes ]]; then

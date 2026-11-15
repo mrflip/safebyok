@@ -439,7 +439,7 @@ demandPuttable(patch, choices) { /* parses the patch, then demands enabled, vaul
 
 **Enabled is a special guard:** one check is enough. The code that ends a listing is synchronous: it disables the
 listing, disables every thing in it, and removes them, so nothing crosses it halfway. The only check after storage answers is at
-the top of `deliver`, before it takes the answer's parent.
+the top of `deliver`, before it delivers the answer's parent.
 
 ```ts
 protected async deliver(answer) {
@@ -1003,7 +1003,7 @@ demandPromptable(): this { return this.demandEnabled().demandPresent() }        
 
 ## Record first, then what's live `#record-then-opts`
 
-A `make` takes `(recordish, livepropsAndOpts)`, or `(recordish, livepropsAndOpts, friend)`. The first argument is the
+A `make` is given `(recordish, livepropsAndOpts)`, or `(recordish, livepropsAndOpts, friend)`. The first argument is the
 record, give or take a few fields. The second carries what comes out of band: the live objects the thing reaches (its
 device, its bank) and its options. Each is shaped like a pick of the class's interface, so both parts duck as the thing.
 A friend means something specific, a bag of callbacks into its owner's private state, and goes in neither: only third.

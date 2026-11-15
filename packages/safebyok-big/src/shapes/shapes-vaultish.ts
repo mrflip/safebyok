@@ -71,7 +71,7 @@ export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched
 /** How old, in milliseconds, the gate's record may be before a prompt fetches it again. */
 export const Promptly = 3_600_000
 
-/** The checks of the options a storable's verbs take: how fresh the record in hand must be, a get's and a put's policies, and a listener. */
+/** The checks of the options a storable's verbs accept: how fresh the record in hand must be, a get's and a put's policies, and a listener. */
 export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, orDefault, fn }) => {
   // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))

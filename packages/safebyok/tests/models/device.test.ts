@@ -77,7 +77,7 @@ describe("Device.make(record, opts)", () => {
     expect(Object.values(device)).to.not.include.members([requestCleartext, TH.testDeriver, TH.anyStrengthChecker])
   })
 
-  it("takes a fraction of a minute to the nearest millisecond, and Infinity as ForeverMillis", () => {
+  it("rounds a fraction of a minute to the nearest millisecond, and turns Infinity into ForeverMillis", () => {
     expect(TH.makeDevice({}, { autolockMinutes: 1 / 7 }).leaseMillis).to.eq(8571)
     expect(TH.makeDevice({}, { autolockMinutes: Infinity }).leaseMillis).to.eq(Consts.ForeverMillis)
     expect(TH.makeDevice({}, { autolockMinutes: 30 }).autolockMinutes).to.eq(30)

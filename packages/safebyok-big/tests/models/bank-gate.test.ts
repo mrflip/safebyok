@@ -88,7 +88,7 @@ describe("a gate changed on another device", () => {
     expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
   })
 
-  it("taken from a fetch leaves this bank unlocked, its lease in force", async () => {
+  it("adopted from a fetch leaves this bank unlocked, its lease in force", async () => {
     const { bank, vault, anotherDevice, demandStoredGate } = deafened(await makeBornVaultWithPasskey())
     const ante = bank.maingate.pickle()
     const theirs = await anotherDevice().ensureBank()
