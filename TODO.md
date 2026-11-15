@@ -9,3 +9,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   storage loses the bank row and a bank is born again at the same lifeseq, a wrap of the earlier life opens in the new
   one: only to the earlier bankKey, but it opens. Big's random `bank_tok` ruled that out. Whatever closes it should not
   be one more check in the box.
+
+* If a request has any kind of `world` error it must not send anything in `val` or `dbhas`
+
+* Seal must reject anything with revision < 0 (the void sentinel)

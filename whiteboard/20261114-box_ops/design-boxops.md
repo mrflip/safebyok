@@ -130,16 +130,6 @@ const KindChecks = {
 The verbs are unchanged. A box can be deleted, which the main gate never is: a `del` of a live box answers `deleted`,
 a `put` over its tombstone answers `reborn` at the next lifeseq, and a `del` over a tombstone refuses `dubdel`.
 
-### Ensuring parentage on a write (TODO)
-
-A write ask may carry `parentage: SparseParent[]`, with `SparseParent = { revtok, born_at }`, plus `whisper_sealed`
-for a box. It names every parent of the Thing written, or it is left out.
-
-* **Where a parent is stored live**, nothing happens to it.
-* **Where a parent is missing, or is a tombstone one lifeseq short of the lifepath written**, its sparse parent is
-  filled out and stored in its place. It takes the `written_at` of the Thing written, and the scope, life and other
-  fields its position implies. Its sealed part binds those same fields.
-
 ### Listing a Thing's children: `tryListThings`
 
 ```
@@ -174,8 +164,8 @@ null under `void` or wherever the store's answer is in doubt.
 * **`val` is an array of sparse children**, not descendants, in labelpath order, byte for byte, as Postgres's
   `COLLATE "C"` sorts them. A full record comes from a get.
 * **`dbhas` has `val`'s shape, and changes with it.** `parent` and `damaged_rows` do not change with the shape of
-  what is listed. Under `gone`, `dbhas` is `[]`: nothing is written under a tombstone's odd lifeseq. Under `void` it
-  is open question 4. Under any other refusal it is null.
+  what is listed. Under `void` and `gone` it is `[]`: a child hangs off its parent's live lifepath, so neither has
+  one, and the same stored state under `ifAbsent: 'nil'` gives `val: []`. Under any other refusal it is null.
 * **`parent`** is the parent's sparse record, or null for none.
 * **Tombstones are listed**, `am: 'x'`, so that a cache learns of a delete from a listing.
 * **A child that fails its checks is listed in `damaged_rows`**, and the rest are listed as usual. A row stored
@@ -306,7 +296,7 @@ until something needs it.
 | `stamp`                | `user_id`, `banklabel`, `bank_tok`, `registered_at` | `userid`, `banklabel`, `lifeseq`, `born_at` |
 | `scope`                | `user_id`, `banklabel`                              | `userid`, `banklabel`                       |
 | `maingate`             | the main gate                                       | the main gate                               |
-| `rootBox`              |                                                     | the root box's sparse record                |
+| `rootBox`              |                                                     | `#rootBox`, the root box's sparse record    |
 | `device`, `device_tok` | the device                                          | unchanged                                   |
 | the lock and its guards, `modelkind` | the model's own                       | unchanged                                   |
 
@@ -397,19 +387,25 @@ Three PRs, each stacked on the one before:
 
 ## Open questions
 
-1. **How the bank knows its root box.** I recommend it hold the root box, as it holds its main gate, given by
-   `tryBirthBank` or a listing. A rule tying the root's lifeseq to the bank's is your TODO, and nothing here needs it.
-2. **The gate's wayins as `Sealed` parts.** They fit the shape, and moving them is a change to the gate's stored
-   shape. I recommend a thread of its own after this one.
-3. **`Sealed`'s fields.** Your `sealers.ts` has `wrapped`, `codec`, and a ciphered `schematag`, and your doc has
-   `key_wrapped`, `codectag`, and a plain `schematag`. I took the doc's: a stored field is underbar_case, and the
-   schematag is visible, so a host reads it without unlocking.
-4. **A listing's `dbhas` under `void`.** Rows can be stored under a missing parent, because a write does not check its
-   parent, and a parentage write is built to mend just that. None of them is a child, since the parent has no life,
-   but `[]` would read as "nothing is there", which the store cannot say. I recommend `dbhas: null` under `void`. A
-   `gotvoid` listing has `val: []` all the same, since a good answer's `val` is always a list.
+1. **The gate's wayins and `Sealed`.** A wayin wraps the bankKey under a key its passphrase or passkey derives, and
+   ciphers nothing, so it has no `ciphered`, `codectag` or `schematag`: it is a wrap, not a seal. Its shapes can be
+   made one schema per kind in a thread of its own; none of it touches boxes.
 
 ## Principles
 
 * **Disable a case only once you can say how it breaks**, and then decide. Never work around it. A get of a root box
   is allowed. A root is never listed because nothing lists its parent, not because it is banned.
+
+### Ensuring parentage on a write (TODO) NO CODE YET IGNORE THE BELOW
+
+A write ask may carry `parentage: SparseParent[]`, with `SparseParent = { revtok, born_at }`, plus `whisper_sealed`
+for a box. It names every parent of the Thing written, or it is left out.
+
+* **Where a parent is stored live**, nothing happens to it.
+* **Where a parent is missing, or is a tombstone one lifeseq short of the lifepath written**, its sparse parent is
+  filled out and stored in its place. It takes the `written_at` of the Thing written, and the scope, life and other
+  fields its position implies. Its sealed part binds those same fields.
+
+There's some good arguments being made by the  other  agent that  we should be passing the void singleton or a void shell around in more places. I'm sympathetic to that argument for the normal `dbhas`
+
+However: for listing, and maybe get, we should return parentage: [...parents, from root to first tombstone]
