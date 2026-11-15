@@ -23,7 +23,7 @@ const makeVault = async (): Promise<Vault> => {
   return bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
 }
 
-/** Store `whisper` in the `Boxlabel` box of `vault`. */
+/** Put `whisper` in the `Boxlabel` box of `vault`. */
 const putWhisper = async (vault: Vault, whisper: object) => { await vault.putBox({ boxlabel: Boxlabel, whisper }) }
 
 describe("extractSavedApiKey", () => {

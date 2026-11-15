@@ -215,7 +215,7 @@ function twoDevices(firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) {
   }
 }
 
-/** Build the vault on `bank`, unlocked by its build, then store {@link FakeWhisper} in one of its boxes. */
+/** Build the vault on `bank`, unlocked by its build, then put {@link FakeWhisper} in one of its boxes. */
 async function putFakeBox(bank: Bank): Promise<void> {
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })

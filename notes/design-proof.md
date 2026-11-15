@@ -34,7 +34,7 @@ device.ensureBank()                                  the bank listed is returned
 
 ## What a bank's birth needs
 
-A bank's birth stores two rows together: the bank row, and its `main` gate row, which carries the wayins. Neither
+A bank's birth puts two rows together: the bank row, and its `main` gate row, which carries the wayins. Neither
 has anything encrypted but the wayins' wraps. A vault is born later, by `bank.ensureVault`, and has no key.
 
 | Part                | Fields                          | Comes from                                           |
@@ -399,7 +399,7 @@ each gate change's act, past its provings
   the verb again.
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, citing the older gate revision, is forgotten at its next session (Decided).
-* **The bankDB applies the gating's storage policy, in the step that stores the record.** The record is built from
+* **The bankDB applies the gating's storage policy, in the step that puts the record.** The record is built from
   `ante`, so it changes only its gating's wayin, and the policy refuses one that changes more (`gate_issue`). The device
   never meets that refusal: `add_passkey` refuses before proving when the gate the attempt read has a passkey
   (`bad_option`). The bankDB cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.

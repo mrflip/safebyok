@@ -67,7 +67,7 @@ Each test compares the record received (`rcvd`) with the record of the instance 
 
 The acts are the classifier's and the gate verbs' (`notes/answer-contract.md`). Each act says by itself where the record
 is (`deliveryFieldingOf`), so nothing here looks at the request again: a validated answer is trusted. "The stored record"
-is what the datastore contains, as it reported fetching or writing it; "the record sent" is what the caller asked to store.
+is what the datastore contains, as it reported fetching or writing it; "the record sent" is what the caller asked to write.
 
 | fielding  | acts                                                                                                                 | the record       | checked against                                            |
 | --------- | -------------------------------------------------------------------------------------------------------------------- | ---------------- | ---------------------------------------------------------- |
@@ -164,7 +164,7 @@ vault's ended life refuses `disabled` from then on, since its listing's `vault_t
 2. **A live record over a tombstone of the same life** (`newer`) is adopted at a vault or a box listing. A life made
    again gets a new life token, so this should not happen; it could refuse `record_conflict` instead.
 3. **The stored record is checked against the record sent by its tokens alone** (F2): scope, revision and life. The
-   answer contract asks that the two agree, so a datastore that stored another value under the same tokens would pass.
+   answer contract asks that the two agree, so a datastore that wrote another value under the same tokens would pass.
 4. **A gate row of another `gate_tok` under the bank's `bank_tok`** is damage by the design, as only `delBank` deletes
    the main gate. It is adopted (R2), the Gate standing for its scope through its lives as a Vault does; it could refuse
    `record_conflict` instead.

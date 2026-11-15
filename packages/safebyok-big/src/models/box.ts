@@ -195,16 +195,16 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, putExposed, tryPutExposed, edit, keptWhisper
 
-  /** Seal `patch` over the record as its next revision, and store it, resolving this box.
+  /** Seal `patch` over the record as its next revision, and put it, resolving this box.
    *
    * A patch that leaves out the whisper or the sidecar keeps the stored one, but may fetch the box first to get it.
    * A lock does not interrupt or reverse a put once its write has begun.
    * - `ifPresent` -- what to do over a live box:
    *   - `'repl'` -- replace it (default)
    *   - `'fail'` -- refuse `camped`
-   *   - `'get'`  -- store nothing, and resolve this box with the stored record
+   *   - `'get'`  -- put nothing, and resolve this box with the stored record
    * - `ifAbsent`  -- what to do where the box was never stored, or deleted:
-   *   - `'add'`  -- store it as a new life of the box, its whisper and sidecar `{}` where left out (default)
+   *   - `'add'`  -- put it as a new life of the box, its whisper and sidecar `{}` where left out (default)
    *   - `'fail'` -- refuse `absent_box`
    *
    * Refuses `stale_write` when storage has a newer revision. The box then has that revision: edit from it.

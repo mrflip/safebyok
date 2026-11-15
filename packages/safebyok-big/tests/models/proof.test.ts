@@ -160,7 +160,7 @@ describe("the proof", () => {
     const boxesUi = mountComponent(vault.boxListing, boxList)
     boxesUi.expectRenders(['no boxes'])
 
-    // Seal a box: storage has stored only ciphertext, and the list shows it.
+    // Seal a box: storage has only ciphertext, and the list shows it.
     const box = await vault.putBox(ApiKey)
     boxesUi.expectRenders(['anthropic_api_key'])
     const boxUi = mountComponent(box, boxRow)

@@ -137,8 +137,8 @@ function failNextCall(bankDB: ConvexBankDB, text = '[Request ID: 0123456789abcde
 const RowFields = ['bank', 'gate', 'vault', 'box']
 
 // convex-test's database is not exported, so this alters each document on its way into the database, at the syscall that writes it.
-/** Until the test ends, have the deployment's database store a row other than the one each write sends, as a datastore that alters what it stores would. */
-function storeOtherwise(): void {
+/** Until the test ends, have the deployment's database write a row other than the one each write sends, as a datastore that alters what it writes would. */
+function writeOtherwise(): void {
   /** The runtime's syscall that writes, as convex-test installs it on the global `Convex`. */
   type AsyncSyscall = (op: string, jsonArgs: string) => Promise<string>
   const convex = (globalThis as unknown as { Convex: { asyncSyscall: unknown } }).Convex
@@ -149,7 +149,7 @@ function storeOtherwise(): void {
     return async (op: string, jsonArgs: string) => {
       if ((op !== '1.0/insert') && (op !== '1.0/replace')) { return await asyncSyscall(op, jsonArgs) }
       const args = JSON.parse(jsonArgs) as { value: Record<string, unknown> }
-      for (const field of RowFields) { if (Object.hasOwn(args.value, field)) { args.value[field] = TH.storedOtherwiseOf(args.value[field]) } }
+      for (const field of RowFields) { if (Object.hasOwn(args.value, field)) { args.value[field] = TH.writtenOtherwiseOf(args.value[field]) } }
       return await asyncSyscall(op, JSON.stringify(args))
     }
   })
@@ -166,7 +166,7 @@ TH.describeBankDBBattery("ConvexBankDB over a ConvexClient", {
   },
   _cheat_rowsOf:         convexRowsOf,
   _cheat_failNextCall:   (bankDB) => { failNextCall(bankDB) },
-  _cheat_storeOtherwise: storeOtherwise,
+  _cheat_writeOtherwise: writeOtherwise,
 })
 
 describe("ConvexBankDB's refusals", () => {

@@ -11,7 +11,7 @@ const world = useModelsWorld()
 
 function scopeOf(boxlabel = 'anthropic_api_key') { return world.mw.boxscope(boxlabel) }
 
-/** A listing with a box of the record storage has stored, and the next revision of it to put. */
+/** A listing with a box of the record storage has, and the next revision of it to put. */
 function putable() {
   const listing = boxListingOf(world.mw)
   world.mw.seedPut(fullBoxRecord())
@@ -177,7 +177,7 @@ describe("listing.put: the versioned replace", () => {
     expect(listing.things.map(({ isPresent }) => isPresent)).to.deep.equal([false])
   })
 
-  it("stores the record exactly as given where there is no row", async () => {
+  it("puts the record exactly as given where there is no row", async () => {
     const box = await boxListingOf(world.mw).put(fullBoxRecord({ revision_tok: 'rev-new', revision_seq: 0 }), { expected: shellBoxRecord() })
     expect(box).to.include({ revision_tok: 'rev-new', revision_seq: 0 })
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-new', revision_seq: 0 })

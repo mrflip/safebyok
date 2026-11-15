@@ -45,7 +45,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['watchRows',  (caller) => caller.query(fns.watchRows, { scope: BW.bankScope })],
 ]
 
-/** List what u1 has stored, as the component itself reports it. */
+/** List what u1 has put, as the component itself reports it. */
 async function storedIn(backend: Backend) {
   return await backend.withIdentity({ subject: 'u1' }).query(fns.watchRows, { scope: BW.bankScope })
 }

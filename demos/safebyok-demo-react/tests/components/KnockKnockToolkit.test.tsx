@@ -53,7 +53,7 @@ const knock = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The box rows `bankDB` has stored for the API key's vault, by boxlabel. */
+/** The box rows `bankDB` has for the API key's vault, by boxlabel. */
 const storedBoxRows = (bankDB: MemoryBankDB) => {
   const { bank, vaultrows } = bankDB._cheat_shelfOf({ user_id: 'u1', banklabel: 'acme' })
   const { bank_tok } = bank as { bank_tok: string }

@@ -313,7 +313,7 @@ The Coach (2026-10-19, sprint contract): "changing scope requires a new vault fr
 vault_tok, user_id, banklabel, vaultlabel are immutable." A vault's scope fields are fixed for its
 life (a test checks that every field its snapshot shows is read-only), so renaming a vault, or
 moving it to a new `user_id` (because an auth provider changed, or accounts merged), means making a
-new vault and storing each whisper again, which needs the old vault's passphrase. Decide whether
+new vault and putting each whisper again, which needs the old vault's passphrase. Decide whether
 safebyok offers that move as a call, or documents it as the host's job, alongside *Identity should
 not be tied to the backing database*.
 

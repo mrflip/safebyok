@@ -316,12 +316,12 @@ describe("a row no listing can set aside", () => {
   })
 })
 
-describe("a write the datastore stores other than the record sent", () => {
+describe("a datastore that writes a row other than the record sent", () => {
   it("is refused as storage_issue, with the row stored left as it is", async () => {
     const { vault, boxrows } = await makeWorld()
-    boxrows.set = (label, row) => Map.prototype.set.call(boxrows, label, TH.storedOtherwiseOf(row)) as Map<string, unknown>
+    boxrows.set = (label, row) => Map.prototype.set.call(boxrows, label, TH.writtenOtherwiseOf(row)) as Map<string, unknown>
     await TH.expectRefusal(vault.putBox({ boxlabel, whisper: Whisper }), 'storage_issue')
-    expect(boxrows.get(boxlabel)).to.have.property('revision_tok').that.match(new RegExp(`${TH.StoredOtherwiseSuffix}$`, 'u'))
+    expect(boxrows.get(boxlabel)).to.have.property('revision_tok').that.match(new RegExp(`${TH.WrittenOtherwiseSuffix}$`, 'u'))
   })
 })
 

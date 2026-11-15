@@ -303,7 +303,7 @@ describe("box.putExposed", () => {
 // == [Hearing of a lock]: subscribe, getSnapshot, isLocked
 
 describe("box.subscribe and box.getSnapshot, through a lock", () => {
-  it("reads isLocked live without storing it on the box", async () => {
+  it("reads isLocked live without caching it on the box", async () => {
     const box = await unexposedOf()
     expect(box.isLocked).to.be.false
     world.mw.setLocked(true)

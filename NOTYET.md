@@ -57,9 +57,9 @@ implementation.
 Things we are leaving as they are until they bite again. Each is filed so that the next person to
 be bitten finds the ruling.
 
-* **Storing without a sidecar keeps the old one.** The Coach (2026-10-16, thread 2,
+* **Putting a box without a sidecar keeps the old one.** The Coach (2026-10-16, thread 2,
   [#133](https://github.com/mrflip/safebyok/pull/133)): "I hate optional fields but we can wait for
-  it to bug me again, go ahead as you propose." Storing a new whisper under an existing label with
+  it to bug me again, go ahead as you propose." Putting a new whisper under an existing label with
   no sidecar keeps the box's sidecar; passing `{}` empties it. The alternative, an omitted
   sidecar meaning empty, is one line.
 * **The demo's App tests depend on order.** The Coach (2026-10-16, thread 14,

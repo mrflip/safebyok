@@ -160,7 +160,7 @@ Three layers have key material, and the words for each matter.
 * **IndexedDB** keeps a `CryptoKey` by structured clone: the handle survives a page load, its
   material still inside the browser, never as bytes JavaScript sees. The only key safebyok writes
   this way is the leaseKey (`lease.cacheAsCacheCan`, through a `DeviceDB`'s `tryStow`). The core's `IdbDeviceDB`
-  (`storage/idb-device-db.ts`, on `safebyok/browser`) stores the lease row, including its `lease_key` handle, in
+  (`storage/idb-device-db.ts`, on `safebyok/browser`) stows the lease row, including its `lease_key` handle, in
   the database `safebyok:device-v002-001-001` (`safebyok-<dbName>:…` with a `dbName`) by IndexedDB's structured clone, never as bytes; its `MemoryDeviceDB`
   (`storage/memory-device-db.ts`) keeps the row by `structuredClone` in a Map for the page's life. No other key is ever written anywhere: not to
   IndexedDB, not to the host's BankDB, which receives only ciphertext and visible fields. The

@@ -31,7 +31,7 @@ function presenceOf(row: Meta | null): Presence {
   return (row.am === 'a') ? 'live' : 'gone'
 }
 
-/** A put or del ask, of any row: one that carries the row it expects and the record it would store. */
+/** A put or del ask, of any row: one that carries the row it expects and the record it would write. */
 type RecordAsk = Readonly<{ expected: Meta, record: Meta }>
 /** A put ask, of any row, with the policies that apply over a live row and over a tombstone or none. */
 type PutAsk    = RecordAsk & Readonly<{ ifAbsent: PutIfAbsent, ifPresent: IfPresent }>
@@ -217,28 +217,28 @@ function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknow
 // --
 
 // == [Rows written]: writtenBankOf, writtenGateOf, writtenVaultOf, writtenBoxOf
-// An adapter answers a write with the row the datastore reports storing, checked here as a fetched row is, and against
+// An adapter answers a write with the row the datastore reports writing, checked here as a fetched row is, and against
 // the address it was stored at. Whether it agrees with the record sent is the delivery's to judge.
 
-/** The bank row the datastore reports storing at `bankScope`, checked. */
+/** The bank row the datastore reports writing at `bankScope`, checked. */
 export function writtenBankOf(bankScope: BankScope, bankRaw: unknown): BankRow {
   if (! CX.isPlainBag(bankRaw)) { throw Refuse.storageIssue() }
   return BX.storedBankRow.parseConsistent(bankRaw, CX.bankScope.parse(bankScope), RowOfOtherAddress)
 }
 
-/** The gate row the datastore reports storing at `gateScope`, checked. */
+/** The gate row the datastore reports writing at `gateScope`, checked. */
 export function writtenGateOf(gateScope: GateScope, gateRaw: unknown): GateRecord {
   if (! CX.isPlainBag(gateRaw)) { throw Refuse.storageIssue() }
   return BX.storedGateRow.parseConsistent(gateRaw, CX.gateScope.parse(gateScope), RowOfOtherAddress)
 }
 
-/** The vault row the datastore reports storing at `vaultScope`, checked. */
+/** The vault row the datastore reports writing at `vaultScope`, checked. */
 export function writtenVaultOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
   if (! CX.isPlainBag(vaultRaw)) { throw Refuse.storageIssue() }
   return BX.storedVaultRow.parseConsistent(vaultRaw, CX.vaultScope.parse(vaultScope), RowOfOtherAddress)
 }
 
-/** The box row the datastore reports storing at `boxQuery`, in the vault life it names, checked. */
+/** The box row the datastore reports writing at `boxQuery`, in the vault life it names, checked. */
 export function writtenBoxOf(boxQuery: BoxQuery, boxRaw: unknown): BoxRow {
   if (! CX.isPlainBag(boxRaw)) { throw Refuse.storageIssue() }
   return BX.storedBoxRow.parseConsistent(boxRaw, BX.boxQuery.parse(boxQuery), RowOfOtherAddress)
@@ -247,7 +247,7 @@ export function writtenBoxOf(boxQuery: BoxQuery, boxRaw: unknown): BoxRow {
 
 // == [Acts]: isWriteAct, isBirthAct, isOkAct, cappedActOf
 
-/** True when the act tells the caller to store the ask's record. */
+/** True when the act tells the caller to write the ask's record. */
 export function isWriteAct(act: BoxAct | VaultAct | ParentBankAct): act is WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 
 /** True when the act creates a row, or re-creates a deleted one. */
@@ -275,8 +275,8 @@ const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const
 // == [Classifying]: RowOfVault, RowOfBox, BankEnsureFetched, GateFetched, BankFetched, VaultFetched, BoxFetched, BoxesFetched, BankEnsureStored, BankBuildStored, GateStored, BankDelStored, VaultStored, BoxStored, BoxesStored, classifyEnsureBank, classifyBuildBank, classifyStoredGate, classifyDelBank, classifyStoredVault, classifyStoredBox, classifyStoredBoxes
 // The classifier checks each stored row once, and returns everything it worked out on the way to the answer. Each verb's
 // row above is judged first: when it refuses, the row asked for goes unchecked, whatever is stored there.
-// The rows it returns are the rows fetched. Under a write act, the adapter stores the record sent, and returns the row
-// the datastore reports storing in place of the row fetched (`[Rows written]`).
+// The rows it returns are the rows fetched. Under a write act, the adapter writes the record sent, and returns the row
+// the datastore reports writing in place of the row fetched (`[Rows written]`).
 
 /** A vault row from storage, unchecked, with its vaultlabel. */
 export type RowOfVault = { vaultlabel: string, vault: unknown }
@@ -405,7 +405,7 @@ export function classifyEnsureBank(ask: BankEnsureAsk, fetched: BankEnsureFetche
 
 // A gate row under a bank that is not live is of an ended life, and goes unchecked: the gate record is put over it.
 /** Classify a `buildBank` ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` and `ask.gate` in the same step that fetched the rows, and answers with the rows the datastore reports storing.
+ * When {@link isWriteAct} is true of the act, the adapter puts `ask.record` and `ask.gate` in the same step that fetched the rows, and answers with the rows the datastore reports writing.
  * Throws for a damaged row, and for a live bank with no `main` gate row.
  */
 export function classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): BankBuildStored {
@@ -418,7 +418,7 @@ export function classifyBuildBank(ask: BankBuildAsk, fetched: GateFetched): Bank
 }
 
 /** Classify a `putGate` ask against the rows an adapter fetched for it, per the put table in `notes/answer-contract.md`.
- * Applies no storage policy: under `replaced`, the caller applies the ask's (`demandStorage`, `helpers/policies.ts`) before it stores `ask.record`, in the same step that fetched the rows.
+ * Applies no storage policy: under `replaced`, the caller applies the ask's (`demandStorage`, `helpers/policies.ts`) before it puts `ask.record`, in the same step that fetched the rows.
  * Throws for a damaged row.
  */
 export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateStored {
@@ -433,7 +433,7 @@ export function classifyStoredGate(ask: GatePutAsk, fetched: GateFetched): GateS
 }
 
 /** Classify a `delBank` ask against the bank row an adapter fetched for it, per the del table in `notes/answer-contract.md`.
- * Under `deleted`, the adapter stores `ask.record` and deletes every gate, vault and box row under the bank's scope, in the same step that fetched the row, and answers with the row the datastore reports storing.
+ * Under `deleted`, the adapter writes `ask.record` and deletes every gate, vault and box row under the bank's scope, in the same step that fetched the row, and answers with the row the datastore reports writing.
  * Throws for a damaged row.
  */
 export function classifyDelBank(ask: BankDelAsk, fetched: BankFetched): BankDelStored {
@@ -444,7 +444,7 @@ export function classifyDelBank(ask: BankDelAsk, fetched: BankFetched): BankDelS
 }
 
 /** Classify a vault ask against the rows an adapter fetched for it, per the tables in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports storing.
+ * When {@link isWriteAct} is true of the act, the adapter writes `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports writing.
  * Throws for a row that fails its checks or is stored at another scope.
  */
 export function classifyStoredVault(ask: VaultAsk, fetched: VaultFetched): VaultStored {
@@ -461,7 +461,7 @@ export function classifyStoredVault(ask: VaultAsk, fetched: VaultFetched): Vault
 // A box ask is classified entirely here, top to bottom. Each fetched row is checked once, when first read, and is
 // sound and typed from then on.
 /** Classify a box ask against the rows an adapter fetched for it, per the tables in `notes/answer-contract.md`.
- * When {@link isWriteAct} is true of the act, the adapter stores `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports storing.
+ * When {@link isWriteAct} is true of the act, the adapter writes `ask.record` in the same step that fetched the rows, and answers with the row the datastore reports writing.
  * Throws for a row that fails its checks or is stored at another address.
  */
 export function classifyStoredBox(ask: BoxAsk, fetched: BoxFetched): BoxStored {

@@ -247,7 +247,7 @@ export type ModelsWorld = {
   answerOf(scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, parent?: unknown): BoxAnswer
   /** The refused answer about `scope`; `dbhas` is the row it carries. */
   refusalOf(scope: Boxscope, err: VaultError, parent?: unknown, dbhas?: unknown): BoxAnswer
-  /** The `stale_write` refusal about `scope` carrying what storage has stored as `dbhas`: a record, or null; `undefined` leaves it out. */
+  /** The `stale_write` refusal about `scope` carrying what storage has as `dbhas`: a record, or null; `undefined` leaves it out. */
   staleWriteOf(scope: Boxscope, stored: Fetched<BoxRecord, BoxSparse> | null | undefined, parent?: unknown): BoxAnswer
 
   /** Push `record` through the live watch as a notice, under the world's vault row unless told otherwise, resolving once the listing has delivered it. Throws where no watch is live. */

@@ -41,7 +41,7 @@ function listedVaultOf(vault: Vault | null): Vault {
 }
 
 describe("A new vault", () => {
-  it("is born unlocked, and stores neither the whisper nor the passphrase", async () => {
+  it("is born unlocked, and its rows have neither the whisper nor the passphrase", async () => {
     const { bank, bankDB, vault, box, demandStored } = await makeVaultWithBox()
     expect(bank.isUnlocked).to.be.true
     expect(bank.maingate.passkey0).to.be.null

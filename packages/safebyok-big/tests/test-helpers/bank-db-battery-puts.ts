@@ -110,7 +110,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
   }
 
   describe("buildBank", () => {
-    it("is born over no bank, storing the bank row and its gate row together, with the gate as val and the bank as parent", async () => {
+    it("is born over no bank, putting the bank row and its gate row together, with the gate as val and the bank as parent", async () => {
       const bankDB = await fresh()
       const bank = bankAt()
       const gate = gateAt()
@@ -130,7 +130,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(gate)
     })
 
-    it("over a live bank, returns its gate as passed, storing nothing", async () => {
+    it("over a live bank, returns its gate as passed, putting nothing", async () => {
       const { bankDB, bank, gate } = await putWith()
       const rival = { ...bankAt(0, 'bank2'), ...Rival }
       const ask = bankBuildAskOf(rival, gateAt(0, 'bank2'))
@@ -160,7 +160,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(gate)
     })
 
-    it("refuses a gate under another bank_tok than its bank record, or past its first revision, storing nothing", async () => {
+    it("refuses a gate under another bank_tok than its bank record, or past its first revision, putting nothing", async () => {
       const bankDB = await fresh()
       for (const gate of [gateAt(0, 'bank2'), gateAt(1)]) {
         const ask = bankBuildAskOf(bankAt(), gate)
@@ -170,7 +170,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.be.null
     })
 
-    it("refuses a bank_tok or gate_tok that is not new, over none or over the bank's tombstone, storing nothing", async () => {
+    it("refuses a bank_tok or gate_tok that is not new, over none or over the bank's tombstone, putting nothing", async () => {
       const { bankDB, bank } = await putWith()
       const tombstone = bankTombstoneOf(bank)
       await bankDB.delBank(bankDelAskOf(bank))
@@ -238,7 +238,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(bankDB).vaultRowOf(vaultScope)).to.deep.equal(vault)
     })
 
-    it("over a live row, ifPresent 'get' returns it as passed and 'fail' refuses, and neither stores", async () => {
+    it("over a live row, ifPresent 'get' returns it as passed and 'fail' refuses, and neither puts", async () => {
       const { bankDB, bank, vault } = await putWith()
       const passed = await bankDB.putVault(vaultPutAskOf(vaultAt(0, 'bank1', 'life2', Rival), null, { ifPresent: 'get' }))
       expect(passed).to.deep.include({ ok: true, act: 'passed', val: vault, parent: bank })
@@ -370,7 +370,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await rowsOf(bankDB).boxRowsOf(vaultScope, 'bank1', 'life1')).to.have.property('size', 0)
     })
 
-    it("refuses a box over maxRecordSizeEst, and stores one under it", async () => {
+    it("refuses a box over maxRecordSizeEst, and puts one under it", async () => {
       const bankDB = await fresh({ maxRecordSizeEst: 2000 })
       await bankDB.buildBank(bankBuildAskOf())
       await bankDB.putVault(vaultPutAskOf(vaultAt()))
@@ -393,7 +393,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       expect(await bankDB.putBox(boxPutAskOf(nextBox, box))).to.deep.include({ act: 'replaced' })
     })
 
-    it("stores a put over a box's own tombstone at its bankDB's cap", async () => {
+    it("puts a box over its own tombstone at its bankDB's cap", async () => {
       const { bankDB } = await cappedWithVault(makeCapped)
       await bankDB.putBox(boxPutAskOf(box))
       await bankDB.delBox(boxDelAskOf(box))
@@ -579,7 +579,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
       }
     })
 
-    it("refuses 'stale_write' where the row stored has the revision_tok its record brings, storing nothing", async () => {
+    it("refuses 'stale_write' where the row stored has the revision_tok its record brings, putting nothing", async () => {
       const { bankDB, bank, gate } = await putWith()
       const ask = gatePutAskOf('replace_passphrase', gate, { main: otherMainWayin })
       const { val: stored } = await bankDB.putGate(ask)
@@ -618,7 +618,7 @@ export function describePuts({ fresh, putWith, rowsOf, hasCap, makeCapped }: Bat
     })
 
     // A bankDB over a shared store may empty it for each bankDB made, so each case makes one.
-    describe("refuses a put its storage policy refuses, storing nothing", () => {
+    describe("refuses a put its storage policy refuses, putting nothing", () => {
       for (const [policy, keyed, askOf, phrase, blurb] of PolicyRefusedAsks) {
         it(`under ${policy}, ${blurb}`, async () => {
           const { bankDB, bank, gate: bare } = await putWith()

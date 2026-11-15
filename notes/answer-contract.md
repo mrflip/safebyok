@@ -340,7 +340,7 @@ get, put or del of a bank, gate or vault row reads the tables above, with these 
   verb, `buildBank` and `ensureBank`; the vault row for a box verb; none for `delBank`. The shell
   stands in for none.
 - `bank_tok` and `gate_tok` are life toks as `vault_tok` and `box_tok` are. buildBank mints both, a
-  `putGate` keeps both, delBank stores a new `bank_tok` on the bank's tombstone.
+  `putGate` keeps both, delBank writes a new `bank_tok` on the bank's tombstone.
 - A gate row is never tombstoned: it is put with its bank and deleted with it.
 - A box row's life is the pair of its `bank_tok` and `vault_tok`, `${bank_tok}/${vault_tok}` as one
   string (`BX.vaultLifeOf`). Where it is not its vault row's, the box row is of an ended life: it
@@ -378,9 +378,9 @@ its live bank's is of an ended life: it counts as no row, and the op tables read
 - `ensureBank` answers a live bank's vault rows, tombstones among them, leaves out a vault row of an
   ended life, and lists a vault row that fails its checks among `damaged_rows`.
 - `buildBank` puts the bank record and its gate record in one step: under `born` or `reborn` it
-  stores both, and answers both. Under `passed` it answers the live bank and its main gate row.
+  puts both, and answers both. Under `passed` it answers the live bank and its main gate row.
   A gate row left by an ended life is put over.
-- `delBank` under `deleted` stores the bank's tombstone, and deletes every gate, vault and box row
+- `delBank` under `deleted` writes the bank's tombstone, and deletes every gate, vault and box row
   under the bank's scope, in the same step.
 
 ### Gate ops
@@ -396,7 +396,7 @@ empty `auth`, `sigs` and `meta`, and exactly one policy; P4 and the revision rul
 
 ### The bank adapter
 
-`AdapterBankDB` carries each verb to one `do*` call, which fetches, classifies and stores the whole
+`AdapterBankDB` carries each verb to one `do*` call, which fetches, classifies and writes the whole
 verb in one atomic unit, so that a datastore can run the classifier
 inside itself (a Postgres function, a Convex mutation). Each call is handed the parsed ask, runs
 the classifier (the `classify*` methods, which a datastore judging for itself overrides), and
@@ -423,8 +423,8 @@ overwrites one.
 Three roles take part in every call, and each rule below names the one it binds.
 
 - **bankDB**: the core's `BankDB`, the interface a model calls. It checks the request's shape before anything is fetched (`bad_record`), and it answers: `act`, `val`, `parent`, `dbhas`. It owns the **classifier**, the shared pure function that is given the request and the rows fetched, returns the `act`, and says what to write, if anything. Every judgment in the tables above is the classifier's.
-- **adapter**: the package that carries a bankDB call to one kind of datastore. It opens the atomic unit, fetches the rows, passes them to the classifier, writes what the classifier says to write, and returns the rows: as fetched, and each row it wrote as the datastore reports storing it. It judges nothing.
-- **datastore**: the engine that stores the vault and box rows: Postgres, IndexedDB, a host's backend. It must offer a unique key per scope, and an atomic unit that spans a fetch and a write. It may also enforce these same invariants and checks a second time, with constraints, foreign keys or stored procedures. That is allowed but never required. It decides no outcome in the tables, and its details are outside this note.
+- **adapter**: the package that carries a bankDB call to one kind of datastore. It opens the atomic unit, fetches the rows, passes them to the classifier, writes what the classifier says to write, and returns the rows: as fetched, and each row it wrote as the datastore reports writing it. It judges nothing.
+- **datastore**: the engine that keeps the vault and box rows: Postgres, IndexedDB, a host's backend. It must offer a unique key per scope, and an atomic unit that spans a fetch and a write. It may also enforce these same invariants and checks a second time, with constraints, foreign keys or stored procedures. That is allowed but never required. It decides no outcome in the tables, and its details are outside this note.
 
 ## Scope and consistency checks
 
@@ -448,7 +448,7 @@ Two primary keys locate every row, and the datastore enforces them. Every other 
 | C10 | The write lands on the row the classifier saw                                                        | the atomic unit: the adapter fetches, classifies and writes inside one | —                                                                                                                                                                                                                                                                                | impossible, by the atomic unit; a write that misses is an adapter defect, and throws                                               |
 | C11 | A stored row is well formed: tokens present, seq an integer >= 0, live or gone                       | classifier, on every row it is handed                                  | shape check                                                                                                                                                                                                                                                                      | thrown: `damaged_row`, or `damaged_vault` for a box op's vault                                                                     |
 | C12 | Every response carries its parent back: the whole vault row                                          | bankDB, on every response                                             | —                                                                                                                                                                                                                                                                                | —                                                                                                                                  |
-| C13 | A write never stores a row the next fetch would judge damaged                                        | bankDB, in the request                                                | the proposed record's scope and `vault_tok` are those addressed; no proposed `revision_tok` is the shell's, nor is a new life token (a del citing the shell brings a life token of its own like any other, and can never be written); a put proposes a live record and a del a tombstone | `bad_record`                                                                                                                       |
+| C13 | A put or del never writes a row the next fetch would judge damaged                                   | bankDB, in the request                                                | the proposed record's scope and `vault_tok` are those addressed; no proposed `revision_tok` is the shell's, nor is a new life token (a del citing the shell brings a life token of its own like any other, and can never be written); a put proposes a live record and a del a tombstone | `bad_record`                                                                                                                       |
 | C14 | The row a request expects is the row stored                                                          | classifier, on a `revision_tok` match                                  | expected seq, life token and state = the stored row's                                                                                                                                                                                                                            | `clash`                                                                                                                            |
 | C15 | A put or del writes at most once                                                                     | fresh revision tokens, and tombstones                                  | once its proposed revision is stored, or its expected revision is no longer the stored one, the request writes nothing                                                                                                                                                           | none: it refuses as the tables say. delRaw returns a scope to void, and ends this for a request citing the shell                |
 
@@ -479,15 +479,15 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - A write happens only when the outcome is born, reborn, replaced or deleted, and in the same atomic unit that fetched the rows the classifier judged. Nothing else writes those rows in between, so a write never misses.
 - A write changes exactly one row, the one the classifier was handed, or inserts one where it was handed none.
 - born inserts: no row exists for the `box_scope` in this life of its vault. A box of an earlier life stands under its own key, untouched.
-- Every write stores the proposed revision: the proposed `revision_tok`, at seq = stored seq + 1. The seq at a scope therefore rises by exactly one at each write.
+- Every put or del writes the proposed revision: the proposed `revision_tok`, at seq = stored seq + 1. The seq at a scope therefore rises by exactly one at each write.
 - The seq goes on across a rebirth: a reborn row is stored at its tombstone's seq + 1. So the seq at a scope never falls, whatever the life, and a device can tell a row of an earlier life from a row of a later one by its seq (`notes/deliver-contract.md`). Only delRaw, which returns a scope to void, ends this.
-- born, reborn and delete store the proposed `box_tok`, which differs from the stored row's. Replace leaves `box_tok` unchanged.
-- delete stores a tombstone (state gone, no value, the proposed `revision_tok`, seq + 1, the proposed `box_tok`) and never removes the row. Only delRaw removes rows.
+- born, reborn and delete write the proposed `box_tok`, which differs from the stored row's. Replace leaves `box_tok` unchanged.
+- delete writes a tombstone (state gone, no value, the proposed `revision_tok`, seq + 1, the proposed `box_tok`) and never removes the row. Only delRaw removes rows.
 - Every successful modification, delete included, writes a new revision. Deleting a tombstone refuses (`dubdel`) and leaves the revision unchanged.
-- Vault delete sets state gone, writes a new revision (the proposed `revision_tok`, seq + 1) and stores the proposed `vault_tok`, which differs from the stored row's. Afterwards, no box op under that `vault_scope` returns a live box until the vault has been re-created.
+- Vault delete sets state gone, writes a new revision (the proposed `revision_tok`, seq + 1) and writes the proposed `vault_tok`, which differs from the stored row's. Afterwards, no box op under that `vault_scope` returns a live box until the vault has been re-created.
 - Vault delete removes every box of that vault life (box.`vault_tok` = the deleted `vault_tok`), in the same atomic unit where the datastore can. Where it can't, those boxes stay inaccessible (C6) until tidyBoxes removes them, and are never fetched again once the vault is re-created (C5).
-- Vault re-create stores the proposed `vault_tok`, which differs from the tombstone's, with seq = stored seq + 1.
-- Vault replace stores the proposed revision and leaves `vault_tok` unchanged.
+- Vault re-create writes the proposed `vault_tok`, which differs from the tombstone's, with seq = stored seq + 1.
+- Vault replace writes the proposed revision and leaves `vault_tok` unchanged.
 - No write copies a new `vault_tok` onto existing boxes. A foreign key from (box.`vault_scope`, box.`vault_tok`) to the vault, where declared, never cascades updates.
 - A put or del writes at most once (C15): once its proposed revision is stored, or its expected revision is no longer the stored one, it writes nothing.
 - A put that would be `born` may refuse `vault_full` under the bankDB's soft cap, which counts the vault life's box rows, tombstones among them. The count is an estimate, made outside any lock, and the check may run at any point in the atomic unit (*Soft caps*).
@@ -504,7 +504,7 @@ Each rule is one testable statement about what an adapter does. An atomic unit i
 - Required: a unique key per scope. `vault_scope` keys the vault table and (`vault_scope`, `vault_tok`, boxlabel) keys the box table, so a scope never has two rows in one vault life.
 - Required: an atomic unit that spans the fetch and the write of a get, put or del. tidyBoxes asks for none beyond each conditioned delete.
 - Allowed, never required: the datastore enforces an invariant itself, by a foreign key (C5), a check constraint, a condition on the write, or a stored procedure that runs these checks. Such a check agrees with the classifier, or the adapter has a defect; it never decides an outcome.
-- Allowed: the datastore refuses to store a row the classifier would refuse. So a flawed row has one of two fates: the datastore does not store it, or the classifier throws it, as `storage_issue` if its scope is not the one it is filed under, and as damaged otherwise.
+- Allowed: the datastore refuses to write a row the classifier would refuse. So a flawed row has one of two fates: the datastore does not write it, or the classifier throws it, as `storage_issue` if its scope is not the one it is filed under, and as damaged otherwise.
 
 ### tidyBoxes tests
 

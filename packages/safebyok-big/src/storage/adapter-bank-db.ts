@@ -75,7 +75,7 @@ export abstract class AdapterBankDB implements BankDB {
   }
 
   /** Apply the storage policies `ask` names to the rows stored, throwing `gate_issue` where one refuses.
-   * Override it to do nothing in a store that applies them itself, in the step that stores the record.
+   * Override it to do nothing in a store that applies them itself, in the step that puts the record.
    */
   protected demandPolicies(ask: GatePutAsk, stored: StoredGateRows): void { Policy.demandStorage(ask, stored) }
 
@@ -101,7 +101,7 @@ export abstract class AdapterBankDB implements BankDB {
   // --
 
   // == [Bank verbs]: ensureBank, tryEnsureBank, buildBank, tryBuildBank, delBank, tryDelBank
-  // Each verb parses its ask, has the subclass fetch, classify and store, and makes its answer from what the classifier returned.
+  // Each verb parses its ask, has the subclass fetch, classify and write, and makes its answer from what the classifier returned.
 
   /** Get the bank row, and for a live bank its `main` gate row and its vault rows ({@link BankDB.ensureBank}). */
   async ensureBank(ask: BankEnsureAsk) { return goodOrThrow(await this.tryEnsureBank(ask)) }
@@ -116,7 +116,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'ensureBank', ask) }
   }
 
-  /** Store a new bank record and its `main` gate row together ({@link BankDB.buildBank}). */
+  /** Put a new bank record and its `main` gate row together ({@link BankDB.buildBank}). */
   async buildBank(ask: BankBuildAsk) { return goodOrThrow(await this.tryBuildBank(ask)) }
 
   /** Non-throwing form of {@link buildBank}. */
@@ -132,7 +132,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'buildBank', ask) }
   }
 
-  /** Store the bank's tombstone, and delete every gate, vault and box row under it ({@link BankDB.delBank}). */
+  /** Write the bank's tombstone, and delete every gate, vault and box row under it ({@link BankDB.delBank}). */
   async delBank(ask: BankDelAsk) { return goodOrThrow(await this.tryDelBank(ask)) }
 
   /** Non-throwing form of {@link delBank}. */
@@ -150,7 +150,7 @@ export abstract class AdapterBankDB implements BankDB {
 
   // == [Gate verbs]: putGate, tryPutGate
 
-  /** Store `ask.record` over the gate row `ask.expected`, under its storage policy ({@link BankDB.putGate}). */
+  /** Put `ask.record` over the gate row `ask.expected`, under its storage policy ({@link BankDB.putGate}). */
   async putGate(ask: GatePutAsk) { return goodOrThrow(await this.tryPutGate(ask)) }
 
   /** Non-throwing form of {@link putGate}. */
@@ -184,7 +184,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'getVault', ask) }
   }
 
-  /** Store `ask.record` over the vault row `ask.expected` ({@link BankDB.putVault}). */
+  /** Put `ask.record` over the vault row `ask.expected` ({@link BankDB.putVault}). */
   async putVault(ask: VaultPutAsk) { return goodOrThrow(await this.tryPutVault(ask)) }
 
   /** Non-throwing form of {@link putVault}. */
@@ -199,7 +199,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'putVault', ask) }
   }
 
-  /** Store the vault's tombstone, and delete the boxes of that vault life ({@link BankDB.delVault}). */
+  /** Write the vault's tombstone, and delete the boxes of that vault life ({@link BankDB.delVault}). */
   async delVault(ask: VaultDelAsk) { return goodOrThrow(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
@@ -253,7 +253,7 @@ export abstract class AdapterBankDB implements BankDB {
     if (recordSizeEst > this.#maxRecordSizeEst) { throw Refuse.boxTooLarge(recordSizeEst, this.#maxRecordSizeEst) }
   }
 
-  /** Store `ask.record` over the box row `ask.expected` ({@link BankDB.putBox}).
+  /** Put `ask.record` over the box row `ask.expected` ({@link BankDB.putBox}).
    * Refuses `box_too_large` for a record over `maxRecordSizeEst` bytes of JSON, before the datastore is asked.
    */
   async putBox(ask: BoxPutAsk) { return goodOrThrow(await this.tryPutBox(ask)) }
@@ -273,7 +273,7 @@ export abstract class AdapterBankDB implements BankDB {
     } catch (err) { return this.answerForRefusal(err, 'putBox', ask) }
   }
 
-  /** Store the box's tombstone ({@link BankDB.delBox}). */
+  /** Write the box's tombstone ({@link BankDB.delBox}). */
   async delBox(ask: BoxDelAsk) { return goodOrThrow(await this.tryDelBox(ask)) }
 
   /** Non-throwing form of {@link delBox}. */
@@ -322,32 +322,32 @@ export abstract class AdapterBankDB implements BankDB {
   // --
 
   // == [Protected, for a subclass to write]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
-  // Each is one atomic step: fetch the rows the classifier needs, classify them, and when `isWriteAct(act)` is true, store
-  // the record sent and return the row the datastore reports storing in place of the one fetched, checked by the bank
+  // Each is one atomic step: fetch the rows the classifier needs, classify them, and when `isWriteAct(act)` is true, write
+  // the record sent and return the row the datastore reports writing in place of the one fetched, checked by the bank
   // classifier's `writtenBankOf`, `writtenGateOf`, `writtenVaultOf` or `writtenBoxOf`. A store that can run code of its own
   // may run the whole step there.
 
   /** In one step: fetch the bank row, its `main` gate row and every vault row of the bank, and return `this.classifyEnsureBank(ask, fetched)`. */
   protected abstract doEnsureBank(ask: BankEnsureAsk): Awaitable<BankEnsureStored>
-  /** In one step: fetch the bank row and its `main` gate row, classify, and if the act is a write, store `ask.record` and `ask.gate` and return the rows stored. */
+  /** In one step: fetch the bank row and its `main` gate row, classify, and if the act is a write, put `ask.record` and `ask.gate` and return the rows stored. */
   protected abstract doBuildBank(ask: BankBuildAsk): Awaitable<BankBuildStored>
-  /** In one step: fetch the bank row and the gate row, classify (applying the ask's storage policy), and if the act is a write, store `ask.record` and return the row stored. */
+  /** In one step: fetch the bank row and the gate row, classify (applying the ask's storage policy), and if the act is a write, put `ask.record` and return the row stored. */
   protected abstract doPutGate(ask: GatePutAsk): Awaitable<GateStored>
-  /** In one step: fetch the bank row, classify, and if the act is a write, store `ask.record`, delete every gate, vault and box row under the bank, and return the row stored. */
+  /** In one step: fetch the bank row, classify, and if the act is a write, write `ask.record`, delete every gate, vault and box row under the bank, and return the row stored. */
   protected abstract doDelBank(ask: BankDelAsk): Awaitable<BankDelStored>
   /** In one step: fetch the bank row and the vault row at `ask`'s scope, and return `this.classifyStoredVault(ask, fetched)`. */
   protected abstract doGetVault(ask: VaultGetAsk): Awaitable<VaultStored>
-  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and if the act is a write, store `ask.record` and return the row stored. */
+  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and if the act is a write, put `ask.record` and return the row stored. */
   protected abstract doPutVault(ask: VaultPutAsk): Awaitable<VaultStored>
-  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and if the act is a write, store `ask.record`, delete that life's boxes, and return the row stored. */
+  /** In one step: fetch the bank row and the vault row at `ask`'s scope, classify, and if the act is a write, write `ask.record`, delete that life's boxes, and return the row stored. */
   protected abstract doDelVault(ask: VaultDelAsk): Awaitable<VaultStored>
   /** In one step: fetch the vault row and every box row of the asked-for life, and return `this.classifyStoredBoxes(ask, fetched)`. */
   protected abstract doListBoxes(ask: BoxListAsk): Awaitable<BoxesStored>
   /** In one step: fetch the vault row and the box row `ask` names, and return `this.classifyStoredBox(ask, fetched)`. */
   protected abstract doGetBox(ask: BoxGetAsk): Awaitable<BoxStored>
-  /** In one step: fetch the vault row, the box row and the vault's capacity at `ask`'s address, classify, and if the act is a write, store `ask.record` and return the row stored. */
+  /** In one step: fetch the vault row, the box row and the vault's capacity at `ask`'s address, classify, and if the act is a write, put `ask.record` and return the row stored. */
   protected abstract doPutBox(ask: BoxPutAsk): Awaitable<BoxStored>
-  /** In one step: fetch the vault row and the box row at `ask`'s address, classify, and if the act is a write, store `ask.record` and return the row stored. */
+  /** In one step: fetch the vault row and the box row at `ask`'s address, classify, and if the act is a write, put `ask.record` and return the row stored. */
   protected abstract doDelBox(ask: BoxDelAsk): Awaitable<BoxStored>
   /** Delete the vault and box rows of an ended life under the bank, and count the box rows left in it. */
   protected abstract doTidyGone(ask: BoxTidyAsk): Awaitable<Tidied>

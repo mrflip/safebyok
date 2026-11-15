@@ -133,7 +133,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link fetchBox}. */
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Seal `patch` over the box at its `boxlabel`, and store it, resolving the box.
+  /** Seal `patch` over the box at its `boxlabel`, and put it, resolving the box.
    * {@link Box.put} has the options.
    */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {

@@ -17,7 +17,7 @@ import * as CVX from './validators'
 // * check its ask with the core's checker,
 // * fetch the row asked for and the row above it,
 // * classify the ask with the core's classifier, then
-// * store the ask's record if the classifier instructs it to write, and read back the row stored.
+// * write the ask's record if the classifier instructs it to, and read back the row stored.
 // It returns the rows it fetched, as they stood before any write, and as `written` the rows read back, or null if it wrote
 // nothing. The client classifies the fetched rows with the same classifier, so it reaches the same act, outcome or refusal,
 // checks that the act agrees with whether anything was written, and answers the rows read back.
@@ -38,7 +38,7 @@ export const ensureBank = query({
   },
 })
 
-/** Classify a `buildBank` ask against the bank row and its `main` gate row, and store its bank and gate records if the act is a write. */
+/** Classify a `buildBank` ask against the bank row and its `main` gate row, and put its bank and gate records if the act is a write. */
 export const buildBank = mutation({
   args:    CVX.askArgs,
   returns: CVX.bankBuilt,
@@ -54,7 +54,7 @@ export const buildBank = mutation({
   },
 })
 
-/** Classify a `putGate` ask against the bank row and the gate row, apply its storage policy, and store its gate record if the act is a write. */
+/** Classify a `putGate` ask against the bank row and the gate row, apply its storage policy, and put its gate record if the act is a write. */
 export const putGate = mutation({
   args:    CVX.askArgs,
   returns: CVX.gateWritten,
@@ -72,7 +72,7 @@ export const putGate = mutation({
 // `tallies.ts`. So the tombstone is written first, and the rows under the bank are deleted while the cascade's budget lasts.
 // The rows left are of the life the tombstone ended: a gate or vault row under another `bank_tok` than its bank row's reads as
 // no row, and a box row is found only by its own life's tokens. `tidyGone` deletes them.
-/** Classify a `delBank` ask against the bank row. If the act is a write, store its tombstone and delete the rows under the bank, as many as one transaction allows. */
+/** Classify a `delBank` ask against the bank row. If the act is a write, write its tombstone and delete the rows under the bank, as many as one transaction allows. */
 export const delBank = mutation({
   args:    CVX.askArgs,
   returns: CVX.bankWritten,
@@ -102,7 +102,7 @@ export const getVault = query({
   },
 })
 
-/** Classify a vault put against the bank row and the vault row, and store its record if the act is a write. */
+/** Classify a vault put against the bank row and the vault row, and put its record if the act is a write. */
 export const putVault = mutation({
   args:    CVX.askArgs,
   returns: CVX.vaultWritten,
@@ -116,7 +116,7 @@ export const putVault = mutation({
   },
 })
 
-/** Classify a vault del against the bank row and the vault row. If the act is a write, store its tombstone and delete the box rows of the life it ends. */
+/** Classify a vault del against the bank row and the vault row. If the act is a write, write its tombstone and delete the box rows of the life it ends. */
 export const delVault = mutation({
   args:    CVX.askArgs,
   returns: CVX.vaultWritten,
@@ -164,8 +164,8 @@ export const getBox = query({
 // The cap the client sends is a soft cap, as every bankDB's is. Like the tally's `all_count`, it counts every box row, tombstones
 // included. This component currently enforces it and its own limits exactly, inside the mutation: a write that would take the life
 // past one is not stored, and the put answers `roomless` instead. Nothing promises that exactness.
-/** Classify a box put against the vault row, the box row and the life's capacity, and store its record if the act is a write.
- * Answers `roomless`, storing nothing, when the write would take the life past a limit.
+/** Classify a box put against the vault row, the box row and the life's capacity, and put its record if the act is a write.
+ * Answers `roomless`, writing nothing, when the write would take the life past a limit.
  */
 export const putBox = mutation({
   args:    CVX.putBoxArgs,
@@ -190,7 +190,7 @@ export const putBox = mutation({
   },
 })
 
-/** Classify a box del against the vault row and the box row, and store its tombstone if the act is a write. */
+/** Classify a box del against the vault row and the box row, and write its tombstone if the act is a write. */
 export const delBox = mutation({
   args:    CVX.askArgs,
   returns: CVX.boxWritten,

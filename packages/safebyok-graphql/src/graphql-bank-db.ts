@@ -69,7 +69,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'ensureBank', ask) }
   }
 
-  /** Store a new bank record and its `main` gate row together ({@link BX.BankDB.buildBank}). */
+  /** Put a new bank record and its `main` gate row together ({@link BX.BankDB.buildBank}). */
   async buildBank(ask: BX.BankBuildAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryBuildBank(ask)) }
 
   /** Non-throwing form of {@link buildBank}. */
@@ -81,7 +81,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'buildBank', ask) }
   }
 
-  /** Store the bank's tombstone, and delete every gate, vault and box row under it ({@link BX.BankDB.delBank}). */
+  /** Write the bank's tombstone, and delete every gate, vault and box row under it ({@link BX.BankDB.delBank}). */
   async delBank(ask: BX.BankDelAsk): Promise<BX.GoodAnswer<BX.BankRow | null, OkAct, typeof BX.BankTop>> { return goodAnswerOf(await this.tryDelBank(ask)) }
 
   /** Non-throwing form of {@link delBank}. */
@@ -96,7 +96,7 @@ export class GraphQLBankDB implements BX.BankDB {
 
   // == [Gate verbs]: putGate, tryPutGate
 
-  /** Store the gate record over the gate row expected, under its storage policy ({@link BX.BankDB.putGate}). */
+  /** Put the gate record over the gate row expected, under its storage policy ({@link BX.BankDB.putGate}). */
   async putGate(ask: BX.GatePutAsk): Promise<BX.GoodAnswer<BX.GateRecord, OkAct>> { return goodAnswerOf(await this.tryPutGate(ask)) }
 
   /** Non-throwing form of {@link putGate}. */
@@ -123,7 +123,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'getVault', ask) }
   }
 
-  /** Store `ask.record` over the vault row `ask.expected` ({@link BX.BankDB.putVault}). */
+  /** Put `ask.record` over the vault row `ask.expected` ({@link BX.BankDB.putVault}). */
   async putVault(ask: BX.VaultPutAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryPutVault(ask)) }
 
   /** Non-throwing form of {@link putVault}. */
@@ -135,7 +135,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'putVault', ask) }
   }
 
-  /** Store the vault's tombstone, and delete the boxes of that vault life ({@link BX.BankDB.delVault}). */
+  /** Write the vault's tombstone, and delete the boxes of that vault life ({@link BX.BankDB.delVault}). */
   async delVault(ask: BX.VaultDelAsk): Promise<BX.GoodAnswer<BX.VaultRow | null, OkAct>> { return goodAnswerOf(await this.tryDelVault(ask)) }
 
   /** Non-throwing form of {@link delVault}. */
@@ -174,7 +174,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'getBox', ask) }
   }
 
-  /** Store `ask.record` over the box row `ask.expected` ({@link BX.BankDB.putBox}). */
+  /** Put `ask.record` over the box row `ask.expected` ({@link BX.BankDB.putBox}). */
   async putBox(ask: BX.BoxPutAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryPutBox(ask)) }
 
   /** Non-throwing form of {@link putBox}. */
@@ -186,7 +186,7 @@ export class GraphQLBankDB implements BX.BankDB {
     } catch (err) { return answerForRefusal(err, 'putBox', ask) }
   }
 
-  /** Store the box's tombstone ({@link BX.BankDB.delBox}). */
+  /** Write the box's tombstone ({@link BX.BankDB.delBox}). */
   async delBox(ask: BX.BoxDelAsk): Promise<BX.GoodAnswer<BX.BoxRow | null, OkAct, BX.VaultRow>> { return goodAnswerOf(await this.tryDelBox(ask)) }
 
   /** Non-throwing form of {@link delBox}. */

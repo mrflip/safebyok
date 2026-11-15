@@ -11,7 +11,7 @@ function scope() { return world.mw.boxscope('anthropic_api_key') }
 
 const gone    = () => tombstoneBoxRecord({ revision_seq: 2 })
 
-/** The revision a stale_write says storage has stored. */
+/** The revision a stale_write says storage has. */
 const stored = { revision_tok: 'rev-s5', revision_seq: 5 }
 
 /** A full box world, and the calls forgotten. */
@@ -155,7 +155,7 @@ describe("BoxListing: an absent box", () => {
 
   })
 
-  describe("a refused answer carrying what storage has stored", () => {
+  describe("a refused answer carrying what storage has", () => {
     it("delivers a full box_stored to the box, then throws 'stale_write'", async () => {
       const { listing, box } = listedBox()
       const record = fullBoxRecord({ ...stored, sidecar: { note: 'theirs' } })

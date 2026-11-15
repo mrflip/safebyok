@@ -271,7 +271,7 @@ describe("device.birthBankPrompt()", () => {
     expect(put.banks[0]!.isLocked).to.be.true
   })
 
-  it("concludes the gating with the put's refusal in this layer, which stores nothing", async () => {
+  it("concludes the gating with the put's refusal in this layer, which puts nothing", async () => {
     const dialog = typingDialog(TH.TestPassphrase)
     const device = TH.makeDevice({}, { requestCleartext: dialog.requestCleartext })
     const err = await TH.expectRefusal(device.birthBankPrompt(), 'unexpected_error')

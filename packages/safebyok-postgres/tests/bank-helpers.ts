@@ -37,7 +37,7 @@ export function bootDatabaseFirst(): void {
 }
 // --
 
-// == [BankDBs]: listen, bankDBOver, makeBankDB, emptyTables, makeTwin, failNextCall, storeOtherwise
+// == [BankDBs]: listen, bankDBOver, makeBankDB, emptyTables, makeTwin, failNextCall, writeOtherwise
 
 const listenersOf = new Map<string, Set<(text: string) => void>>()
 
@@ -90,15 +90,15 @@ export function failNextCall(bankDB: PostgresBankDB): void { clientsOf.get(bankD
 
 const BankTables = ['safebyok_banks', 'safebyok_gates', 'safebyok_vaults', 'safebyok_boxes']
 
-/** Until the test ends, have every table store a row other than the one each write sends, as a database that alters what it stores would. */
-export async function storeOtherwise(): Promise<void> {
+/** Until the test ends, have every table write a row other than the one each write sends, as a database that alters what it writes would. */
+export async function writeOtherwise(): Promise<void> {
   const db = await database()
   const triggers = BankTables.map((table) => `CREATE TRIGGER store_otherwise BEFORE INSERT OR UPDATE ON ${table} FOR EACH ROW EXECUTE FUNCTION store_otherwise();`)
   const drops = BankTables.map((table) => `DROP TRIGGER store_otherwise ON ${table};`)
   await db.exec(`
     CREATE FUNCTION store_otherwise() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
-      NEW.revision_tok := NEW.revision_tok || '${TH.StoredOtherwiseSuffix}';
+      NEW.revision_tok := NEW.revision_tok || '${TH.WrittenOtherwiseSuffix}';
       RETURN NEW;
     END $$;
     ${triggers.join('\n')}

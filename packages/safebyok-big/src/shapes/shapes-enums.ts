@@ -122,11 +122,11 @@ export type DelAct = typeof delActVals[number]
 
 // == [Classified acts]: writeActVals, WriteAct, foundActVals, FoundAct, OkAct, refusedActVals, RefusedAct, boxVaultActVals, BoxVaultAct, parentBankActVals, ParentBankAct, VaultAct, BoxAct, goodActVals, GoodAct, badActVals, BadAct
 
-/** The acts of a put or del that stored its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
+/** The acts of a put or del that wrote its record: `born` over nothing, `reborn` over a tombstone, `replaced` over a live row, or `deleted`. */
 export const writeActVals = ['born', 'reborn', 'replaced', 'deleted'] as const
 export type WriteAct = typeof writeActVals[number]
 
-/** The acts that store nothing and return what is stored: a get's `gotlive`, `gotvoid` or `gotgone`, and a put's `passed`. */
+/** The acts that write nothing and return what is stored: a get's `gotlive`, `gotvoid` or `gotgone`, and a put's `passed`. */
 export const foundActVals = ['gotlive', 'gotvoid', 'gotgone', 'passed'] as const
 export type FoundAct = typeof foundActVals[number]
 

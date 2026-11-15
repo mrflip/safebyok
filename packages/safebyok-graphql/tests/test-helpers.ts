@@ -17,7 +17,7 @@ import { BankSchemaSdl, bankResolvers } from '../src/server'
 // Re-export the core's test helpers, so a test here imports this one module as TH.
 export * from 'safebyok-big/testing'
 
-// == [The database]: BootMillis, database, bootDatabaseFirst, emptyTables, storeOtherwise, listen
+// == [The database]: BootMillis, database, bootDatabaseFirst, emptyTables, writeOtherwise, listen
 
 // On a CI runner, PGlite's WebAssembly can take eight seconds or more to compile from cold, longer than a test's default timeout.
 export const BootMillis = 60_000
@@ -54,15 +54,15 @@ export async function emptyTables(): Promise<void> {
 
 const BankTables = ['safebyok_banks', 'safebyok_gates', 'safebyok_vaults', 'safebyok_boxes']
 
-/** Until the test ends, have every table store a row other than the one each write sends, as a database that alters what it stores would. */
-export async function storeOtherwise(): Promise<void> {
+/** Until the test ends, have every table write a row other than the one each write sends, as a database that alters what it writes would. */
+export async function writeOtherwise(): Promise<void> {
   const db = await database()
   const triggers = BankTables.map((table) => `CREATE TRIGGER store_otherwise BEFORE INSERT OR UPDATE ON ${table} FOR EACH ROW EXECUTE FUNCTION store_otherwise();`)
   const drops = BankTables.map((table) => `DROP TRIGGER store_otherwise ON ${table};`)
   await db.exec(`
     CREATE FUNCTION store_otherwise() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
-      NEW.revision_tok := NEW.revision_tok || '${TH.StoredOtherwiseSuffix}';
+      NEW.revision_tok := NEW.revision_tok || '${TH.WrittenOtherwiseSuffix}';
       RETURN NEW;
     END $$;
     ${triggers.join('\n')}

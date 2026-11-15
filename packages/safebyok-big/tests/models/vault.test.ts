@@ -8,7 +8,7 @@ import { Dna, T0, listingOptsOf, makeBornVault, makeBornVaultAndFriend, makeVaul
 useVaultWorlds()
 
 describe("bank.ensureVault", () => {
-  it("stores a new vault record of the bank, at its first revision", async () => {
+  it("puts a new vault record of the bank, at its first revision", async () => {
     const { bank, vault, storedNow } = await makeBornVault()
     expect(vault.bank_tok).to.eq(bank.bank_tok)
     expect(vault.revision_seq).to.eq(0)

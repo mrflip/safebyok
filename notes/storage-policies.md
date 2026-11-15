@@ -10,7 +10,7 @@ The capacity check is another policy, though it is not yet named in `options`: o
 
 ## Where a policy is applied
 
-A policy runs where the store's own code runs, on the rows fetched in the step that stores the record. The device
+A policy runs where the store's own code runs, on the rows fetched in the step that puts the record. The device
 cannot be trusted with this: the device-side bankDB runs in the page, beside every script and extension the page
 loads. The device makes the same checks before it calls (`models/gating.ts`), so an honest device never meets a
 refusal. A refusal means some other caller sent the put.
@@ -19,7 +19,7 @@ refusal. A refusal means some other caller sent the put.
   `replaced`. That calls `demandStorage(ask, stored)`, which applies each policy the ask names. This is the bastion
   where the adapter runs beside the database: memory, IndexedDB, a server's bankDB.
 * **Convex**: the component's `putGate` mutation applies `demandStorage` inside Convex.
-* **Postgres**: `safebyok_put_gate` states each policy as conditions of the one statement that stores the record. On a
+* **Postgres**: `safebyok_put_gate` states each policy as conditions of the one statement that puts the record. On a
   refusal, the adapter re-runs the classifier on the rows returned, to name the refusal.
 
 Every adapter passes the same battery cases, one set per policy.

@@ -1,4 +1,4 @@
-/** A bankDB adapter that stores its rows in Postgres. */
+/** A bankDB adapter that keeps its rows in Postgres. */
 
 import * as DB from 'safebyok-big/storage'
 import type { Awaitable, BankScope, BoxTidyAsk, Capacity, Tidied, VaultError, VaultScope, WatchScope } from 'safebyok-big/storage'
@@ -113,7 +113,7 @@ function codeOf(thrown: unknown): string | undefined {
 // --
 
 // == [What the database returns]: Verdict, GateAnswered, BankAnswered, VaultAnswered, BoxAnswered, storedVerdict, parentVaultRow, RowOfOtherAddress, StoredNothing
-// A fetch returns rows alone. A write function also returns whether it stored the record (`ok`), and if it did,
+// A fetch returns rows alone. A write function also returns whether it wrote the record (`ok`), and if it did,
 // the `act` and the `presence` of what was stored before.
 
 /** A write function's verdict, unchecked. */
@@ -142,7 +142,7 @@ const RowOfOtherAddress = { kind: 'storage_issue', message: DB.rowOfOtherAddress
 const StoredNothing = 'The database stored nothing for a write its rows allow.'
 // --
 
-/** A bankDB that stores its rows in your Postgres: `new PostgresBankDB({ client: pgClientOf(pool) })`. */
+/** A bankDB that keeps its rows in your Postgres: `new PostgresBankDB({ client: pgClientOf(pool) })`. */
 export class PostgresBankDB extends DB.AdapterBankDB {
   // == [Props]: #client, #listen, #maxBoxes
 
@@ -226,9 +226,9 @@ export class PostgresBankDB extends DB.AdapterBankDB {
   // --
 
   // == [Classifying]: classifyBuildBank, classifyStoredGate, classifyDelBank, classifyStoredVault, classifyStoredBox
-  // A write function checks an ask and stores its record in one call. When it stored the record, its result is checked and returned
-  // without classifying, with the row written as the database returned it. When it stored nothing, or the ask is a get, the core's classifier classifies the ask against the rows returned.
-  // If the classifier finds a write when the function stored nothing, that is a fault, thrown where the function was called.
+  // A write function checks an ask and writes its record in one call. When it wrote the record, its result is checked and returned
+  // without classifying, with the row written as the database returned it. When it wrote nothing, or the ask is a get, the core's classifier classifies the ask against the rows returned.
+  // If the classifier finds a write when the function wrote nothing, that is a fault, thrown where the function was called.
 
   protected override classifyBuildBank(ask: BX.BankBuildAsk, answered: GateAnswered): BX.BankBuildStored {
     if (answered.ok !== true) { return super.classifyBuildBank(ask, answered) }
@@ -272,7 +272,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
     return this.classifyEnsureBank(ask, fetched)
   }
 
-  // A buildBank over a live bank stores nothing, and is classified against the rows the function returns.
+  // A buildBank over a live bank writes nothing, and is classified against the rows the function returns.
   protected async doBuildBank(ask: BX.BankBuildAsk): Promise<BX.BankBuildStored> {
     const text     = (ask.expected.revision_seq === DB.VoidRevisionSeq) ? BirthBankSql : ReviseBankSql
     const answered = await this.#firstRow<GateAnswered>(text, [JSON.stringify(ask.record), JSON.stringify(ask.gate), JSON.stringify(ask.expected)])
@@ -281,7 +281,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
     return stored
   }
 
-  // The function checks the bank row as it stores, so putGate always calls it: when nothing is stored, the
+  // The function checks the bank row as it puts, so putGate always calls it: when nothing is stored, the
   // classifier answers from the rows it returns.
   protected async doPutGate(ask: BX.GatePutAsk): Promise<BX.GateStored> {
     const answered = await this.#firstRow<GateAnswered>(PutGateSql, [JSON.stringify(ask.record), JSON.stringify(ask.expected), ask.options.policies])
@@ -451,8 +451,8 @@ function isBirth({ expected }: BX.BoxPutAsk | BX.VaultPutAsk): boolean {
 }
 
 // The classifier reads `ifPresent` over a stored live row and `ifAbsent` over a tombstone or no row, and finds a write only
-// when the stored row is the expected row. So only the option for the expected row can let this put store.
-/** True if the put's options let it store its record over the row it expects:
+// when the stored row is the expected row. So only the option for the expected row can let this put write.
+/** True if the put's options let it put its record over the row it expects:
  * - no row or a tombstone, under `ifAbsent: 'add'`
  * - a live row, under `ifPresent: 'repl'`
  */

@@ -55,8 +55,8 @@ of that kind. Use the same id your app gives the core as `user_id`.
 directly, so the component checks each ask with the core's own checks before it reads a row, and
 refuses one that fails them with a `ConvexError` whose `data` has the kind and the core's message.
 It then fetches the row asked for and the row above it, classifies the ask with the core's
-classifier, and stores the record if the outcome is a write, all in one
-mutation. It answers with the rows as it fetched them, and the rows it stored, read back, if it
+classifier, and writes the record if the outcome is a write, all in one
+mutation. It answers with the rows as it fetched them, and the rows it wrote, read back, if it
 wrote: the client classifies the fetched rows to the same outcome, and refuses `unexpected_error`
 should that outcome and whether it wrote disagree, which means a component out of step with the
 client's copy of safebyok. A write answers the rows stored.
@@ -82,7 +82,7 @@ Hand `bankDB` to the core, as its README's *A host* shows.
 * **`maxBoxes`** (optional, default 100) caps the box rows of one vault life, including the tombstones of deleted
   boxes, and never exceeds the component's own limit. A put of a new boxlabel past it refuses as `vault_full`, so
   deleting a box frees no room. Like every bankDB's, it is a soft cap. This adapter currently enforces it exactly,
-  since each put is counted in the mutation that stores it, but do not rely on that. A replacement, a delete, and a
+  since each put is counted in the mutation that puts it, but do not rely on that. A replacement, a delete, and a
   box put again over its own tombstone are never refused for it.
 * **`maxRecordSizeEst`**, optional, as every bankDB accepts it: 5,600 bytes if left out, at most Convex's 1 MiB document.
 
@@ -134,7 +134,7 @@ boxes until the vault is deleted.** Deleting the vault is the only way to empty 
 deletes the box rows of the life it ends, in the same mutation, and the next life starts with none.
 
 **How big a bank can be.** A bank has any number of vaults, more than one Convex transaction
-(16 MiB read, 16,000 documents written) can delete. So `delBank` stores the bank's tombstone, then
+(16 MiB read, 16,000 documents written) can delete. So `delBank` writes the bank's tombstone, then
 deletes the gate, vault and box rows under it while half of each limit lasts, and leaves the rest.
 What it leaves is out of reach: a gate or vault row under another bank life than its bank row's
 reads as no row, and a box row is found only by its own life's tokens. `tidyGone` deletes the rows

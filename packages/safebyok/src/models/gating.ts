@@ -221,7 +221,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // Each attempt proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving
 // builder, and a proving never leaves the attempt that built it.
 
-/** Birth a bank of `device`'s scope from the user's passphrase and optional passkey, store it, and unlock it.
+/** Birth a bank of `device`'s scope from the user's passphrase and optional passkey, put it, and unlock it.
  * Refuses `gate_made_elsewhere` where a live bank is already stored there.
  */
 export async function birthBank(device: Device, cleartexts: unknown): Promise<Bank> {

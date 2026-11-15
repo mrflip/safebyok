@@ -69,7 +69,7 @@ copy it:
   verbs. The base class checks scope and options on the way in, validates every row on the way
   out, and turns a put or del that did not take effect into its refusal.
 * **Do each `do*` in one transaction of your datastore.** Fetch the rows the call depends on, classify the ask with the
-  `classify*` method of its kind, and store the ask's record only if `BX.isWriteAct(stored.act)`, from `safebyok/storage`,
+  `classify*` method of its kind, and write the ask's record only if `BX.isWriteAct(stored.act)`, from `safebyok/storage`,
   is true. Make no check of your own: the classifier throws on a row that fails its checks, so it is never written over.
 * **Triage your datastore's failures into refusals** where you catch them (`inOneStep` from
   `safebyok/storage` does it for IndexedDB). Anything else you throw becomes `storage_unavailable`.

@@ -125,7 +125,7 @@ describe("the README's Yoga recipe, its browser half", () => {
     makeTwin,
     _cheat_rowsOf:         () => TH.rowsOf(),
     _cheat_adapterOf:      (bankDB) => serverOf(bankDB).adapter,
-    _cheat_storeOtherwise: TH.storeOtherwise,
+    _cheat_writeOtherwise: TH.writeOtherwise,
   })
 })
 

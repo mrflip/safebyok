@@ -47,7 +47,7 @@ TH.describeBankDBBattery("PostgresBankDB's battery", {
   makeTwin:              BH.makeTwin,
   _cheat_rowsOf:         () => BH.rowsOf(),
   _cheat_failNextCall:   BH.failNextCall,
-  _cheat_storeOtherwise: BH.storeOtherwise,
+  _cheat_writeOtherwise: BH.writeOtherwise,
 })
 
 describe("PostgresBankDB's constructor", () => {

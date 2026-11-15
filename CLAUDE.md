@@ -186,7 +186,7 @@ Before and after:
 
 ```ts
 /** The act a vault's get, put or del amounts to over `vaultRaw`, the row stored at its scope or null for none.
- * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller stores the request's record, in the atomic unit it fetched the row in.
+ * Nothing is stored here: where {@link isWriteAct} holds of the act, the caller puts the request's record, in the atomic unit it fetched the row in.
  */
 /** Classify a vault request's outcome, based on the stored row. */
 export function vaultActOf(request: VaultRequest, vaultRaw: unknown): VaultAct {

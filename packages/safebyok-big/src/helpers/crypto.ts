@@ -102,7 +102,7 @@ export function makeBoxKey(): Promise<CryptoKey> {
 }
 
 /** A fresh random leaseKey, a non-extractable 256-bit AES-GCM key for wrapping.
- * No code can read its bytes, even the code that made it: store the `CryptoKey` itself, by structured clone.
+ * No code can read its bytes, even the code that made it: stow the `CryptoKey` itself, by structured clone.
  */
 export function makeLeaseKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(AesGcm, false, ['wrapKey', 'unwrapKey'])

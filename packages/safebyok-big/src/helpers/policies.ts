@@ -7,7 +7,7 @@ import type { BankRow, GatePutAsk, GateRecord } from '../shapes/shapes-bankdb'
 import type { StoragePolicy } from '../shapes/shapes-enums'
 
 // == [Gate policies]: StoredGateRows, replace_passphrase, add_passkey, revoke_passkey
-// Each runs on the rows fetched in the step that stores the record, once the put table has found the put would replace
+// Each runs on the rows fetched in the step that puts the record, once the put table has found the put would replace
 // the live gate row. Each line is one row of its policy's table in notes/storage-policies.md, in the same order.
 
 /** The rows a gate put's policy reads: the live bank row, and the live gate row the put would replace. */

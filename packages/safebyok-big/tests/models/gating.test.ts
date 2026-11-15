@@ -50,7 +50,7 @@ function makeRelease() {
 /** The bank's scope in these worlds. */
 const BankScope = Object.freeze({ user_id: Dna.user_id, banklabel: Dna.banklabel })
 
-/** The rows a bankDB stores for one bank: the bank row and its main gate row. */
+/** The rows a bankDB has for one bank: the bank row and its main gate row. */
 type BankRows = Readonly<{ bank: unknown, main: unknown }>
 
 /** A fresh world with a dialog, nothing stored, and the shelf its bankDB keeps the bank's rows on. */
@@ -87,7 +87,7 @@ async function lockedBank(born = makeBornVault()) {
 }
 
 describe("a birth through a gating", () => {
-  it("stores and unlocks the bank on the dialog's attempt", async () => {
+  it("builds and unlocks the bank on the dialog's attempt", async () => {
     const { device, gatingAt, shelf, mainNow, deviceDB } = birthWorld()
     const launched = device.ensureBank()
     const gating = await gatingAt<'build_bank'>()
@@ -205,7 +205,7 @@ describe("a birth through a gating", () => {
     await launched
   })
 
-  it("refuses a bank built on another device without storing the new passkey's wayin", async () => {
+  it("refuses a bank built on another device without putting the new passkey's wayin", async () => {
     const theirs = await theirBankRows()
     const { device, gatingAt, layRows, mainNow } = birthWorld()
     const launched = TH.expectRefusal(device.ensureBank(), 'gate_made_elsewhere')

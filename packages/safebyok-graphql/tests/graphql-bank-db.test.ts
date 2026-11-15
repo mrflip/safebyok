@@ -23,7 +23,7 @@ describe("GraphQLBankDB over the typed schema", () => {
     _cheat_rowsOf:         () => TH.rowsOf(),
     _cheat_failNextCall:   (bankDB) => { bankDB.failNext() },
     _cheat_adapterOf:      TH.adapterOf,
-    _cheat_storeOtherwise: TH.storeOtherwise,
+    _cheat_writeOtherwise: TH.writeOtherwise,
   })
 
   it("keeps a sidecar's own __typename while dropping the ones urql's cache adds", async () => {

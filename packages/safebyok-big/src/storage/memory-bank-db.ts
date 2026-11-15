@@ -64,7 +64,7 @@ export class MemoryBankDB extends AdapterBankDB {
   #boxRowsOf(ask: VaultScope & { bank_tok: string, vault_tok: string }): Map<string, unknown> { return this._cheat_boxRowsOf(ask, ask.bank_tok, ask.vault_tok) }
 
   // Each write reads its row back, so that what it answers and tells is what the store has.
-  /** Store a copy of `record` as its bank row, tell the watchers, and return the row stored. */
+  /** Put a copy of `record` as its bank row, tell the watchers, and return the row stored. */
   #writeBankRow(record: BankRow): unknown {
     const shelf = this._cheat_shelfOf(record)
     shelf.bank = structuredClone(record)
@@ -73,7 +73,7 @@ export class MemoryBankDB extends AdapterBankDB {
     return row
   }
 
-  /** Store a copy of `record` as its gate row, tell the watchers, and return the row stored. */
+  /** Put a copy of `record` as its gate row, tell the watchers, and return the row stored. */
   #writeGateRow(bank: unknown, record: GateRecord): unknown {
     const { gaterows } = this._cheat_shelfOf(record)
     gaterows.set(record.gatelabel, structuredClone(record))
@@ -82,7 +82,7 @@ export class MemoryBankDB extends AdapterBankDB {
     return row
   }
 
-  /** Store a copy of `record` as its vault row, tell the watchers, and return the row stored. */
+  /** Put a copy of `record` as its vault row, tell the watchers, and return the row stored. */
   #writeVaultRow(bank: unknown, record: VaultRow): unknown {
     const { vaultrows } = this._cheat_shelfOf(record)
     vaultrows.set(record.vaultlabel, structuredClone(record))
@@ -91,7 +91,7 @@ export class MemoryBankDB extends AdapterBankDB {
     return row
   }
 
-  /** Store a copy of `record` in `boxrows`, tell the watchers, and return the row stored. */
+  /** Put a copy of `record` in `boxrows`, tell the watchers, and return the row stored. */
   #writeBoxRow(boxrows: Map<string, unknown>, vault: unknown, record: BoxRow): unknown {
     boxrows.set(record.boxlabel, structuredClone(record))
     const row = boxrows.get(record.boxlabel)

@@ -24,7 +24,7 @@ describe("EX.ifPresentVals", () => {
 })
 
 describe("EX.writeActVals, EX.foundActVals, EX.refusedActVals and EX.boxVaultActVals", () => {
-  it("name the four acts that store and the four that answer what is stored", () => {
+  it("name the four acts that write and the four that answer what is stored", () => {
     expect(EX.writeActVals).to.deep.equal(['born', 'reborn', 'replaced', 'deleted'])
     expect(EX.foundActVals).to.deep.equal(['gotlive', 'gotvoid', 'gotgone', 'passed'])
   })

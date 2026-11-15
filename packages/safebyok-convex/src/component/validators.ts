@@ -57,7 +57,7 @@ export const boxFetched = v.object({ parent: v.any(), box: v.any() })
 // --
 
 // == [Written]: bankBuilt, gateWritten, bankWritten, vaultWritten, boxWritten, boxPutWritten, tidied, rowsWatched
-// The rows a write fetched, as they stood before it, and as `written` the rows it then stored, read back, or null if it stored nothing.
+// The rows a write fetched, as they stood before it, and as `written` the rows it then wrote, read back, or null if it wrote nothing.
 
 /** The bank and gate rows `buildBank` stored, or null. */
 const bankAndGateStored = v.union(v.null(), v.object({ bank: v.any(), gate: v.any() }))

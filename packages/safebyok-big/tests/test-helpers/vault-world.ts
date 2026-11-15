@@ -217,7 +217,7 @@ export function listingOptsOf({ bankDB }: VaultTestWorld): BankListingOpts {
   return { bankDB, maxMillisSinceRefresh: RefreshMinutes * 60_000, askUser: null }
 }
 
-/** The vault record of `Dna`, in a bank built under `passphrase`, as a bankDB has stored it. */
+/** The vault record of `Dna`, in a bank built under `passphrase`, as a bankDB has it. */
 export async function storedVaultRecord(passphrase: string = Passphrase): Promise<VaultRecord> {
   const { demandStored } = await makeBornVault(byPassphrase(passphrase))
   return demandStored()

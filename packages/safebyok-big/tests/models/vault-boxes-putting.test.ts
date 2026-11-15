@@ -11,7 +11,7 @@ import { Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWo
 useVaultWorlds()
 
 describe("the box's birth: vault.putBox with no box listed", () => {
-  it("stores a new box whose whisper opens, with none of its cleartext in the row", async () => {
+  it("puts a new box whose whisper opens, with none of its cleartext in the row", async () => {
     const { vault, boxrows, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()

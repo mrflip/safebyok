@@ -1,4 +1,4 @@
-// safebyok/core: the device, bank, gate, gating, wayin, proving and lease, and the bank's methods that store its boxes
+// safebyok/core: the device, bank, gate, gating, wayin, proving and lease, and the bank's methods that put its boxes
 // through its vaultDB; no caching. Private while it is built.
 export { Bank, type BankDna, type BankOpts, type BankPutOpts, type BankRecord, type BoxShell, type BoxUnsealed, type GetBoxAnswer, type GetBoxArgs } from './models/bank'
 export { DefaultLeaseMillis, Device, type DeviceOpts, type DeviceRecord, guardRequestCleartext } from './models/device'

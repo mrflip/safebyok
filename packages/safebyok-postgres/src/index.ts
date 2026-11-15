@@ -1,4 +1,4 @@
-/** safebyok-postgres: a safebyok bankDB that stores its rows in Postgres on your server, using the driver you already have. */
+/** safebyok-postgres: a safebyok bankDB that keeps its rows in Postgres on your server, using the driver you already have. */
 export { PostgresBankDB, bankChannelOf } from './postgres-bank-db'
 export type { PostgresBankDBOpts, PostgresClient, PostgresListen, PostgresQueryable } from './postgres-bank-db'
 export { BankFunctionsSql } from './bank-functions'

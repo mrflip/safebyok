@@ -80,14 +80,14 @@ export function makeBankWorld() {
     building ??= deviceOnAnotherDevice().ensureBank()
     return building
   }
-  /** The bank of `device`, ensured over the bank this world has stored: locked, unless a lease is cached on its device. */
+  /** The bank of `device`, ensured over the bank this world has: locked, unless a lease is cached on its device. */
   async function bankOf(device: Device): Promise<Bank> {
     await ensureBuilt()
     return device.ensureBank()
   }
   return {
     bankDB, deviceDB, dialog, deviceOn, deviceOnAnotherDevice, ensureBuilt,
-    /** The bank of a new {@link deviceOn}, ensured over the bank this world has stored, built elsewhere where none is. */
+    /** The bank of a new {@link deviceOn}, ensured over the bank this world has, built elsewhere where none is. */
     bankOn:    (overrides: Partial<DeviceOpts> = {}): Promise<Bank> => bankOf(deviceOn(overrides)),
     /** The bank of a new {@link deviceOnAnotherDevice}, ensured as `bankOn` ensures it. */
     bankOnAnotherDevice: (overrides: Partial<DeviceOpts> = {}): Promise<Bank> => bankOf(deviceOnAnotherDevice(overrides)),

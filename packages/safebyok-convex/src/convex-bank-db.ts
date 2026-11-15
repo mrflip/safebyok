@@ -64,7 +64,7 @@ type RowsWatched = {
 
 // == [The bankDB]: ConvexBankDB
 
-/** A BankDB that stores its rows in the host's Convex deployment, through the app's Convex client. */
+/** A BankDB that keeps its rows in the host's Convex deployment, through the app's Convex client. */
 export class ConvexBankDB extends DB.AdapterBankDB {
   // == [Props]: #client, #api, #maxBoxes
 
@@ -86,9 +86,9 @@ export class ConvexBankDB extends DB.AdapterBankDB {
 
   // == [Protected, the generic calls of AdapterBankDB]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
   // A get is one query, and the rows it fetched are classified here. A write is one mutation, so one transaction: the component
-  // fetches the rows, classifies the ask with the same classifier, and stores the record if the act is a write. It returns the
-  // rows as it fetched them, which are classified here to the same outcome, and the rows it stored, read back, or null if it
-  // stored nothing. Whether it stored is checked against the act, and a write answers the rows stored.
+  // fetches the rows, classifies the ask with the same classifier, and writes the record if the act is a write. It returns the
+  // rows as it fetched them, which are classified here to the same outcome, and the rows it wrote, read back, or null if it
+  // wrote nothing. Whether it wrote is checked against the act, and a write answers the rows stored.
 
   protected async doEnsureBank(ask: BX.BankEnsureAsk): Promise<BX.BankEnsureStored> {
     const fetched = await runOrRefuse('doEnsureBank', () => this.#client.query(this.#api.ensureBank, { ask }))

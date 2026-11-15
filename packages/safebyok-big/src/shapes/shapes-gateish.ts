@@ -47,9 +47,9 @@ export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
 export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
 /** A wayin without its wrapped bankKey: a tagged union on `wayinkind`. */
 export type WayinHeader           = Z.infer<typeof wayinHeader>
-/** A passphrase wayin as its gate row stores it, under `main`. */
+/** A passphrase wayin as its gate row has it, under `main`. */
 export type PassphraseWayinRecord = Z.infer<typeof BX.passphraseWayin>
-/** A passkey wayin as its gate row stores it, under `passkey0`. */
+/** A passkey wayin as its gate row has it, under `passkey0`. */
 export type PasskeyWayinRecord    = Z.infer<typeof BX.passkeyWayin>
 /** A stored wayin: a tagged union on `wayinkind` of {@link PassphraseWayinRecord} and {@link PasskeyWayinRecord}. */
 export type WayinRecord           = Z.infer<typeof wayinRecord>

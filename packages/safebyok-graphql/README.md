@@ -131,10 +131,10 @@ each a member of a union. A box's sidecar, a damaged row, a refusal's meta and a
 with a null `passkey0`, which the browser half reads as none. Times are `SafebyokEpochMillis`,
 integer UTC epoch milliseconds beyond the range of GraphQL's 32-bit `Int`.
 
-A verb that stores a row, or gets one, has one argument, `ask`: an input whose fields are those of
+A verb that writes a row, or gets one, has one argument, `ask`: an input whose fields are those of
 the core's ask (`op`, the address, the `bank_tok` or `vault_tok` of the life it is made under,
 `ifAbsent` and `ifPresent`, the row it `expected`, read as that row's revision, `am` and tokens, the
-`record` to store, a build's `gate`, and a gate put's `options`, which name its storage policy).
+`record` to write, a build's `gate`, and a gate put's `options`, which name its storage policy).
 A gate change is `safebyokPutGate`, whichever change it is: its `options.policies` says which. `ensureBank`, `listBoxes` and `tidyGone` are given their scope as typed arguments. So your
 logs and allowlists see whose bank each operation reaches. Every name the schema adds begins
 `safebyok` or `Safebyok`, to sit beside your own. `BankOperations` has the documents
