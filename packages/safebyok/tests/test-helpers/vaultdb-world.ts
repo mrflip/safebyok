@@ -2,8 +2,9 @@
 
 import { BW } from 'safebyok-big/testing'
 import {
-  type BankThing, type BirthBankAsk, type BoxThing, type GateThing, type GetThingAsk, type ListThingsAsk, type Thing, type WriteThingAsk,
-  BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, lifeseqOf, lifeseqOfLifepath, modelkindOf, seqOfLifeseq,
+  type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetThingAsk, type ListThingsAsk, type PutAskArgs, type Thing,
+  type ThingCited, type WriteAskOf, type WriteThingAsk,
+  BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOf, lifeseqOfLifepath, listAskOf, putAskOf, seqOfLifeseq,
 } from '../../src/storage/shapes-thing'
 import { T0 } from './models-world'
 
@@ -87,40 +88,27 @@ export function boxRebornOf(prior: BoxThing, overrides: Partial<BoxThing> = {}):
   return { ...next, am: 'a', lifepath, lifeseq: lifeseqOfLifepath(lifepath), born_at: next.written_at, sidecar: {}, ...overrides }
 }
 
-/** The write ask `op` of `record` over what it `cited`, at the record's scope, with `flags`. */
-function writeAskOf(op: 'put' | 'del', cited: WriteThingAsk['cited'], record: Thing, flags: Pick<WriteThingAsk, 'ifAbsent' | 'ifPresent' | 'options'>): WriteThingAsk {
-  const { userid, banklabel, labelpath } = record
-  // The modelkind is the record's labelpath's, as the verb checks.
-  return { op, userid, banklabel, labelpath, modelkind: modelkindOf(labelpath), cited, record, ...flags } as WriteThingAsk
-}
-
 /** The ask that births `record` (the main gate by default) over the shell it `cited` (a root's by default). */
-export function birthAskOf(record: Thing = gateThingOf(), cited: WriteThingAsk['cited'] = ShellCited): WriteThingAsk {
-  return writeAskOf('put', cited, record, { ifAbsent: 'add', ifPresent: 'fail' })
+export function birthAskOf(record: Thing = gateThingOf(), cited: ThingCited = ShellCited): WriteThingAsk {
+  return putAskOf({ cited, record, ifPresent: 'fail' })
 }
 
-/** The ask that puts `record` over the live Thing it `cited`, under the storage `policies`. */
-export function replaceAskOf(cited: WriteThingAsk['cited'], record: Thing, policies?: WriteThingAsk['options']): WriteThingAsk {
-  return writeAskOf('put', cited, record, { ifAbsent: 'fail', ifPresent: 'repl', ...(policies && { options: policies }) })
+/** The ask that puts `record` over the live Thing it `cited`, under the storage policies of `options`. */
+export function replaceAskOf<RecordT extends Thing>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAskArgs['options']): WriteAskOf<RecordT> {
+  return putAskOf({ cited, record, ifAbsent: 'fail', ...(options && { options }) })
 }
 
 /** The ask that deletes the Thing it `cited` with the tombstone `record`. */
-export function delAskFor(cited: WriteThingAsk['cited'], record: Thing): WriteThingAsk {
-  return writeAskOf('del', cited, record, { ifAbsent: 'fail', ifPresent: 'repl' })
-}
+export function delAskFor(cited: ThingCited, record: Thing): WriteThingAsk { return delAskOf({ cited, record }) }
 
 /** The ask that gets the main gate, answering null for none under `'nil'`. */
 export function getGateAskOf(ifAbsent: GetThingAsk['ifAbsent'] = 'nil'): GetThingAsk { return getAskAt('gate', ifAbsent) }
 
 /** The ask that gets the Thing at `labelpath` in {@link ThingBank}. */
-export function getAskAt(labelpath: string, ifAbsent: GetThingAsk['ifAbsent'] = 'nil'): GetThingAsk {
-  return { op: 'get', ...ThingBank, labelpath, modelkind: modelkindOf(labelpath), ifAbsent }
-}
+export function getAskAt(labelpath: string, ifAbsent: GetThingAsk['ifAbsent'] = 'nil'): GetThingAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent }) }
 
 /** The ask that lists the children of the Thing at `labelpath` in {@link ThingBank}. */
-export function listAskAt(labelpath: string, ifAbsent: ListThingsAsk['ifAbsent'] = 'fail'): ListThingsAsk {
-  return { op: 'list', ...ThingBank, labelpath, modelkind: modelkindOf(labelpath), ifAbsent }
-}
+export function listAskAt(labelpath: string, ifAbsent: ListThingsAsk['ifAbsent'] = 'fail'): ListThingsAsk { return listAskOf({ ...ThingBank, labelpath, ifAbsent }) }
 
 /** The ask that births {@link ThingBank} with its three roots, each at revision 0 of life 0, with `overrides` laid over it. */
 export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBankAsk {

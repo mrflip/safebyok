@@ -2,8 +2,8 @@
 
 import { type EX, Helpers } from 'safebyok-big/internals'
 import { AdapterVaultDB } from './adapter-vault-db'
-import { type BirthBankAsk, type GetThingAsk, type ListThingsAsk, type Thing, type ThingScope, type ThingWatchScope, type WriteThingAsk, birthPutsOf } from './shapes-thing'
-import { isWriteAct, writtenThingOf } from './thing-classifier'
+import type { BirthBankAsk, BirthPuts, GetThingAsk, ListThingsAsk, Thing, ThingScope, ThingWatchScope, WriteThingAsk } from './shapes-thing'
+import { type BankRootsFetched, isWriteAct, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
 /** A watch: the bank it hears, and the function that hears each change. */
@@ -18,7 +18,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   readonly #listeners = new Set<Listener>()
   // --
 
-  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #tell
+  // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #tell
 
   /** For tests: the Things stored in `scope`'s bank, by labelpath, to read or change in place. */
   _cheat_things(scope: ThingWatchScope): Map<string, unknown> { return this.#thingsOf(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
@@ -39,6 +39,11 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const things = this.#thingsOf(scope)
     things.set(scope.labelpath, structuredClone(record))
     return writtenThingOf(scope, structuredClone(things.get(scope.labelpath)))
+  }
+
+  /** The raw roots of a bank's `things`, each a copy, or null for none. */
+  #rootsOf(things: Map<string, unknown>): BankRootsFetched {
+    return structuredClone({ bank: things.get('bank') ?? null, gate: things.get('gate') ?? null, root: things.get('box') ?? null })
   }
 
   // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it.
@@ -76,16 +81,14 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children })
   }
 
-  protected doBirthBank(ask: BirthBankAsk): BirthBankActual {
+  protected doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {
     const things = this.#thingsOf(ask)
-    const raws   = { bank: things.get('bank') ?? null, gate: things.get('gate') ?? null, root: things.get('box') ?? null }
-    const actual = this.classifyBirthBank(ask, structuredClone(raws))
+    const actual = this.classifyBirthBank(puts, this.#rootsOf(things))
     if (! (actual.ok && (actual.act === 'born'))) { return actual }
-    const [bankPut, gatePut, rootPut] = birthPutsOf(ask)
-    const written = { bank: this.#write(bankPut, ask.bank), gate: this.#write(gatePut, ask.gate), root: this.#write(rootPut, ask.root) }
+    for (const { labelpath, record } of puts) { things.set(labelpath, structuredClone(record)) }
+    const written = writtenRootsOf(puts, this.#rootsOf(things))
     for (const thing of Object.values(written)) { this.#tell(thing) }
-    // Each was read back by the kind its labelpath names.
-    return { ...actual, things: written as typeof actual.things }
+    return { ...actual, things: written }
   }
 
   protected override doWatch(scope: ThingWatchScope, hear: Listener['hear']): () => void {

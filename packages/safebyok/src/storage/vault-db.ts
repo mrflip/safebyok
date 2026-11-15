@@ -3,7 +3,7 @@
 import type { EX, Errors } from 'safebyok-big/internals'
 import type {
   BankRoots, BirthBankAsk, GetAskArgs, GetThingAsk, ListAskArgs, ListThingsAsk, LoggableAsk, PutAskArgs, DelAskArgs, Sparse, Thing,
-  ThingScope, ThingWatchScope, WriteThingAsk,
+  ThingScope, ThingWatchScope, WriteAskOf, WriteThingAsk,
 } from './shapes-thing'
 
 // == [Answers]: GoodAnswer, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
@@ -67,7 +67,7 @@ export type BirthBankActual =
 
 // == [The interface]: VaultDB
 
-/** Storage for the Things of a user's banks. Each verb is one atomic step, and never throws. Each builder fills in an ask's defaults. */
+/** Storage for the Things of a user's banks. Each verb is one atomic step, and never throws. Each builder fills in an ask's defaults and never throws: the verb it is handed to refuses what is wrong. */
 export interface VaultDB {
   /** The Thing at `ask`'s scope. */
   tryGetThing(ask: GetThingAsk): Promise<GetThingAnswer>
@@ -77,14 +77,14 @@ export interface VaultDB {
   tryListThings(ask: ListThingsAsk): Promise<ListThingsAnswer>
   /** Write a new bank's bank, main gate and root box, where no bank is stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
-  /** The get ask for the Thing at `args`'s scope. Throws `bad_option`. */
+  /** The get ask for the Thing at `args`'s scope. */
   getAsk(args: GetAskArgs): GetThingAsk
-  /** The list ask for the children of the Thing at `args`'s scope. Throws `bad_option`. */
+  /** The list ask for the children of the Thing at `args`'s scope. */
   listAsk(args: ListAskArgs): ListThingsAsk
-  /** The put ask writing `args.record` over `args.cited`. Throws `bad_option` or `bad_record`. */
-  putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteThingAsk<RecordT>
-  /** The del ask writing the tombstone `args.record` over `args.cited`. Throws `bad_option` or `bad_record`. */
-  delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteThingAsk<RecordT>
+  /** The put ask writing `args.record` over `args.cited`. */
+  putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT>
+  /** The del ask writing the tombstone `args.record` over `args.cited`. */
+  delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT>
   /** Watch the Things of a bank, and return a function that stops the watch. */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews?: (news: Errors.VaultError) => void): () => void
 }

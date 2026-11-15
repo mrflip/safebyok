@@ -2,14 +2,14 @@
 export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export {
-  type BankRoots, type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type DelAskArgs, type GateThing, type GetAskArgs,
-  type GetThingAsk, type ListAskArgs, type ListThingsAsk, type LoggableAsk, type PutAskArgs, type Sparse, type Thing, type ThingCited,
-  type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type ThingkindOf, type WriteThingAsk,
+  type BankRoots, type BankThing, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxThing, type BoxWriteAsk, type CitedOf, type DelAskArgs,
+  type GateThing, type GateWriteAsk, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type LoggableAsk, type PutAskArgs,
+  type Sparse, type Thing, type ThingCited, type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type WriteAskOf, type WriteThingAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifepath, ShellLifeseq,
-  delAskOf, getAskOf, isGoneLifeseq, isKindLabelpath, lifeseqOf, lifeseqOfLifepath, listAskOf, modelkindOf, putAskOf, sealed, seqOfLifeseq,
-  shellCitedUnder, sparseOf, thingkindVals,
+  childShellCited, delAskOf, getAskOf, isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, modelkindOf, putAskOf, sealed,
+  seqOfLifeseq, sparseOf, thingkindVals,
 } from './storage/shapes-thing'
-export { type BankRootsFetched, type ThingsFetched, isWriteAct } from './storage/thing-classifier'
+export { type BankRootsFetched, type ThingsFetched, isWriteAct, writtenRootsOf, writtenThingOf } from './storage/thing-classifier'
 export type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, DamagedThing, GetThingAnswer, GoodAnswer, ListThingsActual, ListThingsAnswer,
   ListedBeside, ThingNotice, VaultDB, WriteThingAnswer,

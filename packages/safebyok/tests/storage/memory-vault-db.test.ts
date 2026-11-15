@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type BoxThing, type GateThing, type Thing, lifeseqOf, shellCitedUnder, sparseOf } from '../../src/storage/shapes-thing'
+import { type BoxThing, type GateThing, type Thing, ShellCited, childShellCited, lifeseqOf, sparseOf } from '../../src/storage/shapes-thing'
 import { classifyListThings } from '../../src/storage/thing-classifier'
 import type { ThingNotice } from '../../src/storage/vault-db'
 import * as Phrases from '../../src/phrases'
@@ -233,7 +233,7 @@ async function bornBank(): Promise<MemoryVaultDB> {
 
 /** Write `thing` into `vaultDB`, born under its parent's life at `parentLifepath`. */
 async function bornUnder(vaultDB: MemoryVaultDB, thing: Thing, parentLifepath: string): Promise<void> {
-  const ask = TH.birthAskOf(thing, shellCitedUnder(parentLifepath))
+  const ask = TH.birthAskOf(thing, childShellCited(parentLifepath))
   await TH.expectGood(vaultDB.tryWriteThing(ask))
 }
 
@@ -261,7 +261,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), a box", () => {
 
   it("births a box under its parent's life, deletes it, and gives it a new life", async () => {
     const vaultDB = new MemoryVaultDB()
-    const birth   = TH.birthAskOf(box, shellCitedUnder(TH.Life0))
+    const birth   = TH.birthAskOf(box, childShellCited(TH.Life0))
     expect(await vaultDB.tryWriteThing(birth)).to.deep.include({ ok: true, act: 'born', val: box })
     expect(await vaultDB.tryWriteThing(TH.delAskFor(box, tomb))).to.deep.include({ ok: true, act: 'deleted', val: tomb })
     expect(await vaultDB.tryGetThing(TH.getAskAt(box.labelpath))).to.deep.include({ ok: true, act: 'gotgone', val: tomb })
@@ -278,6 +278,13 @@ describe("MemoryVaultDB.tryWriteThing(ask), a box", () => {
     expect(await new MemoryVaultDB().tryWriteThing(TH.delAskFor(box, tomb))).to.deep.include({ ok: false, dbhas: null })
   })
 
+  it("answers dubdel to a del citing a tombstone", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const answer  = await vaultDB.tryWriteThing(TH.delAskFor(tomb, TH.nextOf(tomb)))
+    expect(answer).to.deep.include({ ok: false, act: 'dubdel' })
+    await TH.expectBad(answer, 'absent_vault')
+  })
+
   it("refuses a storage policy on a box's put", async () => {
     const vaultDB = new MemoryVaultDB()
     await boxesBorn(vaultDB, box)
@@ -286,7 +293,7 @@ describe("MemoryVaultDB.tryWriteThing(ask), a box", () => {
   })
 
   it("keeps the kinds apart: a gate's ask names no box", async () => {
-    const ask = { ...TH.birthAskOf(box, shellCitedUnder(TH.Life0)), modelkind: 'gate' }
+    const ask = { ...TH.birthAskOf(box, childShellCited(TH.Life0)), modelkind: 'gate' }
     await TH.expectBad(new MemoryVaultDB().tryWriteThing(ask as never), 'bad_option')
   })
 })
@@ -334,20 +341,22 @@ describe("MemoryVaultDB.tryListThings(ask)", () => {
     expect(answer.ok && answer.val).to.deep.equal([sparseOf(aa!)])
   })
 
-  it("answers no children, and the parent, for a parent gone or void under ifAbsent 'nil'", async () => {
+  it("answers no children, and the parent, for a parent gone or void under ifAbsent 'nil', reading no child", async () => {
     const vaultDB = await bornBank()
     const [aa] = await boxesBorn(vaultDB, TH.boxThingOf('aa'))
     const aaGone = TH.boxTombOf(aa!)
     await TH.expectGood(vaultDB.tryWriteThing(TH.delAskFor(aa!, aaGone)))
-    expect(await vaultDB.tryListThings(TH.listAskAt('box/aa', 'nil'))).to.deep.include({ ok: true, act: 'gotgone', val: [], parent: sparseOf(aaGone) })
+    vaultDB._cheat_things(TH.ThingBank).set('box/aa/bad', { junk: true })
+    expect(await vaultDB.tryListThings(TH.listAskAt('box/aa', 'nil'))).to.deep.include({ ok: true, act: 'gotgone', val: [], parent: sparseOf(aaGone), damaged_rows: [] })
     expect(await vaultDB.tryListThings(TH.listAskAt('box/zz', 'nil'))).to.deep.include({ ok: true, act: 'gotvoid', val: [], parent: null })
   })
 
-  it("refuses a parent gone or void under ifAbsent 'fail', with no children as dbhas", async () => {
+  it("refuses a parent gone or void under ifAbsent 'fail', with no children as dbhas, reading no child", async () => {
     const vaultDB = await bornBank()
     const [aa] = await boxesBorn(vaultDB, TH.boxThingOf('aa'))
     const aaGone = TH.boxTombOf(aa!)
     await TH.expectGood(vaultDB.tryWriteThing(TH.delAskFor(aa!, aaGone)))
+    vaultDB._cheat_things(TH.ThingBank).set('box/aa/bad', { junk: true })
     expect(await vaultDB.tryListThings(TH.listAskAt('box/aa'))).to.deep.include({ ok: false, act: 'gone', dbhas: [], parent: sparseOf(aaGone), damaged_rows: [] })
     const voidAnswer = await vaultDB.tryListThings(TH.listAskAt('box/zz'))
     await TH.expectBad(Promise.resolve(voidAnswer), 'absent_vault')
@@ -393,10 +402,16 @@ describe("MemoryVaultDB.tryBirthBank(ask)", () => {
     expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', val: roots })
   })
 
+  it("answers retcon to the birth already stored, by the put table", async () => {
+    const vaultDB = await bornBank()
+    expect(await vaultDB.tryBirthBank(TH.birthBankAskOf())).to.deep.include({ ok: false, act: 'retcon', dbhas: TH.bankThingOf() })
+  })
+
   it("refuses a live bank stored without its main gate as a broken store", async () => {
     const vaultDB = await bornBank()
     vaultDB._cheat_things(TH.ThingBank).delete('gate')
-    await TH.expectBad(vaultDB.tryBirthBank(TH.birthBankAskOf()), 'storage_issue')
+    const other = TH.birthBankAskOf({ bank: TH.bankThingOf({ revtok: 'rev-other' }) })
+    await TH.expectBad(vaultDB.tryBirthBank(other), 'storage_issue')
   })
 
   it("refuses over a bank's tombstone, writing nothing", async () => {
@@ -427,11 +442,18 @@ describe("MemoryVaultDB's ask builders", () => {
   it("build asks its verbs take", async () => {
     const vaultDB = await bornBank()
     const box = TH.boxThingOf()
-    const putAsk = vaultDB.putAsk({ cited: shellCitedUnder(TH.Life0), record: box })
+    const putAsk = vaultDB.putAsk({ cited: childShellCited(TH.Life0), record: box })
     expect(await vaultDB.tryWriteThing(putAsk)).to.deep.include({ ok: true, act: 'born' })
     expect(await vaultDB.tryGetThing(vaultDB.getAsk(box))).to.deep.include({ ok: true, act: 'gotlive', val: box })
     const delAsk = vaultDB.delAsk({ cited: box, record: TH.boxTombOf(box) })
     expect(await vaultDB.tryWriteThing(delAsk)).to.deep.include({ ok: true, act: 'deleted' })
     expect(await vaultDB.tryListThings(vaultDB.listAsk(TH.RootScope))).to.deep.include({ ok: true, val: [sparseOf(TH.boxTombOf(box))] })
+  })
+
+  it("leave every refusal to the verb, which answers it", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const junk    = vaultDB.putAsk({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)
+    await TH.expectBad(vaultDB.tryWriteThing(junk), 'bad_option')
+    await TH.expectBad(vaultDB.tryGetThing(vaultDB.getAsk(null as never)), 'bad_option')
   })
 })

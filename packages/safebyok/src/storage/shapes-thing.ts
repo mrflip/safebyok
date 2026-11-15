@@ -32,7 +32,7 @@ export function lifeseqOfLifepath(lifepath: string): string { return lifepath.sl
 function leadingLifeseqsOf(lifepath: string): string { return lifepath.slice(0, Math.max(0, lifepath.lastIndexOf('/'))) }
 // --
 
-// == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, modelkindOf, isKindLabelpath
+// == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, modelkindOf, isLabelpathOfKind
 
 /** The kinds of Thing: the modelkind at the base of each labelpath. */
 export const thingkindVals = ['bank', 'gate', 'box'] as const satisfies readonly Consts.Modelkind[]
@@ -53,16 +53,16 @@ const MaxLabelsUnder = { bank: 0, gate: 1, box: Infinity } as const satisfies Re
 export function modelkindOf(labelpath: string): Thingkind { return labelpath.split('/', 1)[0] as Thingkind }
 
 /** True when `labelpath` is one of `modelkind`'s: the modelkind, then as many labels as the kind nests, each after a `/`. */
-export function isKindLabelpath(modelkind: Thingkind, labelpath: string): boolean {
+export function isLabelpathOfKind(labelpath: string, modelkind: Thingkind): boolean {
   const [head, ...labels] = labelpath.split('/')
   return (head === modelkind) && (labels.length <= MaxLabelsUnder[modelkind]) && labels.every((label) => Validator.Kit.label.safeParse(label).success)
 }
 
 /** True when `labelpath` is one of some kind of Thing's. */
-function isLabelpath(labelpath: string): boolean { return thingkindVals.some((modelkind) => isKindLabelpath(modelkind, labelpath)) }
+function isLabelpath(labelpath: string): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, Sparse, sparseOf, ShellCited, shellCitedUnder
+// == [Thing]: thingScope, thingCited, thingRecord, sealed, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, Sparse, sparseOf, ShellCited, childShellCited
 
 const LifeseqPattern       = /^[\da-v]{10}$/
 const LifepathPattern      = /^[\da-v]{10}(?:\/[\da-v]{10})*$/
@@ -123,7 +123,7 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
   }).strict()
   const gateBase     = obj({
     ...thingRecord.shape,
-    labelpath:      labelpath.refine((given) => isKindLabelpath('gate', given), Phrases.LabelpathOfOtherKind),
+    labelpath:      labelpath.refine((given) => isLabelpathOfKind(given, 'gate'), Phrases.LabelpathOfOtherKind),
     fmt:            lit(GateThingFormat),
     wayins:         BX.wayins,
     /** Reserved: always empty, and read by nothing. */
@@ -135,7 +135,7 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
   }).strict()
   const boxLive      = obj({
     ...thingRecord.shape,
-    labelpath:      labelpath.refine((given) => isKindLabelpath('box', given), Phrases.LabelpathOfOtherKind),
+    labelpath:      labelpath.refine((given) => isLabelpathOfKind(given, 'box'), Phrases.LabelpathOfOtherKind),
     fmt:            lit(BoxThingFormat),
     am:             lit('a'),
     sidecar:        CX.sidecar,
@@ -188,11 +188,6 @@ export type BoxThing     = Readonly<Z.infer<typeof boxThing>>
 /** Any Thing a vaultDB stores. */
 export type Thing        = BankThing | GateThing | BoxThing
 
-/** The record of each kind of Thing. */
-type ThingOfKind = { bank: BankThing, gate: GateThing, box: BoxThing }
-/** The kind of a Thing's record. */
-export type ThingkindOf<RecordT extends Thing> = { [KindT in Thingkind]: RecordT extends ThingOfKind[KindT] ? KindT : never }[Thingkind]
-
 /** A record's Thing fields, without its body: what a listing gives of each Thing. */
 export type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecord>
 
@@ -206,8 +201,8 @@ export const ShellCited: ThingCited = Object.freeze({
   revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: ShellLifepath,
 })
 
-/** What the birth of a Thing under the parent at `parentLifepath` cites: the shell, at the parent's lifepath then `-1`. */
-export function shellCitedUnder(parentLifepath: string): ThingCited {
+/** What the birth of a child of the Thing at `parentLifepath` cites: the shell, at the parent's lifepath then `-1`. */
+export function childShellCited(parentLifepath: string): ThingCited {
   return Object.freeze({ ...ShellCited, lifepath: `${parentLifepath}/${ShellLifeseq}` })
 }
 // --
@@ -215,7 +210,7 @@ export function shellCitedUnder(parentLifepath: string): ThingCited {
 // == [Each kind's checks]: KindChecks, kindChecksOf
 
 /** The checks of each kind of Thing a vaultDB stores: the record proposed, cited and stored, and the storage policies it may name. */
-const KindChecks = {
+export const KindChecks = {
   bank: { record: bankThing, cited: bankCited, stored: bankThing.refusingAs('damaged_row'), policies: [] },
   gate: { record: gateThing, cited: gateCited, stored: gateThing.refusingAs('damaged_row'), policies: EX.storagePolicyVals },
   box:  { record: boxThing,  cited: boxCited,  stored: boxThing.refusingAs('damaged_row'),  policies: [] },
@@ -225,7 +220,7 @@ const KindChecks = {
 export function kindChecksOf(labelpath: string): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
-// == [Asks]: AskChecks, GetThingAsk, ListThingsAsk, WriteThingAsk, BirthBankAsk, BankRoots, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants, demandHeld, demandAsked
+// == [Asks]: AskChecks, GetThingAsk, ListThingsAsk, WriteThingAsk, BirthBankAsk, BankRoots, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: string }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -274,21 +269,27 @@ export type GetThingAsk     = Readonly<Z.infer<typeof AskChecks.getThingAsk>>
 export type ListThingsAsk   = Readonly<Z.infer<typeof AskChecks.listThingsAsk>>
 /** What a write cites of a Thing of `RecordT`'s kind: what {@link ThingCited} names, and any other of its fields. */
 export type CitedOf<RecordT extends Thing> = ThingCited & Partial<Omit<RecordT, keyof ThingCited>>
-/** A write ask of one kind of record: see {@link WriteThingAsk}. */
-type WriteAskOf<RecordT extends Thing> = Readonly<Omit<Z.infer<typeof AskChecks.writeThingAsk>, 'modelkind' | 'cited' | 'record'> & {
-  modelkind: ThingkindOf<RecordT>
-  cited:     CitedOf<RecordT>
-  record:    RecordT
-}>
+/** The flags of a write ask, its modelkind and records aside. */
+type WriteAskFlags = Readonly<Omit<Z.infer<typeof AskChecks.writeThingAsk>, 'modelkind' | 'cited' | 'record'>>
+/** A write ask of the bank: see {@link WriteThingAsk}. */
+export type BankWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'bank', cited: CitedOf<BankThing>, record: BankThing }>
+/** A write ask of a gate: see {@link WriteThingAsk}. */
+export type GateWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'gate', cited: CitedOf<GateThing>, record: GateThing }>
+/** A write ask of a box: see {@link WriteThingAsk}. */
+export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: CitedOf<BoxThing>,  record: BoxThing }>
 /** An ask to write `record` over the Thing it `cited`: `put` a live record, or `del` with a tombstone.
  * `cited` carries what {@link ThingCited} names, which the store compares with the Thing stored. Any other field of the
- * record it carries is read only by a storage policy that takes it as testimony. Its `modelkind` narrows its record.
+ * record it carries is read only by a storage policy that takes it as testimony. Its `modelkind` narrows its records.
  */
-export type WriteThingAsk<RecordT extends Thing = Thing> = ThingkindOf<RecordT> extends infer KindT ? (KindT extends Thingkind ? WriteAskOf<Extract<RecordT, ThingOfKind[KindT]>> : never) : never
+export type WriteThingAsk = BankWriteAsk | GateWriteAsk | BoxWriteAsk
+/** The write ask of `RecordT`'s kind. */
+export type WriteAskOf<RecordT extends Thing> = Extract<WriteThingAsk, { record: RecordT }>
 /** A bank's three roots: the bank, its main gate and its root box. */
 export type BankRoots       = Readonly<{ bank: BankThing, gate: GateThing, root: BoxThing }>
 /** An ask to write a new bank's first Things in one step: the bank, its main gate and its root box. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots> & BankRoots>
+/** The puts a bank's birth amounts to, one for each of its roots. */
+export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope a watch hears: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof thingWatchScope>>
 
@@ -300,28 +301,34 @@ export function checkedListThingsAsk(ask: unknown): ListThingsAsk { return AskCh
 
 /** `ask`, with its records checked by their kind and against each other, or throw `bad_option` or `bad_record` */
 export function checkedWriteThingAsk(ask: unknown): WriteThingAsk {
-  const { cited, record, ...rest } = AskChecks.writeThingAsk.parse(ask)
-  const checks  = KindChecks[rest.modelkind]
-  // The modelkind picked the checks, so the records are of its kind.
-  const checked = { ...rest, cited: checks.cited.parse(cited), record: checks.record.parse(record) } as WriteThingAsk
-  demandAsked((checked.op === 'put') === (checked.record.am === 'a'), Phrases.OpNotOfRecord)
+  const checked = withRecordsChecked(AskChecks.writeThingAsk.parse(ask))
+  if ((checked.op === 'put') !== (checked.record.am === 'a')) { throw opNotOfRecord(checked) }
   checkWriteInvariants(checked)
   return checked
 }
 
+/** `ask`, its flags checked, with its records checked by the kind its modelkind names. */
+function withRecordsChecked({ cited, record, ...flags }: Z.infer<typeof AskChecks.writeThingAsk>): WriteThingAsk {
+  if (flags.modelkind === 'bank') { return { ...flags, modelkind: 'bank', cited: bankCited.parse(cited), record: bankThing.parse(record) } }
+  if (flags.modelkind === 'gate') { return { ...flags, modelkind: 'gate', cited: gateCited.parse(cited), record: gateThing.parse(record) } }
+  return { ...flags, modelkind: 'box', cited: boxCited.parse(cited), record: boxThing.parse(record) }
+}
+
 /** `ask`, with each of its three records checked as the put {@link birthPutsOf} makes of it, or throw `bad_option` or `bad_record` */
 export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
-  // Each record is checked in the put made of it, just below.
-  const checked = AskChecks.birthBankAsk.parse(ask) as BirthBankAsk
+  const parsed  = AskChecks.birthBankAsk.parse(ask)
+  const checked = { ...parsed, bank: bankThing.parse(parsed.bank), gate: gateThing.parse(parsed.gate), root: boxThing.parse(parsed.root) }
   for (const put of birthPutsOf(checked)) { checkedWriteThingAsk(put) }
   return checked
 }
 
-/** The puts a bank's birth amounts to: each root, written over the shell at its kind's root. */
-export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAsk): readonly [WriteThingAsk<BankThing>, WriteThingAsk<GateThing>, WriteThingAsk<BoxThing>] {
+/** The puts a bank's birth amounts to: each root, written over the shell at its kind's root.
+ * The bank's put passes over a live bank; the gate's and the root's refuse over a live Thing.
+ */
+export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAsk): BirthPuts {
   const flags = { userid, banklabel, op: 'put', ifAbsent: 'add', ifPresent: 'fail' } as const
   return [
-    { ...flags, labelpath: 'bank', modelkind: 'bank', cited: ShellCited, record: bank },
+    { ...flags, labelpath: 'bank', modelkind: 'bank', cited: ShellCited, record: bank, ifPresent: 'get' },
     { ...flags, labelpath: 'gate', modelkind: 'gate', cited: ShellCited, record: gate },
     { ...flags, labelpath: 'box',  modelkind: 'box',  cited: ShellCited, record: root },
   ]
@@ -330,80 +337,110 @@ export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAs
 /** Refuse a write whose record does not follow from the one it cites. */
 function checkWriteInvariants(ask: WriteThingAsk): void {
   const { cited, record, userid, banklabel, labelpath } = ask
+  if (record.revseq !== cited.revseq + 1)                                                           { throw revseqNotNext(ask) }
+  if ((record.revtok === cited.revtok) || (record.revtok === SX.VoidRevisionTok))                   { throw revtokNotNew(ask) }
+  if (! Validator.isConsistent(record, { userid, banklabel, labelpath }))                           { throw recordOfOtherScope(ask) }
+  if ((record.am === 'x') && (cited.am === 'x'))                                                    { throw tombstoneOverTombstone(ask) }
+  if (leadingLifeseqsOf(record.lifepath) !== leadingLifeseqsOf(cited.lifepath))                     { throw lifepathNotKept(ask) }
   const isLifeFlipped = (record.am !== cited.am)
-  demandHeld(record.revseq === cited.revseq + 1,                                                      Phrases.RevseqNotNext)
-  demandHeld((record.revtok !== cited.revtok) && (record.revtok !== SX.VoidRevisionTok),              Phrases.RevtokNotNew)
-  demandHeld(Validator.isConsistent(record, { userid, banklabel, labelpath }),                        Phrases.RecordOfOtherScope)
-  demandHeld((record.am === 'a') || (cited.am === 'a'),                                               Phrases.TombstoneOverTombstone)
-  demandHeld(leadingLifeseqsOf(record.lifepath) === leadingLifeseqsOf(cited.lifepath),                Phrases.LifepathNotKept)
-  demandHeld(seqOfLifeseq(record.lifeseq) === seqOfLifeseq(lifeseqOfLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0),  Phrases.LifeseqNotNext)
-  // A live record over a live one keeps the stored born_at: the store checks that, against the Thing it holds.
-  if (isLifeFlipped && (record.am === 'a')) { demandHeld(record.born_at === record.written_at, Phrases.BornAtNotNow) }
-  if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase')) { demandHeld(ask.cited.wayins?.main !== undefined, Phrases.TestimonyMissing) }
-}
-
-/** Throw `bad_record`, saying `phrase`, unless `isHeld` */
-function demandHeld(isHeld: boolean, phrase: string): void {
-  if (! isHeld) { throw new Errors.VaultError('bad_record', phrase) }
-}
-
-/** Throw `bad_option`, saying `phrase`, unless `isHeld` */
-function demandAsked(isHeld: boolean, phrase: string): void {
-  if (! isHeld) { throw new Errors.VaultError('bad_option', phrase) }
+  if (seqOfLifeseq(record.lifeseq) !== seqOfLifeseq(lifeseqOfLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw lifeseqNotNext(ask) }
+  // A live record over a live one keeps the stored born_at: the store checks that, against the Thing it has.
+  if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw bornAtNotNow(ask) }
+  if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw testimonyMissing(ask) }
 }
 // --
 
-// == [Ask builders]: GetAskArgs, ListAskArgs, PutAskArgs, DelAskArgs, getAskOf, listAskOf, putAskOf, delAskOf
-// The one place an ask's flags are defaulted. A builder fills in the op, the modelkind and the default flags; the verb it
-// is handed to checks the whole ask.
+// == [Write throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing
+// Each refuses a write ask, and its meta carries the loggable part of the ask.
 
-/** The checks of what each builder takes, each filling in its defaults. */
-const BuilderChecks = Validator.Checkers('bad_option', ({ obj, lit, unk }) => ({
-  getAskArgs:  thingScope.extend({ ifAbsent: SX.ifAbsent.default('nil') }),
-  listAskArgs: thingScope.extend({ ifAbsent: SX.ifAbsent.default('fail') }),
-  putAskArgs:  obj({ cited: unk, record: unk, ifAbsent: SX.putIfAbsent.default('add'), ifPresent: SX.ifPresent.default('repl'), options: AskChecks.thingOptions.optional() }).strict(),
-  delAskArgs:  obj({ cited: unk, record: unk, ifAbsent: lit('fail').default('fail'), ifPresent: lit('repl').default('repl') }).strict(),
-}))
+/** A `bad_option` refusal: a put's record is a tombstone, or a del's is live. */
+function opNotOfRecord(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_option', Phrases.OpNotOfRecord, { meta: { ask: loggableAskOf(ask) } }) }
 
-/** The records a write builder takes. */
-type WriteArgsOf<ArgsT, RecordT extends Thing> = Readonly<Omit<ArgsT, 'cited' | 'record'> & { cited: CitedOf<RecordT>, record: RecordT }>
+/** A `bad_record` refusal: the record's revseq is not one past the cited one's. */
+function revseqNotNext(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RevseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: the record's revtok is the cited one's, or the void one. */
+function revtokNotNew(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RevtokNotNew, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: the record is not at the scope the ask names. */
+function recordOfOtherScope(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RecordOfOtherScope, { meta: { ask: loggableAskOf(ask) } }) }
+
+// A del is the only write of a tombstone, so this is the act table's dubdel, found before anything is fetched. Its refusal
+// kind is the one big's act tables give dubdel.
+/** An `absent_vault` refusal, act `dubdel`: a del cites a tombstone. */
+function tombstoneOverTombstone(ask: WriteThingAsk): Errors.VaultError {
+  return new Errors.VaultError('absent_vault', Phrases.TombstoneOverTombstone, { meta: { ask: loggableAskOf(ask), act: 'dubdel' } })
+}
+
+/** A `bad_record` refusal: the record changes a leading lifeseq of the lifepath it cites. */
+function lifepathNotKept(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifepathNotKept, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: the record's lifeseq is not the cited one, or the next one when am flips. */
+function lifeseqNotNext(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifeseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: a birth's born_at is not its written_at. */
+function bornAtNotNow(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.BornAtNotNow, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: a replace_passphrase write does not cite the gate's wayins. */
+function testimonyMissing(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
+// --
+
+// == [Ask builders]: GetAskArgs, ListAskArgs, PutAskArgs, DelAskArgs, getAskOf, listAskOf, putAskOf, delAskOf, scopeGiven, modelkindGiven
+// The one place an ask's flags are defaulted. A builder fills in the op, the modelkind and the default flags, and checks
+// nothing: what it was given that is wrong goes through as given, for the verb's checks to refuse in its answer.
+
+/** The storage policies a write names. */
+type ThingOptions = Readonly<Z.infer<typeof AskChecks.thingOptions>>
 
 /** What {@link getAskOf} takes: a Thing's scope, and its `ifAbsent` (default `'nil'`). */
-export type GetAskArgs  = Readonly<Z.input<typeof BuilderChecks.getAskArgs>>
+export type GetAskArgs  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent }>
 /** What {@link listAskOf} takes: the parent's scope, and its `ifAbsent` (default `'fail'`). */
-export type ListAskArgs = Readonly<Z.input<typeof BuilderChecks.listAskArgs>>
+export type ListAskArgs = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent }>
 /** What {@link putAskOf} takes: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), and the storage policies. */
-export type PutAskArgs<RecordT extends Thing = Thing> = WriteArgsOf<Z.input<typeof BuilderChecks.putAskArgs>, RecordT>
+export type PutAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions }>
 /** What {@link delAskOf} takes: the records. Its flags are fixed. */
-export type DelAskArgs<RecordT extends Thing = Thing> = WriteArgsOf<Z.input<typeof BuilderChecks.delAskArgs>, RecordT>
+export type DelAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT }>
 
-/** The get ask for the Thing at `args`'s scope, or throw `bad_option` */
+/** The get ask for the Thing at `args`'s scope. */
 export function getAskOf(args: GetAskArgs): GetThingAsk {
-  const { userid, banklabel, labelpath, ifAbsent } = BuilderChecks.getAskArgs.parse(args)
-  return { userid, banklabel, labelpath, op: 'get', modelkind: modelkindOf(labelpath), ifAbsent }
+  if (! CX.isPlainBag(args)) { return args }
+  const { userid, banklabel, labelpath, ifAbsent = 'nil' } = args
+  return { userid, banklabel, labelpath, op: 'get', modelkind: modelkindGiven(labelpath), ifAbsent } as GetThingAsk
 }
 
-/** The list ask for the children of the Thing at `args`'s scope, or throw `bad_option` */
+/** The list ask for the children of the Thing at `args`'s scope. */
 export function listAskOf(args: ListAskArgs): ListThingsAsk {
-  const { userid, banklabel, labelpath, ifAbsent } = BuilderChecks.listAskArgs.parse(args)
-  return { userid, banklabel, labelpath, op: 'list', modelkind: modelkindOf(labelpath), ifAbsent }
+  if (! CX.isPlainBag(args)) { return args }
+  const { userid, banklabel, labelpath, ifAbsent = 'fail' } = args
+  return { userid, banklabel, labelpath, op: 'list', modelkind: modelkindGiven(labelpath), ifAbsent } as ListThingsAsk
 }
 
-/** The put ask writing `args.record` over `args.cited`, at the record's scope, or throw `bad_option` or `bad_record` */
-export function putAskOf<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteThingAsk<RecordT> {
-  const { cited: _cited, record: _record, ...flags } = BuilderChecks.putAskArgs.parse(args)
-  const { userid, banklabel, labelpath } = thingScope.parse(args.record)
-  // The modelkind is the record's labelpath's, and so of RecordT, which the verb's checks hold it to.
-  return { ...flags, userid, banklabel, labelpath, op: 'put', modelkind: modelkindOf(labelpath), cited: args.cited, record: args.record } as WriteThingAsk<RecordT>
+/** The put ask writing `args.record` over `args.cited`, at the record's scope. */
+export function putAskOf<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT> {
+  if (! CX.isPlainBag(args)) { return args }
+  const { ifAbsent = 'add', ifPresent = 'repl', ...given } = args
+  const scope = scopeGiven(args.record)
+  // A field the put does not take goes through, for the verb's strict check to refuse.
+  return { ...given, ...scope, op: 'put', modelkind: modelkindGiven(scope.labelpath), ifAbsent, ifPresent } as unknown as WriteAskOf<RecordT>
 }
 
-/** The del ask writing the tombstone `args.record` over `args.cited`, at the record's scope, or throw `bad_option` or `bad_record` */
-export function delAskOf<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteThingAsk<RecordT> {
-  const { cited: _cited, record: _record, ...flags } = BuilderChecks.delAskArgs.parse(args)
-  const { userid, banklabel, labelpath } = thingScope.parse(args.record)
-  // The modelkind is the record's labelpath's, and so of RecordT, which the verb's checks hold it to.
-  return { ...flags, userid, banklabel, labelpath, op: 'del', modelkind: modelkindOf(labelpath), cited: args.cited, record: args.record } as WriteThingAsk<RecordT>
+/** The del ask writing the tombstone `args.record` over `args.cited`, at the record's scope. */
+export function delAskOf<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT> {
+  if (! CX.isPlainBag(args)) { return args }
+  const scope = scopeGiven(args.record)
+  // A field the del does not take goes through, for the verb's strict check to refuse.
+  return { ...args, ...scope, op: 'del', modelkind: modelkindGiven(scope.labelpath), ifAbsent: 'fail', ifPresent: 'repl' } as unknown as WriteAskOf<RecordT>
 }
+
+/** The scope fields of `record`, as given: none when it is not a bag. */
+function scopeGiven(record: unknown): Partial<Record<keyof ThingScope, unknown>> {
+  if (! CX.isPlainBag(record)) { return {} }
+  const { userid, banklabel, labelpath } = record
+  return { userid, banklabel, labelpath }
+}
+
+/** The modelkind `labelpath` starts with, or undefined when it is not a string. */
+function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typeof labelpath === 'string') ? modelkindOf(labelpath) : undefined }
 // --
 
 // == [Loggable asks]: loggableAsk, LoggableAsk, loggableAskOf

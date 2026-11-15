@@ -77,6 +77,9 @@ export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank 
 /** A live bank stored without one of its roots. */
 export const BankRootsMissing = "A live bank is stored without its main gate or its root box: the store needs mending by hand."
 
+/** A replace classified over no Thing stored, or over one of another kind: the classifier is broken. */
+export const ReplacedThingAmiss = "A write classified as a replace found no live Thing of its kind stored: this is a bug in safebyok."
+
 /** The last resort of a vaultDB's error handler. */
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
