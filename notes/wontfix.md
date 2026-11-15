@@ -24,3 +24,36 @@ cites the tombstone it found, which is no longer what is stored.
 Reasoning for wontfix: it needs three passphrase prompts on two devices racing, and leaves a refusal that writes
 nothing, which a retry clears. Mending it would put a retry or a lock in a primitive's critical path. Ruled by the
 Coach, 2026-11-15, box_ops thread 1.
+
+### A late, older answer keeps the newer record, but marks it fresh
+
+* current outcome: the ThingMinder keeps the newer record it holds, and TanStack Query marks the entry fresh as of the
+  late answer. The record reads as timely for longer, by however long that answer was in flight.
+* alternatives:
+  - skip a delivery that `betterRecordOf` would refuse: a listing's could, but a get's queryFn must return its record,
+    so a get would still move the staleness on.
+  - deliver with the held record's `dataUpdatedAt` as `updatedAt`: which record wins is known only inside
+    `structuralSharing`, after the time has been chosen.
+* workaround: none needed. A get with a short `staleTime` asks storage again.
+
+Steps to create: a get starts; a notice of a newer revision lands; the get's answer, of the older revision, lands
+after it.
+
+Reasoning for wontfix: the gain is at most one answer's time in flight, against a `staleTime` of an hour, and the fix
+would put a comparison outside `structuralSharing`. Ruled by the Coach, 2026-11-15, vault_minder.
+
+### The ThingMinder detects no conflict among the records it holds
+
+* current outcome: `betterRecordOf` keeps the later record by lifepath and then revseq. Two records of one revision
+  with different revtoks keep whichever landed first, and an older record from storage is kept out.
+* alternatives:
+  - refuse `record_conflict` in the cache: `betterRecordOf` must stay pure, since TanStack Query calls it for every
+    observer's result, so a refusal would need a state of its own outside it.
+* workaround: none needed. A write citing what the cache holds is refused by storage where storage holds otherwise,
+  and the refusal carries the stored record.
+
+Steps to create: storage restored from a backup, or two stores answering for one bank.
+
+Reasoning for wontfix: storage is the ground truth, and the cache a copy. The store knows the record it holds, and
+refuses a write that cites another, so a conflict is found where it can be settled, not in the cache. Ruled by the Coach,
+2026-11-15, vault_minder.

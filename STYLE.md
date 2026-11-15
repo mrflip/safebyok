@@ -196,7 +196,8 @@ Specificity is a virtue (`saltBytes` says it is bytes), but don't tag the obviou
 * `err` -- an error. **Never** `error`.
 * `count` -- a reported quantity; `qty` or `nFoos` -- a requested one.
 * `beg`/`end` for a range, `prev`/`curr`/`next` for a chain, `ante`/`post` for before and after
-  a step.
+  a step, `prior` for what stood before the value in hand arrived (the record a cache held when a
+  get began).
 * `name` -- an identifier exactly isomorphic with what it names. Prefer `title`, `kind`, `label`
   or `handle` when one fits better. `title` is human-readable, never an identifier.
 

@@ -8,7 +8,15 @@ application, and its environments.
 
 This repository is a pnpm workspace. Its packages:
 
-* [`safebyok`](packages/safebyok) -- the vault itself.
+* [`safebyok`](packages/safebyok)`/core`: Usable on its own in front of any datastore served by one of the provided adapters
+  - storage primitives to list, get, delete and update raw record objects
+  - Seal and unseal records.
+  - Unlock the bank by passphrase and passkey
+  - Create a new bank, delete one, add other proof methods ("wayin"s)
+* [`safebyok`](packages/safebyok)`/cached`: A managed cache of objects handling polling and subscriptions based on `@tanstack/query-core`
+* [`safebyok`](packages/safebyok): Class instances and a sync/async listing that offers durable live-updating objects that make it both safer and more straightforward to use the library
+  - storage operations that offer merging of stored secret records retry with backoff
+  - instances move to a safe state when it is deleted, or the bank locks, is swept from the page, etc
 * [`safebyok-react`](packages/safebyok-react) -- the React binding: a provider, snapshot hooks,
   and the dialogs that ask the user for a passphrase or passkey when one is needed.
 * [`safebyok-convex`](packages/safebyok-convex) -- Convex storage: a Convex component, and the
