@@ -5,7 +5,7 @@ not promise, test or design for. `notes/wontfix-big.md` is safebyok-big's. A rev
 what we decided, and this file for what we decided not to decide.
 
 Each entry is a heading naming the case, then its current outcome, the alternatives (a line on why each plausible one
-will not work), the workaround, the steps to create it, and the reasoning. Add one at the end, with who ruled and when.
+will not work), the workaround, the steps to reproduce it, and the reasoning. Add one at the end, with who ruled and when.
 
 ### A birth over a deleted bank refuses `stale` when another device built the bank again first
 
@@ -17,7 +17,7 @@ will not work), the workaround, the steps to create it, and the reasoning. Add o
   - lock the bank across the prompt: keeps storage locked while a user types a passphrase, and a lock is a last resort.
 * workaround: the customer retries, or the user reloads the page.
 
-Steps to create: device A finds the bank deleted, and asks its user for a passphrase for a new one. Meanwhile device B
+Steps to reproduce: device A finds the bank deleted, and asks its user for a passphrase for a new one. Meanwhile device B
 builds the bank again, and may delete it again, each with its own user's passphrase. A's user then submits: A's birth
 cites the tombstone it found, which is no longer what is stored.
 
