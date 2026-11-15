@@ -1,7 +1,7 @@
 # Thread 2: storage going backward, the proposal (2026-11-15)
 
 For the Coach and whoever builds it: how the minder tells storage going back from a late answer, and what it does.
-Not built: the orchestrator asked to see it first.
+Built as ruled, with the kind `stale_read` in place of `record_conflict`.
 
 A get whose answer sorts before the record the cache held **when that get began** means storage went back (a lost
 row, a rollback). One that sorts before a record that landed **during** the get only lost a race (notes/wontfix.md,

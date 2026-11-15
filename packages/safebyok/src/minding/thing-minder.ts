@@ -62,7 +62,7 @@ export type TSQAnswer = (GotAnswer & TSQEntryState) | BadAnswer
 
 // == [Arguments]: MinderRoster, MinderOpts, Checks, isRosterOwn
 
-/** The minder of each kind of Thing in a bank, as one minder hands them the Things it hears of. */
+/** The minder of each kind of Thing in a bank, to which the bank's minder passes each Thing of that kind that the bank's watch reports. */
 export type MinderRoster = Readonly<Partial<Record<Thingkind, ThingMinder>>>
 
 /** The options of {@link ThingMinder.make}, beside its ties and its bank. */
@@ -73,7 +73,7 @@ export interface MinderOpts {
   tsq:             TSQ.QueryClient
   /** How long a record stays timely, and an entry no one listens to stays cached. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
-  /** The minders of the bank's other kinds of Thing, which this minder hands each Thing of their kind it hears of. */
+  /** The minders of the bank's other kinds of Thing. The bank's minder passes each of them the Things of its kind that the watch reports. */
   minders?:        MinderRoster
 }
 
@@ -124,7 +124,7 @@ export class ThingMinder {
   // == [Construction]: make, constructor
 
   /** Make a minder of `ties.modelkind` in `bank`, asking `opts.vaultDB` and caching in `opts.tsq`. Call `hello` to start it.
-   * A bank's minder hands each gate and box it hears of to `opts.minders`.
+   * A bank's minder passes each gate and box the bank's watch reports to `opts.minders`.
    */
   static make(ties: Pick<ThingTies, 'modelkind'>, opts: MinderOpts, bank: MinderFriend): ThingMinder {
     const checked = Checks.minderMakeArgs.parse({ ties, opts, bank })
