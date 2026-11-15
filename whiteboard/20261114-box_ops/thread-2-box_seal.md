@@ -1,6 +1,6 @@
 # Thread 2: box_seal (2026-11-15)
 
-Branch `20261115-box_seal`, PR #TBD, stacked on #701 (`20261115-box_store`). Proved: `pnpm --filter safebyok` lint,
+Branch `20261115-box_seal`, PR #703, stacked on #701 (`20261115-box_store`). Proved: `pnpm --filter safebyok` lint,
 typecheck and test, 641 tests green; `pnpm justify` at ready.
 
 * **Built**
@@ -19,6 +19,9 @@ typecheck and test, 641 tests green; `pnpm justify` at ready.
   * `bank.ts`: `sealBox(prior, cleartexts)`, `tombstoneBox(prior)`, `unsealBox(box)` (a live box or a tombstone), and
     `#demandBox(box, check)`.
   * Tests: `boxShellOf` in `models-world.ts`; sealers, lease, bank, ctx-bytes and `boxSparse` cases.
+  * `notes/security.md`: a new entry for signed tombstones, and two `amended` lines on the 2026-11-14 entry, about the
+    seal's binding and the `bank_tok` loosening. The file's header says to amend an entry that covers the same
+    mechanism in place.
 
 * **Decisions taken**
   * **Who binds the tags.** The lease binds them, as cipherCtx's visible header after the purpose, the house
