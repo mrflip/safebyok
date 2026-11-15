@@ -34,8 +34,8 @@ device.ensureBank()                                  the bank listed is returned
 
 ## What a bank's birth needs
 
-A bank's birth stores two rows together: the bank row, and its `main` gate row, which carries the wayins. Neither
-has anything encrypted but the wayins' wraps. A vault is born later, by `bank.ensureVault`, and holds no key.
+A bank's birth puts two rows together: the bank row, and its `main` gate row, which carries the wayins. Neither
+has anything encrypted but the wayins' wraps. A vault is born later, by `bank.ensureVault`, and has no key.
 
 | Part                | Fields                          | Comes from                                           |
 |---------------------|---------------------------------|------------------------------------------------------|
@@ -64,7 +64,7 @@ The ordering rules:
 
 1. The stamps (`listing.stampsOfBirth()`: the bank stamp and the gate stamp) come before any key: a wayin's ctx binds
    `[bankStamp, gateStamp]`, its purpose and its header, and a passkeyKey's HKDF `info` is that same ctx.
-2. A header comes before its key: a passphraseKey is derived from the header's salt.
+2. A header comes before its wayinKey: a passphraseKey is derived from the header's salt.
 3. The passphrase wayin comes before the passkey wayin: it is where the bankKey comes from.
 
 The lease is not an input. It is a second output of the same bankKey.
@@ -89,13 +89,13 @@ PasskeyProving.buildNovel(bank, gate, passkeyClear, world)
 PassphraseProving.buildStored(gate, passphraseClear, world)
 ├─ key_deriver_label is the world's          else 'newer_format'
 ├─ passphraseKeyOf(keyDeriver, cleartext, stored salt)
-└─ the wrap opens                            else 'wrong_passphrase'
+└─ the wrap unwraps                            else 'wrong_passphrase'
 
 PasskeyProving.buildStored(gate, passkeyClear)
 ├─ the gate has a passkey wayin              else 'absent_wayin'
 ├─ credential_id and prf_salt_b64 match      else 'wrong_passkey', the answer left unspent
 ├─ deriveWrappingKey(prfBytes, ctx)
-└─ the wrap opens                            else 'wrong_passkey'
+└─ the wrap unwraps                            else 'wrong_passkey'
 
 proving.buildWayin(NOVEL | sourceProving)    a Wayin; the bankKey made or unwrapped, wrapped, dropped
 proving.buildLease(friend, gate)             a Lease on friend's bank, citing the gate revision passed
@@ -186,7 +186,7 @@ verbs (*Changing the gate*). The patch hooks belong to `Box`.
 Each way of unlocking makes a lease in its own way, then attaches it in the same way. There is no counter and no compare.
 
 ```text
-an unlock    lease = await proved.buildLease(friend, maingate);                 await bank.#attachLease(lease)
+unlocking    lease = await proved.buildLease(friend, maingate);                 await bank.#attachLease(lease)
 a birth      lease = await passphraseProving.buildLease(friend, maingate);      await bank.#attachLease(lease)
 a gate verb  lease = await proved.buildLease(friend, written);                  await bank.#attachLease(lease)
 the cache    lease = await Lease.buildFromCache(friend, maingate);              await bank.#attachLease(lease)    null → ask
@@ -208,7 +208,7 @@ bank.#revokeLease(where)                             private: called by lock, an
                                                      it does not align: lock aligns after calling it, and adopt's receiveRecord aligns
 ```
 
-**A `lock()` before the attach, on an unlock or a birth,** has no effect, by the enter-key rule. The bank ends
+**A `lock()` before the attach, on an `unlock_bank` gating or a birth,** has no effect, by the enter-key rule. The bank ends
 up unlocked with its lease cached: a normal, visible state that the next `lock()` ends. The bank was
 already locked, so that `lock()` changed no state.
 
@@ -217,7 +217,7 @@ it from the cache. This requires the deviceDB to apply calls in the order they w
 that the forget is written after the stow. The stow is awaited before `align`, because a listener may call
 `lock()`. So the attach needs no compare, and no second forget.
 
-**A `lock()` that crosses a gate change** does not stay in effect, as with an unlock: the proof shows that this
+**A `lock()` that crosses a gate change** does not stay in effect, as with unlocking: the proving shows that this
 user may have the bank unlocked. Each of the three gate changes ends in `#unlockByProving`, which gives the bank a
 lease for a full term citing the gate row that was written.
 
@@ -258,7 +258,7 @@ tab, even if the deviceDB still refuses. A second refusal finds the vacate alrea
 needs no counter; a vacate disables before its forgets.
 
 **A `lock()` and the dialog.** A lock leaves an open gating open: the lock says the bank is locked, and
-the user can still answer the dialog. If the gating was asking for an unlock, it still unlocks, and if it was
+the user can still answer the dialog. If the gating was asking to unlock the bank, it still unlocks, and if it was
 asking for a change of the gate, the change is written and unlocks. A valid request goes through if it was authorized at
 the start of its critical section.
 
@@ -284,13 +284,13 @@ not a second field.
 | `bank.lock`      | No lease attached; the forget called after every stow called; the bank, its gate and vault listings, each vault, box listing and box aligned                                              | Never throws: a refused forget is announced `lease_revoke_failed` after it returns                   |
 | `device.sweep`   | The device and its bank disabled; no lease attached, the cached row left; the watches stopped; its open gating dismissed                                                                 | Never throws                                                                                          |
 | `device.vacate`  | As sweep; each lease of the bank scope cached on this device, and the device row, forgotten or announced as not; `vacated` told                                                          | Never rejects                                                                                         |
-| `box.put`        | The record kept is what it put, or newer; snapshot and cache aligned                                                                                                                      | Nothing stored; on `stale_write` or `camped`, the stored record taken in                             |
+| `box.put`        | The record kept is what it put, or newer; snapshot and cache aligned                                                                                                                      | Nothing stored; on `stale_write` or `camped`, the stored record adopted                             |
 | `attachLease`    | Attached and in force; cached as the cache can; the bank and everything under it aligned                                                                                                 | Past a discard: refused, nothing cached                                                              |
 | build_bank       | A Bank listed, the only one of its scope: unlocked, or locked by a `lock()` after the attach                                                                                              | Nothing stored; has only what the answer delivered. Another won: `gate_made_elsewhere`, its Bank listed, locked |
 | `ensureUnlocked` | Unlocked, a lease in force at its attach                                                                                                                                                  | `dismissed`: no lease granted, none cached by this call                                              |
 | `ensureVault`    | A Vault listed, the only one of its scope, this device's or another's                                                                                                                     | Nothing stored; has only what the answer delivered                                                   |
 | A gate change    | The gate row at its next revision. Unlocked citing that row, a fresh lease of full term, whatever lock came before or crossed                                                              | Nothing stored, unless the answer was lost; the lease as it was                                      |
-| del_bank         | The bank's tombstone stored, its gate, vaults and boxes deleted; the Bank locked and disabled, its cached lease forgotten                                                                  | Nothing stored, unless the answer was lost; the Bank as it was, but locked if the proof passed       |
+| del_bank         | The bank's tombstone stored, its gate, vaults and boxes deleted; the Bank locked and disabled, its cached lease forgotten                                                                  | Nothing stored, unless the answer was lost; the Bank as it was, but locked if the cleartext proved the gate       |
 | `vault.del`      | A tombstone stored under a new `vault_tok`, its box rows deleted; the Vault tombstoned, still listed; the bank as it was                                                                  | Nothing stored, unless the answer was lost; the Vault as it was                                      |
 | `gating.attempt` | At most one under way; its gate read once; no cleartext kept                                                                                                                              | The same; correctable: the gating still open; any other: settled                                     |
 
@@ -339,7 +339,7 @@ attaching a lease. The new Bank reports locked between the build and the attach,
 
 A vault's birth asks nobody: `bank.ensureVault(scope)` returns the vault listed, if present, and otherwise puts
 `vaultListing.recordOfBirth(scope, expected)` over the tombstone or shell, `{ expected, ifAbsent: 'add', ifPresent: 'get' }`.
-A `passed` answer is another device's vault, and is returned: a vault holds no key of its own.
+A `passed` answer is another device's vault, and is returned: a vault has no key of its own.
 
 ## `unlock_bank`
 
@@ -395,14 +395,14 @@ each gate change's act, past its provings
   `expected`. Anything the watch delivers during the attempt therefore makes the put refuse: a passkey revoked elsewhere is
   not brought back, and a passphrase replaced elsewhere is not overwritten.
 * **A write made after the timeliness request.** The put refuses with 'stale_write'. The gating concludes with
-  that refusal, and the gate has by then taken in the stored record. Nothing retries; a host may call
+  that refusal, and the gate has by then adopted the stored record. Nothing retries; a host may call
   the verb again.
 * **A gate change locks no device.** Another device's session keeps its lease until its own lock or next `bank.autolock`; its
   cached lease, citing the older gate revision, is forgotten at its next session (Decided).
-* **The bankDB applies the gating's storage policy, in the step that stores the record.** The record is built from
+* **The bankDB applies the gating's storage policy, in the step that puts the record.** The record is built from
   `ante`, so it changes only its gating's wayin, and the policy refuses one that changes more (`gate_issue`). The device
   never meets that refusal: `add_passkey` refuses before proving when the gate the attempt read has a passkey
-  (`bad_option`). The bankDB cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
+  (`bad_option`). The bankDB cannot tell whether a wrap unwraps, so a bad `bank_key_wayin_wrapped` is still written.
 
 Each prompt is the gate's, and starts the same way:
 
@@ -536,7 +536,7 @@ nothing stored                                   nothing written; no cascade; 'v
 Repeated deletes do not advance the revision. Whoever repeats a delete may not have the current token, having lost the
 first answer. Advancing the revision would wake every device's watch for nothing, and could cause a rebirth that has that
 tombstone as its `expected` to be refused. The package does not retry: a repeat is the host calling the verb again,
-which its Vault allows until the tombstone arrives. After that `vault.del()` finds the vault absent.
+which its Vault allows until the tombstone is delivered. After that `vault.del()` finds the vault absent.
 
 A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or `absent_vault` or `vault_gone`). The damaged_row field will contain a generated tombstone if one is found with that scope *and vault_tok*, null otherwise. In both cases the value is forensic: do not instantiate, do not deliver. (Discovering a row is exceptionally unlikely as they were to have been transactionally removed with the vault deletion. `bank.doctor()` will establish comfort if needed)
 
@@ -552,8 +552,8 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 * `adopt` ignores a record older by `revision_seq`.
 * `Promptly`, a constant: the timeliness an attempt asks of `ensureTimely`. `maxMillis: 0` is the customer's to ask, as an
   override from the inside is one the customer cannot.
-* `ifPresent` is customer-facing, and `putVault` and `putBox` take it alike in `PutOpts`, with `ifAbsent` ('add' or
-  'fail'). Only `repl` saves, and only within the live row's own life: at its revision under another `vault_tok` or
+* `ifPresent` is customer-facing, and `putVault` and `putBox` accept it alike in `PutOpts`, with `ifAbsent` ('add' or
+  'fail'). Only `repl` puts, and only within the live row's own life: at its revision under another `vault_tok` or
   `box_tok` it refuses `camped`. `fail` refuses `camped` with the corpse (`dbhas`, the request), not as a `stale_write`;
   `get` answers the live row in place of the request, `passed`. `isVaultPutAllowed(ante, record, opts)` and
   `isBoxPutAllowed(ante, record, opts)` decide inside each adapter's transaction.
@@ -567,7 +567,7 @@ A Box operation naming a stale or missing vault_tok will fail `vault_reborn` (or
 
 ## Areas of Concern
 
-Eyebrow raisers from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
+Surprises from the Coach's replies in the sprint's Closer Look (`whiteboard/20261103-unrace/unrace-closerlook.md`).
 
 * **The gating family:** `#concluded`, `#outcome` and their flags. "same family of design smells around gating". See `whiteboard/20261102-newdesign/unrace-gating-prompt.md`.
 * **The cache and the forget on one control path:** `lease.cacheAsCacheCan()` before the align in `bank.#attachLease`, the forget before the first await in `bank.#revokeLease`. "that sounds dangerous".

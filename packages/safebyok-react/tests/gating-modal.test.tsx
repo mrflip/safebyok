@@ -7,22 +7,22 @@ import * as TH from './test-helpers'
 
 TH.sweepBankWorlds()
 
-/** The bank's state before the gating is raised: absent, built with a vault, or built with a vault and a passkey. */
+/** The bank's state before the gating is launched: absent, built with a vault, or built with a vault and a passkey. */
 type Before = 'absent' | 'built' | 'passkeyed'
 
-/** Open a gating with `raise`, and render it in a GatingModal. `shown` may replace the gating that is rendered. */
-const shownFor = async (raise: Parameters<typeof TH.openGatingOf>[1], before: Before, shown = (gating: AnyGating) => gating) => {
+/** Open a gating with `launch`, and render it in a GatingModal. `shown` may replace the gating that is rendered. */
+const shownFor = async (launch: Parameters<typeof TH.openGatingOf>[1], before: Before, shown = (gating: AnyGating) => gating) => {
   const world = TH.makeBankWorld()
   if (before !== 'absent') {
     const { vault } = await TH.makeBankWithVault(world)
     if (before === 'passkeyed') { await TH.addPasskeyTo(world, vault) }
   }
-  const opened = await TH.openGatingOf(world, raise)
+  const opened = await TH.openGatingOf(world, launch)
   render(<GatingModal gating={shown(opened.gating)} />)
   return opened
 }
 
-/** Return a copy of `gating` with a gatingkind this package has no dialog for, like one a newer core might raise. */
+/** Return a copy of `gating` with a gatingkind this package has no dialog for, like one a newer core might launch. */
 const forged = (gating: AnyGating): AnyGating => Object.create(gating, { gatingkind: { value: 'forged_kind' }, dismiss: { value: () => { gating.dismiss() } } }) as AnyGating
 
 describe("GatingModal", () => {
@@ -35,16 +35,16 @@ describe("GatingModal", () => {
     [TH.deleting,        'built',     Messages.delBankTitle,       'shows the dialog that deletes the bank for a del_bank gating'],
   ] as const
 
-  for (const [raise, before, title, blurb] of DialogCases) {
+  for (const [launch, before, title, blurb] of DialogCases) {
     it(blurb, async () => {
-      await shownFor(raise, before)
+      await shownFor(launch, before)
       expect(screen.getByText(title)).to.exist
     })
   }
 
   it("dismisses at once a gating whose gatingkind has no dialog", async () => {
-    const { raising } = await shownFor(TH.unlocking, 'built', forged)
-    expect(await raising).to.include({ ok: false })
+    const { launching } = await shownFor(TH.unlocking, 'built', forged)
+    expect(await launching).to.include({ ok: false })
     expect(screen.queryByRole('dialog')).to.be.null
   })
 })

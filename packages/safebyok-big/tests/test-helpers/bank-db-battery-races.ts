@@ -44,7 +44,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
   function boxParent(vault: VaultRow) { return (boxNoticesCarryVault ? vault : null) }
 
   describe("two devices at once", () => {
-    it("two builds of one bank store one, and the other is passed its gate", async () => {
+    it("two builds of one bank put one, and the other is passed its gate", async () => {
       const bankDB = await fresh()
       const twin = await twinOf(bankDB)
       const ours = bankBuildAskOf(bankAt(0, 'bankA'), gateAt(0, 'bankA'))
@@ -57,7 +57,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
       expect(await rowsOf(bankDB).gateRowOf(gateScope)).to.deep.equal(born?.val)
     })
 
-    it("two births of one vault store one, and the other is passed it", async () => {
+    it("two births of one vault put one, and the other is passed it", async () => {
       const { bankDB } = await putWith({ vault: false })
       const twin = await twinOf(bankDB)
       const ours = vaultPutAskOf(vaultAt(0, 'bank1', 'lifeA', { revision_tok: 'vrevA' }), null, { ifPresent: 'get' })
@@ -244,7 +244,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
 
   if (canFail) {
     describe("a bankDB's own failure", () => {
-      it("refuses the call its storage failed, and completes the next", async () => {
+      it("refuses the call its storage failed, and the next succeeds", async () => {
         const { bankDB, vault } = await putWith()
         await failNextCall(bankDB)
         const answer = await bankDB.tryGetVault(vaultGetAskOf())

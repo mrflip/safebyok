@@ -60,7 +60,7 @@ export const { bank_tok, gate_tok, vault_tok, box_tok, revision_tok, device_tok,
  */
 export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
 
-/** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver takes beside the passphrase. */
+/** A passphrase wayin's passphraseSalt, its `salt_b64`: base64url text of the random bytes the key deriver is given beside the passphrase. */
 export type PassphraseSalt = Z.infer<typeof salt_b64>
 
 /** A passkey wayin's prfSalt, its `prf_salt_b64`: base64url text of the {@link PasskeySaltSize} random bytes the authenticator's PRF is asked over. */
@@ -129,7 +129,7 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
 /** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, readable while the bank is locked. Never put secret material in it.
  * It is stored in the clear, as the JSON object it is (a `jsonb` column, say, which a server can
  * query), so anyone who can read the database can read it. It is not authenticated: anyone who can
- * write the database can change it, and the whisper still opens. A field the server should read but
+ * write the database can change it, and the whisper still deciphers. A field the server should read but
  * must not change unnoticed goes in the whisper too, so that you can compare the two once the box is
  * unsealed. safebyok never looks inside it: check its shape yourself before `putBox()`, which refuses
  * only one that is not a plain JSON object.
@@ -167,7 +167,7 @@ export type VaultScope = Z.infer<typeof vaultScope>
 /** What names one box: its vault's scope and its boxlabel. */
 export type Boxscope = Z.infer<typeof boxscope>
 
-/** The check of the scope a bank's calls take to name a vault: its `vaultlabel`, and optionally the bank's `user_id` and `banklabel`.
+/** The check of the scope a bank's calls are given to name a vault: its `vaultlabel`, and optionally the bank's `user_id` and `banklabel`.
  * Anything carrying those names passes, such as a Vault or its snapshot, and the rest is dropped. A
  * bankDB or deviceDB in it refuses, as each goes to `Device.make`.
  *

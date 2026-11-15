@@ -130,7 +130,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
    * Refuses `already_asking` while another gating is open on the device.
    */
   async launch(): Promise<Bank> {
-    // A gating concluded before its launch has nothing to ask: it rejects with its outcome, and never takes the device.
+    // A gating concluded before its launch has nothing to ask: it rejects with its outcome, and never attaches to the device.
     if (this.#outcome !== null) { return Outcome.valOf(this.#outcome) }
     this.#device.attachGating(this)
     this.#isLaunched = true
@@ -189,7 +189,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [Concluding]: dismiss, endAsking, concludeOnce
 
-  /** Close this gating without a proof.
+  /** Close this gating without the user's cleartext.
    * It concludes `dismissed`, or, if an attempt is under way, with that attempt's outcome.
    */
   dismiss(): void { this.#endAsking(Throwers.gatingDismissed()) }
@@ -221,7 +221,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // Each attempt proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving
 // builder, and a proving never leaves the attempt that built it.
 
-/** Birth a bank of `device`'s scope from the user's passphrase and optional passkey, store it, and unlock it.
+/** Birth a bank of `device`'s scope from the user's passphrase and optional passkey, put it, and unlock it.
  * Refuses `gate_made_elsewhere` where a live bank is already stored there.
  */
 export async function birthBank(device: Device, cleartexts: unknown): Promise<Bank> {

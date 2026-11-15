@@ -34,7 +34,7 @@ export async function eventually(check: () => boolean): Promise<void> {
 /** A listener for a BankDB's `subscribe`, and a count of how often it was called, kept for a test
  * to look at.
  *
- * @returns `onChange`, to subscribe with; `heard`, whose `count` it raises.
+ * @returns `onChange`, to subscribe with; `heard`, whose `count` it increments.
  */
 export function changeCounter() {
   const heard = { count: 0 }
@@ -54,12 +54,12 @@ export function changeCounter() {
  */
 export function makeLatch() {
   const opened = deferred()
-  const arrived = deferred()
+  const reached = deferred()
   const pass = async () => {
-    arrived.resolve()
+    reached.resolve()
     await opened.promise
   }
-  return { pass, reached: arrived.promise, release: opened.resolve }
+  return { pass, reached: reached.promise, release: opened.resolve }
 }
 
 /** The names of `Target`'s methods that return a promise. */
@@ -162,7 +162,7 @@ export function pendingNextCall<Target extends object>(target: Target, verb: Asy
  *
  * @example
  *   const written = TH.pendingNextAnswer(deviceDB, 'tryStow')
- *   const unlocking = bank.tryUnlock()     // the lease is in the deviceDB; the unlock has not heard
+ *   const unlocking = bank.tryUnlock()     // the lease is in the deviceDB; tryUnlock has not heard
  *   await written.reached
  *   bank.lock()                            // its forget is called after the write
  *   written.release()

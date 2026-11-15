@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in safebyok. It is a small library that holds people's secrets, so it moves
+Thanks for your interest in safebyok. It is a small library that keeps people's secrets, so it moves
 carefully: please open an issue to talk over anything larger than a fix before you write it.
 
 **Found a security problem?** Don't open an issue: see [SECURITY.md](SECURITY.md).
@@ -19,7 +19,7 @@ pnpm --filter safebyok test:watch   # one package's tests, as you edit
 
 * **`pnpm justify` green**, on every commit: each commit lands in `main` on its own.
 * **Tests**: one for each use case of anything exported, and one for each `@example` in a doc
-  block. For anything touching a secret, also a test that the wrong passphrase, tampered data or a
+  block. For anything touching a secret, also a test that the wrong passphrase, a tampered field or a
   malformed record is refused, and that no error carries the secret.
 * **A doc block** on everything exported, written for the developer calling it.
 * **A branch on the tip of `main`, or of the PR it stacks on**, with no merge commits in it: the

@@ -70,7 +70,7 @@ export class Lease implements LeaseStamp {
       // The damaged row stands until the next lease is cached over it.
       if (! checked.success) { throw damagedLease() }
       // Broken, as the to-do list says (*A cached lease newer than the vault in hand*): a row citing a newer gate revision may be another
-      // tab's good lease over a gate this one holds stale. It should refresh the gate; today it forgets the row.
+      // tab's good lease over a gate this one has stale. It should refresh the gate; today it forgets the row.
       if ((checked.data.gate_tok !== cited.gate_tok) || (checked.data.gate_revision_tok !== cited.revision_tok)) {
         await friend.tryForgetLease()
         return null
@@ -105,7 +105,7 @@ export class Lease implements LeaseStamp {
 
   // == [Caching]: cacheAsCacheCan
 
-  // A refusal costs the next session an unlock, not this one its lease.
+  // A refusal costs the next session a gating, not this one its lease.
   /** Cache this lease on this device, unless it came from there. A device database refusal is told as bad news, not thrown. */
   async cacheAsCacheCan(): Promise<void> {
     if (this.#isFromCache) { return }
@@ -154,7 +154,7 @@ export class Lease implements LeaseStamp {
   evict(): void { this.#record = null }
   // --
 
-  // == [Whispers under the bankKey]: sealWith, unsealWith, opened, ctxOf, bankKey
+  // == [Whispers under the bankKey]: sealWith, unsealWith, decipherSealed, ctxOf, bankKey
 
   /** Seal `whisperText` under a fresh boxKey, bound to the bank's stamp and then `stamps`, in order.
    * {@link unsealWith} needs the same stamps in the same order. The text's bytes are zeroed afterwards, sealed or refused.

@@ -11,7 +11,7 @@ function scope() { return world.mw.boxscope('anthropic_api_key') }
 
 const gone    = () => tombstoneBoxRecord({ revision_seq: 2 })
 
-/** The revision a stale_write says storage has stored. */
+/** The revision a stale_write says storage has. */
 const stored = { revision_tok: 'rev-s5', revision_seq: 5 }
 
 /** A full box world, and the calls forgotten. */
@@ -54,7 +54,7 @@ describe("BoxListing: an absent box", () => {
       expect(box._cheat_central).to.deep.equal(gone())
     })
 
-    it("takes the world of the answer before it refuses", async () => {
+    it("receives the world of the answer before it refuses", async () => {
       world.mw.willGet(world.mw.answerOf(scope(), null, 'a world'))
       await TH.expectRefusal(boxListingOf(world.mw).get(scope(), { maxMillisSinceRefresh: 0 }), 'absent_box')
       expect(world.mw.callsOf('receiveParent')).to.deep.equal([{ verb: 'receiveParent', parent: 'a world' }])
@@ -83,7 +83,7 @@ describe("BoxListing: an absent box", () => {
         expect(listing.at(scope())?.am).to.eq(am)
       })
 
-      it(`takes a ${form} box that was listed alive out of the snapshot, then refuses 'absent_box'`, async () => {
+      it(`removes a ${form} box that was listed alive from the snapshot, then refuses 'absent_box'`, async () => {
         const listing = boxListingOf(world.mw)
         const box = listing.deliverRecord(fullBoxRecord())
         seedTombstone()
@@ -155,7 +155,7 @@ describe("BoxListing: an absent box", () => {
 
   })
 
-  describe("a refused answer carrying what storage has stored", () => {
+  describe("a refused answer carrying what storage has", () => {
     it("delivers a full box_stored to the box, then throws 'stale_write'", async () => {
       const { listing, box } = listedBox()
       const record = fullBoxRecord({ ...stored, sidecar: { note: 'theirs' } })
@@ -259,7 +259,7 @@ describe("BoxListing: its snapshot is the boxlabels of its present boxes", () =>
     expect(told).not.toHaveBeenCalled()
   })
 
-  it("stays the same array, telling no listener, through a lock and an unlock", () => {
+  it("stays the same array, telling no listener, as the bank locks and unlocks", () => {
     const { listing, box } = listedBox()
     const before = listing.snapshot
     const told = vi.fn()

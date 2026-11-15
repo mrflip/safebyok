@@ -41,16 +41,16 @@ export const GetGateWithBankSql = `
 // --
 
 // == [A bank's or a gate's write]: BirthBankSql, ReviseBankSql, PutGateSql
-// Each calls a function in `bank-functions.ts`, which checks the record against the stored rows and stores it.
-// It returns one row: `ok`, `act`, `bank`, `gate` and `presence`. When it stores the record, it also sends the notices.
-// The bank functions take the bank record, its main gate record (null for a delBank), then the row the ask expects,
-// each as JSON text. The gate function takes the gate record, then the row the ask expects, then the ask's policies.
+// Each calls a function in `bank-functions.ts`, which checks the record against the stored rows and writes it.
+// It returns one row: `ok`, `act`, `bank`, `gate` and `presence`. When it writes the record, it also notifies of the write.
+// The bank functions are given the bank record, its main gate record (null for a delBank), then the row the ask expects,
+// each as JSON text. The gate function is given the gate record, then the row the ask expects, then the ask's policies.
 
-/** Store a bank's first record and its main gate, if no row is stored. */
+/** Put a bank's first record and its main gate, if no row is stored. */
 export const BirthBankSql = 'SELECT * FROM safebyok_birth_bank($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)'
-/** Store a bank's next record over the row expected, replacing every row under the bank with its new main gate, if any. */
+/** Write a bank's next record over the row expected, replacing every row under the bank with its new main gate, if any. */
 export const ReviseBankSql = 'SELECT * FROM safebyok_revise_bank($1::text::jsonb, $2::text::jsonb, $3::text::jsonb)'
-/** Store a putGate ask's record over the gate row expected, under the storage policies it names. */
+/** Put a putGate ask's record over the gate row expected, under the storage policies it names. */
 export const PutGateSql = 'SELECT * FROM safebyok_put_gate($1::text::jsonb, $2::text::jsonb, $3::text[])'
 // --
 
@@ -70,11 +70,11 @@ export const GetVaultWithBankSql = `
 
 // == [A vault's write]: BirthVaultSql, ReviseVaultSql
 // Each calls a function in `bank-functions.ts`. It returns one row: `ok`, `act`, `bank`, `vault` and `presence`.
-// Both take the same parameters: the record, then the row the ask expects, each as JSON text.
+// Both have the same parameters: the record, then the row the ask expects, each as JSON text.
 
-/** Store a vault's first record, if no row of its bank's life is stored. */
+/** Put a vault's first record, if no row of its bank's life is stored. */
 export const BirthVaultSql = 'SELECT * FROM safebyok_birth_vault($1::text::jsonb, $2::text::jsonb)'
-/** Store a vault's next record over the row expected. */
+/** Write a vault's next record over the row expected. */
 export const ReviseVaultSql = 'SELECT * FROM safebyok_revise_vault($1::text::jsonb, $2::text::jsonb)'
 // --
 
@@ -105,12 +105,12 @@ export const ListBoxesWithVaultSql = `
 
 // == [A box's write]: BirthBoxSql, ReviseBoxSql
 // Each calls a function in `bank-functions.ts`. It returns one row: `ok`, `act`, `parent`, `box` and `presence`, and for a birth `boxcount`.
-// Both take the same parameters: the record, then the row the ask expects, each as JSON text, then the cap on the vault life's box rows, live and deleted.
+// Both have the same parameters: the record, then the row the ask expects, each as JSON text, then the cap on the vault life's box rows, live and deleted.
 // A revise adds no row and does not read the cap.
 
-/** Store a box's first record, if no row is stored in its vault's life. */
+/** Put a box's first record, if no row is stored in its vault's life. */
 export const BirthBoxSql = 'SELECT * FROM safebyok_birth_box($1::text::jsonb, $2::text::jsonb, $3)'
-/** Store a box's next record over the row expected. */
+/** Write a box's next record over the row expected. */
 export const ReviseBoxSql = 'SELECT * FROM safebyok_revise_box($1::text::jsonb, $2::text::jsonb, $3)'
 // --
 

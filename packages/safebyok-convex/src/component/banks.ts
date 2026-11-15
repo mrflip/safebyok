@@ -6,7 +6,7 @@ import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
 import type { Doc, TableNames } from './_generated/dataModel'
 import { sentenceKindVals } from '../refusals'
-import type { SafebyokErrorData } from '../refusals'
+import type { SafebyokRefusal } from '../refusals'
 import * as Tallies from './tallies'
 import type { BoxDocGiven, Budget, Life } from './tallies'
 import * as CVX from './validators'
@@ -17,7 +17,7 @@ import * as CVX from './validators'
 // * check its ask with the core's checker,
 // * fetch the row asked for and the row above it,
 // * classify the ask with the core's classifier, then
-// * store the ask's record if the classifier instructs it to write, and read back the row stored.
+// * write the ask's record if the classifier instructs it to, and read back the row stored.
 // It returns the rows it fetched, as they stood before any write, and as `written` the rows read back, or null if it wrote
 // nothing. The client classifies the fetched rows with the same classifier, so it reaches the same act, outcome or refusal,
 // checks that the act agrees with whether anything was written, and answers the rows read back.
@@ -38,7 +38,7 @@ export const ensureBank = query({
   },
 })
 
-/** Classify a `buildBank` ask against the bank row and its `main` gate row, and store its bank and gate records if the act is a write. */
+/** Classify a `buildBank` ask against the bank row and its `main` gate row, and put its bank and gate records if the act is a write. */
 export const buildBank = mutation({
   args:    CVX.askArgs,
   returns: CVX.bankBuilt,
@@ -54,7 +54,7 @@ export const buildBank = mutation({
   },
 })
 
-/** Classify a `putGate` ask against the bank row and the gate row, apply its storage policy, and store its gate record if the act is a write. */
+/** Classify a `putGate` ask against the bank row and the gate row, apply its storage policy, and put its gate record if the act is a write. */
 export const putGate = mutation({
   args:    CVX.askArgs,
   returns: CVX.gateWritten,
@@ -68,11 +68,11 @@ export const putGate = mutation({
   },
 })
 
-// One transaction may read 16 MiB and write 16,000 documents, and a bank holds any number of vaults, each up to the limits in
+// One transaction may read 16 MiB and write 16,000 documents, and a bank has any number of vaults, each up to the limits in
 // `tallies.ts`. So the tombstone is written first, and the rows under the bank are deleted while the cascade's budget lasts.
 // The rows left are of the life the tombstone ended: a gate or vault row under another `bank_tok` than its bank row's reads as
 // no row, and a box row is found only by its own life's tokens. `tidyGone` deletes them.
-/** Classify a `delBank` ask against the bank row. If the act is a write, store its tombstone and delete the rows under the bank, as many as one transaction allows. */
+/** Classify a `delBank` ask against the bank row. If the act is a write, write its tombstone and delete the rows under the bank, as many as one transaction allows. */
 export const delBank = mutation({
   args:    CVX.askArgs,
   returns: CVX.bankWritten,
@@ -102,7 +102,7 @@ export const getVault = query({
   },
 })
 
-/** Classify a vault put against the bank row and the vault row, and store its record if the act is a write. */
+/** Classify a vault put against the bank row and the vault row, and put its record if the act is a write. */
 export const putVault = mutation({
   args:    CVX.askArgs,
   returns: CVX.vaultWritten,
@@ -116,7 +116,7 @@ export const putVault = mutation({
   },
 })
 
-/** Classify a vault del against the bank row and the vault row. If the act is a write, store its tombstone and delete the box rows of the life it ends. */
+/** Classify a vault del against the bank row and the vault row. If the act is a write, write its tombstone and delete the box rows of the life it ends. */
 export const delVault = mutation({
   args:    CVX.askArgs,
   returns: CVX.vaultWritten,
@@ -164,8 +164,8 @@ export const getBox = query({
 // The cap the client sends is a soft cap, as every bankDB's is. Like the tally's `all_count`, it counts every box row, tombstones
 // included. This component currently enforces it and its own limits exactly, inside the mutation: a write that would take the life
 // past one is not stored, and the put answers `roomless` instead. Nothing promises that exactness.
-/** Classify a box put against the vault row, the box row and the life's capacity, and store its record if the act is a write.
- * Answers `roomless`, storing nothing, when the write would take the life past a limit.
+/** Classify a box put against the vault row, the box row and the life's capacity, and put its record if the act is a write.
+ * Answers `roomless`, writing nothing, when the write would take the life past a limit.
  */
 export const putBox = mutation({
   args:    CVX.putBoxArgs,
@@ -190,7 +190,7 @@ export const putBox = mutation({
   },
 })
 
-/** Classify a box del against the vault row and the box row, and store its tombstone if the act is a write. */
+/** Classify a box del against the vault row and the box row, and write its tombstone if the act is a write. */
 export const delBox = mutation({
   args:    CVX.askArgs,
   returns: CVX.boxWritten,
@@ -214,10 +214,10 @@ export const delBox = mutation({
 
 // A vault row is of an ended life when its `bank_tok` is not the live bank row's, and a box row or a tally when its life pair is
 // not that of a live vault row. A vault row that fails its checks is left alone, with every box row and tally under its
-// vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one transaction can hold, so it
+// vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one transaction can carry, so it
 // deletes a batch of them, and a host calls it again until it answers that none are left.
 /** Delete the vault rows and tallies of every ended life in a bank, and a batch of their box rows.
- * Returns how many box rows its live vaults hold, and what is left of the box rows of ended lives.
+ * Returns how many box rows its live vaults have, and what is left of the box rows of ended lives.
  */
 export const tidyGone = mutation({
   args:    CVX.askArgs,
@@ -301,7 +301,7 @@ function crossingOf(thrown: unknown): unknown {
   if (! DB.isVaultError(thrown)) { return thrown }
   const { refusalkind: kind, message } = thrown
   const sentenceKind = sentenceKindVals.find((crossed) => crossed === kind)
-  return (sentenceKind === undefined) ? thrown : new ConvexError<SafebyokErrorData>({ kind: sentenceKind, message })
+  return (sentenceKind === undefined) ? thrown : new ConvexError<SafebyokRefusal>({ kind: sentenceKind, message })
 }
 
 // `replaced` means a live gate row was found, so `stored.gate` is set.
@@ -357,7 +357,7 @@ async function deleteWithin<TableT extends TableNames>(db: DatabaseWriter, table
 // It reads the bank's box rows in index order, live ones among them, as `watchRows` does. Each box row of an ended life past the
 // batch is read only to count it, against a second budget the size of the first: the rows counted within it are what the next
 // call's batch deletes, if no more are left in the meantime.
-/** Delete a batch of the bank's box rows that `isEnded` holds of, and say what is left of them. */
+/** Delete a batch of the bank's box rows that `isEnded` is true of, and say what is left of them. */
 async function deleteEndedBoxes(db: DatabaseWriter, scope: BankScope, isEnded: (boxDoc: BoxDoc) => boolean): Promise<DB.Leftover> {
   const deleting = Tallies.tidyBudget()
   const counting = Tallies.tidyBudget()
@@ -383,7 +383,7 @@ async function deleteEndedBoxes(db: DatabaseWriter, scope: BankScope, isEnded: (
 /** The {@link Life} of an ask or a record, without its other fields. */
 function lifeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life): Life { return { user_id, banklabel, vaultlabel, bank_tok, vault_tok } }
 
-/** A map key for `life`, among the lives of one bank. */
+/** The ckey of `life`, among the lives of one bank. */
 function ckeyOfLife({ vaultlabel, bank_tok, vault_tok }: Life): string { return DB.ckeyOf(vaultlabel, bank_tok, vault_tok) }
 
 /** The `bank_tok` of `bankRaw` when it is a live bank row, else null. */

@@ -225,7 +225,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
 
   // The listings below first, this thing's snapshot last: a listener hears of a change once everything below shows it.
   /** Bring this thing and everything below it into line with the bank's lock and their lives, telling the subscribers of any change.
-   * Never throws. A thing that no longer answers drops what it holds of secrets when aligned.
+   * Never throws. A thing that no longer answers drops the secrets it has when aligned.
    */
   align(): void {
     for (const child of this.children) { child.align() }

@@ -22,7 +22,7 @@ export const RuntimeFields = ['dependencies', 'peerDependencies', 'optionalDepen
 /** One of the `package.json` fields that ship to a host */
 export type RuntimeField = typeof RuntimeFields[number]
 
-/** The fields that hold a dependency's range, by its name */
+/** The fields that have a dependency's range, by its name */
 type RangeField = 'dependencies' | 'peerDependencies' | 'optionalDependencies'
 
 /**
@@ -38,7 +38,7 @@ export interface Manifest extends Partial<Record<RangeField, Record<string, stri
   bundleDependencies?:   string[] | boolean
 }
 
-/** What the manifest holds under one field, as a map from a dependency's name to how it is held */
+/** What the manifest has under one field, as a map from a dependency's name to its range */
 function entriesOf(manifest: Manifest, field: RuntimeField): Record<string, string> {
   if (manifest.private) { return {} }
   if (field === 'peerDependenciesMeta') {

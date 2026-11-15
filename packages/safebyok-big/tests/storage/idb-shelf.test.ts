@@ -16,7 +16,7 @@ function specOf(over: Partial<VersionedShelfSpec> = {}): VersionedShelfSpec {
 }
 
 describe("versionedShelfOf(spec)", () => {
-  it("returns a shelf that stores rows in the database named by its stem and version", async () => {
+  it("returns a shelf that keeps rows in the database named by its stem and version", async () => {
     const spec = specOf()
     const shelf = versionedShelfOf(spec)
     await inOneStep(shelf, 'readwrite', (store) => { store.put({ wrapped: 'one' }, 'key') })

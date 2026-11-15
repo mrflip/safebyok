@@ -17,14 +17,14 @@ export type Auth = {
   subscribe: (listener: () => void) => () => void
   /** Sign in as `userlabel`, creating the account on first sight. */
   signIn(userlabel: string): Promise<Session>
-  /** End the session on this device. Touches no server-side data. */
+  /** End the session on this device. Touches nothing on the server. */
   signOut(): void
   /** Delete the signed-in account's row and end the session. Vault rows are the caller's to clean up first. */
   deleteAccount(): Promise<void>
 }
 
 /** Make a fake auth over the demo's two storages. Accounts live in the pretend-remote `dbStorage` (a backend
- * would own them), and the session lives in the on-device `deviceStorage` (a cookie would hold it).
+ * would own them), and the session lives in the on-device `deviceStorage` (a cookie would keep it).
  * Not a pattern for production: there is no password and no verification, by design. The vault
  * passphrase is deliberately separate from signing in.
  *
@@ -51,7 +51,7 @@ export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, 
 
   let session: Session | null = getSession()
   const listeners = new Set<() => void>()
-  const bump = () => { listeners.forEach((listener) => { listener() }) }
+  const notify = () => { listeners.forEach((listener) => { listener() }) }
 
   function getSession(): Session | null {
     const text = deviceStorage.get(sessionCkey)
@@ -84,14 +84,14 @@ export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, 
       if (existing === null) { dbStorage.put(ckey, JSON.stringify(account)) }
       session = { user_id: account.user_id, userlabel: account.userlabel }
       deviceStorage.put(sessionCkey, JSON.stringify(session))
-      bump()
+      notify()
       return Promise.resolve(session)
     },
 
     signOut: () => {
       session = null
       deviceStorage.del(sessionCkey)
-      bump()
+      notify()
     },
 
     deleteAccount: () => {
@@ -99,7 +99,7 @@ export const createAuth = (opts: { banklabel: string, dbStorage: StringStorage, 
       dbStorage.del(accountCkey(session.userlabel))
       session = null
       deviceStorage.del(sessionCkey)
-      bump()
+      notify()
       return Promise.resolve()
     },
   }

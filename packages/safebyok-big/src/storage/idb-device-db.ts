@@ -19,7 +19,7 @@ export interface IdbDeviceDBOpts {
   dbName?: string | undefined
 }
 
-/** The check of an IdbDeviceDB's options, which `browserOpts` takes too. */
+/** The check of an IdbDeviceDB's options, which `browserOpts` accepts too. */
 export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
 // --
 

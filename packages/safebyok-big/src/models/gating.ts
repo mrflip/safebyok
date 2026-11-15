@@ -85,7 +85,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     Object.freeze(this)
   }
 
-  // The package exports Gating as a type only: these take the bank's unlockByProving, which a gating hands a proving.
+  // The package exports Gating as a type only: these are given the bank's unlockByProving, which a gating hands a proving.
   /** Ask the user to prove they may make the `gatingkind` change to `bank`, make it, and resolve the bank. */
   static async launchOn(bank: Bank, gatingkind: BankGatingkind, unlockByProving: UnlockByProving, askUser: AskUser | null): Promise<Bank> {
     const checked = GX.gatingLaunchOnArgs.parse({ gatingkind, bank, unlockByProving, askUser })
@@ -162,7 +162,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [Concluding]: dismiss, endAsking, concludeOnce
 
-  /** Close this gating without a proof.
+  /** Close this gating without the user's cleartext.
    * It concludes `dismissed`, or, if an attempt is under way, with that attempt's outcome.
    */
   dismiss(): void { this.#endAsking(gatingDismissed()) }
@@ -191,7 +191,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // == [The acts]: buildBank, unlockBank, replacePassphrase, addPasskey, revokePasskey, delBank, ActOnBank
 
 // Each act proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving builder (G1); the
-// change hears provings, and comes to the bank's private unlock by unlockByProving (G9).
+// change hears provings, and unlocks the bank privately by unlockByProving (G9).
 
 /** Build a bank over `expected` from the user's passphrase and optional passkey, and unlock it. */
 async function buildBank(listing: BankListing, provingDevice: ProvingDevice, expected: BankSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {
@@ -221,7 +221,7 @@ async function unlockBank(bank: Bank, cleartexts: unknown, unlockByProving: Unlo
   return unlockByProving(bank, proved)
 }
 
-// Each gate change grants a lease to the bank citing the gate row it wrote, not a newer one that arrived meanwhile. The
+// Each gate change grants a lease to the bank citing the gate row it wrote, not a newer one that was delivered meanwhile. The
 // old lease stays in force for the moments between: the bankKey did not change.
 
 /** Replace the passphrase of `bank`, proved by the current one. */

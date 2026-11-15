@@ -47,7 +47,7 @@ const failNextCall = async (deviceDB: IdbDeviceDB, errname = 'InvalidStateError'
   })
 }
 
-/** The name of every database IndexedDB has stored now. */
+/** The name of every database IndexedDB has now. */
 async function dbNamesNow(): Promise<string[]> {
   const dbs = await indexedDB.databases()
   return dbs.map((db) => db.name).filter((dbname) => dbname !== undefined)
@@ -73,7 +73,7 @@ TH.describeDeviceDBBattery("IdbDeviceDB", {
 })
 
 describe("IdbDeviceDB's options", () => {
-  it("takes a dbName, or none", () => {
+  it("accepts a dbName, or none", () => {
     expect(new IdbDeviceDB({ dbName: 'mine' })).to.be.instanceOf(IdbDeviceDB)
     expect(idbDeviceDB()).to.be.instanceOf(IdbDeviceDB)
   })

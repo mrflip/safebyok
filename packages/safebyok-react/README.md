@@ -74,10 +74,10 @@ there rather than a spinner: the device never becomes ready again.
 
 ## Hearing the device
 
-`BankProvider` takes `Device.make`'s `onLifecycle` and `onBadNews`, and calls each as last rendered, so an inline arrow
+`BankProvider` accepts `Device.make`'s `onLifecycle` and `onBadNews`, and calls each as last rendered, so an inline arrow
 is fine. `onLifecycle` receives a `helloed` event, with its outcome, for each `ensureBank` and `beginWatch` the provider and
 the hooks make, and the device's other lifecycle events. `onBadNews` receives the refusals no caller is waiting on, including a failed
-unlock from `BankLockControl`. Leave either out for its default, described in the safebyok README.
+`ensureUnlocked` from `BankLockControl`. Leave either out for its default, described in the safebyok README.
 
 ## React version
 

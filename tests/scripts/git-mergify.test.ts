@@ -171,7 +171,7 @@ describe('scripts/git-mergify', () => {
     expect(got.stdout).to.include('  #4\'s head is already in main\n')
   })
 
-  it('takes only the numbers it is given, and refuses one that is not open', () => {
+  it('labels only the numbers it is given, and refuses one that is not open', () => {
     seedStack(world)
     world.open([{ number: 1, branch: 'low' }, { number: 2, branch: 'mid' }, { number: 3, branch: 'top' }])
     const got = world.run('--apply', '2', '1')
@@ -182,7 +182,7 @@ describe('scripts/git-mergify', () => {
     expect(missing.stderr).to.include('#77 is not an open pull request against main')
   })
 
-  it('takes the numbers out of a pasted stack line, as one argument or many, in whatever order', () => {
+  it('picks the numbers out of a pasted stack line, as one argument or many, in whatever order', () => {
     seedStack(world)
     world.open([{ number: 512, branch: 'top' }, { number: 518, branch: 'low' }, { number: 529, branch: 'mid' }])
     const line = 'Stacked as main -> #518 -> [#529](https://example.com/o/r/pull/529) -> #512 (this PR)'

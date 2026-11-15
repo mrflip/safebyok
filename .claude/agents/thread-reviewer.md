@@ -88,7 +88,7 @@ about to make. Chain each onto the command it heralds.
    package, `pnpm --filter <pkg> lint`, then `typecheck`, then `test`; for `scripts/` or
    `tests/scripts/`, `pnpm justify:root`; for a workflow, `pnpm lint:workflows`; for docs alone,
    `pnpm lint`. `scripts/file-thread` runs the full `pnpm justify` before it pushes, and that is
-   the gate: a dependent package your fix breaks comes back from it as red, to a worker. A fix
+   the filing check: a dependent package your fix breaks comes back from it as red, to a worker. A fix
    that turns its suite red and whose repair is not obvious is undone, not repaired: note it.
    Never commit red. Stop only processes you started, by PID. With no fixes, there is nothing to
    prove.

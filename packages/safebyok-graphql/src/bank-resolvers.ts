@@ -49,7 +49,7 @@ export type CrossingNotice = {
   err:    BX.CrossedErr | null
 }
 
-/** The resolver for one query or mutation field, taking the standard GraphQL resolver arguments. */
+/** The resolver for one query or mutation field, given the standard GraphQL resolver arguments. */
 export type BankFieldResolver<ContextT, FieldnameT extends keyof BankFieldArgs> = (
   parent: unknown, args: BankFieldArgs[FieldnameT], context: ContextT,
 ) => Promise<CrossingAnswer>
@@ -135,7 +135,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice
         // carrying the refusal. The stream is cancelled, so the read after that is done.
         const revoked = await signInRefusalOf(context, scope.user_id)
-        // A GraphQL union cannot hold the string `main`: a bank row's notice crosses with a null parent, and the client restores it.
+        // A GraphQL union cannot contain the string `main`: a bank row's notice crosses with a null parent, and the client restores it.
         const { parent } = read.value
         if (revoked === null) { return { done: false, value: { ok: true, ...read.value, parent: (parent === BX.BankTop) ? null : parent, err: null } } }
         await reader.cancel()

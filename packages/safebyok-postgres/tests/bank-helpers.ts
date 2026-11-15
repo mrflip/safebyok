@@ -1,4 +1,4 @@
-/** Bank test helpers: one PGlite per test file holding the bankDB's tables, PostgresBankDBs on it, and direct row access for the bankDB battery. */
+/** Bank test helpers: one PGlite per test file with the bankDB's tables, PostgresBankDBs on it, and direct row access for the bankDB battery. */
 
 import { afterAll, beforeAll, onTestFinished } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
@@ -37,7 +37,7 @@ export function bootDatabaseFirst(): void {
 }
 // --
 
-// == [BankDBs]: listen, bankDBOver, makeBankDB, emptyTables, makeTwin, failNextCall, storeOtherwise
+// == [BankDBs]: listen, bankDBOver, makeBankDB, emptyTables, makeTwin, failNextCall, writeOtherwise
 
 const listenersOf = new Map<string, Set<(text: string) => void>>()
 
@@ -90,15 +90,15 @@ export function failNextCall(bankDB: PostgresBankDB): void { clientsOf.get(bankD
 
 const BankTables = ['safebyok_banks', 'safebyok_gates', 'safebyok_vaults', 'safebyok_boxes']
 
-/** Until the test ends, have every table store a row other than the one each write sends, as a database that alters what it stores would. */
-export async function storeOtherwise(): Promise<void> {
+/** Until the test ends, have every table write a row other than the one each write sends, as a database that alters what it writes would. */
+export async function writeOtherwise(): Promise<void> {
   const db = await database()
   const triggers = BankTables.map((table) => `CREATE TRIGGER store_otherwise BEFORE INSERT OR UPDATE ON ${table} FOR EACH ROW EXECUTE FUNCTION store_otherwise();`)
   const drops = BankTables.map((table) => `DROP TRIGGER store_otherwise ON ${table};`)
   await db.exec(`
     CREATE FUNCTION store_otherwise() RETURNS trigger LANGUAGE plpgsql AS $$
     BEGIN
-      NEW.revision_tok := NEW.revision_tok || '${TH.StoredOtherwiseSuffix}';
+      NEW.revision_tok := NEW.revision_tok || '${TH.WrittenOtherwiseSuffix}';
       RETURN NEW;
     END $$;
     ${triggers.join('\n')}
@@ -148,7 +148,7 @@ const PlantVaultSql = `
   INSERT INTO safebyok_vaults
   SELECT * FROM jsonb_populate_record(NULL::safebyok_vaults, $4::text::jsonb || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'vaultlabel', $3::text))
 `
-// A box row's life is part of its address. A planted row that names a life of its own is stored under that life, as a store keyed by scope alone would hold it.
+// A box row's life is part of its address. A planted row that names a life of its own is stored under that life, as a store keyed by scope alone would keep it.
 const BoxRowSql = `
   jsonb_build_object('bank_tok', $4::text, 'vault_tok', $5::text) || $7::text::jsonb
   || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'vaultlabel', $3::text, 'boxlabel', $6::text)

@@ -1,5 +1,5 @@
 /** The checks of a bankDB's answers as a client receives them over a wire, each parsing to the answer its verb returns.
- * A field left out arrives as null. Imported as `WX`.
+ * A field left out is received as null. Imported as `WX`.
  */
 
 import type * as Z from 'zod'

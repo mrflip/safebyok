@@ -36,21 +36,21 @@ function makeDialog() {
   }
 }
 
-// Compiles only while every member of AnyGating takes the same cleartexts: a host's dialog need not narrow to attempt.
+// Compiles only while every member of AnyGating accepts the same cleartexts: a host's dialog need not narrow to attempt.
 /** A host's dialog that attempts {@link Passphrase}, never narrowing on the gating's kind. */
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
 /** A promise, and the function that resolves it. */
-function heldOpen() {
+function makeRelease() {
   let release!: () => void
-  const held = new Promise<void>((resolve) => { release = resolve })
-  return { held, release }
+  const released = new Promise<void>((resolve) => { release = resolve })
+  return { released, release }
 }
 
 /** The bank's scope in these worlds. */
 const BankScope = Object.freeze({ user_id: Dna.user_id, banklabel: Dna.banklabel })
 
-/** The rows a bankDB stores for one bank: the bank row and its main gate row. */
+/** The rows a bankDB has for one bank: the bank row and its main gate row. */
 type BankRows = Readonly<{ bank: unknown, main: unknown }>
 
 /** A fresh world with a dialog, nothing stored, and the shelf its bankDB keeps the bank's rows on. */
@@ -87,7 +87,7 @@ async function lockedBank(born = makeBornVault()) {
 }
 
 describe("a birth through a gating", () => {
-  it("stores and unlocks the bank on the dialog's attempt", async () => {
+  it("builds and unlocks the bank on the dialog's attempt", async () => {
     const { device, gatingAt, shelf, mainNow, deviceDB } = birthWorld()
     const launched = device.ensureBank()
     const gating = await gatingAt<'build_bank'>()
@@ -205,7 +205,7 @@ describe("a birth through a gating", () => {
     await launched
   })
 
-  it("refuses a bank built on another device without storing the new passkey's wayin", async () => {
+  it("refuses a bank built on another device without putting the new passkey's wayin", async () => {
     const theirs = await theirBankRows()
     const { device, gatingAt, layRows, mainNow } = birthWorld()
     const launched = TH.expectRefusal(device.ensureBank(), 'gate_made_elsewhere')
@@ -218,10 +218,10 @@ describe("a birth through a gating", () => {
 
   it("refuses when another device builds the bank while the passphrase is derived", async () => {
     const theirs = await theirBankRows()
-    const { held, release } = heldOpen()
+    const { released, release } = makeRelease()
     const keyDeriver = Object.assign(Object.create(TH.testDeriver) as typeof TH.testDeriver, {
       deriveKeyBytes: async (...args: Parameters<typeof TH.testDeriver.deriveKeyBytes>) => {
-        await held
+        await released
         return TH.testDeriver.deriveKeyBytes(...args)
       },
     })
@@ -290,7 +290,7 @@ describe("a birth through a gating", () => {
   })
 })
 
-/** An unlock no launch in these tests reaches. */
+/** An unlockByProving no launch in these tests reaches. */
 const neverUnlocks = (): Promise<never> => Promise.reject(new Error('never called'))
 
 describe("a launcher reached through a live gating", () => {
@@ -442,7 +442,7 @@ describe("gating.attempt", () => {
   })
 })
 
-describe("an unlock through a gating", () => {
+describe("unlocking through a gating", () => {
   it("gives each gating a token of its own", async () => {
     const { bank, gatingAt } = await lockedBank()
     const first = bank.ensureUnlocked()
@@ -530,7 +530,7 @@ describe("an unlock through a gating", () => {
 })
 
 describe("what ends a gating", () => {
-  it("leaves an unlock open through a lock, and the attempt after it unlocks", async () => {
+  it("leaves an unlock_bank gating open through a lock, and the attempt after it unlocks", async () => {
     const { bank, gatingAt } = await lockedBank()
     const unlocking = bank.ensureUnlocked()
     const gating = await gatingAt<'unlock_bank'>()
@@ -562,7 +562,7 @@ describe("what ends a gating", () => {
     expect(gating.isOpen).to.be.false
   })
 
-  it("concludes an open unlock on a vacate of the device", async () => {
+  it("concludes an open unlock_bank gating on a vacate of the device", async () => {
     const { bank, gatingAt } = await lockedBank()
     const unlocking = TH.expectRefusal(bank.ensureUnlocked())
     await gatingAt<'unlock_bank'>()

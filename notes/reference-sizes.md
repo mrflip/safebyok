@@ -1,7 +1,7 @@
 # Sizes: records, notices, banks and the limits they meet
 
 How many bytes each stored record, notice and bank takes, against the limits of the transports and datastores we
-may meet, to judge where data volume is an issue.
+may meet, to judge where size is an issue.
 
 **Lead.** A typical notice fits easily. The Postgres adapter's notice for a box write (box row, vault row as `parent`,
 scope) is 1.6 KB for a mini box and 2.1 to 2.5 KB for a medium one, against pg_notify's 8,000 bytes (the adapter caps
@@ -54,7 +54,7 @@ Typical labels are `acme_chat`, `auth0|` plus 24 hex characters, `main`, and a 2
   *Larger* row grows in two other ways. Each wrapped key is 512 bits, as an AES-256-SIV or HMAC-SHA-512 key would be:
   +43 bytes per wayin. The passphraseSalt is 32 bytes: +21 bytes. Both are overkill: RFC 9106 recommends a 16-byte
   Argon2 salt.
-* **Reading "two more wayins the size of a passphrase".** The gate check allows exactly one passphrase wayin and at
+* **Reading "two more wayins the size of a passphrase".** The gate record's check allows exactly one passphrase wayin and at
   most one passkey wayin. So the two extra passphrase wayins were added as extra gate fields after the check passed.
 
 ## Box rows
@@ -221,9 +221,9 @@ it. Each dimension is set to the given percentage independently. *Boxes after th
 | localStorage                                       | 5 MiB per origin (Chromium counts UTF-16 units) | Hard                         | Documented |
 | IndexedDB                                          | up to 60% of disk (Chromium, Safari 17+); 10% or 10 GiB (Firefox, best-effort) | Soft | Documented |
 
-## Reference payloads
+## Reference whispers
 
-| Payload                                               | Bytes      | gzip    | Source     |
+| Whisper                                               | Bytes      | gzip    | Source     |
 | ----------------------------------------------------- | ---------- | ------- | ---------- |
 | An Anthropic API key, as used here                    | 108        | n/a     | Estimate   |
 | Ed25519 SSH key, public / private (OpenSSH)           | 93 / 399   | n/a     | Measured   |
@@ -288,7 +288,7 @@ The rates are the Professional plan's overage prices: $2 per million calls and $
 * **Boxes per vault.** At 32 or 64, a full vault returned whole stays at 1.1 MB or less, under every response limit in
   the table.
 
-## The Coach's Postgres payload shapes
+## The Coach's Postgres notice shapes
 
 These are the notice shapes as built: safebyok-postgres at `byok-port_postgres` 229ae95d4, `VaultPropFields`,
 `BoxPropFields` and `noticeTextOf`. The encoder is not exported, so `sizes.test.ts` copies it line for line and runs

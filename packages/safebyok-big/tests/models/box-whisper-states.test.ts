@@ -253,7 +253,7 @@ describe("box.putExposed", () => {
     expect(box.whisper).to.eq(exposed)
   })
 
-  it("takes a sidecar, and keeps the current one if given none", async () => {
+  it("accepts a sidecar, and keeps the current one if given none", async () => {
     const box = await showingOf()
     await box.putExposed({ sidecar: { note: 'new' } })
     expect(box.sidecar).to.deep.equal({ note: 'new' })
@@ -303,7 +303,7 @@ describe("box.putExposed", () => {
 // == [Hearing of a lock]: subscribe, getSnapshot, isLocked
 
 describe("box.subscribe and box.getSnapshot, through a lock", () => {
-  it("reads isLocked live without storing it on the box", async () => {
+  it("reads isLocked live without caching it on the box", async () => {
     const box = await unexposedOf()
     expect(box.isLocked).to.be.false
     world.mw.setLocked(true)
@@ -327,7 +327,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it("shows its bank's lock on the snapshot through a lock and an unlock, notifying a listener once each", async () => {
+  it("shows its bank's lock on the snapshot as the bank locks and unlocks, notifying a listener once each", async () => {
     const box = await unexposedOf()
     const listener = vi.fn()
     box.subscribe(listener)

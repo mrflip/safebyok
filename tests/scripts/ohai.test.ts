@@ -140,7 +140,7 @@ describe('scripts/ohai', () => {
     return logged().at(-1)
   }
 
-  it('takes the largest context, not a sibling written later that has just compacted', () => {
+  it('picks the largest context, not a sibling written later that has just compacted', () => {
     plantAgent('a1', 'Restack', 166_000)
     plantAgent('a2', 'Thread 5b', 64_000)
     expect(hook('auto')).to.include('likely=thread-worker "Restack"] compacting (auto, at ~166k)')
@@ -151,12 +151,12 @@ describe('scripts/ohai', () => {
     expect(hook('auto')).to.include('main session or unknown] compacting (auto)')
   })
 
-  it('takes a compaction by hand as the main session\'s, whatever subagents are busy', () => {
+  it('counts a compaction by hand as the main session\'s, whatever subagents are busy', () => {
     plantAgent('a1', 'Finish 5b', 166_000)
     expect(hook('manual')).to.include('main session or unknown] compacting (manual)')
   })
 
-  it('exits 0 from the hook whatever it is given, so a compaction is never held up', () => {
+  it('exits 0 from the hook whatever it is given, so a compaction is never delayed', () => {
     const ran = spawnSync(Script, ['--hook'], { cwd: main, encoding: 'utf8', env: isolatedEnv(scratch, Began), input: 'not json' })
     expect(ran.status).to.equal(0)
   })

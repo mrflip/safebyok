@@ -46,9 +46,9 @@ export interface BankOpts {
 }
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, of the proving an unlock is given, and of the boxes a box method is given. */
+/** The checks of {@link Bank.make}'s arguments, of the proving `unlockByProving` is given, and of the boxes a box method is given. */
 const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => ({
-  // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are taken off.
+  // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
     record: obj({ maingate: BX.gateRecord, rootBox: boxSparse }).loose(),
     opts:   obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device'), vaultDB: custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected) }),
@@ -114,7 +114,7 @@ export class Bank implements BankStamp {
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** The bank of `record`, with its main gate and root box, on `opts.device`, storing its boxes in `opts.vaultDB`. */
+  /** The bank of `record`, with its main gate and root box, on `opts.device`, putting its boxes in `opts.vaultDB`. */
   static make(record: BankRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankRecord, opts: BankOpts) {
@@ -143,7 +143,7 @@ export class Bank implements BankStamp {
   }
 
   // The root box here is the first revision of its life as a seal of its shell would make it, sealed and stored by
-  // nothing: a bank's birth, which would seal and store it, is not built.
+  // nothing: a bank's birth, which would seal and write it, is not built.
   /** The first record of a new bank, its main gate and its root box, made of `dna`, each born when the bank is. */
   static makeRecord(dna: BankDna): BankRecord {
     const { userid, banklabel, lifeseq, born_at } = bankStamp.parse(dna)

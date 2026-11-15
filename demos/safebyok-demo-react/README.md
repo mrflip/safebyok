@@ -24,10 +24,10 @@ The landing page ([index.html](index.html), [src/pages/LandingPage.tsx](src/page
 The Knock-Knock Machine: bring an Anthropic API key, say who's there, and Claude finishes the
 joke. Its header has the sign-in strip
 ([src/components/SessionBar.tsx](src/components/SessionBar.tsx)); a user signing in for the first
-time is asked to choose a passphrase, which builds the bank that holds the vault. Once signed in, the
+time is asked to choose a passphrase, which builds the bank that has the vault. Once signed in, the
 account menu ([src/components/AccountMenu.tsx](src/components/AccountMenu.tsx)): the bank's
 lock control, *Sign out*, which vacates the device (the bank locks, and this device forgets its
-unlock), and *Delete account*, which asks for the passphrase in the provider's dialog, deletes the
+lease), and *Delete account*, which asks for the passphrase in the provider's dialog, deletes the
 bank with every vault in it, then the account. A user who cancelled the bank's dialog at sign-in
 is asked again by the first *Save* or *Add key*. Under it,
 [src/components/WaysIn.tsx](src/components/WaysIn.tsx) lists the bank's passphrase and passkey,

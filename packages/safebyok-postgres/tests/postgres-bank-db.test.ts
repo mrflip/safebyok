@@ -33,7 +33,7 @@ function buildAskFor(user_id: string) {
   return BW.bankBuildAskOf({ ...BW.bankAt(), user_id }, { ...BW.gateAt(), user_id })
 }
 
-/** A bankDB holding the bank `bank1` and its vault. */
+/** A bankDB with the bank `bank1` and its vault. */
 async function bankDBWithVault(opts?: Parameters<typeof BH.makeBankDB>[0]) {
   const bankDB = await BH.makeBankDB(opts)
   await bankDB.buildBank(BW.bankBuildAskOf())
@@ -47,7 +47,7 @@ TH.describeBankDBBattery("PostgresBankDB's battery", {
   makeTwin:              BH.makeTwin,
   _cheat_rowsOf:         () => BH.rowsOf(),
   _cheat_failNextCall:   BH.failNextCall,
-  _cheat_storeOtherwise: BH.storeOtherwise,
+  _cheat_writeOtherwise: BH.writeOtherwise,
 })
 
 describe("PostgresBankDB's constructor", () => {
@@ -102,7 +102,7 @@ describe("PostgresBankDB's watch", () => {
     })
   })
 
-  it("passes over a notification on its channel that no write of ours sent", async () => {
+  it("passes over a notification on its channel that no write of ours made", async () => {
     const bankDB = await BH.makeBankDB()
     await bankDB.buildBank(BW.bankBuildAskOf())
     const notices = watching(bankDB)

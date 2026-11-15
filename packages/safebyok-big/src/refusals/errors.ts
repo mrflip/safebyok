@@ -2,7 +2,7 @@
 
 // The rules for a refusal, its thrower and its phrase are at the top of refusals/throwers.ts. A new refusalkind goes in
 // `refusalkindVals` and in `RefusalFamilyForKind`; if the core throws it inside the Convex component, in safebyok-convex's
-// `safebyokErrorKindVals` too. GraphQL's schema takes its enum from `refusalkindVals`.
+// `safebyokErrorKindVals` too. GraphQL's schema builds its enum from `refusalkindVals`.
 
 import { IsVaultError, brandOf } from '../helpers/consts'
 import type { BadAct } from '../shapes/shapes-enums'
@@ -35,7 +35,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  * `damaged_whisper`. A storage adapter's answer that cannot be, such as one revision under two toks,
  * is `record_conflict`.
  *
- * An unlock refuses `wrong_passphrase` or `wrong_passkey` even when the stored wayin was altered:
+ * A gating's attempt refuses `wrong_passphrase` or `wrong_passkey` even when the stored wayin was altered:
  * decryption fails alike either way, and the message says so.
  */
 export const refusalkindVals = [
@@ -132,7 +132,7 @@ export const RefusalFamilyForKind = {
 // == [The error]: RefusalMeta, VaultErrorOpts, VaultError
 
 /** The facts a refusal learned, each field filled only by the refusals that learn it.
- * It never holds secret material.
+ * It never has secret material.
  */
 export type RefusalMeta = {
   /** On a `vault_full` from a bankDB that counted the vault's boxes: how full the vault was, read in the step that refused the write. */
@@ -143,7 +143,7 @@ export type RefusalMeta = {
   oplabel?:      string
   /** A bankDB's refusal: what happened, when it is not said by the refusalkind alone. */
   act?:          BadAct
-  /** A bankDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a record's payload. */
+  /** A bankDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a whole record. */
   ask?:          Readonly<Record<string, unknown>>
 }
 
@@ -161,7 +161,7 @@ export type RefusalRows = {
   dbhas?:  unknown
 }
 
-// A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they hold wrapped keys.
+// A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they have wrapped keys.
 const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
 
 /** Every refusal a safebyok call makes: a calm message, a `refusalkind` to branch on, and its `family`.

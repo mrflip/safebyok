@@ -2,11 +2,11 @@ import { useEffect, useId, useState } from 'react'
 import { useBox, useDevice, useVault, useWhisper } from 'safebyok-react'
 import { useIsShowing } from '../hooks/useIsShowing'
 import { isQuietRefusal } from '../lib/refusals'
-import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel, ensureApiKeyBoxExposed, extractSavedApiKey } from '../lib/saved-api-key'
+import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel, ensureApiKeyBoxExposed, extractApiKey } from '../lib/api-key'
 import { KnockForm } from './KnockForm'
 
 /** The toolkit form: a knock-knock machine assembled by hand from safebyok-react's hooks.
- * Its API key is an exposed whisper: safebyok holds the working copy, and the form only displays it.
+ * Its API key is an exposed whisper: safebyok keeps the working copy, and the form only displays it.
  */
 export const KnockKnockToolkit = () => {
   const device = useDevice()
@@ -16,7 +16,7 @@ export const KnockKnockToolkit = () => {
   const isShowing = useIsShowing(box)
   const fieldId = useId()
   const [gripe, setGripe] = useState<string | null>(null)
-  const [isSaved, setIsSaved] = useState(false)
+  const [isPut, setIsPut] = useState(false)
   // A key is read once the bank is up; the Edit button brings the bank up itself, building it where none is.
   const isReady = (stage === 'absent') || (stage === 'present')
 
@@ -26,7 +26,7 @@ export const KnockKnockToolkit = () => {
   /** Run a button's action, and show the error message unless the user cancelled. */
   const perform = async (work: () => unknown) => {
     setGripe(null)
-    setIsSaved(false)
+    setIsPut(false)
     try {
       await work()
     } catch (err) {
@@ -35,7 +35,7 @@ export const KnockKnockToolkit = () => {
   }
 
   const edit = () => perform(async () => { if (device !== null) { await ensureApiKeyBoxExposed(device, ToolkitApiKeyBoxlabel) } })
-  const save = () => perform(async () => { await box?.putExposed(); setIsSaved(true) })
+  const putApiKey = () => perform(async () => { await box?.putExposed(); setIsPut(true) })
   const done = () => perform(() => box?.unexpose())
 
   return (
@@ -58,15 +58,15 @@ export const KnockKnockToolkit = () => {
         {isShowing && (box !== null)
           ? (
             <>
-              <button type="button" onClick={() => { void save() }}>Save</button>
+              <button type="button" onClick={() => { void putApiKey() }}>Save</button>
               <button type="button" onClick={() => { void done() }}>Done</button>
             </>
           )
           : <button type="button" disabled={device === null} onClick={() => { void edit() }}>{box === null ? 'Add key' : 'Edit key'}</button>}
-        {isSaved && <span className="quiet">Saved.</span>}
+        {isPut && <span className="quiet">Saved.</span>}
       </div>
       {gripe !== null && <p className="gripe">{gripe}</p>}
-      <KnockForm extractApiKey={() => extractSavedApiKey(vault, ToolkitApiKeyBoxlabel)} isReady={isReady} />
+      <KnockForm extractApiKey={() => extractApiKey(vault, ToolkitApiKeyBoxlabel)} isReady={isReady} />
     </section>
   )
 }

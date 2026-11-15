@@ -14,7 +14,7 @@ async function readyBankOn(world: BankWorld = makeBankWorld()) {
   return { world, bank }
 }
 
-/** What opening the probe's box answers now. */
+/** What unsealing the probe's box answers now. */
 async function whisperIn(bank: Awaited<ReturnType<typeof readyBankOn>>['bank'], vaultlabel = 'home', boxlabel = 'box1'): Promise<unknown> {
   const box = await bank.vaultAt({ vaultlabel })?.fetchBox(boxlabel)
   return box?.extractWhisper()
@@ -54,9 +54,9 @@ describe("bank.tryProbe", () => {
     const report = await TH.expectGood(bank.tryProbe({ whisper: { token: 'sk-test-0000' } }))
     const said = JSON.stringify(report)
     expect(said).to.not.include('sk-test-0000')
-    const sent = await put.mock.results[0]?.value as { val: { whisper_ciphered: { ciphertext_b64: string }, box_key_wrapped: { ciphertext_b64: string } } }
-    expect(said).to.not.include(sent.val.whisper_ciphered.ciphertext_b64)
-    expect(said).to.not.include(sent.val.box_key_wrapped.ciphertext_b64)
+    const putAnswer = await put.mock.results[0]?.value as { val: { whisper_ciphered: { ciphertext_b64: string }, box_key_wrapped: { ciphertext_b64: string } } }
+    expect(said).to.not.include(putAnswer.val.whisper_ciphered.ciphertext_b64)
+    expect(said).to.not.include(putAnswer.val.box_key_wrapped.ciphertext_b64)
     expect(said).to.not.include(bank.maingate.wayins.main.bank_key_wayin_wrapped.ciphertext_b64)
   })
 
@@ -72,7 +72,7 @@ describe("bank.tryProbe", () => {
     expect(bank.vaultAt({ vaultlabel: 'home' })?.boxListing.things.map((listed) => listed.boxlabel)).to.deep.equal(['box1'])
   })
 
-  it("takes the labels, whisper and sidecar it is given", async () => {
+  it("puts the labels, whisper and sidecar it is given", async () => {
     const { bank } = await makeBankWithVault()
     const report = await TH.expectGood(bank.tryProbe({ vaultlabel: 'main', boxlabel: 'trial', whisper: { token: 'sk-test-0000' }, sidecar: { kind: 'trial' } }))
     expect(report.put.val).to.include({ vaultlabel: 'main', boxlabel: 'trial' })

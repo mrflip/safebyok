@@ -29,7 +29,7 @@ afterEach(expectNoBadNews)
 
 type Store<SnapshotT> = { subscribe: (listener: () => void) => () => void, getSnapshot: () => SnapshotT }
 
-/** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React takes them, painting `view`.
+/** A component over `useSyncExternalStore(subscribe, getSnapshot)`, both detached as React accepts them, painting `view`.
  * A listener told with nothing new, or a snapshot that changed with no listener told, fails the next `expectRenders`.
  */
 function mountComponent<SnapshotT>({ subscribe, getSnapshot }: Store<SnapshotT>, view: (snapshot: SnapshotT) => string) {
@@ -160,7 +160,7 @@ describe("the proof", () => {
     const boxesUi = mountComponent(vault.boxListing, boxList)
     boxesUi.expectRenders(['no boxes'])
 
-    // Seal a box: storage has stored only ciphertext, and the list shows it.
+    // Seal a box: storage has only ciphertext, and the list shows it.
     const box = await vault.putBox(ApiKey)
     boxesUi.expectRenders(['anthropic_api_key'])
     const boxUi = mountComponent(box, boxRow)
@@ -195,7 +195,7 @@ describe("the proof", () => {
     await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
 
-    // The user closes the dialog: the unlock refuses dismissed, and nothing moves.
+    // The user closes the dialog: bank.unlock() refuses dismissed, and nothing moves.
     dialog.typing = []
     await TH.expectRefusal(bank.ensureUnlocked(), 'dismissed')
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_bank'])
@@ -262,16 +262,16 @@ describe("the proof", () => {
     nextPageUi.expectRenders([])
     nextVaultsUi.expectRenders([])
 
-    // It opens what the page before it sealed: the lease it picked up has the same bankKey.
+    // It unseals what the page before it sealed: the lease it picked up has the same bankKey.
     await pickedUp.beginWatch()
     const nextBoxesUi = mountComponent(pickedUp.boxListing, boxList)
     nextBoxesUi.expectRenders(['anthropic_api_key'])
-    const opened = await pickedUp.getBox(ApiKey.boxlabel)
-    expect(await opened?.extractWhisper()).to.deep.equal(ApiKey.whisper)
+    const pickedUpBox = await pickedUp.getBox(ApiKey.boxlabel)
+    expect(await pickedUpBox?.extractWhisper()).to.deep.equal(ApiKey.whisper)
     expect(dialog.shown).to.deep.equal([])
   })
 
-  it("bank.autolock locks a vault past its autolock duration, and a page opened later asks for a proof", async () => {
+  it("bank.autolock locks a vault past its autolock duration, and a page opened later asks for cleartext", async () => {
     const { world, device, bank, dialog } = await buildHost()
     const page = mountPage(device, bank)
     page.expectRenders({ device: ['ready'], bank: ['unlocked'], vaults: ['main'] })
@@ -454,7 +454,7 @@ describe("the proof", () => {
     gateUi.expectRenders(['revision 0'])
     boxesUi.expectRenders(['anthropic_api_key'])
 
-    // The second device has no lease cached, so its unlock asks; it then opens the box this one sealed.
+    // The second device has no lease cached, so its ensureUnlocked asks; it then unseals the box this one sealed.
     const phone = makeDialog()
     const phoneBank = await world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
     const phoneVault = await phoneBank.ensureVault(VaultScopeGiven)
@@ -468,7 +468,7 @@ describe("the proof", () => {
     await ticks(1)
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key'])
 
-    // A BankDB with no watch, or a watch ended: nothing arrives until the host says hello to the vault again, on its own timer.
+    // A BankDB with no watch, or a watch ended: nothing is delivered until the host says hello to the vault again, on its own timer.
     vault.boxListing.goodbye()
     await phoneVault.putBox({ ...ApiKey, boxlabel: 'gemini_api_key' })
     await ticks(1)
@@ -476,7 +476,7 @@ describe("the proof", () => {
     await vault.beginWatch()
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key, gemini_api_key'])
 
-    // It replaces the passphrase: this device stays unlocked and hears the new gate; a later unlock takes the new passphrase.
+    // It replaces the passphrase: this device stays unlocked and hears the new gate; a later unlock_bank gating accepts the new passphrase.
     phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
     await phoneBank.maingate.replacePassphrasePrompt()
     await ticks(1)

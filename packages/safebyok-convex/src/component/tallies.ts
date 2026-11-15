@@ -35,7 +35,7 @@ export const MaxVaultBoxSize = (ConvexTransactionReadSize / 2) - ConvexDocumentS
 // --
 
 // == [Budgets]: MaxTidiedBoxes, MaxTidiedBoxSize, Budget, cascadeBudget, tidyBudget, isSpent, spend
-// `delBank` deletes the rows under a bank, which may be more than one transaction can hold. It draws on a budget of half of each
+// `delBank` deletes the rows under a bank, which may be more than one transaction can carry. It draws on a budget of half of each
 // limit it meets, which leaves room for the rest of its mutation, and stops once that is spent. `tidyGone` deletes a batch of the
 // box rows of ended lives, and reads as many again to say what is left. It reads the bank's live box rows besides, as
 // `watchRows` does, so its two budgets together take a quarter of what a transaction may read, and leave the rest to those.
@@ -58,7 +58,7 @@ export function tidyBudget(): Budget { return { count: MaxTidiedBoxes, size: Max
 /** True once `budget` is spent. */
 export function isSpent({ count, size }: Budget): boolean { return (count <= 0) || (size <= 0) }
 
-/** Take one document of `size` bytes from `budget`. */
+/** Spend one document of `size` bytes from `budget`. */
 export function spend(budget: Budget, size: number): void {
   budget.count -= 1
   budget.size -= size

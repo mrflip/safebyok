@@ -70,7 +70,7 @@ describe("box.patchWhisper", () => {
     expect(err.message).to.eq(Phrases.NotExposed)
   })
 
-  it("merges while locked, and shows the result after unlock", async () => {
+  it("merges while locked, and shows the result after the bank unlocks", async () => {
     const box = await unexposedOf()
 
     await box.expose()

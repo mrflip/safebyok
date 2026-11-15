@@ -2,7 +2,7 @@
  * Everything `safebyok-big/testing` publishes comes through it: a cheap key deriver, a strength checker that passes
  * everything, loggers, and the checks that a call refuses and quotes nothing it shouldn't. Beside them, the world of
  * the lean core's models, from `tests/test-helpers/`: fixed stamps, a fake clock, a device, a bank born unlocked, a stub
- * of `bank.put`, a box's shell, and the backdoors a test opens a wayin or a lease with; and the vaultDB's world: a bank's
+ * of `bank.put`, a box's shell, and the backdoors a test unwraps a wayin or a lease with; and the vaultDB's world: a bank's
  * three roots and its boxes as Things, and the asks that get, list and write them. For tests only, and under vitest.
  */
 export * from 'safebyok-big/testing'

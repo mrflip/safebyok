@@ -126,7 +126,7 @@ Paste this into an assistant, pick the reason that fits (or write your own), and
 blanks:
 
 > I'm building an app on safebyok (https://www.npmjs.com/package/safebyok), an end-to-end
-> encrypted vault for API keys and other small secrets. `Device.make` takes a `strengthChecker`
+> encrypted vault for API keys and other small secrets. `Device.make` accepts a `strengthChecker`
 > option: a function `(passphrase, scope) => { strong: true } | { strong: false, reason }`, sync
 > or async, where `scope` is `{ user_id, banklabel, vaultlabel }`, and an optional idempotent
 > `load` the device runs at `device.ensureBank()` for anything it must fetch first. Its contract, from the

@@ -17,7 +17,7 @@ means merged, or on #470. *Planned* means ruled or proposed for a later thread i
 
 Contents:
 
-* **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`, `#lede-first`
+* **Call chains:** `#straight-chute`, `#sugar-has-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`, `#lede-first`
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#chain-guards`, `#no-second-ensure`
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-broken-system`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`, `#callee-parses`
@@ -61,7 +61,7 @@ async create(input, opts = {}) {
 
 *Status: Fixed.*
 
-## Sugar holds no logic `#sugar-holds-no-logic`
+## Sugar has no logic `#sugar-has-no-logic`
 
 A convenience method on a parent forwards to the real verb. If it has branches, the real verb is missing, or it lives in
 the wrong place. Moving the body down a layer intact doesn't fix it: that only moves the slop.
@@ -118,8 +118,8 @@ async delBox(boxlabel, opts = {}) {
 
 ## Don't bounce between classes `#no-bouncing`
 
-If a call goes A to B to A to B, one of them wants the other's data. Give the work to whoever uses the result, and let the
-data arrive the way it already arrives.
+If a call goes A to B to A to B, one of them wants what the other has. Give the work to whoever uses the result, and let
+what it needs arrive the way it already arrives.
 
 **Goofus:** the vault asks its listing to fetch a list the listing doesn't use, carries it across, and hands it to a child
 that the same listing had to construct.
@@ -439,7 +439,7 @@ demandPuttable(patch, choices) { /* parses the patch, then demands enabled, vaul
 
 **Enabled is a special guard:** one check is enough. The code that ends a listing is synchronous: it disables the
 listing, disables every thing in it, and removes them, so nothing crosses it halfway. The only check after storage answers is at
-the top of `deliver`, before it takes the answer's parent.
+the top of `deliver`, before it delivers the answer's parent.
 
 ```ts
 protected async deliver(answer) {
@@ -836,7 +836,7 @@ A function that parses its own return value, to brand what it hands back, is not
 
 # Shapes and state
 
-## Never hold a value you made up `#no-fake-values`
+## Never keep a value you made up `#no-fake-values`
 
 A placeholder that looks real gets read as real. If you don't have the value yet, get it first, or ask for it.
 
@@ -1003,7 +1003,7 @@ demandPromptable(): this { return this.demandEnabled().demandPresent() }        
 
 ## Record first, then what's live `#record-then-opts`
 
-A `make` takes `(recordish, livepropsAndOpts)`, or `(recordish, livepropsAndOpts, friend)`. The first argument is the
+A `make` is given `(recordish, livepropsAndOpts)`, or `(recordish, livepropsAndOpts, friend)`. The first argument is the
 record, give or take a few fields. The second carries what comes out of band: the live objects the thing reaches (its
 device, its bank) and its options. Each is shaped like a pick of the class's interface, so both parts duck as the thing.
 A friend means something specific, a bag of callbacks into its owner's private state, and goes in neither: only third.
@@ -1068,7 +1068,7 @@ get scope(): BankScope { return CX.bankScope.parse(this) }
 
 How the code came to be is not the caller's business: the decision behind a shape, the request that produced it, what it
 replaced, which thread ruled. "As", "so", "since", "rather than", "no longer" and "still" usually mark it. A reason worth
-keeping goes in a `//` comment above the doc block: `// The lock first: no box opens under a lease while the tombstone goes out.`
+keeping goes in a `//` comment above the doc block: `// The lock first: no box unseals under a lease while the tombstone goes out.`
 
 | Goofus | Gallant |
 |---|---|

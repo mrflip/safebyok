@@ -75,7 +75,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.bank.sealWith(whisperText, this.#stampsOf(stamp))
   }
 
-  /** The text in `sealed`, which opens only under the bank, this vault and `stamp` it was sealed with. */
+  /** The text in `sealed`, which deciphers only under the bank, this vault and `stamp` it was sealed with. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     return this.bank.unsealWith(sealed, this.#stampsOf(stamp))
   }
@@ -133,7 +133,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link fetchBox}. */
   tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
-  /** Seal `patch` over the box at its `boxlabel`, and store it, resolving the box.
+  /** Seal `patch` over the box at its `boxlabel`, and put it, resolving the box.
    * {@link Box.put} has the options.
    */
   async putBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Box> {
@@ -144,7 +144,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link putBox}. */
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** Delete the box at `boxlabel`, resolving it, now holding its tombstone.
+  /** Delete the box at `boxlabel`, resolving it, now with its tombstone.
    * Refuses `absent_box` where the box was never stored, or is already deleted.
    */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {

@@ -1,6 +1,6 @@
 # safebyok-fastkey
 
-A [safebyok](../safebyok) key deriver that runs Argon2id through WebAssembly. It takes the same
+A [safebyok](../safebyok) key deriver that runs Argon2id through WebAssembly. It accepts the same
 keyDeriverSpecs and labels as the core's pure-JavaScript deriver, derives the same bytes, and runs
 about four times faster.
 
@@ -55,12 +55,12 @@ core's `parseKeyDeriverSpec` (from `safebyok/browser`), so its messages are the 
 
 At `argon2id_web_v1` (64 MiB, three passes, one lane), in Node 24 on one development
 machine: about 130 ms a derivation through WebAssembly, against about 580 ms through `@noble/hashes`. At 1 GiB, about
-0.9 s against 3 s. A user waits for one derivation at each unlock, and one at each passphrase
+0.9 s against 3 s. A user waits for one derivation each time they unlock, and one at each passphrase
 change.
 
 The derivation runs as one synchronous WebAssembly call: it blocks the thread for those 130 ms,
 while the core's deriver takes longer but yields to the event loop as it runs. For a spec heavier than the
-supplied one, consider running the bank's unlock where a pause does not show.
+supplied one, consider unlocking the bank where a pause does not show.
 
 ## Where it runs, and where it does not
 

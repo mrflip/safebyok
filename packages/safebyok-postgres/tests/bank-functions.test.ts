@@ -1,4 +1,4 @@
-/** BankFunctionsSql on PGlite, called past the adapter: each function stores only what its checks allow, whatever the core's classifier would say, and tells what it stored. */
+/** BankFunctionsSql on PGlite, called past the adapter: each function writes only what its checks allow, whatever the core's classifier would say, and tells what it wrote. */
 
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { bankChannelOf } from '../src/index'
@@ -23,14 +23,14 @@ async function answerOf(text: string, params: unknown[]): Promise<Answered & Rec
   return rows[0]!
 }
 
-/** A bankDB holding the bank `bank1`, built with its `main` gate. */
+/** A bankDB with the bank `bank1`, built with its `main` gate. */
 async function builtBankDB() {
   const bankDB = await BH.makeBankDB()
   await bankDB.buildBank(BW.bankBuildAskOf())
   return bankDB
 }
 
-/** Collect the notices sent on the battery user's channel until the test ends. */
+/** Collect the notices notified on the battery user's channel until the test ends. */
 async function hearing(): Promise<unknown[]> {
   const told: unknown[] = []
   const unlisten = await BH.listen(bankChannelOf(BW.bankScope.user_id), (text) => { told.push(JSON.parse(text)) })
@@ -77,7 +77,7 @@ function breachOf(gate: BX.GateRecord, policy: StoragePolicy, wayins: BX.Wayins,
 }
 
 describe("safebyok_put_gate", () => {
-  it("stores a put's record over the expected gate row, and tells of it with the bank row above", async () => {
+  it("writes a put's record over the expected gate row, and tells of it with the bank row above", async () => {
     await builtBankDB()
     const told = await hearing()
     const { record, expected, options } = BW.gatePutAskOf('add_passkey', BW.gateAt(), WithPasskey)
@@ -86,7 +86,7 @@ describe("safebyok_put_gate", () => {
     await vi.waitFor(() => { expect(told).to.deep.equal([{ at: BW.gateScope, parent: BW.bankAt(), row: record }]) })
   })
 
-  it("stores the record of each policy over a gate row its clause passes", async () => {
+  it("writes the record of each policy over a gate row its clause passes", async () => {
     await builtBankDB()
     const replace = BW.gatePutAskOf('replace_passphrase', BW.gateAt(), { main: BW.otherMainWayin })
     expect(await answerOf(PutGateSql, [replace.record, replace.expected, ['replace_passphrase']])).to.deep.include({ ok: true, act: 'replaced', gate: replace.record })
@@ -99,7 +99,7 @@ describe("safebyok_put_gate", () => {
     expect(await BH.rowsOf().gateRowOf(BW.gateScope)).to.deep.equal(revoke.record)
   })
 
-  it("stores nothing, and answers the rows it found, for a record over another row or of another life", async () => {
+  it("writes nothing, and answers the rows it found, for a record over another row or of another life", async () => {
     await builtBankDB()
     const gate = BW.gateAt()
     const withPasskey = BW.gateAt(0, 'bank1', WithPasskey)
@@ -115,7 +115,7 @@ describe("safebyok_put_gate", () => {
     expect(await BH.rowsOf().gateRowOf(BW.gateScope)).to.deep.equal(gate)
   })
 
-  describe("stores nothing, and answers the rows it found, for a put its policy's clause refuses", () => {
+  describe("writes nothing, and answers the rows it found, for a put its policy's clause refuses", () => {
     for (const [blurb, keyed, breach] of PolicyBreaches) {
       it(blurb, async () => {
         const gate = await storedGateOf(keyed)
@@ -126,7 +126,7 @@ describe("safebyok_put_gate", () => {
     }
   })
 
-  it("stores nothing under a deleted bank", async () => {
+  it("writes nothing under a deleted bank", async () => {
     const bankDB = await builtBankDB()
     await bankDB.delBank(BW.bankDelAskOf(BW.bankAt()))
     const { record, expected } = BW.gatePutAskOf('add_passkey', BW.gateAt(), WithPasskey)
@@ -135,7 +135,7 @@ describe("safebyok_put_gate", () => {
 })
 
 describe("safebyok_revise_bank", () => {
-  it("deletes every gate, vault and box row under the bank in the call that stores its tombstone, and tells of the bank alone", async () => {
+  it("deletes every gate, vault and box row under the bank in the call that writes its tombstone, and tells of the bank alone", async () => {
     const bankDB = await builtBankDB()
     await bankDB.putVault(BW.vaultPutAskOf(BW.vaultAt()))
     await bankDB.putBox(BW.boxPutAskOf(BW.boxAt()))
@@ -149,7 +149,7 @@ describe("safebyok_revise_bank", () => {
     await vi.waitFor(() => { expect(told).to.deep.equal([{ at: BW.bankScope, row: tombstone }]) })
   })
 
-  it("stores nothing over a bank row of another revision, and deletes nothing under it", async () => {
+  it("writes nothing over a bank row of another revision, and deletes nothing under it", async () => {
     await builtBankDB()
     const tombstone = BW.bankTombstoneOf(BW.bankAt())
     expect(await answerOf(ReviseBankSql, [tombstone, null, { ...BW.bankAt(), revision_tok: 'gone' }])).to.deep.include({ ok: false, bank: BW.bankAt(), gate: BW.gateAt() })

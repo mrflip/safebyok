@@ -20,7 +20,7 @@ const passkeyedUnlock = async () => {
 }
 
 /** Render the button for `gating`. Returns the gripes it passed to `onGripe`, and the errors React reported. */
-const buttonFor = (gating: Gating<'unlock_bank'>, extra: { takesFocus?: boolean } = {}) => {
+const buttonFor = (gating: Gating<'unlock_bank'>, extra: { isAutoFocused?: boolean } = {}) => {
   const gripes: (string | null)[] = []
   const ui = <PasskeyUnlockButton gating={gating} onGripe={(gripe) => { gripes.push(gripe) }} {...extra} />
   return { ...TH.renderReporting(ui), ui, gripes }
@@ -36,10 +36,10 @@ const refusingAttempts = (gating: Gating, err: unknown) => TH.attemptsOf(gating)
 
 describe("PasskeyUnlockButton", () => {
   it("unlocks the vault with the passkey the user touches", async () => {
-    const { gating, raising } = await passkeyedUnlock()
+    const { gating, launching } = await passkeyedUnlock()
     buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("is not there in a browser without WebAuthn, nor for a vault with no passkey", async () => {
@@ -64,7 +64,7 @@ describe("PasskeyUnlockButton", () => {
 
   it("stays focusable while the browser asks", async () => {
     const { gating, authenticator } = await passkeyedUnlock()
-    buttonFor(gating, { takesFocus: true })
+    buttonFor(gating, { isAutoFocused: true })
     const button = screen.getByText(Messages.passkeyButton)
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
@@ -81,9 +81,9 @@ describe("PasskeyUnlockButton", () => {
     expect(authenticator.calls.get).to.have.lengthOf(1)
   })
 
-  it("takes the focus when asked to", async () => {
+  it("focuses itself when asked to", async () => {
     const { gating } = await passkeyedUnlock()
-    buttonFor(gating, { takesFocus: true })
+    buttonFor(gating, { isAutoFocused: true })
     expect(document.activeElement).to.equal(screen.getByText(Messages.passkeyButton))
   })
 
@@ -123,18 +123,18 @@ describe("PasskeyUnlockButton", () => {
   })
 
   it("tries a passkey the user touched while an Activity hid it", async () => {
-    const { gating, authenticator, raising } = await passkeyedUnlock()
+    const { gating, authenticator, launching } = await passkeyedUnlock()
     const touching = TH.makePending()
     authenticator.answerNextAfter(touching.promise)
     const { ui, rerender } = buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     rerender(TH.inActivity('hidden', ui))
     await act(async () => { touching.resolve(undefined); await TH.wakeupAtNextTick() })
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 })
 
-/** Render the unlock dialog for a vault that has a passkey. */
+/** Render the unlock_bank dialog for a vault that has a passkey. */
 const dialogFor = async () => {
   const opened = await passkeyedUnlock()
   render(<PassphraseModal gating={opened.gating} />)
@@ -143,15 +143,15 @@ const dialogFor = async () => {
 
 describe("PassphraseModal, for a vault with a passkey", () => {
   it("offers the passkey first, with the focus, and closes unlocked when it is used", async () => {
-    const { raising } = await dialogFor()
+    const { launching } = await dialogFor()
     const button = screen.getByText(Messages.passkeyButton)
     expect(document.activeElement).to.equal(button)
     expect(button.compareDocumentPosition(screen.getByPlaceholderText('vault passphrase')) & Node.DOCUMENT_POSITION_FOLLOWING).to.not.equal(0)
     fireEvent.click(button)
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
-  it("takes no press while a passphrase attempt runs", async () => {
+  it("accepts no press while a passphrase attempt runs", async () => {
     const { gating, authenticator } = await dialogFor()
     const running = TH.makePending()
     TH.attemptsOf(gating).mockImplementation(async () => {

@@ -138,7 +138,7 @@ describe("BX.vaultAsk", () => {
 })
 
 describe("BX.loggableAsk", () => {
-  it("keeps the meta of a record and its gate, and drops their payloads", () => {
+  it("keeps the meta of a record and its gate, and drops the rest", () => {
     const ask    = bankBuildAskOf()
     const logged = BX.loggableAsk.parse(ask)
     expect(logged.gate).to.deep.equal({ ...SX.revisionOf(ask.gate), am: 'a', bank_tok: 'bank1', gate_tok: 'gate1' })

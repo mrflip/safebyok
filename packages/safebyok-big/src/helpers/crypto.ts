@@ -1,5 +1,5 @@
 /** Every call into WebCrypto: AES-256-GCM encryption and key wrapping, the key makers, HKDF and randomness.
- * Every encryption binds a {@link cipherCtx} as additional data, so ciphertext moved anywhere else will not open.
+ * Every encryption binds a {@link cipherCtx} as additional data, so ciphertext moved anywhere else will not decipher or unwrap.
  * Key derivation from a passphrase is in `deriver/`.
  */
 
@@ -55,7 +55,7 @@ export type CipherCtxRecord = Readonly<Record<string, string | number>>
 /** The bytes an encryption is bound to, as AES-GCM additional data or HKDF info: the thing's stamp, a purpose, and its visible header if any.
  * The purpose is the name of the field the ciphertext is stored in. Pass a list of stamps where a thing
  * binds the stamp of what it lies in beside its own. The ctx is rebuilt at each use, never stored, so
- * ciphertext opens only where every bound field is the same.
+ * ciphertext deciphers or unwraps only where every bound field is the same.
  * It refuses a call with no stamp, or with a part or field undefined or null, since each would bind the same as some other ctx.
  *
  * @example cipherCtx([bankStamp, gateStamp], 'bank_key_passphrase_wrapped', { wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label, salt_b64, device_tok, registered_at })
@@ -102,7 +102,7 @@ export function makeBoxKey(): Promise<CryptoKey> {
 }
 
 /** A fresh random leaseKey, a non-extractable 256-bit AES-GCM key for wrapping.
- * No code can read its bytes, even the code that made it: store the `CryptoKey` itself, by structured clone.
+ * No code can read its bytes, even the code that made it: stow the `CryptoKey` itself, by structured clone.
  */
 export function makeLeaseKey(): Promise<CryptoKey> {
   return crypto.subtle.generateKey(AesGcm, false, ['wrapKey', 'unwrapKey'])

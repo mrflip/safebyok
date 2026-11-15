@@ -114,7 +114,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
   }
 
   // The bankKey is unwrapped, wrapped again under the leaseKey and dropped here, crossing no method boundary (G3).
-  /** A new lease on `bank`, holding the bankKey this proving unwraps under a fresh, non-extractable leaseKey, and citing the gate revision `gate`. */
+  /** A new lease on `bank`, with the bankKey this proving unwraps under a fresh, non-extractable leaseKey, and citing the gate revision `gate`. */
   async buildLease(bank: LeaseBank, gate: GX.CitedGate): Promise<Lease> {
     const { bank: { stamp: bankstamp }, gate: cited } = Checks.provingLeaseArgs.parse({ bank, gate })
     Validator.checkedConsistent(bankstamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
@@ -128,7 +128,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
     return Lease.make({ ...granted, lease_key: leaseKey, bank_key_lease_wrapped }, { bank })
   }
 
-  /** The wayin of this proving's header, holding `bankKey` wrapped under its wayinKey */
+  /** The wayin of this proving's header, with `bankKey` wrapped under its wayinKey */
   async #wrapBankKey(bankKey: CryptoKey): Promise<Wayin> {
     const bank_key_wayin_wrapped = await Crypto.wrapKeyUnder(this.#wayinKey, bankKey, this.#wayinCtx())
     this.#wayin = Wayin.make({ ...this.header, bank_key_wayin_wrapped })
@@ -155,7 +155,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
 
   // == [Protected, for a subclass to call]: checkUnwraps
 
-  /** Throw `wrongCleartext()` unless this proving's key unwraps its stored wayin.
+  /** Throw `wrongCleartext()` unless this proving's wayinKey unwraps its stored wayin.
    * The bankKey unwrapped is non-extractable, and dropped at once (G3).
    */
   protected async checkUnwraps(wrongCleartext: () => Errors.VaultError): Promise<void> {
@@ -276,7 +276,7 @@ function mintPasskeyHeader({ device_tok }: GX.ProvingDevice, { credential_id, pr
 export type GuardedKeyDeriver = GX.ProvingDevice['keyDeriver']
 
 // Its interface and its salt length are checked, never its other choices (#the-host-is-not-our-threat-model): what its key bytes must be is
-// checked where they arrive, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
+// checked where they are received, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
 // a VaultError `load` throws passes as it came.
 /** Wrap `hostDeriver`, checked by its interface, so that no error it throws can quote the passphrase. */
 export function guardKeyDeriver(hostDeriver: Deriver.KeyDeriver): GuardedKeyDeriver {

@@ -45,7 +45,7 @@ const EveryCall: [string, (caller: Caller) => Promise<unknown>][] = [
   ['watchRows',  (caller) => caller.query(fns.watchRows, { scope: BW.bankScope })],
 ]
 
-/** List what u1 has stored, as the component itself reports it. */
+/** List what u1 has put, as the component itself reports it. */
 async function storedIn(backend: Backend) {
   return await backend.withIdentity({ subject: 'u1' }).query(fns.watchRows, { scope: BW.bankScope })
 }
@@ -107,7 +107,7 @@ describe("SafebyokBankComponent.api, with the host's getUserId", () => {
     [() => Promise.resolve(null),      'treats a null user id as no one'],
     [() => Promise.resolve(undefined), 'treats an undefined user id as no one'],
     [() => Promise.resolve(''),        'treats an empty user id as no one'],
-    [() => null,                       'takes a getUserId that answers synchronously'],
+    [() => null,                       'accepts a getUserId that answers synchronously'],
   ] as const
 
   for (const [getUserId, blurb] of SignedOutCases) {

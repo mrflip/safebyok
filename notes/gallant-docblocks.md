@@ -314,7 +314,7 @@ Narrates when it demands relative to its one wait, with a "so" clause giving the
 
 ## Name the act `#name-the-act`
 
-A function that stores, wraps or attaches opens with that verb. A past-tense event or a participle phrase may open a lookup's block, never an act's.
+A function that puts, wraps or attaches opens with that verb. A past-tense event or a participle phrase may open a lookup's block, never an act's.
 
 **Goofus:**
 

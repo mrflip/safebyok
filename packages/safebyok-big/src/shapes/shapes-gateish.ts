@@ -47,9 +47,9 @@ export type PassphraseWayinHeader = Z.infer<typeof passphraseWayinHeader>
 export type PasskeyWayinHeader    = Z.infer<typeof passkeyWayinHeader>
 /** A wayin without its wrapped bankKey: a tagged union on `wayinkind`. */
 export type WayinHeader           = Z.infer<typeof wayinHeader>
-/** A passphrase wayin as its gate row stores it, under `main`. */
+/** A passphrase wayin as its gate row has it, under `main`. */
 export type PassphraseWayinRecord = Z.infer<typeof BX.passphraseWayin>
-/** A passkey wayin as its gate row stores it, under `passkey0`. */
+/** A passkey wayin as its gate row has it, under `passkey0`. */
 export type PasskeyWayinRecord    = Z.infer<typeof BX.passkeyWayin>
 /** A stored wayin: a tagged union on `wayinkind` of {@link PassphraseWayinRecord} and {@link PasskeyWayinRecord}. */
 export type WayinRecord           = Z.infer<typeof wayinRecord>
@@ -70,7 +70,7 @@ export const PrfAnswerSize = 32
 
 /** The check of a passkey's answer: its credential's id, the salt it answered for, and its PRF bytes. No refusal quotes it, as its bytes are secret.
  * An answer already used is refused, as the gating that spent it zeroed its bytes: sealed again, it
- * would make a key anyone could rebuild.
+ * would make a passkeyKey anyone could rebuild.
  *
  * @example passkeyAnswer.parse(usedAnswer)  // throws: its bytes were zeroed at its first use
  */
@@ -91,7 +91,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 
 /** The check of a new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a {@link passkeyAnswer} over a fresh salt of {@link PasskeySaltSize} bytes.
- * A passkey wayin sealed over another salt would read as damaged at every later unlock.
+ * A passkey wayin sealed over another salt would read as damaged whenever it is used to unlock the bank.
  *
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws
  */
@@ -202,7 +202,7 @@ export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseSto
   }
 })
 
-/** A gate as a stored wayin's proving takes it: its bank's stamp, its own stamp, and its wayins. */
+/** A gate as a stored wayin's proving is given it: its bank's stamp, its own stamp, and its wayins. */
 export type StampedGate = Z.infer<typeof stampedGate>
 
 /** What `Proving.buildWayin` is passed for a wayin over a bankKey made new: the type of `NOVEL`. */
@@ -215,7 +215,7 @@ export type Novel = typeof NOVEL
 export const LeaseFormat = 7003
 
 /** True when `val` is a leaseKey as `makeLeaseKey` makes one: a non-extractable AES-GCM CryptoKey for `unwrapKey`, and at most `wrapKey` besides.
- * A cached lease whose key fails this was not written by this package, and is treated as damaged.
+ * A cached lease whose leaseKey fails this was not written by this package, and is treated as damaged.
  *
  * @example isLeaseKey(await makeBankKey())  // false: extractable
  */
@@ -267,7 +267,7 @@ export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis
 export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
 
 /** The check of all a lease or a proving is given of its bank: the bank's stamp, and the deviceDB's lease verbs bound to its scope and `bank_tok`.
- * It holds no key, and reaches neither the bankDB nor the boxes.
+ * It has no key, and reaches neither the bankDB nor the boxes.
  */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...bankStamp.shape,
@@ -360,7 +360,7 @@ export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
   askUser:         custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
 }), 'bad_option')
 
-/** What an attempt takes, by the kind of gating. */
+/** What an attempt is given, by the kind of gating. */
 export type CleartextsForGatingkind = {
   build_bank:         Z.input<typeof bankBuildCleartexts>
   unlock_bank:        Z.input<typeof bankUnlockCleartexts>

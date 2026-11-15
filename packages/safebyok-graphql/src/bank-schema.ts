@@ -2,8 +2,8 @@ import { leftoverVals, refusalkindVals, storagePolicyVals } from 'safebyok-big/s
 
 // Each operation is one bankDB verb. It returns what the verb's `try*` form returns, as a typed
 // object with any refusal in its `err` field. A GraphQL error is left for what GraphQL itself
-// rejects, such as a client and server whose schemas differ. A verb that stores a row, or gets one,
-// takes its ask as one input whose fields are the ask's; ensureBank, listBoxes and tidyGone take
+// rejects, such as a client and server whose schemas differ. A verb that writes a row, or gets one,
+// is given its ask as one input whose fields are the ask's; ensureBank, listBoxes and tidyGone are given
 // their scope as separate arguments, so a host's logs and allowlists show whose bank each request
 // reaches. Four things are untyped JSON: a sidecar (the app's own object), a damaged row (it failed
 // validation), a refusal's meta (the few fields a server sends), and a gate's `auth`, `sigs` and
@@ -177,7 +177,7 @@ type SafebyokBankScope {
 
 # Answers
 
-"""What an answer carries of its ask: its op, address and policies, and the revisions of its rows, never a record's payload. A field is null when the ask did not have it."""
+"""What an answer carries of its ask: its op, address and policies, and the revisions of its rows, never a whole record. A field is null when the ask did not have it."""
 type SafebyokAsk {
   op:         String
   user_id:    String
@@ -398,7 +398,7 @@ input SafebyokBoxExpectedInput {
   box_tok:      String!
 }
 
-"""A buildBank request: the bank's scope, the bank row it expects to find, the bank record to store, and its main gate's record."""
+"""A buildBank request: the bank's scope, the bank row it expects to find, the bank record to put, and its main gate's record."""
 input SafebyokBankBuildAskInput {
   op:         SafebyokOp!
   user_id:    String!
@@ -408,7 +408,7 @@ input SafebyokBankBuildAskInput {
   gate:       SafebyokGateRecordInput!
 }
 
-"""A putGate request: the gate's scope, its bank's bank_tok, the gate row it expects to find, the gate record to store, and its storage policy."""
+"""A putGate request: the gate's scope, its bank's bank_tok, the gate row it expects to find, the gate record to put, and its storage policy."""
 input SafebyokGatePutAskInput {
   op:         SafebyokOp!
   user_id:    String!
@@ -420,7 +420,7 @@ input SafebyokGatePutAskInput {
   options:    SafebyokGateOptionsInput!
 }
 
-"""A delBank request: the bank's scope, the bank row it expects to find, and the tombstone to store."""
+"""A delBank request: the bank's scope, the bank row it expects to find, and the tombstone to write."""
 input SafebyokBankDelAskInput {
   op:         SafebyokOp!
   user_id:    String!
@@ -440,7 +440,7 @@ input SafebyokVaultGetAskInput {
   expected:   SafebyokVaultExpectedInput!
 }
 
-"""A putVault request: the vault's scope, its bank's bank_tok, its policies, the row it expects to find, and the record to store."""
+"""A putVault request: the vault's scope, its bank's bank_tok, its policies, the row it expects to find, and the record to put."""
 input SafebyokVaultPutAskInput {
   op:         SafebyokOp!
   user_id:    String!
@@ -453,7 +453,7 @@ input SafebyokVaultPutAskInput {
   record:     SafebyokVaultRowInput!
 }
 
-"""A delVault request: the vault's scope, its bank's bank_tok, the row it expects to find, and the tombstone to store."""
+"""A delVault request: the vault's scope, its bank's bank_tok, the row it expects to find, and the tombstone to write."""
 input SafebyokVaultDelAskInput {
   op:         SafebyokOp!
   user_id:    String!
@@ -477,7 +477,7 @@ input SafebyokBoxGetAskInput {
   expected:   SafebyokBoxExpectedInput!
 }
 
-"""A putBox request: the box's address under its vault's life, its policies, the row it expects to find, and the record to store."""
+"""A putBox request: the box's address under its vault's life, its policies, the row it expects to find, and the record to put."""
 input SafebyokBoxPutAskInput {
   op:         SafebyokOp!
   user_id:    String!
@@ -492,7 +492,7 @@ input SafebyokBoxPutAskInput {
   record:     SafebyokBoxRecordInput!
 }
 
-"""A delBox request: the box's address under its vault's life, the row it expects to find, and the tombstone to store."""
+"""A delBox request: the box's address under its vault's life, the row it expects to find, and the tombstone to write."""
 input SafebyokBoxDelAskInput {
   op:         SafebyokOp!
   user_id:    String!

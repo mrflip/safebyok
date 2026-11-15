@@ -22,7 +22,7 @@ const isolatedEnv = (home: string) => ({
 interface RepoT {
   where: string
   git:   (...args: string[]) => string
-  /** Commits one file holding `body`, under the subject given; returns the commit's hash */
+  /** Commits one file with `body`, under the subject given; returns the commit's hash */
   commit: (filename: string, body: string, subject: string) => string
   /** Runs the script there, never asking GitHub; returns what it printed */
   attic: (...args: string[]) => string
@@ -55,7 +55,7 @@ const makeRepo = (scratch: string): RepoT => {
  * - `landed`, merged into main with a merge commit: in history;
  * - `rebased`, whose one commit main took as the same change under another hash;
  * - `drafted`, whose commit main took reworked, under the same subject;
- * - `stray`, holding a commit main has nothing like.
+ * - `stray`, with a commit main has nothing like.
  */
 const seedKinds = (repo: RepoT) => {
   repo.commit('readme.md', 'hello\n', 'docs: a readme')
@@ -142,7 +142,7 @@ describe('scripts/git-attic', () => {
     expect(repo.git('tag', '--list', '--format=%(contents)', 'attic/rebased')).to.equal('retired elsewhere')
   })
 
-  it('names the tag by its hash when attic/<branch> already holds another commit', () => {
+  it('names the tag by its hash when attic/<branch> already names another commit', () => {
     const { rebasedTip } = seedKinds(repo)
     repo.git('tag', 'attic/rebased', 'main')
     repo.attic('--apply')
@@ -151,7 +151,7 @@ describe('scripts/git-attic', () => {
     expect(repo.git('rev-list', '--max-count=1', hashed)).to.equal(rebasedTip)
   })
 
-  it('leaves alone a merged branch that a worktree holds', () => {
+  it('leaves alone a merged branch that a worktree has checked out', () => {
     seedKinds(repo)
     repo.git('worktree', 'add', '--quiet', path.join(scratch, 'elsewhere'), 'rebased')
     const said = repo.attic('--apply')

@@ -30,7 +30,7 @@ export class Filer {
     this.mode = mode
   }
 
-  /** Write `blob` as the file's whole text, creating it or replacing what it held */
+  /** Write `blob` as the file's whole text, creating it or replacing what it had */
   dump(blob: string): void {
     this.#writeVia(O_WRONLY | O_CREAT | O_TRUNC, blob)
   }
@@ -71,7 +71,7 @@ export class Filer {
 
   /**
    * Has the file or makes it so with `blob`, and hands back its text. An existing file is left
-   * as it is, whatever it holds; only an absent one is created, in a single exclusive open.
+   * as it is, whatever it has; only an absent one is created, in a single exclusive open.
    */
   ensureText(blob: string): string {
     try {

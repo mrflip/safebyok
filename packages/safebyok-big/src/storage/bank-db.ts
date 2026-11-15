@@ -38,7 +38,7 @@ export type Tidied = { totalCount: number, leftover: Leftover }
 
 /** The answer to `ensureBank`. Its `val` is null when no live bank is stored. */
 export type EnsureBankAnswer        = Answer<BankEnsured | null, GotAct>
-/** The answer to `buildBank` or `putGate`: the gate row as the datastore reports storing it, or under `passed` the live one found. */
+/** The answer to `buildBank` or `putGate`: the gate row as the datastore reports writing it, or under `passed` the live one found. */
 export type GateAnswer              = Answer<GateRecord, OkAct>
 /** The answer to `delBank`: the bank's tombstone, or the bank row found. Its `parent` is `main`: a bank has no row above it. */
 export type DelBankAnswer           = Answer<BankRow | null, OkAct, typeof BankTop>
@@ -51,7 +51,7 @@ export type ListBoxesAnswer         = Answer<BoxesListed, ListAct, VaultRow>
 /** The answer to `tidyGone`, with the bank's scope as `parent`. */
 export type TidyGoneAnswer          = Answer<Tidied, 'tidied', BankScope>
 
-/** A changed row reported by a watch, with its `parent`. A bank row's parent is `main`; another row's is the row above it, or null if storage sent none. */
+/** A changed row reported by a watch, with its `parent`. A bank row's parent is `main`; another row's is the row above it, or null if storage reported none. */
 export type Notice = { act: 'gotlive' | 'gotgone', val: BankRow | GateRecord | VaultRow | BoxRow, parent: BankRow | VaultRow | typeof BankTop | null }
 
 /** A good answer with `val`, keeping `answer`'s act, parent and ask. Throws the refusal of a bad `answer`. */
@@ -92,19 +92,19 @@ export interface BankDB {
   ensureBank(ask: BankEnsureAsk): Promise<GoodAnswer<BankEnsured | null, GotAct>>
   /** Non-throwing form of {@link BankDB.ensureBank}. */
   tryEnsureBank(ask: BankEnsureAsk): Promise<EnsureBankAnswer>
-  /** Store the bank record `ask.record` and its `main` gate row `ask.gate` together, over no bank or its tombstone.
+  /** Put the bank record `ask.record` and its `main` gate row `ask.gate` together, over no bank or its tombstone.
    * Under the `passed` act, nothing is stored, and `val` is the live bank's gate row.
    */
   buildBank(ask: BankBuildAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.buildBank}. */
   tryBuildBank(ask: BankBuildAsk): Promise<GateAnswer>
-  /** Store the gate record `ask.record` over the gate row `ask.expected`, under the storage policy `ask.options.policies` names.
+  /** Put the gate record `ask.record` over the gate row `ask.expected`, under the storage policy `ask.options.policies` names.
    * Refuses `gate_issue` when the policy refuses the change over the gate row stored.
    */
   putGate(ask: GatePutAsk): Promise<GoodAnswer<GateRecord, OkAct>>
   /** Non-throwing form of {@link BankDB.putGate}. */
   tryPutGate(ask: GatePutAsk): Promise<GateAnswer>
-  /** Store the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
+  /** Write the tombstone `ask.record` over the live bank row `ask.expected`, and delete every gate, vault and box row under the bank. */
   delBank(ask: BankDelAsk): Promise<GoodAnswer<BankRow | null, OkAct, typeof BankTop>>
   /** Non-throwing form of {@link BankDB.delBank}. */
   tryDelBank(ask: BankDelAsk): Promise<DelBankAnswer>
@@ -114,14 +114,14 @@ export interface BankDB {
   getVault(ask: VaultGetAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link BankDB.getVault}. */
   tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer>
-  /** Store `ask.record` over the vault row `ask.expected`, in a bank live under `bank_tok`, as `ifPresent` and `ifAbsent` allow.
+  /** Put `ask.record` over the vault row `ask.expected`, in a bank live under `bank_tok`, as `ifPresent` and `ifAbsent` allow.
    * Refuses `stale_write` when the row stored is no longer `ask.expected`: get it again, and put over that.
    * Under the `passed` act, nothing is stored, and `val` is the live row found.
    */
   putVault(ask: VaultPutAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link BankDB.putVault}. */
   tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer>
-  /** Store the tombstone `ask.record` over the live vault row `ask.expected`, and delete the boxes of that vault life. */
+  /** Write the tombstone `ask.record` over the live vault row `ask.expected`, and delete the boxes of that vault life. */
   delVault(ask: VaultDelAsk): Promise<GoodAnswer<VaultRow | null, OkAct>>
   /** Non-throwing form of {@link BankDB.delVault}. */
   tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer>
@@ -137,14 +137,14 @@ export interface BankDB {
   getBox(ask: BoxGetAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
   /** Non-throwing form of {@link BankDB.getBox}. */
   tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer>
-  /** Store `ask.record` over the box row `ask.expected`, in a vault live under `bank_tok` and `vault_tok`, as `ifPresent` and `ifAbsent` allow.
+  /** Put `ask.record` over the box row `ask.expected`, in a vault live under `bank_tok` and `vault_tok`, as `ifPresent` and `ifAbsent` allow.
    * Refuses `stale_write` when the row stored is no longer `ask.expected`: get it again, and put over that.
    * Under the `passed` act, nothing is stored, and `val` is the live row found.
    */
   putBox(ask: BoxPutAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
   /** Non-throwing form of {@link BankDB.putBox}. */
   tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer>
-  /** Store the tombstone `ask.record` over the live box row `ask.expected`. */
+  /** Write the tombstone `ask.record` over the live box row `ask.expected`. */
   delBox(ask: BoxDelAsk): Promise<GoodAnswer<BoxRow | null, OkAct, VaultRow>>
   /** Non-throwing form of {@link BankDB.delBox}. */
   tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer>
@@ -157,7 +157,7 @@ export interface BankDB {
   tryTidyGone(ask: BoxTidyAsk): Promise<TidyGoneAnswer>
   /** Watch a bank or a vault: call `onNotice` with each changed row, and `onBadNews` with trouble in the watch.
    * A bank's watch hears its bank, gate, vault and box rows; a vault's, its vault row and its box rows.
-   * Returns a function that stops the watch. Notices are best effort: never count on one arriving.
+   * Returns a function that stops the watch. Notices are best effort: never count on one being delivered.
    * After bad news, the watch may go on or may have ended.
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews?: (news: VaultError) => void): () => void

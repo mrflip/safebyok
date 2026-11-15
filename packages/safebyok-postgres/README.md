@@ -46,7 +46,7 @@ await pglite.exec(BankFunctionsSql)
 
 **A database with older safebyok tables**: drop `safebyok_boxes` and `safebyok_vaults`, and each `safebyok_` function,
 before you run these files. They create only what is missing, so an older table of the same name stays as it is. The
-rows it held are not read: each user's bank starts empty.
+rows it had are not read: each user's bank starts empty.
 
 ## Use
 
@@ -68,7 +68,7 @@ const bankDB = new PostgresBankDB({ client: pgClientOf(pool) })
   past it is refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault
   made anew starts at zero. The cap is exact at moderate write rates. A strict cap would take concurrency machinery this
   package does not add.
-* **`maxRecordSizeEst`**, optional, as every bankDB takes it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
+* **`maxRecordSizeEst`**, optional, as every bankDB accepts it: 5,600 bytes if left out, so a box's row fits a `NOTIFY`.
 
 `PostgresBankDB` writes what it is handed under the scope it is handed. **Your route decides who
 may reach which bank**: check the signed-in user before a request reaches the bankDB, and build
@@ -79,14 +79,14 @@ A missing table or privilege (SQLSTATE class `42`) is a setup fault, refused wit
 
 ## Hearing other writes
 
-Each write sends a notification on its user's channel, `bankChannelOf(user_id)`, which is
+Each write notifies on its user's channel, `bankChannelOf(user_id)`, which is
 `safebyok_` followed by the user_id, as it commits. The database function `safebyok_tell` builds it:
 a JSON object with the written row's address under `at`, the row under `row`, and the row above it
 under `parent`: a gate's or a vault's bank row, a box's vault row. A box's address carries its
 vault's life, `bank_tok` and `vault_tok`. Postgres refuses a notification of 8,000 bytes or more.
 A notification that is too large drops the row above first, then the row, and the listener fetches
-what is stored at the address. Deleting a bank sends one notification, of its tombstone: the gate,
-vault and box rows deleted with it send none. `listen(channel, onNotify)` passes the text of each
+what is stored at the address. Deleting a bank notifies once, of its tombstone: the gate,
+vault and box rows deleted with it notify none. `listen(channel, onNotify)` passes the text of each
 notification on that channel to `onNotify`, unchanged, and returns a function that stops listening.
 A watch hears a box with its vault's row as its parent, or with a null parent when the vault row did
 not fit. A bank or gate row is heard only by a watch of the whole bank. Any role that can connect to the database can `LISTEN` on a channel, and so can read the
@@ -136,16 +136,16 @@ but takes its turn behind the statements already queued.
 
 **A user_id whose channel passes 63 bytes cannot write.** A channel is a Postgres identifier, at
 most 63 bytes, so a user_id of more than 54 characters (a user_id is ASCII, a byte a character, and
-a percent-encoded character is three) makes every write that would send a notice fail with
+a percent-encoded character is three) makes every write that would notify fail with
 `storage_unavailable`, its cause Postgres's `channel name too long`. Keep user_ids to 54 characters
 with this package for now.
 
 ## What is stored
 
 `safebyok_banks` has a row per bank, keyed by `user_id` and `banklabel`. `safebyok_gates` has a row
-per gate of a bank, keyed by those and `gatelabel`; today every bank has one, `main`, holding the
-bank's wayins in `wayins`. `safebyok_vaults` has a row per vault, keyed by the bank's key and
-`vaultlabel`. `safebyok_boxes` has a row per box, keyed by the vault's key, the life of its vault
+per gate of a bank, keyed by those and `gatelabel`; today every bank has one, `main`, with the
+bank's wayins in `wayins`. `safebyok_vaults` has a row per vault, keyed by the bank's primary key and
+`vaultlabel`. `safebyok_boxes` has a row per box, keyed by the vault's primary key, the life of its vault
 (`bank_tok` and `vault_tok`) and its `boxlabel`. Each field of a row is a column of its own. The
 labels, the tokens and `am` are `text`. `fmt`, `revision_seq` and `whisper_schema_version` are
 `integer`. The times, `registered_at` and `written_at`, are `bigint`, in UTC epoch milliseconds.
@@ -174,13 +174,13 @@ connect and LISTEN: this package grants nothing and creates no role or policy.
 Each write is one conditional `INSERT` or `UPDATE`, which takes effect only if the stored row still
 has the revision the write expects at that moment. A vault write reads its bank row,
 and a box write its vault row, without a lock, so writers under one bank do not wait for each other.
-A new row's foreign key takes a share lock on its bank row, which waits only on a `DELETE` of that
+A new row's foreign key acquires a share lock on its bank row, which waits only on a `DELETE` of that
 row. Two things follow:
 
 * A vault or box written while its bank or vault is deleted or built anew may land in the life that
   has ended. No read returns it, and `tidyGone`, or the bank built anew, deletes it. Until then the
   row stays, and it keeps a `DELETE` of its bank row refused. This is accepted: safebyok may later
-  offer advice, or functions, that take locks for tighter atomicity under the same contract. If you
+  offer advice, or functions, that acquire locks for tighter atomicity under the same contract. If you
   write boxes heavily under vaults that get deleted and are not written again, call `tidyGone` now
   and then.
 * The box cap is soft. Writers racing to add their first box can pass it together, and `tidyGone`

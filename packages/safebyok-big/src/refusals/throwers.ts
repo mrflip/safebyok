@@ -10,7 +10,7 @@
 // A thrower's name, its kind and its phrase's name agree; the phrase is of a piece with the kind, mirroring, containing or
 // eliding its words; and all three read naturally at the call site. A caller passes what it has on hand and trusts the
 // thrower to sanitize and cherry-pick. A name carries no "error" or "refusal", ends in "issue" at a loss, and is
-// empathetic and frank to the person who trusted us with their data, and readable to the coder. Reuse is welcome, never
+// empathetic and frank to the person who trusted us with their secrets, and readable to the coder. Reuse is welcome, never
 // forced: a new refusal gets a new thrower and a new phrase. Templated phrases are encouraged.
 //
 // A refusal's `meta` has what reads at a glance, and an adapter may hand a bag of its own beside the cause: props to
@@ -154,7 +154,7 @@ export function refusalOfDelivering(thrown: unknown, answer: { ask: BX.LoggableA
 /** A `damaged_row` refusal: this box is stored damaged and cannot be read. */
 export function boxStoredDamaged({ boxlabel }: SX.DamagedBox): VaultError { return new VaultError('damaged_row', Phrases.boxStoredDamaged(boxlabel)) }
 
-/** A `damaged_whisper` refusal: the box opened, but what is inside is not a whisper this package can read. */
+/** A `damaged_whisper` refusal: the box unsealed, but what is inside is not a whisper this package can read. */
 export function undecodedWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecodedWhisper) }
 
 /** A `bad_option` refusal: the box has no exposed whisper to work on. */
@@ -166,7 +166,7 @@ export function notExposed(): VaultError { return new VaultError('bad_option', P
 /** A `damaged_lease` refusal: this device's lease will not unwrap the bankKey. */
 export function damagedLease(): VaultError { return new VaultError('damaged_lease', Phrases.DamagedLease) }
 
-/** A `damaged_whisper` refusal: the whisper would not decipher under this vault's key. */
+/** A `damaged_whisper` refusal: the box would not unseal under the bankKey. */
 export function undecipheredWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecipheredWhisper) }
 
 /** A `bank_locked` refusal: this lease is out of force. */
@@ -215,7 +215,7 @@ export function passkeyAlreadyAdded(): VaultError { return new VaultError('bad_o
 /** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
 export function notKeyBytes(): VaultError { return new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeySize)) }
 
-/** An `unexpected_error` refusal: a proving was asked for the bankKey before it made or opened a wayin. */
+/** An `unexpected_error` refusal: a proving was asked for the bankKey before it made or unwrapped a wayin. */
 export function wayinNotMadeYet(): VaultError { return new VaultError('unexpected_error', Phrases.WayinNotMadeYet) }
 
 /** An `unexpected_error` refusal: this proving already has a wayin. */

@@ -129,7 +129,7 @@ describe("useVault and useVaultSnapshot", () => {
     expect(TH.seenBanks).to.have.lengthOf(1)
   })
 
-  it("read a vault built elsewhere as present, its snapshot following each unlock and lock", async () => {
+  it("read a vault built elsewhere as present, its snapshot following each time the bank unlocks and locks", async () => {
     const world = TH.makeBankWorld()
     await TH.makeBankWithVault(world)
     const requestCleartext: RequestCleartext = async (gating) => { await gating.attempt(TH.byPassphrase(TH.Passphrase)) }

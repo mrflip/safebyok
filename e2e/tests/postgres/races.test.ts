@@ -9,7 +9,7 @@ import * as TH from './test-helpers'
 const { BW } = TH
 const getDb = TH.useFileDatabase()
 
-/** A fresh bankDB holding the bank and its vault `main`. */
+/** A fresh bankDB with the bank and its vault `main`. */
 async function withVault(opts: TH.BankDBOverOpts = {}): Promise<PostgresBankDB> {
   const first = await TH.freshBankDB(getDb(), opts)
   await first.buildBank(BW.bankBuildAskOf())

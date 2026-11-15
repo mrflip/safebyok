@@ -19,7 +19,7 @@ const WhisperCases = [
   [true,                              false,  'a bare boolean'],
   [["a", "b"],                        false,  'an array'],
   [null,                              false,  'a bare null: emptying a box is delBox\'s job'],
-  [() => 'nope',                      false,  'a function is not data'],
+  [() => 'nope',                      false,  'a function is not a JSON value'],
   [new Date(),                        false,  'a Date would silently flatten to {}'],
   [new Map([["a", 1]]),               false,  'a Map would silently flatten to {}'],
   [{ when: new Date() },              false,  'a class instance hiding inside an object'],
@@ -132,7 +132,7 @@ const SidecarCases = [
   [["a", "b"],                        false,  'an array'],
   [{ when: new Date() },              false,  'a Date would silently flatten to {}'],
   [{ count: NaN },             false,  'NaN would silently become null'],
-  [() => 'nope',                      false,  'a function is not data'],
+  [() => 'nope',                      false,  'a function is not a JSON value'],
 ] as const
 
 describe("sidecar", () => {
@@ -225,7 +225,7 @@ const ScopeCases = [
 ] as const
 
 describe("bankedVaultScope", () => {
-  it("takes a vaultlabel alone, or the names a Vault object carries, leaving the rest", () => {
+  it("accepts a vaultlabel alone, or the names a Vault object carries, leaving the rest", () => {
     expect(CX.bankedVaultScope.parse({ vaultlabel: 'main' })).to.deep.equal({ vaultlabel: 'main' })
     expect(CX.bankedVaultScope.parse({ ...scope, vault_tok: 'tok', lock: () => null })).to.deep.equal(scope)
   })
@@ -259,7 +259,7 @@ const SaltCases = [
 
 describe("CX.salt_b64", () => {
   for (const [candidate, expected, blurb] of SaltCases) {
-    it(`${expected ? 'takes' : 'refuses'} ${blurb}`, () => { expect(CX.salt_b64.safeParse(candidate).success).to.eq(expected) })
+    it(`${expected ? 'accepts' : 'refuses'} ${blurb}`, () => { expect(CX.salt_b64.safeParse(candidate).success).to.eq(expected) })
   }
 
   it("refuses with the sentence that says what a passphrase salt is", () => {

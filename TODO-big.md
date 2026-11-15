@@ -47,7 +47,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   required; the ruleset is the Coach's to change.
 * **Unlocking with an empty passphrase appears to refuse `unexpected_error`.** Found 2026-11-11
   (#647's README pass): `passphraseCleartext` (`shapes/shapes-gateish.ts`) is a bare string, so an
-  empty passphrase on unlock reaches the key deriver. The fastkey deriver throws `wrong_passphrase`
+  empty passphrase given to unlock reaches the key deriver. The fastkey deriver throws `wrong_passphrase`
   for it (`wasm-deriver.ts`, whose comment says a vault never passes one), but the vault turns any
   throw from a deriver into `keyDeriverThrew`'s `unexpected_error`. Either refuse an empty passphrase
   before the deriver, or let a deriver's `wrong_passphrase` through. Confirm with a test first.
@@ -75,7 +75,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
 * **`VacateStory` is no story.** Found 2026-11-11 (names report): it is public, and a story is
   `{ where, advice }`, while this is `{ cause }`. Proposed: `VacateOpts`.
 * **`RevokeSite`'s `'undeleted'` names an unlock.** Found 2026-11-11 (names report): the public
-  type's doc block says it is a row of another epoch or life met at an unlock. Proposed: `'unlock'`.
+  type's doc block says it is a row of another epoch or life met by `ensureUnlocked`. Proposed: `'unlock'`.
 
 ## Roadmapped
 
@@ -126,9 +126,9 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
   stay in-process so `pnpm justify` needs no Docker.
 * **A schema snapshot test for `format`.** Ruled 2026-10-16
   ([#115](https://github.com/mrflip/safebyok/pull/115)): any change to what a stored record may
-  contain -- a field, a shape, or a range a check accepts -- bumps `format`. A test renders each
+  contain -- a field, a shape, or a range a check accepts -- increments `format`. A test renders each
   stored schema with Zod's own `toJSONSchema`, keyed by its `format` literal, and fails with
-  "bump `format`" when a schema changes under the same literal, so a loosened check (`.min(1)`
+  "increment `format`" when a schema changes under the same literal, so a loosened check (`.min(1)`
   to `.min(0)`) cannot ship unmarked.
 
 * **`ShelfBankDB`, a base for key-value databases.** Declined for the store-base sprint, ruled
@@ -141,7 +141,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 
 * **A test that reads the Postgres README's route recipe.** From #252's review (the Coach took
   the Rec, 2026-10-22): the route recipe in `safebyok-postgres`'s README and the route its tests
-  run are hand-kept copies, so the copy a host takes can drift from the one tested. Have the test
+  run are hand-kept copies, so the copy a host copies can drift from the one tested. Have the test
   read the README's code blocks and run those.
 * **The Postgres README should not offer a hand-written route server.** The Coach (2026-10-22):
   instead of one, point to (a) the GraphQL client (`safebyok-graphql`) and (b) an AI
@@ -161,7 +161,7 @@ Straightforward, likely to be done, not needed yet. Each is a thread cut from `m
 * **A forgetful user's start over clears only this device's copy** (the Coach, on #261: "low
   priority, make it a TODO"): without a passphrase, a user may forget the bank on this device
   (`bank.lock()` forgets the lease, which is all a device keeps), but may never delete it from the
-  bankDB: `bank.delPrompt()` asks for a proof, and `vault.del()` needs the bank unlocked.
+  bankDB: `bank.delPrompt()` asks for cleartext, and `vault.del()` needs the bank unlocked.
 
 * **The names' byte-size refusals are unreachable.** Since the restyle (#273) names are short
   labels, so their share of the vault's byte check and of `box_too_large` cannot be reached from
@@ -222,7 +222,7 @@ is shaped around it.
 ### Which wayins a rotation keeps
 
 From [#105](https://github.com/mrflip/safebyok/pull/105) (the rotation design, section 9). The
-first matter said rotation "re-wraps the remaining wayins", but it can't: each wayin's key
+first matter said rotation "re-wraps the remaining wayins", but it can't: each wayin's wayinKey
 comes from a passphrase or a passkey touch the bank never keeps, and any shortcut would hand the
 new bankKey to the wayin being removed. So the design keeps only the wayins the user proves
 during the rotation and removes the rest -- which is also what locks out a lost phone's passkey,
@@ -242,7 +242,7 @@ Revisit before 1.0 if rotation signing every other device out is too blunt.
 epoch was one below the vault props'. `trust_lines` (2026-10-21) removed `vault_key_epoch` from every record, and
 storage's comparison of a box's epoch against the vault props', on the Coach's ruling: the bankKey
 never changes until rotation is built, a vault made anew has a new `vault_tok`, which already
-voids every box, and a bank built anew has a new bankKey. Rotation adds an epoch back, with its own format bump, when it is built.
+voids every box, and a bank built anew has a new bankKey. Rotation adds an epoch back, with its own format increment, when it is built.
 
 ### "tombstone vaults; decide if the vault_tok is a check -- the labels are meant to be the primary key"
 
@@ -256,16 +256,16 @@ stays a check or the labels alone identify the vault.
 ### Lock timing vs. work in flight: what is left of the policy
 
 `packages/safebyok-big/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
-that has been sent completes or is refused as storage decides; a call still at a step before its write refuses with
-`bank_locked`; a read that would return a whisper refuses; and a lock and an unlock each do their own work, in order,
-so a lock that lands during an unlock's proof leaves the bank unlocked. Still open, from the scenarios that
+that has been sent succeeds or is refused as storage decides; a call still at a step before its write refuses with
+`bank_locked`; a read that would return a whisper refuses; and locking and unlocking each do their own work, in order,
+so a lock that lands during an `unlock_bank` gating's attempt leaves the bank unlocked. Still open, from the scenarios that
 `softlock_gone` (2026-10-19) listed:
 
 * **The DeviceDB throws when a lock forgets the lease**: `bank.lock()` locks in memory at once, and a refused forget
   is announced as `lease_revoke_failed`, on which `DefaultOnLifecycle` vacates the device. A host whose
-  `onLifecycle` does less leaves the lease row on disk, and the next Bank on this device takes it up
-  (`Lease.buildFromCache`). Decide whether a lease a lock failed to forget is marked, or the next unlock asks first.
-* **A sign-out with an unlock in flight in another tab**: harmless today, because a lease is scoped
+  `onLifecycle` does less leaves the lease row on disk, and the next Bank on this device attaches it
+  (`Lease.buildFromCache`). Decide whether a lease a lock failed to forget is marked, or the next `ensureUnlocked` asks first.
+* **A sign-out with an `ensureUnlocked` in flight in another tab**: harmless today, because a lease is scoped
   by the bank's scope, the user id included.
 * **A call is not refused when a lock lands during its opening hello** (the documentarian's run 2,
   [#312](https://github.com/mrflip/safebyok/pull/312)): the call then finds no lease and prompts
@@ -313,7 +313,7 @@ The Coach (2026-10-19, sprint contract): "changing scope requires a new vault fr
 vault_tok, user_id, banklabel, vaultlabel are immutable." A vault's scope fields are fixed for its
 life (a test checks that every field its snapshot shows is read-only), so renaming a vault, or
 moving it to a new `user_id` (because an auth provider changed, or accounts merged), means making a
-new vault and storing each whisper again, which needs the old vault's passphrase. Decide whether
+new vault and putting each whisper again, which needs the old vault's passphrase. Decide whether
 safebyok offers that move as a call, or documents it as the host's job, alongside *Identity should
 not be tied to the backing database*.
 
@@ -369,8 +369,8 @@ first; maintainability beats speed unless something is shown slow.
 ### A gate row landing between a gate verb's write and its lease grant
 
 From the bank_world sprint's thread 8c ([#673](https://github.com/mrflip/safebyok/pull/673)): a gate
-row that arrives after a gate verb has written its row and before the gating grants its lease leaves
-the lease citing a superseded `gate_revision_tok`, so the next unlock asks the user to prove again.
+row that is delivered after a gate verb has written its row and before the gating grants its lease leaves
+the lease citing a superseded `gate_revision_tok`, so the next `ensureUnlocked` asks the user to prove again.
 The direction is safe. The Coach (2026-11-12): "yes TODO not this sprint", with two questions. If
 the lease is handled only during align, after the newest gate version has been adopted, is there an
 issue? (The Coach thinks so.) Should the lease row in the deviceDB be written by compare-and-set
@@ -381,7 +381,7 @@ issue? (The Coach thinks so.) Should the lease row in the deviceDB be written by
 From the contract sprint's `a_sec2` ([#203](https://github.com/mrflip/safebyok/pull/203)'s second
 review): a device learns that another deleted the bank, or changed its gate, only when the row reaches it (by a
 watch or its next fetch). A device already unlocked stays unlocked across another device's gate verb, by design;
-a bank's tombstone, once it arrives, ends its Bank and forgets its lease. The Coach (2026-10-19):
+a bank's tombstone, once it is delivered, ends its Bank and forgets its lease. The Coach (2026-10-19):
 "cross device invalidation should be done by a proper mechanism that is coming, where each device
 authenticates a token when it joins or creates a vault." Not to be built piecemeal ahead of it: the
 design question is the token, what storage checks it against, and how a deletion revokes it.
@@ -405,8 +405,8 @@ how an adopted capacity ages, since a hello's listing recounts it.
 
 ### The stamp, not the scope, as a BankDB request's parameter
 
-The Coach (2026-10-22): each BankDB verb takes the scope and an expectation beside it; a verb
-could instead take the whole stamp (`bankStamp`, `gateStamp`, `vaultStamp`: the scope, its life's tok and
+The Coach (2026-10-22): each BankDB verb is given the scope and an expectation beside it; a verb
+could instead be given the whole stamp (`bankStamp`, `gateStamp`, `vaultStamp`: the scope, its life's tok and
 `registered_at`). Also send
 the authenticated immutable fields with puts and reads, so that a server can refuse early what the
 ctx would refuse late. Decide with the wire shapes (`safebyok-graphql`, the Postgres route), since
@@ -458,7 +458,7 @@ tab's copy of the gate, the gate is refreshed and the lease is used. A lease car
 ### A fetch that meets a damaged row, and edge cases generally
 
 A `fetch` that meets a damaged row refuses with `damaged_row` and leaves the listed instance in place, whereas a listing that meets a
-damaged row vacates the instance (#618). Making the two agree would put a branch in `deliver`, which takes renames and deletions only. The Coach (2026-11-10): "I hate how much of
+damaged row vacates the instance (#618). Making the two agree would put a branch in `deliver`, which handles renames and deletions only. The Coach (2026-11-10): "I hate how much of
 our code is given over to these edge cases. TODO it, there's got to be a better way." Look for the design that makes the listing's damaged-row,
 absent and gone cases a single case instead of a branch each.
 
@@ -495,7 +495,7 @@ logging, key derivation and passkey recipes have no new home either, and describ
 ### A size budget, when we want one
 
 `size-limit`, its `.size-limit.json` and `pnpm size:budget` were removed on 2026-11-09 as a distraction (the Coach: "we can add it later"). The removal
-also took out the CI step and the per-thread budget rule in `PROCESS.md`.
+also removed the CI step and the per-thread budget rule in `PROCESS.md`.
 
 ### Gates visible to hosts, and things that stand for their scope while the Bank is remade
 
@@ -517,8 +517,8 @@ vacate on `Storable` with `children()` would bring back per-thing ended state; t
 ### A storage read begun before a create can undo it
 
 From the contract sprint's `a_sec2` ([#206](https://github.com/mrflip/safebyok/pull/206)): a
-read of the vault props that began before this device's first unlock made the vault can finish
-after it, find no vault, and drop the new vault's key as if the vault were gone; the unlock is then
+read of the vault props that began before this device first unlocked and made the vault can return
+after it, find no vault, and drop the new vault's key as if the vault were gone; the unlocking is then
 refused with `vault_locked`, though the vault it made is stored, and the next read of the vault
 props finds it. The Coach (2026-10-21):
 
@@ -542,11 +542,11 @@ Since the restyle moved the core to classic Zod (#274), small entry points bundl
 handful of checks: the mask entry grew from about 6 to 25 kB brotlied, and fastkey's WASM deriver from 16
 to 35 kB. Inside an app that loads the Bank, Zod is shared and costs nothing more. Using
 `zod/mini` selectively, in those entries alone, could slim them. The Coach (2026-10-26): if it
-raised the standard bundle (an app loading the Bank) overall, it is not worth it.
+enlarged the standard bundle (an app loading the Bank) overall, it is not worth it.
 
 ## The react lifecycle
 
-`BankProvider` makes its bank in an effect and passes it down with `setHeld` from that effect,
+`BankProvider` makes its bank in an effect and passes it down with `setDevice` from that effect,
 under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/provider/bank-provider.tsx`);
 `useVault` asks for a vault in an effect of its own (thread 7b, 2026-10-22).
 Thread A5 of the contract sprint ([#199](https://github.com/mrflip/safebyok/pull/199)) moved the

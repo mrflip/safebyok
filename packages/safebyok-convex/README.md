@@ -55,8 +55,8 @@ of that kind. Use the same id your app gives the core as `user_id`.
 directly, so the component checks each ask with the core's own checks before it reads a row, and
 refuses one that fails them with a `ConvexError` whose `data` has the kind and the core's message.
 It then fetches the row asked for and the row above it, classifies the ask with the core's
-classifier, and stores the record if the outcome is a write, all in one
-mutation. It answers with the rows as it fetched them, and the rows it stored, read back, if it
+classifier, and writes the record if the outcome is a write, all in one
+mutation. It answers with the rows as it fetched them, and the rows it wrote, read back, if it
 wrote: the client classifies the fetched rows to the same outcome, and refuses `unexpected_error`
 should that outcome and whether it wrote disagree, which means a component out of step with the
 client's copy of safebyok. A write answers the rows stored.
@@ -82,9 +82,9 @@ Hand `bankDB` to the core, as its README's *A host* shows.
 * **`maxBoxes`** (optional, default 100) caps the box rows of one vault life, including the tombstones of deleted
   boxes, and never exceeds the component's own limit. A put of a new boxlabel past it refuses as `vault_full`, so
   deleting a box frees no room. Like every bankDB's, it is a soft cap. This adapter currently enforces it exactly,
-  since each put is counted in the mutation that stores it, but do not rely on that. A replacement, a delete, and a
+  since each put is counted in the mutation that puts it, but do not rely on that. A replacement, a delete, and a
   box put again over its own tombstone are never refused for it.
-* **`maxRecordSizeEst`**, optional, as every bankDB takes it: 5,600 bytes if left out, at most Convex's 1 MiB document.
+* **`maxRecordSizeEst`**, optional, as every bankDB accepts it: 5,600 bytes if left out, at most Convex's 1 MiB document.
 
 **Sign in first.** Open the bank once the Convex client is authenticated (in React, once
 `useConvexAuth()` says so): a call made before then refuses as `identity_revoked`.
@@ -121,7 +121,7 @@ the `safebyok` component). Coming from an older release, clear all of them: the 
 this release no longer has (`safebyok_bank_vaults`, `safebyok_bank_boxes`, `safebyok_bank_tallies`)
 and the three it kept under their old names with other fields (`safebyok_vaults`, `safebyok_boxes`,
 `safebyok_tallies`), and the bank and gate tables with them, so no bank is left without its vaults.
-Whatever those tables held is gone: export what you need first.
+Whatever those tables had is gone: export what you need first.
 
 **How big a vault can be.** The component limits every life of a vault to **8,000 box rows** and
 **7 MiB less 1 KiB** of them as Convex weighs a document, whatever the client asks, so that one
@@ -133,8 +133,8 @@ larger, and every delete, is always written. **Once deleted boxes fill a vault's
 boxes until the vault is deleted.** Deleting the vault is the only way to empty it: `delVault`
 deletes the box rows of the life it ends, in the same mutation, and the next life starts with none.
 
-**How big a bank can be.** A bank holds any number of vaults, more than one Convex transaction
-(16 MiB read, 16,000 documents written) can delete. So `delBank` stores the bank's tombstone, then
+**How big a bank can be.** A bank has any number of vaults, more than one Convex transaction
+(16 MiB read, 16,000 documents written) can delete. So `delBank` writes the bank's tombstone, then
 deletes the gate, vault and box rows under it while half of each limit lasts, and leaves the rest.
 What it leaves is out of reach: a gate or vault row under another bank life than its bank row's
 reads as no row, and a box row is found only by its own life's tokens. `tidyGone` deletes the rows
@@ -168,7 +168,7 @@ const host = app.defineModules({ safebyokBank: new SafebyokBankComponent(app.com
 ## Testing your own client code
 
 `safebyok-convex/testing` is a Convex deployment in memory that the real Convex clients reach over
-a fake WebSocket. `fakeDeployment(host)` takes a host like the one above.
+a fake WebSocket. `fakeDeployment(host)` accepts a host like the one above.
 
 ```ts
 import { ConvexBankDB } from 'safebyok-convex'

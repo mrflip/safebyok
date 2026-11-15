@@ -224,7 +224,7 @@ export default defineConfig([
     },
   },
 
-  // == [3b. A library that holds secrets] ==
+  // == [3b. A library that handles secrets] ==
   // A library writes nothing to the console: what it has to say goes back to its caller, who
   // decides what may be logged. A stray debug line is how a key ends up in someone's log drain.
   // Randomness is the platform's CSPRNG (`crypto.getRandomValues`), never Math.random.
@@ -333,7 +333,7 @@ export default defineConfig([
     rules: { 'unicorn/filename-case': ['error', { cases: { camelCase: true }, checkDirectories: false }] },
   },
 
-  // STYLE.md, *Naming*: these say nothing about what they hold. Only bindings are refused -- a
+  // STYLE.md, *Naming*: these say nothing about what they contain. Only bindings are refused -- a
   // variable, a parameter, a destructured name -- never a property, so `{ name: 'AES-GCM' }`, as
   // WebCrypto spells its algorithms, stays legal.
   {
@@ -348,7 +348,7 @@ export default defineConfig([
         'ArrayPattern > Identifier.elements',
       ].map((binding) => ({
         selector: `${binding}[name=/^(key|name|value|node|error|query)$/]`,
-        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (bankKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
+        message:  'Name it for what it contains (STYLE.md, Naming): a cryptographic key by its role (bankKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
       }))],
     },
   },
@@ -427,7 +427,7 @@ export default defineConfig([
       'jsdoc/informative-docs':    'warn',
       // The {@link} bullet and #point-dont-redefine: a {@link} names something in scope in its file.
       'jsdoc/no-undefined-types':  'warn',
-      // The @param/@returns bullet: no {Type} in a tag (TypeScript holds the types), and no misspelt or invented tag.
+      // The @param/@returns bullet: no {Type} in a tag (TypeScript has the types), and no misspelt or invented tag.
       'jsdoc/no-types':            ['warn', { contexts: ['any'] }],
       'jsdoc/check-tag-names':     ['warn', { typed: true }],
       // Later lines start with ` * `, aligned under the first asterisk.

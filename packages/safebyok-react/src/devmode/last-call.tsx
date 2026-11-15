@@ -41,7 +41,7 @@ export const isLabel = (text: string): boolean => (text.length <= MaxLabelChars)
 export const jsonOf = (answer: unknown): string => JSON.stringify(answer, null, 2)
 
 // A damaged row's time can be any number. toISOString throws for a number outside a Date's range, and that would happen during render.
-/** Format epoch milliseconds as an ISO time, or as the bare number when a Date cannot hold it. */
+/** Format epoch milliseconds as an ISO time, or as the bare number when a Date cannot represent it. */
 export const timeOf = (millis: number): string => {
   const when = new Date(millis)
   return Number.isNaN(when.getTime()) ? String(millis) : when.toISOString()

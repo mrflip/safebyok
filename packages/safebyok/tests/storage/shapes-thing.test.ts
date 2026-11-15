@@ -306,7 +306,7 @@ describe("boxSparse", () => {
     lifeseq: ShellLifeseq, lifepath: `${Life0}/${ShellLifeseq}`, born_at: TH.T0, written_at: TH.T0,
   })
 
-  it("takes a live box's, a tombstone's and the shell's Thing fields, stripping the body", () => {
+  it("accepts a live box's, a tombstone's and the shell's Thing fields, stripping the body", () => {
     const box = TH.boxThingOf()
     expect(boxSparse.parse(box)).to.deep.equal(sparseOf(box))
     const tomb = TH.boxTombOf(box)

@@ -25,29 +25,29 @@ function alertText() { return screen.getByRole('alert').textContent }
 
 describe("DelBankModal", () => {
   it("deletes the bank on the passphrase, naming the user and the bank, and the gating concludes", async () => {
-    const { world, device, raising } = await shownFor()
+    const { world, device, launching } = await shownFor()
     expect(screen.getByText(Messages.delBankTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     TH.submitBankDeletion(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
     expect(device.bank).to.be.null
     expect(await isBankStored(world)).to.be.false
   })
 
   it("shows a wrong passphrase in place, deleting nothing, and deletes on the right one", async () => {
-    const { world, gating, raising } = await shownFor()
+    const { world, gating, launching } = await shownFor()
     TH.submitBankDeletion('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
     expect(await isBankStored(world)).to.be.true
     TH.submitBankDeletion(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("dismisses the gating on Cancel, and the bank stays", async () => {
-    const { world, raising } = await shownFor()
+    const { world, launching } = await shownFor()
     fireEvent.click(screen.getByText('Cancel'))
-    expect(await raising).to.include({ ok: false })
+    expect(await launching).to.include({ ok: false })
     expect(await isBankStored(world)).to.be.true
   })
 })

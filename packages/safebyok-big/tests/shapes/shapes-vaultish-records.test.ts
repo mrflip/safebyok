@@ -90,11 +90,11 @@ describe("The checks of a record's base fields", () => {
       ["rev-a1",                               false, 'refuses text'],
     ])
 
-    it("takes the six props from a record and strips the rest", () => {
+    it("keeps the six props of a record and strips the rest", () => {
       expect(SX.sparseBase.parse(full)).to.deep.equal(baseProps)
     })
 
-    it("takes the six props from a box", () => {
+    it("keeps the six props of a box", () => {
       const box = boxListingOf(mw).deliverRecord(full)
       expect(SX.sparseBase.parse(box)).to.deep.equal(baseProps)
     })

@@ -182,7 +182,7 @@ export const { thingScope, thingCited, thingRecord, sealed, bankThing, bankCited
     .refine(isShellWhole,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
-  // A shape taken out of a record strips. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
+  // A shape made of a record's fields strips. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
   const boxSparse    = obj({
     ...thingRecord.shape,
     labelpath:      boxLive.shape.labelpath,

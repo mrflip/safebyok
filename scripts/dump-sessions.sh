@@ -4,20 +4,20 @@
 # them out (cleanupPeriodDays); task output and scratchpads live in /tmp, which a rebuild erases.
 # /workspace is the host's own disk, so a dump there outlives both.
 #
-# Each dump is named for what it holds:
+# Each dump is named for what it has:
 #   session-dump-<volume born>-<from>-<to>.tar.gz
 # all three in UTC, as 20261101T170000Z. A run starts from the <to> of the newest dump of this
-# volume, and takes each file changed after <from> and up to <to>. So the ranges meet without a gap
-# or an overlap, and a file changed later (a transcript still growing) is taken whole again by the
+# volume, and archives each file changed after <from> and up to <to>. So the ranges meet without a gap
+# or an overlap, and a file changed later (a transcript still growing) is archived whole again by the
 # next dump: the newest copy of a file is its fullest. A volume keeps its own chain, since another
-# container's dump says nothing of what this one holds.
+# container's dump says nothing of what this one has.
 #
 # Change means ctime, which a copy that keeps an old mtime cannot backdate.
 #
-# It takes only what it names: the transcripts, file history, session records and settings under
+# It archives only what it names: the transcripts, file history, session records and settings under
 # ~/.claude, and the scratch folder. It leaves out credentials (.credentials.json, sessions/*.key,
 # shell-snapshots, backups), and .git and node_modules, which can be had again. Transcripts are not
-# scrubbed, so a dump holds whatever a session read or was told: it is written readable only by
+# scrubbed, so a dump has whatever a session read or was told: it is written readable only by
 # its owner, and belongs nowhere public.
 #
 # The manual is notes/housekeeping.md, *Session dumps*.
@@ -91,8 +91,8 @@ if [[ "$count" -eq 0 ]]; then
 fi
 
 dump="$dumps/session-dump-${volume}-${from}-${to}.tar.gz"
-# Under a name no later run reads, so that a dump cut short never marks its range as taken. Tar's
-# exit of 1 is a file changing as it was read, and the next dump takes that file again.
+# Under a name no later run reads, so that a dump cut short never marks its range as dumped. Tar's
+# exit of 1 is a file changing as it was read, and the next dump archives that file again.
 partial="$dumps/.partial-${volume}-${to}.tar.gz"
 status=0
 tar --create --gzip --file "$partial" --directory / --null --files-from "$list" \

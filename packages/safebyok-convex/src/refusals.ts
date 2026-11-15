@@ -13,20 +13,20 @@ export const sentenceKindVals = ['bad_record', 'damaged_row', 'damaged_vault', '
 /** One of {@link safebyokErrorKindVals}. */
 export type SafebyokErrorKind = typeof safebyokErrorKindVals[number]
 
-/** The `data` of a `ConvexError` that carries a refusal. Every kind but `identity_revoked` has the core's message. */
-export type SafebyokErrorData =
+/** A refusal as a `ConvexError` carries it, in its `data`. Every kind but `identity_revoked` has the core's message. */
+export type SafebyokRefusal =
   | { kind: 'identity_revoked' }
   | { kind: typeof sentenceKindVals[number], message: string }
 
-/** Validator for {@link SafebyokErrorData}, as the client receives it. */
-export const safebyokErrorData = DB.Checker(({ discrim, obj, lit, oneof, str }) => discrim('kind', [
+/** Validator for {@link SafebyokRefusal}, as the client receives it. */
+export const safebyokRefusal = DB.Checker(({ discrim, obj, lit, oneof, str }) => discrim('kind', [
   obj({ kind: lit('identity_revoked') }),
   obj({ kind: oneof(sentenceKindVals), message: str }),
 ]), 'unexpected_error')
 
 true satisfies DB.AssertEqual<SafebyokErrorKind, 'identity_revoked' | typeof sentenceKindVals[number]>
 
-/** True when `data`, from a `ConvexError`, is a {@link SafebyokErrorData}. */
-export function isSafebyokErrorData(data: unknown): data is SafebyokErrorData {
-  return safebyokErrorData.safeParse(data).success
+/** True when `val`, a `ConvexError`'s `data`, is a {@link SafebyokRefusal}. */
+export function isSafebyokRefusal(val: unknown): val is SafebyokRefusal {
+  return safebyokRefusal.safeParse(val).success
 }

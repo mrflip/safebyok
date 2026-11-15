@@ -47,7 +47,7 @@ describe("changesetText", () => {
     expect(text).to.include('`^6.4.0??? heading`')
   })
 
-  it("refuses a package name npm would not take, rather than writing it into the frontmatter", () => {
+  it("refuses a package name npm would not accept, rather than writing it into the frontmatter", () => {
     expect(() => Dependabot.changesetText([{ ...Bumped, pkgname: 'x"\n"safebyok": major' }])).to.throw('no changeset written')
   })
 })
@@ -62,7 +62,7 @@ describe("changesetPath", () => {
   }
 })
 
-// A scratch repository: a base commit holding one public package, and commits on top by whoever.
+// A scratch repository: a base commit with one public package, and commits on top by whoever.
 describe("a Dependabot branch, in a repository", () => {
   let scratch = ''
   let run: Release.Runner = Release.processRunner('.')

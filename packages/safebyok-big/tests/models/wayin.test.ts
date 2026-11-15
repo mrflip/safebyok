@@ -28,7 +28,7 @@ const passkeyRecord = (overrides: Record<string, unknown> = {}): Record<string, 
 })
 
 describe("new Wayin(record): the record check", () => {
-  it("takes a wayin record of either kind", () => {
+  it("accepts a wayin record of either kind", () => {
     expect(new Wayin(passphraseRecord()).wayinkind).to.eq('passphrase')
     expect(new Wayin(passkeyRecord()).wayinkind).to.eq('passkey')
   })

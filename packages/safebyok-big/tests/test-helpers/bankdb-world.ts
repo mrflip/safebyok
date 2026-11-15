@@ -45,7 +45,7 @@ export const passkeyWayin = SX.passkeyWayinRecord.parse({ wayinkind: 'passkey', 
 export const mainWayin     = BX.passphraseWayin.parse({ ...passphraseWayin, wayinlabel: 'main' })
 /** The bank's passkey wayin, its ciphertext fake. */
 export const passkey0Wayin = BX.passkeyWayin.parse({ ...passkeyWayin, wayinlabel: 'passkey0' })
-/** Another passphrase wayin, as `replacePassphrase` stores. */
+/** Another passphrase wayin, as `replacePassphrase` puts. */
 export const otherMainWayin = BX.passphraseWayin.parse({ ...mainWayin, salt_b64: 'b3RoZXJzYWx0b3RoZXJzYQ' })
 
 /** A gate's wayins with no passkey wayin. */
@@ -91,12 +91,12 @@ export function gatePutAskOf(policy: StoragePolicy, stored: GateRecord, wayins: 
   return { op: 'put', ...gateScope, bank_tok, expected: stored, record, options: { policies: [policy] } }
 }
 
-/** The `delBank` ask of the bank row `expected`, storing `record`: its tombstone, unless given. */
+/** The `delBank` ask of the bank row `expected`, writing `record`: its tombstone, unless given. */
 export function bankDelAskOf(expected: BankRow, record: BankTombstone = bankTombstoneOf(expected)): BankDelAsk {
   return { op: 'del', ...bankScopeOf(expected), expected, record }
 }
 
-/** The get of the vault at `scope`, under the bank life `bank_tok`, by a caller that holds no row of it. */
+/** The get of the vault at `scope`, under the bank life `bank_tok`, by a caller that has no row of it. */
 export function vaultGetAskOf(bank_tok = 'bank1', ifAbsent: IfAbsent = 'fail', scope: VaultScope = vaultScope): VaultGetAsk {
   return { op: 'get', ...vaultScopeOfRow(scope), bank_tok, ifAbsent, expected: BX.shellVaultOf(scope) }
 }
@@ -110,7 +110,7 @@ export function vaultPutAskOf(record: VaultRecord, expected: VaultRow | null = n
   return { op: 'put', ...scope, bank_tok: record.bank_tok, ifAbsent: 'add', ifPresent: 'repl', ...policies, expected: expected ?? BX.shellVaultOf(scope), record }
 }
 
-/** The del of the vault row `expected`, storing `record`: its tombstone, unless given. It is made at the row's scope, under its own bank life. */
+/** The del of the vault row `expected`, writing `record`: its tombstone, unless given. It is made at the row's scope, under its own bank life. */
 export function vaultDelAskOf(expected: VaultRow, record: VaultTombstone = vaultTombstoneOf(expected)): VaultDelAsk {
   return { op: 'del', ...vaultScopeOfRow(expected), bank_tok: expected.bank_tok, expected, record }
 }
@@ -129,7 +129,7 @@ export function boxTombstoneOf(record: BoxRow): BoxTombstone { return BX.boxTomb
 
 function boxQueryOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok }: BoxQuery): BoxQuery { return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok } }
 
-/** The get of the box at `asked`, by a caller that holds no row of it. */
+/** The get of the box at `asked`, by a caller that has no row of it. */
 export function boxGetAskOf(asked: BoxQuery = boxQuery, ifAbsent: IfAbsent = 'fail'): BoxGetAsk {
   return { op: 'get', ...boxQueryOf(asked), ifAbsent, expected: BX.shellBoxOf(asked) }
 }
@@ -139,7 +139,7 @@ export function boxPutAskOf(record: BoxRecord, expected: BoxRow | null = null, p
   return { op: 'put', ...boxQueryOf(record), ifAbsent: 'add', ifPresent: 'repl', ...policies, expected: expected ?? BX.shellBoxOf(record), record }
 }
 
-/** The del of the box row `expected`, storing `record`: its tombstone, unless given. It is made in the row's own vault life. */
+/** The del of the box row `expected`, writing `record`: its tombstone, unless given. It is made in the row's own vault life. */
 export function boxDelAskOf(expected: BoxRow, record: BoxTombstone = boxTombstoneOf(expected)): BoxDelAsk {
   return { op: 'del', ...boxQueryOf(expected), expected, record }
 }

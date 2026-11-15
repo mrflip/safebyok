@@ -8,7 +8,7 @@ import * as TH from '../test-helpers'
 const ThreadCases = [
   // regular usage:
   ["20261015-roadmap_fruit",       "20261015-roadmap_fruit", 'a thread branch is its own thread'],
-  ["20261015-tamper_test_helper2", "20261015-tamper_test_helper2", 'a label may hold digits'],
+  ["20261015-tamper_test_helper2", "20261015-tamper_test_helper2", 'a label may have digits'],
   // not a thread:
   ["main",                         undefined,                'main is not a thread'],
   ["",                             undefined,                'a detached HEAD, with no branch, is not a thread'],
@@ -92,7 +92,7 @@ describe("changesetRequest", () => {
     expect(Changeset.changesetRequest(argv, Public)).to.deep.equal({ packages: ['safebyok', 'safebyok-react'], bump: 'minor', message: 'What a host sees.' })
   })
 
-  it("takes packages comma-separated, and the short flags", () => {
+  it("accepts packages comma-separated, and the short flags", () => {
     expect(Changeset.changesetRequest(['-p', 'safebyok,safebyok-convex', '-b', 'patch', '-m', 'A fix.'], Public))
       .to.deep.equal({ packages: ['safebyok', 'safebyok-convex'], bump: 'patch', message: 'A fix.' })
   })
@@ -116,7 +116,7 @@ describe("changesetRequest", () => {
     // a request that is wrong:
     [['--package', 'safebyok', '--bump', 'huge', '--message', 'A fix.'],      /--bump is one of/,            'a level changesets does not have'],
     [['--package', 'safebyok-demo-react', '--bump', 'patch', '--message', 'A fix.'], /safebyok-demo-react is not a public package/, 'a package that is not public'],
-    [['--package', '--bump', 'patch', '--message', 'A fix.'],                 /is not a public package/, 'a package flag with no package after it, which takes the next flag for one'],
+    [['--package', '--bump', 'patch', '--message', 'A fix.'],                 /is not a public package/, 'a package flag with no package after it, which reads the next flag as one'],
   ] as const
   for (const [argv, expected, blurb] of RefusalCases) {
     it(`refuses ${blurb}`, () => { expect(() => Changeset.changesetRequest(argv, Public)).to.throw(expected) })

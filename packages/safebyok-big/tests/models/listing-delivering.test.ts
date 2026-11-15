@@ -41,7 +41,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(outcome.err).to.eq(err)
     })
 
-    it("takes the world of a good answer", async () => {
+    it("receives the world of a good answer", async () => {
       world.mw.seedPut(fullBoxRecord())
       world.mw.willGet(world.mw.answerOf(scopeOf(), fullBoxRecord(), 'the world now'))
       await boxListingOf(world.mw).get(scopeOf(), { maxMillisSinceRefresh: 0 })
@@ -66,7 +66,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
     })
   })
 
-  describe("an answer arriving past the listing's end", () => {
+  describe("an answer delivered past the listing's end", () => {
     it("refuses without receiving its world, even when the answer is a refusal", async () => {
       const listing = boxListingOf(world.mw)
       world.mw.willGet(() => {
@@ -133,7 +133,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.badnews).to.have.length(1)
     })
 
-    it("tells bad news when a refusal stores no row where a live box is listed, and the refusal is still thrown", async () => {
+    it("tells bad news when a refusal finds no row where a live box is listed, and the refusal is still thrown", async () => {
       const listing = boxListingOf(world.mw)
       const box = listing.deliverRecord(fullBoxRecord())
       world.mw.willPut(world.mw.refusalOf(box.scope, new VaultError('stale_write', "Ahead.", { meta: { act: 'ahead' } }), null, null))
@@ -142,7 +142,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(box.isPresent).to.be.true
     })
 
-    it("tells nothing when a refusal stores no row where a deleted box is listed", async () => {
+    it("tells nothing when a refusal finds no row where a deleted box is listed", async () => {
       const listing = boxListingOf(world.mw)
       const box = listing.deliverRecord(tombstoneBoxRecord())
       world.mw.willPut(world.mw.refusalOf(box.scope, new VaultError('stale_write', "Ahead.", { meta: { act: 'ahead' } }), null, null))
@@ -169,7 +169,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(listing.snapshot).to.deep.equal([])
     })
 
-    it("builds the same instance at the void revision however often it arrives", () => {
+    it("builds the same instance at the void revision however often it is delivered", () => {
       const listing = boxListingOf(world.mw)
       const box = listing.deliverRecord(shell())
       expect(listing.deliverRecord(shell())).to.eq(box)
@@ -200,7 +200,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(box.revision_seq).to.eq(3)
     })
 
-    it("makes each scope's instance once, however it arrives: a build, a fetch, a put, a del, a notice", async () => {
+    it("makes each scope's instance once, however it is delivered: a build, a fetch, a put, a del, a notice", async () => {
       const made = vi.spyOn(TestableBoxListing.prototype as unknown as { makeThing: () => TestableBox }, 'makeThing')
       try {
         const listing = boxListingOf(world.mw)
@@ -323,7 +323,7 @@ describe("listing: an answer names the scope of the record it carries", () => {
     expect(listing.things).to.deep.equal([])
   })
 
-  it("takes a record of the scope asked, however the answer's scope object was made", async () => {
+  it("accepts a record of the scope asked, however the answer's scope object was made", async () => {
     const listing = boxListingOf(world.mw)
     world.mw.willGet(world.mw.answerOf({ ...scopeOf('asked_box') }, fullBoxRecord({ boxlabel: 'asked_box' })))
     await expect(listing.get(scopeOf('asked_box'), { maxMillisSinceRefresh: 0 })).resolves.to.be.instanceOf(Box)

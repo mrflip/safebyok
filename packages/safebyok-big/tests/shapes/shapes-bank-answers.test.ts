@@ -1,4 +1,4 @@
-/** WX: the answers of a bankDB as they cross a wire, each absent field arriving as null, parse back to the answers its verbs return. */
+/** WX: the answers of a bankDB as they cross a wire, each absent field received as null, parse back to the answers its verbs return. */
 
 import { describe, expect, it } from 'vitest'
 import * as WX from '../../src/shapes/shapes-bank-answers'
@@ -24,7 +24,7 @@ function crossed(answer: Answer<unknown, string, unknown>): unknown {
   return JSON.parse(JSON.stringify(sent, (_ckey, field: unknown) => field ?? null)) as unknown
 }
 
-/** A bankDB holding the bank `bank1`, its vault, and one box. */
+/** A bankDB with the bank `bank1`, its vault, and one box. */
 async function bankDBWithBox(): Promise<MemoryBankDB> {
   const bankDB = new MemoryBankDB()
   await bankDB.buildBank(bankBuildAskOf())
@@ -97,7 +97,7 @@ describe("WX's answer checks", () => {
     expect(parsed.dbhas).to.deep.equal(gateAt())
   })
 
-  it("takes a damaged box row only under damaged_rows", async () => {
+  it("accepts a damaged box row only under damaged_rows", async () => {
     const bankDB = await bankDBWithBox()
     const listed = crossed(await bankDB.tryListBoxes(boxListAsk)) as { val: { boxes: unknown[], damaged_rows: unknown[] } }
     const damaged = { ...boxQuery, boxlabel: 'Not A Label', am: 'd' }

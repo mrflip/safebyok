@@ -31,7 +31,7 @@ real thing: a current release of Chrome, Firefox and Safari on a desktop, and Sa
 
 * [ ] Create a vault, put a box, and reload: the vault is locked, unlocks with the passphrase, and the
   box reads back (IndexedDB DeviceDB and BankDB, `argon2idWebV1Deriver`).
-* [ ] The device remembers the unlock for its window and forgets it after: lock it, reload.
+* [ ] The device remembers the lease for its window and forgets it after: lock it, reload.
 * [ ] A second tab: unlock in one, and the other follows; sign out in one, and both lock (the device
   shelf's cross-tab forget).
 * [ ] A private window: the vault opens, or refuses calmly, with no stray console output.

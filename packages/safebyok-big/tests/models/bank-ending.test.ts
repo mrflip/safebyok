@@ -80,7 +80,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("a row just inside autolock still opens on a fresh page, asking nothing", async () => {
+  it("a row just inside autolock is still attached on a fresh page, asking nothing", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis)
@@ -240,7 +240,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     expect(await bank.ensureVault(VaultScopeGiven)).to.equal(vault)
   })
 
-  it("unlocks every listed vault at one unlock, each opening what it sealed before the lock", async () => {
+  it("unlocks every listed vault at once, each unsealing what it sealed before the lock", async () => {
     const { world, bank, vault } = await makeBankWithVault()
     const other = await bank.ensureVault(OtherScopeGiven)
     const otherStamp = { ...Stamp, ...OtherScopeGiven }
@@ -581,7 +581,7 @@ describe("the end of a bank, a vault and a device, as their listeners and the ba
     // the bank deleted on another device, its row delivered here:
     [false, false, 'at a tombstone'],
     [true,  false, 'at a bank of another life'],
-    // the delivery dismisses the unlock gating open, which tells the device's listeners:
+    // the delivery dismisses the unlock_bank gating open, which tells the device's listeners:
     [false, true,  'at a tombstone that dismisses a gating'],
   ] as const
 

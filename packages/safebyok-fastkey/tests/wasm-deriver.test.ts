@@ -56,9 +56,9 @@ describe("argon2idWasmWebV1Deriver beside argon2idWebV1Deriver", () => {
     expect([...wasmBytes]).to.deep.equal([...nobleBytes])
   })
 
-  // The saved value came from calling hash-wasm's argon2id directly, and agrees with noble's argon2idAsync. Its parameters are the spec's:
+  // The known value came from calling hash-wasm's argon2id directly, and agrees with noble's argon2idAsync. Its parameters are the spec's:
   // memorySize 65_536, 3 iterations, 1 lane and 32 bytes, with the passphrase and saltOf(16) below. The core's browser.test.ts checks its own deriver against the same value.
-  it("derives the saved value for one fixed passphrase and salt, at the supplied spec's cost", { timeout: 60_000 }, async () => {
+  it("derives the known value for one fixed passphrase and salt, at the supplied spec's cost", { timeout: 60_000 }, async () => {
     const wasmBytes = await argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16))
     expect(hexOf(wasmBytes)).to.eq(SavedHex)
   })
@@ -102,7 +102,7 @@ const SameBytesCases = [
   [{ memory_kib: 1024, parallelism: 8 },                 "correct horse battery staple",  'eight lanes'],
   [{},                                                   "pässwörd mit Umlaut und 🔑",    'a passphrase past ASCII, encoded as UTF-8'],
   [{},                                                   "word ".repeat(40),              'a passphrase longer than one BLAKE2b block'],
-  [{},                                                   " ",                             'a passphrase of one space, which a deriver takes as it is'],
+  [{},                                                   " ",                             'a passphrase of one space, which a deriver accepts as it is'],
   [{},                                                   "half a \u{D83D} key",           'a lone surrogate, which each encodes as U+FFFD'],
 ] as const
 
@@ -133,7 +133,7 @@ describe("makeArgon2idWasmDeriver", () => {
     expect(deriver).to.be.frozen
   })
 
-  it("takes a spec of the host's own, under its own label", () => {
+  it("accepts a spec of the host's own, under its own label", () => {
     const deriver = makeArgon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_kib: 131_072 })
     expect(deriver.key_deriver_label).to.eq('acme_argon2id_v1')
     expect(deriver.memory_kib).to.eq(131_072)
@@ -215,14 +215,14 @@ function twoDevices(firstDeriver: KeyDeriver, secondDeriver: KeyDeriver) {
   }
 }
 
-/** Build the vault on `bank`, unlocked by its build, then store {@link FakeWhisper} in one of its boxes. */
+/** Build the vault on `bank`, unlocked by its build, then put {@link FakeWhisper} in one of its boxes. */
 async function putFakeBox(bank: Bank): Promise<void> {
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   await vault.putBox({ boxlabel: 'openai', whisper: FakeWhisper })
 }
 
 /** Unlock `bank` (the test world's dialog types the passphrase), and check that the box the other device stored is there. */
-async function expectWhisperOpens(bank: Bank): Promise<void> {
+async function expectBoxUnseals(bank: Bank): Promise<void> {
   await bank.ensureUnlocked()
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   const box = (await vault.getBox('openai'))!
@@ -241,7 +241,7 @@ describe("a vault shared between the two derivers", () => {
   it("made through WebAssembly opens through the core's deriver", { timeout: 60_000 }, async () => {
     const devices = twoDevices(argon2idWasmWebV1Deriver, argon2idWebV1Deriver)
     await putFakeBox(await devices.first())
-    await expectWhisperOpens(await devices.second())
+    await expectBoxUnseals(await devices.second())
   })
 
   it("made through the core's deriver opens through WebAssembly, and refuses a wrong passphrase there", { timeout: 60_000 }, async () => {
@@ -251,7 +251,7 @@ describe("a vault shared between the two derivers", () => {
       requestCleartext: async (gating) => { await TH.expectBad(gating.attempt(TH.byPassphrase('correct horse battery stapler')), 'wrong_passphrase') },
     })
     await expect(mistyped.ensureUnlocked()).rejects.toThrow(/dismissed/u)
-    await expectWhisperOpens(await devices.second())
+    await expectBoxUnseals(await devices.second())
   })
 })
 

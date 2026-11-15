@@ -22,7 +22,7 @@ const isolatedEnv = (home: string) => ({
 interface RepoT {
   where: string
   git:   (...args: string[]) => string
-  /** Commits one file holding `body`, under the subject given; returns the commit's hash */
+  /** Commits one file with `body`, under the subject given; returns the commit's hash */
   commit: (filename: string, body: string, subject: string) => string
   /** Runs the script there against main, never fetching, with the pull requests given; returns what it printed */
   survey: (...args: string[]) => string
@@ -255,7 +255,7 @@ describe('scripts/git-survey.sh', () => {
     expect(repo.tipOf('rebased')).to.equal(rebasedHead)
   })
 
-  it('keeps a worktree holding work, and tags its branch without moving it', () => {
+  it('keeps a worktree with work, and tags its branch without moving it', () => {
     const { rebasedTip } = seedKinds(repo)
     const tree = path.join(scratch, 'wt-rebased')
     repo.git('worktree', 'add', '--quiet', tree, 'rebased')

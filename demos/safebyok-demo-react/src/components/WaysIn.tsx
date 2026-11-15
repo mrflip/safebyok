@@ -10,7 +10,7 @@ function getNothing(): null { return null }
 /** The bank's ways in (its passphrase, and its passkey if it has one), with buttons to change them. */
 export const WaysIn = () => {
   const bank = useBank()
-  // The ways in are the bank's: its main gate holds the passphrase, and the passkey where there is one.
+  // The ways in are the bank's: its main gate has the passphrase, and the passkey where there is one.
   const gate = bank?.gateListing.at({ ...bank.scope, gatelabel: 'main' }) ?? null
   const maingate = useSyncExternalStore(gate?.subscribe ?? subscribeToNothing, gate?.getSnapshot ?? getNothing)
   const [gripe, setGripe] = useState<string | null>(null)

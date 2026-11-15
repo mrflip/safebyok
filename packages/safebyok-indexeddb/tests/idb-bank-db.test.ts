@@ -10,7 +10,7 @@ import { BankDBVersion, bankScopepathOf, boxPlaceOf, boxScopepathOf, filedIn, ga
 import { IdbBankDB, idbBankDB } from '../src/idb-bank-db'
 import type { IdbBankDBOpts } from '../src/idb-bank-db'
 
-// == [World]: databaseNameOf, makeBankDB, idbRowsOf, failNextCall, storeOtherwise, dbNamesNow, plantClosedDB
+// == [World]: databaseNameOf, makeBankDB, idbRowsOf, failNextCall, writeOtherwise, dbNamesNow, plantClosedDB
 
 /** The database name each BankDB under test was made with. */
 const dbNameOf = new WeakMap<IdbBankDB, string>()
@@ -79,12 +79,12 @@ const failNextCall = (): void => {
   })
 }
 
-/** From now on, have IndexedDB store a row other than the one each write sends, as a datastore that alters what it stores would. */
-const storeOtherwise = (): void => {
-  // The original put is held to be called with the store as `this`.
+/** From now on, have IndexedDB write a row other than the one each write sends, as a datastore that alters what it writes would. */
+const writeOtherwise = (): void => {
+  // The original put must be called with the store as `this`.
   const { put } = IDBObjectStore.prototype // eslint-disable-line @typescript-eslint/unbound-method
   vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (this: IDBObjectStore, row: unknown, scopepath?: IDBValidKey) {
-    return put.call(this, TH.storedOtherwiseOf(row), scopepath)
+    return put.call(this, TH.writtenOtherwiseOf(row), scopepath)
   })
 }
 
@@ -119,11 +119,11 @@ TH.describeBankDBBattery("IdbBankDB", {
   _cheat_rowsOf:         idbRowsOf,
   makeCappedBankDB:      (maxBoxes) => makeBankDB({ maxBoxes }),
   _cheat_failNextCall:   failNextCall,
-  _cheat_storeOtherwise: storeOtherwise,
+  _cheat_writeOtherwise: writeOtherwise,
 })
 
 describe("IdbBankDB's options", () => {
-  it("takes a dbName and the AdapterBankDB's own options", () => {
+  it("accepts a dbName and the AdapterBankDB's own options", () => {
     expect(new IdbBankDB({ dbName: 'mine', maxRecordSizeEst: 1000 })).to.be.instanceOf(IdbBankDB)
     expect(idbBankDB()).to.be.instanceOf(IdbBankDB)
   })

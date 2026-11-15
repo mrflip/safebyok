@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Bank } from 'safebyok-big'
 import { useBox } from 'safebyok-react'
 import type { MemoryBankDB } from 'safebyok-big/storage'
-import { ApiKeyVaultlabel, WidgetApiKeyBoxlabel } from '../../src/lib/saved-api-key'
+import { ApiKeyVaultlabel, WidgetApiKeyBoxlabel } from '../../src/lib/api-key'
 import { KnockKnockWidget } from '../../src/components/KnockKnockWidget'
 import * as TH from '../test-helpers'
 
@@ -22,7 +22,7 @@ const ExposureProbe = () => {
   return <span data-testid="exposure">{isExposed ? 'exposed' : 'sealed'}</span>
 }
 
-/** Find the API key field, which is present even before a key is saved. */
+/** Find the API key field, which is present even before a key is put. */
 const apiKeyField = async () => screen.findByLabelText<HTMLInputElement>('Anthropic API key')
 
 /** Wait until the flow is ready, then type `apiKey` into the field and press Save. */
@@ -34,7 +34,7 @@ const typeAndSave = async (apiKey: string) => {
   return field
 }
 
-/** Type and save the fake key, answer the passphrase dialog that the first Save opens, and wait for "Saved." */
+/** Type and put the fake key, answer the passphrase dialog that the first Save opens, and wait for "Saved." */
 const saveKey = async () => {
   const field = await typeAndSave(FakeApiKey)
   await TH.answerPassphraseDialog()
@@ -49,7 +49,7 @@ const knock = async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Knock' }))
 }
 
-/** The box rows `bankDB` has stored for the API key's vault, by boxlabel. */
+/** The box rows `bankDB` has for the API key's vault, by boxlabel. */
 const storedBoxRows = (bankDB: MemoryBankDB) => {
   const { bank, vaultrows } = bankDB._cheat_shelfOf({ user_id: 'u1', banklabel: 'acme' })
   const { bank_tok } = bank as { bank_tok: string }
@@ -58,14 +58,14 @@ const storedBoxRows = (bankDB: MemoryBankDB) => {
 }
 
 describe("KnockKnockWidget", () => {
-  it("shows no key saved before any Save", async () => {
+  it("shows no key put before any Save", async () => {
     await renderFlow()
     const field = await apiKeyField()
     expect(field.value).to.eq('')
     expect(screen.getByText('No key saved yet.')).to.not.be.null
   })
 
-  it("saves what was typed, encrypted, in a box of its own", async () => {
+  it("puts what was typed, encrypted, in a box of its own", async () => {
     const { bankDB } = await renderFlow()
     await saveKey()
     const boxrows = storedBoxRows(bankDB)
@@ -79,13 +79,13 @@ describe("KnockKnockWidget", () => {
     expect(field.value).to.eq('')
   })
 
-  it("says a key is saved once one is", async () => {
+  it("says a key is put once one is", async () => {
     await renderFlow()
     await saveKey()
     expect(screen.queryByText('No key saved yet.')).to.be.null
   })
 
-  it("saves under StrictMode", async () => {
+  it("puts under StrictMode", async () => {
     await TH.renderInBank(<StrictMode><KnockKnockWidget /><TH.VaultProbe /></StrictMode>)
     await saveKey()
     await TH.expectProbe('present unlocked')
@@ -100,7 +100,7 @@ describe("KnockKnockWidget", () => {
     await TH.expectProbe('absent none')
   })
 
-  it("replaces the saved key at a second Save", async () => {
+  it("replaces the stored key at a second Save", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -112,7 +112,7 @@ describe("KnockKnockWidget", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal(['sk-ant-second-key'])
   })
 
-  it("knocks with the saved key", async () => {
+  it("knocks with the stored key", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -122,7 +122,7 @@ describe("KnockKnockWidget", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("knocks with the saved key after a lock", async () => {
+  it("knocks with the stored key after a lock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -141,7 +141,7 @@ describe("KnockKnockWidget", () => {
     await waitFor(() => { expect(screen.getByTestId('exposure').textContent).to.eq('sealed') })
   })
 
-  it("asks for the key at a knock before one is saved", async () => {
+  it("asks for the key at a knock before one is put", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()

@@ -12,7 +12,7 @@ const world = useModelsWorld()
 function scopeOf(boxlabel = 'anthropic_api_key') { return world.mw.boxscope(boxlabel) }
 function dnaOf(boxlabel = 'anthropic_api_key') { return boxDnaOf(scopeOf(boxlabel)) }
 
-/** A listing with a full box and a deleted one, each of a record storage has stored too, with no call made yet. */
+/** A listing with a full box and a deleted one, each of a record storage has too, with no call made yet. */
 function seededListing() {
   const listing = boxListingOf(world.mw)
   const full = fullBoxRecord({ boxlabel: 'full_box' })

@@ -22,7 +22,7 @@ import type { Vault } from './vault'
 import { refusedAnswerOf } from '../storage/bank-db'
 
 /** A box in this tab, with its record's fields as its own props.
- * Its whisper opens while the bank is unlocked.
+ * It unseals while the bank is unlocked.
  */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // == [Props]: user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, listing, #exposed, #isVeiled
@@ -81,7 +81,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
     return this.#exposed
   }
 
-  // Taken in the order `whisper` picks its bag.
+  // Listed in the order `whisper` picks its bag.
   /** Whether {@link whisper} shows the whisper, or why it does not:
    * - `'unexposed'` -- nothing is exposed, whether or not the bank is locked
    * - `'locked'`    -- exposed, but hidden while the bank is locked
@@ -195,19 +195,19 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Putting]: put, tryPut, putExposed, tryPutExposed, edit, keptWhisper
 
-  /** Seal `patch` over the record as its next revision, and store it, resolving this box.
+  /** Seal `patch` over the record as its next revision, and put it, resolving this box.
    *
    * A patch that leaves out the whisper or the sidecar keeps the stored one, but may fetch the box first to get it.
    * A lock does not interrupt or reverse a put once its write has begun.
    * - `ifPresent` -- what to do over a live box:
    *   - `'repl'` -- replace it (default)
    *   - `'fail'` -- refuse `camped`
-   *   - `'get'`  -- store nothing, and resolve this box holding the stored record
+   *   - `'get'`  -- put nothing, and resolve this box with the stored record
    * - `ifAbsent`  -- what to do where the box was never stored, or deleted:
-   *   - `'add'`  -- store it as a new life of the box, its whisper and sidecar `{}` where left out (default)
+   *   - `'add'`  -- put it as a new life of the box, its whisper and sidecar `{}` where left out (default)
    *   - `'fail'` -- refuse `absent_box`
    *
-   * Refuses `stale_write` when storage has a newer revision. The box then holds that revision: edit from it.
+   * Refuses `stale_write` when storage has a newer revision. The box then has that revision: put from it.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     demandGood(await this.tryPut(patch, opts))
@@ -220,7 +220,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
       const { ifAbsent, ifPresent, maxMillisSinceRefresh, maxParentMillis } = VX.boxPutOpts.parse(opts)
       await this.ensurePuttable(patch, { maxMillisSinceRefresh, maxParentMillis })
       const given = this.demandPuttable(patch, { ifPresent })
-      const { record, expected } = await this.#editAndSeal(given)
+      const { record, expected } = await this.#nextSealedOf(given)
       this.demandPuttable(patch, { ifPresent })
       return await this.listing.tryPut(record, { expected, ifAbsent, ifPresent })
     } catch (err) { return refusedAnswerOf(err, UNANSWERED) }
@@ -237,7 +237,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   tryPutExposed(patch: BoxExposedPatch = {}, opts: BoxPutOpts = {}): Promise<Outcome<this>> { return outcomeOf(() => this.putExposed(patch, opts)) }
 
   /** The next record for `patch`, sealed but not yet put, with the row it is put over. */
-  async #editAndSeal({ whisper, sidecar }: BoxPatchParsed): Promise<{ record: BoxRecord, expected: BoxSparse }> {
+  async #nextSealedOf({ whisper, sidecar }: BoxPatchParsed): Promise<{ record: BoxRecord, expected: BoxSparse }> {
     const expected = this.central
     const written_at = nowMillis()
     const next = { ...expected, ...SX.nextRevisionOf(expected, written_at), am: 'a' as const }
@@ -297,7 +297,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Aligning]: align
 
-  // A lock only hides the whisper exposed, so that edits survive to the unlock (notes/expose_improves_security.md). A
+  // A lock only hides the whisper exposed, so that edits survive until the bank unlocks (notes/expose_improves_security.md). A
   // box that no longer answers will never show it again.
   /** Align (see {@link Storable.align}), dropping the whisper exposed and its veil once this box is not `isEnabled`. Never throws. */
   override align(): void {
@@ -362,10 +362,10 @@ function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
 
 // == [The seal]: sealedRecordOf, boxStampOf, deserializeWhisper
 
-// The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still opens.
+// The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still deciphers.
 /** The full record of `base`, with `sidecar` in the clear and `whisper` sealed through `vault`.
  * The whisper is ciphered, as JSON text, under a fresh boxKey. Both are bound to the stamps of the box, its vault and
- * its bank: they open only for this revision of this box, unchanged. Only the sparse fields of `base` are taken.
+ * its bank: they decipher and unwrap only for this revision of this box, unchanged. Only the sparse fields of `base` are used.
  */
 async function sealedRecordOf(vault: Pick<Vault, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> {
   const sparse = BX.boxSparse.parse(base)

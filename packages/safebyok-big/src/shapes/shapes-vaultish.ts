@@ -71,7 +71,7 @@ export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched
 /** How old, in milliseconds, the gate's record may be before a prompt fetches it again. */
 export const Promptly = 3_600_000
 
-/** The checks of the options a storable's verbs take: how fresh the record in hand must be, a get's and a put's policies, and a listener. */
+/** The checks of the options a storable's verbs accept: how fresh the record in hand must be, a get's and a put's policies, and a listener. */
 export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, orDefault, fn }) => {
   // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
@@ -112,7 +112,7 @@ export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxC
   return { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
 })
 
-/** The checks of what `bank.tryProbe` is handed: where its trial box goes and what it holds, and how fresh its record must be. */
+/** The checks of what `bank.tryProbe` is handed: where its trial box goes and what it has, and how fresh its record must be. */
 export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlabel, boxlabel }) => ({
   probeAsked: obj({
     vaultlabel: vaultlabel.default('home'),
@@ -128,7 +128,7 @@ export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlab
   }),
 }))
 
-/** Where `bank.tryProbe` puts its trial box and what it holds, each with a default. */
+/** Where `bank.tryProbe` puts its trial box and what it has, each with a default. */
 export type ProbeAsked = Z.input<typeof probeAsked>
 /** How fresh `bank.tryProbe` needs its trial's vault and box. */
 export type ProbeOpts = Z.input<typeof probeOpts>
@@ -136,7 +136,7 @@ export type ProbeOpts = Z.input<typeof probeOpts>
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
 export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: BX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
 
-/** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box opened. */
+/** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box unsealed. */
 export type ProbeReport = Readonly<{
   timely: Readonly<{ box: BX.BoxSparse | null, vault: BX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
   put:    ProbeStep
@@ -213,7 +213,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, ListingOf
 
-/** A thing a listing holds: a bank, gate, vault or box. */
+/** A thing a listing keeps: a bank, gate, vault or box. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a bankDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */
@@ -277,7 +277,7 @@ export interface BoxSnapshot extends Boxscope {
 
 // == [What a box is handed]: boxDna, boxPatch, boxExposedPatch, whisperPatch, BoxHalves, BoxPatchParsed, BoxPatch, BoxExposedPatch, BoxPut, BoxDna
 
-/** Both halves of a box, the whisper and the sidecar: what every update of a box names, and what it seals. */
+/** Both halves of a box, the whisper and the sidecar: what every put of a box names, and what it seals. */
 export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
 
 /** True where a patch names a half of its box. */
@@ -431,7 +431,7 @@ export interface DeviceOpts {
   strengthChecker?:     StrengthChecker | undefined
   /** Where the device reports what it has no caller to throw to: the default logger, the console, when left out. */
   logger?:              VaultLogger | undefined
-  /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
+  /** How long a lease lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?:     number | undefined
   /** How recently a vault's record must have been fetched to be trusted, in minutes; 5 when left out. */
   vaultRefreshMinutes?: number | undefined
@@ -476,7 +476,7 @@ export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
  * - `'lock'`      -- the bank's lock
  * - `'tombstone'` -- the bank found deleted, or of another life
  * - `'vacate'`    -- the device's vacate
- * - `'undeleted'` -- a cached row of another gate revision or bank life, met at an unlock
+ * - `'undeleted'` -- a cached row of another gate revision or bank life, met by `ensureUnlocked`
  */
 export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 

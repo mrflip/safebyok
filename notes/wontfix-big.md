@@ -98,13 +98,13 @@ not as a settled ruling, and check it against the current design before relying 
   `_cheat_clock`. A device clock that jumps or runs backward is undefined behaviour.
 * 2026-11-05 (the Coach, on `box.put` returning `this`): **a box discarded while its own `put` is in flight returns itself, not the instance listed.**
   A box listing never replaces a box it lists, so `put` returns the instance it was called on. Only a `box.vacate()` or `box.sweep()`, or a
-  `boxListing.hello` that finds the box damaged, empties the slot, and only if it runs during the put's `doTryPut`. The delivery then lists a new
+  `boxListing.hello` that finds the box damaged, removes the box from the listing, and only if it runs during the put's `doTryPut`. The delivery then lists a new
   instance. The caller has the discarded one, which refuses `disabled` from then on, and the listing returns the new one.
-* 2026-11-05 (the Coach's brief for `box.putExposed`: "a race gets a row"): **a `box.unexpose()` crossing a `box.putExposed()`.** `putExposed` takes
+* 2026-11-05 (the Coach's brief for `box.putExposed`: "a race gets a row"): **a `box.unexpose()` crossing a `box.putExposed()`.** `putExposed` reads
   the value exposed when it is called, before its hydrate. An `unexpose` that runs during the put's awaits changes nothing about what is sealed:
-  the value taken at the call is stored, and the instance keeps none.
+  the value read at the call is stored, and the instance keeps none.
 * 2026-11-05 (the Coach's brief for the fields, now `BoxFields` in `safebyok/dom`: "a race gets a row"): **a `box.expose()` crossing the last unbind.** An `expose` in flight when the
-  last field unbinds completes after the `unexpose`, so the whisper stays exposed with no field to tie it to, until the host unexposes or the box is
+  last field unbinds resolves after the `unexpose`, so the whisper stays exposed with no field to tie it to, until the host unexposes or the box is
   swept, vacated or deleted. Also: **a `fields.put()` crossing an edit:** it reads the fields when called, so what is typed during the put's awaits is
   not in that put, and stays in the element for the next.
 * 2026-11-06 (a review of #505, the Coach: "add the row"): **two copies of `safebyok/dom` in one page.** `BoxFields.of` keeps one `BoxFields` per box
@@ -112,7 +112,7 @@ not as a settled ruling, and check it against the current design before relying 
   each with its own fields and its own last unbind, so the box unexposes when either copy's last field unbinds.
 * 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, the Convex field-name row): **Convex refuses a field name that starts with `$` or contains a
   non-ASCII character, at any depth of a record.** Convex refuses a sidecar or a record field with such a name, and the call fails as
-  `storage_unavailable`. Convex's docs list more it will not take: an empty name, a name starting with `_`, nesting past 16 levels, and more than
+  `storage_unavailable`. Convex's docs list more it will not accept: an empty name, a name starting with `_`, nesting past 16 levels, and more than
   1024 entries in one object. The core does not check for any of these before the call.
 * 2026-11-07 (the Coach, vaultdb_cleanup, thread 7, the GraphQL stream row): **the GraphQL stream stops on a best-effort basis.** The server's
   resolvers call `getUserId` again on each notice, so an idle stream stays open until its next change. A `getUserId` that does not look the
@@ -146,13 +146,13 @@ not as a settled ruling, and check it against the current design before relying 
   disable, we won't do either"): **a new passphrase leaves the passkey in place.** Replacing the passphrase changes only the passphrase wayin. The passkey
   wayin stays as stored and still unlocks the vault, and no later use of the passkey demands the passphrase. Someone who knew the old passphrase and added a
   passkey keeps that access until the passkey is revoked, which is a separate gate change. Recorded as a decision in `notes/security.md`.
-* 2026-11-09 (the Coach, closing out the old design): **a vault uses its bank's storage.** `ensureVault` takes no `bankDB` or `deviceDB` of its own, as it did in
+* 2026-11-09 (the Coach, closing out the old design): **a vault uses its bank's storage.** `ensureVault` is given no `bankDB` or `deviceDB` of its own, as it did in
   the old design. A host wanting a vault in other storage makes a second `Bank` over it.
 * 2026-11-10 (the Coach, on the review of #618: "If you set maxWorldMillis to zero you get what you asked for"): **a get with `maxParentMillis: 0`
   may fetch the vault twice.** When a listing's `get` falls through to its `fetch`, each of the two makes sure its parent is timely, so a horizon of
   zero fetches the vault row once for each, before the box's own get.
-* 2026-11-10 (the Coach, on the review of #618: "an eventual gc mechanism"): **a listing's joined fetches are never collected.** For each slot a listing
-  has fetched, absent slots included, it keeps a small entry that joins its fetches, for the listing's life. Collecting them waits on a gc mechanism.
+* 2026-11-10 (the Coach, on the review of #618: "an eventual gc mechanism"): **a listing's joined fetches are never collected.** For each scope a listing
+  has fetched, absent scopes included, it keeps a small entry that joins its fetches, for the listing's life. Collecting them waits on a gc mechanism.
 * 2026-11-11 (the Coach, on #639: "This is paranoiac coding, you have validated the record correctness before writing it"): **a row garbled
   outside the bankDB may be overwritten.** Postgres runs a put or del as one call that compares the stored row's revision, state, life token
   and `fmt`, and reads nothing else of it. Its tables refuse a flawed row one level into each `jsonb` field. If a direct write garbles a row

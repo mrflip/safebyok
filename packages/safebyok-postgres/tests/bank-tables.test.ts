@@ -58,7 +58,7 @@ describe("BankTablesSql", () => {
     expect(await keysOf('safebyok_boxes')).to.have.members(['PRIMARY KEY (user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel)', ToBank])
   })
 
-  it("has a column for every field of each row the core stores, and no other, with only what a box's tombstone lacks nullable", async () => {
+  it("has a column for every field of each row the core puts, and no other, with only what a box's tombstone lacks nullable", async () => {
     const rows = { safebyok_banks: BW.bankAt(), safebyok_gates: BW.gateAt(), safebyok_vaults: BW.vaultAt(), safebyok_boxes: BW.boxAt() }
     for (const [table, row] of Object.entries(rows)) {
       const columns = await columnsOf(table)

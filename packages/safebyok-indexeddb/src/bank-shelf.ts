@@ -30,17 +30,17 @@ export async function filedIn(store: IDBObjectStore, range: IDBKeyRange): Promis
 // The scopepaths are a stored contract: existing rows are found by them, so changing one orphans stored rows.
 // IndexedDB sorts any array after every string, so `[...prefix, []]` is an upper bound for every scopepath that starts with `prefix`.
 
-/** The shelf key of a bank row. */
+/** The scopepath of a bank row. */
 export type BankScopepath = [tag: 'bank', user_id: string, banklabel: string]
 
-/** The shelf key of a gate row. */
+/** The scopepath of a gate row. */
 export type GateScopepath = [tag: 'gate', user_id: string, banklabel: string, gatelabel: string]
 
-/** The shelf key of a vault row. */
+/** The scopepath of a vault row. */
 export type VaultScopepath = [tag: 'vault', user_id: string, banklabel: string, vaultlabel: string]
 
-// The key holds both toks, so a box row under any other pair of lives is at another key, and a put under one cannot overwrite it.
-/** The shelf key of a box row. Each vault life has its own box rows. */
+// The scopepath has both toks, so a box row under any other pair of lives is at another scopepath, and a put under one cannot overwrite it.
+/** The scopepath of a box row. Each vault life has its own box rows. */
 export type BoxScopepath = [tag: 'box', user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string, boxlabel: string]
 
 /** The scopepath of the bank row at `scope`. */

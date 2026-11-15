@@ -68,7 +68,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(await bankDB.getVault(vaultGetAskOf())).to.deep.include({ ok: true, act: 'gotlive', val: otherLife })
     })
 
-    it("returns what is stored, whatever row its caller holds", async () => {
+    it("returns what is stored, whatever row its caller has", async () => {
       const { bankDB, bank, vault } = await putWith()
       for (const expected of [vault, vaultAt(7, 'bank1', 'life2'), vaultTombstoneOf(vault)]) {
         expect(await bankDB.getVault({ ...vaultGetAskOf(), expected })).to.deep.include({ act: 'gotlive', val: vault, parent: bank })
@@ -155,7 +155,7 @@ export function describeGets({ fresh, putWith, rowsOf, twinOf }: BatteryWorld): 
       expect(await bankDB.getBox(boxGetAskOf())).to.deep.include({ ok: true, act: 'gotlive', val: box, parent: vault })
     })
 
-    it("returns what is stored, whatever row its caller holds", async () => {
+    it("returns what is stored, whatever row its caller has", async () => {
       const { bankDB, vault, box } = await putWith({ box: true })
       for (const expected of [box, boxAt(7, 'bank1', 'life1', { box_tok: 'box9' }), boxTombstoneOf(box)]) {
         expect(await bankDB.getBox({ ...boxGetAskOf(), expected })).to.deep.include({ act: 'gotlive', val: box, parent: vault })

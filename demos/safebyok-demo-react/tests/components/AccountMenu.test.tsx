@@ -64,7 +64,7 @@ describe("AccountMenu", () => {
     expect(screen.getByRole('button', { name: 'Change passphrase' })).to.not.be.null
   })
 
-  it("vacates the device as it signs out, forgetting its unlock and its device row", async () => {
+  it("vacates the device as it signs out, forgetting its lease and its device row", async () => {
     const { auth, deviceDB } = await renderWithVault()
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await screen.findByPlaceholderText('username')

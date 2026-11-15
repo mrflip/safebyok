@@ -28,11 +28,11 @@ typecheck (`pnpm --filter <pkg> typecheck`): CI's run then goes alongside your l
 **Ready**, the ask for review, is `pnpm justify` green (the first run in a
 fresh worktree adds the eslint cold start). It is stated in the thread-worker's *Ready* step
 (`.claude/agents/thread-worker.md`) and in a line of CLAUDE.md's *Commands*; a session outside a
-sprint holds itself to the same. The selective tests, not `pnpm justify`, serve a mid-workstream
+sprint keeps to the same. The selective tests, not `pnpm justify`, serve a mid-workstream
 rebase and a reviewer's fixes (a reviewer proves what its fixes touch). Run `pnpm justify` after
 the rebase that prepares filing; if that turns up trouble, go back to the selective tests or to
 `pnpm justify`, as you judge the odds. Run it before a PR leaves draft: `scripts/file-thread`
-runs it as the gate.
+runs it, and pushes nothing unless it passes.
 
 Do not select by change with pnpm's `...[<base>]` filter: it selects the root when a root file
 changed, whose `test` runs every package again, and its packages run one at a time, each
@@ -138,7 +138,7 @@ File against `main`, as a draft while you work. *Significant* questions -- ones 
 would change the code in the PR -- are asked in chat, and lead the PR's body until answered.
 
 * **Draft while you work.** Open the PR as a draft (`gh pr create --draft`) when you first push
-  the branch, and push to it as the work goes: CI holds a draft's jobs until it carries the label
+  the branch, and push to it as the work goes: CI skips a draft's jobs until it carries the label
   `ci` (`notes/ci.md`). Once it is proven ready (*Proving*), add the label (`gh pr edit <n>
   --add-label ci`), then catch it up onto its base's current tip and push: CI reads the label at
   each push, and adding it starts nothing. Before you
@@ -168,7 +168,7 @@ for what it plugs in. A storage adapter is `safebyok-<store>` (`safebyok-convex`
 `safebyok-indexeddb`, `safebyok-postgres`, `safebyok-graphql`), a framework binding
 `safebyok-<framework>` (`safebyok-react`), and anything else is named for what it supplies
 (`safebyok-fastkey`, a key deriver). A new one copies an existing package's packaging: its own
-`eslint.config.mjs` cut from the core's, a README, and a changeset. It takes `safebyok` as a peer
+`eslint.config.mjs` cut from the core's, a README, and a changeset. It has `safebyok` as a peer
 dependency, so that `VaultError` is one class across the packages, and it joins the `fixed` group
 in `.changeset/config.json` (a test refuses a public package left out of it).
 `safebyok-indexeddb`'s README is written as the template for a storage adapter.
@@ -236,7 +236,7 @@ The toolchain: TypeScript, Vitest, ESLint, tsdown.
 
 * **`human/`** -- from agents, to Coaches: one file per entry (`human/README.md`).
 * **`whiteboard/`** -- a thread's plans and progress, while it is open.
-* **`winboard/`** -- a completed thread's folder, moved from `whiteboard/`, with its `human/`
+* **`winboard/`** -- a done thread's folder, moved from `whiteboard/`, with its `human/`
   entries renamed `*-human.md` and a `*-resolution.md` saying how each of its gripes was settled.
 * **`notes/security.md`** -- a decision a security reviewer should look at, in a sentence or two,
   dated. Add one when you make such a decision, in the same PR, through a subagent (the file's

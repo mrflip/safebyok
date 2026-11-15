@@ -24,28 +24,28 @@ const alertText = () => screen.getByRole('alert').textContent
 
 describe("RevokePasskeyModal", () => {
   it("removes the passkey on the passphrase, naming the user and the vault, and the gating concludes", async () => {
-    const { bank, raising } = await shownFor()
+    const { bank, launching } = await shownFor()
     expect(screen.getByText(Messages.revokePasskeyTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     TH.submitPasskeyRevoke(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
     expect(hasPasskey(bank)).to.be.false
   })
 
   it("shows a wrong passphrase in place, removing nothing, and removes on the right one", async () => {
-    const { bank, gating, raising } = await shownFor()
+    const { bank, gating, launching } = await shownFor()
     TH.submitPasskeyRevoke('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
     expect(hasPasskey(bank)).to.be.true
     TH.submitPasskeyRevoke(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("dismisses the gating on Cancel, and the passkey stays", async () => {
-    const { bank, raising } = await shownFor()
+    const { bank, launching } = await shownFor()
     fireEvent.click(screen.getByText('Cancel'))
-    expect(await raising).to.include({ ok: false })
+    expect(await launching).to.include({ ok: false })
     expect(hasPasskey(bank)).to.be.true
   })
 })

@@ -15,7 +15,7 @@ and several have changed since. Each figure is the median of 20 runs, or of 5 fo
 | Peek a value in deviceDB                   | 0.04; real 0.5 to 5 | See below | `tryGetLease` on fake-indexeddb; the real figure is an estimate                                   |
 | Vacate a value in deviceDB                 | 0.04; real 1 to 20  | See below | `tryDelLease` on fake-indexeddb; the real figure is an estimate                                   |
 | Make a new lease from a proving            | 0.17                | Measured  | `makeLease`: unwrap, wrap, and a put to a spy deviceDB                                            |
-| Encrypt a whisper, 1 KB                    | 0.25                | Measured  | `lease.sealWith`: box key made and wrapped, then AES-GCM. AES-GCM alone is 0.023                  |
+| Encrypt a whisper, 1 KB                    | 0.25                | Measured  | `lease.sealWith`: boxKey made and wrapped, then AES-GCM. AES-GCM alone is 0.023                   |
 | Encrypt a whisper, 64 KB                   | 0.32                | Measured  | As above. AES-GCM alone is 0.18                                                                   |
 | Convex database call                       | 50 to 300           | Estimate  | A query or mutation round trip, once connected. A cold start or a far region costs more           |
 | GraphQL call to Postgres                   | 50 to 500           | Estimate  | Network, resolver and query, on a healthy API. A cold serverless start can reach 1,000+           |
@@ -44,7 +44,7 @@ and several have changed since. Each figure is the median of 20 runs, or of 5 fo
   on 2026-11-03, `Proving.attempt` (through `gate.attemptProof`), `makeLease`, `tryPutLease`, `tryGetLease` and
   `tryDelLease`.
 
-## Crossings raised
+## Crossings found
 
 One sentence each. The goal is that nothing crosses a `lock()`, and that we get there with simple code analyzed in
 context, not by fine-tuning each of these.
@@ -63,7 +63,7 @@ called while the new lease is made.
   `disabled`. From then on the new passphrase unlocks the vault, and the next `hello` lists the row.
 * A crypto failure in `proved.buildLease`, which the test stages with a mock: the verb rejects with the failure. The vault has
   the new gate and the old lease, and it stays unlocked and able to seal. Its cached row is of the old epoch, so the next
-  session asks for a proof.
+  session asks for cleartext.
 * Only **a birth** can have `demandReadyToAttach` refuse after a tombstone or a sweep crosses it. It refuses with `vault_gone`
   or `disabled`, and the new lease is vacated. A gate change cannot reach that refusal. The tombstone or sweep drops the
   vault's lease, `#renewLease` sees that it was forgotten and leaves the new lease unattached, and the verb *resolves*,
@@ -71,7 +71,7 @@ called while the new lease is made.
 * A refused stow in `cacheAsCacheCan` does not reject: the verb resolves with the vault unlocked, and the refusal goes to
   `onBadNews`.
 
-## Crossings the sprint's threads raised
+## Crossings the sprint's threads found
 
 Copied from `unrace-progress.md` at the sprint's end. The names are as they were when each was found (`tidy` is now
 `bank.autolock`).
@@ -81,7 +81,7 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
 * A bankDB watch stopped in the same tick still receives a queued notice (thread 2).
 * A `lock()` called while `vault.ensureUnlocked` is proving leaves the vault unlocked, with its lease cached. The ruling
   is in `noted.md` (thread 3).
-* `uncacheForgotten` deletes by scope outside the lease's chores, so its delete can be written after an unlock's put, and the
+* `uncacheForgotten` deletes by scope outside the lease's chores, so its delete can be written after `ensureUnlocked`'s put, and the
   next session then has to prove again (thread 3's review).
 * `ensureTimely(0)` can join a `get` begun before the call and resolve with the older record, which is how the spec draws the
   join (thread 5's review).
@@ -89,16 +89,16 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
   was postponed that sprint (thread 7's review).
 * When `create`'s put answer loses to a delete and a new life, `create` returns another vault; thread 10's `#runBirth` ended this.
 * A `lock()` during the `ensureTimely` in `delBox`'s path for no box in memory lets the tombstone be written for a vault that is by then locked (thread 9's review).
-* If an instance arrives during `putBox`'s `ensureTimely`, the birth reaches `demandNotHeld`, which refuses with `bad_option` (thread 9's review).
+* If an instance is enlisted during `putBox`'s `ensureTimely`, the birth reaches `demandNotHeld`, which refuses with `bad_option` (thread 9's review).
 * A second `attempt` with the same answer, made while the first is running, zeroes the bytes in use, so the first refuses with `bad_option` (thread 10's review).
-* A tombstone or sparse record that arrives during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
-* A tombstone or discard that arrives between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
+* A tombstone or sparse record that is delivered during `ensureUnlocked`'s lease peek makes `Gating`'s constructor throw `bad_option` (thread 10's review).
+* A tombstone or discard that is delivered between the gate verb and the lease concludes the gating as failed, although the row moved (thread 11's review).
 * A gate verb refused with `vault_gone` or `vault_reborn` delivers nothing, so the Vault still reports present until its next fetch, box answer or notice (thread 11's review).
 * When two `hello`s cross, the last one answered sets the stage (thread 12).
 * A record changed between `getBank` and the watch's start isn't seen until the next fetch (thread 12).
 * A listed live vault whose row is void in `getBank` stays listed until its next fetch (thread 12).
 * A lease in force whose cache row was never written, or was forgotten by another page's `tidy`, isn't found by `tidy`, so the vault stays unlocked past autolock: a lease that should be dropped is kept (thread 12 and its review; a Coach's row).
-* A birth that is past the enter key when `bank.vacate` runs still finishes, and caches its lease after the vacate: a lease that should be dropped is kept (thread 12's review).
+* A birth that is past the enter key when `bank.vacate` runs still succeeds, and caches its lease after the vacate: a lease that should be dropped is kept (thread 12's review).
 * A swept `hello` that returns late marks a fresh listing `refused` (thread 12).
 * A `getBank` or plugin load that never returns blocks `tidy`: a lease that should be dropped is kept (thread 12's rework).
 * A `hello` that crosses `bank.vacate` marks the emptied listing `ready`, which reopens the false prompt; found by reading (thread 12's rework and second review).

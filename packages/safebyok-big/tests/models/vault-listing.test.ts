@@ -55,7 +55,7 @@ function laySecondVaultRow(world: Awaited<ReturnType<typeof makeBornVault>>): Va
   return record
 }
 
-// A tombstone is of a life of its own, which the vault listed takes on: it stands for its scope through its lives.
+// A tombstone is of a life of its own, which the vault listed adopts: it stands for its scope through its lives.
 /** Past its forget, `vault` stands at its scope, out of the list and enabled, as the tombstone of a life after `lived`, the vault_tok it had. */
 async function expectLandedGone(vault: Vault, lived: string, { listing }: Pick<Awaited<ReturnType<typeof makeBornVault>>, 'listing'>) {
   await forgotten()
@@ -197,7 +197,7 @@ describe("vault.del(vault.scope)", () => {
 })
 
 describe("a new life made elsewhere over a deleted vault", () => {
-  it("is taken on by the vault's fetch and hydrate", async () => {
+  it("is adopted by the vault's fetch and hydrate", async () => {
     const fetching = await deleted()
     const fetched = otherLifeAt({ ...fetching.vault.toJSON(), am: 'a' }, 2)
     fetching.restoreRow(fetched)
@@ -213,7 +213,7 @@ describe("a new life made elsewhere over a deleted vault", () => {
 })
 
 describe("a newer record of another vault_tok over a live vault", () => {
-  it("is taken on by the vault's fetch and hydrate", async () => {
+  it("is adopted by the vault's fetch and hydrate", async () => {
     const fetching = await makeBornVault()
     const fetched = otherLifeAt(fetching.demandStored(), 5)
     fetching.restoreRow(fetched)
@@ -226,7 +226,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     expect(hydrating.vault.vault_tok).to.eq(hydrated.vault_tok)
   })
 
-  it("is taken on by the vault listed, its boxes let go, the bank's lease untouched", async () => {
+  it("is adopted by the vault listed, its boxes let go, the bank's lease untouched", async () => {
     const { bank, vault, listing, deviceDB, demandStored, restoreRow } = await makeBornVault()
     const boxes = vault.boxListing
     const other = otherLifeAt(demandStored(), 5)
@@ -242,7 +242,7 @@ describe("a newer record of another vault_tok over a live vault", () => {
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("is taken on by the vault listed when it is a tombstone", async () => {
+  it("is adopted by the vault listed when it is a tombstone", async () => {
     const { vault, listing, demandStored, restoreRow } = await makeBornVault()
     const tombstone = tombstoneOver(otherLifeAt(demandStored(), 5))
     restoreRow(tombstone)

@@ -22,7 +22,7 @@ allowBuilds:
 
 # Supply chain: pnpm installs no version of anything, transitive dependencies included, until it has
 # been public for seven days (minutes), and refuses rather than falling back to a younger version
-# (strict). A version we must take sooner is an exception: PROCESS.md, *Dependencies*, says how it
+# (strict). A version we need sooner is an exception: PROCESS.md, *Dependencies*, says how it
 # is made, and each one is recorded in notes/security.md.
 minimumReleaseAge: 10080
 minimumReleaseAgeStrict: true

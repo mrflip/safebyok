@@ -12,7 +12,7 @@ import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
 import * as TH from '../test-helpers'
 
 describe("wayinkind", () => {
-  it("takes each kind of wayin, and refuses any other", () => {
+  it("accepts each kind of wayin, and refuses any other", () => {
     expect(GX.wayinkind.safeParse('passkey').success).to.be.true
     expect(GX.wayinkind.parse('passphrase')).to.eq('passphrase')
     TH.expectSyncRefusal(() => GX.wayinkind.parse('hunter2'))
@@ -22,7 +22,7 @@ describe("wayinkind", () => {
 describe("guardedLogger", () => {
   const bare = { log: () => undefined, warn: () => undefined, error: () => undefined }
 
-  it("takes a logger parseLogger guarded", () => {
+  it("accepts a logger parseLogger guarded", () => {
     const guarded = parseLogger(bare)
     expect(GX.guardedLogger.parse(guarded)).to.eq(guarded)
   })
@@ -38,12 +38,12 @@ describe("gatingLaunchOnArgs", () => {
   const askUser = guardRequestCleartext(() => undefined)
   const args = { gatingkind: 'unlock_bank', bank, unlockByProving, askUser }
 
-  it("passes a stored bank's gating kind, the bank, its unlock and the device's dialog, handing on the bank it was given", () => {
+  it("passes a stored bank's gating kind, the bank, its unlockByProving and the device's dialog, handing on the bank it was given", () => {
     expect(GX.gatingLaunchOnArgs.parse(args).bank).to.eq(bank)
     expect(GX.gatingLaunchOnArgs.parse({ ...args, askUser: null }).askUser).to.be.null
   })
 
-  it("refuses a build_bank, a kind it does not know, what is no bank, an unlock that is no function, a dialog the device did not wrap, and a field it does not know", () => {
+  it("refuses a build_bank, a kind it does not know, what is no bank, an unlockByProving that is no function, a dialog the device did not wrap, and a field it does not know", () => {
     for (const bad of [
       { ...args, gatingkind: 'build_bank' }, { ...args, gatingkind: 'open_sesame' }, { ...args, bank: { modelkind: 'vault' } },
       { ...args, unlockByProving: null }, { ...args, askUser: () => Promise.resolve(true) }, { ...args, prior: VoidRevision },
@@ -60,12 +60,12 @@ describe("gatingLaunchBirthArgs", () => {
   const askUser = guardRequestCleartext(() => undefined)
   const args = { listing, expected: shellBankOf(scope), unlockByProving, askUser }
 
-  it("passes a bank listing, the row built over, the unlock and the device's dialog, handing on the listing it was given", () => {
+  it("passes a bank listing, the row built over, the unlockByProving and the device's dialog, handing on the listing it was given", () => {
     expect(GX.gatingLaunchBirthArgs.parse(args).listing).to.eq(listing)
     expect(GX.gatingLaunchBirthArgs.parse({ ...args, askUser: null }).askUser).to.be.null
   })
 
-  it("refuses what is no bank listing, an expected that is no bank row, an unlock that is no function, and a dialog the device did not wrap", () => {
+  it("refuses what is no bank listing, an expected that is no bank row, an unlockByProving that is no function, and a dialog the device did not wrap", () => {
     for (const bad of [
       { ...args, listing: { modelkind: 'vault_listing' } }, { ...args, expected: { revision_seq: 'one' } },
       { ...args, unlockByProving: 'unlock' }, { ...args, askUser: () => Promise.resolve(true) },
@@ -95,7 +95,7 @@ describe("passkeyAnswer", () => {
     expect(checked.prfBytes).to.eq(answer.prfBytes)
   })
 
-  it("takes bytes made in another realm, an iframe's or a test's jsdom, judging them by their tag", async () => {
+  it("accepts bytes made in another realm, an iframe's or a test's jsdom, judging them by their tag", async () => {
     const answer = await TH.passkeyOf('laptop')
     const foreign = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
     expect(foreign instanceof Uint8Array).to.be.false
@@ -128,7 +128,7 @@ describe("passkeyAnswer", () => {
 })
 
 describe("freshPasskeyAnswer", () => {
-  it("takes a passkey's answer over a fresh salt", async () => {
+  it("accepts a passkey's answer over a fresh salt", async () => {
     const answer = await TH.passkeyOf('laptop')
     expect(GX.freshPasskeyAnswer.parse(answer)).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
   })

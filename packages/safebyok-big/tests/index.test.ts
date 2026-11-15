@@ -68,7 +68,7 @@ describe("safebyok-big", () => {
     expectTypeOf<Front.DamagedBox>().toEqualTypeOf<Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>>()
   })
 
-  it("exports Gating as a type only: the published surface has no launcher that hands a gating an unlock", () => {
+  it("exports Gating as a type only: the published surface has no launcher that hands a gating an unlockByProving", () => {
     expect(Front).to.not.have.property('Gating')
   })
 

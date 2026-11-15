@@ -12,11 +12,11 @@ const WeekMillis = 7 * 24 * 60 * MinuteMillis
 /** A strength checker that calls any passphrase under 12 characters weak. */
 const underTwelveWeak = (typed: string) => (typed.length < 12 ? { strong: false as const, reason: 'Make it longer.' } : { strong: true as const })
 
-/** Open a gating with `raise`, and render it in a PassphraseModal. */
-const shownFor = async (raise: Parameters<typeof TH.openGatingOf>[1], opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
+/** Open a gating with `launch`, and render it in a PassphraseModal. */
+const shownFor = async (launch: Parameters<typeof TH.openGatingOf>[1], opts: { built?: boolean, bankOpts?: Parameters<typeof TH.openGatingOf>[2], leaseMillis?: number } = {}) => {
   const world = TH.makeBankWorld()
   if (opts.built === true) { await TH.makeBankWithVault(world) }
-  const opened = await TH.openGatingOf(world, raise, opts.bankOpts)
+  const opened = await TH.openGatingOf(world, launch, opts.bankOpts)
   return { ...opened, ...render(<PassphraseModal gating={TH.passphraseGatingOf(opened.gating)} leaseMillis={opts.leaseMillis} />) }
 }
 
@@ -28,11 +28,11 @@ const submitButton = (word: string) => screen.getByText<HTMLButtonElement>(word)
 
 describe("PassphraseModal, building a vault", () => {
   it("chooses the first passphrase, naming the user and the vault", async () => {
-    const { raising } = await shownFor(TH.building)
+    const { launching } = await shownFor(TH.building)
     expect(screen.getByText(Messages.chooseTitle)).to.exist
     expect(screen.getByDisplayValue('u1 (acme vault)')).to.exist
     await TH.submitNewPassphrase(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("gives its two fields distinct names for password managers", async () => {
@@ -67,18 +67,18 @@ describe("PassphraseModal, building a vault", () => {
     expect(screen.queryByText('Make it longer.')).to.be.null
   })
 
-  it("holds the button disabled from each keystroke until the verdict on it is in", async () => {
+  it("keeps the button disabled from each keystroke until the verdict on it is in", async () => {
     const answering = TH.makePending()
-    let isHeld = false
-    const heldChecker = async (typed: string) => {
-      if (isHeld) { await answering.promise }
+    let isStalling = false
+    const stallingChecker = async (typed: string) => {
+      if (isStalling) { await answering.promise }
       return underTwelveWeak(typed)
     }
-    await shownFor(TH.building, { bankOpts: { strengthChecker: heldChecker } })
+    await shownFor(TH.building, { bankOpts: { strengthChecker: stallingChecker } })
     typeIn('vault passphrase', TH.Passphrase)
     typeIn('confirm vault passphrase', TH.Passphrase)
     await waitFor(() => { expect(submitButton(Messages.createButton).disabled).to.be.false })
-    isHeld = true
+    isStalling = true
     typeIn('vault passphrase', 'short')
     typeIn('confirm vault passphrase', 'short')
     expect(submitButton(Messages.createButton).disabled).to.be.true
@@ -100,13 +100,13 @@ describe("PassphraseModal, building a vault", () => {
 
 describe("PassphraseModal, unlocking a vault", () => {
   it("shows a wrong passphrase in place, the gating still open, and concludes on the right one", async () => {
-    const { gating, raising } = await shownFor(TH.unlocking, { built: true })
+    const { gating, launching } = await shownFor(TH.unlocking, { built: true })
     expect(screen.getByText(Messages.unlockTitle)).to.exist
     TH.submitPassphrase('not the passphrase')
     await waitFor(() => { expect(alertText()).to.not.eq('') })
     expect(gating.isOpen).to.be.true
     TH.submitPassphrase(TH.Passphrase)
-    expect(await raising).to.include({ ok: true })
+    expect(await launching).to.include({ ok: true })
   })
 
   it("after a wrong passphrase empties the field, marks it invalid and gives it the focus", async () => {
@@ -119,7 +119,7 @@ describe("PassphraseModal, unlocking a vault", () => {
     expect(document.activeElement).to.equal(typedIn)
   })
 
-  it("says what it is doing and takes no second submit while an attempt runs", async () => {
+  it("says what it is doing and accepts no second submit while an attempt runs", async () => {
     const { gating } = await shownFor(TH.unlocking, { built: true })
     const running = TH.makePending()
     const attempts = TH.attemptsOf(gating).mockImplementation(async () => {
@@ -170,9 +170,9 @@ describe("PassphraseModal, unlocking a vault", () => {
 
   for (const [how, closeIt] of CloseCases) {
     it(`dismisses the gating on ${how}, the dialog staying up until the gating's owner takes it down`, async () => {
-      const { raising } = await shownFor(TH.unlocking, { built: true })
+      const { launching } = await shownFor(TH.unlocking, { built: true })
       closeIt()
-      expect(await raising).to.include({ ok: false })
+      expect(await launching).to.include({ ok: false })
       expect(screen.getByRole<HTMLDialogElement>('dialog').open).to.be.true
     })
   }
@@ -204,13 +204,13 @@ describe("PassphraseModal over a later gating", () => {
 describe("PassphraseModal's footnote", () => {
   const FootnoteCases = [
     [TH.building,  WeekMillis,    "Locks on this device in 7 days.",       'says when a vault built now locks'],
-    [TH.unlocking, WeekMillis,    "Locks again on this device in 7 days.", 'says when an unlock lapses'],
+    [TH.unlocking, WeekMillis,    "Locks again on this device in 7 days.", 'says when the lease lapses'],
     [TH.unlocking, ForeverMillis, Messages.staysUnlocked,                  'says an endless lease stays unlocked'],
   ] as const
 
-  for (const [raise, leaseMillis, footnote, blurb] of FootnoteCases) {
+  for (const [launch, leaseMillis, footnote, blurb] of FootnoteCases) {
     it(blurb, async () => {
-      await shownFor(raise, { built: raise === TH.unlocking, leaseMillis })
+      await shownFor(launch, { built: launch === TH.unlocking, leaseMillis })
       expect(screen.getByText(footnote)).to.exist
     })
   }

@@ -1,4 +1,4 @@
-/** A `lock()` crossing a put, an unlock's proof or a box verb. What can reject a gate change after its record is stored is in `vault-gate.test.ts`. */
+/** A `lock()` crossing a put, an `unlock_bank` gating's attempt or a box verb. What can reject a gate change after its record is stored is in `vault-gate.test.ts`. */
 
 import { ENCRYPTED } from '../../src/helpers/consts'
 import { describe, expect, it, vi } from 'vitest'
@@ -27,9 +27,9 @@ describe("a lock() called during a put", () => {
     const record = fullBoxRecord()
     world.mw.seedPut(record)
     const box = boxListingOf(world.mw).deliverRecord(record)
-    world.mw.willPut(({ record: sent }) => {
+    world.mw.willPut(({ record: asked }) => {
       world.mw.setLocked(true)
-      return world.mw.answerOf(box.scope, sent)
+      return world.mw.answerOf(box.scope, asked)
     })
     await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent while locking' } })).resolves.to.eq(box)
     expect(box.isLocked).to.be.true
@@ -37,7 +37,7 @@ describe("a lock() called during a put", () => {
   })
 })
 
-describe("A lock called while an unlock proves", () => {
+describe("A lock called while an unlock_bank gating proves", () => {
   it("leaves the vault unlocked", async () => {
     const { vault, deviceDB, dialog } = await makeBornVault()
     vault.bank.lock()
@@ -100,7 +100,7 @@ describe("A lock called during a box verb", () => {
   })
 })
 
-/** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
+/** A stored box whose next unseal runs `crossing` with the whisper deciphered, before it comes back to `box.expose`. */
 async function boxCrossingUnseal(crossing: (box: TestableBox) => unknown) {
   const unsealStampedString: Vault['unsealStampedString'] = async (sealed, stamp) => {
     const whisperText = await world.mw.world.unsealStampedString(sealed, stamp)

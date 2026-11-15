@@ -21,11 +21,11 @@ propose the exception.
 * **Validators are reached through a namespace**, tests included: a `src/shapes/` module is
   star-imported under the short name its header gives (`import * as CX from
   '../shapes/shapes-core'`, then `CX.bankScope.parse(opts)`), and its types are imported by name.
-  A file that imports many validators by name grows a list that churns, and takes names its locals
+  A file that imports many validators by name grows a list that churns, and uses up names its locals
   want (`vaultRecord`, `whisper`); one that needs one or two may name them. Outside the core, a
   file that reaches many star-imports `safebyok` as `Safebyok`, and an adapter star-imports
   `safebyok/storage` as `DB` (`DB.vaultRow`).
-* **The core's `src/shapes/` holds the validators a module exports**, and no other module exports
+* **The core's `src/shapes/` has the validators a module exports**, and no other module exports
   one. A validator a module keeps to itself stays beside its only user, made in a `Checkers` call
   at module level (`helpers/validator.ts`'s and `gate.ts`'s `Checks`, `device.ts`'s `HostChecks`).
 * **Pick fields by destructuring the parsed output.** Where a pick by a list of names is truly
@@ -143,7 +143,7 @@ is named for the act.
 cleaned value. An `ensure` that returns nothing is misnamed.
 
 **A condition gets up to three members**: a synchronous yes/no query named for it
-(`bank.isUnlocked`); a synchronous `demandFoo` that throws when it does not hold
+(`bank.isUnlocked`); a synchronous `demandFoo` that throws when it is false
 (`bank.demandUnlocked()`); and, only where a caller needs it, an async `ensureFoo` that makes it
 so (`bank.ensureUnlocked()`). The query is the non-throwing form, so there is no `tryDemandFoo`.
 
@@ -266,7 +266,7 @@ two apart, so this is kept by hand.
   ```
 
 * **Parallel construction shows in the whitespace.** Align it into columns: values in an object
-  literal, rows of an example table. When one line takes fields out and the next puts the same
+  literal, rows of an example table. When one line pulls fields out and the next puts the same
   fields back, pad so the field lists start in the same column (the example in *Build for
   maintenance*): what was extracted and what is injected is obvious at a glance, and a field
   dropped or swapped stands out.
@@ -288,7 +288,7 @@ object whole (`.refine()`, `.readonly()`) goes inside the builder: chained onto 
 kit returns, it would refuse as plain Zod does.
 
 **Always at a boundary**: what comes off the wire; records read back from storage, which is
-someone else's database and may hold a vault another version of this package wrote; a published
+someone else's database and may contain a vault another version of this package wrote; a published
 package's exports; `Class.make` and any constructor accepting outside input; a host's options; what
 a host's callback returns (a strength checker's verdict, a key deriver's output). A failure there
 is a refusal with a `kind` the caller can branch on.
@@ -307,7 +307,7 @@ has.
 * **A boundary belongs to the export, not the caller.** An export checks every time, an internal
   caller included; one function with one behaviour beats a checked public twin and an unchecked
   private one. Inside the package, don't re-check what was checked where it entered.
-* **Clear intent at the door, clean data inside.** An entrypoint accepts a host's plain way of
+* **Clear intent at the door, clean values inside.** An entrypoint accepts a host's plain way of
   saying a thing and fills in defaults in the schema. What it keeps, and every stored field, is
   bounded: `leaseHours: Infinity` becomes the longest finite window.
 * **Not Zod's job**: rules about state ("the vault is locked"), which are control flow; rules
@@ -329,7 +329,7 @@ has.
 * **Frame a refusal of a host's options in the parse**, `parse(opts, { where, advice })`, not in a
   catch that rethrows. Never `Z.config`: it is the host's Zod too.
 
-**Strict or strip.** A shape taken out of whatever carries it (a scope, a stamp, a sparse shape)
+**Strict or strip.** A shape parsed out of whatever carries it (a scope, a stamp, a sparse shape)
 strips, so a Vault object, its record or its snapshot passes as any of them, and destructuring the
 parsed output sanitizes it. Three things are strict: a bag of options a person typed, where
 stripping would quietly drop a misspelt option; a stored record, where a field this version does
@@ -363,7 +363,7 @@ validator splits it into its parts before checking them.
   built from each other with `pick`, `omit`, `partial` and `extend`, never written twice. A record
   is one object schema, not a union of variants: an optional part is a nullable field.
 * **Use each shape's name for what it means, even where two are one type.** `LeaseSparse =
-  LeaseStamp` is fine; a log line or a listing takes a `LeaseSparse`, and a ctx a `LeaseStamp`.
+  LeaseStamp` is fine; a log line or a listing is given a `LeaseSparse`, and a ctx a `LeaseStamp`.
 * **A part's shapes nest as the part does.** A record that has parts has them in every shape: the
   gate's sparse shape contains each wayin's sparse shape, never a flat pick of their fields.
 * **A class names the shapes it passes for**: `class Lease implements LeaseStamp`. The compiler
@@ -396,8 +396,8 @@ validator splits it into its parts before checking them.
   `gate_epoch`, so its stamp has it.
 * **A reference to another thing's part keeps a flat field, named as in the owner**: a lease's
   `gate_epoch` names the gate it was granted under, as a foreign key would.
-* **What one atomic step reads travels together**, its halves apart until checked, so damaged
-  data cannot collide with its own fields: `{ world, boxes }` (`BoxesFetched`). Checked, it
+* **What one atomic step reads travels together**, its halves apart until checked, so a damaged
+  row cannot collide with its own fields: `{ world, boxes }` (`BoxesFetched`). Checked, it
   is the thing it describes, written out where it is used: a vault's record and its box listing
   are a vault, `VaultRecord & { boxes: readonly BoxSparse[] }`.
 
@@ -406,7 +406,7 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
 
 ## Crossings, spreading and logging
 
-* **Take a part out by parsing or destructuring, never by spreading the thing.** A spread copies
+* **Pull a part out by parsing or destructuring, never by spreading the thing.** A spread copies
   only own enumerable fields: a getter on the prototype is lost while TypeScript types it as
   present, and every other own field comes along. The linter refuses a spread of a class instance
   (`no-misused-spread`). When a caller wants a thing's fields as plain data, a getter returns a
@@ -451,7 +451,7 @@ a server) are designed in `notes/more_style.md` *Interfaces a host implements*.
 
 ## Order comes from an explicit list
 
-Anything stored, hashed or bound into a ctx takes its order from an explicit list (the array a
+Anything stored, hashed or bound into a ctx gets its order from an explicit list (the array a
 maker joins, the tuple its inverse checks) or from a canonical encoding that sorts keys
 (`stableJsonify`, as `cipherCtx` uses), not from an object's key order as it happens to fall:
 Zod's output order is undocumented, and JavaScript puts integer-like keys first.
@@ -519,7 +519,7 @@ A member that will not describe in a line is a smell: report it.
   is a cue to rewrite as a sentence, not a ban.
 * **A member's block names no refusal catalog** `#no-refusal-catalog`. The thrower's doc and the `Outcome` type carry the
   kinds, and a class or module doc may say in one sentence what misuse refuses. The only kind worth naming is a condition the
-  caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on an unlock. Before naming one, taste it
+  caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on a gating's attempt. Before naming one, taste it
   against those two from memory: a kind of lesser salience goes unnamed. Where a caller meets a refusal in normal use, say
   what to do instead `#say-what-to-do`: `Precede with await vault.beginWatch(), repeated to force a refresh`.
 * **The guarantee is the line worth writing** `#say-the-guarantee`. What the call proves, or what a caller could get wrong about a secret, goes
@@ -556,21 +556,21 @@ tested, in proportion to what it does and what a caller could get wrong.
 * **A title is one plain clause naming the behaviour**: `it("refuses a misspelt field")`, not
   `"refuses a misspelt field as 'bad_option', as its second example shows"`. It quotes a refusal
   kind only where a customer checks for it (`stale_write` is API, `bad_record` is not); the linter
-  holds that list. A test that covers an `@example` says so on its first line,
+  has that list. A test that covers an `@example` says so on its first line,
   `// putBox @example 2`. `notes/gallant-test_titles.md` has the pairs.
 * **Each case ties to a plausible failure**: what null, undefined or a missing value mean; an
   absurd type (`seal(42)`); a not-quite-absurd one (a salt one byte short, a passphrase of only
   whitespace, a vault written by a newer version).
-* **For anything that holds a secret, test what must not happen**: the wrong passphrase is
+* **For anything that has a secret, test what must not happen**: the wrong passphrase is
   refused, tampered ciphertext is refused, an error does not carry the secret, locking forgets
   the key.
 * **No real secret in a test, fixture or example**: generate one, or use an obvious fake that
   validates.
 * **Test an entrypoint with sloppy input**: that is its job. Code past the validation boundary is
-  entitled to clean data.
+  entitled to clean input.
 * **A test's way past the API has a loud `_cheat_` name**, for what it returns (`_cheat_central`,
   `_cheat_clock`), on a test-world subclass or a test-facing adapter such as the memory DBs, never
-  a coined verb that could pass for the API (`keptOf`). On a class that holds keys, prefer a
+  a coined verb that could pass for the API (`keptOf`). On a class that has keys, prefer a
   constructor seam: an optional callback handed a typed cheater object, so nothing sits on the
   instance.
 * **Cases that look alike become a table**, grouped by comments, with `"` for inputs and expected

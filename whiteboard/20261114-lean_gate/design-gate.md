@@ -1,7 +1,7 @@
 # Lean gate: what each class needs for three flows
 
 Thread `20261114-lean_gate`, worktree `/workspace/byok-lean_gate`. The new `safebyok` holds Device, Bank, Gate,
-Gating, Wayin, Proving and Lease, with no deviceDB methods. The bank is given a VaultDB and stores its boxes through
+Gating, Wayin, Proving and Lease, with no deviceDB methods. The bank is given a VaultDB and puts its boxes through
 it (design-boxops.md, *Light sugar on the bank*). Each class is made by
 `.make(recordish, livepropsAndOpts)` (`notes/gallant.md`, `#record-then-opts`): the record give or take a few fields,
 then the live objects and options that come out of band, such as `{ device }`. Helpers, shapes and throwers come from `safebyok-big/internals`, so
@@ -86,7 +86,7 @@ bank.unsealBox(box)              → { ...box without its sealed fields, whisper
 
 | Signature | |
 |---|---|
-| `static make(record: DeviceRecord, opts: DeviceOpts): Device` | `DeviceOpts` takes `vaultDB` and `requestCleartext?` |
+| `static make(record: DeviceRecord, opts: DeviceOpts): Device` | `DeviceOpts` has `vaultDB` and `requestCleartext?`   |
 | `vaultDB`: the VaultDB each bank born on the device is given | |
 | `birthBankPrompt(): Promise<Bank>` | |
 | `#askUser: AskUser \| null`, made by `guardRequestCleartext(requestCleartext)` | |
@@ -97,7 +97,7 @@ bank.unsealBox(box)              → { ...box without its sealed fields, whisper
 
 | Signature | |
 |---|---|
-| `static make(record: BankRecord, { device, vaultDB }): Bank`, the record holding its `maingate` and `rootBox` | |
+| `static make(record: BankRecord, { device, vaultDB }): Bank`, the record with its `maingate` and `rootBox` | |
 | `scope`, `stamp` (`userid`, `banklabel`, `lifeseq`, `born_at`), `rootBox`: getters | |
 | `static mintStamps(scope): { bankStamp, gateStamp }` | |
 | `static makeRecord(dna: BankDna): BankRecord`, its `maingate` made by `Gate.makeRecord` | |
@@ -179,4 +179,4 @@ Directions this work leans, not rules.
 * A box is a Thing (design-boxops.md). The box seal binds the bank's stamp, then the box's sparse fields; it no
   longer binds a vault stamp.
 * The bank is on its Thing, with its root box and its VaultDB. Its stamp binds its `lifeseq` where it bound
-  `bank_tok`. The gate is still big's row, whose `bank_tok` now holds its bank's lifeseq.
+  `bank_tok`. The gate is still big's row, whose `bank_tok` now has its bank's lifeseq.

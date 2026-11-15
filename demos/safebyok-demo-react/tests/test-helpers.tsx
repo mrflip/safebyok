@@ -15,7 +15,7 @@ import type { StringStorage } from '../src/lib/string-storage'
 export * from 'safebyok-big/testing'
 
 /** Render `ui` inside a BankProvider signed in as `u1`, with the cheap test deriver, over a fresh in-memory bankDB and deviceDB. Returns the two.
- * The bankDB holds u1's bank, built with {@link Passphrase} as another device builds it, so it opens locked; with `isBankBuilt: false` it is
+ * The bankDB has u1's bank, built with {@link Passphrase} as another device builds it, so it opens locked; with `isBankBuilt: false` it is
  * empty, and the provider opens its dialog to build the bank.
  *
  * @example await TH.renderInBank(<><SessionBar auth={auth} /><TH.VaultProbe /></>)

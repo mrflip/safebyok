@@ -160,7 +160,7 @@ describe("mask", () => {
     expect(mask('sk-ant-abcd1234', { maxLen: Number.MAX_SAFE_INTEGER })).to.eq('sk*********1234')
   })
 
-  it("takes a partial bag of options, filling in the rest", () => {
+  it("accepts a partial bag of options, filling in the rest", () => {
     expect(mask('abcdefghijkl', { head: undefined, tail: 1 })).to.eq('ab*********l')
   })
 

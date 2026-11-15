@@ -84,7 +84,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
     super.assignInitialProps(central)
   }
 
-  /** The first record of a new gate `gate` of bank `bank`, holding the wayins `main` and `passkey0`. */
+  /** The first record of a new gate `gate` of bank `bank`, with the wayins `main` and `passkey0`. */
   static recordOfBirth(bank: BankStamp, gate: GateStamp, main: Wayin, passkey0: Wayin | null): GateRecord {
     const checked = Checks.recordOfBirthArgs.parse({ bank, gate, main, passkey0 })
     return gateRecord.parse({

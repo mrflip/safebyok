@@ -19,10 +19,10 @@ function textBytes(text: string): Uint8Array { return new TextEncoder().encode(t
 
 const WhisperText = '{"val":"sk-test-0000"}'
 
-/** The JSON text of {@link WorldBankStamp}, as every ctx under the bank holds it first: its keys sorted. */
+/** The JSON text of {@link WorldBankStamp}, as every ctx under the bank has it first: its keys sorted. */
 const BankStampText = `{"bank_tok":"bank-tok-u1","banklabel":"acme","registered_at":${String(T0)},"user_id":"u1"}`
 
-/** The JSON text of {@link WorldGateStamp}, as each wayin's ctx holds it after the bank's. */
+/** The JSON text of {@link WorldGateStamp}, as each wayin's ctx has it after the bank's. */
 const GateStampText = `{"banklabel":"acme","gate_tok":"gate-tok-u1","gatelabel":"main","registered_at":${String(T0)},"user_id":"u1"}`
 
 const BankStampFields = ['user_id', 'banklabel', 'bank_tok', 'registered_at'] as const
@@ -34,7 +34,7 @@ const BoxStampFields = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'fmt',
 /** The stamps a box hands a seal when no real vault is wanted: {@link WorldVaultStamp}, then a box's. */
 const SealStamps = [WorldVaultStamp, sealStampOf('anthropic')] as const
 
-/** A lease of the bank `overrides` moves {@link WorldBankStamp} to, over a bankKey the test holds, its record cached on the friend. */
+/** A lease of the bank `overrides` moves {@link WorldBankStamp} to, over a bankKey the test has, its record cached on the friend. */
 async function leaseOver(bankKey: CryptoKey, overrides: Partial<BankStamp> = {}) {
   const friend = fakeLeaseFriendOf(overrides)
   const lease = await Lease.buildGranted(friend, bankKey, GrantedAs)
@@ -53,8 +53,8 @@ async function realBoxStamps(): Promise<readonly [CipherCtxRecord, CipherCtxReco
   return [stamps[0]!, stamps[1]!]
 }
 
-/** Whether a gate's passphrase wayin opens under the ctx of the stamps `bank` and `gateStamp`, built field for field without a check. */
-async function passphraseWayinOpens(bank: CipherCtxRecord, gateStamp: CipherCtxRecord): Promise<boolean> {
+/** Whether a gate's passphrase wayin unwraps under the ctx of the stamps `bank` and `gateStamp`, built field for field without a check. */
+async function passphraseWayinUnwraps(bank: CipherCtxRecord, gateStamp: CipherCtxRecord): Promise<boolean> {
   const { gate } = await builtGateOf()
   const { bank_key_wayin_wrapped: wrapped, ...header } = gate.wayins.main
   const wayinKey = await importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(passphraseCleartext.parse(TestPassphrase), fromB64(header.salt_b64)))
@@ -83,7 +83,7 @@ describe("each ctx, byte for byte", () => {
     expect(await unwrapKeyUnder(wayinKey, wayin.bank_key_wayin_wrapped, ctx, { extractable: false, usage: ['wrapKey'] })).to.be.instanceOf(CryptoKey)
   })
 
-  it("binds a passkey wayin's wrap and its key to the bank's stamp, the gate's, the purpose and its whole header", async () => {
+  it("binds a passkey wayin's wrap and its passkeyKey to the bank's stamp, the gate's, the purpose and its whole header", async () => {
     const answer = passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
     const { gate } = await builtGateOf(answer)
@@ -111,8 +111,8 @@ describe("each ctx, byte for byte", () => {
     const vaultText = `{"banklabel":"acme","registered_at":${JSON.stringify(vaultStamp['registered_at'])},"user_id":"u1","vault_tok":${JSON.stringify(vaultStamp['vault_tok'])},"vaultlabel":"main"}`
     const boxText = `{"am":${field('am')},"bank_tok":${field('bank_tok')},"banklabel":${field('banklabel')},"box_tok":${field('box_tok')},"boxlabel":"anthropic","fmt":${field('fmt')},"registered_at":${field('registered_at')},"revision_seq":${field('revision_seq')},"revision_tok":${field('revision_tok')},"user_id":${field('user_id')},"vault_tok":${field('vault_tok')},"vaultlabel":${field('vaultlabel')},"whisper_codec":"json_v1","whisper_schema_version":1,"written_at":${field('written_at')}}`
     const boxKey = await unwrapKeyUnder(bankKey, sealed.box_key_wrapped, textBytes(`[${BankStampText},${vaultText},${boxText},"box_key_wrapped"]`), { extractable: false, usage: ['decrypt'] })
-    const opened = await decipherBytes(boxKey, sealed.whisper_ciphered, textBytes(`[${BankStampText},${vaultText},${boxText},"whisper_ciphered"]`))
-    expect(new TextDecoder().decode(opened)).to.eq(WhisperText)
+    const deciphered = await decipherBytes(boxKey, sealed.whisper_ciphered, textBytes(`[${BankStampText},${vaultText},${boxText},"whisper_ciphered"]`))
+    expect(new TextDecoder().decode(deciphered)).to.eq(WhisperText)
   })
 })
 
@@ -161,8 +161,8 @@ describe("each ctx binds every field of its stamps", () => {
     })
 
     it(`keeps a wayin shut under a bank stamp with another ${fieldname}`, async () => {
-      expect(await passphraseWayinOpens(WorldBankStamp, WorldGateStamp)).to.be.true
-      expect(await passphraseWayinOpens({ ...WorldBankStamp, [fieldname]: changed(WorldBankStamp[fieldname]) as string }, WorldGateStamp)).to.be.false
+      expect(await passphraseWayinUnwraps(WorldBankStamp, WorldGateStamp)).to.be.true
+      expect(await passphraseWayinUnwraps({ ...WorldBankStamp, [fieldname]: changed(WorldBankStamp[fieldname]) as string }, WorldGateStamp)).to.be.false
     })
 
     it(`keeps a lease shut under a bank stamp with another ${fieldname}`, async () => {
@@ -175,7 +175,7 @@ describe("each ctx binds every field of its stamps", () => {
 
   for (const fieldname of GateStampFields) {
     it(`keeps a wayin shut under a gate stamp with another ${fieldname}`, async () => {
-      expect(await passphraseWayinOpens(WorldBankStamp, { ...WorldGateStamp, [fieldname]: changed(WorldGateStamp[fieldname]) as string })).to.be.false
+      expect(await passphraseWayinUnwraps(WorldBankStamp, { ...WorldGateStamp, [fieldname]: changed(WorldGateStamp[fieldname]) as string })).to.be.false
     })
   }
 

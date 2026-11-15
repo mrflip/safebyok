@@ -72,26 +72,26 @@ describe("parseLogger", () => {
   it("guards a logger whose prototype is a guarded logger", () => {
     const child = Object.create(parseLogger(TH.spyLogger().logger)) as VaultLogger
     child.error = () => { throw new Error('a child logger that throws') }
-    const taken = parseLogger(child)
-    expect(taken).to.not.eq(child)
-    expect(() => { taken.error('x') }).to.not.throw()
+    const parsed = parseLogger(child)
+    expect(parsed).to.not.eq(child)
+    expect(() => { parsed.error('x') }).to.not.throw()
   })
 
   it("guards a logger that claims to be guarded already, by any property it carries", () => {
     const claiming = { log: () => undefined, warn: () => undefined, error: () => { throw new Error('a logger that throws') }, _safebyok_modded: true }
-    const taken = parseLogger(claiming)
-    expect(taken).to.not.eq(claiming)
-    expect(() => { taken.error('x') }).to.not.throw()
+    const parsed = parseLogger(claiming)
+    expect(parsed).to.not.eq(claiming)
+    expect(() => { parsed.error('x') }).to.not.throw()
   })
 
   // VaultLogger @example 2
-  it("takes the console itself", () => {
+  it("accepts the console itself", () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* kept out of the test output */ })
     parseLogger(console).error('the adapter is broken')
     expect(consoleError).toHaveBeenCalledWith('the adapter is broken', undefined, undefined)
   })
 
-  it("takes a logger built as a class, calling each method on it with its own `this`", () => {
+  it("accepts a logger built as a class, calling each method on it with its own `this`", () => {
     class Telemetry {
       readonly heard: string[] = []
       log(message = '') { this.heard.push(`log ${message}`) }
@@ -159,7 +159,7 @@ describe("isGuardedLogger", () => {
 describe("setDefaultLogger", () => {
   afterEach(() => { setDefaultLogger(undefined) })
 
-  it("routes the default logger's calls to the app's logger, including a fallback taken before the call", () => {
+  it("routes the default logger's calls to the app's logger, including a fallback parsed before the call", () => {
     const fallback = parseLogger(undefined)
     const telemetry = TH.spyLogger()
     setDefaultLogger(telemetry.logger)
@@ -214,7 +214,7 @@ describe("VaultLogger", () => {
     expectTypeOf<Console>().toExtend<VaultLogger>()
   })
 
-  it("takes a story of any plain facts, nested ones too", () => {
+  it("accepts a story of any plain facts, nested ones too", () => {
     const spy = TH.spyLogger()
     const story = { oplabel: 'putBox', attempt: 2, retried: true, when: null, detail: { kinds: ['stale_write'] } }
     spy.logger.warn('a datastore retried', story)

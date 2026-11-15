@@ -97,7 +97,7 @@ describe("classifyStoredGate, the put table over a live bank's gate", () => {
     expect(classifyStoredGate(ask, fetchedOver(keyedGate))).to.deep.include({ ok: true, act: 'replaced', gate: keyedGate })
   })
 
-  it("answers a replay of the stored record as retcon, storing nothing", () => {
+  it("answers a replay of the stored record as retcon, writing nothing", () => {
     const ask = gatePutAskOf('add_passkey', liveGate, { main: mainWayin, passkey0: passkey0Wayin })
     expect(classifyStoredGate(ask, fetchedOver(ask.record))).to.deep.include({ ok: false, act: 'retcon', gate: ask.record })
   })
@@ -107,7 +107,7 @@ describe("classifyStoredGate, the put table over a live bank's gate", () => {
     expect(classifyStoredGate(ask, fetchedOver(liveGate))).to.deep.include({ ok: false, act: 'stale', gate: liveGate })
   })
 
-  it("puts no gate row where the live bank stores none", () => {
+  it("puts no gate row where the live bank has none", () => {
     const ask = gatePutAskOf('replace_passphrase', liveGate, { main: otherMainWayin })
     expect(classifyStoredGate(ask, fetchedOver(null))).to.deep.include({ ok: false, act: 'ahead', gate: null, presence: 'void' })
   })
@@ -227,7 +227,7 @@ describe("classifyStoredBox and classifyStoredBoxes, under a bank's vault row", 
   })
 })
 
-describe("writtenBankOf, writtenGateOf, writtenVaultOf and writtenBoxOf, the row a write reports storing", () => {
+describe("writtenBankOf, writtenGateOf, writtenVaultOf and writtenBoxOf, the row a write reports writing", () => {
   it("answers the row written, at its address", () => {
     expect(writtenBankOf(bankScope, liveBank)).to.deep.equal(liveBank)
     expect(writtenGateOf(gateScope, liveGate)).to.deep.equal(liveGate)

@@ -8,7 +8,7 @@ import type { WhisperFieldProps } from '../shapes'
  * @example <WhisperField onChange={setKeyText} aria-label="Anthropic API key" />
  * @example <WhisperField onChange={setKeyText} placeholder="sk-ant-…" aria-label="Anthropic API key" />
  * @example
- *   <form onSubmit={(evt) => { evt.preventDefault(); void save(new FormData(evt.currentTarget).get('whisper_text')) }}>
+ *   <form onSubmit={(evt) => { evt.preventDefault(); void putWhisper(new FormData(evt.currentTarget).get('whisper_text')) }}>
  *     <WhisperField aria-label="Anthropic API key" /> <button>Save</button>
  *   </form>
  */

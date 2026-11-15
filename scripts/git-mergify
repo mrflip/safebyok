@@ -4,7 +4,7 @@
 # labels each `queue` so Mergify lands them as one merge commit apiece (.mergify.yml, PROCESS.md,
 # *The history we keep*). Reports the stack and labels nothing unless given --apply.
 #
-# The pull requests to take can be given as numbers, or as any text that holds them, such as the
+# The pull requests to queue can be given as numbers, or as any text that contains them, such as the
 # stack line of a PR's body pasted whole: every run of digits in it is a number. Their order there
 # does not matter, the script finds the order itself.
 #
@@ -24,12 +24,12 @@
 # Environment: GIT_MERGIFY_PAUSE, the seconds to wait between labels so that Mergify sees them in
 # order (default 3).
 #
-# Usage: scripts/git-mergify [--apply] [--base <branch>] [<pr number or text holding them>...]
+# Usage: scripts/git-mergify [--apply] [--base <branch>] [<pr number or text containing them>...]
 # Exits 0 when the stack is reported (or labeled), 1 on a failure, 2 on a bad argument, 3 when the
 # pull requests are not one line.
 set -euo pipefail
 
-usage="Usage: scripts/git-mergify [--apply] [--base <branch>] [<pr number or text holding them>...]"
+usage="Usage: scripts/git-mergify [--apply] [--base <branch>] [<pr number or text containing them>...]"
 label=queue
 
 die() {

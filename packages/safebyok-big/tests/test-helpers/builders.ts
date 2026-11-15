@@ -29,11 +29,11 @@ export const testDeriver: KeyDeriver = {
  */
 export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
 
-/** A Ciphered that opens under no key, so it stands in any ciphered role: what {@link fakeCiphered} makes. */
+/** A Ciphered that deciphers or unwraps under no key, so it stands in any ciphered role: what {@link fakeCiphered} makes. */
 export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & BankKeyWayinWrapped & BankKeyLeaseWrapped
 
-/** A shape-valid Ciphered that opens nothing, in any ciphered role: for storage-layer tests, which never decrypt.
- * Opening under no key, it is no more one role's than another's, so it fills any ciphered field (a
+/** A shape-valid Ciphered that deciphers or unwraps nothing, in any ciphered role: for storage-layer tests, which never decrypt.
+ * Deciphering or unwrapping under no key, it is no more one role's than another's, so it fills any ciphered field (a
  * box's `whisper_ciphered`, a wayin's wrap) without a parse.
  *
  * @example fakeCiphered('a1')  // => { cipher_iv_b64: 'iv-a1', ciphertext_b64: 'ct-a1' }
@@ -59,7 +59,7 @@ export function wayinOf(tag: string, overrides: Partial<PassphraseWayin> = {}): 
   return {
     wayinkind:               'passphrase',
     key_deriver_label:       'test_digest_v0',
-    // base64 of the literal text 'saltsaltsaltsalt': a fake salt, public material anyway
+    // base64 of the literal text 'saltsaltsaltsalt': a fake salt, visible anyway
     salt_b64:                CX.salt_b64.parse('c2FsdHNhbHRzYWx0c2FsdA'),
     device_tok:              '00000000-0000-4000-8000-0000000000b1',
     registered_at:           Date.UTC(2026, 9, 14),

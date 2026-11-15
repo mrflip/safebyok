@@ -1,8 +1,8 @@
 # Box ops: get, write and list boxes as Things
 
-Thread `20261114-box_ops`, worktree `/workspace/byok-box_ops`. The vaultDB stores two more kinds of Thing, the box and
+Thread `20261114-box_ops`, worktree `/workspace/byok-box_ops`. The vaultDB keeps two more kinds of Thing, the box and
 the bank. It lists the children of a Thing, and it writes a new bank's first Things in one step. On the model side, the
-bank seals a box into the record the vaultDB stores, signs a box's tombstone, and offers the box flows as methods.
+bank seals a box into the record the vaultDB keeps, signs a box's tombstone, and offers the box flows as methods.
 
 **proposed**, **cited** and **actual** are defined in [design-vaultdb.md](../20261114-vault_db/design-vaultdb.md).
 
@@ -85,7 +85,7 @@ type UnsealedOf<RecordT, CleartextsT> =
 
 Its other fields are the Thing's, named as in the box's table. It has no body.
 
-* **The vaultDB stores a bank's tombstone** as it does any kind's. What a bank's delete does to its gate and boxes is
+* **The vaultDB keeps a bank's tombstone** as it does any kind's. What a bank's delete does to its gate and boxes is
   decided where the coordinated operations are built.
 
 ## Storage
@@ -123,7 +123,7 @@ const KindChecks = {
   | `putAsk`  | `ifAbsent: 'add'`, `ifPresent: 'repl'`                    |
   | `delAsk`  | `ifAbsent: 'fail'`, `ifPresent: 'repl'`, neither overridable |
 
-  A verb takes only a whole ask, so every logged ask shows its policies.
+  A verb accepts only a whole ask, so every logged ask shows its policies.
 
 ### Get and write
 
@@ -154,7 +154,7 @@ type ListThingsAnswer<RecordT extends Thing = Thing> =
   | (BadAnswer<Sparse<RecordT>[] | null>       & ListedBeside<RecordT>)
 ```
 
-`BadAnswer` takes the type of its `dbhas`, as `GoodAnswer` takes the type of its `val`. Its default is `Thing | null`,
+`BadAnswer` has the type of its `dbhas` as a type parameter, as `GoodAnswer` has the type of its `val`. Its default is `Thing | null`,
 which every other verb keeps. A get's refusal has the stored record as its `dbhas`: the tombstone under `gone`, and
 null under `void` or wherever the store's answer is in doubt.
 
@@ -245,16 +245,16 @@ As for the gate, this is not built.
 
 ### The types
 
-| Type            | What it holds                                                          | What it is for                                             |
-| --------------- | ---------------------------------------------------------------------- | ---------------------------------------------------------- |
-| `BoxRecord`     | a live box as stored: its Thing fields, `sidecar` and `whisper_sealed` | what the vaultDB stores                                    |
-| `BoxTombstone`  | a deleted box as stored: its Thing fields and `whisper_sealed`          | the same, for a deleted box                                |
-| `BoxSparse`     | a box's Thing fields alone, live or a tombstone                        | what a listing gives; with a sidecar, what `sealBox` takes |
-| `BoxCleartexts` | `{ whisper }`                                                          | what `bank.sealBox` ciphers                                |
-| `BoxUnsealed`   | `UnsealedOf<BoxRecord, BoxCleartexts>`: Thing fields, sidecar, whisper | what `bank.unsealBox` gives                                |
+| Type            | What it contains                                                       | What it is for                                               |
+| --------------- | ---------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `BoxRecord`     | a live box as stored: its Thing fields, `sidecar` and `whisper_sealed` | what the vaultDB keeps                                       |
+| `BoxTombstone`  | a deleted box as stored: its Thing fields and `whisper_sealed`          | the same, for a deleted box                                  |
+| `BoxSparse`     | a box's Thing fields alone, live or a tombstone                        | what a listing gives; with a sidecar, what `sealBox` accepts |
+| `BoxCleartexts` | `{ whisper }`                                                          | what `bank.sealBox` ciphers                                  |
+| `BoxUnsealed`   | `UnsealedOf<BoxRecord, BoxCleartexts>`: Thing fields, sidecar, whisper | what `bank.unsealBox` gives                                  |
 
-The seal makes the next revision itself, so it needs no draft type: what it takes is the prior box's Thing fields
-with the sidecar to store.
+The seal makes the next revision itself, so it needs no draft type: what it accepts is the prior box's Thing fields
+with the sidecar to put.
 
 ### The bank's box methods
 
@@ -309,7 +309,7 @@ The bank is given a VaultDB when it is made. Each method fills in the bank's sco
 exports the bank with its sugar, for a host that wants only lock, unlock and a few secrets. The header of `core.ts`,
 which says core does no storing, is corrected to match the README.
 
-* **`bank.rootBox`**: the root box's sparse record, held since the bank was made.
+* **`bank.rootBox`**: the root box's sparse record, kept since the bank was made.
 * **`bank.tryListBoxes()`**: `tryListThings` of the root box.
 * **`bank.tryGetBox({ labelpath, ifAbsent })`**: `tryGetThing`, with one more `ifAbsent`, `'shell'`, which gives the
   box's shell under the root box where none is stored.
@@ -365,7 +365,7 @@ delete  const record  = await bank.tombstoneBox(prior)
    found boxes and `gotvoid` when it found none. Here a live parent answers `gotlive` with or without children, and an
    empty one gives `val: []`. A caller that read `gotvoid` as "no boxes" reads `val.length === 0` instead.
 8. **The bank's stamp binds its lifeseq, not a random `bank_tok`.** Each life of a bank has a new bankKey, so a wrap
-   from an earlier life opens only to that life's key. What the random token added: a wrap never opens in another life,
+   from an earlier life unwraps only to that life's key. What the random token added: a wrap never unwraps in another life,
    even where storage loses the bank row and a bank is born again at the same lifeseq. In TODO.md.
 9. **A birth's `passed` does not check that the gate and root box are of the bank's life.** Big's build checked the gate
    row's `bank_tok` against the bank's. A root's lifepath carries none of the bank's lifeseq, so the check cannot be
@@ -408,7 +408,7 @@ for a box. It names every parent of the Thing written, or it is left out.
 
 * **Where a parent is stored live**, nothing happens to it.
 * **Where a parent is missing, or is a tombstone one lifeseq short of the lifepath written**, its sparse parent is
-  filled out and stored in its place. It takes the `written_at` of the Thing written, and the scope, life and other
+  filled out and written in its place. It is given the `written_at` of the Thing written, and the scope, life and other
   fields its position implies. Its sealed part binds those same fields.
 
 There's some good arguments being made by the  other  agent that  we should be passing the void singleton or a void shell around in more places. I'm sympathetic to that argument for the normal `dbhas`

@@ -378,7 +378,7 @@ describe("birthBank(device, cleartexts)", () => {
     expect(put.lockedAtPuts).to.deep.equal([true])
   })
 
-  it("lays a passkey's wayin beside the passphrase's, opening the same bankKey", async () => {
+  it("lays a passkey's wayin beside the passphrase's, wrapping the same bankKey", async () => {
     TH.stubBankPut()
     const answer = TH.passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
@@ -414,7 +414,7 @@ describe("birthBank(device, cleartexts)", () => {
     expect(put.banks[0]!.isLocked).to.be.true
   })
 
-  it("passes the put's refusal in this layer, which stores nothing", async () => {
+  it("passes the put's refusal in this layer, which puts nothing", async () => {
     const err = await TH.expectRefusal(birthBank(TH.makeDevice(), { passphraseClear: TH.TestPassphrase }), 'unexpected_error')
     expect(err.message).to.eq(PutNotBuilt)
   })

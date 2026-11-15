@@ -1,4 +1,4 @@
-/** The battery's dels and tidyGone: a box, a vault or a bank deleted with what it holds, and the rows of an ended life tidied away. */
+/** The battery's dels and tidyGone: a box, a vault or a bank deleted with what it has, and the rows of an ended life tidied away. */
 
 import { describe, expect, it } from 'vitest'
 import * as BX from '../../src/shapes/shapes-bankdb'
@@ -25,7 +25,7 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
   }
 
   describe("delBox", () => {
-    it("stores the tombstone over a live row at its revision", async () => {
+    it("writes the tombstone over a live row at its revision", async () => {
       const { bankDB, vault, box } = await putWith({ box: true })
       const tombstone = boxTombstoneOf(box)
       expect(await bankDB.delBox(boxDelAskOf(box))).to.deep.include({ ok: true, act: 'deleted', val: tombstone, parent: vault })
@@ -86,7 +86,7 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
   })
 
   describe("delVault", () => {
-    it("stores the tombstone at its revision, and deletes the boxes of the life it ends", async () => {
+    it("writes the tombstone at its revision, and deletes the boxes of the life it ends", async () => {
       const { bankDB, bank, vault } = await putWith({ box: true })
       const tombstone = vaultTombstoneOf(vault)
       expect(await bankDB.delVault(vaultDelAskOf(vault))).to.deep.include({ ok: true, act: 'deleted', val: tombstone, parent: bank })
@@ -172,7 +172,7 @@ export function describeDels({ fresh, putWith, rowsOf }: BatteryWorld): void {
   })
 
   describe("delBank", () => {
-    it("stores the tombstone at its revision, and deletes the gate, the vaults and the boxes of the life it ends", async () => {
+    it("writes the tombstone at its revision, and deletes the gate, the vaults and the boxes of the life it ends", async () => {
       const { bankDB, bank } = await putWith({ box: true })
       const tombstone = bankTombstoneOf(bank)
       expect(await bankDB.delBank(bankDelAskOf(bank))).to.deep.include({ ok: true, act: 'deleted', val: tombstone, parent: BX.BankTop })

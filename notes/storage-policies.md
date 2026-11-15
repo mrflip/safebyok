@@ -10,7 +10,7 @@ The capacity check is another policy, though it is not yet named in `options`: o
 
 ## Where a policy is applied
 
-A policy runs where the store's own code runs, on the rows fetched in the step that stores the record. The device
+A policy runs where the store's own code runs, on the rows fetched in the step that puts the record. The device
 cannot be trusted with this: the device-side bankDB runs in the page, beside every script and extension the page
 loads. The device makes the same checks before it calls (`models/gating.ts`), so an honest device never meets a
 refusal. A refusal means some other caller sent the put.
@@ -19,7 +19,7 @@ refusal. A refusal means some other caller sent the put.
   `replaced`. That calls `demandStorage(ask, stored)`, which applies each policy the ask names. This is the bastion
   where the adapter runs beside the database: memory, IndexedDB, a server's bankDB.
 * **Convex**: the component's `putGate` mutation applies `demandStorage` inside Convex.
-* **Postgres**: `safebyok_put_gate` holds each policy as conditions of the one statement that stores the record. On a
+* **Postgres**: `safebyok_put_gate` states each policy as conditions of the one statement that puts the record. On a
   refusal, the adapter re-runs the classifier on the rows returned, to name the refusal.
 
 Every adapter passes the same battery cases, one set per policy.
@@ -39,7 +39,7 @@ and the stored gate row as `dbhas`, and nothing is stored.
 | RP2 | the expected row's `main` wayin is the stored `main`: the wayin the gating proved against has not been modified | `ProvedWayinMoved` |
 | RP3 | every wayin of the record but `main` is the stored row's | `OtherWayinMoved` |
 
-RP2 is the only demand of a proof, and it proves little: a caller can copy the stored `main`. It is where a later
+RP2 is the only demand on what the gating proved, and it proves little: a caller can copy the stored `main`. It is where a later
 version can check a change countersigned against the proving wayin. The other two policies need no RP2: their RP3
 already demands that the record's `main` is the stored one.
 
@@ -61,8 +61,8 @@ already demands that the record's `main` is the stored one.
 | RK3 | the record has no `passkey0` | `PasskeyNotRevoked` |
 | RK4 | every wayin of the record but `passkey0` is the stored row's | `OtherWayinMoved` |
 
-## What the gate policies do not hold
+## What the gate policies do not check
 
-No policy checks that a new wayin opens, since the bankDB cannot unwrap one. A `replace_passphrase` whose new `main`
-does not open passes, and so does an `add_passkey` whose `passkey0` does not open. A caller holding the host's session
-can therefore lock the user out, or add a passkey that opens nothing.
+No policy checks that a new wayin unwraps, since the bankDB cannot unwrap one. A `replace_passphrase` whose new `main`
+does not unwrap passes, and so does an `add_passkey` whose `passkey0` does not unwrap. A caller with the host's session
+can therefore lock the user out, or add a passkey that unwraps nothing.

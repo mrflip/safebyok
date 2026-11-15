@@ -98,14 +98,14 @@ export const addPasskeyTo = async (world: BankWorld, vault: Vault, passkeyClear?
 /** `createPasskey` options for tests: a relying party and a user, named as a host would name them. */
 export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vault)', displayName: 'u1' } }
 
-/** Call `raise` on a new device, on another device, over `world`'s bankDB, and return the gating it opens.
- * The gating stays open until it concludes or the test calls `close`, as it would while a host's dialog is showing. `raising` is the pending outcome of `raise`.
+/** Call `launch` on a new device, on another device, over `world`'s bankDB, and return the gating it opens.
+ * The gating stays open until it concludes or the test calls `close`, as it would while a host's dialog is showing. `launching` is the pending outcome of `launch`.
  *
  * @example
  *   await TH.makeBankWithVault(world)
- *   const { gating, raising, close } = await TH.openGatingOf(world, TH.unlocking)
+ *   const { gating, launching, close } = await TH.openGatingOf(world, TH.unlocking)
  */
-export const openGatingOf = async (world: BankWorld, raise: (device: Device) => Promise<Outcome<unknown>>, overrides: Partial<DeviceOpts> = {}) => {
+export const openGatingOf = async (world: BankWorld, launch: (device: Device) => Promise<Outcome<unknown>>, overrides: Partial<DeviceOpts> = {}) => {
   const handed = makePending<AnyGating>()
   const closing = makePending()
   const requestCleartext: RequestCleartext = async (gating) => {
@@ -113,10 +113,10 @@ export const openGatingOf = async (world: BankWorld, raise: (device: Device) => 
     await Promise.race([gating.whenConcluded, closing.promise])
   }
   const device = world.deviceOnAnotherDevice({ requestCleartext, ...overrides })
-  const raising = raise(device)
-  const unasked = (async () => { throw new Error(`settled with nobody asked: ${JSON.stringify(await raising)}`) })()
+  const launching = launch(device)
+  const unasked = (async () => { throw new Error(`settled with nobody asked: ${JSON.stringify(await launching)}`) })()
   const gating = await Promise.race([handed.promise, unasked])
-  return { gating, raising, device, close: () => { closing.resolve(undefined) } }
+  return { gating, launching, device, close: () => { closing.resolve(undefined) } }
 }
 
 /** Open a `build_bank` gating on a device whose bank is not built yet. */

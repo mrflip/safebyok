@@ -210,9 +210,9 @@ describe("storable.put(patch): seal, then put", () => {
     })
     let resolved = false
     const putting = (async () => {
-      const sent = await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
+      const result = await box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'sent' } })
       resolved = true
-      return sent
+      return result
     })()
     await vi.advanceTimersByTimeAsync(0)
     const [put] = world.mw.callsOf('put')
@@ -277,7 +277,7 @@ describe("storable.del()", () => {
     expect(world.mw.callsOf('del')[0]?.expectedRevisionTok).to.equal(revision_tok)
   })
 
-  it("sends a delete of a deleted thing expecting its tombstone, which the bankDB refuses", async () => {
+  it("asks for a del of a deleted thing expecting its tombstone, which the bankDB refuses", async () => {
     const { box } = timelyBoxOf()
     await box.del(box.scope)
     const tombstone = box._cheat_central
@@ -338,8 +338,8 @@ describe("storable try forms: an outcome, never a rejection", () => {
   const GoodCases = [
     [(box: TestableBox) => box.tryGet({ maxMillisSinceRefresh: 0 }),                                                   'tryGet of a stored record'],
     [(box: TestableBox) => box.tryHydrate(),                                                 'tryHydrate of a timely record'],
-    [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage takes'],
-    [(box: TestableBox) => box.tryDel(box.scope),                                                     'tryDel that storage takes'],
+    [(box: TestableBox) => box.tryPut({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'x' } }), 'tryPut that storage accepts'],
+    [(box: TestableBox) => box.tryDel(box.scope),                                                     'tryDel that storage accepts'],
   ] as const
   for (const [tryVerb, blurb] of GoodCases) {
     it(`resolves a good outcome with the thing: ${blurb}`, async () => {
@@ -415,10 +415,10 @@ describe("storable.hydrate(opts): timeliness after a fetch", () => {
 
 // --
 
-// == [Rebirth, sentences]: a deletion arriving again after a put, phrases.ts
+// == [Rebirth, sentences]: a deletion delivered again after a put, phrases.ts
 
 describe("storable.listing.deliverRecord(rcvd): after a put over a deleted box", () => {
-  it("keeps a rebirth when the old deletion arrives again", async () => {
+  it("keeps a rebirth when the old deletion is delivered again", async () => {
     const gone = tombstoneBoxRecord({ revision_seq: 2, revision_tok: 'rev-x2' })
     world.mw.seedPut(gone)
     const box = fakeSealBoxListingOf(world.mw).deliverRecord(gone)

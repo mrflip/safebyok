@@ -14,12 +14,12 @@ function dna(boxlabel = 'anthropic_api_key') { return boxDnaOf(world.mw.boxscope
 
 function scope() { return world.mw.boxscope('anthropic_api_key') }
 
-/** The revision a stale_write says storage has stored. */
+/** The revision a stale_write says storage has. */
 const stored = { revision_tok: 'rev-s5', revision_seq: 5 }
 
 describe("BoxListing", () => {
   describe("listing.create(dna)", () => {
-    it("has a box of the record it stored, at revision 0, once it is written", async () => {
+    it("has a box of the record it put, at revision 0, once it is written", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.create(dna())
       expect(box).to.be.instanceOf(Box)

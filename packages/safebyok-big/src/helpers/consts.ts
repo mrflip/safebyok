@@ -30,7 +30,7 @@ export const MinuteMillis = 60_000
 /** The longest span between two times the package accepts, in milliseconds: {@link FarPast} to {@link FarFuture}. */
 export const ForeverMillis = FarFuture - FarPast
 
-// The version of this package, written to each device row. A release bumps it by hand, in the Version PR; a test holds it to package.json.
+// The version of this package, written to each device row. A release bumps it by hand, in the Version PR; a test checks it against package.json.
 /** The npm version of safebyok. */
 export const PackageVersion = '0.5.0'
 

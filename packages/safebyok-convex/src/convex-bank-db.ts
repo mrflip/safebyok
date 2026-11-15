@@ -7,7 +7,7 @@ import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
 import type { BoxTidyAsk, Tidied, VaultError, WatchScope } from 'safebyok-big/storage'
 import * as Phrases from './phrases'
-import { isSafebyokErrorData, safebyokErrorData } from './refusals'
+import { isSafebyokRefusal, safebyokRefusal } from './refusals'
 import type { SafebyokBankApi } from './server'
 
 // == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexBankClient, ConvexBankDBOpts
@@ -64,7 +64,7 @@ type RowsWatched = {
 
 // == [The bankDB]: ConvexBankDB
 
-/** A BankDB that stores its rows in the host's Convex deployment, through the app's Convex client. */
+/** A BankDB that keeps its rows in the host's Convex deployment, through the app's Convex client. */
 export class ConvexBankDB extends DB.AdapterBankDB {
   // == [Props]: #client, #api, #maxBoxes
 
@@ -86,9 +86,9 @@ export class ConvexBankDB extends DB.AdapterBankDB {
 
   // == [Protected, the generic calls of AdapterBankDB]: doEnsureBank, doBuildBank, doPutGate, doDelBank, doGetVault, doPutVault, doDelVault, doListBoxes, doGetBox, doPutBox, doDelBox, doTidyGone, doWatch
   // A get is one query, and the rows it fetched are classified here. A write is one mutation, so one transaction: the component
-  // fetches the rows, classifies the ask with the same classifier, and stores the record if the act is a write. It returns the
-  // rows as it fetched them, which are classified here to the same outcome, and the rows it stored, read back, or null if it
-  // stored nothing. Whether it stored is checked against the act, and a write answers the rows stored.
+  // fetches the rows, classifies the ask with the same classifier, and writes the record if the act is a write. It returns the
+  // rows as it fetched them, which are classified here to the same outcome, and the rows it wrote, read back, or null if it
+  // wrote nothing. Whether it wrote is checked against the act, and a write answers the rows stored.
 
   protected async doEnsureBank(ask: BX.BankEnsureAsk): Promise<BX.BankEnsureStored> {
     const fetched = await runOrRefuse('doEnsureBank', () => this.#client.query(this.#api.ensureBank, { ask }))
@@ -224,7 +224,7 @@ export class ConvexBankDB extends DB.AdapterBankDB {
 /** Convex's size limit for one document, in bytes. */
 const ConvexDocumentSize = 1_048_576
 
-// Takes a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
+// Accepts a thunk because ConvexReactClient.query can throw synchronously, before it returns a promise.
 /** Run `thunk`, converting anything it throws into a safebyok refusal. */
 async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): Promise<ValT> {
   try {
@@ -238,13 +238,13 @@ async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): P
 // passed on. A refusal from the host's safebyok functions is recognized by its `data`, which only they make.
 /** The refusal for `thrown`: a refusal sent by the host's safebyok functions, else `storage_unavailable` naming `oplabel`. */
 function refusalOf(oplabel: string, thrown: unknown): VaultError {
-  if ((thrown instanceof ConvexError) && isSafebyokErrorData(thrown.data)) { return refusalOfCrossed(thrown.data) }
+  if ((thrown instanceof ConvexError) && isSafebyokRefusal(thrown.data)) { return refusalOfCrossed(thrown.data) }
   return DB.storageFailed(oplabel, thrown)
 }
 
 /** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message. */
-function refusalOfCrossed(data: unknown): VaultError {
-  const crossed = safebyokErrorData.parse(data)
+function refusalOfCrossed(val: unknown): VaultError {
+  const crossed = safebyokRefusal.parse(val)
   if (crossed.kind === 'identity_revoked') { return DB.identityRevoked() }
   return new DB.VaultError(crossed.kind, crossed.message)
 }

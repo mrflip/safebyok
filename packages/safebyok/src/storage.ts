@@ -1,4 +1,4 @@
-// The storage of the lean core: the vaultDB, where every kind is stored as a Thing, and its memory store.
+// The storage of the lean core: the vaultDB, which keeps every kind as a Thing, and its memory store.
 export { AdapterVaultDB } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export {

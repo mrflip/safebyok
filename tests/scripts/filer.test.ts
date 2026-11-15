@@ -14,7 +14,7 @@ describe('Filer', () => {
     filer = new Filer(filepath)
   })
 
-  it('dumps a blob as the whole file, replacing what it held, and gets it back', () => {
+  it('dumps a blob as the whole file, replacing what it had, and gets it back', () => {
     filer.dump('first')
     filer.dump('second')
     expect(filer.getText()).to.equal('second')

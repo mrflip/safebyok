@@ -15,7 +15,7 @@ function builtOf(record: Fetched<BoxRecord, BoxSparse>, listing: TestableBoxList
   return listing.deliverRecord(record)
 }
 
-// == [Rebirth]: an edit over a box gone or damaged
+// == [Rebirth]: a put over a box gone or damaged
 
 describe("box.put(patch): rebirth over a tombstone", () => {
   const TombstoneCases = [
@@ -123,7 +123,7 @@ const asBuilt = { maxMillisSinceRefresh: Infinity, maxParentMillis: Infinity } a
 
 describe("box.put: the versioned replace, with or without ifPresent 'repl'", () => {
   for (const opts of [{}, { ifPresent: 'repl' }] as const) {
-    it(`refuses 'stale_write' for a box that changed in storage, and updates the box to the stored revision, with opts ${JSON.stringify(opts)}`, async () => {
+    it(`refuses 'stale_write' for a box that changed in storage, and adopts the stored revision, with opts ${JSON.stringify(opts)}`, async () => {
       const box = builtOf(fullBoxRecord())
       world.mw.seedPut(fullBoxRecord({ revision_tok: 'rev-stored', revision_seq: 4 }))
       world.mw.clearCalls()
@@ -150,7 +150,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: box.revision_tok, revision_seq: 2 })
   })
 
-  it("refuses 'stale_write' when a newer revision arrives during the seal", async () => {
+  it("refuses 'stale_write' when a newer revision is delivered during the seal", async () => {
     const rival = fullBoxRecord({ revision_seq: 2, revision_tok: 'rev-rival' })
     const listing = fakeSealBoxListingOf(world.mw, {}, () => { world.mw.seedPut(rival); box.listing.deliverRecord(rival) })
     const box = listing.deliverRecord(fullBoxRecord())
@@ -159,14 +159,14 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
     expect(box.revision_tok).to.eq('rev-rival')
   })
 
-  it("refuses 'camped' with ifPresent 'fail' over a live record, saving nothing", async () => {
+  it("refuses 'camped' with ifPresent 'fail' over a live record, putting nothing", async () => {
     const box = builtOf(fullBoxRecord())
     await TH.expectRefusal(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'fail', ...asBuilt }), 'camped')
     expect(box.revision_seq).to.eq(1)
     expect(world.mw.stored.get('anthropic_api_key')).to.deep.include({ revision_tok: 'rev-a1', revision_seq: 1 })
   })
 
-  it("with ifPresent 'get' over a live record, returns the box unchanged and saves nothing", async () => {
+  it("with ifPresent 'get' over a live record, returns the box unchanged and puts nothing", async () => {
     const box = builtOf(fullBoxRecord())
     await expect(box.put({ whisper: { apiKey: 'sk-test-0000' }, sidecar: { note: 'new' } }, { ifPresent: 'get', ...asBuilt })).resolves.to.eq(box)
     expect(box.revision_seq).to.eq(1)
@@ -189,7 +189,7 @@ describe("box.put: the versioned replace, with or without ifPresent 'repl'", () 
   })
 })
 
-// == [A whisper and a sidecar on every update]: put, expose, veil
+// == [A whisper and a sidecar on every put]: put, expose, veil
 
 describe("box.put(patch): a patch naming a half", () => {
   const PatchCases = [
@@ -258,7 +258,7 @@ describe("box.put checks its patch before it checks the lock", () => {
     expect(world.mw.callsOf('put')).to.deep.equal([])
   })
 
-  it("takes only the whisper and sidecar from a full patch, ignoring other fields", async () => {
+  it("uses only the whisper and sidecar from a full patch, ignoring other fields", async () => {
     const box = builtOf(fullBoxRecord())
     await box.put({ ...fullBoxRecord(), sidecar: { note: 'new' }, whisper: { apiKey: 'sk-test-0001' }, box_key_wrapped: undefined })
     expect(box._cheat_central).to.include({ revision_seq: 2, am: 'a' })

@@ -10,8 +10,8 @@ devices through a storage layer the host plugs in.
 
 * **The backend has ciphertext it cannot decrypt.** It can read labels and times, which are
   authenticated but never encrypted, and each box's sidecar, which is neither: the backend can read
-  and change a sidecar, and the box still opens. Put no secret in a sidecar (*Whisper and sidecar*).
-* **One unlock opens every vault of the bank.** A bank has one passphrase, and at most one passkey,
+  and change a sidecar, and the box still unseals. Put no secret in a sidecar (*Whisper and sidecar*).
+* **Unlocking once opens every vault of the bank.** A bank has one passphrase, and at most one passkey,
   for all its vaults. Once the user unlocks it on a device, every box of every vault in it can be
   unsealed there until the bank locks. Secrets that must be unlocked separately belong in separate
   banks, each under its own `banklabel`.
@@ -19,11 +19,11 @@ devices through a storage layer the host plugs in.
   passphrase is forgotten and which has no working passkey. A replaced passphrase or revoked passkey
   no longer unlocks the bank, but the bankKey never changes, so a copy of the old gate row can still
   be unlocked with the old passphrase or passkey. Deleting a vault deletes its boxes but no key:
-  a copy of those boxes kept elsewhere still unseals under the bank's key. Only deleting the bank,
-  with `bank.delPrompt()`, removes the stored copies of its key.
+  a copy of those boxes kept elsewhere still unseals under the bankKey. Only deleting the bank,
+  with `bank.delPrompt()`, removes the stored copies of its bankKey.
 * **State is framework-agnostic.** `Device`, `Bank`, `Vault`, `Box`, the main gate
   (`bank.maingate`) and each listing (`bank.vaultListing`, `vault.boxListing`) have `subscribe` and
-  `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore` takes them. A
+  `getSnapshot`, which can be passed on their own, the way `useSyncExternalStore` accepts them. A
   snapshot is the same object until something changes, shows only its own thing's state (a
   listing's is its labels), and never contains a whisper. It is plain data, except for the device's
   `openGating`, which is the live gating your dialog calls.
@@ -49,7 +49,7 @@ types here do not have, trust the types.
   deleted and made again is a new life, with a new `vault_tok`; the `Vault` object for its scope
   stays the same, and moves to the new life. While deleted it stays enabled, and its calls answer
   what storage has: a fetch finds the tombstone, or a new life made elsewhere, and its boxes are gone.
-* **device**: the signed-in user's presence on this browser. It holds your options and functions,
+* **device**: the signed-in user's presence on this browser. It has your options and functions,
   and brings up the bank.
 * **bank**: a signed-in user's vaults and what they share: one gate, one lease and one lock. One
   per signed-in user and `banklabel`. A bank deleted, or built again on another device, disables its
@@ -65,12 +65,12 @@ types here do not have, trust the types.
 ## Whisper and sidecar
 
 A box keeps two JSON objects of your app's. The whisper is sealed: encrypted, and bound to the box's
-labels, times and revision, so that a whisper altered or moved in storage refuses to open. The
+labels, times and revision, so that a whisper altered or moved in storage will not decipher. The
 sidecar is laid beside it, unsealed, so that your server may read it and change it. A field the
 server should read but must not change unnoticed goes in both: the sidecar's copy for the server, the
 whisper's for your app, which compares the two once the box is unsealed to see what changed.
 
-| A field kept in       | Server-readable | Server-writable | Authenticated                      |
+| A field kept in       | Unencrypted     | Server-writable | Authenticated                      |
 |-----------------------|-----------------|-----------------|------------------------------------|
 | the whisper           | no              | no              | yes                                |
 | both, copied          | yes             | up to you       | yes: compare to see what changed   |
@@ -126,8 +126,8 @@ Easy to get wrong:
   be built. `browserOpts` supplies `zxcvbnStrengthChecker`, whose dictionary loads at `device.ensureBank()`.
 * The core sets no timers. Call `bank.autolock()` after `ensureBank` and on a timer of your own.
 * `vault.beginWatch()` lists a vault's boxes and starts watching them. Until you call it,
-  `vault.boxListing` is empty and nothing is watched, so a change made on another device does not
-  arrive until the next `vault.beginWatch()`.
+  `vault.boxListing` is empty and nothing is watched, so a change made on another device is not
+  delivered until the next `vault.beginWatch()`.
 * `device.vacate()` is sign-out. It disables the device and its bank, then removes this bank's
   cached leases and its device row from the deviceDB. It does not touch the bankDB, and it resolves
   once each removal has been tried. The next device's `ensureBank` for that user gets a new
@@ -138,7 +138,7 @@ Easy to get wrong:
 * **A swept or vacated device cannot be used again.** From the moment you call `device.sweep()` or
   `device.vacate()`, `device.isEnabled` is permanently false, `device.bank` is null, `ensureBank`,
   `ensureVault` and `vaultAt` refuse with `disabled`, and the device stops calling your functions:
-  the events and refusals it would have sent them go to `DefaultOnLifecycle` and `DefaultOnBadNews`
+  the events and refusals it would have delivered them go to `DefaultOnLifecycle` and `DefaultOnBadNews`
   instead. The only exception is a vacate's
   cleanup, which still reports what it could not remove to your `onLifecycle` and `onBadNews`.
 * **A revoked identity vacates the device**, whatever your handlers do. When your storage adapter
@@ -195,7 +195,7 @@ safebyok has bags of its own. A veiled box stays veiled while its bank is locked
 is still true, and `box.exposure` is `'locked'`. A box's snapshot has `isExposed`, `isVeiled`, and
 `isLocked`, its bank's lock; a vault's snapshot has no lock of its own. `box.veil()` hides
 the whisper and `box.unveil()` shows it again, and the veil is cleared when the whisper is removed.
-A lock hides the whisper, and an unlock shows it again. `box.subscribe` notifies its listeners of
+A lock hides the whisper, and unlocking shows it again. `box.subscribe` notifies its listeners of
 each of these changes.
 
 **A script.** Fetch the passphrase in `requestCleartext`, with a token the container already has:

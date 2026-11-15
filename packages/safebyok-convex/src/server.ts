@@ -7,11 +7,11 @@ import * as DB from 'safebyok-big/storage'
 import type { ComponentApi } from './component-api'
 import * as CVX from './component/validators'
 import * as Phrases from './phrases'
-import type { SafebyokErrorData } from './refusals'
+import type { SafebyokRefusal } from './refusals'
 
 export type { ComponentApi } from './component-api'
-export { safebyokErrorKindVals, safebyokErrorData, isSafebyokErrorData } from './refusals'
-export type { SafebyokErrorData, SafebyokErrorKind } from './refusals'
+export { safebyokErrorKindVals, safebyokRefusal, isSafebyokRefusal } from './refusals'
+export type { SafebyokRefusal, SafebyokErrorKind } from './refusals'
 
 // == [Options]: GetUserId, SafebyokApiOpts
 
@@ -63,7 +63,7 @@ export class SafebyokBankComponent {
     async function demandCaller(ctx: GenericQueryCtx<DataModel>, scope: unknown): Promise<void> {
       const callerId = await opts.getUserId(ctx)
       const asked = scopeUser.safeParse(scope)
-      if ((! callerId) || (! asked.success) || (callerId !== asked.data.user_id)) { throw new ConvexError<SafebyokErrorData>({ kind: 'identity_revoked' }) }
+      if ((! callerId) || (! asked.success) || (callerId !== asked.data.user_id)) { throw new ConvexError<SafebyokRefusal>({ kind: 'identity_revoked' }) }
     }
 
     return {

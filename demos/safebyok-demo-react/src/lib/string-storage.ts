@@ -2,7 +2,7 @@
 export type StringStorage = {
   /** The text stored at `ckey`, or null for none. */
   get(ckey: string): string | null
-  /** Store `text` at `ckey`. */
+  /** Put `text` at `ckey`. */
   put(ckey: string, text: string): void
   /** Remove what is stored at `ckey`. */
   del(ckey: string): void

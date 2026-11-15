@@ -31,7 +31,7 @@ type FieldedType = GraphQLObjectType | GraphQLInputObjectType
 /** The definition of `check`, typed as {@link CheckDef}. */
 function defOf(check: Check): CheckDef { return check._zod.def }
 
-/** Unwrap `check` to the check that holds its fields: through nullable, default and readonly wrappers, a transform's input, and a list's element. */
+/** Unwrap `check` to the check that has its fields: through nullable, default and readonly wrappers, a transform's input, and a list's element. */
 function unwrapped(check: Check): Check {
   const def = defOf(check)
   const inner = def.innerType ?? def.in ?? def.element
@@ -103,7 +103,7 @@ function schemaDriftOf(schema: GraphQLSchema): string[] {
     ...AnswerChecks.flatMap(([fieldname, check]) => driftOf(check, rootFieldOf(schema, fieldname).type, fieldname)),
     ...InputChecks.flatMap(([fieldname, argname, check]) => {
       const arg = rootFieldOf(schema, fieldname).args.find((each) => each.name === argname)
-      if (! arg) { throw new Error(`the schema's ${fieldname} takes no ${argname}`) }
+      if (! arg) { throw new Error(`the schema's ${fieldname} has no ${argname}`) }
       return driftOf(check, arg.type, `${fieldname}(${argname})`)
     }),
   ]
@@ -185,7 +185,7 @@ describe("BankSchemaSdl", () => {
     expect(schemaDriftOf(shorted).join('\n')).to.include('options')
   })
 
-  it("takes a gate put's policy as one of the storage policies, and no other", () => {
+  it("accepts a gate put's policy as one of the storage policies, and no other", () => {
     const policyEnum = buildSchema(BankSchemaSdl).getType('SafebyokStoragePolicy')
     const policies = isEnumType(policyEnum) ? policyEnum.getValues().map((policy) => policy.value as unknown) : null
     expect(policies).to.deep.equal([...storagePolicyVals])

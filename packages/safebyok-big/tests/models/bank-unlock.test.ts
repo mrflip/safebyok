@@ -1,4 +1,4 @@
-/** A bank's unlocking: ensureUnlocked, unlock and lock, the lease it has by an unlock or by the cache, and its vaults' seals under that lease. */
+/** A bank's unlocking: ensureUnlocked, unlock and lock, the lease it has by a gating or by the cache, and its vaults' seals under that lease. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
@@ -41,7 +41,7 @@ describe("proving.buildWayin", () => {
 })
 
 describe("bank.ensureUnlocked, bank.unlock and bank.lock()", () => {
-  it("ensureUnlocked shows no dialog for an unlocked bank, where unlock always asks for proof", async () => {
+  it("ensureUnlocked shows no dialog for an unlocked bank, where unlock always asks for cleartext", async () => {
     const { bank, dialog } = await makeBornVault()
     const asked = vi.fn()
     dialog.requestCleartext = asked
@@ -51,7 +51,7 @@ describe("bank.ensureUnlocked, bank.unlock and bank.lock()", () => {
     expect(asked).toHaveBeenCalledOnce()
   })
 
-  it("only ensureUnlocked uses the cached lease, where unlock still asks for proof", async () => {
+  it("only ensureUnlocked uses the cached lease, where unlock still asks for cleartext", async () => {
     const asked = vi.fn()
     const born = await makeBornVault(byPassphrase(Passphrase), { requestCleartext: asked })
     const { bank } = await nextSessionOf(born)
@@ -99,7 +99,7 @@ describe("bank.ensureUnlocked, bank.unlock and bank.lock()", () => {
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("tells its listeners once at a lock and once at an unlock, its snapshot following", async () => {
+  it("tells its listeners once as it locks and once as it unlocks, its snapshot following", async () => {
     const { bank } = await makeBornVault()
     const listener = vi.fn()
     bank.subscribe(listener)
@@ -137,15 +137,15 @@ describe("vault.sealStampedString and vault.unsealStampedString", () => {
     await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}))
   })
 
-  it("seal nothing a vault of another bank can open", async () => {
+  it("seal nothing a vault of another bank can unseal", async () => {
     const { vault } = await makeBornVault()
     const { vault: other } = await makeBornVault()
     await TH.expectRefusal(other.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), Stamp), 'damaged_whisper')
   })
 })
 
-describe("An unlock, by proof or by the cached lease", () => {
-  it("takes the new lease and caches it over the old one", async () => {
+describe("Unlocking, by a gating or by the cached lease", () => {
+  it("attaches the new lease and caches it over the old one", async () => {
     const { bank, deviceDB, advance } = await makeBornVault()
     const bornRow = deviceDB.cachedNow() as { proved_at: number }
     advance(1)
@@ -240,7 +240,7 @@ describe("The cached lease, used only by ensureUnlocked", () => {
     expect(deviceDB.forget).toHaveBeenCalledOnce()
   })
 
-  it("is reported as bad news when its row is not a valid lease, and the user is asked for proof", async () => {
+  it("is reported as bad news when its row is not a valid lease, and the user is asked for cleartext", async () => {
     const born = await makeBornVault()
     const { deviceDB, badnews } = born
     const cached = deviceDB.cachedNow() as Record<string, unknown>

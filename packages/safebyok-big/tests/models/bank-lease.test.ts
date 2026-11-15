@@ -86,7 +86,7 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
     return { ...born, box }
   }
 
-  it("seals a box through the vault and opens it, end to end", async () => {
+  it("seals a box through the vault and unseals it, end to end", async () => {
     const { box } = await makeVaultWithBox()
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test' })
   })
@@ -231,7 +231,7 @@ function valuesShownBy(subject: object): unknown[] {
 }
 
 describe("a bank, a vault and a lease never reveal the lease friend or the lease key handle", () => {
-  it("a gating does not reveal the bank's unlock or its act through its fields, Object.keys or JSON.stringify", async () => {
+  it("a gating does not reveal the bank's unlockByProving or its act through its fields, Object.keys or JSON.stringify", async () => {
     const { bank, dialog } = await makeBornVault()
     let gatingShown: object | null = null
     dialog.requestCleartext = (gating) => {

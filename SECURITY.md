@@ -1,6 +1,6 @@
 # Security Policy
 
-safebyok holds people's secrets, so we treat a report about it as the most important thing in the
+safebyok keeps people's secrets, so we treat a report about it as the most important thing in the
 queue. Thank you for taking the time.
 
 ## Reporting a vulnerability
@@ -25,23 +25,23 @@ Until 1.0, only the latest published version receives security fixes.
 
 ## Two properties a reviewer should not have to find
 
-Since keys moved from each vault to its bank (one bank per user and `banklabel`), two things hold
-that did not before:
+Since keys moved from each vault to its bank (one bank per user and `banklabel`), two things are true
+that were not before:
 
-* **One unlock on a device opens every vault of the bank.** A bank has one gate: one passphrase,
+* **Unlocking once on a device opens every vault of the bank.** A bank has one gate: one passphrase,
   and at most one passkey, which unwrap the bankKey, and the bankKey wraps the boxKey of every box
   in every vault. Once a device unlocks the bank, by the user's answer or by its lease, it can
   unseal any box of any of its vaults until the bank locks. There is no per-vault secret.
   Secrets that must be unlocked separately belong in separate banks, under separate `banklabel`s.
-* **Deleting a vault no longer removes a wrapped key from storage.** A vault row holds nothing
+* **Deleting a vault no longer removes a wrapped key from storage.** A vault row has nothing
   encrypted, and each box's boxKey is wrapped by the bankKey. Deleting a vault deletes its boxes,
   but a copy of them kept elsewhere (a backup, a replica) still unseals for whoever can unlock the
   bank. Only deleting the bank (`bank.delPrompt()`) removes the stored copies of the bankKey;
-  even then a copy of its gate row still opens to its old passphrase or passkey.
+  even then its old passphrase or passkey still unwraps the bankKey from a copy of its gate row.
 
 ## What we consider in scope
 
-safebyok's promise is that **whoever holds the application's database, server code and environment
+safebyok's promise is that **whoever has the application's database, server code and environment
 cannot read a user's secrets**, and cannot alter them without the change being detected. Anything
 that breaks that promise is in scope, for example:
 
@@ -52,10 +52,10 @@ that breaks that promise is in scope, for example:
 * secret material escaping into an error, a log, a thrown value or anything else that leaves the
   library;
 * weak or predictable randomness, or a key derivation weaker than the published keyDeriverSpec;
-* a published package whose contents do not match this repository's source.
+* a published package whose files do not match this repository's source.
 
 `notes/guarantees.md` states, value by value, where secret material may exist, in what form, for
-how long, and which code may hold it. Anything that shows one of those guarantees broken is in
+how long, and which code may have it. Anything that shows one of those guarantees broken is in
 scope.
 
 ## What is outside safebyok's protection

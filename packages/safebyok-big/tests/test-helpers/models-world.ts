@@ -14,7 +14,7 @@
  * otherwise keep each whisper's text by the stamp it was sealed under and give it back for that
  * stamp alone: its sealed parts are the constants
  * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
- * builders make, opens to a 'damaged_whisper', as under the real vault.
+ * builders make, unseals to a 'damaged_whisper', as under the real vault.
  */
 
 import type { GotAct } from '../../src/shapes/shapes-enums'
@@ -126,7 +126,7 @@ export type ModelsWatch = { onNotice: (notice: Notice) => void, onBadNews: ((new
 
 // == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, FakeDevice, FakeBank, FakeVault, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
 
-/** The sealed parts of every record the fake seal seals: constants that wrap no key and open under none. */
+/** The sealed parts of every record the fake seal seals: constants that wrap no key and unwrap under none. */
 export const FakeBoxKeyWrapped   = fakeCiphered('fake-box-key-wrapped')
 /** The `whisper_ciphered` of every record the fake seal seals. */
 export const FakeWhisperCiphered = fakeCiphered('fake-whisper-ciphered')
@@ -169,7 +169,7 @@ export type FakeVault = {
   subscribe(listener: () => void): () => void
   /** Seal `whisperText` by the fake seal, refusing 'bank_locked' while locked. */
   sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
-  /** Open what the fake seal sealed under `stamp`, refusing 'bank_locked' while locked. */
+  /** Unseal what the fake seal sealed under `stamp`, refusing 'bank_locked' while locked. */
   unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
   /** Log the vault row an answer carried, as a call. */
   receiveParent(parent: unknown): void
@@ -177,7 +177,7 @@ export type FakeVault = {
   ensureTimely(maxMillis?: number): Promise<unknown>
 }
 
-/** How {@link makeModelsWorld} starts the world. */
+/** How {@link makeModelsWorld} builds the world. */
 export type ModelsWorldOpts = {
   /** The clock's first reading; {@link T0}. */
   now?:         number
@@ -247,7 +247,7 @@ export type ModelsWorld = {
   answerOf(scope: Boxscope, val: Fetched<BoxRecord, BoxSparse> | null, parent?: unknown): BoxAnswer
   /** The refused answer about `scope`; `dbhas` is the row it carries. */
   refusalOf(scope: Boxscope, err: VaultError, parent?: unknown, dbhas?: unknown): BoxAnswer
-  /** The `stale_write` refusal about `scope` carrying what storage has stored as `dbhas`: a record, or null; `undefined` leaves it out. */
+  /** The `stale_write` refusal about `scope` carrying what storage has as `dbhas`: a record, or null; `undefined` leaves it out. */
   staleWriteOf(scope: Boxscope, stored: Fetched<BoxRecord, BoxSparse> | null | undefined, parent?: unknown): BoxAnswer
 
   /** Push `record` through the live watch as a notice, under the world's vault row unless told otherwise, resolving once the listing has delivered it. Throws where no watch is live. */
@@ -263,13 +263,13 @@ export type ModelsWorld = {
   boxscope(boxlabel: string): Boxscope
 }
 
-/** A queue of scripted answers: `take` the next, if any. */
+/** A queue of scripted answers: `dequeue` the next, if any. */
 class Script<CallT> {
   readonly #queue: Scripted<CallT>[] = []
 
   push(...answers: readonly Scripted<CallT>[]): void { this.#queue.push(...answers) }
 
-  take(call: CallT): { scripted: boolean, answer: unknown } {
+  dequeue(call: CallT): { scripted: boolean, answer: unknown } {
     if (this.#queue.length === 0) { return { scripted: false, answer: undefined } }
     const next = this.#queue.shift()
     return { scripted: true, answer: typeof next === 'function' ? next(call) : next }
@@ -299,7 +299,7 @@ export class TestableBankDB extends MemoryBankDB {
   override async tryGetBox(ask: BoxGetAsk) {
     const scope = CX.boxscope.parse(ask)
     this.#calls.push({ verb: 'get', scope, expectedRevisionTok: expectedTokOf(ask.expected) })
-    const { scripted, answer } = this.scripts.get.take({ scope })
+    const { scripted, answer } = this.scripts.get.dequeue({ scope })
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryBankDB['tryGetBox']>>) : super.tryGetBox(ask)
   }
 
@@ -308,7 +308,7 @@ export class TestableBankDB extends MemoryBankDB {
     const { record, expected, ifAbsent, ifPresent } = ask
     const call: PutCall = { record, expectedRevisionTok: expectedTokOf(expected), ifAbsent, ifPresent }
     this.#calls.push({ verb: 'put', ...call })
-    const { scripted, answer } = this.scripts.put.take(call)
+    const { scripted, answer } = this.scripts.put.dequeue(call)
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryBankDB['tryPutBox']>>) : super.tryPutBox(ask)
   }
 
@@ -316,7 +316,7 @@ export class TestableBankDB extends MemoryBankDB {
   override async tryDelBox(ask: BoxDelAsk) {
     const call: DelCall = { scope: CX.boxscope.parse(ask), expectedRevisionTok: expectedTokOf(ask.expected), tombstone: ask.record }
     this.#calls.push({ verb: 'del', ...call })
-    const { scripted, answer } = this.scripts.del.take(call)
+    const { scripted, answer } = this.scripts.del.dequeue(call)
     return scripted ? ((await answer) as Awaited<ReturnType<MemoryBankDB['tryDelBox']>>) : super.tryDelBox(ask)
   }
 
@@ -429,7 +429,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     receiveParent:    (parent) => { calls.push({ verb: 'receiveParent', parent }) },
     ensureTimely: async (maxMillis) => {
       calls.push({ verb: 'ensureTimely', maxMillis })
-      const { scripted, answer } = ensureTimelyScript.take(maxMillis)
+      const { scripted, answer } = ensureTimelyScript.dequeue(maxMillis)
       if (scripted) { await answer }
       return world
     },
@@ -601,6 +601,6 @@ export function fakeSealBoxListingOf(mw: ModelsWorld, overrides: BoxListingOverr
 
 // == [Dna]: boxDnaOf
 
-/** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every update of a box names both, and `overrides` laid over them. */
+/** A box's dna for `create`: `scope`, with a fake whisper and an empty sidecar, as every put of a box names both, and `overrides` laid over them. */
 export function boxDnaOf(scope: Boxscope, overrides: Partial<BoxDna> = {}): BoxDna { return { ...scope, whisper: { apiKey: 'sk-test-0000' }, sidecar: {}, ...overrides } }
 // --

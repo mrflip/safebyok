@@ -82,15 +82,15 @@ describe("WhisperField", () => {
   })
 
   it("matches its form example: the form reads the whisper under the field's name", () => {
-    const saved: unknown[] = []
+    const submitted: unknown[] = []
     render(
-      <form onSubmit={(evt) => { evt.preventDefault(); saved.push(new FormData(evt.currentTarget).get('whisper_text')) }}>
+      <form onSubmit={(evt) => { evt.preventDefault(); submitted.push(new FormData(evt.currentTarget).get('whisper_text')) }}>
         <WhisperField aria-label="Anthropic API key" /> <button>Save</button>
       </form>,
     )
     typeWhisper()
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-    expect(saved).to.deep.equal(['sk-ant-fake'])
+    expect(submitted).to.deep.equal(['sk-ant-fake'])
   })
 
   it("hands a ref the input, to read or empty", () => {

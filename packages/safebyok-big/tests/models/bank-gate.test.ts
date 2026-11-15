@@ -38,7 +38,7 @@ function dialogOf({ dialog }: Born) {
   }
 }
 
-/** The proving of the bank's main gate that `passphrase` opens, refusing 'wrong_passphrase' otherwise. */
+/** The proving of the bank's main gate made from `passphrase`, refusing 'wrong_passphrase' otherwise. */
 function proveBy(bank: Bank, passphrase: string) { return PassphraseProving.buildStored(bank.maingate, passphraseCleartext.parse(passphrase), bank) }
 
 /** Moves the gate row past what the attempt read, as another device does just before its put under `policy` reaches the bankDB. */
@@ -88,7 +88,7 @@ describe("a gate changed on another device", () => {
     expect(await vaultRoundTrip(vault, vault)).to.eq('sk-test')
   })
 
-  it("taken from a fetch leaves this bank unlocked, its lease in force", async () => {
+  it("adopted from a fetch leaves this bank unlocked, its lease in force", async () => {
     const { bank, vault, anotherDevice, demandStoredGate } = deafened(await makeBornVaultWithPasskey())
     const ante = bank.maingate.pickle()
     const theirs = await anotherDevice().ensureBank()
@@ -103,7 +103,7 @@ describe("a gate changed on another device", () => {
 
 describe("a passkey over a passphrase change", () => {
   // A decision: notes/wontfix-big.md, 2026-11-09.
-  it("keeps the passkey wayin as stored, and the passkey still opens", async () => {
+  it("keeps the passkey wayin as stored, and the passkey still unwraps it", async () => {
     const { bank, demandStoredGate } = await makeBornVaultWithPasskey()
     const { passkey0 } = demandStoredGate().wayins
     await replaceTyping(bank, Passphrase, NewPassphrase)
@@ -170,7 +170,7 @@ describe("gate.replacePassphrasePrompt()", () => {
     await proveBy(bank, Passphrase)
   })
 
-  it("leases citing the gate row it wrote, not a newer one that arrived meanwhile", async () => {
+  it("leases citing the gate row it wrote, not a newer one that was delivered meanwhile", async () => {
     const { bank, bankDB, deviceDB, demandStoredGate, putGateBehindOurBack } = await makeBornVault()
     const commit = bankDB.tryPutGate.bind(bankDB)
     let written = ''
@@ -226,7 +226,7 @@ describe("gate.replacePassphrasePrompt()", () => {
     expect(await device.ensureBank()).to.include({ bank_tok: storedBankNow()?.bank_tok, isLocked: true })
   })
 
-  it("refuses 'stale_write' when a gate row arrives during the proving", async () => {
+  it("refuses 'stale_write' when a gate row is delivered during the proving", async () => {
     let born: Born | null = null
     const crossing: StrengthChecker = async () => {
       if (born !== null) {
@@ -628,7 +628,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
   })
 
   // PasskeyAnswer @example
-  it("an added passkey alone unlocks the next session and opens the box sealed before it", async () => {
+  it("an added passkey alone unlocks the next session and unseals the box sealed before it", async () => {
     const { bank, unsealIn, openNextSession } = await makeVaultWithBox()
     await addPasskeyTyping(bank, Passphrase, 'laptop')
     bank.lock()
@@ -749,7 +749,7 @@ describe("the gate listing's putGate", () => {
   const MovedDevice = '00000000-0000-4000-8000-0000000000d2'
   const Passkey0 = { ...TH.passkeyWayin, wayinlabel: 'passkey0' as const }
 
-  it("sends the next revision with the new wayins, its gate_tok and bank_tok kept, under the policy given", async () => {
+  it("puts the next revision with the new wayins, its gate_tok and bank_tok kept, under the policy given", async () => {
     const { bank, bankDB } = await makeBornVault()
     const ante = bank.maingate.pickle()
     const main = { ...ante.wayins.main, device_tok: MovedDevice }
@@ -792,7 +792,7 @@ describe("the gate listing's putGate", () => {
     expect(bank.maingate.pickle()).to.deep.equal(ante)
   })
 
-  it("refuses an answer that is not the record it sent", async () => {
+  it("refuses an answer that is not the record it put", async () => {
     const { bank, bankDB } = await makeBornVault()
     const commit = bankDB.tryPutGate.bind(bankDB)
     vi.spyOn(bankDB, 'tryPutGate').mockImplementationOnce(async (ask) => {

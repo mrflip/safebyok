@@ -39,7 +39,7 @@ pnpm justify    # from e2e/: install, lint, typecheck, test (it builds the packa
   * [test-helpers.ts](tests/postgres/test-helpers.ts) -- the file databases, the devices, and
     **`OnRealPostgres`, the list of suites that run against the server**. The rest of the
     Postgres tests stay in `packages/safebyok-postgres`, over a PGlite. To run one more suite on the
-    server, add it to the list. A file database holds the bankDB's tables and functions.
+    server, add it to the list. A file database has the bankDB's tables and functions.
 
 * [tests/graphql/](tests/graphql) -- `safebyok-graphql`'s README recipe, both halves, over real
   sockets: `GraphQLBankDB` over an urql Client posting to Yoga servers, each on its own port and

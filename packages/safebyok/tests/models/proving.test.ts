@@ -37,7 +37,7 @@ function novelPasskey(answer = TH.passkeyAnswerOf(), device: GX.ProvingDevice = 
   return PasskeyProving.buildNovel(TH.WorldBankStamp, TH.WorldGateStamp, answer, device)
 }
 
-/** The main gate of a bank born with both wayins, beside a function giving a fresh copy of the answer that opens its passkey's. */
+/** The main gate of a bank born with both wayins, beside a function giving a fresh copy of the answer that unwraps its passkey's. */
 async function gateWithBoth(): Promise<{ gate: Gate, answerOf: () => GX.PasskeyAnswer }> {
   const answer = TH.passkeyAnswerOf()
   const { bank } = await TH.buildBornBank({ passkeyClear: TH.copyOfAnswer(answer) })
@@ -58,14 +58,14 @@ function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): Stamped
   return { bankStamp: { ...TH.WorldBankStamp, ...moves.bank }, stamp: { ...TH.WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 
-/** What a bankKey is unwrapped as only to see that a wrap opens. */
+/** What a bankKey is unwrapped as only to see that a wrap unwraps. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 function findsWeak() { return { strong: false as const, reason: 'too short' } }
 
 function findsStrongAsync() { return Promise.resolve({ strong: true as const }) }
 
-/** Checks that `one`'s lease opens what `other`'s seals: that both have one bankKey. */
+/** Checks that `one`'s lease unseals what `other`'s seals: that both have one bankKey. */
 async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   const bank = TH.fakeLeaseBankOf()
   const sealer = await one.buildLease(bank, TH.WorldGate)
@@ -205,7 +205,7 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", ()
     expect(TH.isZeroed(short) && TH.isZeroed(long)).to.be.true
   })
 
-  it("takes key bytes handed back as a view into a larger buffer, zeroing that view alone", async () => {
+  it("accepts key bytes handed back as a view into a larger buffer, zeroing that view alone", async () => {
     const buffer = new Uint8Array(48).fill(9)
     buffer.set(Crypto.randomBytes(32), 8)
     await novelOverHanded(() => buffer.subarray(8, 40))
@@ -259,7 +259,7 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, device)", () => {
     expect(proving).to.be.instanceOf(PassphraseProving)
   })
 
-  it("refuses a passphrase that does not open it as 'wrong_passphrase', quoting none of it", async () => {
+  it("refuses a passphrase that does not unwrap it as 'wrong_passphrase', quoting none of it", async () => {
     const gate = await gateWithPassphrase()
     const misremembered = GX.passphraseCleartext.parse(`${TH.TestPassphrase}, misremembered`)
     const err = await TH.expectRefusal(PassphraseProving.buildStored(gate, misremembered, TH.provingDeviceOf()), 'wrong_passphrase')
@@ -329,7 +329,7 @@ describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
   const WrongAnswerCases = [
     [{ credential_id: 'cred-test-other' },                                     'of another credential'],
     [{ prf_salt_b64: Crypto.toB64(Crypto.randomBytes(Consts.PasskeySaltSize)) }, 'of another salt'],
-    [{ prfBytes: Crypto.randomBytes(32) },                                     'whose PRF bytes do not open the wayin'],
+    [{ prfBytes: Crypto.randomBytes(32) },                                     'whose PRF bytes do not unwrap the wayin'],
   ] as const
 
   for (const [overrides, blurb] of WrongAnswerCases) {
@@ -356,7 +356,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
     expect(Consts.isGuarded({ ...guarded })).to.be.false
   })
 
-  it("takes any label a host chooses that fits the interface", async () => {
+  it("accepts any label a host chooses that fits the interface", async () => {
     const guarded = guardKeyDeriver({ ...TH.testDeriver, key_deriver_label: 'my_own_kdf' })
     const proving = await novelPassphrase({ ...TH.provingDeviceOf(), keyDeriver: guarded })
     const wayin = await proving.buildWayin(NOVEL)
@@ -442,7 +442,7 @@ describe("a proving's header", () => {
 })
 
 describe("proving.buildWayin(source)", () => {
-  it("from NOVEL wraps a new bankKey that the passphrase opens", async () => {
+  it("from NOVEL wraps a new bankKey that the passphrase unwraps", async () => {
     const { proving, wayin } = await novelWithWayin()
     expect(wayin).to.be.instanceOf(Wayin)
     expect(wayin.toJSON()).to.deep.equal(proving.header)
@@ -450,7 +450,7 @@ describe("proving.buildWayin(source)", () => {
     expect(bankKeyBytes.length).to.eq(32)
   })
 
-  it("from NOVEL makes a wayin that another passphrase does not open", async () => {
+  it("from NOVEL makes a wayin that another passphrase does not unwrap", async () => {
     const { wayin } = await novelWithWayin()
     await expect(TH._cheat_bankKeyBytesOf(TH.WorldBankStamp, TH.WorldGateStamp, wayin, { passphrase: `${TH.TestPassphrase}, misremembered` })).rejects.toThrow()
   })
@@ -484,7 +484,7 @@ describe("proving.buildWayin(source)", () => {
     expect(bankKeyBytesOne).to.not.deep.equal(bankKeyBytesTwo)
   })
 
-  it("binds the wayin to its bank and its gate: under another's stamp it will not open", async () => {
+  it("binds the wayin to its bank and its gate: under another's stamp it will not unwrap", async () => {
     const { wayin } = await novelWithWayin()
     await expect(TH._cheat_bankKeyBytesOf({ ...TH.WorldBankStamp, lifeseq: lifeseqOf(2) }, TH.WorldGateStamp, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
     await expect(TH._cheat_bankKeyBytesOf(TH.WorldBankStamp, { ...TH.WorldGateStamp, gate_tok: 'gate-tok-other' }, wayin, { passphrase: TH.TestPassphrase })).rejects.toThrow()
@@ -581,7 +581,7 @@ describe("the ctx a wayin is wrapped under", () => {
   }
 })
 
-describe("a passkey proving's key", () => {
+describe("a passkey proving's passkeyKey", () => {
   it("is HKDF over the PRF bytes, with the wayin's ctx as info", async () => {
     const answer = TH.passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
@@ -610,7 +610,7 @@ describe("proving.buildLease(bank, gate)", () => {
     await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), TH.WorldGate))
   })
 
-  it("builds a lease on the bank that cites the gate, and records the proof time and the wayinkind", async () => {
+  it("builds a lease on the bank that cites the gate, and records its proved_at and the wayinkind", async () => {
     const { gate, answerOf } = await gateWithBoth()
     const bank = TH.fakeLeaseBankOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())

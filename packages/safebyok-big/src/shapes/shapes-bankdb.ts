@@ -1,4 +1,4 @@
-/** The rows a bankDB stores (bank, gate, vault and box), the asks of its verbs, and their helpers. Imported as `BX`.
+/** The rows a bankDB has (bank, gate, vault and box), the asks of its verbs, and their helpers. Imported as `BX`.
  * The asks of `tidyGone` and `watch` are in `SX`.
  */
 
@@ -176,7 +176,7 @@ export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxsc
   return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, am: 'd' }
 }
 
-/** The `parent` a notice carries: the one storage sent, or {@link BankTop} for a bank row that came with none. */
+/** The `parent` a notice carries: the one storage reported, or {@link BankTop} for a bank row that came with none. */
 export function noticeParentOf({ fmt }: { fmt: number }, parent: BankRow | VaultRow | typeof BankTop | null): BankRow | VaultRow | typeof BankTop | null {
   return parent ?? ((fmt === BankFormat) ? BankTop : null)
 }
@@ -194,7 +194,7 @@ const isExpectedWhole  = ({ expected }: Expecting): boolean => (expected.revisio
 // A request and its record share only the address fields, so they agree when the record is at the request's address.
 const isRecordAtAsk    = ({ record, ...asked }: { record: object }): boolean => isConsistent(record, asked)
 
-/** True when a record's `lifeTok` is that of the live row it replaces, or a new one when it creates or deletes the row. */
+/** True when a record's `lifeTok` is that of the live row it replaces, or a new one when it is a birth or a deletion. */
 function isLifeTokPlaced(lifeTok: string, expectedLifeTok: string, expectedAm: EX.Am, recordAm: EX.Am): boolean {
   if ((expectedAm === 'a') && (recordAm === 'a')) { return lifeTok === expectedLifeTok }
   return (lifeTok !== expectedLifeTok) && (lifeTok !== SX.VoidLifeTok)
@@ -212,10 +212,10 @@ export const { bankEnsure } = Checkers('bad_scope', ({ lit, tuple, bankScope }) 
 /** An `ensureBank` ask: the bank's scope, and the gates to answer, `['main']`. */
 export type BankEnsureAsk = Readonly<Z.output<typeof bankEnsure>>
 
-// Every ask that stores a row has the same shape: its `op`, the address of the row, the row its caller
-// expects to find, and the record to store. A gate verb's ask and a vault ask also cite the `bank_tok` of the bank they
+// Every ask that writes a row has the same shape: its `op`, the address of the row, the row its caller
+// expects to find, and the record to write. A gate verb's ask and a vault ask also cite the `bank_tok` of the bank they
 // are made under, as a box ask cites its vault's `vault_tok`.
-/** The checks of a bankDB ask that stores a row, or gets a vault row.
+/** The checks of a bankDB ask that writes a row, or gets a vault row.
  * Only the revision and life fields of `expected` are read, so pass the row in hand, or the shell for none.
  */
 export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultAsk } = Checkers('bad_record', ({ obj, lit, oneof, tuple, discrim, bank_tok, gate_tok, bankScope, gateScope, vaultScope }) => {
@@ -279,19 +279,19 @@ export const { bankBuild, gatePut, bankDel, vaultGet, vaultPut, vaultDel, vaultA
   }
 }, [CX])
 
-/** A `buildBank` ask: the bank's scope, the bank record to store over the expected tombstone or shell, and its `main` gate's record. */
+/** A `buildBank` ask: the bank's scope, the bank record to put over the expected tombstone or shell, and its `main` gate's record. */
 export type BankBuildAsk = Readonly<Z.output<typeof bankBuild>>
-/** A `putGate` ask: the gate's scope, its bank's `bank_tok`, the gate record to store over the expected gate row, and the storage policy it is under. */
+/** A `putGate` ask: the gate's scope, its bank's `bank_tok`, the gate record to put over the expected gate row, and the storage policy it is under. */
 export type GatePutAsk   = Readonly<Z.output<typeof gatePut>>
-/** A `delBank` ask: the bank's scope, the tombstone to store, and the expected bank row. */
+/** A `delBank` ask: the bank's scope, the tombstone to write, and the expected bank row. */
 export type BankDelAsk   = Readonly<Z.output<typeof bankDel>>
 /** A vault get, put or del ask, as the bankDB receives it. */
 export type VaultAsk     = Readonly<Z.output<typeof vaultAsk>>
 /** A `getVault` ask: the vault's scope, its bank's `bank_tok`, the expected row (or shell), and the `ifAbsent` option. */
 export type VaultGetAsk  = Extract<VaultAsk, { op: 'get' }>
-/** A `putVault` ask: the vault's scope, its bank's `bank_tok`, the record to store, the expected row (or shell), and the `ifPresent` and `ifAbsent` options. */
+/** A `putVault` ask: the vault's scope, its bank's `bank_tok`, the record to put, the expected row (or shell), and the `ifPresent` and `ifAbsent` options. */
 export type VaultPutAsk  = Extract<VaultAsk, { op: 'put' }>
-/** A `delVault` ask: the vault's scope, its bank's `bank_tok`, the tombstone to store, and the expected row. */
+/** A `delVault` ask: the vault's scope, its bank's `bank_tok`, the tombstone to write, and the expected row. */
 export type VaultDelAsk  = Extract<VaultAsk, { op: 'del' }>
 
 /** The checks of a box's scope under the life of its vault, and of a `listBoxes` ask. */
@@ -342,12 +342,12 @@ export const { boxGet, boxPut, boxDel, boxAsk } = Checkers('bad_record', ({ lit,
 export type BoxAsk    = Readonly<Z.output<typeof boxAsk>>
 /** A `getBox` ask: the box's scope under its vault's life, the expected row (or shell), and the `ifAbsent` option. */
 export type BoxGetAsk = Extract<BoxAsk, { op: 'get' }>
-/** A `putBox` ask: the box's scope under its vault's life, the record to store, the expected row (or shell), and the `ifPresent` and `ifAbsent` options. */
+/** A `putBox` ask: the box's scope under its vault's life, the record to put, the expected row (or shell), and the `ifPresent` and `ifAbsent` options. */
 export type BoxPutAsk = Extract<BoxAsk, { op: 'put' }>
-/** A `delBox` ask: the box's scope under its vault's life, the tombstone to store, and the expected row. */
+/** A `delBox` ask: the box's scope under its vault's life, the tombstone to write, and the expected row. */
 export type BoxDelAsk = Extract<BoxAsk, { op: 'del' }>
 
-// A record is a stored row, payload and all: an answer and a refusal carry only its meta, as they may reach a log.
+// A record is a whole stored row: an answer and a refusal carry only its meta, as they may reach a log.
 /** The check of what a bankDB answer and its refusal carry of an ask: its fields, but of its rows only their revision, `am` and toks.
  * Each field is optional, so a refusal made before the ask was whole carries what of it was sound.
  */

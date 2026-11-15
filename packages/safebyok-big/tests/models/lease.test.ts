@@ -175,7 +175,7 @@ describe("Lease.buildFromCache(friend, gate)", () => {
     expect(await Lease.buildFromCache(fakeLeaseFriendOf(), WorldGate)).to.be.null
   })
 
-  it("returns the cached lease of this bank citing the gate, which opens what the granted lease sealed", async () => {
+  it("returns the cached lease of this bank citing the gate, which unseals what the granted lease sealed", async () => {
     const { friend, lease: granted } = await grantedWorld()
     const stamps = sealStampsOf('b1')
     const sealed = await granted.sealWith('{"val":"cached"}', stamps)
@@ -184,7 +184,7 @@ describe("Lease.buildFromCache(friend, gate)", () => {
     expect(await got!.unsealWith(sealed, stamps)).to.eq('{"val":"cached"}')
   })
 
-  it("returns a lease proved exactly the autolock duration ago, which still opens what the granted lease sealed", async () => {
+  it("returns a lease proved exactly the autolock duration ago, which still unseals what the granted lease sealed", async () => {
     const { friend, lease: granted } = await grantedWorld()
     const stamps = sealStampsOf('b1')
     const sealed = await granted.sealWith('{"val":"cached"}', stamps)
@@ -204,7 +204,7 @@ describe("Lease.buildFromCache(friend, gate)", () => {
     expect(friend.logged).to.deep.equal([])
   })
 
-  it("opens a row past autolock again once the clock is set back", async () => {
+  it("attaches a row past autolock again once the clock is set back", async () => {
     const { friend } = await grantedWorld()
     vi.setSystemTime(T0 + FriendLeaseMillis + 1)
     expect(await Lease.buildFromCache(friend, WorldGate)).to.be.null
@@ -405,7 +405,7 @@ describe("lease.sealWith(whisperText, stamps) and unsealWith(sealed, stamps)", (
     expect(await lease.unsealWith(sealed, stamps)).to.eq('{"val":"sk-test-1234"}')
   })
 
-  it("zeroes the whisper's bytes once each has sealed or opened them", async () => {
+  it("zeroes the whisper's bytes once each has sealed or unsealed them", async () => {
     const { lease } = await grantedWorld()
     const stamps = sealStampsOf('b1')
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
@@ -462,7 +462,7 @@ describe("lease.sealWith(whisperText, stamps) and unsealWith(sealed, stamps)", (
   ] as const
 
   for (const [wrong, blurb] of WrongStampCases) {
-    it(`refuses to open under ${blurb}, as 'damaged_whisper', and locks nothing`, async () => {
+    it(`refuses to unseal under ${blurb}, as 'damaged_whisper', and locks nothing`, async () => {
       const { friend, lease } = await grantedWorld()
       const sealed = await lease.sealWith(WhisperText, sealStampsOf('b1'))
       await TH.expectRefusal(lease.unsealWith(sealed, wrong), 'damaged_whisper')
@@ -477,7 +477,7 @@ describe("lease.sealWith(whisperText, stamps) and unsealWith(sealed, stamps)", (
     await TH.expectRefusal(lease.unsealWith({ box_key_wrapped: sealedOne.box_key_wrapped, whisper_ciphered: sealedTwo.whisper_ciphered }, sealStampsOf('b2')), 'damaged_whisper')
   })
 
-  it("refuses to open what another bank sealed under the same stamps, as 'damaged_whisper'", async () => {
+  it("refuses to unseal what another bank sealed under the same stamps, as 'damaged_whisper'", async () => {
     const { lease } = await grantedWorld()
     const other = await makeGrantedLease(fakeLeaseFriendOf({ bank_tok: 'bank-tok-other' }))
     const stamps = sealStampsOf('b1')

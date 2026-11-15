@@ -18,7 +18,7 @@ export const capacity = zodOutputToConvex(DB.capacity)
 
 // == [Arguments]: askArgs, putBoxArgs, watchRowsArgs
 
-/** The arguments of a bankDB function that takes only an ask. */
+/** The arguments of a bankDB function whose only argument is an ask. */
 export const askArgs = { ask: v.any() }
 
 /** The arguments of `putBox`: its ask, and an optional soft cap on the vault life's box rows, tombstones included. */
@@ -57,7 +57,7 @@ export const boxFetched = v.object({ parent: v.any(), box: v.any() })
 // --
 
 // == [Written]: bankBuilt, gateWritten, bankWritten, vaultWritten, boxWritten, boxPutWritten, tidied, rowsWatched
-// The rows a write fetched, as they stood before it, and as `written` the rows it then stored, read back, or null if it stored nothing.
+// The rows a write fetched, as they stood before it, and as `written` the rows it then wrote, read back, or null if it wrote nothing.
 
 /** The bank and gate rows `buildBank` stored, or null. */
 const bankAndGateStored = v.union(v.null(), v.object({ bank: v.any(), gate: v.any() }))
@@ -94,7 +94,7 @@ export const boxWritten = v.object({ parent: v.any(), box: v.any(), written: box
  */
 export const boxPutWritten = v.object({ parent: v.any(), box: v.any(), capacity, written: boxStored, roomless: v.boolean() })
 
-/** What `tidyGone` returns: how many box rows the bank's live vaults hold afterward, and what is left of the box rows of ended lives. */
+/** What `tidyGone` returns: how many box rows the bank's live vaults have afterward, and what is left of the box rows of ended lives. */
 export const tidied = v.object({ totalCount: v.number(), leftover: v.union(...DB.leftoverVals.map((leftover) => v.literal(leftover))) })
 
 /** What `watchRows` returns: the bank row, every gate and vault row in scope, and the box rows of each live vault. */

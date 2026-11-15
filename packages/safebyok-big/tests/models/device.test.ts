@@ -74,7 +74,7 @@ describe("Device.make", () => {
     TH.expectSyncRefusal(() => makeBankWorld().deviceOn({ gates: gates as never }), 'bad_option')
   })
 
-  it("takes a fraction of a minute to the nearest millisecond, and Infinity as ForeverMillis", () => {
+  it("rounds a fraction of a minute to the nearest millisecond, and turns Infinity into ForeverMillis", () => {
     const device = makeBankWorld().deviceOn({ autolockMinutes: 1 / 7, boxRefreshMinutes: 0.000025 })
     expect([device.leaseMillis, device.boxRefreshMillis]).to.deep.equal([8571, 2])
     expect(makeBankWorld().deviceOn({ autolockMinutes: Infinity }).leaseMillis).to.eq(ForeverMillis)
@@ -106,12 +106,12 @@ describe("device.ensureBank", () => {
     expect(bank.vaultListing.snapshot).to.deep.equal([])
   })
 
-  it.each(['parent', 'val'] as const)("refuses as storage_issue a build whose %s the datastore stored otherwise than sent, listing no bank", async (stored) => {
+  it.each(['parent', 'val'] as const)("refuses as storage_issue a build whose %s the datastore wrote otherwise than sent, listing no bank", async (stored) => {
     const world = makeBankWorld()
     const tryBuildBank = world.bankDB.tryBuildBank.bind(world.bankDB)
     vi.spyOn(world.bankDB, 'tryBuildBank').mockImplementationOnce(async (ask) => {
       const answer = await tryBuildBank(ask)
-      return (answer.ok ? { ...answer, [stored]: TH.storedOtherwiseOf(answer[stored]) } : answer)
+      return (answer.ok ? { ...answer, [stored]: TH.writtenOtherwiseOf(answer[stored]) } : answer)
     })
     const device = world.deviceOn()
     await TH.expectRefusal(device.ensureBank(), 'storage_issue')
@@ -422,7 +422,7 @@ describe("'identity_revoked', the lifecycle and bad news", () => {
     expect(onLifecycle).toHaveBeenCalledExactlyOnceWith({ kind: 'vacated', cause: revoked, unrevoked: 0, device: bank.device })
   })
 
-  it("ignores a revocation that arrives after a sweep", async () => {
+  it("ignores a revocation that is delivered after a sweep", async () => {
     const reported = vi.fn()
     vi.stubGlobal('reportError', reported)
     const onLifecycle = vi.fn(DefaultOnLifecycle)
@@ -646,7 +646,7 @@ async function deviceWaitingOnUnlock() {
 
 function fail(message: string): never { throw new Error(message) }
 
-/** What a test of the open gating holds: the device, its bank, and the vault the gating asks for. */
+/** What a test of the open gating has: the device, its bank, and the vault the gating asks for. */
 interface Made { device: Device, bank: Bank, vault: Vault }
 
 describe("the snapshot's open gating", () => {

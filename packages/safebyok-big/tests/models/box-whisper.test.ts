@@ -26,7 +26,7 @@ async function exposedOf(whisper: Whisper = TestWhisper): Promise<TestableBox> {
   return box.expose()
 }
 
-// == [The absent contract]: a box gone or damaged has no whisper to open
+// == [The absent contract]: a box gone or damaged has no whisper to extract
 
 describe("box.extractWhisper(): refused from its guard", () => {
   const RefusedCases = [
@@ -36,7 +36,7 @@ describe("box.extractWhisper(): refused from its guard", () => {
     [() => tombstoneBoxRecord({ revision_seq: 2 }),      true,    "bank_locked",     'a deleted box while the vault is locked'],
     [() => fullBoxRecord(),                              true,    "bank_locked",     'a full box while the vault is locked'],
     // present and full, past the guard to a lease that never sealed it:
-    [() => fullBoxRecord(),                              false,   "damaged_whisper",  'a full box whose whisper will not open'],
+    [() => fullBoxRecord(),                              false,   "damaged_whisper",  'a full box whose whisper will not decipher'],
   ] as const
   for (const [recordOf, isLocked, refusalkind, blurb] of RefusedCases) {
     it(`refuses '${refusalkind}' for ${blurb}`, async () => {
@@ -48,7 +48,7 @@ describe("box.extractWhisper(): refused from its guard", () => {
 })
 // --
 
-// == [What the lease opens]: a whisper that opens to no whisper
+// == [What the lease unseals]: a whisper that deciphers to no whisper
 
 describe("box.extractWhisper(): a decrypted value that is not a valid whisper", () => {
   const OpenedCases = [
@@ -157,7 +157,7 @@ describe("the sentinel bags and isWhisperedBag", () => {
     })
   }
 
-  it("refuses a put of the whisper read while locked, even after the unlock", async () => {
+  it("refuses a put of the whisper read while locked, even after the bank unlocks", async () => {
     const box = await exposedOf()
     world.mw.setLocked(true)
     const readWhileLocked = box.whisper
@@ -222,7 +222,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
   })
 
   for (const [whisper, blurb] of [[{}, 'an empty object'], [{ val: null }, 'an object whose val is null']] as const) {
-    it(`puts and opens ${blurb} unchanged`, async () => {
+    it(`puts and unseals ${blurb} unchanged`, async () => {
       const box = builtOf(fullBoxRecord())
       await box.put({ whisper })
       expect(await box.extractWhisper()).to.deep.equal(whisper)
@@ -234,7 +234,7 @@ describe("box.whisper and box.put: what a whisper may be", () => {
     })
   }
 
-  it("opens a box sealed as { val } in the old form as the whisper { val }", async () => {
+  it("unseals a box sealed as { val } in the old form as the whisper { val }", async () => {
     const box = builtOf(fullBoxRecord())
     await box.put({ whisper: { val: 'sk-test-0000' } })
     expect(await box.extractWhisper()).to.deep.equal({ val: 'sk-test-0000' })

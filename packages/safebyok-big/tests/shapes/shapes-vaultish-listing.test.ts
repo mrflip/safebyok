@@ -58,7 +58,7 @@ describe("The checks of options", () => {
       [{ maxParentMillis: -1 },                     false, 'refuses a negative horizon'],
     ])
 
-    it("take their fields from the bag given and strip the rest", () => {
+    it("pick their fields from the bag given and strip the rest", () => {
       expect(VX.timelyOpts.parse({ maxParentMillis: 5, reseal: true })).to.deep.equal({ maxParentMillis: 5 })
       expect(VX.boxPutOpts.parse({ maxParentMillis: 5, reseal: true })).to.deep.equal({ maxParentMillis: 5, ifAbsent: 'add', ifPresent: 'repl' })
     })
@@ -101,7 +101,7 @@ describe("VX.boxCreateOpts", () => {
     expect(VX.boxCreateOpts.parse({})).to.deep.equal({ ifAbsent: 'add', ifPresent: 'fail' })
   })
 
-  it("takes a caller's ifPresent and the timely options, stripping the rest", () => {
+  it("keeps a caller's ifPresent and the timely options, stripping the rest", () => {
     expect(VX.boxCreateOpts.parse({ ifPresent: 'repl', maxParentMillis: 5, reseal: true })).to.deep.equal({ ifAbsent: 'add', ifPresent: 'repl', maxParentMillis: 5 })
   })
 
@@ -155,8 +155,8 @@ describe("The checks of the listing's making", () => {
       [{ ...opts, bankDB: { tryPutBox: () => null } }, false, 'refuses a bankDB with no tryGetBox'],
       [{ ...opts, maxMillisSinceRefresh: -1 },         false, 'refuses a negative horizon'],
       [{ ...opts, maxMillisSinceRefresh: undefined },  false, 'refuses a missing horizon'],
-      [{ ...opts, askUser: null },                     false, 'refuses an askUser, which only a bank listing takes'],
-      [{ ...opts, world: mw.world },                   false, 'refuses a world, which the listing takes beside its options'],
+      [{ ...opts, askUser: null },                     false, 'refuses an askUser, which only a bank listing accepts'],
+      [{ ...opts, world: mw.world },                   false, 'refuses a world, which the listing is given beside its options'],
       [{ ...opts, extra: 1 },                          false, 'refuses an option it does not accept, being strict'],
     ])
 

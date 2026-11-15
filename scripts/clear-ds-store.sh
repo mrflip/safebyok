@@ -3,7 +3,7 @@
 # run in, and nowhere else. One left behind keeps a folder git is emptying (in a rebase, or a
 # worktree removal) from being deleted.
 #
-# It takes no arguments, so it cannot be pointed anywhere: the worktree is the one holding the
+# It accepts no arguments, so it cannot be pointed anywhere: the worktree is the one with the
 # current directory. It deletes only a regular file named exactly .DS_Store that belongs to that
 # worktree (not to one nested inside it) and that git ignores, so what git sees never changes. It
 # follows no symlink, crosses into no other filesystem, and skips .git and node_modules.

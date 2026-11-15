@@ -8,7 +8,7 @@ import { Dna, T0, listingOptsOf, makeBornVault, makeBornVaultAndFriend, makeVaul
 useVaultWorlds()
 
 describe("bank.ensureVault", () => {
-  it("stores a new vault record of the bank, at its first revision", async () => {
+  it("puts a new vault record of the bank, at its first revision", async () => {
     const { bank, vault, storedNow } = await makeBornVault()
     expect(vault.bank_tok).to.eq(bank.bank_tok)
     expect(vault.revision_seq).to.eq(0)
@@ -37,7 +37,7 @@ describe("VaultListing.build of a record, and its constructor", () => {
     expect(listing.recordOf(vault)).to.deep.equal(demandStored())
   })
 
-  it("refuses a device in place of its bank, and an option it does not take", async () => {
+  it("refuses a device in place of its bank, and an option it does not accept", async () => {
     const born = await makeBornVault()
     const { bank } = born
     const { bankDB, maxMillisSinceRefresh } = listingOptsOf(born)

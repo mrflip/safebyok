@@ -12,7 +12,7 @@ import type { PassphraseVerdict } from '../shapes/shapes-gateish'
 /** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link PassphraseVerdict}.
  * It is given the passphrase as typed, and the bank's scope: words a guesser who knows the user tries first.
  * It runs on each new passphrase before any key is derived: the one a `build_bank` gating builds the bank
- * with, and each one a `replace_passphrase` gating sets. It never runs on an unlock, and never hears a blank
+ * with, and each one a `replace_passphrase` gating sets. It never runs on an `unlock_bank` gating, and never hears a blank
  * passphrase, which is judged weak without it. It should not throw: one that throws, or returns no verdict,
  * refuses its call.
  *
