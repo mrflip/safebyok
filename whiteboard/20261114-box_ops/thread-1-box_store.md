@@ -66,7 +66,7 @@ PR's **Tests:** line (the rework: storage tests, tsc and eslint clean, then `pnp
 * **Discoveries**:
   * The same birth again answers `retcon`, by the put table; a birth with another revtok, `passed`.
   * A void vault's refusal kind is `absent_vault`.
-  * `MemoryVaultDB.#thingsOf` creates an empty bank map on a read: harmless, left alone.
+  * `MemoryVaultDB.#thingsOf` makes an empty bank map on a read: harmless, left alone.
   * Labels are 2+ characters, so test paths use `box/aa/bb/cc`.
 * **For the Coach**:
   * Stored gate Things at `gate/main` with a `/`-led lifepath now fail safe: the main gate at `gate`

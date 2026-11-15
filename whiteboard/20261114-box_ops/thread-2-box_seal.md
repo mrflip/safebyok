@@ -29,10 +29,10 @@ typecheck and test, 641 tests green; `pnpm justify` at ready.
     tags to the sealer's, so a seal under another codec refuses `damaged_whisper` before any WebCrypto call.
   * **The tag values.** `codectag: 'json_v1'` and `schematag: 'whisper_v1'`, both constants. No signature accepts a
     customer's schematag yet (see *For the Coach*).
-  * **What `#demandBox` parses with.** It takes the check as an argument: `boxSparse` for a prior (so the shell passes),
+  * **What `#demandBox` parses with.** It accepts the check as an argument: `boxSparse` for a prior (so the shell passes),
     `boxThing` for an unseal. Either parse refuses `bad_option`, and then the scope check refuses `record_conflict`.
   * **Tombstones.**
-    * A tombstone keeps `born_at`, as big's kept `registered_at`. It takes the next revseq, the next lifeseq, and no
+    * A tombstone keeps `born_at`, as big's kept `registered_at`. It is given the next revseq, the next lifeseq, and no
       sidecar.
     * revseq counts up across lives.
     * A tombstone or the shell as the prior refuses `bad_option`, with `Phrases.TombstoneOfLiveOnly`.

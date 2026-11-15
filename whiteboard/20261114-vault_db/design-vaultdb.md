@@ -34,7 +34,7 @@ the body. Everything else in the record is the **body**, which the store carries
   modelkind. The bank owns its gates and boxes, but it is a Thing among them, not a node above them: it has no listing
   or lifecycle of theirs, and never ducks as a gate or a box.
 * **Each kind's root**: the bank at `bank`, the main gate at `gate`, the root box at `box`. The main gate is never
-  deleted and holds the passphrase wayin labelled `main`. Further gates sit at `gate/<label>`, one level under it;
+  deleted and has the passphrase wayin labelled `main`. Further gates sit at `gate/<label>`, one level under it;
   boxes nest to any depth. design-boxops.md has the kinds and their checks.
 * **`lifeseq`** is `n.toString(32).padStart(10, '0')`: digits `0-9a-v`, which sort as the numbers do, up to
   `32**10 - 1`, inside a safe integer. Because 32 is even, the even/odd parity of the number is the parity of its last digit,
@@ -493,8 +493,8 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
 * **Storage policies** become named functions over the kind's columns, one per policy (`safebyok_add_passkey_ok`),
   gathered by `safebyok_gate_policies_ok`.
 * **The box cap** becomes `safebyok_capacity_ok`, a count of live boxes under a `labelpath` prefix. It stays soft.
-* **The compound write.** Big's `buildBank` stores a bank and its main gate in one step. A `writeThing` stores one
-  Thing; `tryBirthBank` stores the bank, its main gate and its root box in one call (design-boxops.md).
+* **The compound write.** Big's `buildBank` writes a bank and its main gate in one step. A `writeThing` writes one
+  Thing; `tryBirthBank` writes the bank, its main gate and its root box in one call (design-boxops.md).
 
 ## Gate first
 
@@ -503,11 +503,11 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
   shapes come over into the new core rather than staying big's.
 * `gate.put({ policies })` is a `writeThing` with `options.policies`, under #698's policies, applied as above.
 * The main gate, at `gate`, is never deleted: the adapter refuses its tombstone, and the table's CHECK repeats it.
-  A further gate, at `gate/<label>`, can take one.
+  A further gate, at `gate/<label>`, can have one.
 * The main gate is a root: its `lifepath` is its lifeseq alone, and its write checks the gate alone. Its Thing has a
   `fmt` of its own, 4101, so that it is never read as big's gate row (4001).
 * The bank's stamp already binds its `lifeseq` in place of `bank_tok` (design-boxops.md, thread 3). Until the gate
-  moves, big's gate row keeps its `bank_tok` field, holding the bank's lifeseq.
+  moves, big's gate row keeps its `bank_tok` field, with the bank's lifeseq.
 
 ## Open questions
 
@@ -518,9 +518,9 @@ The interface and the adapter are table-agnostic. Postgres keeps a table per kin
 * Built in `packages/safebyok`, exported as `safebyok/storage`: the Thing's shapes (`shapes-thing.ts`), the classifier
   (`thing-classifier.ts`), `vault-db.ts`, `adapter-vault-db.ts` and `memory-vault-db.ts`, for the bank, gate and box
   kinds, with `tryListThings` and `tryBirthBank` (design-boxops.md, thread 1).
-* The Bank model is on the bank's Thing, holding its root box and a VaultDB, and stores its boxes through it:
+* The Bank model is on the bank's Thing, with its root box and a VaultDB, and puts its boxes through it:
   `tryListBoxes`, `tryGetBox`, `tryPutBox`, `tryDelBox` (design-boxops.md, thread 3). A box's citation may be the
-  whole shell `tryGetBox` gives, the shell's lifeseq included. A bank's birth still stores it through the `bank.put`
+  whole shell `tryGetBox` gives, the shell's lifeseq included. A bank's birth still writes it through the `bank.put`
   seam, not `tryBirthBank`.
 * Postgres is the design above, not built.
 * The Gate model still holds big's `GateRecord`: moving it onto the gate's Thing, and the lease's stamp off `gate_tok`,

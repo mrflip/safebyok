@@ -14,7 +14,7 @@ test, 661 tests green; `pnpm justify` at ready and after the review's rework (se
     `LeaseFormat` (now 7101), `leaseStamp`, `leaseRecord`. They left `lease.ts` and `proving.ts` so that `bank.ts`,
     `lease.ts`, `gate.ts` and `wayin.ts` can share them with no import cycle.
   * `Bank` on its Thing: props `userid`, `banklabel`, `lifeseq`, `born_at`; `#vaultDB`, `#rootBox`; getters `scope`,
-    `stamp`, `rootBox`, `revtok`, `revseq`, `written_at`. `Bank.make(record, { device, vaultDB })`, the record holding
+    `stamp`, `rootBox`, `revtok`, `revseq`, `written_at`. `Bank.make(record, { device, vaultDB })`, the record with
     `maingate` and `rootBox`; the constructor checks the root box is at `box` in the bank's scope.
   * The sugar, section `[Boxes in the vaultDB]` of `bank.ts`: `tryListBoxes()`, `tryGetBox({ labelpath, ifAbsent })`
     with `'shell'`, `tryPutBox`, `tryDelBox`. Each spreads the bank's scope and `modelkind: 'box'` over the builder's
@@ -23,7 +23,7 @@ test, 661 tests green; `pnpm justify` at ready and after the review's rework (se
     root box's lifeseq: guarantee #4 is back.
   * `Device` requires `vaultDB` (`isVaultDB`, new in `storage/vault-db.ts`), and `birthBank` hands the bank
     `device.vaultDB`.
-  * The gate row stays big's: its `bank_tok` now holds the bank's lifeseq, and `gate.ts` checks it against the stamp.
+  * The gate row stays big's: its `bank_tok` now has the bank's lifeseq, and `gate.ts` checks it against the stamp.
   * `tests/models/bank-flows.test.ts`: the design's list, put, put again, delete and rebirth flows through a bank
     born in a `MemoryVaultDB` by `tryBirthBank`, and the sugar's refusals.
   * `core.ts`'s header corrected; exports in `core.ts`, `index.ts`, `storage.ts`.
@@ -46,7 +46,7 @@ test, 661 tests green; `pnpm justify` at ready and after the review's rework (se
   * **`boxCited` accepts the shell's lifeseq** (`storage/shapes-thing.ts`). The design's flow cites the whole shell
     `tryGetBox` gives (`tryPutBox({ cited: prior, record })`), and the cited check refused its lifeseq `-1`. Only the
     box's cited check changed; the bank's and gate's are cited only as `ShellCited`.
-  * **`Phrases.PutNotBuilt` reworded**: it said "This layer stores nothing", untrue once the bank stores its boxes.
+  * **`Phrases.PutNotBuilt` reworded**: it said "This layer stores nothing", untrue once the bank puts its boxes.
   * **Exports beyond the design**: core: `BoxShell`, `GetBoxAnswer`, `GetBoxArgs`, the stamps module, `VaultDB`,
     `isVaultDB`; index: those types plus `BadAnswer`, `GoodAnswer`, `ListThingsAnswer`, `WriteThingAnswer`,
     `BoxThing`, `DelAskArgs`, `PutAskArgs`; storage: `isVaultDB`.
@@ -66,7 +66,7 @@ test, 661 tests green; `pnpm justify` at ready and after the review's rework (se
 * **Discoveries**
   * vitest needs big built: `pnpm build:deps` in `packages/safebyok` first.
   * A device opts refusal reads `opts.vaultDB: ...`, unlike keyDeriver's guard-made prefix.
-  * `birthBank` still stores through the `bank.put` seam, not `tryBirthBank`.
+  * `birthBank` still writes through the `bank.put` seam, not `tryBirthBank`.
 
 * **For the Coach**
   * **The root box in `makeRecord` is a placeholder** (revseq 0, a random revtok, life 0), sealed and stored by
@@ -74,4 +74,4 @@ test, 661 tests green; `pnpm justify` at ready and after the review's rework (se
   * **Two `BoxShell`s**: `models-world.ts`'s test type (with a sidecar) and `bank.ts`'s. Recommendation: rename the
     test one `BoxShellSidecar` in a later sweep.
   * **`gate.test.ts`'s "another life's bank_tok" case** still uses `'bank-tok-other'`, now a lifeseq-shaped field
-    holding any string (`CX.bank_tok` is `str.min(1)`). Harmless; goes when the gate moves to its Thing.
+    that accepts any string (`CX.bank_tok` is `str.min(1)`). Harmless; goes when the gate moves to its Thing.

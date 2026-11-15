@@ -14,13 +14,13 @@ will not work), the workaround, the steps to create it, and the reasoning. Add o
 * alternatives:
   - retry for the customer: belongs to the customer or to orchestration we provide, never the low-level call.
   - make the new record server-side: the server cannot make a sealed record.
-  - lock the bank across the prompt: holds storage while a user types a passphrase, and a lock is a last resort.
+  - lock the bank across the prompt: keeps storage locked while a user types a passphrase, and a lock is a last resort.
 * workaround: the customer retries, or the user reloads the page.
 
 Steps to create: device A finds the bank deleted, and asks its user for a passphrase for a new one. Meanwhile device B
 builds the bank again, and may delete it again, each with its own user's passphrase. A's user then submits: A's birth
 cites the tombstone it found, which is no longer what is stored.
 
-Reasoning for wontfix: it takes three passphrase prompts on two devices racing, and leaves a refusal that writes
+Reasoning for wontfix: it needs three passphrase prompts on two devices racing, and leaves a refusal that writes
 nothing, which a retry clears. Mending it would put a retry or a lock in a primitive's critical path. Ruled by the
 Coach, 2026-11-15, box_ops thread 1.
