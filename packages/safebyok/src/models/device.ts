@@ -1,8 +1,10 @@
 import type { SX } from 'safebyok-big/internals'
-import { CX, Consts, Deriver, Errors, Logger, Phrases, Strength, Throwers, VX, Validator } from 'safebyok-big/internals'
+import { CX, Consts, Deriver, Errors, Logger, Phrases as PhrasesX, Strength, Throwers, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import { type AskUser, Gating, type RequestCleartext, birthBank } from './gating'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
+import * as Phrases from '../phrases'
+import { type VaultDB, isVaultDB } from '../storage/vault-db'
 
 // == [Given to a device]: DefaultLeaseMillis, DeviceRecord, DeviceOpts
 
@@ -14,6 +16,8 @@ export type DeviceRecord = Pick<SX.DeviceRow, 'user_id' | 'banklabel' | 'device_
 
 /** What a host hands {@link Device.make} besides the device's record. */
 export interface DeviceOpts {
+  /** Where this device's banks are stored: each bank made on it is given this vaultDB. */
+  vaultDB:          VaultDB
   /** What makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
   keyDeriver:       Deriver.KeyDeriver
   /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak. */
@@ -32,6 +36,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom, user_id, ban
   deviceMakeArgs: obj({
     record: obj({ user_id, banklabel, device_tok }),
     opts:   Validator.objCheck(() => ({
+      vaultDB:         custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
       keyDeriver:      custom<Deriver.KeyDeriver>(),
       strengthChecker: custom<Strength.StrengthChecker>().optional(),
       logger:          custom<Logger.VaultLogger>().optional(),
@@ -46,12 +51,14 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom, user_id, ban
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
-  // == [Props]: user_id, banklabel, device_tok, keyDeriver, strengthChecker, logger, leaseMillis, #askUser, #openGating, #endCause, toJSON
+  // == [Props]: user_id, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #askUser, #openGating, #endCause, toJSON
 
   declare readonly user_id:    string
   declare readonly banklabel:  string
   /** This device's token in its bank scope, which each wayin it builds records. */
   declare readonly device_tok: string
+  /** Where this device's banks are stored. */
+  readonly vaultDB:            VaultDB
   readonly keyDeriver:         GuardedKeyDeriver
   readonly strengthChecker:    Strength.GuardedStrengthChecker
   readonly logger:             Logger.VaultLogger
@@ -90,14 +97,15 @@ export class Device {
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
     checkSecureContext()
-    const { record: { user_id, banklabel, device_tok }, opts: { keyDeriver, strengthChecker = Strength.DefaultStrengthChecker, logger, autolockMinutes, requestCleartext } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { user_id, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = Strength.DefaultStrengthChecker, logger, autolockMinutes, requestCleartext } } = Checks.deviceMakeArgs.parse({ record, opts })
     Object.assign(this, { user_id, banklabel, device_tok })
+    this.vaultDB = vaultDB
     this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.strengthChecker = Strength.guardStrengthChecker(strengthChecker)
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#askUser = (requestCleartext === undefined) ? null : guardRequestCleartext(requestCleartext)
-    if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(Phrases.TestDeriverNotice, { oplabel: 'Device.make' }) }
+    if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
   }
   // --

@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { DefaultLeaseMillis, Device, guardRequestCleartext } from '../../src/models/device'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
 import { PutNotBuilt } from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -50,6 +51,16 @@ describe("Device.make(record, opts)", () => {
     expect(device.demandEnabled()).to.equal(device)
     expect(device.openGating).to.be.null
     expect(device.modelkind).to.eq('device')
+  })
+
+  it("keeps the vaultDB it is given, for each bank made on it", () => {
+    const vaultDB = new MemoryVaultDB()
+    expect(TH.makeDevice({}, { vaultDB }).vaultDB).to.equal(vaultDB)
+  })
+
+  it("refuses a vaultDB missing a verb, naming it", () => {
+    const err = TH.expectSyncRefusal(() => TH.makeDevice({}, { vaultDB: { tryGetThing: vi.fn() } } as never), 'bad_option')
+    expect(err.message).to.include('vaultDB: ')
   })
 
   it("serializes as its scope and token alone, and is frozen", () => {
@@ -122,10 +133,12 @@ describe("Device.make(record, opts)", () => {
     })
   }
 
-  it("refuses no record, no opts, or opts with no keyDeriver", () => {
-    TH.expectSyncRefusal(() => Device.make(null as never, { keyDeriver: TH.testDeriver }))
+  it("refuses no record, no opts, or opts with no keyDeriver or no vaultDB", () => {
+    const vaultDB = new MemoryVaultDB()
+    TH.expectSyncRefusal(() => Device.make(null as never, { keyDeriver: TH.testDeriver, vaultDB }))
     TH.expectSyncRefusal(() => Device.make({ ...TH.WorldScope, device_tok: TH.DeviceTok }, undefined as never))
-    TH.expectSyncRefusal(() => Device.make({ ...TH.WorldScope, device_tok: TH.DeviceTok }, {} as never))
+    TH.expectSyncRefusal(() => Device.make({ ...TH.WorldScope, device_tok: TH.DeviceTok }, { vaultDB } as never))
+    TH.expectSyncRefusal(() => Device.make({ ...TH.WorldScope, device_tok: TH.DeviceTok }, { keyDeriver: TH.testDeriver } as never))
   })
 })
 

@@ -1,7 +1,19 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-/** A put met where storing is not built: the layer above stores the bank. */
-export const PutNotBuilt = 'This layer stores nothing: the layer above puts the bank.'
+// == [Models]: PutNotBuilt, VaultDBExpected, BoxOfOtherRoot, GotOtherThanBox
+
+/** A bank's put, which is not built: a bank is born through the vaultDB's tryBirthBank. */
+export const PutNotBuilt = "A bank's put is not built yet: the layer above births the bank."
+
+/** A vaultDB that lacks one of its verbs or builders. */
+export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
+
+/** A box whose lifepath is not under the bank's root box. */
+export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its bank's root box: this one is of another life of the root."
+
+/** A box get answered with a Thing of another kind: the vaultDB is broken. */
+export const GotOtherThanBox = 'A box get was answered with a Thing that is not a box: the vaultDB is broken.'
+// --
 
 // == [Things]: the sentences of a Thing's checks, and of a vaultDB's asks
 

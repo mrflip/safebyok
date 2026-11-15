@@ -16,8 +16,10 @@ import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/dev
 import { Lease, type LeaseBank } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { BoxRecord, BoxSparse } from '../../src/models/sealers'
+import type { BankStamp, LeaseRecord } from '../../src/models/stamps'
 import { BoxThingFormat, ShellLifeseq, lifeseqOf } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 
 // == [Time]: T0, useFakeClock
 
@@ -36,8 +38,8 @@ export function useFakeClock(): void {
 /** The bank scope every builder here works in: `u1`'s bank `acme`. */
 export const WorldScope = Object.freeze({ user_id: 'u1', banklabel: 'acme' })
 
-/** The stamp of the bank every builder here makes things in, registered at {@link T0}. */
-export const WorldBankStamp: GX.BankStamp = Object.freeze({ ...WorldScope, bank_tok: 'bank-tok-u1', registered_at: T0 })
+/** The stamp of the bank every builder here makes things in: its first life, born at {@link T0}. */
+export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user_id, banklabel: WorldScope.banklabel, lifeseq: lifeseqOf(0), born_at: T0 })
 
 /** The stamp of {@link WorldBankStamp}'s `main` gate, registered at {@link T0}. */
 export const WorldGateStamp: GX.GateStamp = Object.freeze({ ...WorldScope, gatelabel: 'main', gate_tok: 'gate-tok-u1', registered_at: T0 })
@@ -66,9 +68,9 @@ export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = an
   return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: Strength.guardStrengthChecker(strengthChecker), device_tok }
 }
 
-/** A Device of {@link WorldScope} and {@link DeviceTok}, with `record` laid over them, over `testDeriver`, a checker that passes everything and a quiet logger, with `opts` laid over those. */
+/** A Device of {@link WorldScope} and {@link DeviceTok}, with `record` laid over them, over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those. */
 export function makeDevice(record: Partial<DeviceRecord> = {}, opts: Partial<DeviceOpts> = {}): Device {
-  return Device.make({ ...WorldScope, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, ...opts })
+  return Device.make({ ...WorldScope, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
 }
 
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
@@ -105,7 +107,7 @@ export async function buildBornBank({ passkeyClear, device = makeDevice() }: Bor
   const main = await proving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(proving) ?? null
   const record = Bank.makeRecord({ ...WorldBankStamp, maingate: { ...WorldGateStamp, wayins: { main, passkey0 } } })
-  const bank = Bank.make(record, { device })
+  const bank = Bank.make(record, { device, vaultDB: device.vaultDB })
   await bank.unlockByProving(proving)
   return { device, bank, record, proving }
 }
@@ -159,17 +161,17 @@ export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
 export type FakeLeaseBank = LeaseBank & { lock: Mock<() => void> }
 
 /** A {@link FakeLeaseBank} of {@link WorldBankStamp}, as `overrides` moves it. */
-export function fakeLeaseBankOf(overrides: Partial<GX.BankStamp> = {}): FakeLeaseBank {
+export function fakeLeaseBankOf(overrides: Partial<BankStamp> = {}): FakeLeaseBank {
   return { stamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>() } as unknown as FakeLeaseBank
 }
 
 /** A test backdoor: a lease `proving` builds on `bank` citing `gate`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
-export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GX.CitedGate = WorldGate): Promise<{ lease: Lease, record: GX.LeaseRecord }> {
+export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GX.CitedGate = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
   const lease = await proving.buildLease(bank, gate)
   const [record] = make.mock.calls.at(-1)!
   make.mockRestore()
-  return { lease, record: record as GX.LeaseRecord }
+  return { lease, record: record as LeaseRecord }
 }
 // --
 
@@ -188,7 +190,7 @@ export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
  * It exists only so a test can show two wayins have one bankKey, or read what a seal is bound to; no model hands out a bankKey.
  * Rejects with WebCrypto's error when the wayin will not open.
  */
-export async function _cheat_bankKeyBytesOf(bank: GX.BankStamp, gate: GX.GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
+export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GX.GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(bank, gate, header)
   async function wayinKeyOf(): Promise<CryptoKey> {

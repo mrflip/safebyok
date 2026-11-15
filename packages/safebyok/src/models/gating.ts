@@ -234,7 +234,7 @@ export async function birthBank(device: Device, cleartexts: unknown): Promise<Ba
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const bankRecord = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins: { main, passkey0 } } })
-  const bank = Bank.make(bankRecord, { device })
+  const bank = Bank.make(bankRecord, { device, vaultDB: device.vaultDB })
 
   try {
     await bank.put({ ifPresent: 'fail' })

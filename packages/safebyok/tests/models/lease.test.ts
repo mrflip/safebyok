@@ -3,13 +3,15 @@ import { Crypto, GX } from 'safebyok-big/internals'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { BoxWhisper } from '../../src/models/sealers'
+import { LeaseFormat, type LeaseRecord } from '../../src/models/stamps'
+import { lifeseqOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const StampFieldnames = ['fmt', 'user_id', 'banklabel', 'bank_tok', 'registered_at', 'gatelabel', 'gate_tok', 'gate_revision_tok', 'proved_at', 'wayinkind']
+const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gatelabel', 'gate_tok', 'gate_revision_tok', 'proved_at', 'wayinkind']
 
-const Stamped = { ...TH.WorldBankStamp, fmt: GX.LeaseFormat, gatelabel: 'main', gate_tok: TH.WorldGate.gate_tok, gate_revision_tok: TH.WorldGate.revision_tok, proved_at: TH.T0, wayinkind: 'passphrase' }
+const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gatelabel: 'main', gate_tok: TH.WorldGate.gate_tok, gate_revision_tok: TH.WorldGate.revision_tok, proved_at: TH.T0, wayinkind: 'passphrase' }
 
 const Cleartexts = Object.freeze({ whisper: TH.Whisper })
 
@@ -52,11 +54,11 @@ describe("Lease.make(record, { bank })", () => {
   })
 
   const MalformedCases = [
-    [(record: GX.LeaseRecord) => ({ ...record, fmt: 7000 }),                                             'of another fmt'],
-    [(record: GX.LeaseRecord) => ({ ...record, bank_key_lease_wrapped: undefined }),                     'with no wrapped bankKey'],
-    [(record: GX.LeaseRecord) => ({ ...record, proved_at: undefined }),                                  'with no proved_at'],
-    [(record: GX.LeaseRecord) => ({ ...record, wayinkind: 'carrier_pigeon' }),                           'of an unknown wayinkind'],
-    [(record: GX.LeaseRecord) => ({ ...record, extra: 'field' }),                                        'with a field no lease has'],
+    [(record: LeaseRecord) => ({ ...record, fmt: 7000 }),                                             'of another fmt'],
+    [(record: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: undefined }),                     'with no wrapped bankKey'],
+    [(record: LeaseRecord) => ({ ...record, proved_at: undefined }),                                  'with no proved_at'],
+    [(record: LeaseRecord) => ({ ...record, wayinkind: 'carrier_pigeon' }),                           'of an unknown wayinkind'],
+    [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                                        'with a field no lease has'],
     [() => 'a lease',                                                                                    'that is not a record at all'],
   ] as const
 
@@ -75,9 +77,9 @@ describe("Lease.make(record, { bank })", () => {
   })
 
   const OtherBankCases = [
-    [{ bank_tok: 'bank-tok-other' }, 'another life of the bank, by its bank_tok'],
-    [{ registered_at: TH.T0 + 1 },   'another life of the bank, by its registered_at'],
-    [{ user_id: 'u2' },              "another user's bank"],
+    [{ lifeseq: lifeseqOf(2) },   'another life of the bank, by its lifeseq'],
+    [{ born_at: TH.T0 + 1 },         'another life of the bank, by its born_at'],
+    [{ userid: 'u2' },               "another user's bank"],
     [{ banklabel: 'work' },          'another bank of the same user'],
   ] as const
 
@@ -185,12 +187,12 @@ describe("lease.evict() and isEvicted", () => {
 
 describe("a tampered lease record", () => {
   const TamperCases = [
-    [(record: GX.LeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                            'its proved_at moved'],
-    [(record: GX.LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                       'its wayinkind changed'],
-    [(record: GX.LeaseRecord) => ({ ...record, gate_revision_tok: 'gate-revision-tok-2' }),                   'its gate_revision_tok changed'],
-    [(record: GX.LeaseRecord) => ({ ...record, gate_tok: 'gate-tok-reborn' }),                                'its gate_tok changed'],
-    [(record: GX.LeaseRecord, other: GX.LeaseRecord) => ({ ...record, lease_key: other.lease_key }),          "another lease's leaseKey"],
-    [(record: GX.LeaseRecord, other: GX.LeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],
+    [(record: LeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                            'its proved_at moved'],
+    [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                       'its wayinkind changed'],
+    [(record: LeaseRecord) => ({ ...record, gate_revision_tok: 'gate-revision-tok-2' }),                   'its gate_revision_tok changed'],
+    [(record: LeaseRecord) => ({ ...record, gate_tok: 'gate-tok-reborn' }),                                'its gate_tok changed'],
+    [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }),          "another lease's leaseKey"],
+    [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],
   ] as const
 
   for (const [tamper, blurb] of TamperCases) {
@@ -198,7 +200,7 @@ describe("a tampered lease record", () => {
       const { proving, bank, lease, record } = await leaseWorld()
       const sealed = await lease.seal('BoxWhisper', TH.boxShellOf(), Cleartexts)
       const { record: other } = await TH._cheat_grantedLease(proving, bank)
-      const tampered = Lease.make(tamper(record, other) as GX.LeaseRecord, { bank })
+      const tampered = Lease.make(tamper(record, other) as LeaseRecord, { bank })
       const err = await TH.expectRefusal(tampered.unseal('BoxWhisper', sealed), 'damaged_lease')
       expect(TH.thrownText(err)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
       expect(bank.lock).toHaveBeenCalledTimes(1)

@@ -65,7 +65,7 @@ export type BirthBankActual =
   | { ok: false, act: EX.RefusedAct,     world: null, record: Thing | null }
 // --
 
-// == [The interface]: VaultDB
+// == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
 
 /** Storage for the Things of a user's banks. Each verb is one atomic step, and never throws. Each builder fills in an ask's defaults and never throws: the verb it is handed to refuses what is wrong. */
 export interface VaultDB {
@@ -87,5 +87,17 @@ export interface VaultDB {
   delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT>
   /** Watch the Things of a bank, and return a function that stops the watch. */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews?: (news: Errors.VaultError) => void): () => void
+}
+
+/** The members a vaultDB answers with a function. */
+const VaultDBMembernames = [
+  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'getAsk', 'listAsk', 'putAsk', 'delAsk', 'watch',
+] as const satisfies readonly (keyof VaultDB)[]
+
+/** True for an object with a function for each member of {@link VaultDB}. */
+export function isVaultDB(val: unknown): val is VaultDB {
+  if (typeof val !== 'object' || val === null) { return false }
+  const members: Partial<Record<string, unknown>> = val
+  return VaultDBMembernames.every((membername) => typeof members[membername] === 'function')
 }
 // --
