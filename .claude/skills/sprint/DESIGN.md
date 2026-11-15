@@ -109,14 +109,14 @@ sprinting or not, which is why those are one sentence of when to use it.
 * **The thread is proven once, at filing.** The reviewer ran a full `pnpm justify` and then
   `scripts/file-thread` ran another before pushing, minutes apart on the same tree but for the
   reviewer's fixes. The Coach agreed on 2026-11-12 that the reviewer proves only the suites its
-  fixes touch, and `file-thread`'s justify is the gate: a dependent package a fix breaks comes back
+  fixes touch, and `file-thread`'s justify is the filing check: a dependent package a fix breaks comes back
   from it as exit 4, to a worker.
 * **A worker tests as it judges while building, and is ready on a green `pnpm justify`** (the
   Coach, 2026-11-12: "the tests are a tool for you to write good code"). CLAUDE.md asked for
   `pnpm justify` green before every commit, many runs a thread. Now a worker runs the tests that
   bear on a change (a file or a package) as it builds, pushes to the draft and adds `ci` once the
   packages it touched pass their tests and typecheck, and asks for review on one `pnpm justify`
-  green, while CI runs beside it; `file-thread`'s justify stays the gate. pnpm's
+  green, while CI runs beside it; `file-thread`'s justify stays the filing check. pnpm's
   `...[<sprintbase>]` filter, tried for readiness, measured slower than justify (it selects the
   root, whose `test` is every package, and runs the selected packages one at a time, each
   rebuilding its dependencies), so it is not used. The threshold is stated once, in the worker's *Ready* step and a line of CLAUDE.md, so a

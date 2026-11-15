@@ -132,7 +132,7 @@ jobs:
       - run: pnpm test:coverage
 
   # The unit tests on the Node majors a consumer may run, beside the one we develop on. Node 22 is
-  # the platform floor (`engines`), and a failure there is a gate; the newest Node reports, and a
+  # the platform floor (`engines`), and a failure there fails the run; the newest Node reports, and a
   # failure there is news.
   node-compat:
     if: >-
