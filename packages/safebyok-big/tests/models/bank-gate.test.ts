@@ -38,7 +38,7 @@ function dialogOf({ dialog }: Born) {
   }
 }
 
-/** The proving of the bank's main gate that `passphrase` opens, refusing 'wrong_passphrase' otherwise. */
+/** The proving of the bank's main gate made from `passphrase`, refusing 'wrong_passphrase' otherwise. */
 function proveBy(bank: Bank, passphrase: string) { return PassphraseProving.buildStored(bank.maingate, passphraseCleartext.parse(passphrase), bank) }
 
 /** Moves the gate row past what the attempt read, as another device does just before its put under `policy` reaches the bankDB. */
@@ -103,7 +103,7 @@ describe("a gate changed on another device", () => {
 
 describe("a passkey over a passphrase change", () => {
   // A decision: notes/wontfix-big.md, 2026-11-09.
-  it("keeps the passkey wayin as stored, and the passkey still opens", async () => {
+  it("keeps the passkey wayin as stored, and the passkey still unwraps it", async () => {
     const { bank, demandStoredGate } = await makeBornVaultWithPasskey()
     const { passkey0 } = demandStoredGate().wayins
     await replaceTyping(bank, Passphrase, NewPassphrase)
@@ -628,7 +628,7 @@ describe("Changing the gate, with a box sealed before the change", () => {
   })
 
   // PasskeyAnswer @example
-  it("an added passkey alone unlocks the next session and opens the box sealed before it", async () => {
+  it("an added passkey alone unlocks the next session and unseals the box sealed before it", async () => {
     const { bank, unsealIn, openNextSession } = await makeVaultWithBox()
     await addPasskeyTyping(bank, Passphrase, 'laptop')
     bank.lock()

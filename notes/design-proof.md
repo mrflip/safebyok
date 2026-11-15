@@ -89,13 +89,13 @@ PasskeyProving.buildNovel(bank, gate, passkeyClear, world)
 PassphraseProving.buildStored(gate, passphraseClear, world)
 ├─ key_deriver_label is the world's          else 'newer_format'
 ├─ passphraseKeyOf(keyDeriver, cleartext, stored salt)
-└─ the wrap opens                            else 'wrong_passphrase'
+└─ the wrap unwraps                            else 'wrong_passphrase'
 
 PasskeyProving.buildStored(gate, passkeyClear)
 ├─ the gate has a passkey wayin              else 'absent_wayin'
 ├─ credential_id and prf_salt_b64 match      else 'wrong_passkey', the answer left unspent
 ├─ deriveWrappingKey(prfBytes, ctx)
-└─ the wrap opens                            else 'wrong_passkey'
+└─ the wrap unwraps                            else 'wrong_passkey'
 
 proving.buildWayin(NOVEL | sourceProving)    a Wayin; the bankKey made or unwrapped, wrapped, dropped
 proving.buildLease(friend, gate)             a Lease on friend's bank, citing the gate revision passed
@@ -402,7 +402,7 @@ each gate change's act, past its provings
 * **The bankDB applies the gating's storage policy, in the step that puts the record.** The record is built from
   `ante`, so it changes only its gating's wayin, and the policy refuses one that changes more (`gate_issue`). The device
   never meets that refusal: `add_passkey` refuses before proving when the gate the attempt read has a passkey
-  (`bad_option`). The bankDB cannot tell whether a wrap opens, so a bad `bank_key_wayin_wrapped` is still written.
+  (`bad_option`). The bankDB cannot tell whether a wrap unwraps, so a bad `bank_key_wayin_wrapped` is still written.
 
 Each prompt is the gate's, and starts the same way:
 

@@ -22,7 +22,7 @@ import type { Vault } from './vault'
 import { refusedAnswerOf } from '../storage/bank-db'
 
 /** A box in this tab, with its record's fields as its own props.
- * Its whisper opens while the bank is unlocked.
+ * It unseals while the bank is unlocked.
  */
 export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // == [Props]: user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, listing, #exposed, #isVeiled
@@ -362,10 +362,10 @@ function mergedOver(whisper: Whisper, patch: Whisper): Whisper {
 
 // == [The seal]: sealedRecordOf, boxStampOf, deserializeWhisper
 
-// The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still opens.
+// The sidecar is laid beside the seal, never in it, so storage may change it and the whisper still deciphers.
 /** The full record of `base`, with `sidecar` in the clear and `whisper` sealed through `vault`.
  * The whisper is ciphered, as JSON text, under a fresh boxKey. Both are bound to the stamps of the box, its vault and
- * its bank: they open only for this revision of this box, unchanged. Only the sparse fields of `base` are used.
+ * its bank: they decrypt only for this revision of this box, unchanged. Only the sparse fields of `base` are used.
  */
 async function sealedRecordOf(vault: Pick<Vault, 'sealStampedString'>, base: BoxSparse, sidecar: Sidecar, whisper: Whisper): Promise<BoxRecord> {
   const sparse = BX.boxSparse.parse(base)

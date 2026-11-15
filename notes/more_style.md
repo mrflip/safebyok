@@ -12,7 +12,7 @@ STYLE.md's rules. The doc-block pairs are in `notes/gallant-docblocks.md`.
 * **A guard names the predicates it asks** `#guard-names-its-predicates`, linked: `throw unless {@link isEnabled}, unlocked,
   {@link isPresent}, {@link isFull}`.
 * **A maintainer's note is a `//` comment** `#reason-goes-above`, on the line above the doc block or by the code it concerns.
-  It records an invariant kept (`// every lock goes through here`) or a reason (`// The lock first: no box opens under a
+  It records an invariant kept (`// every lock goes through here`) or a reason (`// The lock first: no box unseals under a
   lease while the tombstone goes out.`). STYLE.md's `#purpose-not-path` already sends a reason there. This rule gives the
   form the note takes.
 * `@param` and `@returns` only for a unit, a range, or what `null` or leaving an optional out means. A `{@link}` names

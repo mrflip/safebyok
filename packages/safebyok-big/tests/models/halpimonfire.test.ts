@@ -100,7 +100,7 @@ describe("A lock called during a box verb", () => {
   })
 })
 
-/** A stored box whose next unseal runs `crossing` with the whisper opened, before it comes back to `box.expose`. */
+/** A stored box whose next unseal runs `crossing` with the whisper deciphered, before it comes back to `box.expose`. */
 async function boxCrossingUnseal(crossing: (box: TestableBox) => unknown) {
   const unsealStampedString: Vault['unsealStampedString'] = async (sealed, stamp) => {
     const whisperText = await world.mw.world.unsealStampedString(sealed, stamp)

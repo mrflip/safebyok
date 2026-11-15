@@ -129,7 +129,7 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
 /** A box's sidecar: your app's own JSON object beside the whisper, `{}` for none, readable while the bank is locked. Never put secret material in it.
  * It is stored in the clear, as the JSON object it is (a `jsonb` column, say, which a server can
  * query), so anyone who can read the database can read it. It is not authenticated: anyone who can
- * write the database can change it, and the whisper still opens. A field the server should read but
+ * write the database can change it, and the whisper still deciphers. A field the server should read but
  * must not change unnoticed goes in the whisper too, so that you can compare the two once the box is
  * unsealed. safebyok never looks inside it: check its shape yourself before `putBox()`, which refuses
  * only one that is not a plain JSON object.

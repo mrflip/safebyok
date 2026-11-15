@@ -220,10 +220,10 @@ export const AnswerNotAsSent = "Storage answered with a record other than the on
 /** Why cleartexts that hand in neither a passphrase nor a passkey's answer are refused. */
 export const CleartextMissing = "An attempt hands in the vault's passphrase or a passkey's answer, and this one handed in neither, so nothing was tried."
 
-/** Why a passphrase whose passphraseKey does not open the vault's passphrase wayin is refused. */
+/** Why a passphrase whose passphraseKey does not unwrap the vault's passphrase wayin is refused. */
 export const WrongPassphrase = "That passphrase didn't unlock the vault. Check for typos and try again. If you're sure it's right, the stored vault may be damaged."
 
-/** Why a passkey's answer whose passkeyKey does not open the vault's passkey wayin is refused. */
+/** Why a passkey's answer whose passkeyKey does not unwrap the vault's passkey wayin is refused. */
 export const WrongPasskey = "That passkey answered, but its answer didn't unlock the vault: its stored way in may be damaged. Unlock with the passphrase; if that works, add the passkey again, which replaces it."
 
 /** Why a passkey's answer is refused by a vault that has no passkey wayin. */
@@ -242,7 +242,7 @@ export const UnknownKeyDeriver = "This vault was made with a key deriver this pa
 export function notKeyBytes(count: number): string { return `The keyDeriver handed back something other than ${String(count)} fresh key bytes.` }
 
 /** Why a proving asked for the bankKey before it has a wayin refuses, a bug in the caller. */
-export const WayinNotMadeYet = "A proving was asked for the bankKey before it made or opened a wayin: a bug in the caller."
+export const WayinNotMadeYet = "A proving was asked for the bankKey before it made or unwrapped a wayin: a bug in the caller."
 
 /** Why a proving that has a wayin already makes no other. */
 export const WayinMadeAlready = "This proving has a wayin already, and a proving has one: make a new proving for another wayin. A bug in the caller."
@@ -254,7 +254,7 @@ export const ProvingOfOtherGate = "The source proving is of another bank or gate
 export const LeaseOfOtherGate = "This proving is of another bank or gate: a lease is granted only to the bank and gate whose stamps its wayin binds, so none was granted. This is a bug in safebyok."
 
 /** Why a seal verb refuses a stamp of another vault, or another life of it. */
-export const StampOfOtherVault = "This stamp names another vault than this one, or another life of it, so nothing was sealed or opened. This is a bug in safebyok."
+export const StampOfOtherVault = "This stamp names another vault than this one, or another life of it, so nothing was sealed or unsealed. This is a bug in safebyok."
 
 /** Why a keyDeriver's throw is replaced: it heard the passphrase. */
 export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key. What it threw is left out, as it heard the passphrase."
@@ -262,16 +262,16 @@ export const KeyDeriverThrew = "The keyDeriver threw rather than deriving a key.
 
 // == [Models: leases, vaults and boxes]: DamagedLease, UndecipheredWhisper, UndecodedWhisper, LeaseNotInForce, LetGoInstance, vaultAbsent, boxAbsent, boxNotListed, VaultDeleted
 
-/** Why this device's lease is not used, whether it was found damaged in the cache or failed to open while in force. */
+/** Why this device's lease is not used, whether it was found damaged in the cache or failed to unwrap while in force. */
 export const DamagedLease = "This device's lease is damaged and will not open, so it was not used: unlock the vault again to carry on."
 
-/** Why a whisper that will not open under its boxKey is refused. */
+/** Why a whisper that will not decipher under its boxKey is refused. */
 export const UndecipheredWhisper = "That whisper would not open under this vault's key: it was altered in storage, or sealed under another vault. Nothing was changed."
 
-/** Why a whisper that opened but is no whisper this package knows is refused. */
+/** Why a whisper that deciphered but is no whisper this package knows is refused. */
 export const UndecodedWhisper = "That box opened, but what was inside is not a whisper this package knows, so it is damaged. It was left as it is; remove it, or seal a whisper over it."
 
-/** Why a lease no longer in force opens nothing. */
+/** Why a lease no longer in force unseals nothing. */
 export const LeaseNotInForce = "This lease is out of force, as the bank locked or the lease would not open, so nothing was read or written: unlock the bank again."
 
 /** Why an instance whose bank or vault ended, or whose row was found damaged, answers nothing. */

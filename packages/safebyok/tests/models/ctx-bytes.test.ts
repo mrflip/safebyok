@@ -30,7 +30,7 @@ const SealTagFields = ['codectag', 'schematag'] as const
 /** The JSON text of a box's tags, as each ctx of its seal holds them last. */
 const BoxTagsText = '{"codectag":"json_v1","schematag":"whisper_v1"}'
 
-/** What a bankKey is unwrapped as only to see that a wrap opens. */
+/** What a bankKey is unwrapped as only to see that a wrap unwraps. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 /** What a part key is unwrapped as. */
 const DecryptUsage = { extractable: false, usage: ['decrypt'] } as const
@@ -46,8 +46,8 @@ async function sealedWorld() {
   return { bank, box, boxStamp: boxStamp!, bankKey: await TH._cheat_bankKeyOf(bank) }
 }
 
-/** The whisper text of `box`, opened by hand under `bankKey` with the ctx of `bankStamp`, `boxStamp` and `tags` (the box's own by default); rejects with WebCrypto's error when it will not open. */
-async function openByHand(bankKey: CryptoKey, box: BoxRecord, bankStamp: Crypto.CipherCtxRecord, boxStamp: Crypto.CipherCtxRecord, tags: Crypto.CipherCtxRecord = BoxWhisper.tags): Promise<string> {
+/** The whisper text of `box`, unsealed by hand under `bankKey` with the ctx of `bankStamp`, `boxStamp` and `tags` (the box's own by default); rejects with WebCrypto's error when it will not unseal. */
+async function unsealByHand(bankKey: CryptoKey, box: BoxRecord, bankStamp: Crypto.CipherCtxRecord, boxStamp: Crypto.CipherCtxRecord, tags: Crypto.CipherCtxRecord = BoxWhisper.tags): Promise<string> {
   const { key_wrapped, ciphered } = box.whisper_sealed
   const partKey = await Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([bankStamp, boxStamp], 'whisper_sealed.key_wrapped', tags), { extractable: false, usage: ['decrypt'] })
   return new TextDecoder().decode(await Crypto.decipherBytes(partKey, ciphered, Crypto.cipherCtx([bankStamp, boxStamp], 'whisper_sealed.ciphered', tags)))
@@ -60,8 +60,8 @@ async function leaseRecordOf(): Promise<LeaseRecord> {
   return record
 }
 
-/** Whether a born bank's passphrase wayin opens under the ctx of the stamps `bankStamp` and `gateStamp`, built field for field without a check. */
-async function passphraseWayinOpens(bankStamp: Crypto.CipherCtxRecord, gateStamp: Crypto.CipherCtxRecord): Promise<boolean> {
+/** Whether a born bank's passphrase wayin unwraps under the ctx of the stamps `bankStamp` and `gateStamp`, built field for field without a check. */
+async function passphraseWayinUnwraps(bankStamp: Crypto.CipherCtxRecord, gateStamp: Crypto.CipherCtxRecord): Promise<boolean> {
   const { bank } = await TH.buildBornBank()
   const { bank_key_wayin_wrapped: wrapped, ...header } = bank.maingate.wayins.main
   const wayinKey = await Crypto.importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(TH.TestPassphrase, Crypto.fromB64(header.salt_b64)))
@@ -111,8 +111,8 @@ describe("each ctx, byte for byte", () => {
     const boxText = `{"am":"a","banklabel":"acme","born_at":${String(TH.T0)},"fmt":${field('fmt')},"label":"anthropic_api_key","labelpath":"box/anthropic_api_key","lifepath":"${life0}/${life0}","lifeseq":"${life0}","revseq":0,"revtok":${field('revtok')},"userid":"u1","written_at":${String(TH.T0)}}`
     const { key_wrapped, ciphered } = box.whisper_sealed
     const partKey = await Crypto.unwrapKeyUnder(bankKey, key_wrapped, textBytes(`[${BankStampText},${boxText},"whisper_sealed.key_wrapped",${BoxTagsText}]`), { extractable: false, usage: ['decrypt'] })
-    const opened = await Crypto.decipherBytes(partKey, ciphered, textBytes(`[${BankStampText},${boxText},"whisper_sealed.ciphered",${BoxTagsText}]`))
-    expect(new TextDecoder().decode(opened)).to.eq(WhisperText)
+    const deciphered = await Crypto.decipherBytes(partKey, ciphered, textBytes(`[${BankStampText},${boxText},"whisper_sealed.ciphered",${BoxTagsText}]`))
+    expect(new TextDecoder().decode(deciphered)).to.eq(WhisperText)
   })
 })
 
@@ -133,22 +133,22 @@ describe("each ctx binds every field of its stamps", () => {
     expect(Object.keys(bank.maingate.stamp)).to.have.members([...GateStampFields])
   })
 
-  it("opens a box by hand under the stamps it was sealed under", async () => {
+  it("unseals a box by hand under the stamps it was sealed under", async () => {
     const { box, boxStamp, bankKey } = await sealedWorld()
-    expect(await openByHand(bankKey, box, TH.WorldBankStamp, boxStamp)).to.eq(WhisperText)
+    expect(await unsealByHand(bankKey, box, TH.WorldBankStamp, boxStamp)).to.eq(WhisperText)
   })
 
   for (const fieldname of BoxStampFields) {
     it(`keeps a box shut under a box stamp with another ${fieldname}`, async () => {
       const { box, boxStamp, bankKey } = await sealedWorld()
-      await expect(openByHand(bankKey, box, TH.WorldBankStamp, { ...boxStamp, [fieldname]: changed(boxStamp[fieldname]) as string })).rejects.toThrow()
+      await expect(unsealByHand(bankKey, box, TH.WorldBankStamp, { ...boxStamp, [fieldname]: changed(boxStamp[fieldname]) as string })).rejects.toThrow()
     })
   }
 
   for (const fieldname of SealTagFields) {
     it(`keeps a box shut under tags with another ${fieldname}`, async () => {
       const { box, boxStamp, bankKey } = await sealedWorld()
-      await expect(openByHand(bankKey, box, TH.WorldBankStamp, boxStamp, { ...BoxWhisper.tags, [fieldname]: changed(BoxWhisper.tags[fieldname]) as string })).rejects.toThrow()
+      await expect(unsealByHand(bankKey, box, TH.WorldBankStamp, boxStamp, { ...BoxWhisper.tags, [fieldname]: changed(BoxWhisper.tags[fieldname]) as string })).rejects.toThrow()
     })
   }
 
@@ -162,12 +162,12 @@ describe("each ctx binds every field of its stamps", () => {
   for (const fieldname of BankStampFields) {
     it(`keeps a box shut under a bank stamp with another ${fieldname}`, async () => {
       const { box, boxStamp, bankKey } = await sealedWorld()
-      await expect(openByHand(bankKey, box, { ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, boxStamp)).rejects.toThrow()
+      await expect(unsealByHand(bankKey, box, { ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, boxStamp)).rejects.toThrow()
     })
 
     it(`keeps a wayin shut under a bank stamp with another ${fieldname}`, async () => {
-      expect(await passphraseWayinOpens(TH.WorldBankStamp, TH.WorldGateStamp)).to.be.true
-      expect(await passphraseWayinOpens({ ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, TH.WorldGateStamp)).to.be.false
+      expect(await passphraseWayinUnwraps(TH.WorldBankStamp, TH.WorldGateStamp)).to.be.true
+      expect(await passphraseWayinUnwraps({ ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, TH.WorldGateStamp)).to.be.false
     })
 
     it(`keeps a lease shut under a bank stamp with another ${fieldname}`, async () => {
@@ -179,7 +179,7 @@ describe("each ctx binds every field of its stamps", () => {
 
   for (const fieldname of GateStampFields) {
     it(`keeps a wayin shut under a gate stamp with another ${fieldname}`, async () => {
-      expect(await passphraseWayinOpens(TH.WorldBankStamp, { ...TH.WorldGateStamp, [fieldname]: changed(TH.WorldGateStamp[fieldname]) as string })).to.be.false
+      expect(await passphraseWayinUnwraps(TH.WorldBankStamp, { ...TH.WorldGateStamp, [fieldname]: changed(TH.WorldGateStamp[fieldname]) as string })).to.be.false
     })
   }
 

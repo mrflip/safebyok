@@ -137,7 +137,7 @@ describe("vault.sealStampedString and vault.unsealStampedString", () => {
     await TH.expectRefusal(vault.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), {}))
   })
 
-  it("seal nothing a vault of another bank can open", async () => {
+  it("seal nothing a vault of another bank can unseal", async () => {
     const { vault } = await makeBornVault()
     const { vault: other } = await makeBornVault()
     await TH.expectRefusal(other.unsealStampedString(await vault.sealStampedString('sk-test', Stamp), Stamp), 'damaged_whisper')

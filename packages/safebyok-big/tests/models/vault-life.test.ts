@@ -86,7 +86,7 @@ describe("Locking, and the sessions after it on this device", () => {
     expect(await unsealIn(third.vault)).to.deep.equal(Whisper)
   })
 
-  it("a locked session unlocks with the lease a later session cached, and opens the whisper that session sealed, its box in hand brought up to it", async () => {
+  it("a locked session unlocks with the lease a later session cached, and deciphers the whisper that session sealed, its box in hand brought up to it", async () => {
     const { vault, box, boxIn, unsealIn, openNextSession, deviceDB } = await makeVaultWithBox()
     vault.bank.lock()
     await TH.eventually(() => deviceDB.cachedNow() === null)
@@ -150,7 +150,7 @@ describe("Another device, over the same bankDB and boxes", () => {
     expect(other.deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("seals a whisper that this device opens", async () => {
+  it("seals a whisper that this device deciphers", async () => {
     const world = await makeVaultWithBox()
     const { vault, boxIn, unsealIn } = world
     const other = await openOtherDevice(world)

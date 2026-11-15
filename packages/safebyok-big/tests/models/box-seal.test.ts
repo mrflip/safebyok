@@ -20,7 +20,7 @@ async function sealWorld() {
 }
 
 describe("a box sealed and unsealed through the vault's lease", () => {
-  it("opens the whispers sealed by create and by a later put", async () => {
+  it("unseals the whispers sealed by create and by a later put", async () => {
     const { boxes } = await sealWorld()
     const box = await boxes.create(BoxDna)
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
@@ -29,7 +29,7 @@ describe("a box sealed and unsealed through the vault's lease", () => {
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test-1111' })
   })
 
-  it("opens the sealed record in another listing, and opens it with its sidecar altered, as the seal leaves the sidecar out", async () => {
+  it("unseals the sealed record in another listing, and unseals it with its sidecar altered, as the seal leaves the sidecar out", async () => {
     const { boxes, boxesOf } = await sealWorld()
     const built = await boxes.create(BoxDna)
     const sealed = built._cheat_central

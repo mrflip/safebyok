@@ -154,7 +154,7 @@ export function refusalOfDelivering(thrown: unknown, answer: { ask: BX.LoggableA
 /** A `damaged_row` refusal: this box is stored damaged and cannot be read. */
 export function boxStoredDamaged({ boxlabel }: SX.DamagedBox): VaultError { return new VaultError('damaged_row', Phrases.boxStoredDamaged(boxlabel)) }
 
-/** A `damaged_whisper` refusal: the box opened, but what is inside is not a whisper this package can read. */
+/** A `damaged_whisper` refusal: the box unsealed, but what is inside is not a whisper this package can read. */
 export function undecodedWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecodedWhisper) }
 
 /** A `bad_option` refusal: the box has no exposed whisper to work on. */
@@ -215,7 +215,7 @@ export function passkeyAlreadyAdded(): VaultError { return new VaultError('bad_o
 /** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
 export function notKeyBytes(): VaultError { return new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeySize)) }
 
-/** An `unexpected_error` refusal: a proving was asked for the bankKey before it made or opened a wayin. */
+/** An `unexpected_error` refusal: a proving was asked for the bankKey before it made or unwrapped a wayin. */
 export function wayinNotMadeYet(): VaultError { return new VaultError('unexpected_error', Phrases.WayinNotMadeYet) }
 
 /** An `unexpected_error` refusal: this proving already has a wayin. */

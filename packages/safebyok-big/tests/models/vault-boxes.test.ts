@@ -233,7 +233,7 @@ describe("vault.getBox", () => {
     })
   }
 
-  it("resolves the full box, whose whisper opens", async () => {
+  it("resolves the full box, which unseals", async () => {
     const { openNextSession } = await makeWorldWithBox()
     const next = await openNextSession()
     const box = await next.getBox(boxlabel)

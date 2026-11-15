@@ -63,6 +63,6 @@ already demands that the record's `main` is the stored one.
 
 ## What the gate policies do not check
 
-No policy checks that a new wayin opens, since the bankDB cannot unwrap one. A `replace_passphrase` whose new `main`
-does not open passes, and so does an `add_passkey` whose `passkey0` does not open. A caller with the host's session
-can therefore lock the user out, or add a passkey that opens nothing.
+No policy checks that a new wayin unwraps, since the bankDB cannot unwrap one. A `replace_passphrase` whose new `main`
+does not unwrap passes, and so does an `add_passkey` whose `passkey0` does not unwrap. A caller with the host's session
+can therefore lock the user out, or add a passkey that unwraps nothing.

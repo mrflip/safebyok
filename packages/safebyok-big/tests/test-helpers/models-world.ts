@@ -14,7 +14,7 @@
  * otherwise keep each whisper's text by the stamp it was sealed under and give it back for that
  * stamp alone: its sealed parts are the constants
  * {@link FakeBoxKeyWrapped} and {@link FakeWhisperCiphered}. A record it never sealed, as the
- * builders make, opens to a 'damaged_whisper', as under the real vault.
+ * builders make, unseals to a 'damaged_whisper', as under the real vault.
  */
 
 import type { GotAct } from '../../src/shapes/shapes-enums'
@@ -126,7 +126,7 @@ export type ModelsWatch = { onNotice: (notice: Notice) => void, onBadNews: ((new
 
 // == [The world]: FakeBoxKeyWrapped, FakeWhisperCiphered, FakeDevice, FakeBank, FakeVault, ModelsWorldOpts, ModelsWorld, makeModelsWorld, boxListingOf
 
-/** The sealed parts of every record the fake seal seals: constants that wrap no key and open under none. */
+/** The sealed parts of every record the fake seal seals: constants that wrap no key and unwrap under none. */
 export const FakeBoxKeyWrapped   = fakeCiphered('fake-box-key-wrapped')
 /** The `whisper_ciphered` of every record the fake seal seals. */
 export const FakeWhisperCiphered = fakeCiphered('fake-whisper-ciphered')
@@ -169,7 +169,7 @@ export type FakeVault = {
   subscribe(listener: () => void): () => void
   /** Seal `whisperText` by the fake seal, refusing 'bank_locked' while locked. */
   sealStampedString(whisperText: string, stamp: CipherCtxRecord): Promise<SealedWhisper>
-  /** Open what the fake seal sealed under `stamp`, refusing 'bank_locked' while locked. */
+  /** Unseal what the fake seal sealed under `stamp`, refusing 'bank_locked' while locked. */
   unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string>
   /** Log the vault row an answer carried, as a call. */
   receiveParent(parent: unknown): void

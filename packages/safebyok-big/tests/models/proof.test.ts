@@ -262,12 +262,12 @@ describe("the proof", () => {
     nextPageUi.expectRenders([])
     nextVaultsUi.expectRenders([])
 
-    // It opens what the page before it sealed: the lease it picked up has the same bankKey.
+    // It unseals what the page before it sealed: the lease it picked up has the same bankKey.
     await pickedUp.beginWatch()
     const nextBoxesUi = mountComponent(pickedUp.boxListing, boxList)
     nextBoxesUi.expectRenders(['anthropic_api_key'])
-    const opened = await pickedUp.getBox(ApiKey.boxlabel)
-    expect(await opened?.extractWhisper()).to.deep.equal(ApiKey.whisper)
+    const pickedUpBox = await pickedUp.getBox(ApiKey.boxlabel)
+    expect(await pickedUpBox?.extractWhisper()).to.deep.equal(ApiKey.whisper)
     expect(dialog.shown).to.deep.equal([])
   })
 
@@ -454,7 +454,7 @@ describe("the proof", () => {
     gateUi.expectRenders(['revision 0'])
     boxesUi.expectRenders(['anthropic_api_key'])
 
-    // The second device has no lease cached, so its unlock asks; it then opens the box this one sealed.
+    // The second device has no lease cached, so its unlock asks; it then unseals the box this one sealed.
     const phone = makeDialog()
     const phoneBank = await world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
     const phoneVault = await phoneBank.ensureVault(VaultScopeGiven)

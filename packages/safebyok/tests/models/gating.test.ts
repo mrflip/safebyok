@@ -378,7 +378,7 @@ describe("birthBank(device, cleartexts)", () => {
     expect(put.lockedAtPuts).to.deep.equal([true])
   })
 
-  it("lays a passkey's wayin beside the passphrase's, opening the same bankKey", async () => {
+  it("lays a passkey's wayin beside the passphrase's, wrapping the same bankKey", async () => {
     TH.stubBankPut()
     const answer = TH.passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)

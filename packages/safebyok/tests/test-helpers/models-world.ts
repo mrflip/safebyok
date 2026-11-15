@@ -1,6 +1,6 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
  * a bank born unlocked, a stub of the `bank.put` seam, a box's shell, a fake of the bank a lease hears, and the loudly named
- * backdoors that open a wayin or read a lease's record from outside.
+ * backdoors that unwrap a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
  * installs vitest's fake timers at {@link T0} before each test and puts real ones back after, so the package's clock
@@ -183,26 +183,26 @@ export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte)
 
 // == [Backdoor]: WayinSecret, _cheat_bankKeyBytesOf, _cheat_bankKeyOf
 
-/** What opens a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes, for a passkey wayin. */
+/** What unwraps a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
-/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, opened from outside the models from the secret, the wayin's header and the bank's and gate's stamps.
+/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, unwrapped from outside the models from the secret, the wayin's header and the bank's and gate's stamps.
  * It exists only so a test can show two wayins have one bankKey, or read what a seal is bound to; no model hands out a bankKey.
- * Rejects with WebCrypto's error when the wayin will not open.
+ * Rejects with WebCrypto's error when the wayin will not unwrap.
  */
 export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GX.GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(bank, gate, header)
   async function wayinKeyOf(): Promise<CryptoKey> {
     if ('prfBytes' in secret) { return Crypto.deriveWrappingKey(secret.prfBytes, ctx) }
-    if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase opens a passphrase wayin alone.') }
+    if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase unwraps a passphrase wayin alone.') }
     return Crypto.importWrappingKeyBytes(await testDeriver.deriveKeyBytes(GX.passphraseCleartext.parse(secret.passphrase), Crypto.fromB64(header.salt_b64)))
   }
   const bankKey = await Crypto.unwrapKeyUnder(await wayinKeyOf(), wayin.bank_key_wayin_wrapped, ctx, { extractable: true, usage: ['wrapKey'] })
   return new Uint8Array(await crypto.subtle.exportKey('raw', bankKey))
 }
 
-/** A test backdoor: the bankKey of `bank`'s main gate, opened by {@link TestPassphrase}, able to unwrap what a lease sealed. */
+/** A test backdoor: the bankKey of `bank`'s main gate, unwrapped by {@link TestPassphrase}, able to unwrap what a lease sealed. */
 export async function _cheat_bankKeyOf(bank: Bank): Promise<CryptoKey> {
   const bankKeyBytes = await _cheat_bankKeyBytesOf(bank.stamp, bank.maingate.stamp, bank.maingate.main, { passphrase: TestPassphrase })
   return crypto.subtle.importKey('raw', bankKeyBytes as BufferSource, 'AES-GCM', false, ['unwrapKey'])

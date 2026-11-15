@@ -131,10 +131,10 @@ contains it: the bank's stamp (scope, `bank_tok`, `registered_at`) in every ctx;
 `gate_tok`, `registered_at`) for a wayin, the lease's own for a lease, and the vault's (`vaultlabel`, `vault_tok`,
 `registered_at`) and the box's for a box's two ciphertexts. It names a purpose string unique to
 the kind of field, and the record's own visible header or stamp, a wayin's header with its `wayinlabel`. So a wrap or a
-ciphertext moved to another bank, gate, wayin, vault, box, lease or purpose does not open, and a visible field altered in
-storage (a box's time or revision, a salt, a lease's `proved_at`) makes its record refuse to open. A box's
+ciphertext moved to another bank, gate, wayin, vault, box, lease or purpose does not decrypt, and a visible field altered in
+storage (a box's time or revision, a salt, a lease's `proved_at`) makes its record refuse to decrypt. A box's
 sidecar is the one unencrypted field of a box that no ctx binds, so that the server may change it: a sidecar
-altered in storage leaves the whisper opening. The gate row's `auth`, `sigs` and `meta` are bound by no ctx either: each
+altered in storage leaves the whisper deciphering. The gate row's `auth`, `sigs` and `meta` are bound by no ctx either: each
 is checked as an empty bag, and nothing reads them. The box's stamp is its sparse fields alone
 (`boxStampOf`, `models/box.ts`). A field a host wants readable in storage and authenticated is kept
 in both the whisper and the sidecar, and the host compares the two once the box is unsealed:
@@ -399,15 +399,15 @@ until garbage-collected, as a passphrase's do (G1). The core does not measure a 
 for measuring to zero. A `Box`'s
 record has ciphertext, never a whisper; the `Box` itself can keep the value, after `expose` (*Open items*, 1).
 *Caveat:* the JSON value itself cannot be zeroed, and no `Box` method shows an outline of one (`mask`, in `safebyok/utils`, is the host's to call on a text it has). Kept by: `models/box.ts`,
-`models/lease.ts`. Checked by: `tests/models/box-seal.test.ts` (*opens the whispers sealed by create and by a
+`models/lease.ts`. Checked by: `tests/models/box-seal.test.ts` (*unseals the whispers sealed by create and by a
 later put*, which finds none of the whisper in the record), `tests/models/lease.test.ts` (*round-trips a whisper's text
-under the same stamps*, *refuses tampered ciphertext as 'damaged_whisper', quoting none of it*). *zeroes the whisper's bytes once each has sealed or opened them*, which spies on `TextEncoder` and `TextDecoder`
+under the same stamps*, *refuses tampered ciphertext as 'damaged_whisper', quoting none of it*). *zeroes the whisper's bytes once each has sealed or unsealed them*, which spies on `TextEncoder` and `TextDecoder`
 and finds the bytes zero after a seal and after an unseal that succeed. No test checks a seal that is refused.
 
 **G7. The set of secrets is closed.** The eight values above are the secrets. A new one, or a new
 form of one (a cache, a copy in a snapshot, a key kept between calls), is a design change that
 amends this note first. The whisper's JSON text, a string between `Box` and `Lease`, is a form of
-the eighth value that this note names here: it lives in locals and arguments for one seal or open, and no field has it.
+the eighth value that this note names here: it lives in locals and arguments for one seal or unseal, and no field has it.
 
 **G8. No secret reaches a refusal, a log, or a thrown value.** A `VaultError` carries none in its
 message, `cause`, `meta` or any property (`errors.ts`); no refusal interpolates anything but a

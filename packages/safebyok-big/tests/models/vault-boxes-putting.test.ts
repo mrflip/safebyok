@@ -11,7 +11,7 @@ import { Passphrase, Sidecar, Whisper, boxlabel, byPassphrase, makeWorld, makeWo
 useVaultWorlds()
 
 describe("the box's birth: vault.putBox with no box listed", () => {
-  it("puts a new box whose whisper opens, with none of its cleartext in the row", async () => {
+  it("puts a new box that unseals, with none of its cleartext in the row", async () => {
     const { vault, boxrows, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, whisper: Whisper, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
@@ -35,7 +35,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
     expect(box.sidecar).to.deep.equal({})
   })
 
-  it("puts a whisper of {} where left out, and it opens under a real seal", async () => {
+  it("puts a whisper of {} where left out, and it deciphers under a real seal", async () => {
     const { vault, tryPutBox } = await makeWorld()
     const box = await vault.putBox({ boxlabel, sidecar: Sidecar })
     expect(tryPutBox).toHaveBeenCalledOnce()
@@ -123,7 +123,7 @@ describe("the box's birth: vault.putBox with no box listed", () => {
 })
 
 describe("a void instance, then a put: no beginWatch, no fetch", () => {
-  it("with nothing stored, is written at seq 0 under a real box_tok, and the whisper opens", async () => {
+  it("with nothing stored, is written at seq 0 under a real box_tok, and the whisper deciphers", async () => {
     const { vault, tryGetBox } = await makeWorld()
     const box = await vault.boxListing.puttable({ ...vault.scope, boxlabel }).put({ whisper: Whisper })
     expect(box.revision_seq).to.eq(0)

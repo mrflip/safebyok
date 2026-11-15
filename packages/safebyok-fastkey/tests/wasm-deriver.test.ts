@@ -222,7 +222,7 @@ async function putFakeBox(bank: Bank): Promise<void> {
 }
 
 /** Unlock `bank` (the test world's dialog types the passphrase), and check that the box the other device stored is there. */
-async function expectWhisperOpens(bank: Bank): Promise<void> {
+async function expectBoxUnseals(bank: Bank): Promise<void> {
   await bank.ensureUnlocked()
   const vault = await bank.ensureVault(TH.VaultScopeGiven)
   const box = (await vault.getBox('openai'))!
@@ -241,7 +241,7 @@ describe("a vault shared between the two derivers", () => {
   it("made through WebAssembly opens through the core's deriver", { timeout: 60_000 }, async () => {
     const devices = twoDevices(argon2idWasmWebV1Deriver, argon2idWebV1Deriver)
     await putFakeBox(await devices.first())
-    await expectWhisperOpens(await devices.second())
+    await expectBoxUnseals(await devices.second())
   })
 
   it("made through the core's deriver opens through WebAssembly, and refuses a wrong passphrase there", { timeout: 60_000 }, async () => {
@@ -251,7 +251,7 @@ describe("a vault shared between the two derivers", () => {
       requestCleartext: async (gating) => { await TH.expectBad(gating.attempt(TH.byPassphrase('correct horse battery stapler')), 'wrong_passphrase') },
     })
     await expect(mistyped.ensureUnlocked()).rejects.toThrow(/dismissed/u)
-    await expectWhisperOpens(await devices.second())
+    await expectBoxUnseals(await devices.second())
   })
 })
 

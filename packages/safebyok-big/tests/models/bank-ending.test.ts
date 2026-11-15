@@ -80,7 +80,7 @@ describe("bank.autolock", () => {
     expect(world.leaseRows()).to.have.lengthOf(1)
   })
 
-  it("a row just inside autolock still opens on a fresh page, asking nothing", async () => {
+  it("a row just inside autolock is still attached on a fresh page, asking nothing", async () => {
     const world = makeBankWorld()
     await makeBankWithVault(world)
     world.advance(AutolockMillis)
@@ -240,7 +240,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     expect(await bank.ensureVault(VaultScopeGiven)).to.equal(vault)
   })
 
-  it("unlocks every listed vault at one unlock, each opening what it sealed before the lock", async () => {
+  it("unlocks every listed vault at one unlock, each unsealing what it sealed before the lock", async () => {
     const { world, bank, vault } = await makeBankWithVault()
     const other = await bank.ensureVault(OtherScopeGiven)
     const otherStamp = { ...Stamp, ...OtherScopeGiven }

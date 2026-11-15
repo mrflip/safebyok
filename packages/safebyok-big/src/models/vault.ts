@@ -75,7 +75,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
     return this.bank.sealWith(whisperText, this.#stampsOf(stamp))
   }
 
-  /** The text in `sealed`, which opens only under the bank, this vault and `stamp` it was sealed with. */
+  /** The text in `sealed`, which deciphers only under the bank, this vault and `stamp` it was sealed with. */
   async unsealStampedString(sealed: SealedWhisper, stamp: CipherCtxRecord): Promise<string> {
     return this.bank.unsealWith(sealed, this.#stampsOf(stamp))
   }

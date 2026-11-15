@@ -102,7 +102,7 @@ const FamilyCases = [
   ["bank_locked",         "condition", 'a locked vault asks for the passphrase'],
   ["wrong_passphrase",    "condition", 'a mistyped passphrase asks again'],
   ["weak_passphrase",     "condition", 'a passphrase too easy to guess asks the user for another'],
-  ["wrong_passkey",       "condition", 'a passkey that does not open the vault asks again, or for a passphrase'],
+  ["wrong_passkey",       "condition", 'a passkey that does not unlock the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator that cannot answer for a passkey asks for the passphrase, or another authenticator'],
   ["absent_box",          "condition", 'a box deleted on another device is a normal part of syncing'],
   ["absent_vault",        "condition", 'a vault with no gate yet is set up by its first unlock'],

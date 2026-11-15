@@ -1,4 +1,4 @@
-/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a fake lease friend with a spy on each verb, a proving device over a fast key deriver, passkey answers, a gate listed in a bank, and the loudly named backdoor that opens a wayin from outside.
+/** The test world of the models' cryptography (`Lease`, `Proving`, `Wayin`, `Gate`): a fake lease friend with a spy on each verb, a proving device over a fast key deriver, passkey answers, a gate listed in a bank, and the loudly named backdoor that unwraps a wayin from outside.
  * Import it directly, not through `TH`, as `models-world.ts` is: `src/models/` is not exported.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving or a lease
@@ -180,19 +180,19 @@ export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte)
 
 // == [Backdoor]: WayinSecret, _cheat_bankKeyBytesOf
 
-/** What opens a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes made before the proving zeroed them, for a passkey wayin. */
+/** What unwraps a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes made before the proving zeroed them, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
-/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, opened from outside the models as a later unlock would open it, from the secret, the wayin's header and the bank's and gate's stamps. It exists only so a test can show two wayins have one bankKey, or that a wayin opens at all; no model hands out a bankKey. Rejects with WebCrypto's error when the wayin will not open. */
+/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, unwrapped from outside the models as a later unlock would unwrap it, from the secret, the wayin's header and the bank's and gate's stamps. It exists only so a test can show two wayins have one bankKey, or that a wayin opens at all; no model hands out a bankKey. Rejects with WebCrypto's error when the wayin will not open. */
 export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(bank, gate, header)
   async function wayinKeyOf(): Promise<CryptoKey> {
     if ('prfBytes' in secret) {
-      if (header.wayinkind !== 'passkey') { throw new Error('PRF bytes open a passkey wayin alone.') }
+      if (header.wayinkind !== 'passkey') { throw new Error('PRF bytes unwrap a passkey wayin alone.') }
       return deriveWrappingKey(secret.prfBytes, ctx)
     }
-    if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase opens a passphrase wayin alone.') }
+    if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase unwraps a passphrase wayin alone.') }
     return importWrappingKeyBytes(await keyDeriver.deriveKeyBytes(GX.passphraseCleartext.parse(secret.passphrase), fromB64(header.salt_b64)))
   }
   const wayinKey = await wayinKeyOf()

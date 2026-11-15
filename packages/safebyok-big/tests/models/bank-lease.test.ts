@@ -86,7 +86,7 @@ describe("the device's sweep and vacate, as its bank, vault and boxes meet them"
     return { ...born, box }
   }
 
-  it("seals a box through the vault and opens it, end to end", async () => {
+  it("seals a box through the vault and unseals it, end to end", async () => {
     const { box } = await makeVaultWithBox()
     expect(await box.extractWhisper()).to.deep.equal({ apiKey: 'sk-test' })
   })

@@ -154,7 +154,7 @@ export class Lease implements LeaseStamp {
   evict(): void { this.#record = null }
   // --
 
-  // == [Whispers under the bankKey]: sealWith, unsealWith, opened, ctxOf, bankKey
+  // == [Whispers under the bankKey]: sealWith, unsealWith, decipherSealed, ctxOf, bankKey
 
   /** Seal `whisperText` under a fresh boxKey, bound to the bank's stamp and then `stamps`, in order.
    * {@link unsealWith} needs the same stamps in the same order. The text's bytes are zeroed afterwards, sealed or refused.

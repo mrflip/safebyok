@@ -1068,7 +1068,7 @@ get scope(): BankScope { return CX.bankScope.parse(this) }
 
 How the code came to be is not the caller's business: the decision behind a shape, the request that produced it, what it
 replaced, which thread ruled. "As", "so", "since", "rather than", "no longer" and "still" usually mark it. A reason worth
-keeping goes in a `//` comment above the doc block: `// The lock first: no box opens under a lease while the tombstone goes out.`
+keeping goes in a `//` comment above the doc block: `// The lock first: no box unseals under a lease while the tombstone goes out.`
 
 | Goofus | Gallant |
 |---|---|

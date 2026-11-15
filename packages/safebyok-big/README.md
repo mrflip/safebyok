@@ -10,7 +10,7 @@ devices through a storage layer the host plugs in.
 
 * **The backend has ciphertext it cannot decrypt.** It can read labels and times, which are
   authenticated but never encrypted, and each box's sidecar, which is neither: the backend can read
-  and change a sidecar, and the box still opens. Put no secret in a sidecar (*Whisper and sidecar*).
+  and change a sidecar, and the box still unseals. Put no secret in a sidecar (*Whisper and sidecar*).
 * **One unlock opens every vault of the bank.** A bank has one passphrase, and at most one passkey,
   for all its vaults. Once the user unlocks it on a device, every box of every vault in it can be
   unsealed there until the bank locks. Secrets that must be unlocked separately belong in separate
@@ -65,7 +65,7 @@ types here do not have, trust the types.
 ## Whisper and sidecar
 
 A box keeps two JSON objects of your app's. The whisper is sealed: encrypted, and bound to the box's
-labels, times and revision, so that a whisper altered or moved in storage refuses to open. The
+labels, times and revision, so that a whisper altered or moved in storage will not decipher. The
 sidecar is laid beside it, unsealed, so that your server may read it and change it. A field the
 server should read but must not change unnoticed goes in both: the sidecar's copy for the server, the
 whisper's for your app, which compares the two once the box is unsealed to see what changed.

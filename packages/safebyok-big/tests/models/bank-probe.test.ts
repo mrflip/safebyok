@@ -14,7 +14,7 @@ async function readyBankOn(world: BankWorld = makeBankWorld()) {
   return { world, bank }
 }
 
-/** What opening the probe's box answers now. */
+/** What unsealing the probe's box answers now. */
 async function whisperIn(bank: Awaited<ReturnType<typeof readyBankOn>>['bank'], vaultlabel = 'home', boxlabel = 'box1'): Promise<unknown> {
   const box = await bank.vaultAt({ vaultlabel })?.fetchBox(boxlabel)
   return box?.extractWhisper()

@@ -37,7 +37,7 @@ that were not before:
   encrypted, and each box's boxKey is wrapped by the bankKey. Deleting a vault deletes its boxes,
   but a copy of them kept elsewhere (a backup, a replica) still unseals for whoever can unlock the
   bank. Only deleting the bank (`bank.delPrompt()`) removes the stored copies of the bankKey;
-  even then a copy of its gate row still opens to its old passphrase or passkey.
+  even then a copy of its gate row still unwraps under its old passphrase or passkey.
 
 ## What we consider in scope
 
