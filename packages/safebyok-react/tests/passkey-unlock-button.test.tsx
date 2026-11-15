@@ -134,7 +134,7 @@ describe("PasskeyUnlockButton", () => {
   })
 })
 
-/** Render the unlock dialog for a vault that has a passkey. */
+/** Render the unlock_bank dialog for a vault that has a passkey. */
 const dialogFor = async () => {
   const opened = await passkeyedUnlock()
   render(<PassphraseModal gating={opened.gating} />)

@@ -1,4 +1,4 @@
-/** A bank's unlocking: ensureUnlocked, unlock and lock, the lease it has by an unlock or by the cache, and its vaults' seals under that lease. */
+/** A bank's unlocking: ensureUnlocked, unlock and lock, the lease it has by a gating or by the cache, and its vaults' seals under that lease. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { makeLeaseKey } from '../../src/helpers/crypto'
@@ -99,7 +99,7 @@ describe("bank.ensureUnlocked, bank.unlock and bank.lock()", () => {
     expect(deviceDB.cachedNow()).not.to.be.null
   })
 
-  it("tells its listeners once at a lock and once at an unlock, its snapshot following", async () => {
+  it("tells its listeners once as it locks and once as it unlocks, its snapshot following", async () => {
     const { bank } = await makeBornVault()
     const listener = vi.fn()
     bank.subscribe(listener)
@@ -144,7 +144,7 @@ describe("vault.sealStampedString and vault.unsealStampedString", () => {
   })
 })
 
-describe("An unlock, by proof or by the cached lease", () => {
+describe("Unlocking, by proof or by the cached lease", () => {
   it("attaches the new lease and caches it over the old one", async () => {
     const { bank, deviceDB, advance } = await makeBornVault()
     const bornRow = deviceDB.cachedNow() as { proved_at: number }

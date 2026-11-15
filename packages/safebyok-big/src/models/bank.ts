@@ -242,7 +242,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   }
   // --
 
-  // == [The gating's unlock]: unlockBankByProving
+  // == [Unlocking by a gating]: unlockBankByProving
 
   // A gating comes to #unlockByProving by this, as no public method of a bank accepts a proving (G9).
   static readonly #unlockBankByProving: UnlockByProving = (bank, proved, cited) => bank.#unlockByProving(proved, cited)

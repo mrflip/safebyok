@@ -477,8 +477,8 @@ no key. The `LeaseFriend` whose
 `peekLease` returns the cached row with its leaseKey handle is kept in `Lease.#bankFriend` and made
 in `Bank.#makeLeaseFriend`. No public `Device`, `Bank` or `Gate` method accepts a proving: a gating's act reaches the bank's `#unlockByProving`
 through `Bank.#unlockBankByProving`, which is private, and which only the Bank's own `prompt` and `launchBirth` pass to
-`Gating.launchOn` and `Gating.launchBirth`; the Device calls `Bank.launchBirth`, and passes no unlock.
-The entry points export `Gating` as a type only, so the published surface has no launcher a host could hand an unlock
+`Gating.launchOn` and `Gating.launchBirth`; the Device calls `Bank.launchBirth`, and passes no `unlockByProving`.
+The entry points export `Gating` as a type only, so the published surface has no launcher a host could hand an `unlockByProving`
 of its own. A live gating's `constructor` still reaches the statics: that goes around the published types, and the host
 is inside the trust boundary (SECURITY.md). Nothing public on a
 `Bank` or a `Lease` hands the friend out, and a test captures it with a spy on `Proving.prototype.buildLease`.

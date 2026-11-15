@@ -183,7 +183,7 @@ export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte)
 /** What unwraps a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes made before the proving zeroed them, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
-/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, unwrapped from outside the models as a later unlock would unwrap it, from the secret, the wayin's header and the bank's and gate's stamps. It exists only so a test can show two wayins have one bankKey, or that a wayin opens at all; no model hands out a bankKey. Rejects with WebCrypto's error when the wayin will not open. */
+/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, unwrapped from outside the models as a later unlock_bank gating would unwrap it, from the secret, the wayin's header and the bank's and gate's stamps. It exists only so a test can show two wayins have one bankKey, or that a wayin opens at all; no model hands out a bankKey. Rejects with WebCrypto's error when the wayin will not open. */
 export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret, keyDeriver: KeyDeriver = testDeriver): Promise<Uint8Array> {
   const header = wayin.toJSON()
   const ctx = wayinCtxOf(bank, gate, header)

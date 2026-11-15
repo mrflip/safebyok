@@ -28,7 +28,7 @@ Until 1.0, only the latest published version receives security fixes.
 Since keys moved from each vault to its bank (one bank per user and `banklabel`), two things are true
 that were not before:
 
-* **One unlock on a device opens every vault of the bank.** A bank has one gate: one passphrase,
+* **Unlocking once on a device opens every vault of the bank.** A bank has one gate: one passphrase,
   and at most one passkey, which unwrap the bankKey, and the bankKey wraps the boxKey of every box
   in every vault. Once a device unlocks the bank, by the user's answer or by its lease, it can
   unseal any box of any of its vaults until the bank locks. There is no per-vault secret.

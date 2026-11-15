@@ -519,7 +519,7 @@ A member that will not describe in a line is a smell: report it.
   is a cue to rewrite as a sentence, not a ban.
 * **A member's block names no refusal catalog** `#no-refusal-catalog`. The thrower's doc and the `Outcome` type carry the
   kinds, and a class or module doc may say in one sentence what misuse refuses. The only kind worth naming is a condition the
-  caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on an unlock. Before naming one, taste it
+  caller branches on in normal use: `stale_write` on a put, `wrong_passphrase` on a gating's attempt. Before naming one, taste it
   against those two from memory: a kind of lesser salience goes unnamed. Where a caller meets a refusal in normal use, say
   what to do instead `#say-what-to-do`: `Precede with await vault.beginWatch(), repeated to force a refresh`.
 * **The guarantee is the line worth writing** `#say-the-guarantee`. What the call proves, or what a caller could get wrong about a secret, goes

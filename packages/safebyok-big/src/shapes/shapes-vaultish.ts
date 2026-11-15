@@ -431,7 +431,7 @@ export interface DeviceOpts {
   strengthChecker?:     StrengthChecker | undefined
   /** Where the device reports what it has no caller to throw to: the default logger, the console, when left out. */
   logger?:              VaultLogger | undefined
-  /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
+  /** How long a lease lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?:     number | undefined
   /** How recently a vault's record must have been fetched to be trusted, in minutes; 5 when left out. */
   vaultRefreshMinutes?: number | undefined
@@ -476,7 +476,7 @@ export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
  * - `'lock'`      -- the bank's lock
  * - `'tombstone'` -- the bank found deleted, or of another life
  * - `'vacate'`    -- the device's vacate
- * - `'undeleted'` -- a cached row of another gate revision or bank life, met at an unlock
+ * - `'undeleted'` -- a cached row of another gate revision or bank life, met by `ensureUnlocked`
  */
 export type RevokeSite = 'lock' | 'tombstone' | 'vacate' | 'undeleted'
 

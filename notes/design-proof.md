@@ -186,7 +186,7 @@ verbs (*Changing the gate*). The patch hooks belong to `Box`.
 Each way of unlocking makes a lease in its own way, then attaches it in the same way. There is no counter and no compare.
 
 ```text
-an unlock    lease = await proved.buildLease(friend, maingate);                 await bank.#attachLease(lease)
+unlocking    lease = await proved.buildLease(friend, maingate);                 await bank.#attachLease(lease)
 a birth      lease = await passphraseProving.buildLease(friend, maingate);      await bank.#attachLease(lease)
 a gate verb  lease = await proved.buildLease(friend, written);                  await bank.#attachLease(lease)
 the cache    lease = await Lease.buildFromCache(friend, maingate);              await bank.#attachLease(lease)    null → ask
@@ -208,7 +208,7 @@ bank.#revokeLease(where)                             private: called by lock, an
                                                      it does not align: lock aligns after calling it, and adopt's receiveRecord aligns
 ```
 
-**A `lock()` before the attach, on an unlock or a birth,** has no effect, by the enter-key rule. The bank ends
+**A `lock()` before the attach, on an `unlock_bank` gating or a birth,** has no effect, by the enter-key rule. The bank ends
 up unlocked with its lease cached: a normal, visible state that the next `lock()` ends. The bank was
 already locked, so that `lock()` changed no state.
 
@@ -217,7 +217,7 @@ it from the cache. This requires the deviceDB to apply calls in the order they w
 that the forget is written after the stow. The stow is awaited before `align`, because a listener may call
 `lock()`. So the attach needs no compare, and no second forget.
 
-**A `lock()` that crosses a gate change** does not stay in effect, as with an unlock: the proof shows that this
+**A `lock()` that crosses a gate change** does not stay in effect, as with unlocking: the proof shows that this
 user may have the bank unlocked. Each of the three gate changes ends in `#unlockByProving`, which gives the bank a
 lease for a full term citing the gate row that was written.
 
@@ -258,7 +258,7 @@ tab, even if the deviceDB still refuses. A second refusal finds the vacate alrea
 needs no counter; a vacate disables before its forgets.
 
 **A `lock()` and the dialog.** A lock leaves an open gating open: the lock says the bank is locked, and
-the user can still answer the dialog. If the gating was asking for an unlock, it still unlocks, and if it was
+the user can still answer the dialog. If the gating was asking to unlock the bank, it still unlocks, and if it was
 asking for a change of the gate, the change is written and unlocks. A valid request goes through if it was authorized at
 the start of its critical section.
 

@@ -35,7 +35,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  * `damaged_whisper`. A storage adapter's answer that cannot be, such as one revision under two toks,
  * is `record_conflict`.
  *
- * An unlock refuses `wrong_passphrase` or `wrong_passkey` even when the stored wayin was altered:
+ * A gating's attempt refuses `wrong_passphrase` or `wrong_passkey` even when the stored wayin was altered:
  * decryption fails alike either way, and the message says so.
  */
 export const refusalkindVals = [

@@ -1,4 +1,4 @@
-/** A `lock()` crossing a put, an unlock's proof or a box verb. What can reject a gate change after its record is stored is in `vault-gate.test.ts`. */
+/** A `lock()` crossing a put, the proof of an `unlock_bank` gating or a box verb. What can reject a gate change after its record is stored is in `vault-gate.test.ts`. */
 
 import { ENCRYPTED } from '../../src/helpers/consts'
 import { describe, expect, it, vi } from 'vitest'
@@ -37,7 +37,7 @@ describe("a lock() called during a put", () => {
   })
 })
 
-describe("A lock called while an unlock proves", () => {
+describe("A lock called while an unlock_bank gating proves", () => {
   it("leaves the vault unlocked", async () => {
     const { vault, deviceDB, dialog } = await makeBornVault()
     vault.bank.lock()

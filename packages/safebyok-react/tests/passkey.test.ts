@@ -260,7 +260,7 @@ describe("attemptThenZero", () => {
   })
 })
 
-describe("a passkey unlock, end to end", () => {
+describe("unlocking with a passkey, end to end", () => {
   it("opens the vault on another device with the passkey createPasskey made", async () => {
     // createPasskey @example, askPasskey @example
     TH.installFakeAuthenticator()

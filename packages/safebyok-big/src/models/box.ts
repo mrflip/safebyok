@@ -297,7 +297,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
 
   // == [Aligning]: align
 
-  // A lock only hides the whisper exposed, so that edits survive to the unlock (notes/expose_improves_security.md). A
+  // A lock only hides the whisper exposed, so that edits survive until the bank unlocks (notes/expose_improves_security.md). A
   // box that no longer answers will never show it again.
   /** Align (see {@link Storable.align}), dropping the whisper exposed and its veil once this box is not `isEnabled`. Never throws. */
   override align(): void {

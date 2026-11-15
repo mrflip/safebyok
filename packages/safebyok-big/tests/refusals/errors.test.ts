@@ -105,7 +105,7 @@ const FamilyCases = [
   ["wrong_passkey",       "condition", 'a passkey that does not unlock the vault asks again, or for a passphrase'],
   ["passkey_unavailable", "condition", 'a browser or authenticator that cannot answer for a passkey asks for the passphrase, or another authenticator'],
   ["absent_box",          "condition", 'a box deleted on another device is a normal part of syncing'],
-  ["absent_vault",        "condition", 'a vault with no gate yet is set up by its first unlock'],
+  ["absent_vault",        "condition", 'a vault with no gate yet is set up the first time it is unlocked'],
   ["absent_wayin",        "condition", 'a passkey removed on another device is a normal part of syncing'],
   ["box_too_large",       "condition", "a box too heavy for one record is the user's whisper and note, not the code"],
   ["vault_full",          "condition", 'a full vault tells the user to remove a box'],

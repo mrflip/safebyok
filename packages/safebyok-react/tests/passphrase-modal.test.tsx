@@ -204,7 +204,7 @@ describe("PassphraseModal over a later gating", () => {
 describe("PassphraseModal's footnote", () => {
   const FootnoteCases = [
     [TH.building,  WeekMillis,    "Locks on this device in 7 days.",       'says when a vault built now locks'],
-    [TH.unlocking, WeekMillis,    "Locks again on this device in 7 days.", 'says when an unlock lapses'],
+    [TH.unlocking, WeekMillis,    "Locks again on this device in 7 days.", 'says when the lease lapses'],
     [TH.unlocking, ForeverMillis, Messages.staysUnlocked,                  'says an endless lease stays unlocked'],
   ] as const
 

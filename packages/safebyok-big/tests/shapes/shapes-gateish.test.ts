@@ -38,12 +38,12 @@ describe("gatingLaunchOnArgs", () => {
   const askUser = guardRequestCleartext(() => undefined)
   const args = { gatingkind: 'unlock_bank', bank, unlockByProving, askUser }
 
-  it("passes a stored bank's gating kind, the bank, its unlock and the device's dialog, handing on the bank it was given", () => {
+  it("passes a stored bank's gating kind, the bank, its unlockByProving and the device's dialog, handing on the bank it was given", () => {
     expect(GX.gatingLaunchOnArgs.parse(args).bank).to.eq(bank)
     expect(GX.gatingLaunchOnArgs.parse({ ...args, askUser: null }).askUser).to.be.null
   })
 
-  it("refuses a build_bank, a kind it does not know, what is no bank, an unlock that is no function, a dialog the device did not wrap, and a field it does not know", () => {
+  it("refuses a build_bank, a kind it does not know, what is no bank, an unlockByProving that is no function, a dialog the device did not wrap, and a field it does not know", () => {
     for (const bad of [
       { ...args, gatingkind: 'build_bank' }, { ...args, gatingkind: 'open_sesame' }, { ...args, bank: { modelkind: 'vault' } },
       { ...args, unlockByProving: null }, { ...args, askUser: () => Promise.resolve(true) }, { ...args, prior: VoidRevision },
@@ -60,12 +60,12 @@ describe("gatingLaunchBirthArgs", () => {
   const askUser = guardRequestCleartext(() => undefined)
   const args = { listing, expected: shellBankOf(scope), unlockByProving, askUser }
 
-  it("passes a bank listing, the row built over, the unlock and the device's dialog, handing on the listing it was given", () => {
+  it("passes a bank listing, the row built over, the unlockByProving and the device's dialog, handing on the listing it was given", () => {
     expect(GX.gatingLaunchBirthArgs.parse(args).listing).to.eq(listing)
     expect(GX.gatingLaunchBirthArgs.parse({ ...args, askUser: null }).askUser).to.be.null
   })
 
-  it("refuses what is no bank listing, an expected that is no bank row, an unlock that is no function, and a dialog the device did not wrap", () => {
+  it("refuses what is no bank listing, an expected that is no bank row, an unlockByProving that is no function, and a dialog the device did not wrap", () => {
     for (const bad of [
       { ...args, listing: { modelkind: 'vault_listing' } }, { ...args, expected: { revision_seq: 'one' } },
       { ...args, unlockByProving: 'unlock' }, { ...args, askUser: () => Promise.resolve(true) },

@@ -24,7 +24,7 @@ export interface DeviceOpts {
   strengthChecker?: Strength.StrengthChecker | undefined
   /** Where the device reports what it has no caller to throw to: the default logger, the console, when left out. */
   logger?:          Logger.VaultLogger | undefined
-  /** How long an unlock lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
+  /** How long a lease lasts on this device, in minutes, `Infinity` for until locked; 14 days when left out. */
   autolockMinutes?: number | undefined
   /** Shows the host's dialog for each gating. Without one, the host renders the device's `openGating` itself. */
   requestCleartext?: RequestCleartext | undefined

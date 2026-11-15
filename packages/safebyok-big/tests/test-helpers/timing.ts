@@ -162,7 +162,7 @@ export function pendingNextCall<Target extends object>(target: Target, verb: Asy
  *
  * @example
  *   const written = TH.pendingNextAnswer(deviceDB, 'tryStow')
- *   const unlocking = bank.tryUnlock()     // the lease is in the deviceDB; the unlock has not heard
+ *   const unlocking = bank.tryUnlock()     // the lease is in the deviceDB; tryUnlock has not heard
  *   await written.reached
  *   bank.lock()                            // its forget is called after the write
  *   written.release()

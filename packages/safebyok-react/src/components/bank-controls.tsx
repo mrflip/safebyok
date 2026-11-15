@@ -4,7 +4,7 @@ import { useBank, useBankSnapshot, useDevice } from '../hooks/hooks'
 import type { CreateVaultButtonProps } from '../shapes'
 
 /** Show whether the signed-in user's bank is locked, with a button to lock or unlock it.
- * Renders nothing while there is no bank. A failed unlock goes to the provider's `onBadNews`, but a dismissed dialog does not.
+ * Renders nothing while there is no bank. A refusal from `ensureUnlocked` goes to the provider's `onBadNews`, but a dismissed dialog does not.
  */
 export function BankLockControl() {
   const bank = useBank()

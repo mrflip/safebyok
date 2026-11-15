@@ -47,7 +47,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
   required; the ruleset is the Coach's to change.
 * **Unlocking with an empty passphrase appears to refuse `unexpected_error`.** Found 2026-11-11
   (#647's README pass): `passphraseCleartext` (`shapes/shapes-gateish.ts`) is a bare string, so an
-  empty passphrase on unlock reaches the key deriver. The fastkey deriver throws `wrong_passphrase`
+  empty passphrase given to unlock reaches the key deriver. The fastkey deriver throws `wrong_passphrase`
   for it (`wasm-deriver.ts`, whose comment says a vault never passes one), but the vault turns any
   throw from a deriver into `keyDeriverThrew`'s `unexpected_error`. Either refuse an empty passphrase
   before the deriver, or let a deriver's `wrong_passphrase` through. Confirm with a test first.
@@ -75,7 +75,7 @@ Small irritants, each a few lines, picked up by whoever is nearby.
 * **`VacateStory` is no story.** Found 2026-11-11 (names report): it is public, and a story is
   `{ where, advice }`, while this is `{ cause }`. Proposed: `VacateOpts`.
 * **`RevokeSite`'s `'undeleted'` names an unlock.** Found 2026-11-11 (names report): the public
-  type's doc block says it is a row of another epoch or life met at an unlock. Proposed: `'unlock'`.
+  type's doc block says it is a row of another epoch or life met by `ensureUnlocked`. Proposed: `'unlock'`.
 
 ## Roadmapped
 
@@ -257,15 +257,15 @@ stays a check or the labels alone identify the vault.
 
 `packages/safebyok-big/tests/models/halpimonfire.test.ts` pins what each verb does when a lock lands: a BankDB write
 that has been sent returns or is refused as storage decides; a call still at a step before its write refuses with
-`bank_locked`; a read that would return a whisper refuses; and a lock and an unlock each do their own work, in order,
-so a lock that lands during an unlock's proof leaves the bank unlocked. Still open, from the scenarios that
+`bank_locked`; a read that would return a whisper refuses; and locking and unlocking each do their own work, in order,
+so a lock that lands during the proof of an `unlock_bank` gating leaves the bank unlocked. Still open, from the scenarios that
 `softlock_gone` (2026-10-19) listed:
 
 * **The DeviceDB throws when a lock forgets the lease**: `bank.lock()` locks in memory at once, and a refused forget
   is announced as `lease_revoke_failed`, on which `DefaultOnLifecycle` vacates the device. A host whose
   `onLifecycle` does less leaves the lease row on disk, and the next Bank on this device attaches it
-  (`Lease.buildFromCache`). Decide whether a lease a lock failed to forget is marked, or the next unlock asks first.
-* **A sign-out with an unlock in flight in another tab**: harmless today, because a lease is scoped
+  (`Lease.buildFromCache`). Decide whether a lease a lock failed to forget is marked, or the next `ensureUnlocked` asks first.
+* **A sign-out with an `ensureUnlocked` in flight in another tab**: harmless today, because a lease is scoped
   by the bank's scope, the user id included.
 * **A call is not refused when a lock lands during its opening hello** (the documentarian's run 2,
   [#312](https://github.com/mrflip/safebyok/pull/312)): the call then finds no lease and prompts
@@ -370,7 +370,7 @@ first; maintainability beats speed unless something is shown slow.
 
 From the bank_world sprint's thread 8c ([#673](https://github.com/mrflip/safebyok/pull/673)): a gate
 row that is delivered after a gate verb has written its row and before the gating grants its lease leaves
-the lease citing a superseded `gate_revision_tok`, so the next unlock asks the user to prove again.
+the lease citing a superseded `gate_revision_tok`, so the next `ensureUnlocked` asks the user to prove again.
 The direction is safe. The Coach (2026-11-12): "yes TODO not this sprint", with two questions. If
 the lease is handled only during align, after the newest gate version has been adopted, is there an
 issue? (The Coach thinks so.) Should the lease row in the deviceDB be written by compare-and-set
@@ -517,8 +517,8 @@ vacate on `Storable` with `children()` would bring back per-thing ended state; t
 ### A storage read begun before a create can undo it
 
 From the contract sprint's `a_sec2` ([#206](https://github.com/mrflip/safebyok/pull/206)): a
-read of the vault props that began before this device's first unlock made the vault can return
-after it, find no vault, and drop the new vault's key as if the vault were gone; the unlock is then
+read of the vault props that began before this device first unlocked and made the vault can return
+after it, find no vault, and drop the new vault's key as if the vault were gone; the unlocking is then
 refused with `vault_locked`, though the vault it made is stored, and the next read of the vault
 props finds it. The Coach (2026-10-21):
 

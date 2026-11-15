@@ -65,7 +65,7 @@ describe("BankLockControl", () => {
     expect(news).to.deep.equal([])
   })
 
-  it("tells the host's onBadNews of an unlock storage refused", async () => {
+  it("tells the host's onBadNews of an ensureUnlocked storage refused", async () => {
     const world = TH.makeBankWorld()
     await world.ensureBuilt()
     const news: VaultError[] = []

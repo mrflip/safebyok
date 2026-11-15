@@ -400,7 +400,7 @@ function heedRevokeFailed({ refusal, where, device }: Extract<DeviceEvent, { kin
 
 /** The default `onLifecycle`: log what a host should hear of, by the event's kind.
  * - `lease_revoke_failed`, after a lock or a vacate: logged at error and reported to the platform, and the device vacated
- * - the same, after a tombstone or at an unlock: a warning
+ * - the same, after a tombstone or in `ensureUnlocked`: a warning
  * - `vacated`, for any cause but `disabled`: logged at error and reported to the platform
  * - `helloed` refused, by `device.ensureBank()` or `vault.beginWatch()`, for any cause but `disabled`: a warning
  */

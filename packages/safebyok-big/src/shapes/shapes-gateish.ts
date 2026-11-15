@@ -91,7 +91,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
 export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
 
 /** The check of a new passkey's answer, as `safebyok-react`'s `createPasskey` gives it: a {@link passkeyAnswer} over a fresh salt of {@link PasskeySaltSize} bytes.
- * A passkey wayin sealed over another salt would read as damaged at every later unlock.
+ * A passkey wayin sealed over another salt would read as damaged whenever it is used to unlock the bank.
  *
  * @example freshPasskeyAnswer.parse({ ...answer, prf_salt_b64: 'c2hvcnQ' })  // throws
  */

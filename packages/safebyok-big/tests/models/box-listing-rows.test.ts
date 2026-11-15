@@ -259,7 +259,7 @@ describe("BoxListing: its snapshot is the boxlabels of its present boxes", () =>
     expect(told).not.toHaveBeenCalled()
   })
 
-  it("stays the same array, telling no listener, through a lock and an unlock", () => {
+  it("stays the same array, telling no listener, as the bank locks and unlocks", () => {
     const { listing, box } = listedBox()
     const before = listing.snapshot
     const told = vi.fn()

@@ -81,7 +81,7 @@ Copied from `unrace-progress.md` at the sprint's end. The names are as they were
 * A bankDB watch stopped in the same tick still receives a queued notice (thread 2).
 * A `lock()` called while `vault.ensureUnlocked` is proving leaves the vault unlocked, with its lease cached. The ruling
   is in `noted.md` (thread 3).
-* `uncacheForgotten` deletes by scope outside the lease's chores, so its delete can be written after an unlock's put, and the
+* `uncacheForgotten` deletes by scope outside the lease's chores, so its delete can be written after `ensureUnlocked`'s put, and the
   next session then has to prove again (thread 3's review).
 * `ensureTimely(0)` can join a `get` begun before the call and resolve with the older record, which is how the spec draws the
   join (thread 5's review).

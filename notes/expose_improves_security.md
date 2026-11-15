@@ -16,7 +16,7 @@ choice is who has it, for how long, and what ends it.
 | Who                                                 | What keeping the whisper on the box changes                                                                           |
 | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | A hostile script, vault unlocked                    | Nothing. It reads `input.value`, or calls `box.extractWhisper()`                                                      |
-| A hostile script, vault locked                      | Little. `box.whisper` returns a bag and `#exposed` is private. It can wait for an unlock, or wrap `Box.prototype.put` |
+| A hostile script, vault locked                      | Little. `box.whisper` returns a bag and `#exposed` is private. It can wait for the bank to unlock, or wrap `Box.prototype.put` |
 | An accident: a log line, `JSON.stringify`, a spread | An improvement on a variable: none of them show it                                                                    |
 | Someone with dev tools or a heap dump, after a lock | A loss. The value is still in memory, and a lock doesn't remove it                                                    |
 

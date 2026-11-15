@@ -157,7 +157,7 @@ describe("the sentinel bags and isWhisperedBag", () => {
     })
   }
 
-  it("refuses a put of the whisper read while locked, even after the unlock", async () => {
+  it("refuses a put of the whisper read while locked, even after the bank unlocks", async () => {
     const box = await exposedOf()
     world.mw.setLocked(true)
     const readWhileLocked = box.whisper

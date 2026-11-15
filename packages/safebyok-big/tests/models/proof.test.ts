@@ -195,7 +195,7 @@ describe("the proof", () => {
     await TH.expectRefusal(box.extractWhisper(), 'bank_locked')
     await expect(vault.getBox(ApiKey.boxlabel)).resolves.to.eq(box)
 
-    // The user closes the dialog: the unlock refuses dismissed, and nothing moves.
+    // The user closes the dialog: bank.unlock() refuses dismissed, and nothing moves.
     dialog.typing = []
     await TH.expectRefusal(bank.ensureUnlocked(), 'dismissed')
     expect(dialog.shown.splice(0)).to.deep.equal(['unlock_bank'])
@@ -454,7 +454,7 @@ describe("the proof", () => {
     gateUi.expectRenders(['revision 0'])
     boxesUi.expectRenders(['anthropic_api_key'])
 
-    // The second device has no lease cached, so its unlock asks; it then unseals the box this one sealed.
+    // The second device has no lease cached, so its ensureUnlocked asks; it then unseals the box this one sealed.
     const phone = makeDialog()
     const phoneBank = await world.bankOnAnotherDevice({ requestCleartext: phone.requestCleartext, onBadNews })
     const phoneVault = await phoneBank.ensureVault(VaultScopeGiven)
@@ -476,7 +476,7 @@ describe("the proof", () => {
     await vault.beginWatch()
     boxesUi.expectRenders(['anthropic_api_key, openai_api_key, gemini_api_key'])
 
-    // It replaces the passphrase: this device stays unlocked and hears the new gate; a later unlock accepts the new passphrase.
+    // It replaces the passphrase: this device stays unlocked and hears the new gate; a later unlock_bank gating accepts the new passphrase.
     phone.typing = { antePassphraseClear: Passphrase, nextPassphraseClear: NewPassphrase }
     await phoneBank.maingate.replacePassphrasePrompt()
     await ticks(1)

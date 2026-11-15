@@ -34,7 +34,7 @@ export const ensureApiKeyBoxExposed = async (device: Device, boxlabel: string): 
   await bank.ensureUnlocked()
   const vault = await bank.ensureVault({ vaultlabel: ApiKeyVaultlabel })
   const box = await vault.putBox({ boxlabel, whisper: {} }, { ifPresent: 'get', ifAbsent: 'add' })
-  // A box that was exposed before a lock still has what was typed, so after an unlock it needs no second expose.
+  // A box that was exposed before a lock still has what was typed, so after the bank unlocks it needs no second expose.
   if (! box.snapshot.isExposed) { await box.expose() }
   return box
 }

@@ -327,7 +327,7 @@ describe("box.subscribe and box.getSnapshot, through a lock", () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 
-  it("shows its bank's lock on the snapshot through a lock and an unlock, notifying a listener once each", async () => {
+  it("shows its bank's lock on the snapshot as the bank locks and unlocks, notifying a listener once each", async () => {
     const box = await unexposedOf()
     const listener = vi.fn()
     box.subscribe(listener)

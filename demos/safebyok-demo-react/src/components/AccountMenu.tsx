@@ -11,7 +11,7 @@ export const AccountMenu = ({ auth, session }: { auth: Auth, session: Session })
   const { stage } = useVault('main')
   const [gripe, setGripe] = useState<string | null>(null)
 
-  // Signing out vacates the device: the bank locks, and this device forgets its unlock. Nothing stored is deleted.
+  // Signing out vacates the device: the bank locks, and this device forgets its lease. Nothing stored is deleted.
   const signOut = () => {
     void device?.vacate()
     auth.signOut()

@@ -43,7 +43,7 @@ export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandle
 export type GatingModalProps = {
   /** The gating this dialog is for, from `requestCleartext` or the device's snapshot. */
   gating:              AnyGating
-  /** The device's `leaseMillis`, used for the line that says how long an unlock lasts. */
+  /** The device's `leaseMillis`, used for the line that says how long a lease lasts. */
   leaseMillis?:        number | undefined
   /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined
@@ -154,7 +154,7 @@ export type BoxWhisperFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type
 
 /** Props of the button that unlocks the bank with its passkey. */
 export type PasskeyUnlockButtonProps = {
-  /** The unlock gating, as the bank passed it to `requestCleartext`. */
+  /** The `unlock_bank` gating, as the bank passed it to `requestCleartext`. */
   gating:      Gating<'unlock_bank'>
   /** Called with a message to show the user, or with null to clear the last message. */
   onGripe:     (gripe: string | null) => void
@@ -196,7 +196,7 @@ export type ModalFormProps = {
   gripeText:      string | null
   /** The live region's id. */
   gripeId:        string
-  /** A muted line under the live region, saying how long an unlock lasts. */
+  /** A muted line under the live region, saying how long a lease lasts. */
   footnote?:      string | undefined
   formRef?:       Ref<HTMLFormElement> | undefined
   /** The form's action, called with the form's fields at each submit. */
@@ -214,7 +214,7 @@ export type PassphraseGating = Gating<'build_bank'> | Gating<'unlock_bank'>
 export type PassphraseModalProps = {
   /** The gating this dialog is for, as the bank passed it to `requestCleartext`. */
   gating:              PassphraseGating
-  /** The device's `leaseMillis`, used for the line that says how long an unlock lasts. */
+  /** The device's `leaseMillis`, used for the line that says how long a lease lasts. */
   leaseMillis?:        number | undefined
   /** The username a password manager saves the passphrase under. */
   passphraseUsername?: string | undefined

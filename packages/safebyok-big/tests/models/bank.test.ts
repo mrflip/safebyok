@@ -49,7 +49,7 @@ describe("bank.ensureVault", () => {
     expect(world.bankDB._cheat_shelfOf(BankScopeGiven).vaultrows.size).to.eq(2)
   })
 
-  it("puts a vault while an unlock's gating is open", async () => {
+  it("puts a vault while an unlock_bank gating is open", async () => {
     const world = makeBankWorld()
     let closeDialog = nothing
     let showDialog = nothing

@@ -290,7 +290,7 @@ describe("a birth through a gating", () => {
   })
 })
 
-/** An unlock no launch in these tests reaches. */
+/** An unlockByProving no launch in these tests reaches. */
 const neverUnlocks = (): Promise<never> => Promise.reject(new Error('never called'))
 
 describe("a launcher reached through a live gating", () => {
@@ -442,7 +442,7 @@ describe("gating.attempt", () => {
   })
 })
 
-describe("an unlock through a gating", () => {
+describe("unlocking through a gating", () => {
   it("gives each gating a token of its own", async () => {
     const { bank, gatingAt } = await lockedBank()
     const first = bank.ensureUnlocked()
@@ -530,7 +530,7 @@ describe("an unlock through a gating", () => {
 })
 
 describe("what ends a gating", () => {
-  it("leaves an unlock open through a lock, and the attempt after it unlocks", async () => {
+  it("leaves an unlock_bank gating open through a lock, and the attempt after it unlocks", async () => {
     const { bank, gatingAt } = await lockedBank()
     const unlocking = bank.ensureUnlocked()
     const gating = await gatingAt<'unlock_bank'>()
@@ -562,7 +562,7 @@ describe("what ends a gating", () => {
     expect(gating.isOpen).to.be.false
   })
 
-  it("concludes an open unlock on a vacate of the device", async () => {
+  it("concludes an open unlock_bank gating on a vacate of the device", async () => {
     const { bank, gatingAt } = await lockedBank()
     const unlocking = TH.expectRefusal(bank.ensureUnlocked())
     await gatingAt<'unlock_bank'>()

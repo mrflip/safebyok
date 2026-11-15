@@ -321,7 +321,7 @@ describe("a sidecar-only put", () => {
     expect(tryPutBox).not.toHaveBeenCalled()
   })
 
-  it("refuses box.whisper read while locked, even after the unlock", async () => {
+  it("refuses box.whisper read while locked, even after the bank unlocks", async () => {
     const { vault, box, tryPutBox } = await makeWorldWithBox()
     await box.expose()
     vault.bank.lock()
@@ -335,7 +335,7 @@ describe("a sidecar-only put", () => {
     expect(await box.extractWhisper()).to.deep.equal(Whisper)
   })
 
-  it("puts an exposed whisper whose reference was kept across a lock and an unlock", async () => {
+  it("puts an exposed whisper whose reference was kept while the bank locked and unlocked", async () => {
     const { vault, box } = await makeWorldWithBox()
     await box.put({ whisper: { apiKey: 'sk-test-0000' } })
     await box.expose()

@@ -191,7 +191,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // == [The acts]: buildBank, unlockBank, replacePassphrase, addPasskey, revokePasskey, delBank, ActOnBank
 
 // Each act proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving builder (G1); the
-// change hears provings, and comes to the bank's private unlock by unlockByProving (G9).
+// change hears provings, and unlocks the bank privately by unlockByProving (G9).
 
 /** Build a bank over `expected` from the user's passphrase and optional passkey, and unlock it. */
 async function buildBank(listing: BankListing, provingDevice: ProvingDevice, expected: BankSparse, cleartexts: unknown, unlockByProving: UnlockByProving): Promise<Bank> {

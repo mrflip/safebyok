@@ -105,7 +105,7 @@ export class Lease implements LeaseStamp {
 
   // == [Caching]: cacheAsCacheCan
 
-  // A refusal costs the next session an unlock, not this one its lease.
+  // A refusal costs the next session a gating, not this one its lease.
   /** Cache this lease on this device, unless it came from there. A device database refusal is told as bad news, not thrown. */
   async cacheAsCacheCan(): Promise<void> {
     if (this.#isFromCache) { return }

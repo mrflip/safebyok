@@ -55,7 +55,7 @@ life, with a new token.
 * `Device.make({ user_id, banklabel, gates: ['main'], bankDB, deviceDB, keyDeriver, requestCleartext, ... })`:
   a Device, synchronously, one per signed-in user. `device.vacate()` at sign-out.
 * `device.ensureBank()`: the Bank, once the deviceDB has this device's row and the vaults are
-  listed. One unlock of the bank (`bank.ensureUnlocked()`) opens every vault in it, until
+  listed. Unlocking the bank once (`bank.ensureUnlocked()`) opens every vault in it, until
   `bank.lock()`; a lease kept in the deviceDB lets this device unlock again without asking, until it
   expires. `bank.maingate` changes the passphrase or passkeys; `bank.delPrompt()` deletes the bank.
 * `bank.ensureVault({ vaultlabel })`: a Vault, fetched or made, asking nobody.

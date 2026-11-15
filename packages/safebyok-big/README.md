@@ -11,7 +11,7 @@ devices through a storage layer the host plugs in.
 * **The backend has ciphertext it cannot decrypt.** It can read labels and times, which are
   authenticated but never encrypted, and each box's sidecar, which is neither: the backend can read
   and change a sidecar, and the box still unseals. Put no secret in a sidecar (*Whisper and sidecar*).
-* **One unlock opens every vault of the bank.** A bank has one passphrase, and at most one passkey,
+* **Unlocking once opens every vault of the bank.** A bank has one passphrase, and at most one passkey,
   for all its vaults. Once the user unlocks it on a device, every box of every vault in it can be
   unsealed there until the bank locks. Secrets that must be unlocked separately belong in separate
   banks, each under its own `banklabel`.
@@ -195,7 +195,7 @@ safebyok has bags of its own. A veiled box stays veiled while its bank is locked
 is still true, and `box.exposure` is `'locked'`. A box's snapshot has `isExposed`, `isVeiled`, and
 `isLocked`, its bank's lock; a vault's snapshot has no lock of its own. `box.veil()` hides
 the whisper and `box.unveil()` shows it again, and the veil is cleared when the whisper is removed.
-A lock hides the whisper, and an unlock shows it again. `box.subscribe` notifies its listeners of
+A lock hides the whisper, and unlocking shows it again. `box.subscribe` notifies its listeners of
 each of these changes.
 
 **A script.** Fetch the passphrase in `requestCleartext`, with a token the container already has:
