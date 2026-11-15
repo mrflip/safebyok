@@ -24,7 +24,7 @@ was learned and built. Three threads, each its own worktree and PR, cut from ori
   `MaxLabelsUnder.box` from `Infinity` to 1, so a box is the root box, at `box`, or `box/<label>`, and add nothing on
   top of it. Nothing brings a parent to life.
 * **`world`.** Every answer, refusals included, and every notice carries `world: WorldRecord | null`, where
-  `WorldRecord` is `{ bank, maingate }`: the bank's row and the main gate's row. `BankRecord` means the bank's row
+  `WorldRecord` is `{ ...bank, maingate }`: the bank's row, spread flat, with the main gate's row as `maingate`. `BankRecord` means the bank's row
   alone. The root box is not part of the world; it rides only in `tryBirthBank`'s `val` (`BankRoots`). The name
   `maingate` stays for now: whether it means the root gate or the gate that authorized the caller is undecided. The
   world is read in the same atomic step, and is the actual (VOCABULARY.md): as stored after the step. For the bank's
@@ -69,8 +69,9 @@ gate's write function*), overriding `classify*` where the store reached the verd
 
 ## Open
 
-* **The world pick's shape.** Recommended: a pair per record, `{ bank: { lifeseq, revseq }, maingate: { lifeseq,
-  revseq } }`, since a passphrase change revises the main gate and not the bank.
+* **Does a gate write also revise the bank?** The pick is the world's own `{ revseq, lifeseq }`, the bank's fields. If
+  a gate write revises the bank too (gate_policies: "gate verbs are bank/gate puts"), the pick catches every change;
+  if not, it misses a passphrase change unless it carries `maingate`'s pair as well.
 * **How an answer says "unchanged".** Recommended: `world` absent when it matches the pick; `null` in the null cases
   above; the `WorldRecord` when the pick is behind or ahead, or the ask carried none.
 
