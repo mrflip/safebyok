@@ -156,7 +156,7 @@ describe('scripts/ohai', () => {
     expect(hook('manual')).to.include('main session or unknown] compacting (manual)')
   })
 
-  it('exits 0 from the hook whatever it is given, so a compaction is never held up', () => {
+  it('exits 0 from the hook whatever it is given, so a compaction is never delayed', () => {
     const ran = spawnSync(Script, ['--hook'], { cwd: main, encoding: 'utf8', env: isolatedEnv(scratch, Began), input: 'not json' })
     expect(ran.status).to.equal(0)
   })

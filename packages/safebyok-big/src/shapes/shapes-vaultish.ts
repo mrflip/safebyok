@@ -112,7 +112,7 @@ export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxC
   return { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener }
 })
 
-/** The checks of what `bank.tryProbe` is handed: where its trial box goes and what it holds, and how fresh its record must be. */
+/** The checks of what `bank.tryProbe` is handed: where its trial box goes and what it has, and how fresh its record must be. */
 export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlabel, boxlabel }) => ({
   probeAsked: obj({
     vaultlabel: vaultlabel.default('home'),
@@ -128,7 +128,7 @@ export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlab
   }),
 }))
 
-/** Where `bank.tryProbe` puts its trial box and what it holds, each with a default. */
+/** Where `bank.tryProbe` puts its trial box and what it has, each with a default. */
 export type ProbeAsked = Z.input<typeof probeAsked>
 /** How fresh `bank.tryProbe` needs its trial's vault and box. */
 export type ProbeOpts = Z.input<typeof probeOpts>
@@ -213,7 +213,7 @@ export const storableArgs = objCheck(({ custom }) => ({
 
 // == [Given to a listing]: Thing, ListingAnswer, ListingPutAnswer, ListingPutOpts, ListingDelOpts, DelTombstone, ListingOf
 
-/** A thing a listing holds: a bank, gate, vault or box. */
+/** A thing a listing keeps: a bank, gate, vault or box. */
 export type Thing<ScopeT extends object, RecordT extends SparseT, SparseT extends SparseBase<ScopeT>> = Storable<ScopeT, RecordT, SparseT, unknown>
 
 /** The answer of a bankDB verb, as a listing delivers it: a record in any form, or null for nothing stored, or a refusal. */

@@ -6,7 +6,7 @@ import { ApiKeyVaultlabel, ToolkitApiKeyBoxlabel, ensureApiKeyBoxExposed, extrac
 import { KnockForm } from './KnockForm'
 
 /** The toolkit form: a knock-knock machine assembled by hand from safebyok-react's hooks.
- * Its API key is an exposed whisper: safebyok holds the working copy, and the form only displays it.
+ * Its API key is an exposed whisper: safebyok keeps the working copy, and the form only displays it.
  */
 export const KnockKnockToolkit = () => {
   const device = useDevice()

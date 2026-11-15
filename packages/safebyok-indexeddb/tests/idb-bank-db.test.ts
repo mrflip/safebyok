@@ -81,7 +81,7 @@ const failNextCall = (): void => {
 
 /** From now on, have IndexedDB store a row other than the one each write sends, as a datastore that alters what it stores would. */
 const storeOtherwise = (): void => {
-  // The original put is held to be called with the store as `this`.
+  // The original put must be called with the store as `this`.
   const { put } = IDBObjectStore.prototype // eslint-disable-line @typescript-eslint/unbound-method
   vi.spyOn(IDBObjectStore.prototype, 'put').mockImplementation(function (this: IDBObjectStore, row: unknown, scopepath?: IDBValidKey) {
     return put.call(this, TH.storedOtherwiseOf(row), scopepath)

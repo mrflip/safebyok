@@ -39,7 +39,7 @@ export type GateScopepath = [tag: 'gate', user_id: string, banklabel: string, ga
 /** The shelf key of a vault row. */
 export type VaultScopepath = [tag: 'vault', user_id: string, banklabel: string, vaultlabel: string]
 
-// The key holds both toks, so a box row under any other pair of lives is at another key, and a put under one cannot overwrite it.
+// The key has both toks, so a box row under any other pair of lives is at another key, and a put under one cannot overwrite it.
 /** The shelf key of a box row. Each vault life has its own box rows. */
 export type BoxScopepath = [tag: 'box', user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string, boxlabel: string]
 

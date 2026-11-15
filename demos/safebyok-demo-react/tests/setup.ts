@@ -21,7 +21,7 @@ if (typeof HTMLDialogElement !== 'undefined') {
   Object.defineProperties(HTMLDialogElement.prototype, { showModal, close })
 }
 
-// A findBy or waitFor returns as soon as its condition holds, so a longer timeout costs nothing when
+// A findBy or waitFor returns as soon as its condition is true, so a longer timeout costs nothing when
 // the test passes. Some waits include making a vault (deriving its keys and storing its rows), which can take
 // longer than the default one second on a loaded CI machine. The test's own timeout (vite.config.ts) is higher still.
 configure({ asyncUtilTimeout: 5000 })

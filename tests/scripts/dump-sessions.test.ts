@@ -14,7 +14,7 @@ const volumeOf = (filename: string) => filename.split('-', 3)[2]!
 const plant = (root: string, relpath: string) => {
   const where = path.join(root, relpath)
   mkdirSync(path.dirname(where), { recursive: true })
-  writeFileSync(where, 'held\n')
+  writeFileSync(where, 'planted\n')
 }
 
 describe('scripts/dump-sessions.sh', () => {
@@ -24,10 +24,10 @@ describe('scripts/dump-sessions.sh', () => {
   let run: () => string
   /** The dumps written so far, oldest first */
   const dumpFilenames = () => readdirSync(dumps).toSorted(byName)
-  /** What a dump holds, as paths under the scratch home and scratch folder */
-  const heldBy = (filename: string) => (
+  /** What a dump has, as paths under the scratch home and scratch folder */
+  const pathsIn = (filename: string) => (
     execFileSync('tar', ['--list', '--file', path.join(dumps, filename)], { encoding: 'utf8' })
-      .trim().split('\n').map((held) => held.replace(/^.*?(?=\.claude\/|tmp-root\/)/, '')).toSorted(byName)
+      .trim().split('\n').map((line) => line.replace(/^.*?(?=\.claude\/|tmp-root\/)/, '')).toSorted(byName)
   )
 
   beforeEach(() => {
@@ -54,7 +54,7 @@ describe('scripts/dump-sessions.sh', () => {
     const [filename] = dumpFilenames()
     expect(filename).toMatch(DumpFilename)
     expect(said).toContain(`${path.join(dumps, filename!)}: 6 files`)
-    expect(heldBy(filename!)).toEqual([
+    expect(pathsIn(filename!)).toEqual([
       '.claude/file-history/abc/snapshot',
       '.claude/projects/-workspace-byok/abc.jsonl',
       '.claude/projects/-workspace-byok/abc/subagents/agent-1.jsonl',
@@ -73,7 +73,7 @@ describe('scripts/dump-sessions.sh', () => {
     plant(tmp, 'clone/.git/config')
     plant(tmp, 'clone/node_modules/dep/index.js')
     run()
-    expect(heldBy(dumpFilenames()[0]!)).toEqual(['.claude/projects/kept.jsonl'])
+    expect(pathsIn(dumpFilenames()[0]!)).toEqual(['.claude/projects/kept.jsonl'])
   })
 
   it('writes the dump readable only by its owner, with relative stored paths', () => {
@@ -100,7 +100,7 @@ describe('scripts/dump-sessions.sh', () => {
     plant(home, '.claude/projects/new.jsonl')
     run()
     const [first, second] = dumpFilenames()
-    expect(heldBy(second!)).toEqual(['.claude/projects/new.jsonl'])
+    expect(pathsIn(second!)).toEqual(['.claude/projects/new.jsonl'])
     const endOfFirst = first!.replace('.tar.gz', '').split('-', 5)[4]
     const startOfSecond = second!.split('-', 4)[3]
     expect(startOfSecond).toBe(endOfFirst)

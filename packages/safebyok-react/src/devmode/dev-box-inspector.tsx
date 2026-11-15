@@ -64,7 +64,7 @@ const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: stri
   const isShowing = (exposure === 'showing')
   const { lastCall, call } = useLastCall()
   const [fieldname, setFieldname] = useState('apiKey')
-  // Held in a ref, not in React state, so the typed text is never part of a render.
+  // Kept in a ref, not in React state, so the typed text is never part of a render.
   const whisperText = useRef('')
   const [extracted, setExtracted] = useState<Whisper | null>(null)
   const isLocked = useBankSnapshot()?.isLocked ?? true

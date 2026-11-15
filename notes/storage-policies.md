@@ -19,7 +19,7 @@ refusal. A refusal means some other caller sent the put.
   `replaced`. That calls `demandStorage(ask, stored)`, which applies each policy the ask names. This is the bastion
   where the adapter runs beside the database: memory, IndexedDB, a server's bankDB.
 * **Convex**: the component's `putGate` mutation applies `demandStorage` inside Convex.
-* **Postgres**: `safebyok_put_gate` holds each policy as conditions of the one statement that stores the record. On a
+* **Postgres**: `safebyok_put_gate` states each policy as conditions of the one statement that stores the record. On a
   refusal, the adapter re-runs the classifier on the rows returned, to name the refusal.
 
 Every adapter passes the same battery cases, one set per policy.
@@ -61,8 +61,8 @@ already demands that the record's `main` is the stored one.
 | RK3 | the record has no `passkey0` | `PasskeyNotRevoked` |
 | RK4 | every wayin of the record but `passkey0` is the stored row's | `OtherWayinMoved` |
 
-## What the gate policies do not hold
+## What the gate policies do not check
 
 No policy checks that a new wayin opens, since the bankDB cannot unwrap one. A `replace_passphrase` whose new `main`
-does not open passes, and so does an `add_passkey` whose `passkey0` does not open. A caller holding the host's session
+does not open passes, and so does an `add_passkey` whose `passkey0` does not open. A caller with the host's session
 can therefore lock the user out, or add a passkey that opens nothing.

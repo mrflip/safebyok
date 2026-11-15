@@ -65,7 +65,7 @@ describe("Listing's pipeline: what every answer goes through", () => {
       expect(world.mw.callsOf('put')[0]?.expectedRevisionTok).to.equal('rev-a1')
     })
 
-    it("expects the shell row where no row is held", async () => {
+    it("expects the shell row where no row is kept", async () => {
       const listing = boxListingOf(world.mw)
       const box = await listing.put(fullBoxRecord({ revision_seq: 0 }), { expected: shellBoxRecord() })
       expect(world.mw.callsOf('put')[0]?.expectedRevisionTok).to.be.null

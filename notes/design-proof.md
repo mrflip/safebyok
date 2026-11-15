@@ -35,7 +35,7 @@ device.ensureBank()                                  the bank listed is returned
 ## What a bank's birth needs
 
 A bank's birth stores two rows together: the bank row, and its `main` gate row, which carries the wayins. Neither
-has anything encrypted but the wayins' wraps. A vault is born later, by `bank.ensureVault`, and holds no key.
+has anything encrypted but the wayins' wraps. A vault is born later, by `bank.ensureVault`, and has no key.
 
 | Part                | Fields                          | Comes from                                           |
 |---------------------|---------------------------------|------------------------------------------------------|
@@ -339,7 +339,7 @@ attaching a lease. The new Bank reports locked between the build and the attach,
 
 A vault's birth asks nobody: `bank.ensureVault(scope)` returns the vault listed, if present, and otherwise puts
 `vaultListing.recordOfBirth(scope, expected)` over the tombstone or shell, `{ expected, ifAbsent: 'add', ifPresent: 'get' }`.
-A `passed` answer is another device's vault, and is returned: a vault holds no key of its own.
+A `passed` answer is another device's vault, and is returned: a vault has no key of its own.
 
 ## `unlock_bank`
 

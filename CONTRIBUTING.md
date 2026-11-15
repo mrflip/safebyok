@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for your interest in safebyok. It is a small library that holds people's secrets, so it moves
+Thanks for your interest in safebyok. It is a small library that keeps people's secrets, so it moves
 carefully: please open an issue to talk over anything larger than a fix before you write it.
 
 **Found a security problem?** Don't open an issue: see [SECURITY.md](SECURITY.md).

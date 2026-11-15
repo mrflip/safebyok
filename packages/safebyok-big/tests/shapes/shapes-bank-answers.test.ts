@@ -24,7 +24,7 @@ function crossed(answer: Answer<unknown, string, unknown>): unknown {
   return JSON.parse(JSON.stringify(sent, (_ckey, field: unknown) => field ?? null)) as unknown
 }
 
-/** A bankDB holding the bank `bank1`, its vault, and one box. */
+/** A bankDB with the bank `bank1`, its vault, and one box. */
 async function bankDBWithBox(): Promise<MemoryBankDB> {
   const bankDB = new MemoryBankDB()
   await bankDB.buildBank(bankBuildAskOf())

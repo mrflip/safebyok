@@ -51,7 +51,7 @@ const ChangeCases = [
   // a package that stops shipping, or starts:
   [Idb6_3,       PrivateIdb,   [{ ...Bumped, post: undefined }],                     'a package made private moves all its dependencies out'],
   [PrivateIdb,   Idb6_3,       [{ ...Bumped, ante: undefined, post: '^6.3.0' }],     'a package made public moves all its dependencies in'],
-  [PrivateIdb,   PrivateIdb,   [],                                                   'a private package ships nothing, whatever it holds'],
+  [PrivateIdb,   PrivateIdb,   [],                                                   'a private package ships nothing, whatever it has'],
 ] as const
 
 describe("runtimeDepChanges", () => {

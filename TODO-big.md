@@ -546,7 +546,7 @@ raised the standard bundle (an app loading the Bank) overall, it is not worth it
 
 ## The react lifecycle
 
-`BankProvider` makes its bank in an effect and passes it down with `setHeld` from that effect,
+`BankProvider` makes its bank in an effect and passes it down with `setDevice` from that effect,
 under a `react-hooks/set-state-in-effect` suppression (`safebyok-react/src/provider/bank-provider.tsx`);
 `useVault` asks for a vault in an effect of its own (thread 7b, 2026-10-22).
 Thread A5 of the contract sprint ([#199](https://github.com/mrflip/safebyok/pull/199)) moved the

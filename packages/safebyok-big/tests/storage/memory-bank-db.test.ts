@@ -83,14 +83,14 @@ describe("describeBankDBBattery", () => {
   })
 })
 
-/** A bankDB holding the bank `bank1`, built with its `main` gate. */
+/** A bankDB with the bank `bank1`, built with its `main` gate. */
 async function builtBankDB(): Promise<MemoryBankDB> {
   const bankDB = new MemoryBankDB()
   await bankDB.buildBank(bankBuildAskOf())
   return bankDB
 }
 
-/** A bankDB holding the bank `bank1` and its vault in the life `life1`. */
+/** A bankDB with the bank `bank1` and its vault in the life `life1`. */
 async function vaultedBankDB(): Promise<MemoryBankDB> {
   const bankDB = await builtBankDB()
   await bankDB.putVault(vaultPutAskOf(vaultAt()))

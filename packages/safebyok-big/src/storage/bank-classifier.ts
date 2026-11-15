@@ -384,7 +384,7 @@ export type BoxStored = Readonly<({ ok: true, act: OkAct } | { ok: false, act: R
 export type BoxesStored = Readonly<({ ok: true, act: ListAct, listed: BoxesListed } | { ok: false, act: BoxVaultAct, listed: null }) & { parent: VaultRow }>
 
 // A vault row of an ended life of the bank counts as no row, and is left out; one that fails its checks is listed among
-// the damaged rows, under the label storage holds it by, so one bad row never hides the rest.
+// the damaged rows, under the label storage keeps it by, so one bad row never hides the rest.
 /** Classify an `ensureBank` ask against the rows an adapter fetched for it.
  * A damaged vault row is listed in `damaged_rows`. A damaged bank row throws, as does a live bank's missing or damaged `main` gate row.
  */

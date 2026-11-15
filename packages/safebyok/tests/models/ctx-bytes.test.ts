@@ -15,10 +15,10 @@ function textBytes(text: string): Uint8Array { return new TextEncoder().encode(t
 
 const WhisperText = '{"apiKey":"sk-test-0000"}'
 
-/** The JSON text of {@link TH.WorldBankStamp}, as every ctx under the bank holds it first: its keys sorted. */
+/** The JSON text of {@link TH.WorldBankStamp}, as every ctx under the bank has it first: its keys sorted. */
 const BankStampText = `{"banklabel":"acme","born_at":${String(TH.T0)},"lifeseq":"0000000000","userid":"u1"}`
 
-/** The JSON text of {@link TH.WorldGateStamp}, as each wayin's ctx holds it after the bank's. */
+/** The JSON text of {@link TH.WorldGateStamp}, as each wayin's ctx has it after the bank's. */
 const GateStampText = `{"banklabel":"acme","gate_tok":"gate-tok-u1","gatelabel":"main","registered_at":${String(TH.T0)},"user_id":"u1"}`
 
 const BankStampFields = ['userid', 'banklabel', 'lifeseq', 'born_at'] as const

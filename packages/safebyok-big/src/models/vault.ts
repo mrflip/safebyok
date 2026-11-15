@@ -144,7 +144,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Non-throwing form of {@link putBox}. */
   tryPutBox(patch: BoxPut, opts: BoxPutOpts = {}): Promise<Outcome<Box>> { return outcomeOf(() => this.putBox(patch, opts)) }
 
-  /** Delete the box at `boxlabel`, resolving it, now holding its tombstone.
+  /** Delete the box at `boxlabel`, resolving it, now with its tombstone.
    * Refuses `absent_box` where the box was never stored, or is already deleted.
    */
   async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {

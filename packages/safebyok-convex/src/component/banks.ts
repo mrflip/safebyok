@@ -68,7 +68,7 @@ export const putGate = mutation({
   },
 })
 
-// One transaction may read 16 MiB and write 16,000 documents, and a bank holds any number of vaults, each up to the limits in
+// One transaction may read 16 MiB and write 16,000 documents, and a bank has any number of vaults, each up to the limits in
 // `tallies.ts`. So the tombstone is written first, and the rows under the bank are deleted while the cascade's budget lasts.
 // The rows left are of the life the tombstone ended: a gate or vault row under another `bank_tok` than its bank row's reads as
 // no row, and a box row is found only by its own life's tokens. `tidyGone` deletes them.
@@ -214,10 +214,10 @@ export const delBox = mutation({
 
 // A vault row is of an ended life when its `bank_tok` is not the live bank row's, and a box row or a tally when its life pair is
 // not that of a live vault row. A vault row that fails its checks is left alone, with every box row and tally under its
-// vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one transaction can hold, so it
+// vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one transaction can carry, so it
 // deletes a batch of them, and a host calls it again until it answers that none are left.
 /** Delete the vault rows and tallies of every ended life in a bank, and a batch of their box rows.
- * Returns how many box rows its live vaults hold, and what is left of the box rows of ended lives.
+ * Returns how many box rows its live vaults have, and what is left of the box rows of ended lives.
  */
 export const tidyGone = mutation({
   args:    CVX.askArgs,
@@ -357,7 +357,7 @@ async function deleteWithin<TableT extends TableNames>(db: DatabaseWriter, table
 // It reads the bank's box rows in index order, live ones among them, as `watchRows` does. Each box row of an ended life past the
 // batch is read only to count it, against a second budget the size of the first: the rows counted within it are what the next
 // call's batch deletes, if no more are left in the meantime.
-/** Delete a batch of the bank's box rows that `isEnded` holds of, and say what is left of them. */
+/** Delete a batch of the bank's box rows that `isEnded` is true of, and say what is left of them. */
 async function deleteEndedBoxes(db: DatabaseWriter, scope: BankScope, isEnded: (boxDoc: BoxDoc) => boolean): Promise<DB.Leftover> {
   const deleting = Tallies.tidyBudget()
   const counting = Tallies.tidyBudget()

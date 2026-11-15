@@ -28,7 +28,7 @@ typecheck (`pnpm --filter <pkg> typecheck`): CI's run then goes alongside your l
 **Ready**, the ask for review, is `pnpm justify` green (the first run in a
 fresh worktree adds the eslint cold start). It is stated in the thread-worker's *Ready* step
 (`.claude/agents/thread-worker.md`) and in a line of CLAUDE.md's *Commands*; a session outside a
-sprint holds itself to the same. The selective tests, not `pnpm justify`, serve a mid-workstream
+sprint keeps to the same. The selective tests, not `pnpm justify`, serve a mid-workstream
 rebase and a reviewer's fixes (a reviewer proves what its fixes touch). Run `pnpm justify` after
 the rebase that prepares filing; if that turns up trouble, go back to the selective tests or to
 `pnpm justify`, as you judge the odds. Run it before a PR leaves draft: `scripts/file-thread`
@@ -138,7 +138,7 @@ File against `main`, as a draft while you work. *Significant* questions -- ones 
 would change the code in the PR -- are asked in chat, and lead the PR's body until answered.
 
 * **Draft while you work.** Open the PR as a draft (`gh pr create --draft`) when you first push
-  the branch, and push to it as the work goes: CI holds a draft's jobs until it carries the label
+  the branch, and push to it as the work goes: CI skips a draft's jobs until it carries the label
   `ci` (`notes/ci.md`). Once it is proven ready (*Proving*), add the label (`gh pr edit <n>
   --add-label ci`), then catch it up onto its base's current tip and push: CI reads the label at
   each push, and adding it starts nothing. Before you

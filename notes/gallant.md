@@ -17,7 +17,7 @@ means merged, or on #470. *Planned* means ruled or proposed for a later thread i
 
 Contents:
 
-* **Call chains:** `#straight-chute`, `#sugar-holds-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`, `#lede-first`
+* **Call chains:** `#straight-chute`, `#sugar-has-no-logic`, `#no-bouncing`, `#own-your-form`, `#no-call-for-side-effects`, `#one-body-per-pair`, `#outcome-for-its-consumer`, `#offer-the-form-they-want`, `#one-catch-routes-the-news`, `#lede-first`
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#chain-guards`, `#no-second-ensure`
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-broken-system`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`, `#callee-parses`
@@ -61,7 +61,7 @@ async create(input, opts = {}) {
 
 *Status: Fixed.*
 
-## Sugar holds no logic `#sugar-holds-no-logic`
+## Sugar has no logic `#sugar-has-no-logic`
 
 A convenience method on a parent forwards to the real verb. If it has branches, the real verb is missing, or it lives in
 the wrong place. Moving the body down a layer intact doesn't fix it: that only moves the slop.
@@ -836,7 +836,7 @@ A function that parses its own return value, to brand what it hands back, is not
 
 # Shapes and state
 
-## Never hold a value you made up `#no-fake-values`
+## Never keep a value you made up `#no-fake-values`
 
 A placeholder that looks real gets read as real. If you don't have the value yet, get it first, or ask for it.
 

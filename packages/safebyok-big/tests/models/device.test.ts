@@ -646,7 +646,7 @@ async function deviceWaitingOnUnlock() {
 
 function fail(message: string): never { throw new Error(message) }
 
-/** What a test of the open gating holds: the device, its bank, and the vault the gating asks for. */
+/** What a test of the open gating has: the device, its bank, and the vault the gating asks for. */
 interface Made { device: Device, bank: Bank, vault: Vault }
 
 describe("the snapshot's open gating", () => {

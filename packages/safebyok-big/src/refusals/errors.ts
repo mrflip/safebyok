@@ -132,7 +132,7 @@ export const RefusalFamilyForKind = {
 // == [The error]: RefusalMeta, VaultErrorOpts, VaultError
 
 /** The facts a refusal learned, each field filled only by the refusals that learn it.
- * It never holds secret material.
+ * It never has secret material.
  */
 export type RefusalMeta = {
   /** On a `vault_full` from a bankDB that counted the vault's boxes: how full the vault was, read in the step that refused the write. */
@@ -161,7 +161,7 @@ export type RefusalRows = {
   dbhas?:  unknown
 }
 
-// A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they hold wrapped keys.
+// A Symbol.for and not enumerable, so the rows reach the answer from whichever copy of safebyok, and never a log: they have wrapped keys.
 const RowsOfRefusal = Symbol.for('safebyok.refusal.rows')
 
 /** Every refusal a safebyok call makes: a calm message, a `refusalkind` to branch on, and its `family`.

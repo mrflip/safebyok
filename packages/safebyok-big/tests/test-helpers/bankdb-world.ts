@@ -96,7 +96,7 @@ export function bankDelAskOf(expected: BankRow, record: BankTombstone = bankTomb
   return { op: 'del', ...bankScopeOf(expected), expected, record }
 }
 
-/** The get of the vault at `scope`, under the bank life `bank_tok`, by a caller that holds no row of it. */
+/** The get of the vault at `scope`, under the bank life `bank_tok`, by a caller that has no row of it. */
 export function vaultGetAskOf(bank_tok = 'bank1', ifAbsent: IfAbsent = 'fail', scope: VaultScope = vaultScope): VaultGetAsk {
   return { op: 'get', ...vaultScopeOfRow(scope), bank_tok, ifAbsent, expected: BX.shellVaultOf(scope) }
 }
@@ -129,7 +129,7 @@ export function boxTombstoneOf(record: BoxRow): BoxTombstone { return BX.boxTomb
 
 function boxQueryOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok }: BoxQuery): BoxQuery { return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok } }
 
-/** The get of the box at `asked`, by a caller that holds no row of it. */
+/** The get of the box at `asked`, by a caller that has no row of it. */
 export function boxGetAskOf(asked: BoxQuery = boxQuery, ifAbsent: IfAbsent = 'fail'): BoxGetAsk {
   return { op: 'get', ...boxQueryOf(asked), ifAbsent, expected: BX.shellBoxOf(asked) }
 }

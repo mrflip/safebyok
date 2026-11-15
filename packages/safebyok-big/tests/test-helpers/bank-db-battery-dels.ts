@@ -1,4 +1,4 @@
-/** The battery's dels and tidyGone: a box, a vault or a bank deleted with what it holds, and the rows of an ended life tidied away. */
+/** The battery's dels and tidyGone: a box, a vault or a bank deleted with what it has, and the rows of an ended life tidied away. */
 
 import { describe, expect, it } from 'vitest'
 import * as BX from '../../src/shapes/shapes-bankdb'

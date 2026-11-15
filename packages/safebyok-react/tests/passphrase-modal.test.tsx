@@ -67,18 +67,18 @@ describe("PassphraseModal, building a vault", () => {
     expect(screen.queryByText('Make it longer.')).to.be.null
   })
 
-  it("holds the button disabled from each keystroke until the verdict on it is in", async () => {
+  it("keeps the button disabled from each keystroke until the verdict on it is in", async () => {
     const answering = TH.makePending()
-    let isHeld = false
-    const heldChecker = async (typed: string) => {
-      if (isHeld) { await answering.promise }
+    let isStalling = false
+    const stallingChecker = async (typed: string) => {
+      if (isStalling) { await answering.promise }
       return underTwelveWeak(typed)
     }
-    await shownFor(TH.building, { bankOpts: { strengthChecker: heldChecker } })
+    await shownFor(TH.building, { bankOpts: { strengthChecker: stallingChecker } })
     typeIn('vault passphrase', TH.Passphrase)
     typeIn('confirm vault passphrase', TH.Passphrase)
     await waitFor(() => { expect(submitButton(Messages.createButton).disabled).to.be.false })
-    isHeld = true
+    isStalling = true
     typeIn('vault passphrase', 'short')
     typeIn('confirm vault passphrase', 'short')
     expect(submitButton(Messages.createButton).disabled).to.be.true

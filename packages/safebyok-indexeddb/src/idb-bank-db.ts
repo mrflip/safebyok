@@ -33,7 +33,7 @@ function bankScopeOf({ user_id, banklabel }: BankScope): BankScope { return { us
 /** The vault scope of an ask or a row, without its other fields. */
 function vaultScopeOf({ user_id, banklabel, vaultlabel }: VaultScope): VaultScope { return { user_id, banklabel, vaultlabel } }
 
-/** Store `record` at `scopepath` in `store`'s transaction, and answer the row the store then holds there. */
+/** Store `record` at `scopepath` in `store`'s transaction, and answer the row the store then has there. */
 async function storeAt(store: IDBObjectStore, record: unknown, scopepath: IDBValidKey): Promise<unknown> {
   store.put(record, scopepath)
   return await DB.rowAt(store, scopepath)

@@ -70,7 +70,7 @@ export class Lease implements LeaseStamp {
       // The damaged row stands until the next lease is cached over it.
       if (! checked.success) { throw damagedLease() }
       // Broken, as the to-do list says (*A cached lease newer than the vault in hand*): a row citing a newer gate revision may be another
-      // tab's good lease over a gate this one holds stale. It should refresh the gate; today it forgets the row.
+      // tab's good lease over a gate this one has stale. It should refresh the gate; today it forgets the row.
       if ((checked.data.gate_tok !== cited.gate_tok) || (checked.data.gate_revision_tok !== cited.revision_tok)) {
         await friend.tryForgetLease()
         return null

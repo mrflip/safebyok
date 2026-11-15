@@ -9,7 +9,7 @@
  * * `changeset` -- writes the changeset for the runtime dependencies the branch moves, a patch for
  *   each package that moves any (the level before 1.0 for a dependency bump), to
  *   `.changeset/dependabot-<pr-number>.md` in the working tree, and prints its path. Writes
- *   nothing, and says why on stderr, when the branch holds a commit that is not Dependabot's or
+ *   nothing, and says why on stderr, when the branch has a commit that is not Dependabot's or
  *   moves no runtime dependency.
  *
  *   node scripts/dependabot.ts commits <base-commit> [<head-commit>]
@@ -49,7 +49,7 @@ export async function foreignCommits(run: Runner, base: string, head: string): P
     .filter((commit) => commit.author !== DependabotEmail)
 }
 
-/** What a name or range may hold to be written into a changeset: nothing that could end a code span or a line */
+/** What a name or range may contain to be written into a changeset: nothing that could end a code span or a line */
 const Unwritable = /[^\w@./~^<>=|*:+ ,{}"-]/g
 
 /** A name as npm spells a package: lowercase, digits and `-._~`, with an optional `@scope/` */
@@ -145,7 +145,7 @@ async function main(argv: readonly string[]): Promise<number> {
   if (outcome.kind === 'written') {
     process.stdout.write(`${outcome.file}\n`)
   } else if (outcome.kind === 'foreign') {
-    process.stderr.write('dependabot: the branch holds a commit that is not Dependabot\'s: no changeset written.\n')
+    process.stderr.write('dependabot: the branch has a commit that is not Dependabot\'s: no changeset written.\n')
   } else {
     process.stderr.write('dependabot: no public package\'s runtime dependencies moved: no changeset written.\n')
   }

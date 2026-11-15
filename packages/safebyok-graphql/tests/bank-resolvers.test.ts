@@ -55,7 +55,7 @@ async function sentGateAsk(schema: GraphQLSchema, ask: BX.GatePutAsk): Promise<u
   return await sent(schema, BankOperations.putGate, gateVarsOf(ask))
 }
 
-// The asks of u1's bank, vault and box that the cases send: a get by a caller that holds no row, and a put or build over none.
+// The asks of u1's bank, vault and box that the cases send: a get by a caller that has no row, and a put or build over none.
 const bankBuilt   = BW.bankBuildAskOf()
 const vaultGetAsk = BW.vaultGetAskOf()
 const boxGetAsk   = BW.boxGetAskOf()
@@ -66,7 +66,7 @@ const withPasskey = { main: BW.mainWayin, passkey0: BW.passkey0Wayin }
 /** A bankDB's answer in wire form: `dbhas` is null when the answer has none. */
 function asCrossed(answer: BX.Answer<unknown, string, unknown>) { return { ...answer, dbhas: answer.dbhas ?? null } }
 
-/** Make a server and its bankDB with the bank built. `listening` holds the watch callbacks that are currently listening. */
+/** Make a server and its bankDB with the bank built. `listening` has the watch callbacks that are currently listening. */
 async function watchedServer() {
   await TH.emptyTables()
   const listening = new Set<unknown>()
@@ -187,7 +187,7 @@ describe("bankResolvers", () => {
     expect(goneBank).to.deep.include({ ok: true, act: 'deleted', val: BW.bankTombstoneOf(bank), parent: BX.BankTop })
   })
 
-  it("holds a request to the user its ask names, refusing a record filed under another user", async () => {
+  it("confines a request to the user its ask names, refusing a record filed under another user", async () => {
     await TH.emptyTables()
     const schema = TH.schemaOver(await TH.serverOver())
     const ask = BX.bankBuild.parse(bankBuilt)

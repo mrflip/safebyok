@@ -121,7 +121,7 @@ the `safebyok` component). Coming from an older release, clear all of them: the 
 this release no longer has (`safebyok_bank_vaults`, `safebyok_bank_boxes`, `safebyok_bank_tallies`)
 and the three it kept under their old names with other fields (`safebyok_vaults`, `safebyok_boxes`,
 `safebyok_tallies`), and the bank and gate tables with them, so no bank is left without its vaults.
-Whatever those tables held is gone: export what you need first.
+Whatever those tables had is gone: export what you need first.
 
 **How big a vault can be.** The component limits every life of a vault to **8,000 box rows** and
 **7 MiB less 1 KiB** of them as Convex weighs a document, whatever the client asks, so that one
@@ -133,7 +133,7 @@ larger, and every delete, is always written. **Once deleted boxes fill a vault's
 boxes until the vault is deleted.** Deleting the vault is the only way to empty it: `delVault`
 deletes the box rows of the life it ends, in the same mutation, and the next life starts with none.
 
-**How big a bank can be.** A bank holds any number of vaults, more than one Convex transaction
+**How big a bank can be.** A bank has any number of vaults, more than one Convex transaction
 (16 MiB read, 16,000 documents written) can delete. So `delBank` stores the bank's tombstone, then
 deletes the gate, vault and box rows under it while half of each limit lasts, and leaves the rest.
 What it leaves is out of reach: a gate or vault row under another bank life than its bank row's

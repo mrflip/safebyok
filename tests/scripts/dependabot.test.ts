@@ -62,7 +62,7 @@ describe("changesetPath", () => {
   }
 })
 
-// A scratch repository: a base commit holding one public package, and commits on top by whoever.
+// A scratch repository: a base commit with one public package, and commits on top by whoever.
 describe("a Dependabot branch, in a repository", () => {
   let scratch = ''
   let run: Release.Runner = Release.processRunner('.')

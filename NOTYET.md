@@ -4,7 +4,7 @@ Reasonable tasks that we do not plan to do in the near term. Do not anticipate t
 implementation.
 
 * **Lock out a device: every wayin it added.** From another device, the user locks out a lost or
-  compromised one: its passkeys removed, its lease revoked, and nothing it holds reading
+  compromised one: its passkeys removed, its lease revoked, and nothing it has reading
   what is written next. Vault-key rotation does the cryptography (not yet built; its design was
   removed on 2026-10-18 for a different plan); what waits is the UX, a device list, and, if the Coach
   wants rotation not to sign every other device out, a key pair per wayin (`TODO-big.md`, *Which wayins
@@ -31,7 +31,7 @@ implementation.
   thread 10, [#136](https://github.com/mrflip/safebyok/pull/136)): "Break out dependencies
   including the -fastkey into a -utils or -bestpractices package". The strength test's
   `@zxcvbn-ts/core` comes from `safebyok/browser`, and `safebyok-fastkey` is a separate package
-  already; a single package for the best-practice defaults would hold them together.
+  already; a single package for the best-practice defaults would bundle them together.
 * **The React binding under real assistive technology and real hosts.** The Coach (2026-10-16,
   thread 7, [#129](https://github.com/mrflip/safebyok/pull/129)): not done, a real screen reader,
   a real shadow-DOM host and a real browser (the Gripefest doc's G356; a Playwright job of its own,
@@ -46,7 +46,7 @@ implementation.
   [#131](https://github.com/mrflip/safebyok/pull/131)): the adapter's own tests
   (`packages/safebyok-postgres/tests/`) stay on PGlite, in-process, because they are written against
   PGlite's interface; only `e2e/tests/postgres/` runs on the container. A PGlite-shaped wrapper over
-  a `pg` pool would run them there too, so that "every Postgres test, one line" held.
+  a `pg` pool would run them there too, so that "every Postgres test, one line" were true.
 
 * **One sentence per refusal.** A value that fails several checks gets a sentence for each, which
   can mislead: an empty `user_id` would also be told to percent-encode. The restyle (#274) stops

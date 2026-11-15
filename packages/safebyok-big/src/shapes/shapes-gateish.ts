@@ -267,7 +267,7 @@ export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis
 export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
 
 /** The check of all a lease or a proving is given of its bank: the bank's stamp, and the deviceDB's lease verbs bound to its scope and `bank_tok`.
- * It holds no key, and reaches neither the bankDB nor the boxes.
+ * It has no key, and reaches neither the bankDB nor the boxes.
  */
 export const leaseFriend = objCheck(({ fn }) => ({
   ...bankStamp.shape,

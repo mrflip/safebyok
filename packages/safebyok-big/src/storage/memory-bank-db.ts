@@ -63,7 +63,7 @@ export class MemoryBankDB extends AdapterBankDB {
   /** The box rows of the vault life `ask` names. */
   #boxRowsOf(ask: VaultScope & { bank_tok: string, vault_tok: string }): Map<string, unknown> { return this._cheat_boxRowsOf(ask, ask.bank_tok, ask.vault_tok) }
 
-  // Each write reads its row back, so that what it answers and tells is what the store holds.
+  // Each write reads its row back, so that what it answers and tells is what the store has.
   /** Store a copy of `record` as its bank row, tell the watchers, and return the row stored. */
   #writeBankRow(record: BankRow): unknown {
     const shelf = this._cheat_shelfOf(record)

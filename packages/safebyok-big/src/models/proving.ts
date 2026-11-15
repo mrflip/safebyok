@@ -96,7 +96,7 @@ export abstract class Proving<HeaderT extends WayinHeader = WayinHeader> {
     return this.#wrapBankKey(bankKey)
   }
 
-  /** A new lease on `friend`'s bank, holding the bankKey this proving unwraps, and citing the gate revision `gate`.
+  /** A new lease on `friend`'s bank, with the bankKey this proving unwraps, and citing the gate revision `gate`.
    * The lease is not yet cached.
    */
   async buildLease(friend: LeaseFriend, gate: CitedGate): Promise<Lease> {

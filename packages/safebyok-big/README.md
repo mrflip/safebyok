@@ -49,7 +49,7 @@ types here do not have, trust the types.
   deleted and made again is a new life, with a new `vault_tok`; the `Vault` object for its scope
   stays the same, and moves to the new life. While deleted it stays enabled, and its calls answer
   what storage has: a fetch finds the tombstone, or a new life made elsewhere, and its boxes are gone.
-* **device**: the signed-in user's presence on this browser. It holds your options and functions,
+* **device**: the signed-in user's presence on this browser. It has your options and functions,
   and brings up the bank.
 * **bank**: a signed-in user's vaults and what they share: one gate, one lease and one lock. One
   per signed-in user and `banklabel`. A bank deleted, or built again on another device, disables its

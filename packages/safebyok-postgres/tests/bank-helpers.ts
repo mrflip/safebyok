@@ -1,4 +1,4 @@
-/** Bank test helpers: one PGlite per test file holding the bankDB's tables, PostgresBankDBs on it, and direct row access for the bankDB battery. */
+/** Bank test helpers: one PGlite per test file with the bankDB's tables, PostgresBankDBs on it, and direct row access for the bankDB battery. */
 
 import { afterAll, beforeAll, onTestFinished } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
@@ -148,7 +148,7 @@ const PlantVaultSql = `
   INSERT INTO safebyok_vaults
   SELECT * FROM jsonb_populate_record(NULL::safebyok_vaults, $4::text::jsonb || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'vaultlabel', $3::text))
 `
-// A box row's life is part of its address. A planted row that names a life of its own is stored under that life, as a store keyed by scope alone would hold it.
+// A box row's life is part of its address. A planted row that names a life of its own is stored under that life, as a store keyed by scope alone would keep it.
 const BoxRowSql = `
   jsonb_build_object('bank_tok', $4::text, 'vault_tok', $5::text) || $7::text::jsonb
   || jsonb_build_object('user_id', $1::text, 'banklabel', $2::text, 'vaultlabel', $3::text, 'boxlabel', $6::text)

@@ -24,7 +24,7 @@ export type Auth = {
 }
 
 /** Make a fake auth over the demo's two storages. Accounts live in the pretend-remote `dbStorage` (a backend
- * would own them), and the session lives in the on-device `deviceStorage` (a cookie would hold it).
+ * would own them), and the session lives in the on-device `deviceStorage` (a cookie would keep it).
  * Not a pattern for production: there is no password and no verification, by design. The vault
  * passphrase is deliberately separate from signing in.
  *

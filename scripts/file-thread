@@ -23,7 +23,7 @@
 #   that directory (retrying a few times) and prunes, but only when the worktree was clean before
 #   the removal, git no longer lists it (a refusal, such as a lock, deletes nothing and leaves it
 #   listed), origin's branch is the local tip, and nothing is left in the directory except
-#   what the tip holds, a .DS_Store, or what git ignores. Otherwise it stops and leaves the
+#   what the tip has, a .DS_Store, or what git ignores. Otherwise it stops and leaves the
 #   directory for a person.
 #
 # With --catch-up it only catches the branch up and pushes it: no proof, and the worktree stays. A
@@ -154,7 +154,7 @@ finish_removal() {
     || fail "could not check what is left in $root, so it is left for a person to inspect"
   if [[ -n "$strangers" ]]; then
     head -n 10 <<< "$strangers" >&2
-    fail "$root holds the files above, which the thread's tip does not, so it is left for a person to inspect"
+    fail "$root has the files above, which the thread's tip does not, so it is left for a person to inspect"
   fi
   for attempt in 1 2 3 4; do
     if rm -rf -- "$root" 2> /dev/null && [[ ! -e "$root" ]]; then break; fi

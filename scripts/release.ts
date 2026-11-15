@@ -120,7 +120,7 @@ export function publicPackages(packages: readonly WorkspacePackage[], rootDir: s
 /** The top-level directories whose packages are never released: the demos, and the cross-harness tests. */
 const NeverReleasedDirs = new Set(['demos', 'e2e'])
 
-/** The top-level directory of the workspace that holds `pkg`. */
+/** The top-level directory of the workspace that has `pkg`. */
 function homeDir(pkg: WorkspacePackage, rootDir: string): string {
   return path.relative(rootDir, pkg.path).split(path.sep)[0] ?? ''
 }
@@ -142,7 +142,7 @@ export function readFixedGroups(configPath: string): string[][] {
 
 /**
  * Everything that would make a release go wrong, each as a sentence saying what to do about it.
- * A release stages every public package in lockstep: one `fixed` group holding exactly the
+ * A release stages every public package in lockstep: one `fixed` group with exactly the
  * public packages, by name, all at one version. A package still at the placeholder `0.0.0` has
  * never been released and joins the group's version at its next release, so it may differ.
  *
@@ -263,7 +263,7 @@ export function readReleasePlan(planPath: string): PlannedRelease[] {
  * The releases in a directory `changeset pack` wrote, in the order they should be published (a
  * package before those that depend on it).
  *
- * @param packDir - The pack directory, holding publish-plan.json and the tarballs.
+ * @param packDir - The pack directory, with publish-plan.json and the tarballs.
  * @returns Each release, its tarball as an absolute path.
  */
 export function readPackDir(packDir: string): Release[] {
@@ -396,7 +396,7 @@ async function stageTarball(release: Release, opts: StageOpts): Promise<StageOut
   const manifest = await packedManifest(opts.run, release.tarball)
   const leftover = [...workspaceRanges(manifest), ...sourceConditions(manifest)]
   if (leftover.length > 0) {
-    return { release, kind: 'failed', detail: `its packed package.json still holds ${leftover.join(', ')}: pack it with pnpm` }
+    return { release, kind: 'failed', detail: `its packed package.json still has ${leftover.join(', ')}: pack it with pnpm` }
   }
   const args = ['stage', 'publish', release.tarball, '--access', 'public', '--tag', distTag(release.version), '--json']
   const result = await opts.run('npm', opts.dryRun ? [...args, '--dry-run'] : args)
@@ -406,7 +406,7 @@ async function stageTarball(release: Release, opts: StageOpts): Promise<StageOut
   }
   const npmError = npmErrorOf(result)
   if (/previously published/i.test(npmError.summary)) {
-    return { release, kind: 'already', detail: 'npm already holds this version, staged or published' }
+    return { release, kind: 'already', detail: 'npm already has this version, staged or published' }
   }
   return { release, kind: 'failed', detail: `npm ${npmError.code}: ${npmError.summary}` }
 }
@@ -421,7 +421,7 @@ async function tagCommit(run: Runner, tag: string): Promise<string | undefined> 
   return refs.get(`refs/tags/${tag}^{}`) ?? refs.get(`refs/tags/${tag}`)
 }
 
-/** Whether GitHub holds a release of the tag; an answer other than "not found" is an error, not a no */
+/** Whether GitHub has a release of the tag; an answer other than "not found" is an error, not a no */
 async function releaseExists(run: Runner, tag: string): Promise<boolean> {
   const result = await run('gh', ['release', 'view', tag])
   if (result.exitCode === 0) { return true }

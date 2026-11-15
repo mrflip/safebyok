@@ -207,8 +207,8 @@ describe("packedManifest", () => {
   }, 30_000)
 })
 
-// A runner standing in for npm, git, gh and tar: npm answers per package, origin holds the tags
-// given (each naming a commit), GitHub holds a release for each tag in `releases`, HEAD is
+// A runner standing in for npm, git, gh and tar: npm answers per package, origin has the tags
+// given (each naming a commit), GitHub has a release for each tag in `releases`, HEAD is
 // `HeadSha`, and every tarball's package.json is clean unless a manifest is given for it.
 const HeadSha = 'headd00d0000000000000000000000000000000'
 interface FakeT {
@@ -374,7 +374,7 @@ describe("stage", () => {
     expect(fake.calls.map(([command]) => command)).to.deep.equal(['git'])
   })
 
-  it("refuses a tarball whose package.json still holds a workspace: range", async () => {
+  it("refuses a tarball whose package.json still has a workspace: range", async () => {
     const tarball = '/pack/packages/safebyok-react-0.1.0.tgz'
     const fake = makeFake({}, { manifests: { [tarball]: { peerDependencies: { safebyok: 'workspace:^' } } } })
     const outcomes = await Release.stage([releaseOf('safebyok-react')], { run: fake.run, dryRun: false, tagfile })

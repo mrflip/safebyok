@@ -5,7 +5,7 @@ import { consoleLogger } from './console-logger'
  * Pass one to `Device.make` as `logger`. With none, a device uses the {@link DefaultLogger}.
  *
  * Each call has a plain-language `message`, a `story` of facts to filter on (`oplabel` names the
- * operation), and the error behind it, if any. None of the three holds a whisper, passphrase, key,
+ * operation), and the error behind it, if any. None of the three has a whisper, passphrase, key,
  * ciphertext or option value. An error the host's own bankDB threw is passed on as it was made, so
  * what it quotes is the host's to keep clean.
  *

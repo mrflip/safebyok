@@ -31,7 +31,7 @@ type FieldedType = GraphQLObjectType | GraphQLInputObjectType
 /** The definition of `check`, typed as {@link CheckDef}. */
 function defOf(check: Check): CheckDef { return check._zod.def }
 
-/** Unwrap `check` to the check that holds its fields: through nullable, default and readonly wrappers, a transform's input, and a list's element. */
+/** Unwrap `check` to the check that has its fields: through nullable, default and readonly wrappers, a transform's input, and a list's element. */
 function unwrapped(check: Check): Check {
   const def = defOf(check)
   const inner = def.innerType ?? def.in ?? def.element

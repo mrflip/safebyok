@@ -390,9 +390,9 @@ table. Where the table answers `replaced`, the storage policy the ask names (`op
 `replace_passphrase`, `add_passkey` and `revoke_passkey`) is applied to the rows fetched, in the same
 step, before anything is stored (`notes/storage-policies.md`). A put it refuses answers `gate_issue`,
 with the stored gate row as `dbhas`, and nothing is stored. A good answer is `replaced`, with the
-stored record (**reqval**); a replay of the stored record is `retcon`. The ask's check (V2) holds the
-empty `auth`, `sigs` and `meta`, and exactly one policy; P4 and the revision rules hold `bank_tok` and
-`gate_tok` being the row's.
+stored record (**reqval**); a replay of the stored record is `retcon`. The ask's check (V2) requires the
+empty `auth`, `sigs` and `meta`, and exactly one policy; P4 and the revision rules require `bank_tok` and
+`gate_tok` to be the row's.
 
 ### The bank adapter
 
@@ -402,7 +402,7 @@ inside itself (a Postgres function, a Convex mutation). Each call is handed the 
 the classifier (the `classify*` methods, which a datastore judging for itself overrides), and
 returns what the classifier returned:
 
-| call          | verbs                                              | atomic unit holds                                            |
+| call          | verbs                                              | atomic unit contains                                         |
 | ------------- | -------------------------------------------------- | ------------------------------------------------------------ |
 | `doEnsureBank`  | ensureBank                                       | the bank row, its gate rows and vault rows                   |
 | `doBuildBank`   | buildBank                                        | the bank row and its `main` gate row                         |

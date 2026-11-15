@@ -19,10 +19,10 @@ function textBytes(text: string): Uint8Array { return new TextEncoder().encode(t
 
 const WhisperText = '{"val":"sk-test-0000"}'
 
-/** The JSON text of {@link WorldBankStamp}, as every ctx under the bank holds it first: its keys sorted. */
+/** The JSON text of {@link WorldBankStamp}, as every ctx under the bank has it first: its keys sorted. */
 const BankStampText = `{"bank_tok":"bank-tok-u1","banklabel":"acme","registered_at":${String(T0)},"user_id":"u1"}`
 
-/** The JSON text of {@link WorldGateStamp}, as each wayin's ctx holds it after the bank's. */
+/** The JSON text of {@link WorldGateStamp}, as each wayin's ctx has it after the bank's. */
 const GateStampText = `{"banklabel":"acme","gate_tok":"gate-tok-u1","gatelabel":"main","registered_at":${String(T0)},"user_id":"u1"}`
 
 const BankStampFields = ['user_id', 'banklabel', 'bank_tok', 'registered_at'] as const
@@ -34,7 +34,7 @@ const BoxStampFields = ['user_id', 'banklabel', 'vaultlabel', 'boxlabel', 'fmt',
 /** The stamps a box hands a seal when no real vault is wanted: {@link WorldVaultStamp}, then a box's. */
 const SealStamps = [WorldVaultStamp, sealStampOf('anthropic')] as const
 
-/** A lease of the bank `overrides` moves {@link WorldBankStamp} to, over a bankKey the test holds, its record cached on the friend. */
+/** A lease of the bank `overrides` moves {@link WorldBankStamp} to, over a bankKey the test has, its record cached on the friend. */
 async function leaseOver(bankKey: CryptoKey, overrides: Partial<BankStamp> = {}) {
   const friend = fakeLeaseFriendOf(overrides)
   const lease = await Lease.buildGranted(friend, bankKey, GrantedAs)

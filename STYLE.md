@@ -25,7 +25,7 @@ propose the exception.
   want (`vaultRecord`, `whisper`); one that needs one or two may name them. Outside the core, a
   file that reaches many star-imports `safebyok` as `Safebyok`, and an adapter star-imports
   `safebyok/storage` as `DB` (`DB.vaultRow`).
-* **The core's `src/shapes/` holds the validators a module exports**, and no other module exports
+* **The core's `src/shapes/` has the validators a module exports**, and no other module exports
   one. A validator a module keeps to itself stays beside its only user, made in a `Checkers` call
   at module level (`helpers/validator.ts`'s and `gate.ts`'s `Checks`, `device.ts`'s `HostChecks`).
 * **Pick fields by destructuring the parsed output.** Where a pick by a list of names is truly
@@ -143,7 +143,7 @@ is named for the act.
 cleaned value. An `ensure` that returns nothing is misnamed.
 
 **A condition gets up to three members**: a synchronous yes/no query named for it
-(`bank.isUnlocked`); a synchronous `demandFoo` that throws when it does not hold
+(`bank.isUnlocked`); a synchronous `demandFoo` that throws when it is false
 (`bank.demandUnlocked()`); and, only where a caller needs it, an async `ensureFoo` that makes it
 so (`bank.ensureUnlocked()`). The query is the non-throwing form, so there is no `tryDemandFoo`.
 
@@ -288,7 +288,7 @@ object whole (`.refine()`, `.readonly()`) goes inside the builder: chained onto 
 kit returns, it would refuse as plain Zod does.
 
 **Always at a boundary**: what comes off the wire; records read back from storage, which is
-someone else's database and may hold a vault another version of this package wrote; a published
+someone else's database and may contain a vault another version of this package wrote; a published
 package's exports; `Class.make` and any constructor accepting outside input; a host's options; what
 a host's callback returns (a strength checker's verdict, a key deriver's output). A failure there
 is a refusal with a `kind` the caller can branch on.
@@ -556,12 +556,12 @@ tested, in proportion to what it does and what a caller could get wrong.
 * **A title is one plain clause naming the behaviour**: `it("refuses a misspelt field")`, not
   `"refuses a misspelt field as 'bad_option', as its second example shows"`. It quotes a refusal
   kind only where a customer checks for it (`stale_write` is API, `bad_record` is not); the linter
-  holds that list. A test that covers an `@example` says so on its first line,
+  has that list. A test that covers an `@example` says so on its first line,
   `// putBox @example 2`. `notes/gallant-test_titles.md` has the pairs.
 * **Each case ties to a plausible failure**: what null, undefined or a missing value mean; an
   absurd type (`seal(42)`); a not-quite-absurd one (a salt one byte short, a passphrase of only
   whitespace, a vault written by a newer version).
-* **For anything that holds a secret, test what must not happen**: the wrong passphrase is
+* **For anything that has a secret, test what must not happen**: the wrong passphrase is
   refused, tampered ciphertext is refused, an error does not carry the secret, locking forgets
   the key.
 * **No real secret in a test, fixture or example**: generate one, or use an obvious fake that
@@ -570,7 +570,7 @@ tested, in proportion to what it does and what a caller could get wrong.
   entitled to clean data.
 * **A test's way past the API has a loud `_cheat_` name**, for what it returns (`_cheat_central`,
   `_cheat_clock`), on a test-world subclass or a test-facing adapter such as the memory DBs, never
-  a coined verb that could pass for the API (`keptOf`). On a class that holds keys, prefer a
+  a coined verb that could pass for the API (`keptOf`). On a class that has keys, prefer a
   constructor seam: an optional callback handed a typed cheater object, so nothing sits on the
   instance.
 * **Cases that look alike become a table**, grouped by comments, with `"` for inputs and expected

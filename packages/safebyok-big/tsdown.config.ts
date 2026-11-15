@@ -8,7 +8,7 @@ import { defineConfig } from 'tsdown'
 //
 // `unbundle` keeps each source module its own file in dist/, so `sideEffects: false` can do its
 // work: a host's bundler drops every module the host's imports never reach, schemas and all. A
-// bundled chunk would hold them together, and a bare `stableJsonify` would carry every validator.
+// bundled chunk would bind them together, and a bare `stableJsonify` would carry every validator.
 export default defineConfig({
   // `safebyok-big/browser` is its own entry, so the Argon2id derivers (and the hashing code under them) reach only a host that imports them.
   // `safebyok-big/utils` is its own entry, so a host that wants only `mash` pulls in none of the vault.

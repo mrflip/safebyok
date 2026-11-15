@@ -202,12 +202,12 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
    * - `ifPresent` -- what to do over a live box:
    *   - `'repl'` -- replace it (default)
    *   - `'fail'` -- refuse `camped`
-   *   - `'get'`  -- store nothing, and resolve this box holding the stored record
+   *   - `'get'`  -- store nothing, and resolve this box with the stored record
    * - `ifAbsent`  -- what to do where the box was never stored, or deleted:
    *   - `'add'`  -- store it as a new life of the box, its whisper and sidecar `{}` where left out (default)
    *   - `'fail'` -- refuse `absent_box`
    *
-   * Refuses `stale_write` when storage has a newer revision. The box then holds that revision: edit from it.
+   * Refuses `stale_write` when storage has a newer revision. The box then has that revision: edit from it.
    */
   async put(patch: BoxPatch, opts: BoxPutOpts = {}): Promise<this> {
     demandGood(await this.tryPut(patch, opts))

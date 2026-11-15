@@ -219,7 +219,7 @@ describe("ConvexBankDB's constructor", () => {
 const Overflow = 10_000
 
 // A transaction may write 16,000 documents, and delBank's cascade spends half of that: past it, it leaves rows for tidyGone.
-describe("ConvexBankDB's cascades, past what one transaction holds", () => {
+describe("ConvexBankDB's cascades, past what one transaction can carry", () => {
   it("leaves the rows past its budget after a delBank, unreachable, for tidyGone to delete", { timeout: 60_000 }, async () => {
     const { deployment, bankDB, bank, vault } = await builtWithLimits()
     const other = BW.vaultAt(0, 'bank1', 'life2', { vaultlabel: 'other' })
@@ -260,7 +260,7 @@ const TidyCases = [
   [(2 * MaxTidiedBoxes) + 1, "many", 'leaves many when more than a batch is past the batch'],
 ] as const
 
-// The live vault holds one box row, which every call leaves, and the rows planted under an earlier bank life are of an ended one.
+// The live vault has one box row, which every call leaves, and the rows planted under an earlier bank life are of an ended one.
 describe("ConvexBankDB's tidyGone, deleting a batch of box rows of ended lives", () => {
   for (const [planted, leftover, blurb] of TidyCases) {
     it(blurb, { timeout: 60_000 }, async () => {

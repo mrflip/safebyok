@@ -334,15 +334,15 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     if (age === 'newer')                                                 { return { making: 'listed', mod: 'adopt', listed, record } }
     if (! listed.isOfLife(record))                                       { throw oneRevisionTwoLives(record) }
     const rcvdShape  = listed.shapeOf(record)
-    const heldShape  = listed.shape
-    if ((rcvdShape === 'gone') !== (heldShape === 'gone'))               { throw oneRevisionTwoFates(record) }
-    if ((rcvdShape === 'full') && (heldShape === 'sparse'))              { return { making: 'listed', mod: 'adopt', listed, record } }
+    const listedShape  = listed.shape
+    if ((rcvdShape === 'gone') !== (listedShape === 'gone'))               { throw oneRevisionTwoFates(record) }
+    if ((rcvdShape === 'full') && (listedShape === 'sparse'))              { return { making: 'listed', mod: 'adopt', listed, record } }
     return { making: 'listed', mod: 'same', listed, record }
   }
 
   // The one place an instance is made and enlisted. It is made at the void revision and handed its record as a listed one
   // is, so that receiving runs for it too: a vault made from a tombstone forgets the lease cached on this device. What
-  // can throw (`makeThing`, `receiveRecord`) runs before the listing changes; an instance never enlisted holds nothing.
+  // can throw (`makeThing`, `receiveRecord`) runs before the listing changes; an instance never enlisted has nothing.
   /** Carry out `delivering`, and return the instance it leaves listed.
    * Chute: doDeliverRecord → thing.receiveRecord
    */
@@ -388,7 +388,7 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     return things
   }
 
-  // A damaged row's address is storage's, under whatever labels it holds, so it is looked up as it is, never checked as a scope.
+  // A damaged row's address is storage's, under whatever labels it has, so it is looked up as it is, never checked as a scope.
   /** Let the instance kept at `damaged`'s address go, if any, and align it, which drops its secrets. */
   #takeDown(damaged: DamagedT): void {
     const scopepath = this.scopepathOf(damaged)

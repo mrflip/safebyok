@@ -212,7 +212,7 @@ export const PassphraseField = ({ ref, fieldname, fieldlabel, advice, invalidBy,
 }
 
 /** Return the live state of a choose-a-passphrase form: strength advice, and whether the confirmation matches.
- * React state holds only these verdicts, never the passphrase text.
+ * React state has only these verdicts, never the passphrase text.
  */
 export const useChosenPassphrase = (gating: AnyGating, source: BoundarySource) => {
   const chosenRef = useRef<HTMLInputElement>(null)

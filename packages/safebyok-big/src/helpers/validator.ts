@@ -169,7 +169,7 @@ function refusalkindOf(opts: Refusalkind | RefusalOpts): Refusalkind { return Ch
 function kitWith<SourcesT extends readonly object[]>(sources?: SourcesT): KitWith<SourcesT> { return Object.assign({}, ...(sources ?? []), Kit) as KitWith<SourcesT> }
 
 /** True exactly when `A` and `B` are the same type.
- * Hold a hand-written shape to its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`.
+ * Check a hand-written shape against its checker with `true satisfies AssertEqual<Shape, CheckerInput<typeof check>>`.
  */
 export type AssertEqual<A, B> = Z.core.util.AssertEqual<A, B>
 

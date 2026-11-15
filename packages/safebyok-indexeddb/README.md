@@ -26,7 +26,7 @@ const bankDB = idbBankDB({ dbName: 'acme' })
 Hand it to the core wherever a `BankDB` is asked for.
 
 * **`dbName`** names the database: `safebyok-<dbName>:bank-v001-001-001`, or `safebyok:bank-v001-001-001` when you
-  leave it out, so every database this library writes begins `safebyok`. One database holds every user's banks. Two
+  leave it out, so every database this library writes begins `safebyok`. One database has every user's banks. Two
   `IdbBankDB`s made with the same `dbName`, in one tab or two, share the rows.
 * **`maxRecordSizeEst`**, an option of every `AdapterBankDB`, is the largest box record a `putBox` accepts, 5,600 bytes if
   left out.

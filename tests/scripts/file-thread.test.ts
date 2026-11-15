@@ -297,7 +297,7 @@ describe('scripts/file-thread', () => {
       chmodSync(path.join(stubs, 'rm'), 0o755)
     })
 
-    it("deletes the leftover directory, retrying, and prunes, when it holds only the tip, a .DS_Store and ignored files", () => {
+    it("deletes the leftover directory, retrying, and prunes, when it has only the tip, a .DS_Store and ignored files", () => {
       writeFileSync(path.join(main, '.gitignore'), 'node_modules\ndist\n')
       git('add', '.gitignore')
       git('commit', '--quiet', '--message', 'docs: ignore')
@@ -321,7 +321,7 @@ describe('scripts/file-thread', () => {
       expect(existsSync(root)).to.eq(false)
     })
 
-    it("leaves the directory for a person when it holds a file the tip does not, naming it", () => {
+    it("leaves the directory for a person when it has a file the tip does not, naming it", () => {
       cutAndBuild('origin/main')
       const result = fileWithLeftovers({ 'shim.ts': 'export {}\n', 'notes/scratch.txt': 'mine' })
       expect(result.status).to.eq(1)
@@ -340,7 +340,7 @@ describe('scripts/file-thread', () => {
       expect(existsSync(path.join(root, 'notes/scratch.txt'))).to.eq(true)
     })
 
-    it("leaves the directory for a person when the worktree held uncommitted changes before the removal", () => {
+    it("leaves the directory for a person when the worktree had uncommitted changes before the removal", () => {
       cutAndBuild('origin/main')
       const result = fileWithLeftovers({ 'shim.ts': 'export {}\n' }, {}, 'echo changed > shim.ts')
       expect(result.status).to.eq(1)

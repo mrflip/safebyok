@@ -8,7 +8,7 @@ import * as TH from '../test-helpers'
 const ThreadCases = [
   // regular usage:
   ["20261015-roadmap_fruit",       "20261015-roadmap_fruit", 'a thread branch is its own thread'],
-  ["20261015-tamper_test_helper2", "20261015-tamper_test_helper2", 'a label may hold digits'],
+  ["20261015-tamper_test_helper2", "20261015-tamper_test_helper2", 'a label may have digits'],
   // not a thread:
   ["main",                         undefined,                'main is not a thread'],
   ["",                             undefined,                'a detached HEAD, with no branch, is not a thread'],

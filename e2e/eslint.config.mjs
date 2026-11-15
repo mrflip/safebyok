@@ -247,7 +247,7 @@ export default defineConfig([
     },
   },
 
-  // STYLE.md, *Naming*: these say nothing about what they hold. Only bindings are refused -- a
+  // STYLE.md, *Naming*: these say nothing about what they contain. Only bindings are refused -- a
   // variable, a parameter, a destructured name -- never a property, so `{ name: 'AES-GCM' }`, as
   // WebCrypto spells its algorithms, stays legal.
   {
@@ -262,7 +262,7 @@ export default defineConfig([
         'ArrayPattern > Identifier.elements',
       ].map((binding) => ({
         selector: `${binding}[name=/^(key|name|value|node|error|query)$/]`,
-        message:  'Name it for what it holds (STYLE.md, Naming): a cryptographic key by its role (bankKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
+        message:  'Name it for what it contains (STYLE.md, Naming): a cryptographic key by its role (bankKey, boxKey: VOCABULARY.md), a map key `ckey`, `err` for an error, `vaultlabel` over `name`.',
       }))],
     },
   },

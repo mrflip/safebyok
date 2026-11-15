@@ -46,7 +46,7 @@ await pglite.exec(BankFunctionsSql)
 
 **A database with older safebyok tables**: drop `safebyok_boxes` and `safebyok_vaults`, and each `safebyok_` function,
 before you run these files. They create only what is missing, so an older table of the same name stays as it is. The
-rows it held are not read: each user's bank starts empty.
+rows it had are not read: each user's bank starts empty.
 
 ## Use
 
@@ -143,7 +143,7 @@ with this package for now.
 ## What is stored
 
 `safebyok_banks` has a row per bank, keyed by `user_id` and `banklabel`. `safebyok_gates` has a row
-per gate of a bank, keyed by those and `gatelabel`; today every bank has one, `main`, holding the
+per gate of a bank, keyed by those and `gatelabel`; today every bank has one, `main`, with the
 bank's wayins in `wayins`. `safebyok_vaults` has a row per vault, keyed by the bank's key and
 `vaultlabel`. `safebyok_boxes` has a row per box, keyed by the vault's key, the life of its vault
 (`bank_tok` and `vault_tok`) and its `boxlabel`. Each field of a row is a column of its own. The

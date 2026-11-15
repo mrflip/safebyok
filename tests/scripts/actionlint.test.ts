@@ -9,7 +9,7 @@ const Platforms = ['linux_amd64', 'linux_arm64', 'darwin_amd64', 'darwin_arm64']
 
 describe('scripts/actionlint.sh', () => {
   it('refuses a cached tarball that is not the one recorded, and fetches nothing in its place', () => {
-    // A copy of the script in a scratch checkout, whose cache already holds a tarball for every
+    // A copy of the script in a scratch checkout, whose cache already has a tarball for every
     // platform the script knows: none is the release recorded, so the run must stop at the hash.
     const scratch = TH.makeScratchDir('actionlint-test-')
     const script = path.join(scratch, 'scripts/actionlint.sh')

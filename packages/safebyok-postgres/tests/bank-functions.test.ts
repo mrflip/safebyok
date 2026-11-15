@@ -23,7 +23,7 @@ async function answerOf(text: string, params: unknown[]): Promise<Answered & Rec
   return rows[0]!
 }
 
-/** A bankDB holding the bank `bank1`, built with its `main` gate. */
+/** A bankDB with the bank `bank1`, built with its `main` gate. */
 async function builtBankDB() {
   const bankDB = await BH.makeBankDB()
   await bankDB.buildBank(BW.bankBuildAskOf())

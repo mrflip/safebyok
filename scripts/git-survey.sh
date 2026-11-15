@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Sweeps finished threads. Each local branch whose pull request merged into main, and whose every
-# commit main holds (as the same change, or under the same subject line, as scripts/git-attic
+# commit main has (as the same change, or under the same subject line, as scripts/git-attic
 # judges), gets an annotated tag closed/<branch> at its tip and is pointed at the PR's merged
-# head. Each worktree holding such a branch is removed when it is clean and idle. Every other
+# head. Each worktree with such a branch checked out is removed when it is clean and idle. Every other
 # branch and worktree is only reported: active, a stray for scripts/git-attic, or weird. A
 # worktree whose directory is missing is pruned, unless its branch has an open PR or commits not on
-# origin: then no prune is run, and the report says which held it back. Reports what it would do
+# origin: then no prune is run, and the report says which stopped it. Reports what it would do
 # unless given --apply. Never pushes, deletes a branch, or moves a closed/ tag unless --retag
 # names it.
 #
@@ -104,10 +104,10 @@ fi
 git log --format=%s "$base" > "${scratch}/subjects"
 # Each worktree but the main one, as <path> TAB <branch>, the path with its symlinks resolved.
 git worktree list --porcelain | awk '
-  /^worktree / { path = substr($0, 10); held = "(detached)" }
-  /^branch /   { held = substr($0, 19) }
-  /^$/         { if (path != "" && seen++) { print path "\t" held }; path = "" }
-  END          { if (path != "" && seen++) { print path "\t" held } }
+  /^worktree / { path = substr($0, 10); branch = "(detached)" }
+  /^branch /   { branch = substr($0, 19) }
+  /^$/         { if (path != "" && seen++) { print path "\t" branch }; path = "" }
+  END          { if (path != "" && seen++) { print path "\t" branch } }
 ' > "${scratch}/worktrees"
 # The working directory of every process we can see, or nothing and a note that we cannot.
 sees_processes=yes
@@ -148,9 +148,9 @@ worktreeOf() {
 # Where a branch stands, as one line: <verdict> TAB <branch> TAB <tip> TAB <target> TAB <pr> TAB <note>.
 # The target is the commit a closed branch is pointed at; the pr, "#73" or "-".
 judge() {
-  local branch="$1" tip held tagged opened merged other pr target unmatched moved
+  local branch="$1" tip checkedout tagged opened merged other pr target unmatched moved
   tip="$(git rev-parse "refs/heads/${branch}")"
-  held="$(worktreeOf "$branch")"
+  checkedout="$(worktreeOf "$branch")"
   tagged="$(git rev-parse --verify --quiet "refs/tags/closed/${branch}^{commit}" || true)"
   opened="$(prsOf "$branch" OPEN | sed -n 1p)"
   merged="$(prsOf "$branch" MERGED main | sed -n 1p)"
@@ -172,7 +172,7 @@ judge() {
     if [[ -z "$moved" ]]; then moved="$(git log -1 --format=%ct "$tip")"; fi
     if [[ -n "$other" ]]; then
       printf 'weird\t%s\t%s\t-\t-\t%s\n' "$branch" "$tip" "no PR merged into main: ${other}"
-    elif [[ -n "$held" || $((now - moved)) -lt $((idle_mins * 60)) ]]; then
+    elif [[ -n "$checkedout" || $((now - moved)) -lt $((idle_mins * 60)) ]]; then
       printf 'active\t%s\t%s\t-\t-\t%s\n' "$branch" "$tip" "no PR yet"
     elif [[ -z "$(unmatchedOf "$branch")" ]]; then
       printf 'stray\t%s\t%s\t-\t-\t%s\n' "$branch" "$tip" "no PR; every commit is on main, so scripts/git-attic would retire it"
@@ -223,9 +223,9 @@ closingNote() {
   fi
 }
 
-# What a branch holds that only this checkout has, in words, or nothing: an open PR, or commits not
+# The work on a branch that only this checkout has, in words, or nothing: an open PR, or commits not
 # on origin (a branch origin lacks counts its commits not on the history judged by).
-holdsOnlyHere() {
+workOnlyHere() {
   local branch="$1" opened unpushed
   if [[ "$branch" == "(detached)" ]]; then return; fi
   opened="$(prsOf "$branch" OPEN | sed -n 1p)"
@@ -243,13 +243,13 @@ holdsOnlyHere() {
 
 # Whether a worktree may go, as one line: <verdict> TAB <path> TAB <branch> TAB <note>.
 judgeTree() {
-  local where="$1" branch="$2" verdict real why dirty precious busy recent held
+  local where="$1" branch="$2" verdict real why dirty precious busy recent onlyhere
   verdict="$(awk -F '\t' -v branch="$branch" '$2 == branch { print $1; exit }' "${scratch}/verdicts")"
   if [[ ! -d "$where" ]]; then
-    held="$(holdsOnlyHere "$branch")"
-    if [[ -n "$held" ]]; then
-      : > "${scratch}/hold-prune"
-      printf 'keep\t%s\t%s\t%s\n' "$where" "$branch" "its directory is missing, but its branch has ${held}: no worktree is pruned while it stands"
+    onlyhere="$(workOnlyHere "$branch")"
+    if [[ -n "$onlyhere" ]]; then
+      : > "${scratch}/skip-prune"
+      printf 'keep\t%s\t%s\t%s\n' "$where" "$branch" "its directory is missing, but its branch has ${onlyhere}: no worktree is pruned while it stands"
     else
       printf 'keep\t%s\t%s\t%s\n' "$where" "$branch" "its directory is gone: git worktree prune clears it"
     fi
@@ -305,7 +305,7 @@ while IFS=$'\t' read -r where branch; do
   judgeTree "$where" "$branch" >> "${scratch}/trees"
 done < "${scratch}/worktrees"
 
-# Worktrees first: a branch a worktree holds cannot be moved under it.
+# Worktrees first: a branch a worktree has checked out cannot be moved under it.
 removed=0
 kept=0
 while IFS=$'\t' read -r verdict where branch note; do
@@ -323,10 +323,10 @@ while IFS=$'\t' read -r verdict where branch note; do
   if [[ "$verdict" == keep ]]; then kept=$((kept + 1)); else removed=$((removed + 1)); fi
   printf '%s\t%s\t%s\t%s\n' "$verdict" "$where" "$branch" "$note"
 done < "${scratch}/trees" > "${scratch}/swept-trees"
-if [[ -e "${scratch}/hold-prune" ]]; then
+if [[ -e "${scratch}/skip-prune" ]]; then
   # git worktree prune takes every registration whose directory is missing, a branch with work
   # in it as readily as any (a directory that merely cannot be seen from here looks the same).
-  printf 'held\tgit worktree prune\t-\t%s\n' "not run: a worktree whose directory is missing holds a branch that is not finished (above)" >> "${scratch}/swept-trees"
+  printf 'held\tgit worktree prune\t-\t%s\n' "not run: a worktree whose directory is missing has a branch checked out that is not finished (above)" >> "${scratch}/swept-trees"
 elif [[ "$apply" == yes ]]; then
   git worktree prune --verbose 2>&1 | sed 's/^/pruned\t/' >> "${scratch}/swept-trees" || true
 else
@@ -335,10 +335,10 @@ fi
 
 while IFS=$'\t' read -r verdict branch tip target pr note; do
   if [[ "$verdict" == close ]]; then
-    holder="$(awk -F '\t' -v branch="$branch" '$3 == branch && $1 != "removed" && $1 != "remove" { print $2 "\t" $4; exit }' "${scratch}/swept-trees")"
-    if [[ -n "$holder" ]]; then
+    owner="$(awk -F '\t' -v branch="$branch" '$3 == branch && $1 != "removed" && $1 != "remove" { print $2 "\t" $4; exit }' "${scratch}/swept-trees")"
+    if [[ -n "$owner" ]]; then
       verdict=weird
-      note="finished, but $(cut -f1 <<< "$holder") holds it ($(cut -f2 <<< "$holder")); would be tagged closed/${branch}, and is not moved"
+      note="finished, but $(cut -f1 <<< "$owner") holds it ($(cut -f2 <<< "$owner")); would be tagged closed/${branch}, and is not moved"
       if [[ "$apply" == yes ]]; then note="${note/would be tagged/tagged}"; fi
     fi
     action="tag closed/${branch} at ${tip:0:7}"

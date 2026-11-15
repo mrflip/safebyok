@@ -41,10 +41,10 @@ function makeDialog() {
 const unnarrowedDialog: RequestCleartext = async (gating) => { await gating.attempt({ passphraseClear }) }
 
 /** A promise, and the function that resolves it. */
-function heldOpen() {
+function makeRelease() {
   let release!: () => void
-  const held = new Promise<void>((resolve) => { release = resolve })
-  return { held, release }
+  const released = new Promise<void>((resolve) => { release = resolve })
+  return { released, release }
 }
 
 /** The bank's scope in these worlds. */
@@ -218,10 +218,10 @@ describe("a birth through a gating", () => {
 
   it("refuses when another device builds the bank while the passphrase is derived", async () => {
     const theirs = await theirBankRows()
-    const { held, release } = heldOpen()
+    const { released, release } = makeRelease()
     const keyDeriver = Object.assign(Object.create(TH.testDeriver) as typeof TH.testDeriver, {
       deriveKeyBytes: async (...args: Parameters<typeof TH.testDeriver.deriveKeyBytes>) => {
-        await held
+        await released
         return TH.testDeriver.deriveKeyBytes(...args)
       },
     })

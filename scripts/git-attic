@@ -2,7 +2,7 @@
 # Retires stray local branches to tags. A branch off the history it is judged by (HEAD's, unless
 # --against names another), whose every commit is nonetheless in that history -- as the same
 # change, or under the same subject line -- becomes an annotated tag attic/<branch> that says what
-# it was, and the branch is deleted. A branch holding unmatched work is only reported, until
+# it was, and the branch is deleted. A branch with unmatched work is only reported, until
 # --retire names it. Reports what it would do unless given --apply. Never touches a remote.
 #
 # The manual is notes/housekeeping.md, *Retiring stray branches*; --help prints that section.
@@ -103,15 +103,15 @@ prOf() {
 # The tag to retire a branch to, given its tip, and whether it already exists there:
 # prints "<tagname> new" or "<tagname> exists".
 tagFor() {
-  local branch="$1" tip="$2" tagname held
+  local branch="$1" tip="$2" tagname existing
   for tagname in "attic/${branch}" "attic/${branch}-$(git rev-parse --short "$tip")"; do
     git check-ref-format "refs/tags/${tagname}" || die "cannot make a tag of branch ${branch}"
-    held="$(git rev-parse --verify --quiet "refs/tags/${tagname}^{commit}" || true)"
-    if [[ -z "$held" ]]; then
+    existing="$(git rev-parse --verify --quiet "refs/tags/${tagname}^{commit}" || true)"
+    if [[ -z "$existing" ]]; then
       echo "${tagname} new"
       return
     fi
-    if [[ "$held" == "$tip" ]]; then
+    if [[ "$existing" == "$tip" ]]; then
       echo "${tagname} exists"
       return
     fi
@@ -122,7 +122,7 @@ tagFor() {
 in_history=0
 retired=0
 unmerged=0
-held=0
+checkedout=0
 verb="would retire"
 if [[ "$apply" == yes ]]; then verb="retired"; fi
 
@@ -168,7 +168,7 @@ while IFS= read -r branch; do
     continue
   fi
   if grep -qxF -- "$branch" "${scratch}/checked_out"; then
-    held=$((held + 1))
+    checkedout=$((checkedout + 1))
     echo "checked out   ${branch}: left alone, as a worktree holds it"
     continue
   fi
@@ -214,7 +214,7 @@ echo
 tally="${retired} retired"
 if [[ "$apply" == no ]]; then tally="${retired} to retire"; fi
 echo "$(counted "$in_history" branch branches) in the history of ${against}, left alone;" \
-  "${tally}, ${unmerged} unmerged, ${held} checked out."
+  "${tally}, ${unmerged} unmerged, ${checkedout} checked out."
 if [[ "$apply" == no && "$retired" -gt 0 ]]; then
   echo "Nothing was changed: --apply retires them."
 elif [[ "$apply" == yes && "$retired" -gt 0 ]]; then

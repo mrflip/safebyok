@@ -22,7 +22,7 @@ import { describeStoredOtherwise } from './bank-db-battery-stored'
 /** A bankDB's raw rows, past its verbs: the test backdoor the battery plants a row by, damaged or not, and reads one back by. */
 export type BankDBRowCheats = {
   /** Writes `row` as the bank row at `scope`, unchecked.
-   * Where the store cannot hold `row`, it may throw or store something else: the battery reads the row back to tell.
+   * Where the store cannot keep `row`, it may throw or store something else: the battery reads the row back to tell.
    */
   plantBankRow: (scope: BankScope, row: unknown) => Awaitable<void>
   /** Writes `row` as the gate row at `scope`, unchecked, whether or not a bank row stands over it. */

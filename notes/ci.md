@@ -7,7 +7,7 @@ or wants to know why a check failed. A thread needs none of it: what a PR must c
 ## On every pull request
 
 CI runs on every PR that is not a draft, or is a draft carrying the label `ci`, over the root and
-every workspace package. Any other draft is held: its jobs are skipped, so it can be pushed as
+every workspace package. Any other draft waits: its jobs are skipped, so it can be pushed as
 often as its author likes without filling the queue. The label is read when a push, opening,
 reopening or marking ready runs CI, and adding it starts nothing: add `ci` before the push you
 expect green, and leave it on. A skipped job's check reads as passed, so a run that skips on a

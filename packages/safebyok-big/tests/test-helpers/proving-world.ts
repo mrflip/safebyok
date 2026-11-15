@@ -160,7 +160,7 @@ export async function builtGateOf(answer?: GX.PasskeyAnswer): Promise<{ gate: Ga
   return { gate: await listedGateOf(Gate.recordOfBirth(WorldBankStamp, WorldGateStamp, passphraseWayin, passkeyWayin)), proving }
 }
 
-/** The Gate of `record`, a gate row of {@link WorldBankStamp}'s bank, as a device's ensureBank lists it: a bankDB holds that bank's row and `record`, and a device ensures the bank. */
+/** The Gate of `record`, a gate row of {@link WorldBankStamp}'s bank, as a device's ensureBank lists it: a bankDB has that bank's row and `record`, and a device ensures the bank. */
 export async function listedGateOf(record: GateRecord): Promise<Gate> {
   const bankDB = new MemoryBankDB()
   const shelf = bankDB._cheat_shelfOf(WorldBankStamp)

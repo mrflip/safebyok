@@ -1,4 +1,4 @@
-/** The battery's rows of a later fmt, as a later version of the package writes them: held by the store, and refused by every verb that must read one. */
+/** The battery's rows of a later fmt, as a later version of the package writes them: kept by the store, and refused by every verb that must read one. */
 
 import { describe, expect, it } from 'vitest'
 import * as BX from '../../src/shapes/shapes-bankdb'
@@ -69,7 +69,7 @@ async function unrefusedOf(verbs: [string, () => Promise<Answered>][]): Promise<
 /** Registers the cases of rows of a later fmt over `world`. */
 export function describeFlaws({ putWith, rowsOf }: BatteryWorld): void {
   describe("a row of a later fmt", () => {
-    it("is held as written, a bank, gate, vault and box row alike", async () => {
+    it("is kept as written, a bank, gate, vault and box row alike", async () => {
       const { bankDB } = await putWith({ box: true })
       const rows = rowsOf(bankDB)
       const later = {
