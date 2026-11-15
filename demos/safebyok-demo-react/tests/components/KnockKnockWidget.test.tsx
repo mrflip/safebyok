@@ -100,7 +100,7 @@ describe("KnockKnockWidget", () => {
     await TH.expectProbe('absent none')
   })
 
-  it("replaces the put key at a second Save", async () => {
+  it("replaces the stored key at a second Save", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -112,7 +112,7 @@ describe("KnockKnockWidget", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal(['sk-ant-second-key'])
   })
 
-  it("knocks with the put key", async () => {
+  it("knocks with the stored key", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -122,7 +122,7 @@ describe("KnockKnockWidget", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("knocks with the put key after a lock", async () => {
+  it("knocks with the stored key after a lock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()

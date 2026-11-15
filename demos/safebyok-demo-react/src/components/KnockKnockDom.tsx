@@ -32,7 +32,7 @@ export const KnockKnockDom = () => {
   // The dialogs that build or unlock the vault open from this click.
   const edit = () => perform(async () => { if (device !== null) { await ensureApiKeyBoxExposed(device, DomApiKeyBoxlabel) } })
 
-  const putKey = () => perform(async () => {
+  const putApiKey = () => perform(async () => {
     if (box === null) { return }
     await BoxFields.of(box).put()
     setIsPut(true)
@@ -54,7 +54,7 @@ export const KnockKnockDom = () => {
         {isShowing && (box !== null)
           ? (
             <>
-              <button type="button" onClick={() => { void putKey() }}>Save</button>
+              <button type="button" onClick={() => { void putApiKey() }}>Save</button>
               <button type="button" onClick={() => { void done() }}>Done</button>
             </>
           )

@@ -18,7 +18,7 @@ export const KnockKnockWidget = () => {
   const isReady = (stage === 'absent') || (stage === 'present')
 
   // The dialog that builds or unlocks the bank opens from this click.
-  const putKey = async (evt: SyntheticEvent<HTMLFormElement>) => {
+  const putApiKey = async (evt: SyntheticEvent<HTMLFormElement>) => {
     evt.preventDefault()
     const form = evt.currentTarget
     const apiKey = new FormData(form).get('whisper_text')
@@ -43,7 +43,7 @@ export const KnockKnockWidget = () => {
     <section className="flow knock-knock" aria-labelledby={`${fieldId}-title`}>
       <h2 id={`${fieldId}-title`}>Widget form</h2>
       <p className="quiet">Preassembled pieces from safebyok-react, landed in place. Your key goes in, and comes out only to knock.</p>
-      <form className="api-key-slot" onSubmit={(evt) => { void putKey(evt) }}>
+      <form className="api-key-slot" onSubmit={(evt) => { void putApiKey(evt) }}>
         <label htmlFor={fieldId}>Anthropic API key</label>
         <WhisperField id={fieldId} placeholder="sk-ant-…" />
         <div className="row">

@@ -83,7 +83,7 @@ describe("KnockKnockDom", () => {
     expect(JSON.stringify([...boxrows.values()])).to.not.contain(FakeApiKey)
   })
 
-  it("hides the field on Done, and offers to edit the put key", async () => {
+  it("hides the field on Done, and offers to edit the stored key", async () => {
     await renderFlow()
     const field = await saveKey()
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
@@ -103,7 +103,7 @@ describe("KnockKnockDom", () => {
     expect(screen.queryByText('Saved.')).to.be.null
   })
 
-  it("knocks with the put key, and shows Claude's punchline", async () => {
+  it("knocks with the stored key, and shows Claude's punchline", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -113,7 +113,7 @@ describe("KnockKnockDom", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("knocks with the put key after an edit not yet put and a lock", async () => {
+  it("knocks with the stored key after an edit not yet put and a lock", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await renderFlow()
@@ -127,7 +127,7 @@ describe("KnockKnockDom", () => {
     expect(anthropic.seen.map((request) => request.apiKey)).to.deep.equal([FakeApiKey])
   })
 
-  it("knocks with the put key while the box is veiled", async () => {
+  it("knocks with the stored key while the box is veiled", async () => {
     const anthropic = TH.fakeAnthropic(200, Punchline)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await TH.renderInBank(<><KnockKnockDom /><BoxVeiler /><TH.VaultProbe /></>)

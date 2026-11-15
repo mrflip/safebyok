@@ -35,7 +35,7 @@ export const KnockKnockToolkit = () => {
   }
 
   const edit = () => perform(async () => { if (device !== null) { await ensureApiKeyBoxExposed(device, ToolkitApiKeyBoxlabel) } })
-  const putKey = () => perform(async () => { await box?.putExposed(); setIsPut(true) })
+  const putApiKey = () => perform(async () => { await box?.putExposed(); setIsPut(true) })
   const done = () => perform(() => box?.unexpose())
 
   return (
@@ -58,7 +58,7 @@ export const KnockKnockToolkit = () => {
         {isShowing && (box !== null)
           ? (
             <>
-              <button type="button" onClick={() => { void putKey() }}>Save</button>
+              <button type="button" onClick={() => { void putApiKey() }}>Save</button>
               <button type="button" onClick={() => { void done() }}>Done</button>
             </>
           )

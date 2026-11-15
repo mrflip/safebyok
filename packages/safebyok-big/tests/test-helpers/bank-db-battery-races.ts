@@ -244,7 +244,7 @@ export function describeRaces({ fresh, putWith, rowsOf, twinOf, adapterOf, hasCa
 
   if (canFail) {
     describe("a bankDB's own failure", () => {
-      it("refuses the call its storage failed, and returns the next", async () => {
+      it("refuses the call its storage failed, and the next succeeds", async () => {
         const { bankDB, vault } = await putWith()
         await failNextCall(bankDB)
         const answer = await bankDB.tryGetVault(vaultGetAskOf())

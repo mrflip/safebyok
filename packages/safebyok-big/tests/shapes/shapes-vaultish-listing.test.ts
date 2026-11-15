@@ -58,7 +58,7 @@ describe("The checks of options", () => {
       [{ maxParentMillis: -1 },                     false, 'refuses a negative horizon'],
     ])
 
-    it("keep their fields of the bag given and strip the rest", () => {
+    it("pick their fields from the bag given and strip the rest", () => {
       expect(VX.timelyOpts.parse({ maxParentMillis: 5, reseal: true })).to.deep.equal({ maxParentMillis: 5 })
       expect(VX.boxPutOpts.parse({ maxParentMillis: 5, reseal: true })).to.deep.equal({ maxParentMillis: 5, ifAbsent: 'add', ifPresent: 'repl' })
     })

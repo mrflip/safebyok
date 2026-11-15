@@ -5,7 +5,7 @@ import { Passphrase, anyStrengthChecker, quietLogger, testDeriver } from 'safeby
 import { ApiKeyVaultlabel, ensureApiKeyBoxExposed, extractApiKey } from '../../src/lib/api-key'
 
 const Boxlabel = 'anthropic_api_key_test'
-const FakeApiKey = 'sk-ant-fake-put-key'
+const FakeApiKey = 'sk-ant-fake-stored-key'
 
 /** Make a device on in-memory storage, its bank not yet brought up. Its dialog answers at once with the right passphrase. */
 const makeDevice = () => (
@@ -47,13 +47,13 @@ describe("extractApiKey", () => {
     expect(await extractApiKey(vault, Boxlabel)).to.be.null
   })
 
-  it("returns the put key", async () => {
+  it("returns the stored key", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: FakeApiKey })
     expect(await extractApiKey(vault, Boxlabel)).to.eq(FakeApiKey)
   })
 
-  it("unlocks a locked bank to return the put key", async () => {
+  it("unlocks a locked bank to return the stored key", async () => {
     const vault = await makeVault()
     await putWhisper(vault, { apiKey: FakeApiKey })
     vault.bank.lock()
