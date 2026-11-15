@@ -98,7 +98,7 @@ function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
 }
 
 /** The checks of a Thing's fields, and of each kind as a Thing, as proposed and as cited. */
-export const { thingScope, thingCited, thingRecord, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
+export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
@@ -113,6 +113,8 @@ export const { thingScope, thingCited, thingRecord, sealed, wayins, bankThing, b
     lifepath: union([lifepath, str.regex(ShellLifepathPattern, Phrases.LifepathShape)]),
   })
   const thingRecord  = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
+  // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
+  const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
   const emptyBag     = obj({}).strict()
   // The store checks only the shape of a sealed part: what is inside is the sealer's.
   const sealed       = obj({
@@ -127,6 +129,8 @@ export const { thingScope, thingCited, thingRecord, sealed, wayins, bankThing, b
   }).strict()
   // A record has no optional part: a gate with no passkey has `passkey0: null`.
   const wayins       = obj({ main: BX.wayins.shape.main, passkey0: BX.wayins.shape.passkey0.unwrap().nullable() }).strict()
+  // What a write under a storage policy reads of the gate stored, beside its storedCited.
+  const storedWayins = obj({ wayins })
 
   // A stored record is strict: a field this version does not know is damage, or a newer format.
   const bankBase     = obj({
@@ -201,13 +205,15 @@ export const { thingScope, thingCited, thingRecord, sealed, wayins, bankThing, b
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
     .refine(isShellWhole,   Phrases.SparseHalfShell)
-  return { thingScope, thingCited, thingRecord, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse }
+  return { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse }
 })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof thingScope>>
 /** What a write cites of the Thing it expects to find, the shell's included: its revision, its life and its liveness, just what the store compares. */
 export type ThingCited   = Readonly<Z.infer<typeof thingCited>>
+/** What a write reads of the Thing stored at its scope: its scope, what the act tables compare, and the born_at a replace keeps. */
+export type StoredCited  = Readonly<Z.infer<typeof storedCited>>
 /** The fields every kind of Thing has, which the store reads. The rest of a record is its body. */
 export type ThingRecord  = Readonly<Z.infer<typeof thingRecord>>
 /** The bank, as a Thing. */

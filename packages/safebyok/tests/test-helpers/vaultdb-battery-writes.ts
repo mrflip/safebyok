@@ -193,11 +193,22 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
   })
 
   describe("a Thing stored that fails its checks", () => {
-    it("refuses a damaged gate as damaged, to a get and to a write", async () => {
+    // Which refusal a write over a damaged Thing meets is unspecified: see tryWriteThing.
+    it("refuses a damaged gate as damaged to a get, and refuses a write over it", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(GateScope, { ...gateThingOf(), wayins: { main: {}, passkey0: null } })
       await expectBad(vaultDB.tryGetThing(getGateAskOf()), 'damaged_row')
-      await expectBad(vaultDB.tryWriteThing(birthAskOf()), 'damaged_row')
+      expect(await vaultDB.tryWriteThing(birthAskOf())).to.deep.include({ ok: false })
+    })
+
+    it("carries a gate damaged outside its wayins forward, under the storage policy it meets", async () => {
+      const vaultDB = await fresh()
+      const stored = gateThingOf()
+      await rowsOf(vaultDB).plant(GateScope, { ...stored, auth: { stray: true } })
+      const next = nextGateOf(stored, { wayins: { main: BW.otherMainWayin, passkey0: null } })
+      const ask  = replaceAskOf(stored, next, { policies: ['replace_passphrase'] })
+      expect(await vaultDB.tryWriteThing(ask)).to.deep.include({ ok: true, act: 'replaced', val: next })
+      expect(await gotAt(vaultDB, 'gate')).to.deep.equal(next)
     })
   })
 
@@ -272,15 +283,12 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       await expectBad(vaultDB.tryGetThing(getAskAt(box.labelpath)), 'damaged_row')
     })
 
-    // A store that checks only in the statement that writes compares the rows' revisions, not their shapes, so it may
-    // write over a damaged row the write cites exactly. Either way, the box stored after is one that passes its checks.
-    it("refuses a write citing a damaged box as damaged, or replaces it", async () => {
+    it("carries a box damaged in its body forward, under a write that cites it exactly", async () => {
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: box.labelpath }, { ...box, whisper_sealed: {} })
-      const next   = nextOf(box)
-      const answer = await vaultDB.tryWriteThing(replaceAskOf(box, next))
-      const outcome = answer.ok ? { act: answer.act, val: answer.val, stored: await gotAt(vaultDB, box.labelpath) } : { refusalkind: answer.err.refusalkind }
-      expect([{ act: 'replaced', val: next, stored: next }, { refusalkind: 'damaged_row' }]).to.deep.include(outcome)
+      const next = nextOf(box)
+      expect(await vaultDB.tryWriteThing(replaceAskOf(box, next))).to.deep.include({ ok: true, act: 'replaced', val: next })
+      expect(await gotAt(vaultDB, box.labelpath)).to.deep.equal(next)
     })
   })
 
