@@ -11,7 +11,7 @@ import {
   KindChecks, MainGateLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
 } from './shapes-thing'
 
-// == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeOff
+// == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
@@ -60,7 +60,7 @@ function revseqCmpOf({ cited }: WriteCmpAsk, stored: ThingCited | null): RevseqC
 
 // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
 /** True when a Thing is stored and differs from the cited one in its life or its liveness. */
-function isLifeOff({ cited }: WriteCmpAsk, stored: ThingCited | null): boolean {
+function isLifeMismatch({ cited }: WriteCmpAsk, stored: ThingCited | null): boolean {
   return (stored !== null) && ((stored.lifepath !== cited.lifepath) || (stored.am !== cited.am))
 }
 // --
@@ -84,7 +84,7 @@ function putActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.PutAct | EX.R
   const revtokCmp = revtokCmpOf(ask, stored)
   if (revtokCmp  === '=next')                                                     { return 'retcon' }
   if (revseqCmp  === 'ahead')                                                     { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, stored)))  { return 'clash' }
+  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeMismatch(ask, stored)))  { return 'clash' }
   if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                              { return 'forked' }
   if (revtokCmp  === 'neq')                                                       { return ((presence === 'live') && (opflag === 'get')) ? 'passed' : 'stale' }
   if (presence   === 'void')                                                      { return (opflag === 'add') ? 'born'   : 'void' }
@@ -100,7 +100,7 @@ function delActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.DelAct | EX.R
   const revtokCmp = revtokCmpOf(ask, stored)
   if (revtokCmp  === '=next')                                                     { return 'retcon' }
   if (revseqCmp  === 'ahead')                                                     { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, stored)))  { return 'clash' }
+  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeMismatch(ask, stored)))  { return 'clash' }
   if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                              { return 'forked' }
   if (revtokCmp  === 'neq')                                                       { return (presence === 'gone') ? 'gone' : 'stale' }
   if (presence   === 'void')                                                      { return 'void' }
