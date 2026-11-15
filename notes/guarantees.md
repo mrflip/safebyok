@@ -356,7 +356,7 @@ bank tombstone or a bank row of another life delivered, which are among the site
 leaseKey's access chain names (a sweep leaves the row for the next page), **with one exception**: a lease row that fails
 its check is neither listed by `listLeases` nor forgotten by `forget`. It stays until a later `stow` over its scope, or
 until a host calls `forgetRawLease` with the scopepath that `listRawLeases` returns beside the row; `forgetRawLease`
-reaches a row filed under labels that today's checks refuse (notes/wontfix.md). No lease is dropped by the passage of
+reaches a row filed under labels that today's checks refuse (notes/wontfix-big.md). No lease is dropped by the passage of
 time alone, and **autolock is a best-effort reminder process, not a guarantee**: a lease granted in a page stays granted
 until something locks it. A lease's expiry is stored nowhere: it is the cached row's `proved_at` plus the autolock
 duration, the device's `leaseMillis` (from the host's `autolockMinutes`), which the bank hands the Lease in its
@@ -426,7 +426,7 @@ through `HostErrorSanitizer.refusalFor`, and `guardRequestCleartext` (`models/de
 and returns false, so that `Gating.#askHost` refuses with `requestCleartextThrew`, an `unexpected_error`. The gating's
 `checkedCleartexts` does the same for a getter or proxy of the host's that throws while an attempt's cleartexts are read:
 the refusal is `cleartextsThrew`, an `unexpected_error` with no cause. A `VaultError` that a getter throws passes through
-unchanged (`notes/wontfix.md`).
+unchanged (`notes/wontfix-big.md`).
 A `keyDeriver`'s `load` and a strength checker's `load` are given no passphrase. A `VaultError` that either throws
 passes through unchanged, and any other throw is kept as the cause of `keyDeriverLoadFailed` or
 `strengthCheckerLoadFailed`. A WebCrypto

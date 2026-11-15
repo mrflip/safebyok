@@ -102,7 +102,7 @@ describe("a gate changed on another device", () => {
 })
 
 describe("a passkey over a passphrase change", () => {
-  // A decision: notes/wontfix.md, 2026-11-09.
+  // A decision: notes/wontfix-big.md, 2026-11-09.
   it("keeps the passkey wayin as stored, and the passkey still opens", async () => {
     const { bank, demandStoredGate } = await makeBornVaultWithPasskey()
     const { passkey0 } = demandStoredGate().wayins

@@ -421,7 +421,7 @@ done. Decide how a host says "ask every time", and what a zero-length lease mean
 ### What "rollback" means
 
 The Coach (2026-10-26): "We have a lot of things surrounding the very muddy meaning of rollback." The device watermark
-is gone, and storage that rolls a record back is not detected beyond one session (`notes/wontfix.md`, 2026-11-07). What remains is
+is gone, and storage that rolls a record back is not detected beyond one session (`notes/wontfix-big.md`, 2026-11-07). What remains is
 `gate_revision_tok` (a lease citing an earlier gate revision is forgotten), `revision_seq` and `stale_write`, each guarding against a different kind of "going backwards". Settle one definition,
 say which mechanism guards which case, and name each mechanism for its case.
 
@@ -464,7 +464,7 @@ absent and gone cases a single case instead of a branch each.
 
 ### A wontfix test pool
 
-The Coach (2026-11-10): a pool of tests, each demonstrating that a row of `notes/wontfix.md` is what happens today; a row with no
+The Coach (2026-11-10): a pool of tests, each demonstrating that a row of `notes/wontfix-big.md` is what happens today; a row with no
 such test is removed. The file's header says that what it lists is not tested; change that when the pool is added. The test that pinned
 a vault row restored from before a passphrase change, deleted in [#617](https://github.com/mrflip/safebyok/pull/617), is the first to
 bring back from history.

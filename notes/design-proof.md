@@ -228,7 +228,7 @@ as its first step, so a refusal there leaves nothing cached.
 
 **The cache:** a `lock()` during `Lease.buildFromCache`'s read has no effect on the bank either: the bank reports
 unlocked. The lock's forget of the cached lease does take effect, so the next session asks. This is a row for
-`notes/wontfix.md`.
+`notes/wontfix-big.md`.
 
 Another tab's `lock()` is not passed on to this tab.
 
