@@ -1,4 +1,4 @@
-# Thread 2: minder_buttonup (2026-11-15, rounds 3 to 5 on 2026-11-16)
+# Thread 2: minder_buttonup (2026-11-15, rounds 3 to 6 on 2026-11-16)
 
 Branch `20261115-minder_buttonup`, PR [#709](https://github.com/mrflip/safebyok/pull/709) (draft), on #708, on #707.
 Round 3 starts from 1b061d9d9, the restacked tip. Proved: see the PR's **Tests:** line. `thread-2-storage_backward.md`
@@ -7,7 +7,7 @@ beside this file holds the round-1 proposal behind `stale_read`.
 Rounds 1 and 2 built the minder's inputs, fixed cache options, `#doDeliverRecord` as the one `setQueryData`,
 `list()`, `listen` over one `QueryCache.subscribe`, `stale_read` (TanStack's error state keeps the record, marks it
 untimely, holds the refusal as `lastErr`), `goodbye` during a get refusing `disabled`, and the keys. Round 3 (every item
-the Coach's ruling), rounds 4 and 5 change:
+the Coach's ruling), rounds 4 to 6 change:
 
 * **Built**:
   * **`track` has three fixed keys**: `bank`, `gate` (`MainGateLabelpath`) and `box` (`RootBoxLabelpath`), in
@@ -32,10 +32,13 @@ the Coach's ruling), rounds 4 and 5 change:
     listings alone. A get tells listeners once.
   * **Root box seeding**: the box minder seeds `rootBox` through `#doDeliverSeed` in `hello`, not in the constructor:
     before `hello` nothing is cached and no defaults exist, and `goodbye` removes it, so `hello` seeds again.
-    `#pinRootBox` then subscribes a `QueryObserver` with `enabled: false` on its key until `goodbye`: TanStack never
-    collects an entry with an observer, and this one never fetches. Query defaults could not: the root box's key is
-    the box minder's own `keyPrefix`. A test with `gcTime: 10` and fake timers shows a listed box collected and the
-    root box kept.
+    Before seeding, it sets `setQueryDefaults(queryKey(rootBox), { gcTime: Infinity })`, emptied in `goodbye` (round
+    6; round 4's never-fetching `QueryObserver` is gone). A test with `gcTime: 10` and fake timers shows a listed box
+    collected, with the host's `gcTime`, and the root box kept; a removal by `[..., 'box']` takes both.
+  * **Keys** (round 6): `queryKey` is `['safebyok', userid, banklabel, ...labels, '.']`. The `'.'` marks the Thing
+    itself and is never a label, so the root box's key starts no other and its defaults reach it alone, while the key
+    without it selects a subtree (the Coach wants a deleted Thing's children vacated that way). The modelkind is not
+    repeated. A whole-labelpath form was built briefly and replaced at the Coach's correction.
   * **Minders serve a born bank** (ruling A): `ThingMinder`'s class doc says a get or a list before the bank's
     birth refuses. No wontfix row.
   * **The builders' inputs** are `GetAsk`, `ListAsk`, `PutAsk`, `DelAsk`, `BankAsk`, `GetBoxAsk` (were `*Args`), each
