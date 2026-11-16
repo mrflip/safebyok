@@ -8,9 +8,9 @@ import { type GateThing, type GetThingAsk, type ThingScope, type Thingkind, Shel
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
-/** The whole get ask a minder takes for `scope`: the bank's, tracking the roots at revision 0, with the default staleTime and `ifStale: 'get'`, and `over` laid on it. */
-function askOf(scope: ThingScope, over: Partial<MinderGetAsk> = {}): MinderGetAsk {
-  return { op: 'get', modelkind: modelkindOf(scope.labelpath), ...scope, ifAbsent: 'nil', track: TH.trackOf(), staleTime: DefaultQueryCacheOpts.staleTime, ifStale: 'get', ...over }
+/** The get ask a minder takes for `scope`: the bank's, tracking the roots at revision 0. */
+function askOf(scope: ThingScope): MinderGetAsk {
+  return { op: 'get', modelkind: modelkindOf(scope.labelpath), ...scope, ifAbsent: 'nil', track: TH.trackOf() }
 }
 
 /** The ask that gets the main gate, as a minder takes it. */
@@ -279,7 +279,7 @@ describe("ThingMinder.tryAt", () => {
     await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
-    const answer = minder.tryAt({ ...GateAsk, staleTime: 0 })
+    const answer = minder.tryAt(GateAsk, { staleTime: 0 })
     expect(answer).to.deep.include({ ok: true, act: 'untimely', val: undefined, isTimely: false })
     expect(answer).to.have.property('refreshedAt').above(0)
   })
@@ -302,7 +302,7 @@ describe("ThingMinder.tryAt", () => {
     await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
-    expect(minder.tryAt({ ...GateAsk, ifStale: 'get' })).to.deep.include({ act: 'vacant', isFetching: false })
+    expect(minder.tryAt(GateAsk, { ifStale: 'get' })).to.deep.include({ act: 'vacant', isFetching: false })
     await TH.wakeupAtNextTick()
     expect(asked.mock.calls).to.have.lengthOf(0)
   })
@@ -311,7 +311,7 @@ describe("ThingMinder.tryAt", () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
-    expect(minder.tryAt({ ...GateAsk, ifStale: 'refresh' })).to.deep.include({ act: 'vacant', isFetching: true })
+    expect(minder.tryAt(GateAsk, { ifStale: 'refresh' })).to.deep.include({ act: 'vacant', isFetching: true })
     await TH.eventually(() => actOf(minder.tryAt(GateAsk)) === 'gotlive')
     expect(minder.at(GateAsk)).to.deep.equal(gate)
   })
@@ -322,63 +322,56 @@ describe("ThingMinder.tryAt", () => {
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
-    expect(minder.tryAt({ ...GateAsk, ifStale: 'refresh' })).to.deep.include({ act: 'gotlive', isFetching: false })
+    expect(minder.tryAt(GateAsk, { ifStale: 'refresh' })).to.deep.include({ act: 'gotlive', isFetching: false })
     await TH.wakeupAtNextTick()
     expect(asked.mock.calls).to.have.lengthOf(0)
   })
 
   it("answers a background get's refusal as lastErr", async () => {
     const { minder } = minderWorldOf(new DownVaultDB())
-    minder.tryAt({ ...GateAsk, ifStale: 'refresh' })
+    minder.tryAt(GateAsk, { ifStale: 'refresh' })
     await TH.eventually(() => ('lastErr' in minder.tryAt(GateAsk)) && (minder.tryAt(GateAsk) as { lastErr: unknown }).lastErr !== null)
     const answer = minder.tryAt(GateAsk)
     expect(answer).to.deep.include({ ok: true, act: 'vacant', isFetching: false })
     expect(answer).to.have.nested.property('lastErr.refusalkind', 'storage_unavailable')
   })
 
-  const { staleTime: _staleTime, ...noStaleTime } = GateAsk
-  const { ifStale: _ifStale, ...noIfStale } = GateAsk
   const { track: _track, ...noTrack } = GateAsk
   const RefusedAsks = [
-    [{ ...GateAsk, userid: 'u2' },            'refuses bad_option for an ask of another bank'],
-    [{ ...GateAsk, ifAbsent: 'fail' },        "refuses bad_option for an ask that is not ifAbsent: 'nil'"],
-    [{ ...GateAsk, labelpath: 'box/openai' }, 'refuses bad_option for a labelpath of another kind'],
-    [noStaleTime,                             'refuses bad_option for an ask with no staleTime'],
-    [noIfStale,                               'refuses bad_option for an ask with no ifStale'],
-    [noTrack,                                 'refuses bad_option for an ask that tracks nothing'],
-    [{ ...GateAsk, staleTime: undefined },    'refuses bad_option for a staleTime given as undefined'],
-    [{ ...GateAsk, ifStale: 'keep' },         'refuses bad_option for an ifStale it does not know'],
-    [{ ...GateAsk, extra: 1 },                'refuses bad_option for a field neither the minder nor the vaultDB takes'],
+    [{ ...GateAsk, userid: 'u2' },            {},                       'refuses bad_option for an ask of another bank'],
+    [{ ...GateAsk, ifAbsent: 'fail' },        {},                       "refuses bad_option for an ask that is not ifAbsent: 'nil'"],
+    [{ ...GateAsk, labelpath: 'box/openai' }, {},                       'refuses bad_option for a labelpath of another kind'],
+    [noTrack,                                 {},                       'refuses bad_option for an ask that tracks nothing'],
+    [{ ...GateAsk, staleTime: 0 },            {},                       'refuses bad_option for an ask that carries an option'],
+    [GateAsk,                                 { staleTime: undefined }, 'refuses bad_option for a staleTime given as undefined'],
+    [GateAsk,                                 { ifStale: 'keep' },      'refuses bad_option for an ifStale it does not know'],
   ] as const
-  for (const [ask, blurb] of RefusedAsks) {
+  for (const [ask, opts, blurb] of RefusedAsks) {
     it(blurb, async () => {
       const { minder } = minderWorldOf(new MemoryVaultDB())
-      await TH.expectBad(minder.tryAt(ask as never), 'bad_option')
-      await TH.expectRefusal(minder.get(ask as never), 'bad_option')
+      await TH.expectBad(minder.tryAt(ask as never, opts as never), 'bad_option')
     })
   }
-})
 
-describe("ThingMinder.makeGetAsk", () => {
-  it("is the bank's get ask, with the minder's staleTime and ifStale: 'get' unless given", () => {
-    const tsq    = new TSQ.QueryClient()
-    const minder = minderOf('gate', new MemoryVaultDB(), tsq, { staleTime: 5 })
-    expect(minder.makeGetAsk({ labelpath: 'gate' })).to.deep.equal(askOf(TH.GateScope, { staleTime: 5 }))
-    expect(minder.makeGetAsk({ labelpath: 'gate', staleTime: 0, ifStale: 'refresh' })).to.deep.equal(askOf(TH.GateScope, { staleTime: 0, ifStale: 'refresh' }))
-  })
-
-  it("makes an ask the minder sends the vaultDB as given, less its own two fields", async () => {
+  it("sends the vaultDB the ask exactly as given", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = minderWorldOf(vaultDB)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
-    const ask   = minder.makeGetAsk({ labelpath: 'gate' })
-    await minder.get(ask)
-    const { staleTime: _staleTime, ifStale: _ifStale, ...vaultAsk } = ask
-    expect(asked.mock.calls).to.deep.equal([[vaultAsk]])
+    minder.tryAt(GateAsk, { ifStale: 'refresh' })
+    await TH.eventually(() => asked.mock.calls.length === 1)
+    expect(asked.mock.calls).to.deep.equal([[GateAsk]])
   })
 })
 
 describe("ThingMinder.get", () => {
+  it("refuses bad_option for an ask that tracks nothing, or a staleTime given as undefined", async () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    const { track: _track, ...noTrack } = GateAsk
+    await TH.expectRefusal(minder.get(noTrack as never), 'bad_option')
+    // @ts-expect-error -- an explicit undefined is the point
+    await TH.expectRefusal(minder.get(GateAsk, { staleTime: undefined }), 'bad_option')
+  })
+
   it("returns the record stored, and reads the cache after", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 1)
@@ -416,7 +409,7 @@ describe("ThingMinder.get", () => {
     const { minder } = minderWorldOf(vaultDB)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     await minder.get(GateAsk)
-    await minder.get({ ...GateAsk, staleTime: 0 })
+    await minder.get(GateAsk, { staleTime: 0 })
     expect(asked.mock.calls).to.have.lengthOf(2)
   })
 
@@ -471,7 +464,7 @@ describe("ThingMinder.get", () => {
       const { boxMinder } = minderWorldOf(vaultDB)
       await boxMinder.get(BoxAsk)
       goBack(vaultDB, box0)
-      await TH.expectRefusal(boxMinder.get({ ...BoxAsk, staleTime: 0 }), 'stale_read')
+      await TH.expectRefusal(boxMinder.get(BoxAsk, { staleTime: 0 }), 'stale_read')
       expect(boxMinder.at(BoxAsk)).to.deep.equal(box1)
       expect(boxMinder.tryAt(BoxAsk)).to.deep.include({ act: 'untimely', isTimely: false })
       expect(boxMinder.tryAt(BoxAsk)).to.have.nested.property('lastErr.refusalkind', 'stale_read')
@@ -487,7 +480,7 @@ describe("ThingMinder.get", () => {
     const { minder, receive } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
     vaultDB._cheat_things(TH.ThingBank).set(TH.GateScope.labelpath, TH.gateThingOf())
-    await TH.expectRefusal(minder.get({ ...GateAsk, staleTime: 0 }), 'stale_read')
+    await TH.expectRefusal(minder.get(GateAsk, { staleTime: 0 }), 'stale_read')
     const gate2 = TH.nextGateOf(gate1)
     receive(noticeOf(gate2))
     expect(minder.tryAt(GateAsk)).to.deep.include({ act: 'gotlive', val: gate2, isTimely: true })
@@ -561,7 +554,7 @@ describe("ThingMinder.listen", () => {
     expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ ok: true, ask: getAskOf({ ...TH.GateScope, track: TH.trackOf() }), isTimely: true, lastErr: null })
     unlisten()
     heard.mockClear()
-    await minder.get({ ...GateAsk, staleTime: 0 })
+    await minder.get(GateAsk, { staleTime: 0 })
     expect(heard.mock.calls).to.have.lengthOf(0)
   })
 
@@ -599,7 +592,7 @@ describe("ThingMinder.listen", () => {
     const heard = listenerOf()
     minder.listen(heard)
     vaultDB._cheat_things(TH.ThingBank).set(TH.GateScope.labelpath, TH.gateThingOf())
-    await TH.expectRefusal(minder.get({ ...GateAsk, staleTime: 0 }), 'stale_read')
+    await TH.expectRefusal(minder.get(GateAsk, { staleTime: 0 }), 'stale_read')
     expect(toldOf(heard)).to.deep.equal([['untimely', 'gate', undefined]])
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('lastErr.refusalkind', 'stale_read')
   })

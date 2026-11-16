@@ -17,8 +17,8 @@ import {
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
-  type MinderFriend, type MinderGetAsk, type MinderGetAskArgs, type QueryCacheOpts, type ThingTies,
-  DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskTail, minderFriend, minderListener, queryCacheOpts, tsqClient,
+  type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
+  DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, minderTrack, queryCacheOpts, tsqClient,
 } from './shapes-minder'
 
 // == [Answers]: DeliverableThing, GotAnswer, TSQEntryState, TSQGotAnswer, TSQAnswer
@@ -140,43 +140,40 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, makeGetAsk, tryAt, get, list, isStaleAt, listen
+  // == [Reading]: at, tryAt, get, list, isStaleAt, listen
 
   /** The cached record for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at(scoped: ThingScope): DeliverableThing | undefined {
     return this.#tsq.getQueryData<DeliverableThing>(this.queryKey(scoped))
   }
 
-  /** The get ask for the Thing at `args.labelpath`: the bank's, with this minder's `staleTime` and `ifStale: 'get'` unless `args` gives them. */
-  makeGetAsk(args: MinderGetAskArgs): MinderGetAsk {
-    const { staleTime = this.#queryCacheOpts.staleTime, ifStale = 'get', ...given } = args
-    // The bank's get ask defaults ifAbsent to 'nil', the only one a minder takes.
-    return { ...this.#bank.makeGetAsk(given), staleTime, ifStale } as MinderGetAsk
-  }
-
-  /** The cache's answer for `ask`'s scope, and whether it is timely within `ask.staleTime`. Never waits on the vaultDB.
-   * Under `ifStale: 'refresh'`, a stale or vacant record is also fetched in the background.
+  /** The cache's answer for `ask`'s scope, and whether it is timely. Never waits on the vaultDB.
+   * - `staleTime`          -- a record older than this (milliseconds) is `untimely`, without its `val`
+   * - `ifStale: 'get'`     -- read the cache alone (default)
+   * - `ifStale: 'refresh'` -- also fetch a stale or vacant record in the background
    */
-  tryAt(ask: MinderGetAsk): TSQAnswer {
+  tryAt(ask: MinderGetAsk, opts: MinderAskOpts = {}): TSQAnswer {
     try {
+      const { staleTime = this.#queryCacheOpts.staleTime, ifStale = 'get' } = minderAskOpts.parse(opts)
       this.#demandReady()
-      const { staleTime, ifStale, ...vaultAsk } = this.#demandOwnAsk(ask)
-      if (ifStale === 'refresh') { this.#backgroundRefresh(vaultAsk, staleTime) }
+      this.#demandOwnAsk(ask)
+      if (ifStale === 'refresh') { this.#backgroundRefresh(ask, staleTime) }
       // Found after the refresh starts, so that a vacant entry's answer is isFetching.
-      return this.#answerOfTSQ(vaultAsk, this.#tsqFind(vaultAsk), staleTime)
+      return this.#answerOfTSQ(ask, this.#tsqFind(ask), staleTime)
     } catch (err) {
       return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Outcome.storageRefusalOf(err) }
     }
   }
 
-  /** Get the record `ask` names: the cached one if timely within `ask.staleTime`, else from the vaultDB. A get already under way is shared.
+  /** Get the record `ask` names: the cached one if timely, else from the vaultDB. A get already under way is shared.
    * Refuses `stale_read` where storage answers older than the record cached when the get began. That record stays cached, and no longer counts as timely.
    * Refuses `disabled` where `goodbye` is called while it waits.
    */
-  async get(ask: MinderGetAsk): Promise<DeliverableThing> {
+  async get(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): Promise<DeliverableThing> {
+    const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
     this.#demandReady()
-    const { staleTime, ifStale: _ifStale, ...vaultAsk } = this.#demandOwnAsk(ask)
-    return this.#doGet(vaultAsk, staleTime)
+    this.#demandOwnAsk(ask)
+    return this.#doGet(ask, staleTime)
   }
 
   /** List the Things one label under this minder's root, tombstones included, and resolve their labelpaths. A box minder lists the boxes under the root box.
@@ -324,13 +321,10 @@ export class ThingMinder {
     return this.#isWholeRecord(this.at(scoped))
   }
 
-  /** Demand that `rawAsk` is a whole minder's get ask: a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind, and its own two fields. Throws `bad_option`.
-   * Resolves `rawAsk` itself, whose vaultDB part goes to the vaultDB as given.
-   */
-  #demandOwnAsk(rawAsk: MinderGetAsk): MinderGetAsk {
-    const { staleTime: _staleTime, ifStale: _ifStale, ...vaultAsk } = minderAskTail.parse(rawAsk)
-    Validator.checkedConsistent(checkedGetThingAsk(vaultAsk), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
-    return rawAsk
+  /** Demand that `rawAsk` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. Throws `bad_option`. */
+  #demandOwnAsk(rawAsk: unknown): void {
+    minderTrack.parse(rawAsk)
+    Validator.checkedConsistent(checkedGetThingAsk(rawAsk), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */

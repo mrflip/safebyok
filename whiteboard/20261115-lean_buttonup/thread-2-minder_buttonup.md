@@ -19,10 +19,11 @@ the Coach's ruling) changes:
     its root box). `VaultDB` and `AdapterVaultDB` lose their builders. `bank.tellBadNews(badnews)` passes to the device.
   * **`Device`** ports big's `onBadNews` option, `DefaultOnBadNews`, `tellBadNewsTo`, `BadNews`, `BadNewsHandler` and
     `device.tellBadNews` (the host's handler while enabled, the default after a sweep), with big's tests.
-  * **The minder's strict ask**: `MinderGetAsk` (shapes-minder) is the bank's get ask, `track` required, plus
-    `staleTime` and `ifStale`; `get` and `tryAt` take only it. `minderAskTail` checks the minder's fields and the track
-    loosely, then `checkedGetThingAsk` the rest, strict. The vaultDB gets the ask less those two fields, as given.
-    `minder.makeGetAsk({ labelpath, staleTime?, ifStale? })` calls the friend's and adds the defaults.
+  * **The minder's strict ask**: `MinderGetAsk` (shapes-minder) is the bank's get ask, `track` required. `get(ask,
+    opts)` and `tryAt(ask, opts)` keep round 2's `opts` and defaults: merging `staleTime` and `ifStale` into the ask
+    is held (`#one-band-per-argument`, unsettled). `minderTrack` demands the track, then `checkedGetThingAsk` the
+    ask, strict; the vaultDB gets the ask as given. The merged form, with `minder.makeGetAsk`, was built and sits
+    unpushed on top of the branch, as the revert of the commit that held it.
   * **Own watches**: every minder watches in `hello`; `#receive` caches a notice's Thing of its own kind and drops the
     rest. The roster, `#routeWorld`, `#route` and their phrases are gone. The friend is
     `Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'tellBadNews'>`.
@@ -63,5 +64,6 @@ the Coach's ruling) changes:
 
 * **Root box gc'd**: re-seed in `#shellAt`, pin it with an observer, or accept. Recommendation: accept, as a row.
 * **Gets before birth** refuse: recommend a row; it is the unspecified missing tracked row.
+* **The merged ask**: built, unpushed, the branch's local tip; it waits on `#one-band-per-argument`.
 * **The double tell per get**: recommend the `queryFn` return the record without `#doDeliverRecord`, a later thread.
 * **`Bank.queryCacheOpts`** is read by nothing: recommend removing it in step 3.
