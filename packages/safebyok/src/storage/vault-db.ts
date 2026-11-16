@@ -3,21 +3,22 @@
 import type { EX, Errors } from 'safebyok-big/internals'
 import type {
   BankRoots, BirthBankAsk, GetAskArgs, GetThingAsk, ListAskArgs, ListThingsAsk, LoggableAsk, PutAskArgs, DelAskArgs, Sparse, Thing,
-  ThingScope, ThingWatchScope, WriteAskOf, WriteThingAsk,
+  ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAskOf, WriteThingAsk,
 } from './shapes-thing'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
 
-// `world` will be the bank's Thing, read in the same step as the Thing asked for, once the Bank is a Thing. Other
-// fields earn their own place on the answer.
-/** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, and the loggable part of its `ask`. */
-export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: null, val: ValT }
+/** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, its bank's `world`, and the loggable part of its `ask`.
+ * `world` is the bank and its main gate as the step left them, read in that step: null where no bank is stored, where either fails its checks, or where the step threw.
+ * `tracked`, only for an ask that tracks, compares the same two with what the ask tracks.
+ */
+export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, tracked?: Tracked, val: ValT }
 
 /** Every act a refused answer carries: big's, and `policied` for a write that a storage policy, or the kept born_at, refuses where the put table would replace. */
 export type BadAct = EX.BadAct | 'policied'
 
-/** A vaultDB verb's refused answer: its `err`, its `act`, what is stored as `dbhas`, and the loggable part of its `ask`. */
-export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: null, dbhas: DbhasT, err: Errors.VaultError }
+/** A vaultDB verb's refused answer: its `err`, its `act`, what is stored as `dbhas`, its bank's `world`, and the loggable part of its `ask`. */
+export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, tracked?: Tracked, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
@@ -43,30 +44,30 @@ export type ListThingsAnswer<RecordT extends Thing = Thing> =
 /** The answer to `tryBirthBank`: the bank's three roots, as written under `born`, or as stored under `passed`. */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
-/** A Thing a watch saw change, as a get would answer it. */
+/** A Thing a watch saw change, as a get would answer it, with its bank's world as the store last read it. */
 export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val' | 'world'>
 // --
 
 // == [What a store reports]: Actual, ListThingsActual, BirthBankActual
 
-/** What a store reports of one atomic step: the act, and the Thing stored as `record`, which the adapter places on the
- * answer as `val` when good, as `dbhas` when refused. After a write, `record` is the Thing as the store reports writing it.
+/** What a store reports of one atomic step: the act, the bank's world as the step left it and its `tracked`, and the Thing stored as `record`, which the adapter
+ * places on the answer as `val` when good, as `dbhas` when refused. After a write, `record` is the Thing as the store reports writing it.
  * Refused, it carries the refused act and no error: the adapter makes the error from the act.
  */
 export type Actual<ActT extends EX.GoodAct> =
-  | { ok: true,  act: ActT,           world: null, record: Thing | null }
-  | { ok: false, act: EX.RefusedAct,  world: null, record: Thing | null }
+  | { ok: true,  act: ActT,           world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
+  | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
 
 /** What a store reports of a listing: the parent's act, the children `listed`, the parent, and the children that failed their checks. */
-export type ListThingsActual = Readonly<{ world: null, listed: Sparse<Thing>[] } & ListedBeside & (
+export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: Tracked, listed: Sparse<Thing>[] } & ListedBeside & (
   | { ok: true,  act: EX.GotAct }
   | { ok: false, act: EX.RefusedAct }
 )>
 
 /** What a store reports of a bank's birth: the three roots, written or found, or the refusal of the first that refuses with the Thing it found. */
 export type BirthBankActual =
-  | { ok: true,  act: 'born' | 'passed', world: null, things: BankRoots }
-  | { ok: false, act: EX.RefusedAct,     world: null, record: Thing | null }
+  | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, tracked?: Tracked, things: BankRoots }
+  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
 // --
 
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
@@ -75,7 +76,14 @@ export type BirthBankActual =
 export interface VaultDB {
   /** The Thing at `ask`'s scope. */
   tryGetThing(ask: GetThingAsk): Promise<GetThingAnswer>
-  /** Write `ask.record` over the Thing `ask.cited`, if that is the Thing stored. */
+  /** Write `ask.record` over the Thing `ask.cited`, if that is the Thing stored.
+   * - A write whose preconditions hold (the exact revision cited, the storage policies it names, the born_at of a live Thing kept)
+   *   carries its record forward. Nothing else of the Thing stored is checked.
+   * - Where several refusals apply at once, the answer is one of them, but which is unspecified, and may differ between stores
+   *   and between versions. A Thing stored too damaged to check the preconditions against may refuse `damaged_row`,
+   *   `storage_issue`, or the failed precondition's own refusal.
+   * - The record carries every field, so a store may write it by replacing the Thing stored whole.
+   */
   tryWriteThing(ask: WriteThingAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope. */
   tryListThings(ask: ListThingsAsk): Promise<ListThingsAnswer>
@@ -89,7 +97,9 @@ export interface VaultDB {
   putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT>
   /** The del ask writing the tombstone `args.record` over `args.cited`. */
   delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT>
-  /** Watch the Things of a bank, and return a function that stops the watch. `onBadNews` hears the trouble the watch meets, a Thing heard that fails its checks among it. */
+  /** Watch the Things of a bank, and return a function that stops the watch. `onBadNews` hears the trouble the watch meets, a Thing heard that fails its checks among it.
+   * It also hears each Thing a verb's answer reports in its `tracked` other than as `'same'`.
+   */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }
 

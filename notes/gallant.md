@@ -91,10 +91,10 @@ async getBox(boxlabel, opts = {}) { return this.boxListing.get({ ...this.scope, 
 
 // BoxListing
 async get(scoped, opts = {}) {
-  const held = this.at(scoped)
-  if (held === null) { return this.fetch(scoped, opts) }
+  const box = this.at(scoped)
+  if (box === null) { return this.fetch(scoped, opts) }
   const { ifAbsent = 'fail', ...timely } = MSX.fetchOpts.parse(opts)
-  return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
+  return this.handleIfAbsent(await box.hydrate(timely), scoped, ifAbsent)
 }
 ```
 
@@ -223,7 +223,7 @@ async put(patch, opts = {}) {
 protected buildOrReceive(record) {
   this.demandEnabled()
   const sparse = this.sparseOf(record)
-  const held = this.at(this.scopeOf(sparse))
+  const listed = this.at(this.scopeOf(sparse))
 ```
 
 *Status: `box.put`, `listing.build`, Fixed. `device.ensureBank`, Planned, Thread 2.*
@@ -429,9 +429,9 @@ under `ifAbsent: 'fail'`, as the plan rules.
 puttable(scoped, opts = {}) {
   const { ifAbsent } = MSX.boxPutOpts.parse(opts)
   const scope = this.scopeOf(scoped)
-  const held = this.at(scope)
-  if ((held === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
-  return held ?? this.#shellFor(scope)
+  const thing = this.at(scope)
+  if ((thing === null) && (ifAbsent === 'fail')) { throw notListedBoxError(scope) }
+  return thing ?? this.#shellFor(scope)
 }
 
 demandPuttable(patch, choices) { /* parses the patch, then demands enabled, vault usable, whole */ }
@@ -586,15 +586,15 @@ const box = await (isHeard ? held.hydrate(timely) : this.fetch(scope, { ifAbsent
 **Goofus again:** the next fix fetched every tombstone, to cover that one case.
 
 ```ts
-const box = await ((held?.isPresent === true) ? held.hydrate(timely) : this.fetch(/* ... */))
+const box = await ((prior?.isPresent === true) ? prior.hydrate(timely) : this.fetch(/* ... */))
 ```
 
 **Gallant:** the plain two branches. A tombstone within its horizon is timely, and `hydrate` already handles the rest. After a
 refused put on a box stored but not listed, `get` can say absent until the horizon passes, and we accept that.
 
 ```ts
-const held = this.at(scoped)
-if (held === null) { return this.fetch(scoped, opts) }
+const record = this.at(scoped)
+if (record === null) { return this.fetch(scoped, opts) }
 ```
 
 *Status: Fixed.*
@@ -717,7 +717,7 @@ return (ifAbsent === 'nil' && thing?.isPresent !== true) ? null : thing
 **Gallant:** one `handleIfAbsent`, called by whoever is asking. `deliver` and `hydrate` take no `ifAbsent`.
 
 ```ts
-return this.handleIfAbsent(await held.hydrate(timely), scoped, ifAbsent)
+return this.handleIfAbsent(await thing.hydrate(timely), scoped, ifAbsent)
 ```
 
 **Goofus again:** `receive` asks whether the answer is older, right after `reconcileCentral` compared the same two revisions.
@@ -1006,7 +1006,8 @@ demandPromptable(): this { return this.demandEnabled().demandPresent() }        
 A `make` is given `(recordish, livepropsAndOpts)`, or `(recordish, livepropsAndOpts, friend)`. The first argument is the
 record, give or take a few fields. The second carries what comes out of band: the live objects the thing reaches (its
 device, its bank) and its options. Each is shaped like a pick of the class's interface, so both parts duck as the thing.
-A friend means something specific, a bag of callbacks into its owner's private state, and goes in neither: only third.
+A friend is the narrow set of an owner's attributes and callbacks that it hands a collaborator. It is a pick of the owner's
+interface where the names coincide, so the owner can duck for it, and it goes in neither of the first two: only third.
 
 **Goofus:** the friend comes first, and a flag rides along beside the record.
 
@@ -1093,7 +1094,7 @@ report it.
 | Goofus | Gallant |
 |---|---|
 | A void box held under `scope`, timely as it received its own void revision, so a put on it fetches nothing. | A timely tombstoned box listed at `scope`. |
-| The instance held under `scope`, once it hears that storage holds nothing there; null where none is held, as nothing is made of an absence. | Handle an impossible situation: BankDB reports an empty row whereas we have an instance at `scope`.\nPass the null to held.receive, share the bad news and settle |
+| The instance held under `scope`, once it hears that storage holds nothing there; null where none is held, as nothing is made of an absence. | Handle an impossible situation: BankDB reports an empty row whereas we have an instance at `scope`.\nPass the null to thing.receive, share the bad news and settle |
 | The next record `patch` makes of the record in hand on entry, sealed and not yet stored, with that revision it was sealed over. | A sealed uncommitted record for the `patch`, with the `prior` revision bag proving it is next in sequence. |
 
 *Status, both: Fixed on the blocks #470 changed and the ones its review named. The rest of `models/` hasn't had a pass.*

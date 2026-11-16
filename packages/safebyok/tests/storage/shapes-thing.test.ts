@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
-  type WriteThingAsk, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf,
+  type BankRecord, type GateThing, type Tracked, type WriteThingAsk, MainGateLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf,
   isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, seqOfLifeseq, childShellCited, sparseOf, boxSparse,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
@@ -66,7 +66,8 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
     ['gate/second',      'gate', true,  'a further gate'],
     ['gate/second/more', 'gate', false, 'two labels under gate'],
     ['box',              'box',  true,  'the root box'],
-    ['box/aa/bb/cc',     'box',  true,  'a box at any depth'],
+    ['box/openai',       'box',  true,  'a box under the root box'],
+    ['box/aa/bb',        'box',  false, 'two labels under box'],
     ['box/Main!',        'box',  false, 'a label that is not one'],
     ['box/',             'box',  false, 'an empty label'],
   ] as const
@@ -86,7 +87,7 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
 
 describe("checkedGetThingAsk(ask) and checkedListThingsAsk(ask)", () => {
   it("accepts an ask of each kind", () => {
-    for (const labelpath of ['bank', 'gate', 'gate/second', 'box', 'box/openai/v2']) {
+    for (const labelpath of ['bank', 'gate', 'gate/second', 'box', 'box/openai']) {
       expect(checkedGetThingAsk(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
       expect(checkedListThingsAsk(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
     }
@@ -350,5 +351,12 @@ describe("loggableAskOf(ask)", () => {
   it("gives nothing for an ask that will not parse", () => {
     expect(loggableAskOf(null)).to.deep.equal({})
     expect(loggableAskOf({ userid: 42 })).to.deep.equal({})
+  })
+})
+
+describe("Tracked", () => {
+  it("is, for each of the bank and main gate, its record or 'same'", () => {
+    expectTypeOf<Tracked['bank']>().toEqualTypeOf<BankRecord | 'same'>()
+    expectTypeOf<Tracked[typeof MainGateLabelpath]>().toEqualTypeOf<GateThing | 'same'>()
   })
 })

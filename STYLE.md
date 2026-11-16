@@ -511,9 +511,13 @@ A member that will not describe in a line is a smell: report it.
   (`Chute: tryPut → doTryPut → deliverAnswer → … → thing.receiveRecord`). It is kept because "it helps a user 'gosh I wish
   I could just call a method that takes an object/doesn't hydrate/etc'" (the Coach): it shows where to step in.
 * **The first sentence names the act or the thing** `#name-the-act`. A function that puts, decrypts, asks the user or sends opens with that
-  verb: `Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata`. A lookup, a type
-  or a constant opens with what it is or returns: ``Vault **or tombstone** listed at `scope`, null if absent.`` When that
-  noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
+  verb: `Create a new box for whisper (encrypted) and sidecar (readable), sealed against the box metadata`. A first line
+  opens with the noun it is, the thing it returns, or (most commonly) an imperative verb and its object:
+  - `The cached record for a scope` (never "What the cache holds for a scope")
+  - `The bank's three roots` (never "What a birth writes")
+  - `Remove every one of this minder's entries from the cache.`
+
+  When that noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
   member's name against that sentence (*Naming*). It carries one qualifier at most; anything more is a sentence of its own.
 * **Replace multiple fragments with a sentence** `#use-sentences`. The usual signs: a semicolon joining two facts, a list with its verb gapped out (`a row or record, 'bad_record'; a cutoff,
   'bad_option'`), a clause hung on "as", "so", "once", "since" or "which", and "one" standing in for a noun you cut. Each

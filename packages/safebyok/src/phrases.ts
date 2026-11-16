@@ -15,7 +15,7 @@ export const GotOtherThanBox = 'A box get was answered with a Thing that is not 
 // == [Things]: the sentences of a Thing's checks, and of a vaultDB's asks
 
 /** A labelpath that is not a modelkind and then labels. */
-export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then labels, each after a '/': none under bank, at most one under gate, any number under box."
+export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then labels, each after a '/': none under bank, at most one under gate or box."
 
 /** A record whose labelpath is another kind's. */
 export const LabelpathOfOtherKind = "A Thing's labelpath starts with its own modelkind."
@@ -91,9 +91,6 @@ export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank 
 
 /** A live bank stored without one of its roots. */
 export const BankRootsMissing = "A live bank is stored without its main gate or its root box: the store needs mending by hand."
-
-/** A replace classified over no Thing stored, or over one of another kind: the classifier is broken. */
-export const ReplacedThingAmiss = "A write classified as a replace found no live Thing of its kind stored: this is a bug in safebyok."
 
 /** The last resort of a vaultDB's error handler. */
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."

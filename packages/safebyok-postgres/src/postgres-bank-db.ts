@@ -80,7 +80,8 @@ function toldOf(text: string): Told | null {
   return { ...where.data, heard: (parent === undefined) ? { row } : { row, parent } }
 }
 
-function jsonOrNull(text: string): unknown {
+/** The JSON value in `text`, or null where it is not JSON. */
+export function jsonOrNull(text: string): unknown {
   try {
     return JSON.parse(text)
   } catch { return null }
@@ -95,7 +96,7 @@ function isHeardIn(scope: WatchScope, told: Told): boolean {
 // == [Refusals]: refusalOf, causeOf, codeOf
 
 /** The VaultError for `thrown`: `unexpected_error` for a setup fault (SQLSTATE class 42), else `storage_unavailable`. */
-function refusalOf(thrown: unknown): VaultError {
+export function refusalOf(thrown: unknown): VaultError {
   if (DB.isVaultError(thrown)) { return thrown }
   if (codeOf(thrown)?.startsWith('42')) { return DB.unexpectedError(causeOf(thrown)) }
   return DB.storageUnavailable(causeOf(thrown))
@@ -419,7 +420,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
 // == [Listening]: listenOrNull, unlistenOnceListening
 
 /** Start listening and return the function that stops it. If listening fails, tell `onFailed` and return null. */
-async function listenOrNull(listen: PostgresListen, channel: string, onNotify: (text: string) => void, onFailed: (news: VaultError) => void): Promise<(() => unknown) | null> {
+export async function listenOrNull(listen: PostgresListen, channel: string, onNotify: (text: string) => void, onFailed: (news: VaultError) => void): Promise<(() => unknown) | null> {
   try {
     return await listen(channel, onNotify)
   } catch (err) {
@@ -428,7 +429,8 @@ async function listenOrNull(listen: PostgresListen, channel: string, onNotify: (
   }
 }
 
-async function unlistenOnceListening(listening: Promise<(() => unknown) | null>): Promise<void> {
+/** Stop listening once `listening` has started, ignoring a failure to stop. */
+export async function unlistenOnceListening(listening: Promise<(() => unknown) | null>): Promise<void> {
   const unlisten = await listening
   try {
     await unlisten?.()

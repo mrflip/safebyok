@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors, SX } from 'safebyok-big/internals'
-import { Bank, type BankRecord } from '../../src/models/bank'
+import { Bank, type BankMakeRecord } from '../../src/models/bank'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
@@ -131,17 +131,17 @@ describe("Bank.make(record, { device, vaultDB })", () => {
   })
 
   const RecordCases = [
-    [(record: BankRecord) => ({ ...record, am: 'x' }),                    'a tombstone'],
-    [(record: BankRecord) => ({ ...record, fmt: 3000 }),                  'another fmt'],
-    [(record: BankRecord) => TH.omitting(record, 'lifeseq'),              'no lifeseq'],
-    [(record: BankRecord) => ({ ...record, lifepath: Life2 }),            'a lifepath not its lifeseq'],
-    [(record: BankRecord) => ({ ...record, labelpath: 'gate' }),          'the labelpath of another kind'],
-    [(record: BankRecord) => ({ ...record, vaultlabel: 'main' }),         'a field no bank Thing has'],
-    [(record: BankRecord) => TH.omitting(record, 'maingate'),             'no main gate'],
-    [(record: BankRecord) => ({ ...record, maingate: null }),             'a null main gate'],
-    [(record: BankRecord) => TH.omitting(record, 'rootBox'),              'no root box'],
-    [(record: BankRecord) => ({ ...record, rootBox: { ...record.rootBox, am: 'd' } }), 'a root box of a damaged row'],
-    [(record: BankRecord) => ({ ...record, born_at: 'yesterday' }),       'a born_at that is not epoch millis'],
+    [(record: BankMakeRecord) => ({ ...record, am: 'x' }),                    'a tombstone'],
+    [(record: BankMakeRecord) => ({ ...record, fmt: 3000 }),                  'another fmt'],
+    [(record: BankMakeRecord) => TH.omitting(record, 'lifeseq'),              'no lifeseq'],
+    [(record: BankMakeRecord) => ({ ...record, lifepath: Life2 }),            'a lifepath not its lifeseq'],
+    [(record: BankMakeRecord) => ({ ...record, labelpath: 'gate' }),          'the labelpath of another kind'],
+    [(record: BankMakeRecord) => ({ ...record, vaultlabel: 'main' }),         'a field no bank Thing has'],
+    [(record: BankMakeRecord) => TH.omitting(record, 'maingate'),             'no main gate'],
+    [(record: BankMakeRecord) => ({ ...record, maingate: null }),             'a null main gate'],
+    [(record: BankMakeRecord) => TH.omitting(record, 'rootBox'),              'no root box'],
+    [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, am: 'd' } }), 'a root box of a damaged row'],
+    [(record: BankMakeRecord) => ({ ...record, born_at: 'yesterday' }),       'a born_at that is not epoch millis'],
     [() => null,                                                          'null'],
   ] as const
 

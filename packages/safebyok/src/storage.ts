@@ -1,15 +1,19 @@
 // The storage of the lean core: the vaultDB, which keeps every kind as a Thing, and its memory store.
-export { AdapterVaultDB } from './storage/adapter-vault-db'
+export { type AdapterVaultDBOpts, type Received, AdapterVaultDB } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export {
-  type BankRoots, type BankThing, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxSparse, type BoxThing, type BoxWriteAsk, type CitedOf, type DelAskArgs,
+  type BankRecord, type BankRoots, type BankThing, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxSparse, type BoxThing, type BoxWriteAsk, type CitedOf, type DelAskArgs,
   type GateThing, type GateWriteAsk, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type LoggableAsk, type PutAskArgs, type Sealed, type Wayins,
-  type Sparse, type Thing, type ThingCited, type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type WriteAskOf, type WriteThingAsk,
-  BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifepath, ShellLifeseq,
+  type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type Track, type Tracked, type WorldRecord, type WriteAskOf, type WriteThingAsk,
+  BankThingFormat, BoxThingFormat, GateThingFormat, MainGateLabelpath, ShellCited, ShellLifepath, ShellLifeseq,
   boxSparse, childShellCited, delAskOf, getAskOf, isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, modelkindOf, putAskOf, sealed, wayins,
   seqOfLifeseq, sparseOf, thingkindVals,
 } from './storage/shapes-thing'
-export { type BankRootsFetched, type ThingsFetched, isWriteAct, writtenRootsOf, writtenThingOf } from './storage/thing-classifier'
+export {
+  type BankRootsFetched, type ThingsFetched, type TrackedFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing,
+  demandBornAtKept, demandPolicies, isWriteAct, storedCitedOf, storedThingOf, trackedFieldOf, unwrittenBirthOf, unwrittenWriteOf, worldOf, writeActOf,
+  writtenRootsOf, writtenThingOf,
+} from './storage/thing-classifier'
 export {
   type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
   type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,

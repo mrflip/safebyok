@@ -292,7 +292,7 @@ export function guardKeyDeriver(hostDeriver: Deriver.KeyDeriver): GuardedKeyDeri
   return ConstsX.brandGuarded<GuardedKeyDeriver>({ key_deriver_label, salt_size, deriveKeyBytes: (passphrase, saltBytes) => deriveKeyBytes(hostDeriver, passphrase, saltBytes), load })
 }
 
-// The key deriver hears the passphrase here (guarantees.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
+// The key deriver hears the passphrase here (guarantees-big.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
 /** The key bytes `hostDeriver` derives from `passphrase` */
 async function deriveKeyBytes(hostDeriver: Deriver.KeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> {
   try {

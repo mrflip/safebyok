@@ -24,12 +24,13 @@ kept apart from networking, caching and instance sugar. Code is teleported into 
 * **`safebyok-big` is frozen and private.** Every adapter, `safebyok-react`, the demo and e2e still
   build on it. Its code changes only to export more for the new core to import, through
   `safebyok-big/internals`.
-* **Re-export from `safebyok-big` freely, and ask no one.** When a host, or a signature the new core
-  exports, needs something big defines (`VaultError`, a logger, a shape, a type a field names),
-  re-export it from the new core's entry point (`safebyok`, `safebyok/core`, `safebyok/storage`)
-  rather than redefining it: a copy would split one class in two. Say it in the PR.
+* **Export freely, and ask no one** (`notes/transition.md`; read it before exporting from the new
+  core or reaching for something big has). Re-export what big defines rather than redefining it;
+  port a helper's file or have big export it, and never reimplement it a different way.
+* **`notes/security.md` tracks both packages** for the interim. Report what its subagent records;
+  never have it rewrite old entries, and an addition awaits no one's approval.
 * **A note, README or guide that names files under `packages/safebyok-big/` describes
-  safebyok-big alone**: `notes/guarantees.md`, `notes/wontfix-big.md`, the package READMEs and the rest.
+  safebyok-big alone**: `notes/guarantees-big.md`, `notes/wontfix-big.md`, the package READMEs and the rest.
   It says nothing about the new core until it is rewritten for it.
 
 ## Working relationship
@@ -118,10 +119,12 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
   (`human/README.md`).
 * `notes/` -- durable notes. A decision a security reviewer should see goes into
   `notes/security.md` through a `sonnet` subagent (the file's header says how); don't read it
-  yourself. `notes/wontfix.md`: behaviour the new core leaves undefined on purpose (`notes/wontfix-big.md`, safebyok-big's). `notes/guarantees.md`: where
+  yourself. `notes/wontfix.md`: behaviour the new core leaves unspecified on purpose (`notes/wontfix-big.md`, safebyok-big's). `notes/guarantees-big.md`: where
   secret material lives in `safebyok-big`, as guarantees. **Before changing a file
-  `notes/guarantees.md` names under *Where the guarantees are kept*, read its *The guarantees*
-  section, and check the change against it.**
+  `notes/guarantees-big.md` names under *Where the guarantees are kept*, read its *The guarantees*
+  section, and check the change against it.** The new core may cite a guarantee by number where it
+  keeps it in substance. It never edits `notes/guarantees-big.md`, and any drift is written into
+  `notes/guarantees-drift.md`.
 
 ## Reading
 

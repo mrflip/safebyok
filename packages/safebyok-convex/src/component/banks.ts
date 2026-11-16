@@ -295,7 +295,7 @@ function askFor<AskT>(parse: () => AskT): AskT {
 }
 
 // A ConvexError's `data` reaches the client whole, on any deployment, where another error's text is withheld or may quote the
-// call's arguments. The message is the core's own sentence, which quotes no value (notes/guarantees.md, G8).
+// call's arguments. The message is the core's own sentence, which quotes no value (notes/guarantees-big.md, G8).
 /** `thrown` wrapped in a ConvexError if it is a refusal the client must see, else `thrown` unchanged. */
 function crossingOf(thrown: unknown): unknown {
   if (! DB.isVaultError(thrown)) { return thrown }

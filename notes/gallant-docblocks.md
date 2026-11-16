@@ -972,4 +972,18 @@ Goofus: "behind the same gate": the sign-in check is not the Gate; gate means `G
 Gallant:
     the rest, behind the same sign-in check: a host calls `tidyGone({ user_id, banklabel })` on its
 
+Goofus: "What the cache holds", "What … is given": a headline that opens on "What" dodges naming the thing; name it, or open with the verb
+    /** What the cache holds for a scope: a Thing, whole or sparse, or the void sentinel. */
+    /** What {@link Bank.make} is given besides its record. */
+Gallant:
+    /** A cached record: a Thing, whole or sparse, or the void sentinel. */
+    /** Options for {@link Bank.make}. */
+
+Goofus: "the record held", "where it now holds": a figure; say cached, stored, current, or the one the caller passed
+    /** The record the cache holds for `scoped`, however old, or undefined for none. */
+    /** Hand the cache `record`, a listed child, and mark its entry stale where it now holds a sparse record. */
+Gallant:
+    /** The cached record for `scoped`, however old, or undefined for none. */
+    /** Cache sparse `record`, marking it stale: the next get will fetch it whole. */
+
 ```

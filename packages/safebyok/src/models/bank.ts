@@ -10,13 +10,15 @@ import type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone, UnsealedOf } fr
 import { type BankScope, type BankStamp, type CitedGate, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import * as Phrases from '../phrases'
 import {
-  type BankThing, type BoxThing, type DelAskArgs, type GateThing, type LoggableAsk, type PutAskArgs, type Thing,
+  type BankThing, type BoxThing, type DelAskArgs, type LoggableAsk, type PutAskArgs, type Thing, type WorldRecord,
   BankThingFormat, BoxThingFormat, ShellCited, ShellLifeseq, bankThing, boxSparse, boxThing, childShellCited, gateThing, lifeseqOf, loggableAskOf, sparseOf,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
-/** A bank's record: its Thing, with its main gate's Thing as `maingate` and its root box's sparse record as `rootBox`. */
-export type BankRecord = BankThing & { maingate: GateThing, rootBox: BoxSparse }
+export type { BankRecord, WorldRecord } from '../storage/shapes-thing'
+
+/** What {@link Bank.make} is given: the bank's world, with its root box's sparse record as `rootBox`. */
+export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: BoxSparse }>
 
 /** What a new bank is made of: its stamp, and its main gate's dna. */
 export type BankDna = BankStamp & { maingate: GateDna }
@@ -112,7 +114,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // == [Construction]: make, birth, constructor, mintStamps, makeRecord
 
   /** The bank of `record`, with its main gate and root box, on `opts.device`, putting its boxes in `opts.vaultDB`. */
-  static make(record: BankRecord, opts: BankOpts): Bank {
+  static make(record: BankMakeRecord, opts: BankOpts): Bank {
     const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
     const parsed = Checks.bankThing.parse(rest)
     // The device names its user `user_id`, and the bank's Thing `userid`.
@@ -124,7 +126,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** The bank of `record`, put with its main gate and root box where no bank is stored, and unlocked under a lease built from `opts.proving`.
    * Refuses `gate_made_elsewhere` where another bank is stored at its scope.
    */
-  static async birth(record: BankRecord, opts: BirthOpts): Promise<Bank> {
+  static async birth(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
     const { proving, ...bankOpts } = opts
     const bank = this.make(record, bankOpts)
     const born = await bank.#tryBirth(proving)
@@ -134,7 +136,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return bank
   }
 
-  private constructor(parsed: BankThing, { maingate, rootBox }: Pick<BankRecord, 'maingate' | 'rootBox'>, opts: BankOpts & { queryCacheOpts: QueryCacheOpts }) {
+  private constructor(parsed: BankThing, { maingate, rootBox }: Pick<BankMakeRecord, 'maingate' | 'rootBox'>, opts: BankOpts & { queryCacheOpts: QueryCacheOpts }) {
     super(parsed)
     this.#device = opts.device
     this.#vaultDB = opts.vaultDB
@@ -155,7 +157,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   /** The first record of a new bank and its main gate, made of `dna`, with its root box's shell. The birth seals the root box over it. */
-  static makeRecord(dna: BankDna): BankRecord {
+  static makeRecord(dna: BankDna): BankMakeRecord {
     const { userid, banklabel, lifeseq, born_at } = bankStamp.parse(dna)
     const bank = bankThing.parse({
       userid, banklabel, labelpath: 'bank', label: 'bank', fmt: BankThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,

@@ -1,16 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { type EX, Errors } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
-import { AdapterVaultDB } from '../../src/storage/adapter-vault-db'
+import { AdapterVaultDB, type Received } from '../../src/storage/adapter-vault-db'
 import type { BirthBankAsk, GetThingAsk, ListThingsAsk, ThingWatchScope, WriteThingAsk } from '../../src/storage/shapes-thing'
 import type { Actual, BirthBankActual, ListThingsActual, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
-type Hear = (heard: { record: unknown, world: null }) => void
-
 /** A store whose every step does what the test hands it: throws, or reports what it is given. */
 class ScriptedVaultDB extends AdapterVaultDB {
-  hear: Hear | null = null
+  receive: ((received: Received) => void) | null = null
   readonly step: () => Actual<EX.GoodAct>
 
   constructor(step: () => Actual<EX.GoodAct>) {
@@ -22,9 +20,9 @@ class ScriptedVaultDB extends AdapterVaultDB {
   protected doWriteThing(_ask: WriteThingAsk): Actual<EX.PutAct | EX.DelAct> { return this.step() as Actual<EX.PutAct | EX.DelAct> }
   protected doListThings(_ask: ListThingsAsk): ListThingsActual { return this.step() as unknown as ListThingsActual }
   protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.step() as unknown as BirthBankActual }
-  protected override doWatch(_scope: ThingWatchScope, hear: Hear, _onBadNews: (news: Errors.VaultError) => void): () => void {
-    this.hear = hear
-    return () => { this.hear = null }
+  protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void {
+    this.receive = receive
+    return () => { this.receive = null }
   }
 }
 
@@ -98,9 +96,9 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     const notices: ThingNotice[] = []
     const badNews: Errors.VaultError[] = []
     vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
-    vaultDB.hear?.({ record: { ...TH.gateThingOf(), wayins: {} }, world: null })
-    vaultDB.hear?.({ record: 'not a Thing', world: null })
-    vaultDB.hear?.({ record: TH.gateThingOf(), world: null })
+    vaultDB.receive?.({ record: { ...TH.gateThingOf(), wayins: {} }, world: null })
+    vaultDB.receive?.({ record: 'not a Thing', world: null })
+    vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
     expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: TH.gateThingOf(), world: null }])
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['damaged_row', 'storage_issue'])
   })
@@ -110,9 +108,17 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     const notices: ThingNotice[] = []
     const badNews: Errors.VaultError[] = []
     vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, (news) => { badNews.push(news) })
-    vaultDB.hear?.({ record: TH.gateThingOf({ banklabel: 'other' }), world: null })
+    vaultDB.receive?.({ record: TH.gateThingOf({ banklabel: 'other' }), world: null })
     expect(notices).to.deep.equal([])
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['storage_issue'])
+  })
+
+  it("tells onBadNews of a notice handler that throws, as an unexpected error", () => {
+    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
+    const badNews: Errors.VaultError[] = []
+    vaultDB.watch(TH.ThingBank, () => { throw new Error('host bug') }, (news) => { badNews.push(news) })
+    vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
+    expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['unexpected_error'])
   })
 
   it("refuses a watch with no onBadNews", () => {
