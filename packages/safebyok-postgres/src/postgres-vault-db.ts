@@ -3,9 +3,9 @@
 import { type EX, type Errors, Throwers, Validator } from 'safebyok-big/internals'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type Actual, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type ListThingsActual,
-  type ListAsk, type Received, type ThingScope, type ThingWatchScope, type ThingsFetched, type Track, type TrackedFetched, type WorldFetched,
-  type WriteAsk, AdapterVaultDB, ShellCited, demandBornAtKept, demandPolicies, isWriteAct, modelkindOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
+  type Actual, type AnyAsk, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type ListThingsActual,
+  type ListAsk, type Received, type ThingWatchScope, type ThingsFetched, type TrackedFetched, type WorldFetched,
+  type WriteAsk, AdapterVaultDB, ShellCited, demandBornAtKept, demandPolicies, isWriteAct, getAskOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
   unwrittenWriteOf, worldOf, writeActOf, writtenRootsOf, writtenThingOf,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, unlistenOnceListening } from './postgres-bank-db'
@@ -64,8 +64,8 @@ function toldOf({ userid, banklabel }: ThingWatchScope, text: string): Told | nu
 /** A get's row, unchecked: the Thing, null for none, the raw world, and how it compares with the ask's track. */
 type FetchedThing = { thing: unknown, world: WorldFetched, tracked: TrackedFetched }
 
-/** The parameter that carries an ask's `track`: its JSON, or null for none. */
-function trackParam(track: Track | undefined): string | null { return (track === undefined) ? null : JSON.stringify(track) }
+/** The parameter that carries what `ask` tracks: its JSON, or null for none. */
+function trackParam({ track }: AnyAsk): string | null { return (track === undefined) ? null : JSON.stringify(track) }
 
 // The classifier finds a write only where the Thing stored is the one cited, so only the flag for the cited Thing can let the ask write.
 /** True when the ask's flags let it write over the Thing it cites: a del over a live Thing; a put by `ifPresent` over a live one, by `ifAbsent` over a tombstone or the shell. */
@@ -113,26 +113,27 @@ export class PostgresVaultDB extends AdapterVaultDB {
     } catch (err) { throw refusalOf(err) }
   }
 
-  /** The raw Thing at `scope`, null for none, its bank's raw world, and how it compares with `track`. */
-  async #fetchThing({ userid, banklabel, labelpath }: ThingScope, track?: Track): Promise<FetchedThing> {
-    return await this.#firstRow<FetchedThing>(GetThingSql[modelkindOf(labelpath)], [userid, banklabel, labelpath, trackParam(track)])
+  /** The raw Thing at `ask`'s scope, null for none, its bank's raw world, and how it compares with what `ask` tracks. */
+  async #fetchThing(ask: GetAsk | WriteAsk): Promise<FetchedThing> {
+    const { userid, banklabel, labelpath, modelkind } = ask
+    return await this.#firstRow<FetchedThing>(GetThingSql[modelkind], [userid, banklabel, labelpath, trackParam(ask)])
   }
   // --
 
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
 
   protected async doGetThing(ask: GetAsk): Promise<Actual<EX.GotAct>> {
-    const { thing, world, tracked } = await this.#fetchThing(ask, ask.track)
+    const { thing, world, tracked } = await this.#fetchThing(ask)
     return this.classifyGetThing(ask, thing, { ...world, tracked })
   }
 
   protected async doWriteThing(ask: WriteAsk): Promise<Actual<EX.PutAct | EX.DelAct>> {
     if (! mayWrite(ask)) {
-      const { thing, world, tracked } = await this.#fetchThing(ask, ask.track)
+      const { thing, world, tracked } = await this.#fetchThing(ask)
       return this.classifyWriteThing(ask, thing, { ...world, tracked })
     }
     const policies = (ask.modelkind === 'gate') ? [ask.options?.policies ?? []] : []
-    const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), trackParam(ask.track), ...policies]
+    const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), trackParam(ask), ...policies]
     // Whether it stored the record, the Thing as it now stands, the raw world, how it compares with the track, and the verdicts
     // of the checks the act tables cannot name: the stored born_at kept, and the storage policies met (the gate's alone). Each
     // verdict is true where its check does not apply.
@@ -151,15 +152,15 @@ export class PostgresVaultDB extends AdapterVaultDB {
   }
 
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
-    const { userid, banklabel, labelpath, modelkind, track } = ask
-    const params = [userid, banklabel, labelpath, trackParam(track)]
+    const { userid, banklabel, labelpath, modelkind } = ask
+    const params = [userid, banklabel, labelpath, trackParam(ask)]
     const { parent, children, world, tracked } = await this.#firstRow<ThingsFetched & { world: WorldFetched, tracked: TrackedFetched }>(ListThingsSql[modelkind], params)
     return this.classifyListThings(ask, { parent, children }, { ...world, tracked })
   }
 
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
     // Whether it stored the three roots, each as it now stands, and how they compare with the track.
-    const params  = [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask.track)]
+    const params  = [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask)]
     const written = await this.#firstRow<BankRootsFetched & { ok: boolean, tracked: TrackedFetched }>(BirthRootsSql, params)
     if (written.ok) {
       const things = writtenRootsOf(puts, written)
@@ -200,7 +201,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
   async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, world }: Told): Promise<Received | null> {
     if ((thing !== undefined) && (world !== undefined)) { return { record: thing, world: worldOf(scope, world as WorldFetched) } }
     try {
-      const fetched = await this.#fetchThing({ ...scope, labelpath })
+      const fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath }))
       return (fetched.thing === null) ? null : { record: fetched.thing, world: worldOf(scope, fetched.world) }
     } catch {
       return null  // a notice is only a hint: if its Thing cannot be fetched, drop it
