@@ -17,10 +17,10 @@ interface DnaWayins { main: Wayin, passkey0: Wayin | null }
 
 /** The wayins of a new gate of {@link TH.WorldGateStamp}: its passphrase's, and a passkey's if `isPasskeyed`. */
 async function wayinsOf(isPasskeyed = false): Promise<DnaWayins> {
-  const proving = await PassphraseProving.buildNovel(TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase, TH.provingDeviceOf())
+  const proving = await PassphraseProving.buildNovel(TH.provingDeviceOf(), TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase)
   const main = await proving.buildWayin(NOVEL)
   if (! isPasskeyed) { return { main, passkey0: null } }
-  const passkeyProving = await PasskeyProving.buildNovel(TH.WorldBankStamp, TH.WorldGateStamp, TH.passkeyAnswerOf(), TH.provingDeviceOf())
+  const passkeyProving = await PasskeyProving.buildNovel(TH.provingDeviceOf(), TH.WorldBankStamp, TH.WorldGateStamp, TH.passkeyAnswerOf())
   return { main, passkey0: await passkeyProving.buildWayin(proving) }
 }
 

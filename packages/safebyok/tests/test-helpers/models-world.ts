@@ -104,8 +104,8 @@ export interface BornBank {
 
 /** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB as a birth makes it, and so unlocked by its passphrase's proving. */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
-  const proving = await PassphraseProving.buildNovel(WorldBankStamp, WorldGateStamp, TestPassphrase, device)
-  const passkeyProving = passkeyCleartext && await PasskeyProving.buildNovel(WorldBankStamp, WorldGateStamp, passkeyCleartext, device)
+  const proving = await PassphraseProving.buildNovel(device, WorldBankStamp, WorldGateStamp, TestPassphrase)
+  const passkeyProving = passkeyCleartext && await PasskeyProving.buildNovel(device, WorldBankStamp, WorldGateStamp, passkeyCleartext)
   const main = await proving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(proving) ?? null
   const record = Bank.makeRecord({ ...WorldBankStamp, maingate: { ...WorldGateStamp, wayins: { main, passkey0 } } })

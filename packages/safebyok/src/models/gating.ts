@@ -226,8 +226,8 @@ export async function birthBank(device: Device, cleartexts: unknown): Promise<Ba
   const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
   // A birth's stamps are minted here, one pair per attempt.
   const { bankStamp, gateStamp } = Bank.mintStamps(device)
-  const passphraseProving = await PassphraseProving.buildNovel(bankStamp, gateStamp, passphraseCleartext, device)
-  const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(bankStamp, gateStamp, passkeyCleartext, device) : null
+  const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
+  const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext) : null
 
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null

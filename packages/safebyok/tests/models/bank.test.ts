@@ -21,11 +21,11 @@ const Life2 = lifeseqOfLifenum(2)
 const Life3 = lifeseqOfLifenum(3)
 
 /** A stored proving of `bank`'s main gate, by {@link TH.TestPassphrase}. */
-function storedProvingOf(bank: Bank): Promise<PassphraseProving> { return PassphraseProving.buildStored(bank.maingate, TH.TestPassphrase, bank.device) }
+function storedProvingOf(bank: Bank): Promise<PassphraseProving> { return PassphraseProving.buildStored(bank.device, bank.maingate, TH.TestPassphrase) }
 
 /** What a birth on `device` is given, as the gating attempt makes it: the record of a bank of {@link TH.WorldBankStamp}, and opts with its passphrase's proving. */
 async function birthArgsOf(device = TH.makeDevice()) {
-  const proving = await PassphraseProving.buildNovel(TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase, device)
+  const proving = await PassphraseProving.buildNovel(device, TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase)
   const record = Bank.makeRecord({ ...TH.WorldBankStamp, maingate: { ...TH.WorldGateStamp, wayins: { main: await proving.buildWayin(NOVEL), passkey0: null } } })
   return { device, record, opts: { device, vaultDB: device.vaultDB, proving } }
 }
@@ -242,7 +242,7 @@ describe("bank.unlockByProving(proved, cited) and bank.lock()", () => {
     const { bank } = await TH.buildBornBank()
     const { bank: other } = await TH.buildBornBank()
     bank.lock()
-    const theirs = await PassphraseProving.buildNovel({ ...TH.WorldBankStamp, lifeseq: Life2 }, TH.WorldGateStamp, TH.TestPassphrase, bank.device)
+    const theirs = await PassphraseProving.buildNovel(bank.device, { ...TH.WorldBankStamp, lifeseq: Life2 }, TH.WorldGateStamp, TH.TestPassphrase)
     await theirs.buildWayin(NOVEL)
     await TH.expectRefusal(bank.unlockByProving(theirs))
     expect(bank.isLocked).to.be.true
