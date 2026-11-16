@@ -99,7 +99,7 @@ export class Lease implements LeaseStamp {
   async seal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, prior: PriorOf<KindT>, cleartexts: CleartextsOf<KindT>): Promise<RecordOf<KindT>> {
     const sealer = sealerOf(sealerkind)
     const next = sealer.nextRevisionOf(prior)
-    const sealed = await this.#sealText(sealer.encode(cleartexts), sealer.stampsOf(next), sealer.purposes, sealer.tags)
+    const sealed = await this.#sealText(sealer, next, sealer.encode(cleartexts))
     return sealer.recordOf(next, sealed)
   }
 
@@ -108,12 +108,14 @@ export class Lease implements LeaseStamp {
    */
   async unseal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, record: RecordOf<KindT>): Promise<CleartextsOf<KindT>> {
     const sealer = sealerOf(sealerkind)
-    const text = await this.#openSealed(sealer.sealedOf(record), sealer.stampsOf(record), sealer.purposes)
+    const text = await this.#openSealed(sealer, record)
     return sealer.decode(text)
   }
 
-  /** The {@link Sealers.Sealed} form of `text`: ciphered under a fresh key that is wrapped under the bankKey, with `tags`. */
-  async #sealText(text: string, stamps: readonly Crypto.CipherCtxRecord[], purposes: Sealers.SealPurposes, tags: Sealers.SealTags): Promise<Sealers.Sealed> {
+  /** The {@link Sealers.Sealed} form of `text`, for `sealer` to add to `next`: ciphered under a fresh key that is wrapped under the bankKey, with the sealer's tags. */
+  async #sealText<NextT>(sealer: Sealers.Sealer<unknown, NextT, unknown, unknown>, next: NextT, text: string): Promise<Sealers.Sealed> {
+    const { purposes, tags } = sealer
+    const stamps  = sealer.stampsOf(next)
     const bankKey = await this.#bankKey('wrapKey')
     const partKey = await Crypto.makeBoxKey()
     const key_wrapped = await Crypto.wrapKeyUnder(bankKey, partKey, this.#ctxOf(stamps, purposes.key, tags))
@@ -127,10 +129,12 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** The text in `sealed` */
-  async #openSealed(sealed: Sealers.Sealed, stamps: readonly Crypto.CipherCtxRecord[], purposes: Sealers.SealPurposes): Promise<string> {
+  /** The text sealed in `record`, the part `sealer` seals. */
+  async #openSealed<RecordT>(sealer: Sealers.Sealer<unknown, unknown, RecordT, unknown>, record: RecordT): Promise<string> {
+    const { key_wrapped, ciphered, ...tags } = sealer.sealedOf(record)
+    const stamps  = sealer.stampsOf(record)
+    const { purposes } = sealer
     const bankKey = await this.#bankKey('unwrapKey')
-    const { key_wrapped, ciphered, ...tags } = sealed
     const keyCtx    = this.#ctxOf(stamps, purposes.key, tags)
     const cipherCtx = this.#ctxOf(stamps, purposes.cipher, tags)
     let bytes: Uint8Array
