@@ -1132,7 +1132,7 @@ Proving.judgeStrength(device, scope, cleartext)
 Proving.judgeStrength(passphraseCleartext, scope, device)
 ```
 
-*Status: `judgeStrength`, Fixed, in the signature PR.*
+*Status: `judgeStrength`, Fixed, in #713.*
 
 ---
 
