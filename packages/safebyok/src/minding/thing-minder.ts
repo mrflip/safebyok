@@ -399,10 +399,11 @@ function isVoidSentinel(record: DeliverableThing): record is VoidSentinel {
 
 /** A get's answer for `record`, the cached record at `ask`'s scope: act `vacant` for none, `untimely` unless `isTimely`, `gotvoid` for a void sentinel. */
 function gotAnswerOf(ask: GetAsk, record: DeliverableThing | undefined, isTimely: boolean): GotAnswer {
-  if (record === undefined) { return { ok: true, ask, act: 'vacant', world: null, val: undefined } }
-  if (! isTimely) { return { ok: true, ask, act: 'untimely', world: null, val: undefined } }
-  if (isVoidSentinel(record)) { return { ok: true, ask, act: 'gotvoid', world: null, val: null } }
-  return { ok: true, ask, act: (record.am === 'a') ? 'gotlive' : 'gotgone', world: null, val: record }
+  if (record === undefined)   { return { ok: true, ask, act: 'vacant',   world: null, val: undefined } }
+  if (! isTimely)             { return { ok: true, ask, act: 'untimely', world: null, val: undefined } }
+  if (isVoidSentinel(record)) { return { ok: true, ask, act: 'gotvoid',  world: null, val: null } }
+  const act = (record.am === 'a') ? 'gotlive' : 'gotgone'
+  return                               { ok: true, ask, act,             world: null, val: record }
 }
 
 // Kept pure: TanStack also calls it on observers' results, and marks the entry fresh whichever record it keeps.
