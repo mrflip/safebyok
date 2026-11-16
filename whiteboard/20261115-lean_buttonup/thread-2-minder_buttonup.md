@@ -23,10 +23,13 @@ the Coach's ruling) changes:
     opts)` and `tryAt(ask, opts)` keep round 2's `opts` and defaults: merging `staleTime` and `ifStale` into the ask
     is held (`#one-band-per-argument`, unsettled). `minderTrack` demands the track, then `checkedGetThingAsk` the
     ask, strict; the vaultDB gets the ask as given. The merged form, with `minder.makeGetAsk`, was built and sits
-    unpushed on top of the branch, as the revert of the commit that held it.
+    unpushed on the local branch `held-merged-ask` (c4c55831b), as the revert of the commit that held it.
   * **Own watches**: every minder watches in `hello`; `#receive` caches a notice's Thing of its own kind and drops the
     rest. The roster, `#routeWorld`, `#route` and their phrases are gone. The friend is
-    `Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'tellBadNews'>`.
+    `Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>`.
+  * **One way into the cache**: the get's `queryFn` returns the record, or its shell, after the `stale_read` check,
+    and TanStack caches it through `structuralSharing` (`betterRecordOf`); `#doDeliverRecord` is for notices and
+    listings alone. A get tells listeners once.
   * **Root box seeding**: the box minder seeds `rootBox` through `#doDeliverSeed` in `hello`, not in the constructor:
     before `hello` nothing is cached and no defaults exist, and `goodbye` removes it, so `hello` seeds again.
     `#shellAt` builds a box's shell from the root box in the minder's own cache.
@@ -44,7 +47,11 @@ the Coach's ruling) changes:
   * **`stale_read`** joined `CustomerKinds` in both eslint configs. VOCABULARY.md: **shell**, **Void Sentinel**,
     **minder** and **listen** updated; **lifeseq** and **lifenum** added.
 * **Decisions made**:
-  * **`list()` builds its ask with `listAskOf`**, untracked: the friend has no `makeListAsk`.
+  * **`list()` sends `bank.makeListAsk`**, tracked; on an unborn bank it refuses `storage_issue`, as a get does.
+  * **`#doGet` still answers `this.at(ask) ?? fetched`**: TanStack's `query` resolves with what the `queryFn`
+    returned, not what `structuralSharing` kept, so a notice that lands while the get waits would otherwise be
+    answered over (two tests break without it). Its comment now says that, in place of the one about the gap between
+    the `queryFn` returning and TanStack resolving.
   * **`bank.tellBadNews` takes an array**, as `device.tellBadNews` does, so it passes straight through.
   * **The bank's put still forces `labelpath: 'bank'`** and the box verbs `modelkind: 'box'` over the built ask, so
     what is not this bank's refuses, as before.
@@ -55,8 +62,6 @@ the Coach's ruling) changes:
     nor reach a root's shell. The minder tests birth the bank first, and the root-shell get test is gone.
   * **A box minder whose root box entry is collected** (a host's finite `gcTime`) cannot build a void box's shell:
     `shellOf` refuses `bad_option`, and the get with it.
-  * **Each get tells listeners twice**: once as the `queryFn` caches the record, once as TanStack resolves the fetch.
-    complete.md says "the get's `queryFn` stops writing the cache itself", which this code does not yet do.
   * Changing a write function's output columns, or a parameter's name, makes `CREATE OR REPLACE` fail on a database
     that has the old function. The thread before did the same without a `DROP`; pre-1.0, no migration.
 
@@ -64,6 +69,5 @@ the Coach's ruling) changes:
 
 * **Root box gc'd**: re-seed in `#shellAt`, pin it with an observer, or accept. Recommendation: accept, as a row.
 * **Gets before birth** refuse: recommend a row; it is the unspecified missing tracked row.
-* **The merged ask**: built, unpushed, the branch's local tip; it waits on `#one-band-per-argument`.
-* **The double tell per get**: recommend the `queryFn` return the record without `#doDeliverRecord`, a later thread.
+* **The merged ask**: built, unpushed, on the local branch `held-merged-ask`; it waits on `#one-band-per-argument`.
 * **`Bank.queryCacheOpts`** is read by nothing: recommend removing it in step 3.
