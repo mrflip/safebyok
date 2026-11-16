@@ -6,7 +6,7 @@ import { type ThingScope, lifeseqOfLifenum, modelkindOf } from 'safebyok/storage
 import * as VT from 'safebyok/testing'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
 import type { PostgresListen } from '../src/postgres-bank-db'
-import { VaultFunctionsSql } from '../src/vault-functions'
+import { VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
 import { VaultTablesSql } from '../src/vault-tables'
 import * as TH from './test-helpers'
 
@@ -101,7 +101,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const db = await database()
     const gate = VT.gateThingOf()
     await plant(VT.GateScope, gate)
-    const write = 'SELECT ok, born_at_ok, policies_ok FROM safebyok_write_gate($1::text::jsonb, $2::text::jsonb, $3::text[])'
+    const write = `SELECT ok, born_at_ok, policies_ok FROM ${VaultFunctionNames.write_gate}($1::text::jsonb, $2::text::jsonb, $3::text[])`
     const moved = VT.nextGateOf(gate, { born_at: gate.born_at + 1 })
     const added = VT.nextGateOf(gate)
     const cases = [[moved, [], { ok: false, born_at_ok: false, policies_ok: true }], [added, ['add_passkey'], { ok: false, born_at_ok: true, policies_ok: false }]] as const
@@ -116,7 +116,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const db = await database()
     const box = VT.boxThingOf()
     await plant({ ...VT.ThingBank, labelpath: box.labelpath }, box)
-    const write = 'SELECT ok, thing FROM safebyok_write_box($1::text::jsonb, $2::text::jsonb)'
+    const write = `SELECT ok, thing FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`
     const stale = { ...box, revtok: 'rev-other' }
     const skips = VT.nextOf(box, { lifeseq: lifeseqOfLifenum(2), lifepath: lifeseqOfLifenum(2) })
     for (const [record, cited] of [[VT.nextOf(box), stale], [skips, box]]) {
@@ -125,11 +125,19 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     }
   })
 
+  it("names each function it creates for the version of its tables and its revision", async () => {
+    const db = await database()
+    const { rows } = await db.query<{ proname: string }>("SELECT DISTINCT proname FROM pg_proc WHERE proname LIKE 'safebyok\\_%'")
+    expect(new Set(rows.map((row) => row.proname))).to.deep.equal(new Set(Object.values(VaultFunctionNames)))
+    expect(VaultFunctionNames.write_box).to.equal('safebyok_t01_r000_write_box')
+  })
+
   it("keeps its tables and writing functions from every role but their owner", async () => {
     const db = await database()
     const { rows: tables } = await db.query("SELECT relname, relrowsecurity FROM pg_class WHERE relname LIKE 'safebyok\\_%' AND relkind = 'r' ORDER BY relname")
     expect(tables).to.deep.equal(['safebyok_bank_things', 'safebyok_box_things', 'safebyok_gate_things'].map((relname) => ({ relname, relrowsecurity: true })))
-    const writers = ['safebyok_write_bank(jsonb, jsonb)', 'safebyok_write_gate(jsonb, jsonb, text[])', 'safebyok_write_box(jsonb, jsonb)', 'safebyok_birth_roots(jsonb, jsonb, jsonb)', 'safebyok_tell_thing(jsonb, jsonb)']
+    const { write_bank, write_gate, write_box, birth_roots, tell_thing } = VaultFunctionNames
+    const writers = [`${write_bank}(jsonb, jsonb)`, `${write_gate}(jsonb, jsonb, text[])`, `${write_box}(jsonb, jsonb)`, `${birth_roots}(jsonb, jsonb, jsonb)`, `${tell_thing}(jsonb, jsonb)`]
     const { rows: grants } = await db.query("SELECT bool_or(has_function_privilege('public', writer, 'EXECUTE')) AS any FROM unnest($1::text[]) AS writer", [writers])
     expect(grants).to.deep.equal([{ any: false }])
   })
