@@ -91,11 +91,11 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
 
   // == [Methods]: judgeStrength, buildWayin, buildLease, wrapBankKey, unwrapBankKey, wayinCtx
 
-  /** The strength checker's verdict on `passphraseClear`.
+  /** The strength checker's verdict on `passphraseCleartext`.
    * A throw from the checker is replaced, so no error quotes the passphrase.
    */
-  static async judgeStrength(passphraseClear: string, scope: CX.BankScope, device: GX.ProvingDevice): Promise<GX.PassphraseVerdict> {
-    const checked = GX.strengthArgs.parse({ passphraseClear, scope, device })
+  static async judgeStrength(passphraseCleartext: string, scope: CX.BankScope, device: GX.ProvingDevice): Promise<GX.PassphraseVerdict> {
+    const checked = GX.strengthArgs.parse({ passphraseClear: passphraseCleartext, scope, device })
     return checked.device.strengthChecker(checked.passphraseClear, checked.scope)
   }
 
@@ -184,8 +184,8 @@ export class PassphraseProving extends Proving<GX.PassphraseWayinHeader> {
   /** Build a proving for a new passphrase wayin of gate `gate` in bank `bank`, under a fresh salt.
    * Throws `weak_passphrase` if the strength checker judges the passphrase weak.
    */
-  static async buildNovel(bank: BankStamp, gate: GateStamp, passphraseClear: GX.PassphraseCleartext, device: GX.ProvingDevice): Promise<PassphraseProving> {
-    const { bank: checkedBank, gate: checkedGate, passphraseClear: typed } = Checks.passphraseNovelArgs.parse({ bank, gate, passphraseClear, device })
+  static async buildNovel(bank: BankStamp, gate: GateStamp, passphraseCleartext: GX.PassphraseCleartext, device: GX.ProvingDevice): Promise<PassphraseProving> {
+    const { bank: checkedBank, gate: checkedGate, passphraseClear: typed } = Checks.passphraseNovelArgs.parse({ bank, gate, passphraseClear: passphraseCleartext, device })
     // The host's strength checker hears the user as `user_id`.
     const verdict = await super.judgeStrength(typed, { user_id: checkedBank.userid, banklabel: checkedBank.banklabel }, device)
     if (! verdict.strong) { throw Throwers.weakPassphrase(verdict.reason) }
@@ -194,11 +194,11 @@ export class PassphraseProving extends Proving<GX.PassphraseWayinHeader> {
     return this.make({ bank: checkedBank, gate: checkedGate, header, stored: null }, { wayinKey })
   }
 
-  /** Build the proving of `gate`'s passphrase wayin from `passphraseClear`.
+  /** Build the proving of `gate`'s passphrase wayin from `passphraseCleartext`.
    * Throws `wrong_passphrase` if the passphrase is not that wayin's.
    */
-  static async buildStored(gate: StampedGate, passphraseClear: GX.PassphraseCleartext, device: GX.ProvingDevice): Promise<PassphraseProving> {
-    const { gate: { bankStamp, stamp, wayins }, passphraseClear: typed } = Checks.passphraseStoredArgs.parse({ gate, passphraseClear, device })
+  static async buildStored(gate: StampedGate, passphraseCleartext: GX.PassphraseCleartext, device: GX.ProvingDevice): Promise<PassphraseProving> {
+    const { gate: { bankStamp, stamp, wayins }, passphraseClear: typed } = Checks.passphraseStoredArgs.parse({ gate, passphraseClear: passphraseCleartext, device })
     const { main } = wayins
     const { bank_key_wayin_wrapped: _wrapped, ...header } = main
     if (header.key_deriver_label !== device.keyDeriver.key_deriver_label) { throw Throwers.unknownKeyDeriver() }
@@ -218,18 +218,18 @@ export class PasskeyProving extends Proving<GX.PasskeyWayinHeader> {
   static make(parts: ProvingParts<GX.PasskeyWayinHeader>, opts: ProvingOpts): PasskeyProving { return new PasskeyProving(parts, opts) }
 
   /** Build a proving for a new passkey wayin of gate `gate` in bank `bank`. */
-  static async buildNovel(bank: BankStamp, gate: GateStamp, passkeyClear: GX.PasskeyAnswer, device: GX.ProvingDevice): Promise<PasskeyProving> {
-    const { bank: checkedBank, gate: checkedGate, passkeyClear: answer } = Checks.passkeyNovelArgs.parse({ bank, gate, passkeyClear, device })
+  static async buildNovel(bank: BankStamp, gate: GateStamp, passkeyCleartext: GX.PasskeyAnswer, device: GX.ProvingDevice): Promise<PasskeyProving> {
+    const { bank: checkedBank, gate: checkedGate, passkeyClear: answer } = Checks.passkeyNovelArgs.parse({ bank, gate, passkeyClear: passkeyCleartext, device })
     const header = mintPasskeyHeader(device, answer)
     const wayinKey = await Crypto.deriveWrappingKey(answer.prfBytes, wayinCtxOf(checkedBank, checkedGate, header))
     return this.make({ bank: checkedBank, gate: checkedGate, header, stored: null }, { wayinKey })
   }
 
-  /** Build the proving of `gate`'s passkey wayin from `passkeyClear`.
+  /** Build the proving of `gate`'s passkey wayin from `passkeyCleartext`.
    * Throws `wrong_passkey` if the answer is not from that wayin's passkey.
    */
-  static async buildStored(gate: StampedGate, passkeyClear: GX.PasskeyAnswer): Promise<PasskeyProving> {
-    const { gate: { bankStamp, stamp, wayins }, passkeyClear: { credential_id, prf_salt_b64, prfBytes } } = Checks.passkeyStoredArgs.parse({ gate, passkeyClear })
+  static async buildStored(gate: StampedGate, passkeyCleartext: GX.PasskeyAnswer): Promise<PasskeyProving> {
+    const { gate: { bankStamp, stamp, wayins }, passkeyClear: { credential_id, prf_salt_b64, prfBytes } } = Checks.passkeyStoredArgs.parse({ gate, passkeyClear: passkeyCleartext })
     const { passkey0 } = wayins
     if (passkey0 === null) { throw Throwers.noPasskeyWayin() }
     const { bank_key_wayin_wrapped: _wrapped, ...header } = passkey0

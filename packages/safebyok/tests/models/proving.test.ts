@@ -40,7 +40,7 @@ function novelPasskey(answer = TH.passkeyAnswerOf(), device: GX.ProvingDevice = 
 /** The main gate of a bank born with both wayins, beside a function giving a fresh copy of the answer that unwraps its passkey's. */
 async function gateWithBoth(): Promise<{ gate: Gate, answerOf: () => GX.PasskeyAnswer }> {
   const answer = TH.passkeyAnswerOf()
-  const { bank } = await TH.buildBornBank({ passkeyClear: TH.copyOfAnswer(answer) })
+  const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.copyOfAnswer(answer) })
   return { gate: bank.maingate, answerOf: () => TH.copyOfAnswer(answer) }
 }
 
@@ -77,7 +77,7 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
 /** A checker whose answer throws the passphrase it heard, when its verdict is read. */
 function answersThrowingGetter(passphrase: string) { return { get strong(): true { throw new Error(passphrase) } } }
 
-describe("Proving.judgeStrength(passphraseClear, scope, device)", () => {
+describe("Proving.judgeStrength(passphraseCleartext, scope, device)", () => {
   it("returns the strengthChecker's verdict for the passphrase and scope", async () => {
     const strengthChecker = vi.fn(() => ({ strong: false as const, reason: 'too short' }))
     const verdict = await Proving.judgeStrength(TH.TestPassphrase, WorldScope, TH.provingDeviceOf({ strengthChecker }))
@@ -121,7 +121,7 @@ describe("Proving.judgeStrength(passphraseClear, scope, device)", () => {
   })
 })
 
-describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", () => {
+describe("PassphraseProving.buildNovel(bank, gate, passphraseCleartext, device)", () => {
   const ArgsCases = [
     [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'keyDeriver') }),                       'a device with no keyDeriver'],
     [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'device_tok') }),                       'a device with no device_tok'],
@@ -135,13 +135,13 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", ()
     [() => ({ gate: { ...TH.WorldGateStamp, lifeseq: undefined } }),                            'a gate stamp with no lifeseq'],
     [() => ({ gate: TH.omitting(TH.WorldGateStamp, 'labelpath') }),                              'a gate stamp with no labelpath'],
     [() => ({ gate: null }),                                                                    'no gate stamp at all'],
-    [() => ({ passphraseClear: 42 }),                                                           'a passphrase that is not a string'],
+    [() => ({ passphraseCleartext: 42 }),                                                           'a passphrase that is not a string'],
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb}`, async () => {
-      const { bank = TH.WorldBankStamp, gate = TH.WorldGateStamp, passphraseClear = TH.TestPassphrase, device = TH.provingDeviceOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildNovel(bank as never, gate as never, passphraseClear as never, device as GX.ProvingDevice))
+      const { bank = TH.WorldBankStamp, gate = TH.WorldGateStamp, passphraseCleartext = TH.TestPassphrase, device = TH.provingDeviceOf() } = argsOf() as Record<string, unknown>
+      await TH.expectRefusal(PassphraseProving.buildNovel(bank as never, gate as never, passphraseCleartext as never, device as GX.ProvingDevice))
     })
   }
 
@@ -214,7 +214,7 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseClear, device)", ()
   })
 })
 
-describe("PasskeyProving.buildNovel(bank, gate, passkeyClear, device)", () => {
+describe("PasskeyProving.buildNovel(bank, gate, passkeyCleartext, device)", () => {
   it("has the stamps given, and does not zero the answer", async () => {
     const answer = TH.passkeyAnswerOf()
     const proving = await novelPasskey(answer)
@@ -243,7 +243,7 @@ describe("PasskeyProving.buildNovel(bank, gate, passkeyClear, device)", () => {
   })
 })
 
-describe("PassphraseProving.buildStored(gate, passphraseClear, device)", () => {
+describe("PassphraseProving.buildStored(gate, passphraseCleartext, device)", () => {
   it("proves the gate's passphrase wayin, with the gate's stamps and bankKey", async () => {
     const { gate, answerOf } = await gateWithBoth()
     const proving = await PassphraseProving.buildStored(gate, TH.TestPassphrase, TH.provingDeviceOf())
@@ -296,20 +296,20 @@ describe("PassphraseProving.buildStored(gate, passphraseClear, device)", () => {
 
   const ArgsCases = [
     [() => ({ gate: null }),                  'no gate'],
-    [() => ({ passphraseClear: 42 }),         'a passphrase that is not a string'],
+    [() => ({ passphraseCleartext: 42 }),         'a passphrase that is not a string'],
     [() => ({ device: {} }),                  'a malformed device'],
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
-      const { gate: handed = gate, passphraseClear = TH.TestPassphrase, device = TH.provingDeviceOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildStored(handed as never, passphraseClear as never, device as never))
+      const { gate: handed = gate, passphraseCleartext = TH.TestPassphrase, device = TH.provingDeviceOf() } = argsOf() as Record<string, unknown>
+      await TH.expectRefusal(PassphraseProving.buildStored(handed as never, passphraseCleartext as never, device as never))
     })
   }
 })
 
-describe("PasskeyProving.buildStored(gate, passkeyClear)", () => {
+describe("PasskeyProving.buildStored(gate, passkeyCleartext)", () => {
   it("proves the gate's passkey wayin, and does not zero the answer", async () => {
     const { gate, answerOf } = await gateWithBoth()
     const answer = answerOf()

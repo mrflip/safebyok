@@ -58,7 +58,7 @@ describe("Gating.make(record, opts)", () => {
   })
 
   it("shows the header of its bank's passkey wayin, with no wrapped bankKey", async () => {
-    const { bank, device } = await TH.buildBornBank({ passkeyClear: TH.passkeyAnswerOf() })
+    const { bank, device } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
     const gating = makeGating({ device, bank })
     expect(gating.bank).to.equal(bank)
     expect(gating.passkeyHeader).to.deep.equal(bank.maingate.passkey0!.toJSON())
@@ -259,8 +259,8 @@ describe("gating.attempt(cleartexts)", () => {
   it("keeps its outcome when reading the passkey answer to zero it throws", async () => {
     const { bank, device } = await TH.buildBornBank()
     const gating = launchedGating({ device, attempt: attemptLanding(bank) })
-    const passkeyClear = { ...TH.passkeyAnswerOf(), get prfBytes(): Uint8Array { throw new Error(TH.TestPassphrase) } }
-    expect(await TH.expectGood(gating.attempt({ passphraseClear: TH.TestPassphrase, passkeyClear }))).to.equal(bank)
+    const passkeyCleartext = { ...TH.passkeyAnswerOf(), get prfBytes(): Uint8Array { throw new Error(TH.TestPassphrase) } }
+    expect(await TH.expectGood(gating.attempt({ passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }))).to.equal(bank)
   })
 })
 
@@ -341,7 +341,7 @@ describe("a gating's host dialog", () => {
   })
 })
 
-describe("gating.judgeStrength(passphraseClear)", () => {
+describe("gating.judgeStrength(passphraseCleartext)", () => {
   it("returns the verdict of its device's strength checker, and stays open", async () => {
     const gating = makeGating({ device: TH.makeDevice({}, { strengthChecker }) })
     expect(await gating.judgeStrength('weak')).to.deep.equal({ strong: false, reason: 'too short' })
@@ -451,8 +451,8 @@ describe("birthBank(device, cleartexts)", () => {
   }
 
   it("refuses a passkey answer whose PRF bytes are zeroed already", async () => {
-    const passkeyClear = TH.passkeyAnswerOf({ prfBytes: new Uint8Array(32) })
-    await TH.expectRefusal(birthBank(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear }))
+    const passkeyCleartext = TH.passkeyAnswerOf({ prfBytes: new Uint8Array(32) })
+    await TH.expectRefusal(birthBank(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }))
   })
 
   it("keeps a passphrase out of the refusal when a getter on the cleartexts throws it", async () => {
