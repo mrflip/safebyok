@@ -18,8 +18,11 @@ redefine it, since a copy would split one class in two. Say so in the PR.
 When the new core needs a facility from big:
 
 * **a helper**: port its file into the new core.
-* **anything it can share directly**: have big export it, through `safebyok-big/internals`. Making that export is the
-  only change big's code takes.
+* **anything it can share directly**: have big export it, through `safebyok-big/internals`.
+* **something big defines that the new core needs a little more of**: broaden big, where porting it makes no sense: a
+  new refusal kind, a new checker, an ignored field on a checker. Say so in the PR.
+
+Exporting and broadening are the only changes big's code takes.
 
 Never reimplement something in a different way just because big does not export it, or because nobody planned to port
 it.

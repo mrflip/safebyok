@@ -23,7 +23,8 @@ kept apart from networking, caching and instance sugar. Code is teleported into 
   guarantee over by reflex.
 * **`safebyok-big` is frozen and private.** Every adapter, `safebyok-react`, the demo and e2e still
   build on it. Its code changes only to export more for the new core to import, through
-  `safebyok-big/internals`.
+  `safebyok-big/internals`, or to broaden it where porting makes no sense: a new refusal kind, a
+  new checker, an ignored field on a checker.
 * **Export freely, and ask no one** (`notes/transition.md`; read it before exporting from the new
   core or reaching for something big has). Re-export what big defines rather than redefining it;
   port a helper's file or have big export it, and never reimplement it a different way.

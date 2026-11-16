@@ -21,7 +21,7 @@ Contents:
 * **Guards and awaits:** `#ensure-works-demand-refuses`, `#guard-at-the-entrypoint`, `#chain-guards`, `#no-second-ensure`
 * **Letting things fail:** `#the-backend-judges`, `#impossible-is-a-broken-system`, `#host-choices-cost-the-host`, `#edge-cases-dont-drive`, `#no-repair-in-normal-ops`
 * **Reuse:** `#use-the-helper`, `#one-test-one-place`, `#use-what-you-parse`, `#callee-parses`
-* **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`, `#record-then-opts`, `#stamp-is-a-getter`
+* **Shapes and state:** `#no-fake-values`, `#stable-sentinels`, `#ask-the-host`, `#no-wrapper-without-a-job`, `#say-the-positive`, `#record-then-opts`, `#pass-it-whole`, `#one-band-per-argument`, `#big-to-little`, `#stamp-is-a-getter`
 * **Words:** `#purpose-not-path`, `#purpose-not-machinery`, `#no-refusal-catalog`, `#say-what-to-do`, `#say-the-guarantee`, `#a-helper-gets-a-phrase`, `#its-name-is-its-doc`
 * **Reading the Coach:** `#a-fact-is-not-a-ruling`, `#dont-overstretch-a-request`
 
@@ -1030,6 +1030,111 @@ Lease.make(record, { bank })
 ```
 
 *Status: the new core follows it, thread `20261114-lean_gate`, not yet merged. `safebyok-big` keeps the Goofus, frozen.*
+
+## Pass what you hold, whole `#pass-it-whole`
+
+A signature takes whole members of the cast, each named for its role: an ask, an answer, a record, a scope, props, opts.
+Each already has a type and a validator, so a caller has no signature to remember: it passes what it holds, and the
+callee picks. A callee that reads less than it is handed still takes the whole: its parameter is named for what is passed
+and typed by what is read (`ask: Scope`). Two of one kind in two roles are named for the roles (`ante` and `post`), and a
+`make` takes a record-ish half and a live half, both ducking (`#record-then-opts`).
+
+**Gallant:** each argument is something the caller already holds, whole.
+
+```ts
+foo(ask: Ask, answer: Answer)
+foo(ask: Scope, answer: Scope)      // handed the ask and the answer, reads only their scopes
+foo(answer)
+foo(record)
+foo(record, opts)
+foo(ante: ThingT, post: ThingT)
+make(props, instances)              // both halves duck
+```
+
+**Goofus:** one member spread into a tuple, or several bundled into a bag of their own.
+
+```ts
+foo(scoped, record)                 // the record has a scope: two arguments overlap, and must agree
+foo({ record, bank })               // a bag nobody else uses, with no type or validator to pick from
+foo(act, ask, record)               // an answer, spread: pass the answer
+foo(gate: Gate, bank: Bank)         // the gate has a bank: pass the gate
+foo(scoped, answer)                 // always handed an answer's ask, for its scope: take the answer and pick
+```
+
+At best these tell a thinner story than they could. Each also makes its caller remember an order, and has nothing
+pre-built to check or type it with.
+
+**Goofus, from the minder:** the listener gets a scope beside the record that carries one, and the void sentinel takes its
+parent's life as a bare string.
+
+```ts
+listen(listener: (scoped: ThingScope, record: DeliverableThing | undefined) => void): () => void
+export function voidSentinelOf(scoped: ThingScope, parentLifepath: string | null): VoidSentinel
+```
+
+**Gallant:** the listener gets the answer `tryAt` would give, and the shell takes its own proposed fields, or the
+parent's two strings, which any parent record also carries.
+
+```ts
+listen(listener: (answer: TSQAnswer) => void): () => void
+shellOf({ ...scope, labelpath, lifepath })
+shellOf({ ...scope, label }, { labelpath, lifepath })
+```
+
+*Status: the minder's two are fixed on #709. Elsewhere Open: a sweep of the new core found the rest, listed for the
+signature PR in `whiteboard/20261115-lean_buttonup/complete.md`.*
+
+---
+
+## One band per argument `#one-band-per-argument`
+
+`#pass-it-whole` has a limit: two things in different bands stay two arguments, even where one would hold them both. A
+band is what a value is for and who may see it: the record in hand and the changes to it, what carries no cleartext and
+what does, what holds for every call and what this call adds.
+
+**Gallant:**
+
+```ts
+foo(record, patch)                  // a record in hand, and the changes to it
+bank.sealBox(prior, { whisper })    // no cleartext in the first, only cleartext in the second, named even when it is the only field
+foo(constantProps, perCallProps)    // most often foo(arg, opts): the callee lays this call's props over its constants
+```
+
+**Goofus:** the bands merged, so the callee must take them apart again, or every caller merges by hand.
+
+```ts
+bank.sealBox({ ...prior, whisper })
+foo({ ...constantProps, bob: perCallProps.bob, staleTime: perCallProps.staleTime ?? DefaultStaleTime })
+```
+
+*Status: the Goofus pair is illustrative; `Bank.sealBox(prior, cleartexts)` is the Gallant as built.*
+
+---
+
+## Big to little, past to future `#big-to-little`
+
+Where a signature takes several arguments, they come in the order the story runs: the container before what it
+contains, the earlier before the later, the request before its answer, the thing before its changes, and what is safe to
+show before what is secret.
+
+```ts
+foo(bank, box)
+foo(ante, post)
+foo(ask, answer)
+foo(vessel, patch)
+foo(device, gate, wayins)
+Proving.judgeStrength(device, scope, cleartext)
+```
+
+**Goofus:** the secret first, then the scope its device already carries.
+
+```ts
+Proving.judgeStrength(passphraseClear, scope, device)
+```
+
+*Status: `judgeStrength` is Open, for the signature PR after #709.*
+
+---
 
 ## A stamp is read off its owner `#stamp-is-a-getter`
 
