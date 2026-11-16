@@ -19,6 +19,8 @@ const GateAsk = askOf(TH.GateScope)
 const BankAsk = askOf(TH.BankScope)
 /** The ask that gets the box under the root box, as a minder takes it. */
 const BoxAsk  = askOf(TH.BoxScope)
+/** The ask that gets the root box, as a minder takes it. */
+const RootAsk = askOf(TH.RootScope)
 
 /** A bank as a minder reads it: its scope, its root box in life 0, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
 function fakeBankOf() {
@@ -192,8 +194,27 @@ describe("ThingMinder.hello", () => {
   it("caches the bank's root box in the box minder, sparse and stale, so that the next get of it fetches it whole", () => {
     const { boxMinder, minder } = minderWorldOf(new MemoryVaultDB())
     expect(boxMinder.at(TH.RootScope)).to.deep.equal(sparseOf(TH.rootBoxOf()))
-    expect(boxMinder.isStaleAt(TH.RootScope)).to.be.true
+    expect(boxMinder.isStaleAt(RootAsk)).to.be.true
     expect(minder.at(TH.GateScope)).to.be.undefined
+  })
+
+  it("keeps the root box cached past the host's gcTime, which collects the boxes under it, until goodbye", async () => {
+    vi.useFakeTimers()
+    try {
+      const vaultDB   = new MemoryVaultDB()
+      await storedBoxOf(vaultDB)
+      const tsq       = new TSQ.QueryClient()
+      const boxMinder = minderOf('box', vaultDB, tsq, { gcTime: 10 })
+      boxMinder.hello()
+      await boxMinder.list()
+      await vi.advanceTimersByTimeAsync(20)
+      expect(boxMinder.at(RootAsk)).to.deep.equal(sparseOf(TH.rootBoxOf()))
+      expect(boxMinder.at(BoxAsk)).to.be.undefined
+      boxMinder.goodbye()
+      expect(tsq.getQueryCache().getAll()).to.have.lengthOf(0)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("comes before any read: until then, each refuses disabled", async () => {
@@ -258,7 +279,7 @@ describe("ThingMinder.at", () => {
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
-    expect(minder.isStaleAt(GateAsk, 0)).to.be.true
+    expect(minder.isStaleAt(GateAsk, { staleTime: 0 })).to.be.true
     expect(minder.at(GateAsk)).to.deep.equal(gate)
   })
 })
@@ -516,7 +537,7 @@ describe("ThingMinder.list", () => {
     const { boxMinder } = minderWorldOf(vaultDB)
     expect(await boxMinder.list()).to.deep.equal([TH.BoxScope.labelpath])
     expect(boxMinder.at(BoxAsk)).to.deep.equal(sparseOf(box))
-    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.true
+    expect(boxMinder.isStaleAt(BoxAsk)).to.be.true
     expect(await boxMinder.get(BoxAsk)).to.deep.equal(box)
   })
 
@@ -527,7 +548,7 @@ describe("ThingMinder.list", () => {
     await boxMinder.get(BoxAsk)
     await boxMinder.list()
     expect(boxMinder.at(BoxAsk)).to.deep.equal(box)
-    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.false
+    expect(boxMinder.isStaleAt(BoxAsk)).to.be.false
   })
 
   it("lists nothing under a root box with no boxes under it", async () => {
@@ -641,7 +662,14 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(GateAsk)).to.be.true
     await minder.get(GateAsk)
     expect(minder.isStaleAt(GateAsk)).to.be.false
-    expect(minder.isStaleAt(GateAsk, 0)).to.be.true
+    expect(minder.isStaleAt(GateAsk, { staleTime: 0 })).to.be.true
+  })
+
+  it("refuses bad_option for an ask that tracks nothing, or another bank's", () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    const { track: _track, ...noTrack } = GateAsk
+    TH.expectSyncRefusal(() => minder.isStaleAt(noTrack as never), 'bad_option')
+    TH.expectSyncRefusal(() => minder.isStaleAt({ ...GateAsk, banklabel: 'other' }), 'bad_option')
   })
 })
 

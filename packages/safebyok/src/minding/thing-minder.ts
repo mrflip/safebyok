@@ -70,9 +70,11 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
 }))
 // --
 
-/** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through a watch of the bank of its own. */
+/** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through a watch of the bank of its own.
+ * The bank must be stored: before its birth, a get or a list refuses.
+ */
 export class ThingMinder {
-  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #isReady
+  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #unpinRootBox, #isReady
   readonly userid:    string
   readonly banklabel: string
   readonly modelkind: Thingkind
@@ -82,6 +84,7 @@ export class ThingMinder {
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   readonly #recordChecker:  typeof KindChecks[Thingkind]['record']
   #unwatch: (() => void) | null = null
+  #unpinRootBox: (() => void) | null = null
   /** True from `hello` until `goodbye`: the reads answer, and records are cached, only then. */
   #isReady = false
   // --
@@ -108,10 +111,10 @@ export class ThingMinder {
   }
   // --
 
-  // == [Starting and ending]: hello, #startVaultDBWatch, goodbye
+  // == [Starting and ending]: hello, #startVaultDBWatch, #pinRootBox, goodbye
 
   // The root box is cached here, not when the minder is made: only a minder minding keeps records, under its defaults.
-  /** Start minding: set this minder's defaults on the cache, and watch the bank. A box minder caches its bank's root box. A second call does nothing. */
+  /** Start minding: set this minder's defaults on the cache, and watch the bank. A box minder caches its bank's root box until `goodbye`. A second call does nothing. */
   hello(): void {
     if (this.#isReady) { return }
     this.#tsq.setQueryDefaults(this.keyPrefix, {
@@ -120,7 +123,10 @@ export class ThingMinder {
       structuralSharing: (prior: unknown, record: unknown) => betterRecordOf(prior, record, (cached) => this.#isWholeRecord(cached)),
     })
     this.#isReady = true
-    if (this.modelkind === 'box') { this.#doDeliverSeed(this.#bank.rootBox) }
+    if (this.modelkind === 'box') {
+      this.#doDeliverSeed(this.#bank.rootBox)
+      this.#unpinRootBox = this.#pinRootBox()
+    }
     this.#startVaultDBWatch()
   }
 
@@ -129,11 +135,20 @@ export class ThingMinder {
     this.#unwatch = this.#vaultDB.watch(this.scope, (notice: ThingNotice) => { this.#receive(notice) }, (news) => { this.#bank.tellBadNews([news]) })
   }
 
+  // Query defaults cannot keep it: the root box's key is the box minder's own keyPrefix, whose defaults they would replace.
+  /** Keep the root box cached whatever the host's `gcTime`: TanStack never collects an entry with an observer, and this one never fetches. Returns the function that lets it go. */
+  #pinRootBox(): () => void {
+    const observer = new TSQ.QueryObserver<DeliverableThing>(this.#tsq, { queryKey: this.queryKey(this.#bank.rootBox), enabled: false })
+    return observer.subscribe(noop)
+  }
+
   /** Stop minding, and remove this minder's entries and defaults from the cache. Reads refuse until `hello` is called again. */
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
-    this.#unwatch = null
+    if (this.#unpinRootBox) { this.#unpinRootBox() }
+    this.#unwatch      = null
+    this.#unpinRootBox = null
     this.#tsq.removeQueries({ queryKey: this.keyPrefix })
     // TanStack Query cannot remove a key's defaults: empty ones in their place set nothing.
     this.#tsq.setQueryDefaults(this.keyPrefix, {})
@@ -158,8 +173,7 @@ export class ThingMinder {
       this.#demandReady()
       this.#demandOwnAsk(ask)
       if (ifStale === 'refresh') { this.#backgroundRefresh(ask, staleTime) }
-      // Found after the refresh starts, so that a vacant entry's answer is isFetching.
-      return this.#answerOfTSQ(ask, this.#tsqFind(ask), staleTime)
+      return this.#answerOfTSQ(ask, { staleTime })
     } catch (err) {
       return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Outcome.storageRefusalOf(err) }
     }
@@ -189,9 +203,11 @@ export class ThingMinder {
     return answer.val.map((record) => record.labelpath)
   }
 
-  /** True when no cached record for `scoped` is timely within `staleTime`. */
-  isStaleAt(scoped: ThingScope, staleTime: number = this.#queryCacheOpts.staleTime): boolean {
-    return this.#tsqFind(scoped)?.isStaleByTime(staleTime) ?? true
+  /** True when no cached record for `ask`'s scope is timely. `staleTime` overrides the minder's own. Never asks the vaultDB. */
+  isStaleAt(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): boolean {
+    const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
+    this.#demandOwnAsk(ask)
+    return this.#tsqFind(ask)?.isStaleByTime(staleTime) ?? true
   }
 
   /** Call `listener` with the answer `tryAt` would give for a scope, under this minder's own `staleTime`, each time its record or its standing changes.
@@ -204,9 +220,9 @@ export class ThingMinder {
     return this.#tsq.getQueryCache().subscribe((event) => {
       if (! (isRecordEvent(event) && TSQ.matchQuery({ queryKey: keyPrefix }, event.query))) { return }
       // The cache's events are typed loosely; an entry under this minder's prefix holds a record of its own.
-      const entry = event.query as TSQ.Query<DeliverableThing>
-      const ask   = this.#bank.makeGetAsk(this.#scopeOfKey(entry.queryKey))
-      const answer = this.#answerOfTSQ(ask, (event.type === 'removed') ? undefined : entry, this.#queryCacheOpts.staleTime)
+      const entry  = event.query as TSQ.Query<DeliverableThing>
+      const ask    = this.#bank.makeGetAsk(this.#scopeOfKey(entry.queryKey))
+      const answer = this.#answerOfTSQ(ask, this.#queryCacheOpts)
       try { checked(answer) } catch (err) { this.#bank.tellBadNews([Throwers.unexpectedError(err)]) }
     })
   }
@@ -339,10 +355,12 @@ export class ThingMinder {
 
   // == [TSQ Helpers]: #answerOfTSQ
 
-  /** The {@link TSQAnswer} for `entry`, the cache's entry for `ask`'s scope. */
-  #answerOfTSQ(ask: GetThingAsk, entry: TSQ.Query<DeliverableThing> | undefined, staleTime: number): TSQGotAnswer {
+  // Its caller starts any refresh first, so that a vacant entry's answer is isFetching. A removed entry is vacant.
+  /** The {@link TSQGotAnswer} the cache gives for `ask`'s scope, timely within `opts.staleTime`. */
+  #answerOfTSQ(ask: GetThingAsk, opts: Readonly<{ staleTime: number }>): TSQGotAnswer {
+    const entry    = this.#tsqFind(ask)
     const state    = entry?.state
-    const isTimely = (! (entry?.isStaleByTime(staleTime) ?? true))
+    const isTimely = (! (entry?.isStaleByTime(opts.staleTime) ?? true))
     return {
       ...gotAnswerOf(ask, state?.data, isTimely),
       isTimely,
