@@ -21,43 +21,20 @@ Nothing on the list was skipped.
   - 7: `otherThanBox(answer)`.
   - `notifyTrackedRecords(ask, answer)`.
   - `Bank`'s private constructor takes `(record, opts)` and parses first; `Bank.make` only constructs.
-  - 10: `doBirthBank(ask)`, and `tryBirthBank` answers in the batch shape (`vault-db.ts`):
-
-    ```ts
-    type SlotAnswer<RecordT extends Thing = Thing> =
-      | Omit<GoodAnswer<RecordT, EX.PutAct>, 'world' | 'tracked'>
-      | Omit<BadAnswer<RecordT | null>, 'world' | 'tracked'>
-    type BirthSlotAnswers = Readonly<{ bank: SlotAnswer<BankThing>, gate: SlotAnswer<GateThing>, box: SlotAnswer<BoxThing> }>
-    type BirthBankAnswer =
-      | Omit<BadAnswer, 'dbhas'>
-      | { ok: true, ask: Readonly<{ op: 'birth' }>, act: 'born' | 'noop', world: WorldRecord | null, tracked?: Tracked, val: BirthSlotAnswers }
-    ```
-
-    Stores report `BirthBankActual = { act, world, tracked?, slots: BirthSlotActuals }`, each slot a `SlotActual`
-    (`{ ok, act, record }`). `classifyBirthBank(ask, fetched)`, `unwrittenBirthOf(ask, fetched)`, `writtenBirthOf(ask,
-    written)` (was `writtenRootsOf`); `birthPutsOf` is exported. No SQL changed. `Bank.birth` throws
-    `gate_made_elsewhere` where the bank's slot is `stale` over a live bank, else the first refused slot's `err`.
+  - 10: **reverted** (the Coach's ruling). Item 10 had `doBirthBank(ask)` and a batch-shaped `tryBirthBank` answer, with
+    the bank put at `ifPresent: 'fail'`. That changed the birth's working-state contract: the birth is an ensure (an
+    idempotent get-or-create, "write a new bank's three roots, or answer the roots already stored"), and a repeated
+    birth must not be refused. The birth is redesigned in a later thread (the bank becomes a function of the main
+    gate), so the three-slot answer shape is not kept either. The branch is as before item 10: `doBirthBank(ask, puts)`,
+    `BankRootsMissing`, the `storage_issue` over a bank stored without its roots, the removed bank test, the wontfix.md line.
 * **Decisions made**:
   - `AnyAsk` (`GetAsk | ListAsk | WriteAsk | BirthBankAsk`), new in `shapes-thing.ts` and exported from
     `safebyok/storage`, types every helper that takes "the ask" for its scope or `track`.
   - A Postgres notice that carried too little is fetched by `getAskOf({ ...scope, labelpath })`, so `#fetchThing` takes
     only an ask.
-  - A slot's `ask` is its put's loggable ask, and a refused slot's `err` has `oplabel: 'writeThing'`: what the lone put
-    would answer. The good birth answer's `ask` is `{ op: 'birth' }`, after complete.md's `Pick<BatchAsk, 'op' |
-    'policies'>`; the refused one keeps the whole loggable birth ask.
-  - Slots are keyed `bank`, `gate`, `box` (labelpaths), while the ask and `BankRootsFetched` keep `root`. The batch ask
-    replaces both later.
-  - A slot's only good act here is `born`; `slotActualOf` says so in a comment rather than branching on other acts.
 * **Deviations**:
-  - `birthPutsOf`'s bank put refuses over a live bank (`ifPresent: 'fail'`, was `'get'`). With `'get'` the bank's slot
-    would answer `passed` with `val`, not `dbhas`, against complete.md's "each slot's `dbhas` carries the root the winner
-    stored"; and over a live bank missing both its gate and its root box, every slot would be good, so the batch would
-    write a gate and root box under another's bank. Consequence: a live bank stored without its gate is no longer a
-    `storage_issue` (`BankRootsMissing` is gone); it answers `noop`, the gate's slot `born`, writing nothing.
+  - Item 10 is reverted, above; the birth's redesign is a later thread.
   - The validators were renamed with the types (`checkedGetAsk`, `checkedListAsk`, `checkedWriteAsk`), beyond the list.
-  - The test "unlocks where the vaultDB passes on this same bank" went: no birth answers `passed` now.
-* **Discoveries**: Postgres's `birth_roots` needs no change: it stores nothing where any root exists and reads the
-  three back, which `unwrittenBirthOf` classifies. A race on the gate or root insert still throws whole (unchanged).
 * **For the Coach**:
   - Goofus/Gallant: only `judgeStrength` was in `notes/gallant.md`. Pairs not shown there, for the Coach to place:
     `#sealText(text, stamps, purposes, tags)` / `#sealText(sealer, next, text)` (`#pass-it-whole`);
