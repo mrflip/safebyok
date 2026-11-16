@@ -7,15 +7,17 @@ What PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Pos
 
 ## safebyok/core
 
-* **Bank's box verbs answer by kind.** `GetThingAnswer` and `WriteThingAnswer` are generic in the record, as the asks
-  already are (`WriteAskOf<RecordT>`). Bank's box verbs then lose the `otherThanBox` check, which cannot fire; the
-  `answer.val as BankThing` cast; and the ended-bank check repeated in five methods (`disabledAnswerOf`).
-* **`CoreBox` is the box's record-level class, and the sealer of its whisper.** A class of statics beside `Bank` and
-  `Gate` (renamed `CoreBank` and `CoreGate` when the instance model's subclasses arrive): `nextRevisionOf`,
-  `tombstoneOf`, and the Sealer's members (`tags`, `purposes`, `stampsOf`, `encode`, `decode`, `sealedOf`, `recordOf`),
-  with `CoreBox satisfies Sealer`. The Sealer loses `nextRevisionOf`; the lease takes the sealer itself, not a kind
-  string, so `sealerkindVals`, `BoxWhisper`, `BoxTombstone` (the sealer) and `sealerOf` go. One sealer, since only the
-  whisper is sealed. `sealBox`, `tombstoneBox` and `unsealBox` stay on the bank, which holds the lease.
+* **Bank's box verbs answer by kind.**
+  - `GetAnswer<RecordT>`, `WriteAnswer<RecordT>`, `WriteAsk<RecordT>`.
+  - Bank's box verbs then lose the `otherThanBox` check, which cannot fire; the
+    `answer.val as BankThing` cast; and the ended-bank check repeated in five methods (`disabledAnswerOf`).
+* **`CoreBox` is the box's record-level class, and the sealer of its whisper.**
+  - A class of statics beside `Bank` and `Gate` (renamed `CoreBank` and `CoreGate` when the instance model's subclasses
+    arrive): `nextRevisionOf`, `tombstoneOf`, and the Sealer's members (`tags`, `purposes`, `stampsOf`, `encode`,
+    `decode`, `sealedOf`, `recordOf`), with `CoreBox satisfies Sealer`. The Sealer loses `nextRevisionOf`; the lease
+    takes the sealer itself, not a kind string, so `sealerkindVals`, `BoxWhisper`, `BoxTombstone` (the sealer) and
+    `sealerOf` go. One sealer, since only the whisper is sealed. `sealBox`, `tombstoneBox` and `unsealBox` stay on the
+    bank, which holds the lease.
 * **The bank's box verbs take and give records.** `getBoxRecord`, `putBoxRecord`, `delBoxRecord`, `listBoxRecords` throw
   and give the record; each `try` twin answers instead (STYLE.md, *Naming*: `tryFoo`). They accept a duck record, fill
   in defaults, and hand the vaultDB a full ask, which it checks strictly.
