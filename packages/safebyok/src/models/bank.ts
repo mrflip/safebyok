@@ -10,7 +10,7 @@ import type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone, UnsealedOf } fr
 import { type BankScope, type BankStamp, type CitedGate, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import * as Phrases from '../phrases'
 import {
-  type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type LoggableAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
+  type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
   type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
   listAskOf, loggableAskOf, putAskOf, shellOf, sparseOf,
 } from '../storage/shapes-thing'
@@ -318,7 +318,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     if (! answer.ok) { return answer }
     // A box's labelpath, so its shell is a box's.
     if (answer.val === null) { return { ...answer, val: (ifAbsent === 'shell') ? shellOf({ ...this.scope, labelpath: given.labelpath }, this.#rootBox) as BoxShell : null } }
-    if (answer.val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer.ask, answer.val) } }
+    if (answer.val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer) } }
     return { ...answer, val: answer.val }
   }
 
@@ -389,8 +389,8 @@ function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<
 }
 
 // The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.
-/** A `storage_issue` refusal: the vaultDB answered `row`, which is not a box, to a box's get. */
-function otherThanBox(ask: LoggableAsk, row: Thing): Errors.VaultError {
-  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: row } })
+/** A `storage_issue` refusal of `answer`, the vaultDB's to a box's get, whose Thing is not a box. */
+function otherThanBox({ ask, val }: GoodAnswer<Thing, EX.GotAct>): Errors.VaultError {
+  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
 }
 // --
