@@ -2,7 +2,7 @@
 export { type AdapterVaultDBOpts, type Received, AdapterVaultDB } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export {
-  type BankRecord, type BankRoots, type BankThing, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxSparse, type BoxThing, type BoxWriteAsk, type CitedOf, type DelAskDraft,
+  type AnyAsk, type BankRecord, type BankRoots, type BankThing, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxSparse, type BoxThing, type BoxWriteAsk, type CitedOf, type DelAskDraft,
   type GateThing, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type Sealed, type ShellParent, type ShellScoped, type VoidSentinel, type Wayins,
   type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type Track, type Tracked, type WorldRecord, type WriteAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifepath, ShellLifeseq,

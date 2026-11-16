@@ -6,7 +6,7 @@ import { BankRootsMissing, BornAtNotStored } from '../phrases'
 import { PoliciedMeta, gateIssue, policyRefusalOf } from './policies'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
+  type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
   type Tracked, type WorldRecord, type WriteAsk,
   KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
 } from './shapes-thing'
@@ -202,8 +202,8 @@ export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unkn
 /** The raw bank, main gate and root box a store fetched, each null for none, under its key in a `track`. */
 export type TrackedRows = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown, [RootBoxLabelpath]: unknown }>
 
-/** The {@link TrackedFetched} report of `track` against the raw rows a store fetched, for a store that compares in TypeScript. */
-export function trackedFetchedOf(track: Track | undefined, rows: TrackedRows): TrackedFetched {
+/** The {@link TrackedFetched} report of what `ask` tracks against the raw rows a store fetched, for a store that compares in TypeScript. */
+export function trackedFetchedOf({ track }: AnyAsk, rows: TrackedRows): TrackedFetched {
   if (track === undefined) { return null }
   return {
     bank:               trackedRawOf(track.bank, rows.bank),

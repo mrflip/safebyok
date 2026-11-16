@@ -410,6 +410,8 @@ export type WriteAsk<RecordT extends Thing = Thing> = Extract<BankWriteAsk | Gat
 export type BankRoots       = Readonly<{ bank: BankThing, gate: GateThing, root: BoxThing }>
 /** An ask to write a new bank's first Things in one step: the bank, its main gate and its root box. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots> & BankRoots>
+/** Any ask a vaultDB answers: a get, a list, a put or del, or a birth. */
+export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk
 /** The three puts of a bank's birth, one for each root. */
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */
