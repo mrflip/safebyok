@@ -16,7 +16,7 @@ function askOf(scope: ThingScope): MinderGetAsk {
 /** The ask that gets the main gate, as a minder takes it. */
 const GateAsk = askOf(TH.GateScope)
 /** The ask that gets the bank, as a minder takes it. */
-const BankAskDraft = askOf(TH.BankScope)
+const BankAsk = askOf(TH.BankScope)
 /** The ask that gets the box under the root box, as a minder takes it. */
 const BoxAsk  = askOf(TH.BoxScope)
 /** The ask that gets the root box, as a minder takes it. */
@@ -448,7 +448,7 @@ describe("ThingMinder.get", () => {
     const { minder, bankMinder } = minderWorldOf(vaultDB)
     await TH.wakeupAtNextTick()
     expect(minder.at(TH.GateScope)).to.be.undefined
-    expect(await bankMinder.get(BankAskDraft)).to.have.property('labelpath', 'bank')
+    expect(await bankMinder.get(BankAsk)).to.have.property('labelpath', 'bank')
     await TH.eventually(() => revtokAt(minder) === gate1.revtok)
     expect(minder.at(TH.GateScope)).to.deep.equal(gate1)
   })
@@ -691,7 +691,7 @@ describe("Each minder's watch", () => {
     const { minder, boxMinder, bankMinder, receive } = minderWorldOf(new MemoryVaultDB())
     const [bank, gate, box] = [TH.bankThingOf(), TH.gateThingOf(), TH.boxThingOf()]
     receive(noticeOf(box, { ...bank, maingate: gate }))
-    expect(bankMinder.at(BankAskDraft)).to.be.undefined
+    expect(bankMinder.at(BankAsk)).to.be.undefined
     expect(minder.at(GateAsk)).to.be.undefined
     expect(boxMinder.at(BoxAsk)).to.deep.equal(box)
   })
