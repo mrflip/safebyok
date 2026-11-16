@@ -135,7 +135,7 @@ describe("PassphraseProving.buildNovel(bank, gate, passphraseCleartext, device)"
     [() => ({ gate: { ...TH.WorldGateStamp, lifeseq: undefined } }),                            'a gate stamp with no lifeseq'],
     [() => ({ gate: TH.omitting(TH.WorldGateStamp, 'labelpath') }),                              'a gate stamp with no labelpath'],
     [() => ({ gate: null }),                                                                    'no gate stamp at all'],
-    [() => ({ passphraseCleartext: 42 }),                                                           'a passphrase that is not a string'],
+    [() => ({ passphraseCleartext: 42 }),                                                       'a passphrase that is not a string'],
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
@@ -296,7 +296,7 @@ describe("PassphraseProving.buildStored(gate, passphraseCleartext, device)", () 
 
   const ArgsCases = [
     [() => ({ gate: null }),                  'no gate'],
-    [() => ({ passphraseCleartext: 42 }),         'a passphrase that is not a string'],
+    [() => ({ passphraseCleartext: 42 }),     'a passphrase that is not a string'],
     [() => ({ device: {} }),                  'a malformed device'],
   ] as const
 

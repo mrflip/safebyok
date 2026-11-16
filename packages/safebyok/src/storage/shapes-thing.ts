@@ -367,11 +367,11 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
   return {
     thingOptions,
     trackShape,
-    getAsk:     thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
+    getAsk:          thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
-    listAsk:   thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
+    listAsk:         thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
-    writeAsk:   thingScope.extend({
+    writeAsk:        thingScope.extend({
       op: oneof(['put', 'del']), modelkind, cited: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(), track,
     }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn)
@@ -388,9 +388,9 @@ export const { thingWatchScope, watchArgs, trackShape } = AskChecks
 /** The revseq and lifepath the ask's sender has of its bank, its main gate and its root box. The answer's `tracked` says, for each, whether it is still the one stored. */
 export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>
 /** An ask for the Thing at its scope. */
-export type GetAsk     = Readonly<Z.infer<typeof AskChecks.getAsk>>
+export type GetAsk          = Readonly<Z.infer<typeof AskChecks.getAsk>>
 /** An ask for the children of the Thing at its scope. Its `ifAbsent` is the parent's. */
-export type ListAsk   = Readonly<Z.infer<typeof AskChecks.listAsk>>
+export type ListAsk         = Readonly<Z.infer<typeof AskChecks.listAsk>>
 /** A write's citation of a Thing of `RecordT`'s kind: {@link ThingCited}, and optionally any other of its fields. */
 export type CitedOf<RecordT extends Thing> = ThingCited & Partial<Omit<RecordT, keyof ThingCited>>
 /** The flags of a write ask, its modelkind and records aside. */
