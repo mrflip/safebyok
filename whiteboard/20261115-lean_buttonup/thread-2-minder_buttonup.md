@@ -1,4 +1,4 @@
-# Thread 2: minder_buttonup (2026-11-15, rounds 3 and 4 on 2026-11-16)
+# Thread 2: minder_buttonup (2026-11-15, rounds 3 to 5 on 2026-11-16)
 
 Branch `20261115-minder_buttonup`, PR [#709](https://github.com/mrflip/safebyok/pull/709) (draft), on #708, on #707.
 Round 3 starts from 1b061d9d9, the restacked tip. Proved: see the PR's **Tests:** line. `thread-2-storage_backward.md`
@@ -7,7 +7,7 @@ beside this file holds the round-1 proposal behind `stale_read`.
 Rounds 1 and 2 built the minder's inputs, fixed cache options, `#doDeliverRecord` as the one `setQueryData`,
 `list()`, `listen` over one `QueryCache.subscribe`, `stale_read` (TanStack's error state keeps the record, marks it
 untimely, holds the refusal as `lastErr`), `goodbye` during a get refusing `disabled`, and the keys. Round 3 (every item
-the Coach's ruling) and round 4 change:
+the Coach's ruling), rounds 4 and 5 change:
 
 * **Built**:
   * **`track` has three fixed keys**: `bank`, `gate` (`MainGateLabelpath`) and `box` (`RootBoxLabelpath`), in
@@ -38,8 +38,8 @@ the Coach's ruling) and round 4 change:
     root box kept.
   * **Minders serve a born bank** (ruling A): `ThingMinder`'s class doc says a get or a list before the bank's
     birth refuses. No wontfix row.
-  * **The builders' inputs** are `GetAsk`, `ListAsk`, `PutAsk`, `DelAsk` (were `*AskArgs`), each documented as the
-    ask with its defaulted fields left out; every parameter of those types is `ask`. In `tryGetBox`, `tryPutBox` and
+  * **The builders' inputs** are `GetAsk`, `ListAsk`, `PutAsk`, `DelAsk`, `BankAsk`, `GetBoxAsk` (were `*Args`), each
+    documented as the ask with its defaulted fields left out; every parameter of those types is `ask`. In `tryGetBox`, `tryPutBox` and
     `tryDelBox` the whole ask built from it is `thingAsk`.
     `#shellAt` builds a box's shell from the root box in the minder's own cache.
   * **`listen(listener)`** calls `listener(answer)`, a `TSQGotAnswer`: `#answerOfTSQ` at the minder's own staleTime,
@@ -64,17 +64,20 @@ the Coach's ruling) and round 4 change:
   * **`bank.tellBadNews` takes an array**, as `device.tellBadNews` does, so it passes straight through.
   * **The bank's put still forces `labelpath: 'bank'`** and the box verbs `modelkind: 'box'` over the built ask, so
     what is not this bank's refuses, as before.
+  * **Versioned vault functions** (round 5): `TableVersion` (head, 2 digits) and `SqlRevision` (tail, 3 digits) in
+    `vault-functions.ts` build every name in `VaultFunctionNames`: `safebyok_t01_r000_write_box`. Starting at
+    `t01_r000`: no installed function has a versioned name, so these are all new; the unversioned ones stay installed,
+    uncalled. `vault-queries.ts` and the tests use only the built names; the REVOKEs are unchanged, per name. A test
+    checks the functions created are exactly `VaultFunctionNames`. Scope: the 17 functions of `VaultFunctionsSql`;
+    `BankFunctionsSql` (`PostgresBankDB`, for safebyok-big) is untouched.
 * **Deviations**: none.
 * **Discoveries**:
   * **A get with a `track` refuses `storage_issue` where a tracked root is missing** (`writtenOf(null)`), so a
     minder serves only a born bank. The minder tests birth the bank first, and the root-shell get test is gone.
   * Changing a write function's output columns, or a parameter's name, makes `CREATE OR REPLACE` fail on a database
-    that has the old function. The thread before did the same without a `DROP`; pre-1.0, no migration. Held: the
-    Coach wants a data version in the function names, its form not yet settled.
+    that has the old function. Round 5 answers it with versioned names (below).
 
 ## For the Coach
 
-* **`BankAskArgs` and `GetBoxArgs`** are the same kind of input (the ask as a caller states it) but were not in the
-  rename list; their parameters are now `ask`. Recommendation: rename them too, perhaps `BankAsk` and `GetBoxAsk`.
-* **The SQL `CREATE OR REPLACE`**: held for the data version in the function names.
+* **`BankFunctionsSql` names stay unversioned**: it serves safebyok-big's `PostgresBankDB`. Recommendation: leave it.
 * **`Bank.queryCacheOpts`** is read by nothing: recommend removing it in step 3.
