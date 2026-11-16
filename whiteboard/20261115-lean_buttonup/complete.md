@@ -20,8 +20,8 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 * **Each ask has a draft and a full form, from one schema.** The draft (`GetAskDraft`, `ListAskDraft`,
   `PutAskDraft`, `DelAskDraft`) leaves its defaulted fields optional, and is `Z.input` of a defaulted twin of the strict
   schema. The full form takes the brief name (`GetAsk`, `ListAsk`, `WriteAsk<RecordT>`), and the vaultDB demands it.
-* **A birth answers in the batch answer's shape:** `act: 'born' | 'noop'`, with `val` keyed by slot (`bank`, `gate`,
-  `box`), each slot answering as a lone ask would.
+* **The birth is an ensure,** answering the roots stored over a complete bank. Its redesign, the bank as a function of
+  the main gate, is whiteboarded in `whiteboard/20261116-world_function/world_function.md`, a later thread.
 * **The models do not depend on the cache.** `Bank` holds no `QueryCacheOpts` and imports nothing from `minding/`. The
   vaultDB has one source, not two.
 * **The classifier is lean.** The memory store and a store that decides (Postgres, and Convex after it) compose the
@@ -60,7 +60,8 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 * Error handling and consistency checks in the minder.
 * Trees: boxes deeper than one label, gates beyond the main gate (which will control adding and removing them), and
   bringing a parent to life.
-* What `maingate` names: the root gate, or the gate that authorized the caller.
+* What `maingate` names: the root gate, or the gate that authorized the caller. (Proposed: the world carries the
+  gate the caller came in through; `whiteboard/20261116-world_function/world_function.md`.)
 * A box birth checking that its parent is live (TODO.md).
 * The batch ask (*Batch Ask*, below): a generic batch of writes, built when convenient, replacing `tryBirthBank`. Its
   answer's shape matters most, then its ask's.
@@ -108,11 +109,13 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 
 ### 3. The signature PR (`#pass-it-whole`)
 
-* The signature hunt's clear wins 1-8, 10 (`doBirthBank(ask)`) and 12, and its cosmetic fixes (`notifyTrackedRecords`
-  named `(ask, answer)`; `Bank`'s constructor takes `(record, opts)` and parses first).
+* The signature hunt's clear wins 1-8 and 12, and its cosmetic fixes (`notifyTrackedRecords` named `(ask, answer)`;
+  `Bank`'s constructor takes `(record, opts)` and parses first).
 * `judgeStrength(device, scope, cleartext)`.
 * `clear` becomes `cleartext` in code (19 uses).
-* `tryBirthBank` answers in the batch answer's shape.
+* Not done: 10, `doBirthBank(ask)` and `tryBirthBank` answering in the batch answer's shape, was reverted from #713.
+  Its bank put went to `ifPresent: 'fail'`, which made the birth create-only. The birth is redone in
+  `whiteboard/20261116-world_function/world_function.md`.
 * The asks' drafts and full forms renamed, in one commit, drafts first: `GetAsk`, `ListAsk`, `PutAsk`, `DelAsk`,
   `BankAsk` and `GetBoxAsk` become `GetAskDraft`, `ListAskDraft`, `PutAskDraft`, `DelAskDraft`, `BankAskDraft` and
   `GetBoxAskDraft`; then `GetThingAsk`, `ListThingsAsk` and `WriteAskOf` / `WriteThingAsk` become `GetAsk`, `ListAsk`
@@ -191,16 +194,18 @@ A batch promises only what a birth needs, and no more:
 What a store does to give more is its own affair, and no caller may rely on it. The levels, weakest first, and what gives
 each:
 
-1. *All or none*: the writes run in one database transaction (one Postgres function call is one). Each write locks the
+1. *All or none* (#all-or-none): the writes run in one database transaction (one Postgres function call is one). Each write locks the
    row it writes until the transaction ends, so another writer of that row waits for it; an insert over a key another
    transaction is inserting waits for that one to end.
-2. *Observed at or after the end*: the store reads each record back after its writes, in the same call or later.
-3. *Observed at one instant* (a snapshot across slots): every record is read in one statement, or under `REPEATABLE
+2. *Observed at or after the end* (#seen-at-commit / #seen-after-commit): the store reads each record back after its writes, in the same call or later.
+3. *Observed at one instant* (a #snapshot across slots): every record is read in one statement, or under `REPEATABLE
    READ`.
-4. *Serializable*, as if batches ran one at a time: `SERIALIZABLE` isolation, or a lock taken for it, which is a last
+4. *Serializable* (#needs-lock), as if batches ran one at a time: `SERIALIZABLE` isolation, or a lock taken for it, which is a last
    resort.
 
-A birth needs 1 and 2 only. Each store known *at current time* guarantees *All or none* an *Observed at or after the end*
+A birth needs 1 and 2 only. Each store known *at current time* guarantees *All or none* and *Observed at or after the
+end*. `notes/transaction-levels.md` sets these handles against Postgres's rungs, and finds that nothing in Postgres
+reads "at commit": #seen-at-commit is better named #still-true-at-commit.
 
 **Every slot is answered**, as a lone ask would be answered over the same rows:
 
