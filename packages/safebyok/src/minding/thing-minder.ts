@@ -13,7 +13,7 @@ import { Errors, Outcome, SX, Throwers, Validator } from 'safebyok-big/internals
 import * as Phrases from '../phrases'
 import {
   type GetThingAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  KindChecks, checkedGetThingAsk, listAskOf, loggableAskOf, modelkindOf, shellOf, thingkindVals,
+  KindChecks, checkedGetThingAsk, loggableAskOf, modelkindOf, shellOf, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
@@ -181,7 +181,7 @@ export class ThingMinder {
    */
   async list(): Promise<string[]> {
     this.#demandReady()
-    const answer = await this.#vaultDB.tryListThings(listAskOf({ ...this.scope, labelpath: this.modelkind, ifAbsent: 'nil' }))
+    const answer = await this.#vaultDB.tryListThings(this.#bank.makeListAsk({ labelpath: this.modelkind, ifAbsent: 'nil' }))
     if (! answer.ok) { throw answer.err }
     TSQ.notifyManager.batch(() => {
       for (const record of answer.val) { this.#doDeliverSeed(record) }
@@ -229,7 +229,8 @@ export class ThingMinder {
       // TanStack cancels a get under way when goodbye removes its entry.
       throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
     }
-    // A notice can land after the queryFn returns and before TanStack resolves the fetch with what it returned.
+    // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
+    // get may have left the cache a later record.
     return this.at(ask) ?? fetched
   }
 
@@ -272,7 +273,7 @@ export class ThingMinder {
   /** The key of the cache entry for `scoped`. */
   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/')] }
 
-  /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. Its record goes in through `#doDeliverRecord`. */
+  /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. TanStack caches its record through `betterRecordOf`. */
   #tsqGetAskOf(ask: GetThingAsk) {
     return {
       queryKey: this.queryKey(ask),
@@ -284,10 +285,7 @@ export class ThingMinder {
         const record = answer.val ?? this.#shellAt(ask)
         // TanStack keeps the entry's record and its time, marks it invalidated, and holds the refusal as the entry's error.
         if ((prior !== undefined) && (cmpRecords(prior, record) < 0)) { throw staleRead(ask) }
-        this.#doDeliverRecord(record)
-        // TanStack writes what this returns over the entry: the record the entry holds changes nothing. After goodbye,
-        // nothing was cached, and TanStack drops what this returns.
-        return this.at(ask) ?? record
+        return record
       },
     }
   }

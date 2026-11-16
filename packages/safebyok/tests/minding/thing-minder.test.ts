@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateThing, type GetThingAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSparse, getAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetThingAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSparse, getAskOf, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -20,12 +20,13 @@ const BankAsk = askOf(TH.BankScope)
 /** The ask that gets the box under the root box, as a minder takes it. */
 const BoxAsk  = askOf(TH.BoxScope)
 
-/** A bank as a minder reads it: its scope, its root box in life 0, its get asks tracking the roots at revision 0, and a spy for its bad news. */
+/** A bank as a minder reads it: its scope, its root box in life 0, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
 function fakeBankOf() {
   return {
     scope:       { ...TH.ThingBank },
     rootBox:     sparseOf(TH.rootBoxOf()),
     makeGetAsk:  (args: { labelpath: string }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
+    makeListAsk: (args: { labelpath: string }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
   } satisfies MinderFriend
 }
@@ -133,10 +134,12 @@ describe("ThingMinder.make", () => {
   const tsq     = new TSQ.QueryClient()
   const vaultDB = new MemoryVaultDB()
   const { makeGetAsk: _makeGetAsk, ...noAsks } = fakeBankOf()
+  const { makeListAsk: _makeListAsk, ...noListAsks } = fakeBankOf()
   const MakeCases = [
     [{ modelkind: 'vault' }, {},                                                    null,                'refuses a modelkind that is no kind of Thing'],
     [{},                     {},                                                    { ...TH.ThingBank }, 'refuses a bank without its scope and root box'],
     [{},                     {},                                                    noAsks,              'refuses a bank that builds no get asks'],
+    [{},                     {},                                                    noListAsks,          'refuses a bank that builds no list asks'],
     [{},                     { vaultDB: { tryGetThing: () => 1, watch: () => 1 } }, null,                'refuses a vaultDB without the brand'],
     [{},                     { tsq: { query: 1 } },                                 null,                'refuses a QueryClient without its methods'],
     [{},                     { queryCacheOpts: { networkMode: 'online' } },         null,                'refuses a networkMode, which no host sets'],
@@ -527,9 +530,14 @@ describe("ThingMinder.list", () => {
     expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.false
   })
 
-  it("lists nothing under a root box not yet stored, though the ask it sends tracks nothing", async () => {
-    const { boxMinder } = minderWorldOf(new MemoryVaultDB())
+  it("lists nothing under a root box with no boxes under it", async () => {
+    const { boxMinder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     expect(await boxMinder.list()).to.deep.equal([])
+  })
+
+  it("sends the bank's list ask, which tracks the roots, and refuses where the bank is not stored", async () => {
+    const { boxMinder } = minderWorldOf(new MemoryVaultDB())
+    await TH.expectRefusal(boxMinder.list(), 'storage_issue')
   })
 })
 
@@ -566,8 +574,7 @@ describe("ThingMinder.listen", () => {
     await boxMinder.get(BoxAsk)
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     receive(noticeOf(tombstone))
-    // A get lands its record twice, as it caches it and as TanStack resolves it: each is told.
-    expect(toldOf(heard)).to.deep.equal([['gotvoid', 'box/openai', null], ['gotvoid', 'box/openai', null], ['gotgone', 'box/openai', tombstone]])
+    expect(toldOf(heard)).to.deep.equal([['gotvoid', 'box/openai', null], ['gotgone', 'box/openai', tombstone]])
   })
 
   it("tells nothing while a get waits, then the record it lands", async () => {
@@ -617,7 +624,7 @@ describe("ThingMinder.listen", () => {
     minder.listen(later)
     await minder.get(GateAsk)
     expect(toldOf(later)).to.deep.include(['gotlive', 'gate', gate])
-    expect(new Set(badnewsOf(bank))).to.deep.equal(new Set(['unexpected_error']))
+    expect(badnewsOf(bank)).to.deep.equal(['unexpected_error'])
     expect(bank.tellBadNews.mock.calls[0]?.[0][0]).to.have.nested.property('cause.message', 'listener broke')
   })
 

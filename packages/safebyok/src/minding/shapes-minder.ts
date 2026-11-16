@@ -42,7 +42,7 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderTr
     gcTime:    orDefault(gcTime, DefaultQueryCacheOpts.gcTime),
   }).strict()
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
-  const friendFields     = obj({ scope: thingWatchScope, rootBox: boxSparse, makeGetAsk: fn(), tellBadNews: fn() })
+  const friendFields     = obj({ scope: thingWatchScope, rootBox: boxSparse, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn(), invalidateQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)
@@ -65,8 +65,8 @@ export type MinderGetAskOpts = Z.input<typeof minderGetAskOpts>
  * - `ifStale: 'refresh'` -- also fetch a stale or vacant record in the background
  */
 export type MinderAskOpts    = Z.input<typeof minderAskOpts>
-/** Internal. What a minder reads of its bank: its scope, its get asks, where trouble with no caller goes, and its root box, which a box minder caches when it starts. */
-export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'tellBadNews'>
+/** Internal. What a minder reads of its bank: its scope, its get and list asks, where trouble with no caller goes, and its root box, which a box minder caches when it starts. */
+export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
 /** The user, bank and modelkind a minder is tied to: every ask it takes must match them. */
 export type ThingTies        = ThingWatchScope & Readonly<{ modelkind: Thingkind }>
 // --
