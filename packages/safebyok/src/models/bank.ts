@@ -30,11 +30,15 @@ export type BoxUnsealed = UnsealedOf<BoxRecord | BoxTombstone, BoxCleartexts>
 /** A box's shell: the void sparse record a box's first revision is sealed over and cites. */
 export type BoxShell = BoxSparse & Readonly<{ am: 'x' }>
 
-/** The arguments of {@link Bank.tryGetBox}: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`). */
-export type GetBoxArgs = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent | 'shell' }>
+/** A box's get ask as a caller of {@link Bank.tryGetBox} states it: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`).
+ * Its defaulted field may be left out, and the bank fills in the rest of the whole {@link GetThingAsk}.
+ */
+export type GetBoxAsk = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent | 'shell' }>
 
-/** The arguments of {@link Bank.makeGetAsk} and {@link Bank.makeListAsk}: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there. */
-export type BankAskArgs = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent }>
+/** A get or list ask as a caller of {@link Bank.makeGetAsk} or {@link Bank.makeListAsk} states it: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
+ * Its defaulted field may be left out, and the bank fills in the rest of the whole {@link GetThingAsk} or {@link ListThingsAsk}.
+ */
+export type BankAsk = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent }>
 
 /** The answer of {@link Bank.tryGetBox}: the box, what `ifAbsent` gives when none is stored, or a refusal. */
 export type GetBoxAnswer<ValT> = GoodAnswer<ValT, EX.GotAct> | BadAnswer
@@ -183,10 +187,10 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** The get ask for the Thing at `ask.labelpath` in this bank.
    * A ThingMinder sends it to the vaultDB exactly as given, in the get ask it is handed.
    */
-  makeGetAsk(ask: BankAskArgs): GetThingAsk { return getAskOf({ ...ask, ...this.scope, track: this.track }) }
+  makeGetAsk(ask: BankAsk): GetThingAsk { return getAskOf({ ...ask, ...this.scope, track: this.track }) }
 
   /** The list ask for the children of the Thing at `ask.labelpath` in this bank. */
-  makeListAsk(ask: BankAskArgs): ListThingsAsk { return listAskOf({ ...ask, ...this.scope, track: this.track }) }
+  makeListAsk(ask: BankAsk): ListThingsAsk { return listAskOf({ ...ask, ...this.scope, track: this.track }) }
 
   /** The put ask writing `ask.record` over `ask.cited`, in this bank. */
   makePutAsk<RecordT extends Thing>(ask: Omit<PutAsk<RecordT>, 'track'>): WriteAskOf<RecordT> {
@@ -303,9 +307,9 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   /** The box at `ask.labelpath`. If none is stored, `ifAbsent: 'shell'` answers its shell, which a first revision is sealed over and cites. */
-  tryGetBox(ask: GetBoxArgs & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxThing | BoxShell>>
-  tryGetBox(ask: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | null>>
-  async tryGetBox(ask: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
+  tryGetBox(ask: GetBoxAsk & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxThing | BoxShell>>
+  tryGetBox(ask: GetBoxAsk): Promise<GetBoxAnswer<BoxThing | null>>
+  async tryGetBox(ask: GetBoxAsk): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
     const { ifAbsent, ...given } = { ...ask }
     const thingAsk = { ...this.makeGetAsk({ ...given, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
     const { endCause } = this.#device
