@@ -123,6 +123,10 @@ a safe, committed stopping point, push it, lead the PR's body with the question,
 thread file well enough that a fresh agent could finish the thread from your worktree if you are
 never resumed. Smaller open questions do not block: syndicate them and carry on.
 
+A change to what a command answers when everything works is always significant, even one that
+would fix a broken state you found: report it `blocked`, and never build it. Quote the contract
+it would change, from the doc block, comment or test that states it.
+
 ## Syndication
 
 The same facts, to different readers, at different altitudes.
