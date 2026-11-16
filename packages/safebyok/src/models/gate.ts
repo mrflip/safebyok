@@ -73,7 +73,7 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
   private constructor(parsed: GateThing, opts: GateOpts) {
     const main = Wayin.make(parsed.wayins.main)
     const passkey0 = (parsed.wayins.passkey0 === null) ? null : Wayin.make(parsed.wayins.passkey0)
-    super({ ...parsed, wayins: wayinsOf(main, passkey0) })
+    super({ ...parsed, wayins: wayinsOf({ main, passkey0 }) })
     this.#bank = opts.bank
     this.#main = main
     this.#passkey0 = passkey0
@@ -85,7 +85,7 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
     const { wayins, ...stamp } = Checks.makeRecordArgs.parse(dna)
     return gateThing.parse({
       ...stamp, label: stamp.labelpath, fmt: GateThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a',
-      lifepath: stamp.lifeseq, written_at: stamp.born_at, wayins: wayinsOf(wayins.main, wayins.passkey0), auth: {}, sigs: {}, meta: {},
+      lifepath: stamp.lifeseq, written_at: stamp.born_at, wayins: wayinsOf(wayins), auth: {}, sigs: {}, meta: {},
     })
   }
   // --
@@ -105,8 +105,8 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
 // == [Helpers]: wayinsOf
 
 // A Wayin's pickle is typed as either kind; the gate record's parse checks each is the kind its label wants.
-/** The frozen wayin records of `main` and `passkey0`, null for none. */
-function wayinsOf(main: Wayin, passkey0: Wayin | null): Wayins {
+/** The frozen records of `wayins`, its passkey0 null for none. */
+function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
   return Object.freeze({ main: main.pickle(), passkey0: passkey0?.pickle() ?? null }) as Wayins
 }
 // --
