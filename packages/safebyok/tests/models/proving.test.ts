@@ -77,46 +77,46 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
 /** A checker whose answer throws the passphrase it heard, when its verdict is read. */
 function answersThrowingGetter(passphrase: string) { return { get strong(): true { throw new Error(passphrase) } } }
 
-describe("Proving.judgeStrength(passphraseCleartext, scope, device)", () => {
+describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {
   it("returns the strengthChecker's verdict for the passphrase and scope", async () => {
     const strengthChecker = vi.fn(() => ({ strong: false as const, reason: 'too short' }))
-    const verdict = await Proving.judgeStrength(TH.TestPassphrase, WorldScope, TH.provingDeviceOf({ strengthChecker }))
+    const verdict = await Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), WorldScope, TH.TestPassphrase)
     expect(verdict).to.deep.equal({ strong: false, reason: 'too short' })
     expect(strengthChecker).toHaveBeenCalledWith(TH.TestPassphrase, WorldScope)
   })
 
   it("awaits a checker that returns a promise", async () => {
-    expect(await Proving.judgeStrength(TH.TestPassphrase, WorldScope, TH.provingDeviceOf({ strengthChecker: findsStrongAsync }))).to.deep.equal({ strong: true })
+    expect(await Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker: findsStrongAsync }), WorldScope, TH.TestPassphrase)).to.deep.equal({ strong: true })
   })
 
   it("keeps a passphrase out of the refusal when a getter on the verdict throws it", async () => {
-    const err = await TH.expectRefusal(Proving.judgeStrength(TH.TestPassphrase, WorldScope, TH.provingDeviceOf({ strengthChecker: answersThrowingGetter })))
+    const err = await TH.expectRefusal(Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker: answersThrowingGetter }), WorldScope, TH.TestPassphrase))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
 
   it("replaces what a throwing checker threw with a refusal quoting none of it and keeping no cause", async () => {
     function strengthChecker(): never { throw new Error(`weak: ${TH.TestPassphrase}`) }
-    const err = await TH.expectRefusal(Proving.judgeStrength(TH.TestPassphrase, WorldScope, TH.provingDeviceOf({ strengthChecker })))
+    const err = await TH.expectRefusal(Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), WorldScope, TH.TestPassphrase))
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
 
   it("refuses a checker result that is not a verdict", async () => {
     const strengthChecker = (() => 'looks fine') as never
-    await TH.expectRefusal(Proving.judgeStrength(TH.TestPassphrase, WorldScope, TH.provingDeviceOf({ strengthChecker })))
+    await TH.expectRefusal(Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), WorldScope, TH.TestPassphrase))
   })
 
   it("finds a blank passphrase weak without calling the checker", async () => {
     const strengthChecker = vi.fn(() => ({ strong: true as const }))
-    const verdict = await Proving.judgeStrength(GX.passphraseCleartext.parse(' '.repeat(3)), WorldScope, TH.provingDeviceOf({ strengthChecker }))
+    const verdict = await Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), WorldScope, GX.passphraseCleartext.parse(' '.repeat(3)))
     expect(verdict).to.have.property('strong', false)
     expect(strengthChecker).not.toHaveBeenCalled()
   })
 
   it("refuses a passphrase that is not a string, without calling the checker", async () => {
     const strengthChecker = vi.fn(() => ({ strong: true as const }))
-    await TH.expectRefusal(Proving.judgeStrength(42 as never, WorldScope, TH.provingDeviceOf({ strengthChecker })))
+    await TH.expectRefusal(Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), WorldScope, 42 as never))
     expect(strengthChecker).not.toHaveBeenCalled()
   })
 })

@@ -1129,10 +1129,10 @@ Proving.judgeStrength(device, scope, cleartext)
 **Goofus:** the secret first, then the scope its device already carries.
 
 ```ts
-Proving.judgeStrength(passphraseClear, scope, device)
+Proving.judgeStrength(passphraseCleartext, scope, device)
 ```
 
-*Status: `judgeStrength` is Open, for the signature PR after #709.*
+*Status: `judgeStrength`, Fixed, in the signature PR.*
 
 ---
 

@@ -94,7 +94,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
   /** The strength checker's verdict on `passphraseCleartext`.
    * A throw from the checker is replaced, so no error quotes the passphrase.
    */
-  static async judgeStrength(passphraseCleartext: string, scope: CX.BankScope, device: GX.ProvingDevice): Promise<GX.PassphraseVerdict> {
+  static async judgeStrength(device: GX.ProvingDevice, scope: CX.BankScope, passphraseCleartext: string): Promise<GX.PassphraseVerdict> {
     const checked = GX.strengthArgs.parse({ passphraseClear: passphraseCleartext, scope, device })
     return checked.device.strengthChecker(checked.passphraseClear, checked.scope)
   }
@@ -187,7 +187,7 @@ export class PassphraseProving extends Proving<GX.PassphraseWayinHeader> {
   static async buildNovel(bank: BankStamp, gate: GateStamp, passphraseCleartext: GX.PassphraseCleartext, device: GX.ProvingDevice): Promise<PassphraseProving> {
     const { bank: checkedBank, gate: checkedGate, passphraseClear: typed } = Checks.passphraseNovelArgs.parse({ bank, gate, passphraseClear: passphraseCleartext, device })
     // The host's strength checker hears the user as `user_id`.
-    const verdict = await super.judgeStrength(typed, { user_id: checkedBank.userid, banklabel: checkedBank.banklabel }, device)
+    const verdict = await super.judgeStrength(device, { user_id: checkedBank.userid, banklabel: checkedBank.banklabel }, typed)
     if (! verdict.strong) { throw Throwers.weakPassphrase(verdict.reason) }
     const header = mintPassphraseHeader(device)
     const wayinKey = await passphraseKeyOf(device.keyDeriver, typed, Crypto.fromB64(header.salt_b64))

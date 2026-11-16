@@ -147,7 +147,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   /** The strength checker's verdict on `passphraseCleartext`, for a dialog to show as the user types. */
   async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> {
-    return Proving.judgeStrength(passphraseCleartext, this.scope, this.#device)
+    return Proving.judgeStrength(this.#device, this.scope, passphraseCleartext)
   }
 
   /** Try what the user typed, resolving an outcome instead of throwing. Call {@link launch} first, and await one attempt before the next.
