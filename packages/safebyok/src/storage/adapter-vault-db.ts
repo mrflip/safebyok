@@ -141,7 +141,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parent: null, damaged_rows: [] } }
   }
 
-  /** Write a new bank's three roots (bank, main gate, root box) in one step, all or none ({@link VaultDB.tryBirthBank}). */
+  /** Ensure a bank's three roots (bank, main gate, root box), in one step, all or none ({@link VaultDB.tryBirthBank}). */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     try {
       const checked = checkedBirthBankAsk(ask)

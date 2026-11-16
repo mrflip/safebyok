@@ -108,7 +108,10 @@ export interface VaultDB {
   tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope. */
   tryListThings(ask: ListAsk): Promise<ListThingsAnswer>
-  /** Write a new bank's three roots (bank, main gate, root box) in one step, all or none, answering each root's put as a lone put would be answered. */
+  /** Ensure a bank's three roots (bank, main gate, root box): write all three in one step where none is stored, or answer the roots stored.
+   * A repeated birth over a complete bank writes nothing and is not refused. Where only some roots are stored, it refuses `storage_issue`.
+   * Each root answers as its lone put would.
+   */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onNotice` gets each changed Thing, and each Thing in a verb's answer's `tracked` that is not `'same'`.
