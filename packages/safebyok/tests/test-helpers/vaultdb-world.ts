@@ -2,7 +2,7 @@
 
 import { BW } from 'safebyok-big/testing'
 import {
-  type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetThingAsk, type ListThingsAsk, type PutAskArgs, type Thing,
+  type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetThingAsk, type ListThingsAsk, type PutAsk, type Thing,
   type ThingCited, type Track, type WriteAskOf, type WriteThingAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, putAskOf, lifenumOfLifeseq,
 } from '../../src/storage/shapes-thing'
@@ -103,7 +103,7 @@ export function birthAskOf(record: Thing = gateThingOf(), cited: ThingCited = Sh
 }
 
 /** The ask that puts `record` over the live Thing it `cited`, under the storage policies of `options`. */
-export function replaceAskOf<RecordT extends Thing>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAskArgs['options']): WriteAskOf<RecordT> {
+export function replaceAskOf<RecordT extends Thing>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAsk['options']): WriteAskOf<RecordT> {
   return putAskOf({ cited, record, ifAbsent: 'fail', ...(options && { options }) })
 }
 

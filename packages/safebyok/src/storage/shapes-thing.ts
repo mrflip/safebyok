@@ -516,53 +516,61 @@ function bornAtNotNow(ask: WriteThingAsk): Errors.VaultError { return new Errors
 function testimonyMissing(ask: WriteThingAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Ask builders]: GetAskArgs, ListAskArgs, PutAskArgs, DelAskArgs, getAskOf, listAskOf, putAskOf, delAskOf, scopeGiven, trackGiven, modelkindGiven
+// == [Ask builders]: GetAsk, ListAsk, PutAsk, DelAsk, getAskOf, listAskOf, putAskOf, delAskOf, scopeGiven, trackGiven, modelkindGiven
 // The one place an ask's flags are defaulted. A builder fills in the op, the modelkind and the default flags, and checks
 // nothing: what it was given that is wrong goes through as given, for the verb's checks to refuse in its answer.
 
 /** The storage policies a write names. */
 type ThingOptions = Readonly<Z.infer<typeof AskChecks.thingOptions>>
 
-/** The args of {@link getAskOf}: a Thing's scope, its `ifAbsent` (default `'nil'`), and what its sender tracks. */
-export type GetAskArgs  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, track?: Track }>
-/** The args of {@link listAskOf}: the parent's scope, its `ifAbsent` (default `'fail'`), and what its sender tracks. */
-export type ListAskArgs = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, track?: Track }>
-/** The args of {@link putAskOf}: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), the storage policies, and what its sender tracks. */
-export type PutAskArgs<RecordT extends Thing = Thing> = Readonly<{
+/** A get ask as a caller states it: a Thing's scope, its `ifAbsent` (default `'nil'`), and what its sender tracks.
+ * Its defaulted fields may be left out; {@link getAskOf} fills them in to make the whole {@link GetThingAsk}.
+ */
+export type GetAsk  = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, track?: Track }>
+/** A list ask as a caller states it: the parent's scope, its `ifAbsent` (default `'fail'`), and what its sender tracks.
+ * Its defaulted fields may be left out; {@link listAskOf} fills them in to make the whole {@link ListThingsAsk}.
+ */
+export type ListAsk = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, track?: Track }>
+/** A put ask as a caller states it: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), the storage policies, and what its sender tracks.
+ * Its defaulted fields may be left out; {@link putAskOf} fills them in to make the whole {@link WriteThingAsk}.
+ */
+export type PutAsk<RecordT extends Thing = Thing> = Readonly<{
   cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions, track?: Track,
 }>
-/** The args of {@link delAskOf}: the records, and what its sender tracks. Its flags are fixed. */
-export type DelAskArgs<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, track?: Track }>
+/** A del ask as a caller states it: the records, and what its sender tracks.
+ * Its flags are fixed, so it leaves them out; {@link delAskOf} fills them in to make the whole {@link WriteThingAsk}.
+ */
+export type DelAsk<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, track?: Track }>
 
-/** The get ask for the Thing at `args`'s scope. */
-export function getAskOf(args: GetAskArgs): GetThingAsk {
-  if (! CX.isPlainBag(args)) { return args }
-  const { userid, banklabel, labelpath, ifAbsent = 'nil', track } = args
+/** The get ask for the Thing at `ask`'s scope. */
+export function getAskOf(ask: GetAsk): GetThingAsk {
+  if (! CX.isPlainBag(ask)) { return ask }
+  const { userid, banklabel, labelpath, ifAbsent = 'nil', track } = ask
   return { userid, banklabel, labelpath, op: 'get', modelkind: modelkindGiven(labelpath), ifAbsent, ...trackGiven(track) } as GetThingAsk
 }
 
-/** The list ask for the children of the Thing at `args`'s scope. */
-export function listAskOf(args: ListAskArgs): ListThingsAsk {
-  if (! CX.isPlainBag(args)) { return args }
-  const { userid, banklabel, labelpath, ifAbsent = 'fail', track } = args
+/** The list ask for the children of the Thing at `ask`'s scope. */
+export function listAskOf(ask: ListAsk): ListThingsAsk {
+  if (! CX.isPlainBag(ask)) { return ask }
+  const { userid, banklabel, labelpath, ifAbsent = 'fail', track } = ask
   return { userid, banklabel, labelpath, op: 'list', modelkind: modelkindGiven(labelpath), ifAbsent, ...trackGiven(track) } as ListThingsAsk
 }
 
-/** The put ask writing `args.record` over `args.cited`, at the record's scope. */
-export function putAskOf<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT> {
-  if (! CX.isPlainBag(args)) { return args }
-  const { ifAbsent = 'add', ifPresent = 'repl', ...given } = args
-  const scope = scopeGiven(args.record)
+/** The put ask writing `ask.record` over `ask.cited`, at the record's scope. */
+export function putAskOf<RecordT extends Thing>(ask: PutAsk<RecordT>): WriteAskOf<RecordT> {
+  if (! CX.isPlainBag(ask)) { return ask }
+  const { ifAbsent = 'add', ifPresent = 'repl', ...given } = ask
+  const scope = scopeGiven(ask.record)
   // A field the put does not accept goes through, for the verb's strict check to refuse.
   return { ...given, ...scope, op: 'put', modelkind: modelkindGiven(scope.labelpath), ifAbsent, ifPresent } as unknown as WriteAskOf<RecordT>
 }
 
-/** The del ask writing the tombstone `args.record` over `args.cited`, at the record's scope. */
-export function delAskOf<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT> {
-  if (! CX.isPlainBag(args)) { return args }
-  const scope = scopeGiven(args.record)
+/** The del ask writing the tombstone `ask.record` over `ask.cited`, at the record's scope. */
+export function delAskOf<RecordT extends Thing>(ask: DelAsk<RecordT>): WriteAskOf<RecordT> {
+  if (! CX.isPlainBag(ask)) { return ask }
+  const scope = scopeGiven(ask.record)
   // A field the del does not accept goes through, for the verb's strict check to refuse.
-  return { ...args, ...scope, op: 'del', modelkind: modelkindGiven(scope.labelpath), ifAbsent: 'fail', ifPresent: 'repl' } as unknown as WriteAskOf<RecordT>
+  return { ...ask, ...scope, op: 'del', modelkind: modelkindGiven(scope.labelpath), ifAbsent: 'fail', ifPresent: 'repl' } as unknown as WriteAskOf<RecordT>
 }
 
 /** The scope fields of `record`, as given: none when it is not a bag. */

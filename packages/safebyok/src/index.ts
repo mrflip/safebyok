@@ -10,7 +10,7 @@ export type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone } from './models
 export type { Wayin } from './models/wayin'
 export type { BankScope, BankStamp } from './models/stamps'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'
-export type { BoxThing, DelAskArgs, PutAskArgs, VoidSentinel } from './storage/shapes-thing'
+export type { BoxThing, DelAsk, PutAsk, VoidSentinel } from './storage/shapes-thing'
 export { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies } from './minding/shapes-minder'
 export { type DeliverableThing, type MinderOpts, type TSQAnswer, type TSQGotAnswer, ThingMinder } from './minding/thing-minder'
 

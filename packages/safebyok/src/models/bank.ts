@@ -10,7 +10,7 @@ import type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone, UnsealedOf } fr
 import { type BankScope, type BankStamp, type CitedGate, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import * as Phrases from '../phrases'
 import {
-  type BankThing, type BoxThing, type DelAskArgs, type GetThingAsk, type ListThingsAsk, type LoggableAsk, type PutAskArgs, type Thing, type Track, type WorldRecord,
+  type BankThing, type BoxThing, type DelAsk, type GetThingAsk, type ListThingsAsk, type LoggableAsk, type PutAsk, type Thing, type Track, type WorldRecord,
   type WriteAskOf, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
   listAskOf, loggableAskOf, putAskOf, shellOf, sparseOf,
 } from '../storage/shapes-thing'
@@ -180,22 +180,22 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // Each fills in this bank's scope and its `track`, and the modelkind and default flags of `getAskOf` and the rest. The
   // track is this object's, which may be stale: the answer's `tracked` says so. Nothing is checked here: the verb does that.
 
-  /** The get ask for the Thing at `args.labelpath` in this bank.
+  /** The get ask for the Thing at `ask.labelpath` in this bank.
    * A ThingMinder sends it to the vaultDB exactly as given, in the get ask it is handed.
    */
-  makeGetAsk(args: BankAskArgs): GetThingAsk { return getAskOf({ ...args, ...this.scope, track: this.track }) }
+  makeGetAsk(ask: BankAskArgs): GetThingAsk { return getAskOf({ ...ask, ...this.scope, track: this.track }) }
 
-  /** The list ask for the children of the Thing at `args.labelpath` in this bank. */
-  makeListAsk(args: BankAskArgs): ListThingsAsk { return listAskOf({ ...args, ...this.scope, track: this.track }) }
+  /** The list ask for the children of the Thing at `ask.labelpath` in this bank. */
+  makeListAsk(ask: BankAskArgs): ListThingsAsk { return listAskOf({ ...ask, ...this.scope, track: this.track }) }
 
-  /** The put ask writing `args.record` over `args.cited`, in this bank. */
-  makePutAsk<RecordT extends Thing>(args: Omit<PutAskArgs<RecordT>, 'track'>): WriteAskOf<RecordT> {
-    return { ...putAskOf<RecordT>({ ...args, track: this.track }), ...this.scope }
+  /** The put ask writing `ask.record` over `ask.cited`, in this bank. */
+  makePutAsk<RecordT extends Thing>(ask: Omit<PutAsk<RecordT>, 'track'>): WriteAskOf<RecordT> {
+    return { ...putAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
   }
 
-  /** The del ask writing the tombstone `args.record` over `args.cited`, in this bank. */
-  makeDelAsk<RecordT extends Thing>(args: Omit<DelAskArgs<RecordT>, 'track'>): WriteAskOf<RecordT> {
-    return { ...delAskOf<RecordT>({ ...args, track: this.track }), ...this.scope }
+  /** The del ask writing the tombstone `ask.record` over `ask.cited`, in this bank. */
+  makeDelAsk<RecordT extends Thing>(ask: Omit<DelAsk<RecordT>, 'track'>): WriteAskOf<RecordT> {
+    return { ...delAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
   }
 
   /** Tell the device's `onBadNews` of failures no caller is waiting on ({@link Device.tellBadNews}). Never throws. */
@@ -204,10 +204,10 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   // == [Methods]: put
 
-  /** Write `args.record`, this bank's next revision, over `args.cited`. Resolves the bank's Thing the store reports writing. This Bank object is not updated. */
-  async put(args: PutAskArgs<BankThing>): Promise<BankThing> {
+  /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing. This Bank object is not updated. */
+  async put(ask: PutAsk<BankThing>): Promise<BankThing> {
     this.demandEnabled()
-    const answer = await this.#vaultDB.tryWriteThing({ ...this.makePutAsk(args), labelpath: 'bank', modelkind: 'bank' })
+    const answer = await this.#vaultDB.tryWriteThing({ ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
     if (! answer.ok) { throw answer.err }
     // The ask's modelkind is the bank's, which the vaultDB checks what it answers against.
     return answer.val as BankThing
@@ -302,15 +302,15 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return this.#vaultDB.tryListThings(ask)
   }
 
-  /** The box at `args.labelpath`. If none is stored, `ifAbsent: 'shell'` answers its shell, which a first revision is sealed over and cites. */
-  tryGetBox(args: GetBoxArgs & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxThing | BoxShell>>
-  tryGetBox(args: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | null>>
-  async tryGetBox(args: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
-    const { ifAbsent, ...given } = { ...args }
-    const ask = { ...this.makeGetAsk({ ...given, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
+  /** The box at `ask.labelpath`. If none is stored, `ifAbsent: 'shell'` answers its shell, which a first revision is sealed over and cites. */
+  tryGetBox(ask: GetBoxArgs & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxThing | BoxShell>>
+  tryGetBox(ask: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | null>>
+  async tryGetBox(ask: GetBoxArgs): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
+    const { ifAbsent, ...given } = { ...ask }
+    const thingAsk = { ...this.makeGetAsk({ ...given, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
     const { endCause } = this.#device
-    if (endCause !== null) { return disabledAnswerOf(ask, endCause) }
-    const answer = await this.#vaultDB.tryGetThing(ask)
+    if (endCause !== null) { return disabledAnswerOf(thingAsk, endCause) }
+    const answer = await this.#vaultDB.tryGetThing(thingAsk)
     if (! answer.ok) { return answer }
     // A box's labelpath, so its shell is a box's.
     if (answer.val === null) { return { ...answer, val: (ifAbsent === 'shell') ? shellOf({ ...this.scope, labelpath: given.labelpath }, this.#rootBox) as BoxShell : null } }
@@ -318,20 +318,20 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return { ...answer, val: answer.val }
   }
 
-  /** Write the live box `args.record` over the box `args.cited` cites: the one stored at its scope, or its shell. */
-  tryPutBox(args: PutAskArgs<BoxThing>): Promise<WriteThingAnswer> {
-    const ask = { ...this.makePutAsk(args), modelkind: 'box' } as const
+  /** Write the live box `ask.record` over the box `ask.cited` cites: the one stored at its scope, or its shell. */
+  tryPutBox(ask: PutAsk<BoxThing>): Promise<WriteThingAnswer> {
+    const thingAsk = { ...this.makePutAsk(ask), modelkind: 'box' } as const
     const { endCause } = this.#device
-    if (endCause !== null) { return Promise.resolve(disabledAnswerOf(ask, endCause)) }
-    return this.#vaultDB.tryWriteThing(ask)
+    if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
+    return this.#vaultDB.tryWriteThing(thingAsk)
   }
 
-  /** Write the tombstone `args.record` over the live box `args.cited` cites. */
-  tryDelBox(args: DelAskArgs<BoxThing>): Promise<WriteThingAnswer> {
-    const ask = { ...this.makeDelAsk(args), modelkind: 'box' } as const
+  /** Write the tombstone `ask.record` over the live box `ask.cited` cites. */
+  tryDelBox(ask: DelAsk<BoxThing>): Promise<WriteThingAnswer> {
+    const thingAsk = { ...this.makeDelAsk(ask), modelkind: 'box' } as const
     const { endCause } = this.#device
-    if (endCause !== null) { return Promise.resolve(disabledAnswerOf(ask, endCause)) }
-    return this.#vaultDB.tryWriteThing(ask)
+    if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
+    return this.#vaultDB.tryWriteThing(thingAsk)
   }
   // --
 
