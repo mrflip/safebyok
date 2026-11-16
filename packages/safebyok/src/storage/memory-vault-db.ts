@@ -2,8 +2,8 @@
 
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
-import { type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingScope, type ThingWatchScope, type Track, type Tracked, type WorldRecord,
-  type WriteThingAsk, MainGateLabelpath, RootBoxLabelpath } from './shapes-thing'
+import { type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type Thing, type ThingScope, type ThingWatchScope, type Track, type Tracked, type WorldRecord,
+  type WriteAsk, MainGateLabelpath, RootBoxLabelpath } from './shapes-thing'
 import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
@@ -76,12 +76,12 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
 
-  protected doGetThing(ask: GetThingAsk): Actual<EX.GotAct> {
+  protected doGetThing(ask: GetAsk): Actual<EX.GotAct> {
     const things = this.#thingsOf(ask)
     return this.classifyGetThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things, ask.track))
   }
 
-  protected doWriteThing(ask: WriteThingAsk): Actual<EX.PutAct | EX.DelAct> {
+  protected doWriteThing(ask: WriteAsk): Actual<EX.PutAct | EX.DelAct> {
     const things = this.#thingsOf(ask)
     const actual = this.classifyWriteThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(things, ask.track))
     if (! (actual.ok && isWriteAct(actual.act))) { return actual }
@@ -91,7 +91,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return { ...actual, ...after, record }
   }
 
-  protected doListThings(ask: ListThingsAsk): ListThingsActual {
+  protected doListThings(ask: ListAsk): ListThingsActual {
     const things   = this.#thingsOf(ask)
     const under    = `${ask.labelpath}/`
     const children = [...things]

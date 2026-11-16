@@ -2,8 +2,8 @@
 
 import { BW } from 'safebyok-big/testing'
 import {
-  type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetThingAsk, type ListThingsAsk, type PutAsk, type Thing,
-  type ThingCited, type Track, type WriteAskOf, type WriteThingAsk,
+  type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetAsk, type ListAsk, type PutAskDraft, type Thing,
+  type ThingCited, type Track, type WriteAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, putAskOf, lifenumOfLifeseq,
 } from '../../src/storage/shapes-thing'
 import { T0 } from './models-world'
@@ -98,26 +98,26 @@ export function boxRebornOf(prior: BoxThing, overrides: Partial<BoxThing> = {}):
 }
 
 /** The ask that births `record` (the main gate by default) over the shell it `cited` (a root's by default). */
-export function birthAskOf(record: Thing = gateThingOf(), cited: ThingCited = ShellCited): WriteThingAsk {
+export function birthAskOf(record: Thing = gateThingOf(), cited: ThingCited = ShellCited): WriteAsk {
   return putAskOf({ cited, record, ifPresent: 'fail' })
 }
 
 /** The ask that puts `record` over the live Thing it `cited`, under the storage policies of `options`. */
-export function replaceAskOf<RecordT extends Thing>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAsk['options']): WriteAskOf<RecordT> {
+export function replaceAskOf<RecordT extends Thing>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAskDraft['options']): WriteAsk<RecordT> {
   return putAskOf({ cited, record, ifAbsent: 'fail', ...(options && { options }) })
 }
 
 /** The ask that deletes the Thing it `cited` with the tombstone `record`. */
-export function delAskFor(cited: ThingCited, record: Thing): WriteThingAsk { return delAskOf({ cited, record }) }
+export function delAskFor(cited: ThingCited, record: Thing): WriteAsk { return delAskOf({ cited, record }) }
 
 /** The ask that gets the main gate, answering null for none under `'nil'`. */
-export function getGateAskOf(ifAbsent: GetThingAsk['ifAbsent'] = 'nil'): GetThingAsk { return getAskAt('gate', ifAbsent) }
+export function getGateAskOf(ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskAt('gate', ifAbsent) }
 
 /** The ask that gets the Thing at `labelpath` in {@link ThingBank}. */
-export function getAskAt(labelpath: string, ifAbsent: GetThingAsk['ifAbsent'] = 'nil'): GetThingAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent }) }
+export function getAskAt(labelpath: string, ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent }) }
 
 /** The ask that lists the children of the Thing at `labelpath` in {@link ThingBank}. */
-export function listAskAt(labelpath: string, ifAbsent: ListThingsAsk['ifAbsent'] = 'fail'): ListThingsAsk { return listAskOf({ ...ThingBank, labelpath, ifAbsent }) }
+export function listAskAt(labelpath: string, ifAbsent: ListAsk['ifAbsent'] = 'fail'): ListAsk { return listAskOf({ ...ThingBank, labelpath, ifAbsent }) }
 
 /** The ask that births {@link ThingBank} with its three roots, each at revision 0 of life 0, with `overrides` laid over it. */
 export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBankAsk {

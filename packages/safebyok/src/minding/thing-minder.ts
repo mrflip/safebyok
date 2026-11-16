@@ -12,8 +12,8 @@ import { noop } from 'es-toolkit'
 import { Errors, Outcome, SX, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
-  type GetThingAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  KindChecks, checkedGetThingAsk, loggableAskOf, modelkindOf, shellOf, thingkindVals,
+  type GetAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
+  KindChecks, checkedGetAsk, loggableAskOf, modelkindOf, shellOf, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
@@ -32,7 +32,7 @@ type GotAnswer = (
   | GoodAnswer<Thing | Sparse<Thing>, 'gotlive' | 'gotgone'>
   | GoodAnswer<null, 'gotvoid'>
   | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
-) & { ask: GetThingAsk }
+) & { ask: GetAsk }
 
 /** How recent a cache entry is, and how its last get went. */
 interface TSQEntryState { isTimely: boolean, refreshedAt: number, isFetching: boolean, lastErr: Errors.VaultError | null }
@@ -230,12 +230,12 @@ export class ThingMinder {
 
   // Its refusal lands in the entry, where the next tryAt finds it as `lastErr`.
   /** Initiate fetch of `ask`'s record, if it is stale, without waiting for the result. If a fetch is under way, it will use its result (not starting a new one). */
-  #backgroundRefresh(ask: GetThingAsk, staleTime: number): void {
+  #backgroundRefresh(ask: GetAsk, staleTime: number): void {
     void this.#doGet(ask, staleTime).catch(noop)
   }
 
   /** The record for `ask`'s scope, from the cache if timely within `staleTime`, else from the vaultDB. */
-  async #doGet(ask: GetThingAsk, staleTime: number): Promise<DeliverableThing> {
+  async #doGet(ask: GetAsk, staleTime: number): Promise<DeliverableThing> {
     let fetched: DeliverableThing
     try {
       fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), staleTime })
@@ -290,7 +290,7 @@ export class ThingMinder {
   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
 
   /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. TanStack caches its record through `betterRecordOf`. */
-  #tsqGetAskOf(ask: GetThingAsk) {
+  #tsqGetAskOf(ask: GetAsk) {
     return {
       queryKey: this.queryKey(ask),
       queryFn:  async (): Promise<DeliverableThing> => {
@@ -338,7 +338,7 @@ export class ThingMinder {
   /** Demand that `rawAsk` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. Throws `bad_option`. */
   #demandOwnAsk(rawAsk: unknown): void {
     minderTrack.parse(rawAsk)
-    Validator.checkedConsistent(checkedGetThingAsk(rawAsk), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
+    Validator.checkedConsistent(checkedGetAsk(rawAsk), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
@@ -357,7 +357,7 @@ export class ThingMinder {
 
   // Its caller starts any refresh first, so that a vacant entry's answer is isFetching. A removed entry is vacant.
   /** The {@link TSQGotAnswer} the cache gives for `ask`'s scope, timely within `opts.staleTime`. */
-  #answerOfTSQ(ask: GetThingAsk, opts: Readonly<{ staleTime: number }>): TSQGotAnswer {
+  #answerOfTSQ(ask: GetAsk, opts: Readonly<{ staleTime: number }>): TSQGotAnswer {
     const entry    = this.#tsqFind(ask)
     const state    = entry?.state
     const isTimely = (! (entry?.isStaleByTime(opts.staleTime) ?? true))
@@ -380,7 +380,7 @@ function minderNotStarted(): Errors.VaultError {
 }
 
 /** The refusal of a get that storage answered older than the record cached when it began. */
-function staleRead(ask: GetThingAsk): Errors.VaultError {
+function staleRead(ask: GetAsk): Errors.VaultError {
   return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
 }
 
@@ -398,7 +398,7 @@ function isVoidSentinel(record: DeliverableThing): record is VoidSentinel {
 }
 
 /** A get's answer for `record`, the cached record at `ask`'s scope: act `vacant` for none, `untimely` unless `isTimely`, `gotvoid` for a void sentinel. */
-function gotAnswerOf(ask: GetThingAsk, record: DeliverableThing | undefined, isTimely: boolean): GotAnswer {
+function gotAnswerOf(ask: GetAsk, record: DeliverableThing | undefined, isTimely: boolean): GotAnswer {
   if (record === undefined) { return { ok: true, ask, act: 'vacant', world: null, val: undefined } }
   if (! isTimely) { return { ok: true, ask, act: 'untimely', world: null, val: undefined } }
   if (isVoidSentinel(record)) { return { ok: true, ask, act: 'gotvoid', world: null, val: null } }

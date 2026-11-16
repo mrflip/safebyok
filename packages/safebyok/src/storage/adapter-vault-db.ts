@@ -5,8 +5,8 @@ import type * as Z from 'zod'
 import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../phrases'
 import {
-  type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
-  type WriteThingAsk, birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, loggableAskOf, watchArgs,
+  type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
+  type WriteAsk, birthPutsOf, checkedBirthBankAsk, checkedGetAsk, checkedListAsk, checkedWriteAsk, loggableAskOf, watchArgs,
 } from './shapes-thing'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
@@ -73,13 +73,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   // takes the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
-  protected classifyGetThing(ask: GetThingAsk, raw: unknown, world: WorldFetched): Actual<EX.GotAct> { return classifyGetThing(ask, raw, world) }
+  protected classifyGetThing(ask: GetAsk, raw: unknown, world: WorldFetched): Actual<EX.GotAct> { return classifyGetThing(ask, raw, world) }
 
   /** Classify a write against the raw Thing fetched at its scope, null for none, checking the born_at and storage policies of a replace. */
-  protected classifyWriteThing(ask: WriteThingAsk, raw: unknown, world: WorldFetched): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw, world) }
+  protected classifyWriteThing(ask: WriteAsk, raw: unknown, world: WorldFetched): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw, world) }
 
   /** Classify a listing against the raw parent and the raw Things one label under it. */
-  protected classifyListThings(ask: ListThingsAsk, fetched: ThingsFetched, world: WorldFetched): ListThingsActual { return classifyListThings(ask, fetched, world) }
+  protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, world: WorldFetched): ListThingsActual { return classifyListThings(ask, fetched, world) }
 
   /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
   protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return classifyBirthBank(puts, fetched) }
@@ -90,9 +90,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   // Each verb's body is the plain path. Every throw in it lands in `answerForThrown`.
 
   /** The Thing at `ask`'s scope ({@link VaultDB.tryGetThing}). */
-  async tryGetThing(ask: GetThingAsk): Promise<GetThingAnswer> {
+  async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
     try {
-      const checked     = checkedGetThingAsk(ask)
+      const checked     = checkedGetAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doGetThing(checked) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'getThing', loggableAsk)
@@ -102,9 +102,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** Write `ask.record` over the Thing `ask.cited` ({@link VaultDB.tryWriteThing}). */
-  async tryWriteThing(ask: WriteThingAsk): Promise<WriteThingAnswer> {
+  async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
-      const checked     = checkedWriteThingAsk(ask)
+      const checked     = checkedWriteAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doWriteThing(checked) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'writeThing', loggableAsk)
@@ -114,9 +114,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** The children of the Thing at `ask`'s scope ({@link VaultDB.tryListThings}). */
-  async tryListThings(ask: ListThingsAsk): Promise<ListThingsAnswer> {
+  async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
     try {
-      const checked     = checkedListThingsAsk(ask)
+      const checked     = checkedListAsk(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doListThings(checked)
       const beside      = { world: actual.world, ...trackedFieldOf(actual), parent: actual.parent, damaged_rows: actual.damaged_rows }
@@ -220,13 +220,13 @@ export abstract class AdapterVaultDB implements VaultDB {
   // no verdict explains the refusal. A birth answers with `unwrittenBirthOf`, or `storage_issue` where it finds a write.
 
   /** In one step: fetch the Thing at `ask`'s scope and its bank's raw world, and return `this.classifyGetThing(ask, raw, world)`. */
-  protected abstract doGetThing(ask: GetThingAsk): Helpers.Awaitable<Actual<EX.GotAct>>
+  protected abstract doGetThing(ask: GetAsk): Helpers.Awaitable<Actual<EX.GotAct>>
   /** In one step: fetch the Thing at `ask`'s scope, classify, and if the act is a write, write `ask.record` and report the Thing written,
    * with its bank's world after the write.
    */
-  protected abstract doWriteThing(ask: WriteThingAsk): Helpers.Awaitable<Actual<EX.PutAct | EX.DelAct>>
+  protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<Actual<EX.PutAct | EX.DelAct>>
   /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw world, and return `this.classifyListThings(ask, fetched, world)`. */
-  protected abstract doListThings(ask: ListThingsAsk): Helpers.Awaitable<ListThingsActual>
+  protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListThingsActual>
   /** In one step: fetch the raw bank, main gate and root box, return `this.classifyBirthBank(puts, fetched)`, and under `born` first
    * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world the bank and main gate make.
    */

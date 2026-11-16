@@ -6,7 +6,7 @@ import { exactOptional } from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type GetThingAsk, type ThingWatchScope, type Thingkind, type Track, boxSparse, thingWatchScope, trackShape } from '../storage/shapes-thing'
+import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, boxSparse, thingWatchScope, trackShape } from '../storage/shapes-thing'
 import type { TSQGotAnswer } from './thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
@@ -56,7 +56,7 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderTr
 })
 
 /** A minder's get ask: the bank's get ask, `track` and `ifAbsent: 'nil'` included, which the minder sends to the vaultDB exactly as given. */
-export type MinderGetAsk     = GetThingAsk & Readonly<{ ifAbsent: 'nil', track: Track }>
+export type MinderGetAsk     = GetAsk & Readonly<{ ifAbsent: 'nil', track: Track }>
 /** A get's options: `staleTime` overrides the minder's own. */
 export type MinderGetAskOpts = Z.input<typeof minderGetAskOpts>
 /** `tryAt`'s options:

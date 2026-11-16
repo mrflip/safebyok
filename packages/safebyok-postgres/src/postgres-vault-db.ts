@@ -3,9 +3,9 @@
 import { type EX, type Errors, Throwers, Validator } from 'safebyok-big/internals'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type Actual, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsActual,
-  type ListThingsAsk, type Received, type ThingScope, type ThingWatchScope, type ThingsFetched, type Track, type TrackedFetched, type WorldFetched,
-  type WriteThingAsk, AdapterVaultDB, ShellCited, demandBornAtKept, demandPolicies, isWriteAct, modelkindOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
+  type Actual, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type ListThingsActual,
+  type ListAsk, type Received, type ThingScope, type ThingWatchScope, type ThingsFetched, type Track, type TrackedFetched, type WorldFetched,
+  type WriteAsk, AdapterVaultDB, ShellCited, demandBornAtKept, demandPolicies, isWriteAct, modelkindOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
   unwrittenWriteOf, worldOf, writeActOf, writtenRootsOf, writtenThingOf,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, unlistenOnceListening } from './postgres-bank-db'
@@ -69,13 +69,13 @@ function trackParam(track: Track | undefined): string | null { return (track ===
 
 // The classifier finds a write only where the Thing stored is the one cited, so only the flag for the cited Thing can let the ask write.
 /** True when the ask's flags let it write over the Thing it cites: a del over a live Thing; a put by `ifPresent` over a live one, by `ifAbsent` over a tombstone or the shell. */
-function mayWrite({ op, cited, ifAbsent, ifPresent }: WriteThingAsk): boolean {
+function mayWrite({ op, cited, ifAbsent, ifPresent }: WriteAsk): boolean {
   if (op === 'del') { return cited.am === 'a' }
   return (cited.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add')
 }
 
 /** The act of a write the store made, over the Thing the ask cites. */
-function writtenActOf({ op, cited }: WriteThingAsk): EX.WriteAct {
+function writtenActOf({ op, cited }: WriteAsk): EX.WriteAct {
   if (op === 'del')                        { return 'deleted' }
   if (cited.revseq === ShellCited.revseq)  { return 'born' }
   return (cited.am === 'a') ? 'replaced' : 'reborn'
@@ -121,12 +121,12 @@ export class PostgresVaultDB extends AdapterVaultDB {
 
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
 
-  protected async doGetThing(ask: GetThingAsk): Promise<Actual<EX.GotAct>> {
+  protected async doGetThing(ask: GetAsk): Promise<Actual<EX.GotAct>> {
     const { thing, world, tracked } = await this.#fetchThing(ask, ask.track)
     return this.classifyGetThing(ask, thing, { ...world, tracked })
   }
 
-  protected async doWriteThing(ask: WriteThingAsk): Promise<Actual<EX.PutAct | EX.DelAct>> {
+  protected async doWriteThing(ask: WriteAsk): Promise<Actual<EX.PutAct | EX.DelAct>> {
     if (! mayWrite(ask)) {
       const { thing, world, tracked } = await this.#fetchThing(ask, ask.track)
       return this.classifyWriteThing(ask, thing, { ...world, tracked })
@@ -150,7 +150,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     throw Throwers.storageIssue()
   }
 
-  protected async doListThings(ask: ListThingsAsk): Promise<ListThingsActual> {
+  protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
     const { userid, banklabel, labelpath, modelkind, track } = ask
     const params = [userid, banklabel, labelpath, trackParam(track)]
     const { parent, children, world, tracked } = await this.#firstRow<ThingsFetched & { world: WorldFetched, tracked: TrackedFetched }>(ListThingsSql[modelkind], params)
