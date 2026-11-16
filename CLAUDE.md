@@ -94,8 +94,9 @@ govern how code is changed:
 * **The bankDB is the ground truth; what the local instance keeps is a cache.** A
   data-integrity failure met in a consistent state is reported by throwing. A broken state
   is reported, never accommodated: a fix for a broken state never changes what a command
-  answers when everything works. Insert no retry logic, abort controllers or other whizbangs into the critical path of a primitive
-  operation: the customer, or orchestration code we provide, can add them as warranted.
+  answers when everything works. Insert no retry logic, abort controllers or other
+  whizbangs into the critical path of a primitive operation: the customer, or orchestration
+  code we provide, can add them as warranted.
   A lock where none was needed before is a last resort too.
 
 ## Commands
