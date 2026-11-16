@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { BW, expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { ShellCited, childShellCited, delAskOf, getAskOf, lifeseqOf, listAskOf, putAskOf, sparseOf } from '../../src/storage/shapes-thing'
+import { ShellCited, childShellCited, delAskOf, getAskOf, lifeseqOfLifenum, listAskOf, putAskOf, sparseOf } from '../../src/storage/shapes-thing'
 import {
   GateScope, Life0, RootScope, ThingBank, WithPasskey, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, getGateAskOf,
   nextGateOf, nextOf, replaceAskOf, rootBoxOf,
@@ -86,7 +86,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     const stored = gateThingOf()
     const next   = nextGateOf(stored)
     const later  = nextGateOf(next)
-    const lifeseq2 = lifeseqOf(2)
+    const lifeseq2 = lifeseqOfLifenum(2)
     const otherLife = { lifeseq: lifeseq2, lifepath: lifeseq2 }
     const ActCases = [
       // the store moved on:
@@ -125,7 +125,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("refuses the main gate's deletion, writing nothing", async () => {
       const vaultDB = await withGate(stored)
-      const life1 = lifeseqOf(1)
+      const life1 = lifeseqOfLifenum(1)
       const gone = nextOf(stored, { am: 'x', lifeseq: life1, lifepath: life1 })
       await expectBad(vaultDB.tryWriteThing(delAskFor(stored, gone)), 'bad_record')
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(stored)

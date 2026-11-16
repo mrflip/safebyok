@@ -11,7 +11,7 @@ import { type BankScope, type BankStamp, type CitedGate, type GateStamp, bankSco
 import * as Phrases from '../phrases'
 import {
   type BankThing, type BoxThing, type DelAskArgs, type GetThingAsk, type ListThingsAsk, type LoggableAsk, type PutAskArgs, type Thing, type Track, type WorldRecord,
-  type WriteAskOf, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOf,
+  type WriteAskOf, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
   listAskOf, loggableAskOf, putAskOf, shellOf, sparseOf,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
@@ -160,8 +160,8 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const { user_id, banklabel } = CX.bankScope.parse(scope)
     const born_at = Clock.nowMillis()
     return {
-      bankStamp: bankStamp.parse({ userid: user_id, banklabel, lifeseq: lifeseqOf(0), born_at }),
-      gateStamp: gateStamp.parse({ userid: user_id, banklabel, labelpath: 'gate', lifeseq: lifeseqOf(0), born_at }),
+      bankStamp: bankStamp.parse({ userid: user_id, banklabel, lifeseq: lifeseqOfLifenum(0), born_at }),
+      gateStamp: gateStamp.parse({ userid: user_id, banklabel, labelpath: 'gate', lifeseq: lifeseqOfLifenum(0), born_at }),
     }
   }
 

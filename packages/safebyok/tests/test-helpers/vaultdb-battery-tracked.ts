@@ -1,7 +1,7 @@
 /** The battery's cases of `tracked`: what an answer says of the bank, main gate and root box its ask tracks. */
 import { describe, expect, it } from 'vitest'
 import { expectBad } from 'safebyok-big/testing'
-import { lifeseqOf } from '../../src/storage/shapes-thing'
+import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import {
   BankStaleTrack, GateStaleTrack, RootStaleTrack, bankThingOf, birthAskOf, birthBankAskOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
@@ -56,7 +56,7 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       const { bank, gate, box } = trackOf()
       await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate } } as never), 'bad_option')
       await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate, box, vault: box } } as never), 'bad_option')
-      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank: { ...bank, lifeseq: lifeseqOf(0) }, gate, box } } as never), 'bad_option')
+      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank: { ...bank, lifeseq: lifeseqOfLifenum(0) }, gate, box } } as never), 'bad_option')
     })
   })
 }

@@ -6,7 +6,7 @@ import { exactOptional } from 'zod'
 import { BX, type Consts, CX, EX, Errors, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 
-// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOf, seqOfLifeseq, isGoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
+// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isGoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
 
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10
@@ -16,14 +16,14 @@ export const ShellLifeseq = '-000000001'
 /** A root's shell lifepath: the shell's lifeseq alone. */
 export const ShellLifepath = ShellLifeseq
 
-/** The lifeseq of life `seq`: its base-32 digits (`0-9a-v`) padded to 10, which sort in the order of the lives. */
-export function lifeseqOf(seq: number): string { return seq.toString(32).padStart(LifeseqDigits, '0') }
+/** The lifeseq of life `lifenum`: its base-32 digits (`0-9a-v`) padded to 10, which sort in the order of the lives. Life -1's is the shell's. */
+export function lifeseqOfLifenum(lifenum: number): string { return (lifenum === -1) ? ShellLifeseq : lifenum.toString(32).padStart(LifeseqDigits, '0') }
 
-/** The life `lifeseq` names: -1 for the shell's. */
-export function seqOfLifeseq(lifeseq: string): number { return Number.parseInt(lifeseq, 32) }
+/** The lifenum of `lifeseq`, the number of the life it names: -1 for the shell's. */
+export function lifenumOfLifeseq(lifeseq: string): number { return Number.parseInt(lifeseq, 32) }
 
 /** True when `lifeseq` is a tombstone's: an odd life, the shell's among them. */
-export function isGoneLifeseq(lifeseq: string): boolean { return Math.abs(seqOfLifeseq(lifeseq) % 2) === 1 }
+export function isGoneLifeseq(lifeseq: string): boolean { return Math.abs(lifenumOfLifeseq(lifeseq) % 2) === 1 }
 
 /** The Thing's own lifeseq: the last of its lifepath. */
 export function lifeseqOfLifepath(lifepath: string): string { return lifepath.slice(lifepath.lastIndexOf('/') + 1) }
@@ -474,7 +474,7 @@ function checkWriteInvariants(ask: WriteThingAsk): void {
   if ((record.am === 'x') && (cited.am === 'x'))                                                    { throw tombstoneOverTombstone(ask) }
   if (leadingLifeseqsOf(record.lifepath) !== leadingLifeseqsOf(cited.lifepath))                     { throw lifepathNotKept(ask) }
   const isLifeFlipped = (record.am !== cited.am)
-  if (seqOfLifeseq(record.lifeseq) !== seqOfLifeseq(lifeseqOfLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw lifeseqNotNext(ask) }
+  if (lifenumOfLifeseq(record.lifeseq) !== lifenumOfLifeseq(lifeseqOfLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw lifeseqNotNext(ask) }
   // A live record over a live one keeps the stored born_at: the store checks that, against the Thing it has.
   if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw bornAtNotNow(ask) }
   if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw testimonyMissing(ask) }

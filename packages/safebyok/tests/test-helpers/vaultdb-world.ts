@@ -4,7 +4,7 @@ import { BW } from 'safebyok-big/testing'
 import {
   type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetThingAsk, type ListThingsAsk, type PutAskArgs, type Thing,
   type ThingCited, type Track, type WriteAskOf, type WriteThingAsk,
-  BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOf, lifeseqOfLifepath, listAskOf, putAskOf, seqOfLifeseq,
+  BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, putAskOf, lifenumOfLifeseq,
 } from '../../src/storage/shapes-thing'
 import { T0 } from './models-world'
 
@@ -29,7 +29,7 @@ const FakeCiphered = Object.freeze({ cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q'
 export const FakeSealed = Object.freeze({ key_wrapped: FakeCiphered, ciphered: FakeCiphered, codectag: 'json_v1', schematag: 'test_v1' })
 
 /** Life 0's lifeseq, which is also a root's lifepath in its first life. */
-export const Life0 = lifeseqOf(0)
+export const Life0 = lifeseqOfLifenum(0)
 
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
 const FirstRevision = { am: 'a', revtok: 'rev-0', revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
@@ -80,7 +80,7 @@ export function nextGateOf(prior: GateThing, overrides: Partial<GateThing> = {})
 /** `lifepath` with its own lifeseq moved on by `lives`. */
 export function lifepathPlus(lifepath: string, lives: number): string {
   const leading = lifepath.slice(0, lifepath.lastIndexOf('/') + 1)
-  return `${leading}${lifeseqOf(seqOfLifeseq(lifeseqOfLifepath(lifepath)) + lives)}`
+  return `${leading}${lifeseqOfLifenum(lifenumOfLifeseq(lifeseqOfLifepath(lifepath)) + lives)}`
 }
 
 /** The tombstone of the live box `prior`: its next revision, in its next life, sealing an empty whisper, with no sidecar. */
@@ -125,7 +125,7 @@ export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBank
 }
 
 /** The track of a sender that holds the main gate of another life. */
-export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: lifeseqOf(2) }))
+export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: lifeseqOfLifenum(2) }))
 /** The track of a sender that holds the bank at another revision. */
 export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
 /** The track of a sender that holds the root box at another revision. */

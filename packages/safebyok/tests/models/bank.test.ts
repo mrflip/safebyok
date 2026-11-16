@@ -5,7 +5,7 @@ import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
-import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxSparse, boxThing, getAskOf, lifeseqOf } from '../../src/storage/shapes-thing'
+import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxSparse, boxThing, getAskOf, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -15,10 +15,10 @@ TH.useFakeClock()
 const BankFields = Object.keys(TH.bankThingOf())
 
 /** The lifeseqs of a box's first lives: live, gone, live again, gone again. Life 0 is the root box's too. */
-const Life0 = lifeseqOf(0)
-const Life1 = lifeseqOf(1)
-const Life2 = lifeseqOf(2)
-const Life3 = lifeseqOf(3)
+const Life0 = lifeseqOfLifenum(0)
+const Life1 = lifeseqOfLifenum(1)
+const Life2 = lifeseqOfLifenum(2)
+const Life3 = lifeseqOfLifenum(3)
 
 /** A stored proving of `bank`'s main gate, by {@link TH.TestPassphrase}. */
 function storedProvingOf(bank: Bank): Promise<PassphraseProving> { return PassphraseProving.buildStored(bank.maingate, TH.TestPassphrase, bank.device) }

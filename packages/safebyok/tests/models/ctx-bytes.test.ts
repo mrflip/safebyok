@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { Crypto } from 'safebyok-big/internals'
 import { type BoxRecord, BoxWhisper } from '../../src/models/sealers'
 import { LeaseFormat, type LeaseRecord } from '../../src/models/stamps'
-import { lifeseqOf } from '../../src/storage/shapes-thing'
+import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -107,7 +107,7 @@ describe("each ctx, byte for byte", () => {
     const { box, boxStamp, bankKey } = await sealedWorld()
     function field(fieldname: string): string { return JSON.stringify(boxStamp[fieldname]) }
     expect(boxStamp).to.not.have.property('sidecar')
-    const life0 = lifeseqOf(0)
+    const life0 = lifeseqOfLifenum(0)
     const boxText = `{"am":"a","banklabel":"acme","born_at":${String(TH.T0)},"fmt":${field('fmt')},"label":"anthropic_api_key","labelpath":"box/anthropic_api_key","lifepath":"${life0}/${life0}","lifeseq":"${life0}","revseq":0,"revtok":${field('revtok')},"userid":"u1","written_at":${String(TH.T0)}}`
     const { key_wrapped, ciphered } = box.whisper_sealed
     const partKey = await Crypto.unwrapKeyUnder(bankKey, key_wrapped, textBytes(`[${BankStampText},${boxText},"whisper_sealed.key_wrapped",${BoxTagsText}]`), { extractable: false, usage: ['decrypt'] })

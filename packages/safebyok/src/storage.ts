@@ -6,8 +6,8 @@ export {
   type GateThing, type GateWriteAsk, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type LoggableAsk, type PutAskArgs, type Sealed, type ShellParent, type ShellScoped, type VoidSentinel, type Wayins,
   type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type Track, type Tracked, type WorldRecord, type WriteAskOf, type WriteThingAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifepath, ShellLifeseq,
-  ThingFormats, boxSparse, childShellCited, delAskOf, getAskOf, isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, modelkindOf, putAskOf, sealed, wayins,
-  seqOfLifeseq, shellOf, sparseOf, thingkindVals,
+  ThingFormats, boxSparse, childShellCited, delAskOf, getAskOf, isGoneLifeseq, isLabelpathOfKind, lifenumOfLifeseq, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, modelkindOf,
+  putAskOf, sealed, shellOf, sparseOf, thingkindVals, wayins,
 } from './storage/shapes-thing'
 export {
   type BankRootsFetched, type ThingsFetched, type TrackedFetched, type TrackedRows, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing,

@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
   type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteThingAsk, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf,
-  isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, seqOfLifeseq, childShellCited, shellOf, sparseOf, boxSparse,
+  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSparse,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -11,8 +11,9 @@ const { Life0 } = TH
 /** What a strict check says of a field it does not accept, which it never names. */
 const Unaccepted = 'There is a field it does not accept'
 
-describe("lifeseqOf(seq) and seqOfLifeseq(lifeseq)", () => {
+describe("lifeseqOfLifenum(lifenum) and lifenumOfLifeseq(lifeseq)", () => {
   const LifeseqCases = [
+    [-1,             "-000000001",  "life -1, the shell's"],
     [0,              "0000000000",  'life 0, a birth'],
     [1,              "0000000001",  'life 1, its deletion'],
     [31,             "000000000v",  'the last one-digit life'],
@@ -20,31 +21,31 @@ describe("lifeseqOf(seq) and seqOfLifeseq(lifeseq)", () => {
     [(32 ** 10) - 1, "vvvvvvvvvv",  'the last life ten digits can name'],
   ] as const
 
-  for (const [seq, lifeseq, blurb] of LifeseqCases) {
+  for (const [lifenum, lifeseq, blurb] of LifeseqCases) {
     it(blurb, () => {
-      expect(lifeseqOf(seq)).to.eq(lifeseq)
-      expect(seqOfLifeseq(lifeseq)).to.eq(seq)
+      expect(lifeseqOfLifenum(lifenum)).to.eq(lifeseq)
+      expect(lifenumOfLifeseq(lifeseq)).to.eq(lifenum)
     })
   }
 
   it("sorts lifeseqs as their lives", () => {
-    const seqs = [33, 2, 1024, 31, 0, 32]
-    const sorted = seqs.map((seq) => lifeseqOf(seq)).toSorted((aa, bb) => aa.localeCompare(bb))
-    expect(sorted.map((lifeseq) => seqOfLifeseq(lifeseq))).to.deep.equal(seqs.toSorted((aa, bb) => aa - bb))
+    const lifenums = [33, 2, 1024, 31, 0, 32]
+    const sorted = lifenums.map((lifenum) => lifeseqOfLifenum(lifenum)).toSorted((aa, bb) => aa.localeCompare(bb))
+    expect(sorted.map((lifeseq) => lifenumOfLifeseq(lifeseq))).to.deep.equal(lifenums.toSorted((aa, bb) => aa - bb))
   })
 
   it("reads the shell's lifeseq, ten characters like every lifeseq, as life -1, sorting below every life's", () => {
     expect(ShellLifeseq).to.have.length(10)
-    expect(seqOfLifeseq(ShellLifeseq)).to.eq(-1)
-    const isFirst = ShellLifeseq < lifeseqOf(0)
+    expect(lifenumOfLifeseq(ShellLifeseq)).to.eq(-1)
+    const isFirst = ShellLifeseq < lifeseqOfLifenum(0)
     expect(isFirst).to.be.true
   })
 })
 
 describe("lifeseqOfLifepath(lifepath)", () => {
   it("is the last lifeseq of the lifepath, a root's whole lifepath", () => {
-    expect(lifeseqOfLifepath(lifeseqOf(3))).to.eq(lifeseqOf(3))
-    expect(lifeseqOfLifepath(`${lifeseqOf(3)}/${lifeseqOf(4)}`)).to.eq(lifeseqOf(4))
+    expect(lifeseqOfLifepath(lifeseqOfLifenum(3))).to.eq(lifeseqOfLifenum(3))
+    expect(lifeseqOfLifepath(`${lifeseqOfLifenum(3)}/${lifeseqOfLifenum(4)}`)).to.eq(lifeseqOfLifenum(4))
     expect(lifeseqOfLifepath(ShellCited.lifepath)).to.eq(ShellLifeseq)
     expect(lifeseqOfLifepath(childShellCited(Life0).lifepath)).to.eq(ShellLifeseq)
   })
@@ -52,7 +53,7 @@ describe("lifeseqOfLifepath(lifepath)", () => {
 
 describe("isGoneLifeseq(lifeseq)", () => {
   it("is true of odd lives, the shell's among them", () => {
-    expect([ShellLifeseq, lifeseqOf(0), lifeseqOf(1), lifeseqOf(32), lifeseqOf(33)].map((lifeseq) => isGoneLifeseq(lifeseq))).to.deep.equal([true, false, true, false, true])
+    expect([ShellLifeseq, lifeseqOfLifenum(0), lifeseqOfLifenum(1), lifeseqOfLifenum(32), lifeseqOfLifenum(33)].map((lifeseq) => isGoneLifeseq(lifeseq))).to.deep.equal([true, false, true, false, true])
   })
 })
 
@@ -60,7 +61,7 @@ describe("ShellCited and childShellCited(parentLifepath)", () => {
   it("cite the shell at revision -1, a root's at lifepath '-000000001', a child's at its parent's lifepath then '-000000001'", () => {
     expect(Object.isFrozen(ShellCited)).to.be.true
     expect(ShellCited).to.deep.equal({ revtok: '00000000-0000-0000-0000-000000000000', revseq: -1, lifepath: '-000000001', am: 'x' })
-    expect(childShellCited(`${Life0}/${lifeseqOf(2)}`)).to.deep.equal({ ...ShellCited, lifepath: `${Life0}/${lifeseqOf(2)}/-000000001` })
+    expect(childShellCited(`${Life0}/${lifeseqOfLifenum(2)}`)).to.deep.equal({ ...ShellCited, lifepath: `${Life0}/${lifeseqOfLifenum(2)}/-000000001` })
   })
 })
 
@@ -99,7 +100,7 @@ describe("shellOf(scoped, parent?)", () => {
     [() => shellOf(TH.BoxScope),                                                        Phrases.ShellLifeless,      'a Thing below a root given no life'],
     [() => shellOf({ ...TH.ThingBank, label: 'openai' }),                               Phrases.ShellUnscoped,      'a label with no parent'],
     [() => shellOf({ ...TH.ThingBank, labelpath: 'gate/openai' }, TH.rootBoxOf()),      Phrases.ShellNotChild,      'a labelpath not one label under its parent'],
-    [() => shellOf({ ...TH.BoxScope, lifepath: `${lifeseqOf(2)}/${ShellLifeseq}` }, TH.rootBoxOf()), Phrases.ShellOfOtherLife, 'a lifepath under another life than its parent'],
+    [() => shellOf({ ...TH.BoxScope, lifepath: `${lifeseqOfLifenum(2)}/${ShellLifeseq}` }, TH.rootBoxOf()), Phrases.ShellOfOtherLife, 'a lifepath under another life than its parent'],
     [() => shellOf({ ...TH.BoxScope, lifepath: `${Life0}/${Life0}` }),                  Phrases.LifepathShape,      'a lifepath not a shell\'s'],
     [() => shellOf({ ...TH.BoxScope, lifepath: ShellLifeseq }),                         Phrases.LifepathDepth,      'a lifepath shallower than its labelpath'],
     [() => shellOf({ ...TH.BoxScope, label: 'other', lifepath: `${Life0}/${ShellLifeseq}` }), Phrases.LabelNotLast, 'a label not the last of its labelpath'],
@@ -179,8 +180,8 @@ describe("checkedWriteThingAsk(ask), of the main gate", () => {
     expect(checkedWriteThingAsk(good)).to.deep.equal(good)
   })
 
-  const lifeseq1 = lifeseqOf(1)
-  const lifeseq2 = lifeseqOf(2)
+  const lifeseq1 = lifeseqOfLifenum(1)
+  const lifeseq2 = lifeseqOfLifenum(2)
   const noTestimony = { revtok: stored.revtok, revseq: 0, am: 'a' as const, lifepath: stored.lifepath }
   const BadRecordCases: readonly (readonly [WriteThingAsk, string, string])[] = [
     // the record does not follow the one cited:
@@ -234,7 +235,7 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
 
   it("accepts the bank's and the root box's births, and a further gate's deletion", () => {
     const second = TH.gateThingOf({ labelpath: 'gate/second', label: 'second', lifepath: `${Life0}/${Life0}` })
-    const secondGone = TH.nextOf(second, { am: 'x', lifeseq: lifeseqOf(1), lifepath: `${Life0}/${lifeseqOf(1)}` })
+    const secondGone = TH.nextOf(second, { am: 'x', lifeseq: lifeseqOfLifenum(1), lifepath: `${Life0}/${lifeseqOfLifenum(1)}` })
     for (const ask of [TH.birthAskOf(TH.bankThingOf()), TH.birthAskOf(TH.rootBoxOf()), TH.delAskFor(second, secondGone)]) {
       expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
     }
@@ -259,7 +260,7 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
 
   const BadRecordCases: readonly (readonly [WriteThingAsk, string, string])[] = [
     [TH.birthAskOf(box),                                                             Phrases.LifepathNotKept,    'a box\'s birth citing a root\'s shell'],
-    [TH.birthAskOf(box, childShellCited(lifeseqOf(2))),                              Phrases.LifepathNotKept,    'a box\'s birth under another life of its parent'],
+    [TH.birthAskOf(box, childShellCited(lifeseqOfLifenum(2))),                              Phrases.LifepathNotKept,    'a box\'s birth under another life of its parent'],
     [TH.birthAskOf(TH.boxThingOf('openai', { lifepath: Life0 }), under),             Phrases.LifepathDepth,      'a box whose lifepath is shallower than its labelpath'],
     [TH.birthAskOf(TH.boxThingOf('openai', { label: 'other' }), under),              Phrases.LabelNotLast,       'a box whose label is not its last'],
     [TH.birthAskOf({ ...box, sidecar: undefined } as never, under),                  'sidecar',                  'a live box with no sidecar'],
@@ -295,7 +296,7 @@ describe("checkedBirthBankAsk(ask)", () => {
   })
 
   it("refuses a root that is not born live", () => {
-    const life1 = lifeseqOf(1)
+    const life1 = lifeseqOfLifenum(1)
     const ask   = TH.birthBankAskOf({ bank: TH.bankThingOf({ am: 'x', lifeseq: life1, lifepath: life1 }) })
     const err   = TH.expectSyncRefusal(() => checkedBirthBankAsk(ask), 'bad_option')
     expect(err.message).to.include(Phrases.OpNotOfRecord)

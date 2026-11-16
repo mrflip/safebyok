@@ -163,15 +163,15 @@ BEGIN
   PERFORM pg_notify('safebyok_things_' || (thing->>'userid'), notice);
 END $$;
 
--- The 10 base-32 digits (0-9a-v) of seq: a lifeseq. Raises unless seq is between 0 and 32^10 - 1.
-CREATE OR REPLACE FUNCTION safebyok_base32_of_bigint(seq bigint) RETURNS text
+-- The 10 base-32 digits (0-9a-v) of lifenum: a lifeseq. Raises unless lifenum is between 0 and 32^10 - 1.
+CREATE OR REPLACE FUNCTION safebyok_base32_of_bigint(lifenum bigint) RETURNS text
 LANGUAGE plpgsql IMMUTABLE STRICT PARALLEL SAFE AS $$
 BEGIN
-  IF ((seq < 0) OR (seq >= (1::bigint << 50))) THEN    -- 2^50 is 32^10
+  IF ((lifenum < 0) OR (lifenum >= (1::bigint << 50))) THEN    -- 2^50 is 32^10
     RAISE EXCEPTION 'safebyok_base32_of_bigint: a lifeseq is a life from 0 to 32^10 - 1';
   END IF;
   RETURN (
-    SELECT string_agg(substr('0123456789abcdefghijklmnopqrstuv', (((seq >> (5 * place)) & 31)::integer + 1), 1), '' ORDER BY place DESC)
+    SELECT string_agg(substr('0123456789abcdefghijklmnopqrstuv', (((lifenum >> (5 * place)) & 31)::integer + 1), 1), '' ORDER BY place DESC)
     FROM   generate_series(0, 9) AS place
   );
 END $$;
