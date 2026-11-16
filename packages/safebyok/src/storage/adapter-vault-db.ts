@@ -5,9 +5,8 @@ import type * as Z from 'zod'
 import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../phrases'
 import {
-  type BirthBankAsk, type BirthPuts, type DelAskArgs, type GetAskArgs, type GetThingAsk, type ListAskArgs, type ListThingsAsk, type LoggableAsk, type PutAskArgs,
-  type Thing, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAskOf, type WriteThingAsk,
-  birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf, watchArgs,
+  type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
+  type WriteThingAsk, birthPutsOf, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, loggableAskOf, watchArgs,
 } from './shapes-thing'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
@@ -86,20 +85,6 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return classifyBirthBank(puts, fetched) }
   // --
 
-  // == [Ask builders]: getAsk, listAsk, putAsk, delAsk
-
-  /** The get ask for the Thing at `args`'s scope ({@link VaultDB.getAsk}). */
-  getAsk(args: GetAskArgs): GetThingAsk { return getAskOf(args) }
-
-  /** The list ask for the children of the Thing at `args`'s scope ({@link VaultDB.listAsk}). */
-  listAsk(args: ListAskArgs): ListThingsAsk { return listAskOf(args) }
-
-  /** The put ask writing `args.record` over `args.cited` ({@link VaultDB.putAsk}). */
-  putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT> { return putAskOf(args) }
-
-  /** The del ask writing the tombstone `args.record` over `args.cited` ({@link VaultDB.delAsk}). */
-  delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT> { return delAskOf(args) }
-  // --
 
   // == [Verbs]: tryGetThing, tryWriteThing, tryListThings, tryBirthBank, watch
   // Each verb's body is the plain path. Every throw in it lands in `answerForThrown`.
@@ -220,8 +205,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
   // fetched. A store that can run code of its own may run the whole step there. For an ask that carries `track`, the step
-  // also compares it with the bank and main gate the world is read from, and reports that as the world's `tracked`
-  // (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
+  // also compares it with the bank and main gate the world is read from, and with the root box read beside them, and reports
+  // that as the answer's `tracked` (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
   //
   // A write checks only its preconditions of the Thing stored: the revision cited, the born_at a live Thing keeps, and the
   // storage policies it names (`classifyWriteThing` reads no more). Where several refusals apply at once, any one of them

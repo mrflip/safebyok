@@ -8,10 +8,10 @@ import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './
 import {
   type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
   type Tracked, type WorldRecord, type WriteThingAsk,
-  KindChecks, MainGateLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
+  KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
 } from './shapes-thing'
 
-// == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeOff
+// == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
@@ -60,7 +60,7 @@ function revseqCmpOf({ cited }: WriteCmpAsk, stored: ThingCited | null): RevseqC
 
 // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
 /** True when a Thing is stored and differs from the cited one in its life or its liveness. */
-function isLifeOff({ cited }: WriteCmpAsk, stored: ThingCited | null): boolean {
+function isLifeMismatch({ cited }: WriteCmpAsk, stored: ThingCited | null): boolean {
   return (stored !== null) && ((stored.lifepath !== cited.lifepath) || (stored.am !== cited.am))
 }
 // --
@@ -84,7 +84,7 @@ function putActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.PutAct | EX.R
   const revtokCmp = revtokCmpOf(ask, stored)
   if (revtokCmp  === '=next')                                                     { return 'retcon' }
   if (revseqCmp  === 'ahead')                                                     { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, stored)))  { return 'clash' }
+  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeMismatch(ask, stored)))  { return 'clash' }
   if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                              { return 'forked' }
   if (revtokCmp  === 'neq')                                                       { return ((presence === 'live') && (opflag === 'get')) ? 'passed' : 'stale' }
   if (presence   === 'void')                                                      { return (opflag === 'add') ? 'born'   : 'void' }
@@ -100,7 +100,7 @@ function delActOf(ask: WriteCmpAsk, stored: ThingCited | null): EX.DelAct | EX.R
   const revtokCmp = revtokCmpOf(ask, stored)
   if (revtokCmp  === '=next')                                                     { return 'retcon' }
   if (revseqCmp  === 'ahead')                                                     { return 'ahead' }
-  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeOff(ask, stored)))  { return 'clash' }
+  if ((revtokCmp === 'eq')  && ((revseqCmp !== 'eq') || isLifeMismatch(ask, stored)))  { return 'clash' }
   if ((revtokCmp === 'neq') && (revseqCmp === 'eq'))                              { return 'forked' }
   if (revtokCmp  === 'neq')                                                       { return (presence === 'gone') ? 'gone' : 'stale' }
   if (presence   === 'void')                                                      { return 'void' }
@@ -192,17 +192,24 @@ export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFe
 }
 // --
 
-// == [Tracked]: TrackedFetched, trackedFetchedOf, trackedFieldOf, trackedEntryOf
-// The store compares what an ask tracks with the bank and main gate it fetched, in the step that fetched them. The adapter
-// checks each row the store reports in place of 'same'.
+// == [Tracked]: TrackedFetched, TrackedRows, trackedFetchedOf, trackedFieldOf, trackedEntryOf
+// The store compares what an ask tracks with the bank, main gate and root box it fetched, in the step that fetched them.
+// The adapter checks each row the store reports in place of 'same'.
 
-/** A store's report on the bank and main gate an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
-export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown }> | null
+/** A store's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
+export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown, [RootBoxLabelpath]: unknown }> | null
 
-/** The {@link TrackedFetched} report of `track` against the raw bank and main gate a store fetched, for a store that compares in TypeScript. */
-export function trackedFetchedOf(track: Track | undefined, { bank, maingate }: WorldFetched): TrackedFetched {
+/** The raw bank, main gate and root box a store fetched, each null for none, under its key in a `track`. */
+export type TrackedRows = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown, [RootBoxLabelpath]: unknown }>
+
+/** The {@link TrackedFetched} report of `track` against the raw rows a store fetched, for a store that compares in TypeScript. */
+export function trackedFetchedOf(track: Track | undefined, rows: TrackedRows): TrackedFetched {
   if (track === undefined) { return null }
-  return { bank: trackedRawOf(track.bank, bank), [MainGateLabelpath]: trackedRawOf(track[MainGateLabelpath], maingate) }
+  return {
+    bank:               trackedRawOf(track.bank, rows.bank),
+    [MainGateLabelpath]: trackedRawOf(track[MainGateLabelpath], rows[MainGateLabelpath]),
+    [RootBoxLabelpath]:  trackedRawOf(track[RootBoxLabelpath], rows[RootBoxLabelpath]),
+  }
 }
 
 /** `'same'` where `raw` has the revseq and lifepath of `pair`, else `raw`. */
@@ -216,6 +223,7 @@ export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: 
   return { tracked: {
     bank:                 trackedEntryOf(KindChecks.bank.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
     [MainGateLabelpath]:  trackedEntryOf(KindChecks.gate.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched[MainGateLabelpath]),
+    [RootBoxLabelpath]:   trackedEntryOf(KindChecks.box.stored, { userid, banklabel, labelpath: RootBoxLabelpath }, fetched[RootBoxLabelpath]),
   } }
 }
 

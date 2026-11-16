@@ -72,12 +72,12 @@ gate's write function*), overriding `classify*` where the store reached the verd
 ## Settled, 2026-11-15
 
 * **The world push (T1): `track` / `tracked`.** Every answer carries its world (`WorldRecord | null`), as today. An
-  ask may carry `track: { bank: { revseq, lifepath }, <main gate>: { revseq, lifepath } }`, exactly two fixed keys,
-  hard-coded in the stores' queries: not a general mechanism, and nothing fetches other records. The answer carries
+  ask may carry `track: { bank: { revseq, lifepath }, <main gate>: { revseq, lifepath }, <root box>: { revseq, lifepath } }`,
+  exactly three fixed keys (the root box's added in T2), hard-coded in the stores' queries: not a general mechanism, and nothing fetches other records. The answer carries
   `tracked`, each entry `'same'` where revseq and lifepath match, otherwise the full row (the bank's row alone); no
   null. Every response method ends in one `notifyTrackedRecords`, which returns unless `doNotifyTracked` is enabled,
   and otherwise notifies each entry that is not `'same'`. Bank revisions stay honest: a gate write does not revise
-  the bank, and there is no compound gate write. The main gate's key is its labelpath, `gate`, in one constant. An ask
+  the bank, and there is no compound gate write. The main gate's key is its labelpath, `gate`, in one constant, and the root box's is `box`. An ask
   with no `track` gets no `tracked`. `doNotifyTracked` is on by default. A missing or damaged tracked row is unspecified
   behavior (notes/wontfix.md): no code handles it, pinned by a type-level test and a pointer comment.
 * **A friend** is the narrow set of an owner's attributes and callbacks that it hands a collaborator, a pick of the

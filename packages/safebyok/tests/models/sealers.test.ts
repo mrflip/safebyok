@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import * as Sealers from '../../src/models/sealers'
 import { BoxTombstone, BoxWhisper } from '../../src/models/sealers'
 import * as Phrases from '../../src/phrases'
-import { boxSparse, boxThing, lifeseqOf } from '../../src/storage/shapes-thing'
+import { boxSparse, boxThing, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -11,9 +11,9 @@ TH.useFakeClock()
 const Sealed = Object.freeze({ ...TH.FakeSealed, ...BoxWhisper.tags })
 const OtherSealed = Object.freeze({ ...Sealed, key_wrapped: TH.fakeCiphered('k2') })
 
-const Life0 = lifeseqOf(0)
-const Life1 = lifeseqOf(1)
-const Life2 = lifeseqOf(2)
+const Life0 = lifeseqOfLifenum(0)
+const Life1 = lifeseqOfLifenum(1)
+const Life2 = lifeseqOfLifenum(2)
 
 /** A live box at its first revision, as a seal over {@link TH.boxShellOf}'s shell leaves it, without its sealed whisper. */
 function liveNext() { return BoxWhisper.nextRevisionOf(TH.boxShellOf()) }

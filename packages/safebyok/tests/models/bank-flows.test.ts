@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
 import type { Bank, BoxShell, BoxUnsealed } from '../../src/models/bank'
 import type { BoxRecord } from '../../src/models/sealers'
-import { type BoxThing, ShellLifeseq, lifeseqOf } from '../../src/storage/shapes-thing'
+import { type BoxThing, ShellLifeseq, getAskOf, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -59,7 +59,7 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
   it("puts a box over its shell, and again over itself, each put unsealing what the one before sealed", async () => {
     const bank = await storedBank()
     const first = await bumpApicalls(bank)
-    expect(first).to.include({ revseq: 0, am: 'a', lifepath: `${bank.rootBox.lifeseq}/${lifeseqOf(0)}` })
+    expect(first).to.include({ revseq: 0, am: 'a', lifepath: `${bank.rootBox.lifeseq}/${lifeseqOfLifenum(0)}` })
     await bumpApicalls(bank)
     const unsealed = await unsealedAt(bank)
     expect(unsealed).to.include({ revseq: 1, am: 'a' })
@@ -76,13 +76,13 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
     const deleted = await bank.tryDelBox({ cited: prior, record: tombstone })
     expect(deleted).to.include({ ok: true, act: 'deleted' })
     const unsealed = await unsealedAt(bank)
-    expect(unsealed).to.include({ am: 'x', lifeseq: lifeseqOf(1) })
+    expect(unsealed).to.include({ am: 'x', lifeseq: lifeseqOfLifenum(1) })
     expect(unsealed.whisper).to.deep.equal({})
     const listed = await bank.tryListBoxes()
     expect(listed.ok && listed.val.map((box) => box.am)).to.deep.equal(['x'])
 
     const reborn = await bumpApicalls(bank)
-    expect(reborn).to.include({ am: 'a', lifeseq: lifeseqOf(2) })
+    expect(reborn).to.include({ am: 'a', lifeseq: lifeseqOfLifenum(2) })
     const unsealedAgain = await unsealedAt(bank)
     expect(unsealedAgain.whisper).to.deep.equal({ ...TH.Whisper, apicalls: 1 })
   })
@@ -97,7 +97,7 @@ describe("the bank's box methods refuse, never throwing", () => {
     const answer = await bank.tryPutBox({ cited: prior, record })
     await TH.expectBad(answer, 'disabled')
     expect(answer).to.include({ dbhas: null, err: bank.device.endCause })
-    const got = await bank.device.vaultDB.tryGetThing(bank.device.vaultDB.getAsk({ ...bank.scope, labelpath: Openai }))
+    const got = await bank.device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: Openai }))
     expect(got).to.include({ ok: true, val: null })
   })
 

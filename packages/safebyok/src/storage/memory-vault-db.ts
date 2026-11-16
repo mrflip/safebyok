@@ -3,7 +3,7 @@
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
 import { type BirthBankAsk, type BirthPuts, type GetThingAsk, type ListThingsAsk, type Thing, type ThingScope, type ThingWatchScope, type Track, type Tracked, type WorldRecord,
-  type WriteThingAsk, MainGateLabelpath } from './shapes-thing'
+  type WriteThingAsk, MainGateLabelpath, RootBoxLabelpath } from './shapes-thing'
 import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
@@ -42,16 +42,17 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return writtenThingOf(scope, structuredClone(things.get(scope.labelpath)))
   }
 
-  /** The raw roots of a bank's `things`, each a copy, or null for none, and how its bank and main gate compare with `track`. */
+  /** The raw roots of a bank's `things`, each a copy, or null for none, and how its bank, main gate and root box compare with `track`. */
   #rootsOf(things: Map<string, unknown>, track: Track | undefined): BankRootsFetched {
     const { maingate: gate, ...fetched } = this.#worldFetchedOf(things, track)
-    return { ...fetched, gate, root: structuredClone(things.get('box') ?? null) }
+    return { ...fetched, gate, root: structuredClone(things.get(RootBoxLabelpath) ?? null) }
   }
 
-  /** The raw bank and main gate of a bank's `things`, each a copy, or null for none, and how they compare with `track`. */
+  /** The raw bank and main gate of a bank's `things`, each a copy, or null for none, and how they and its root box compare with `track`. */
   #worldFetchedOf(things: Map<string, unknown>, track: Track | undefined): WorldFetched {
     const fetched = structuredClone({ bank: things.get('bank') ?? null, maingate: things.get(MainGateLabelpath) ?? null })
-    return { ...fetched, tracked: trackedFetchedOf(track, fetched) }
+    const rows    = { bank: fetched.bank, [MainGateLabelpath]: fetched.maingate, [RootBoxLabelpath]: structuredClone(things.get(RootBoxLabelpath) ?? null) }
+    return { ...fetched, tracked: trackedFetchedOf(track, rows) }
   }
 
   /** The world of the bank of `things` at `scope`, as it now stands, and its `tracked` for `track`. */

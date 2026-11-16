@@ -1,6 +1,6 @@
 import { CX, Clock, Crypto, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type BoxSparse, type BoxThing, type Sealed, boxSparse, boxThing, lifeseqOf, seqOfLifeseq } from '../storage/shapes-thing'
+import { type BoxSparse, type BoxThing, type Sealed, boxSparse, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../storage/shapes-thing'
 
 export type { BoxSparse, Sealed } from '../storage/shapes-thing'
 
@@ -137,7 +137,7 @@ function boxTombstoneOf(prior: BoxSparse): Omit<BoxTombstone, 'whisper_sealed'> 
 
 /** The lifeseq and lifepath of the life after `box`'s */
 function nextLifeOf({ lifeseq, lifepath }: Pick<BoxSparse, 'lifeseq' | 'lifepath'>): Pick<BoxSparse, 'lifeseq' | 'lifepath'> {
-  const nextLifeseq = lifeseqOf(seqOfLifeseq(lifeseq) + 1)
+  const nextLifeseq = lifeseqOfLifenum(lifenumOfLifeseq(lifeseq) + 1)
   return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
 }
 

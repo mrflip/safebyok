@@ -58,7 +58,7 @@ describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
     const notices: unknown[] = []
     vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
     const track = TH.trackOf(TH.bankThingOf({ revseq: 3 }), TH.gateThingOf())
-    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box'), track })).to.deep.include({ tracked: { bank: TH.bankThingOf(), gate: 'same' } })
+    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box'), track })).to.deep.include({ tracked: { bank: TH.bankThingOf(), gate: 'same', box: 'same' } })
     await TH.aWhile()
     expect(notices).to.deep.equal([])
   })

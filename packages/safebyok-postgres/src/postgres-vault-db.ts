@@ -38,7 +38,7 @@ const postgresVaultDBOpts = Validator.objCheck(({ custom, fn, bool }) => ({
 /** The notification channel of `userid`'s Things: the channel a `PostgresListen` subscribes to. */
 export function thingsChannelOf(userid: string): string { return `safebyok_things_${userid}` }
 
-// Each notice comes from `safebyok_tell_thing` in `vault-functions.ts`: a JSON object with the Thing's scope under `at`,
+// Each notice comes from the `tell_thing` function in `vault-functions.ts`: a JSON object with the Thing's scope under `at`,
 // the Thing under `thing` and the raw world under `world`, whichever fit.
 
 /** A parsed notice: the labelpath of the Thing stored, and the Thing and raw world, where they fit. */

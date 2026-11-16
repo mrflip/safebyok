@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
-import { type GateThing, GateThingFormat, lifeseqOf } from '../../src/storage/shapes-thing'
+import { type GateThing, GateThingFormat, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -59,7 +59,7 @@ describe("Gate.makeRecord(dna)", () => {
     [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, wayins: { main: wayins.main } }),                    'no passkey0, where a gate with no passkey has null'],
     [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, labelpath: 'box/gate', wayins }),                    'the labelpath of a box'],
     [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, lifeseq: undefined, wayins }),                       'no lifeseq'],
-    [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, lifeseq: lifeseqOf(1), wayins }),                    'the lifeseq of a gone life'],
+    [(wayins: DnaWayins) => ({ ...TH.WorldGateStamp, lifeseq: lifeseqOfLifenum(1), wayins }),                    'the lifeseq of a gone life'],
     [() => null,                                                                                        'null'],
   ] as const
 
@@ -85,8 +85,8 @@ describe("Gate.make(record, { bank })", () => {
     [(record: GateThing) => ({ ...record, wayins: { passkey0: record.wayins.passkey0 } }),                           'no passphrase wayin'],
     [(record: GateThing) => ({ ...record, wayins: { main: record.wayins.main } }),                                   'no passkey0, where a gate with no passkey has null'],
     [(record: GateThing) => TH.omitting(record, 'revtok'),                                                           'no revtok'],
-    [(record: GateThing) => ({ ...record, lifeseq: lifeseqOf(2) }),                                                  'a lifeseq its lifepath does not end with'],
-    [(record: GateThing) => ({ ...record, am: 'x', lifeseq: lifeseqOf(1), lifepath: lifeseqOf(1) }),                 'am x, where the main gate is never deleted'],
+    [(record: GateThing) => ({ ...record, lifeseq: lifeseqOfLifenum(2) }),                                                  'a lifeseq its lifepath does not end with'],
+    [(record: GateThing) => ({ ...record, am: 'x', lifeseq: lifeseqOfLifenum(1), lifepath: lifeseqOfLifenum(1) }),                 'am x, where the main gate is never deleted'],
     [(record: GateThing) => ({ ...record, maingate: record }),                                                       'a field no gate Thing has'],
     [() => null,                                                                                                     'null'],
   ] as const
@@ -111,7 +111,7 @@ describe("Gate.make(record, { bank })", () => {
   }
 
   it("accepts a record of another life than its bank's: only the bank's scope is checked", async () => {
-    const later = lifeseqOf(2)
+    const later = lifeseqOfLifenum(2)
     const record = { ...await gateRecordOf(), lifeseq: later, lifepath: later }
     expect(Gate.make(record, { bank: WorldBank }).lifeseq).to.eq(later)
   })

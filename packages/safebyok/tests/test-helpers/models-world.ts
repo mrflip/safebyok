@@ -17,7 +17,7 @@ import { Lease, type LeaseBank } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { BoxRecord, BoxSparse } from '../../src/models/sealers'
 import type { BankStamp, CitedGate, GateStamp, LeaseRecord } from '../../src/models/stamps'
-import { BoxThingFormat, ShellLifeseq, lifeseqOf } from '../../src/storage/shapes-thing'
+import { BoxThingFormat, ShellLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAsk } from '../../src/storage/shapes-thing'
@@ -41,7 +41,7 @@ export function useFakeClock(): void {
 export const WorldScope = Object.freeze({ user_id: 'u1', banklabel: 'acme' })
 
 /** The stamp of the bank every builder here makes things in: its first life, born at {@link T0}. */
-export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user_id, banklabel: WorldScope.banklabel, lifeseq: lifeseqOf(0), born_at: T0 })
+export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user_id, banklabel: WorldScope.banklabel, lifeseq: lifeseqOfLifenum(0), born_at: T0 })
 
 /** The stamp of {@link WorldBankStamp}'s main gate: its first life, born at {@link T0}. */
 export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
@@ -157,7 +157,7 @@ export type BoxShell = BoxSparse & Pick<BoxRecord, 'sidecar'>
 export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
   return {
     userid: WorldScope.user_id, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
-    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: `${lifeseqOf(0)}/${ShellLifeseq}`,
+    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${ShellLifeseq}`,
     born_at: T0, written_at: T0, sidecar: { account: 'work' }, ...overrides,
   }
 }

@@ -2,7 +2,7 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
-import { DefaultLeaseMillis, Device, guardRequestCleartext } from '../../src/models/device'
+import { type BadNews, DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
 import * as TH from '../test-helpers'
@@ -111,6 +111,7 @@ describe("Device.make(record, opts)", () => {
     [{ autolockMinutes: -5 },    'an autolock of negative minutes'],
     [{ autolockMinutes: '30' },  'an autolock written as text'],
     [{ gates: ['main'] },        'an option of the old core'],
+    [{ onBadNews: 'tell me' },   'an onBadNews that is not a function'],
   ] as const
 
   for (const [moved, blurb] of OtherOptsCases) {
@@ -220,6 +221,71 @@ describe("device.sweep()", () => {
     device.sweep()
     await TH.expectRefusal(device.birthBankPrompt(), 'disabled')
     expect(device.openGating).to.be.null
+  })
+})
+
+describe("device.tellBadNews(badnews)", () => {
+  it("tells a refusal as it is and anything else thrown as an unexpected error, and drops the news of a thing disabled", async () => {
+    const onBadNews = vi.fn()
+    const device = TH.makeDevice({}, { onBadNews })
+    device.tellBadNews([new Errors.VaultError('storage_unavailable', "Down."), new Error("Thrown."), new Errors.VaultError('disabled', "Gone.")])
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['storage_unavailable', 'unexpected_error'])
+  })
+
+  it("warns of each on the device's logger by default, and once the device is swept, in place of the host's", async () => {
+    const warn = vi.fn()
+    const onBadNews = vi.fn()
+    const device = TH.makeDevice({}, { logger: { log: vi.fn(), warn, error: vi.fn() }, onBadNews })
+    warn.mockClear()
+    device.sweep()
+    device.tellBadNews([new Errors.VaultError('storage_unavailable', "Down.")])
+    await TH.eventually(() => warn.mock.calls.length === 1)
+    expect(warn.mock.calls[0]?.slice(0, 2)).to.deep.equal(["Down.", { oplabel: 'Device.onBadNews', refusalkind: 'storage_unavailable' }])
+    expect(onBadNews).not.toHaveBeenCalled()
+    expect(DefaultOnBadNews).to.be.a('function')
+  })
+})
+
+describe("tellBadNewsTo", () => {
+  it("calls the handler with each news and its device", async () => {
+    const device = TH.makeDevice()
+    const onBadNews = vi.fn()
+    const news = [new Errors.VaultError('storage_unavailable', "Down."), new Errors.VaultError('absent_box', "Gone.")]
+    tellBadNewsTo(onBadNews, device, news)
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect(onBadNews.mock.calls).to.deep.equal(news.map((told) => [{ news: told, device }]))
+  })
+
+  it("reports a handler's throw to the platform and still delivers the rest of the news", () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const told: string[] = []
+    const device = TH.makeDevice()
+    tellBadNewsTo(({ news }) => { told.push(news.refusalkind); throw new Error("The handler is broken.") }, device, [new Errors.VaultError('storage_unavailable', "Down."), new Errors.VaultError('absent_box', "Gone.")])
+    expect(told).to.deep.equal(['storage_unavailable', 'absent_box'])
+    expect(reported).toHaveBeenCalledTimes(2)
+    vi.unstubAllGlobals()
+  })
+
+  it("reports a handler whose promise rejects to the platform, with no unhandled rejection", async () => {
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
+    const device = TH.makeDevice()
+    tellBadNewsTo(() => Promise.reject(new Error("Rejected.")), device, [new Errors.VaultError('storage_unavailable', "Down.")])
+    await TH.eventually(() => reported.mock.calls.length === 1)
+    expect(reported.mock.calls[0]?.[0]).to.have.property('message', "Rejected.")
+    vi.unstubAllGlobals()
+  })
+
+  it("refuses a handler that is not a function, a missing device, or news that is not a VaultError", () => {
+    const device = TH.makeDevice()
+    const onBadNews = vi.fn()
+    const news = new Errors.VaultError('storage_unavailable', "Down.")
+    TH.expectSyncRefusal(() => { tellBadNewsTo('tell me' as never, device, [news]) }, 'bad_option')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_option')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, device, [new Error("Down.") as never]) }, 'bad_option')
+    expect(onBadNews).not.toHaveBeenCalled()
   })
 })
 

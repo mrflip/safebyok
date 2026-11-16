@@ -2,15 +2,14 @@
 
 import type { EX, Errors } from 'safebyok-big/internals'
 import type {
-  BankRoots, BirthBankAsk, GetAskArgs, GetThingAsk, ListAskArgs, ListThingsAsk, LoggableAsk, PutAskArgs, DelAskArgs, Sparse, Thing,
-  ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAskOf, WriteThingAsk,
+  BankRoots, BirthBankAsk, GetThingAsk, ListThingsAsk, LoggableAsk, Sparse, Thing, ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteThingAsk,
 } from './shapes-thing'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, its bank's `world`, and the loggable part of its `ask`.
  * `world` is the bank and its main gate as the step left them, read in that step. It is null if either is missing or fails its checks.
- * `tracked`, only for an ask that tracks, says for each of the two whether it is still at the revision the ask tracks ({@link Tracked}).
+ * `tracked`, only for an ask that tracks, says for each of the bank, its main gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
  */
 export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, tracked?: Tracked, val: ValT }
 
@@ -93,14 +92,6 @@ export interface VaultDB {
   tryListThings(ask: ListThingsAsk): Promise<ListThingsAnswer>
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
-  /** The get ask for the Thing at `args`'s scope. */
-  getAsk(args: GetAskArgs): GetThingAsk
-  /** The list ask for the children of the Thing at `args`'s scope. */
-  listAsk(args: ListAskArgs): ListThingsAsk
-  /** The put ask writing `args.record` over `args.cited`. */
-  putAsk<RecordT extends Thing>(args: PutAskArgs<RecordT>): WriteAskOf<RecordT>
-  /** The del ask writing the tombstone `args.record` over `args.cited`. */
-  delAsk<RecordT extends Thing>(args: DelAskArgs<RecordT>): WriteAskOf<RecordT>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onNotice` gets each changed Thing, and each Thing in a verb's answer's `tracked` that is not `'same'`.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
@@ -110,7 +101,7 @@ export interface VaultDB {
 
 /** The members of {@link VaultDB} that are functions. */
 const VaultDBMembernames = [
-  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'getAsk', 'listAsk', 'putAsk', 'delAsk', 'watch',
+  'tryGetThing', 'tryWriteThing', 'tryListThings', 'tryBirthBank', 'watch',
 ] as const satisfies readonly (keyof VaultDB)[]
 
 /** True for an object with a function for each member of {@link VaultDB}. */

@@ -1,7 +1,7 @@
 /** The battery's cases of tryBirthBank. */
 import { describe, expect, it } from 'vitest'
 import { expectBad } from 'safebyok-big/testing'
-import { lifeseqOf } from '../../src/storage/shapes-thing'
+import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { BankScope, GateScope, RootScope, bankThingOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, nextOf, rootBoxOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
@@ -48,7 +48,7 @@ export function describeVaultDBBirths({ fresh, bornBank, withGate, gotAt, rowsOf
 
     it("refuses over a bank's tombstone, writing nothing", async () => {
       const vaultDB = await fresh()
-      const life1 = lifeseqOf(1)
+      const life1 = lifeseqOfLifenum(1)
       const bankGone = nextOf(bankThingOf(), { am: 'x', lifeseq: life1, lifepath: life1 })
       await rowsOf(vaultDB).plant(BankScope, bankGone)
       expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: bankGone })
