@@ -1,69 +1,57 @@
 # What "functionally complete" means for the new core
 
-The work remaining to functionally complete  `safebyok/core` (the gate, the lease, the models, and the vaultDB they write through) and the
-caching layer, called `safebyok/cached` here (the ThingMinder; not yet an entry point).
-What PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `PostgresVaultDB`, `world` and
-`track` / `tracked`) is left out.
+What `safebyok/core` (the gate, the lease, the models, and the vaultDB they write through) and the caching layer,
+called `safebyok/cached` here (the ThingMinder; not yet an entry point), must do to be functionally complete. What
+PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `PostgresVaultDB`, `world` and `track` /
+`tracked`) is left out. *Sprint Notes*, below, has the steps to get there.
 
-## safebyok/core
+## Features
 
-* **Bank's box verbs answer by kind.**
-  - `GetAnswer<RecordT>`, `WriteAnswer<RecordT>`, `WriteAsk<RecordT>`.
-  - Bank's box verbs then lose the `otherThanBox` check, which cannot fire; the
-    `answer.val as BankThing` cast; and the ended-bank check repeated in five methods (`disabledAnswerOf`).
-* **`CoreBox` is the box's record-level class, and the sealer of its whisper.**
-  - A class of statics beside `Bank` and `Gate` (renamed `CoreBank` and `CoreGate` when the instance model's subclasses
-    arrive): `nextRevisionOf`, `tombstoneOf`, and the Sealer's members (`tags`, `purposes`, `stampsOf`, `encode`,
-    `decode`, `sealedOf`, `recordOf`), with `CoreBox satisfies Sealer`. The Sealer loses `nextRevisionOf`; the lease
-    takes the sealer itself, not a kind string, so `sealerkindVals`, `BoxWhisper`, `BoxTombstone` (the sealer) and
-    `sealerOf` go. One sealer, since only the whisper is sealed. `sealBox`, `tombstoneBox` and `unsealBox` stay on the
-    bank, which holds the lease.
-* **The bank's box verbs take and give records.** `getBoxRecord`, `putBoxRecord`, `delBoxRecord`, `listBoxRecords` throw
-  and give the record; each `try` twin answers instead (STYLE.md, *Naming*: `tryFoo`). They accept a duck record, fill
-  in defaults, and hand the vaultDB a full ask, which it checks strictly.
+### safebyok/core
+
+* **Bank's box verbs answer by kind:** `GetAnswer<RecordT>`, `WriteAnswer<RecordT>`, `WriteAsk<RecordT>`.
+* **`CoreBox` is the box's record-level class, and the sealer of its whisper.** A class of statics beside `Bank` and
+  `Gate`, which are renamed `CoreBank` and `CoreGate` when the instance model's subclasses arrive.
+* **The bank's box verbs take and give records:** `getBoxRecord`, `putBoxRecord`, `delBoxRecord` and `listBoxRecords`
+  throw and give the record, and each `try` twin answers instead. They accept a duck record, fill in defaults, and
+  hand the vaultDB a full ask, which it checks strictly.
+* **DONE** *The bank builds the asks.* `makeGetAsk`, `makeListAsk`, `makePutAsk` and `makeDelAsk` fill in the
+  bank's scope, the modelkind, and `track` for the bank, its main gate and its root box.
+* **Each ask has a draft and a full form, from one schema.** The draft (`GetAskDraft`, `ListAskDraft`,
+  `PutAskDraft`, `DelAskDraft`) leaves its defaulted fields optional, and is `Z.input` of a defaulted twin of the strict
+  schema. The full form takes the brief name (`GetAsk`, `ListAsk`, `WriteAsk<RecordT>`), and the vaultDB demands it.
+* **A birth answers in the batch answer's shape:** `act: 'born' | 'noop'`, with `val` keyed by slot (`bank`, `gate`,
+  `box`), each slot answering as a lone ask would.
 * **The models do not depend on the cache.** `Bank` holds no `QueryCacheOpts` and imports nothing from `minding/`. The
-  vaultDB has one source, not two (`Device` and `BankOpts` each hold one now).
-* **The classifier is lean.** `AdapterVaultDB`'s protected `classify*` methods pass through to plain functions, no store
-  overrides them, and they go. The memory store and a store that decides (Postgres, and Convex after it) both compose
-  the same exported steps.
+  vaultDB has one source, not two.
+* **The classifier is lean.** The memory store and a store that decides (Postgres, and Convex after it) compose the
+  same exported steps, and each classifier takes one step's fetch as one bag.
+* **DONE** *Postgres's functions are versioned* by name, `safebyok_t01_r000_<stem>`: the head changes with the
+  tables, the tail with behaviour atop the same tables.
 
-## safebyok/cached
+### safebyok/cached
 
-* **One way into the cache.** Every record enters through `#doDeliverRecord`: a get's answer, a notice, a write's
-  answer, a listing, and each Thing that `tracked` or `world` carries. The get's `queryFn` stops writing the cache
-  itself.
-* **Each minder holds its own watch, and the minders know nothing of each other.** A minder's `receive` drops the
-  notices of other kinds. A change to the bank, the main gate or the root box comes back as that Thing's own notice,
-  through `tracked`, so no minder delivers `world`.
-* **The bank builds the asks.** `makeGetAsk`, `makePutAsk`, `makeDelAsk` and `makeListAsk` move from `VaultDB` to
-  `Bank`, and fill in the bank's scope, the modelkind and `track` (the bank, its main gate and its root box). The
-  ThingMinder is a strict public primitive: `get` and `tryAt` take one full ask, made by `minder.makeGetAsk`, with
-  `staleTime` and `ifStale` in it and no `opts`.
-* **`listen`.** A host subscribes to a minder's records through one `QueryCache.subscribe`, filtered by the minder's
-  `keyPrefix`. The listener gets the answer `tryAt` would give, `vacant` once the entry is removed.
-* **Trouble with no caller goes to the device's `onBadNews`** (ported from big), whose default warns on the device's
-  logger: the watch's trouble, and a host listener that throws.
-* **The box listing.** A box minder lists the boxes one label under the root box. Each listed box enters the cache as
-  a sparse record, marked stale, so the next get fetches it whole. The dead `#tsqListAskOf` goes, and its two safety
-  hatches with it.
-* **Storage going backward is not served as fresh.** Where storage answers a get with a record older than the cached
-  one (a lost row, a rollback), the entry stops counting as timely, rather than staying fresh until `goodbye`. A late
-  answer that only lost a race stays as `notes/wontfix.md` describes.
-* **`VoidSentinel` is a whole tombstone**, with every field a tombstone has. `isVoidSentinel`, `gotAnswerOf` and box
-  citing change with it. A box under the root cites its own shell.
-* **One `shellOf`**, in shapes-thing, replacing `voidSentinelOf` and `Bank.#shellOf`. Its forms are
-  `shellOf({ ...scope, labelpath, lifepath? })`, with any life at that scope or none for a root, and
-  `shellOf({ ...scope, label | labelpath }, { labelpath, lifepath })`, with the parent's two strings or any parent
-  record. No `lifeseq` input.
-* **The minder's inputs.** It takes `make(recordish, livepropsAndOpts, friend)`, with the friend
-  `Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'tellBadNews'>` (the root box only to seed the box minder's cache)
-  and the cache options apart from it. `onBadNews` goes until something calls it. The ended-bank check goes.
-* **Cache options are fixed where hosts can't safely choose them.** `networkMode` is `'always'` and `retry` is off,
-  neither settable by a host. `staleTime` defaults to an hour.
-* **Lifecycle.** `hello` is idempotent (it checks `#isReady`, so a second call opens no second watch). `goodbye`
-  removes the minder's query defaults from the shared client.
-* **Keys and names.** `queryKey` names the modelkind once. `pins` becomes `ties`, read without parsing the minder on
-  every access. `isLifeOff` becomes `isLifeMismatch`.
+* **DONE** *One way into the cache.* Every record enters through `structuralSharing` (`betterRecordOf`): a get's
+  answer as its `queryFn` returns it, and a notice or a listing through `#doDeliverRecord`.
+* **DONE** *Each minder holds its own watch, and the minders know nothing of each other.* A change to the bank, the
+  main gate or the root box comes back as that Thing's own notice, through `tracked`.
+* **DONE** *The ThingMinder is a strict public primitive.* `get(ask, opts)` and `tryAt(ask, opts)` take the bank's
+  full get ask, `track` included, and send it to storage exactly as given. `opts` are the call's overrides of the
+  minder's own settings.
+* **DONE** *Minders serve a born bank.* Before its birth, a get or a list refuses.
+* **DONE** *`listen`.* The listener gets the answer `tryAt` would give, `vacant` once the entry is removed.
+* **DONE** *Trouble with no caller goes to the device's `onBadNews`,* whose default warns on the device's logger:
+  the watch's trouble, and a host listener that throws.
+* **DONE** *The box listing.* A box minder lists the boxes one label under the root box. Each enters the cache sparse
+  and stale, so the next get fetches it whole.
+* **DONE** *Storage going backward is not served as fresh.* A get whose answer is older than the record cached
+  before it refuses `stale_read`, and the newer record stays. A late answer that only lost a race stays as
+  `notes/wontfix.md` describes.
+* **DONE** *The void sentinel is the shell of its scope,* a whole tombstone, made by one `shellOf`.
+* **DONE** *The root box stays cached* while the box minder minds, whatever a host's `gcTime`.
+* **DONE** *Cache options are fixed where hosts can't safely choose them.* `networkMode` is `'always'` and `retry` is
+  off; `staleTime` defaults to an hour.
+* **DONE** *Lifecycle.* `hello` is idempotent, and `goodbye` empties the minder's entries and query defaults.
 
 ## Not part of this push
 
@@ -75,8 +63,7 @@ What PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Pos
 * What `maingate` names: the root gate, or the gate that authorized the caller.
 * A box birth checking that its parent is live (TODO.md).
 * The batch ask (*Batch Ask*, below): a generic batch of writes, built when convenient, replacing `tryBirthBank`. Its
-  answer's shape matters most, then its ask's. Until it is built, `doBirthBank` takes the ask alone, and `tryBirthBank`
-  answers in the batch answer's final shape.
+  answer's shape matters most, then its ask's.
 * A subscription to one record's feed on the minder, so the bank follows its own revisions and `track` stops carrying
   rows it has already seen.
 * A bank's lives sharing a lifeseq (TODO.md).
@@ -84,25 +71,70 @@ What PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Pos
   vaultDB.
 * Moving the adapters, `safebyok-react`, the demo and e2e off `safebyok-big`.
 
-## Order of operations
+## Sprint Notes
 
-1. Done: the doc-block branch, rebased onto #707, as its own PR (#708).
-2. Done: T2 `minder_buttonup`, stacked on it (#709):
-   1. the minder's inputs, cache options and lifecycle;
-   2. one way into the cache;
-   3. `VoidSentinel`;
-   4. the bank minder's `receive`, routing gates and boxes;
-   5. `listen`;
-   6. the box listing;
-   7. storage going backward;
-   8. keys and names.
-3. The signature PR (`#pass-it-whole`): the signature hunt's clear wins 1-8, 10 (`doBirthBank(ask)`) and 12, the
-   cosmetic fixes, `judgeStrength(device, scope, cleartext)`, `clear` becoming `cleartext` in code, and `tryBirthBank`
-   answering in the batch answer's shape: `act: 'born' | 'noop'`, `val` keyed by slot (`bank`, `gate`, `box`).
-4. The classifier tidy, and the models off the cache: each classifier takes one step's fetch as one bag; each ask's
-   caller-stated type is `Z.input` of a defaulted twin of its strict schema, and its builder one `safeParse`;
-   `Bank.queryCacheOpts` goes.
-5. T3 `bank_box_errors`: answers by kind, then a box's methods off its Sealer, with the Coach.
+### 1. The doc-block branch (#708)
+
+* **DONE** Plain-English doc blocks across `packages/safebyok/src`, rebased onto #707 and made coherent with its code.
+
+### 2. T2 `minder_buttonup` (#709)
+
+* **DONE** `VaultDB`'s `getAsk`, `putAsk`, `delAsk` and `listAsk` removed; `Bank` gains `makeGetAsk`, `makeListAsk`,
+  `makePutAsk`, `makeDelAsk` and a `track` getter, and its verbs use them.
+* **DONE** `GetAskArgs`, `ListAskArgs`, `PutAskArgs`, `DelAskArgs`, `BankAskArgs` and `GetBoxArgs` renamed `GetAsk`,
+  `ListAsk`, `PutAsk`, `DelAsk`, `BankAsk` and `GetBoxAsk`; every parameter of them is named `ask`.
+* **DONE** `track` gains a third fixed key, the root box at `box`, in both stores; Postgres gains `safebyok_root_box`,
+  and each write function returns the root box after the write.
+* **DONE** The roster (`MinderRoster`), `#routeWorld`, `#route` and `make`'s `minders` input removed; `receive` drops
+  notices of other kinds.
+* **DONE** The get's `queryFn` stops writing the cache; `#doGet` reads the cache after the fetch, since TanStack's
+  `query()` resolves with the raw value the `queryFn` returned.
+* **DONE** The friend is `Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>`; `rootBox`
+  only seeds the box minder's cache, in `hello`.
+* **DONE** `onBadNews`, `DefaultOnBadNews` and `tellBadNewsTo` ported from big into `Device`; `bank.tellBadNews`
+  passes through to it, and `#reportTrouble` calls it. The minder's own `onBadNews` and its ended-bank check removed.
+* **DONE** `voidSentinelOf`, `Bank.#shellOf` and `#voidSentinelAt` replaced by `shellOf`, with forced defaults for
+  the shell's fixed fields. The shell's lifeseq is `'-000000001'`.
+* **DONE** `seqOfLifeseq` and `lifeseqOf` renamed `lifenumOfLifeseq` and `lifeseqOfLifenum`.
+* **DONE** `stale_read` added to big's refusal kinds (family `condition`) and to `CustomerKinds`; the wontfix entry
+  "The ThingMinder detects no conflict among the records it holds" amended.
+* **DONE** `listen` translates TanStack's events into answers, and catches a listener's throw.
+* **DONE** `goodbye` during a get refuses `disabled`, not TanStack's `CancelledError`.
+* **DONE** The box minder holds a `QueryObserver` (`enabled: false`) on the root box from `hello` to `goodbye`.
+* **DONE** `isStaleAt(ask, opts)` and `#answerOfTSQ(ask, opts)`.
+* **DONE** The dead `#tsqListAskOf` and its two safety hatches removed.
+* **DONE** `queryKey` names the modelkind once; `pins` becomes `ties`; `isLifeOff` becomes `isLifeMismatch`.
+* **DONE** `TableVersion` and `SqlRevision` name every Postgres function; old versions stay installed.
+
+### 3. The signature PR (`#pass-it-whole`)
+
+* The signature hunt's clear wins 1-8, 10 (`doBirthBank(ask)`) and 12, and its cosmetic fixes (`notifyTrackedRecords`
+  named `(ask, answer)`; `Bank`'s constructor takes `(record, opts)` and parses first).
+* `judgeStrength(device, scope, cleartext)`.
+* `clear` becomes `cleartext` in code (19 uses).
+* `tryBirthBank` answers in the batch answer's shape.
+* The asks' drafts and full forms renamed, in one commit, drafts first: `GetAsk`, `ListAsk`, `PutAsk`, `DelAsk`,
+  `BankAsk` and `GetBoxAsk` become `GetAskDraft`, `ListAskDraft`, `PutAskDraft`, `DelAskDraft`, `BankAskDraft` and
+  `GetBoxAskDraft`; then `GetThingAsk`, `ListThingsAsk` and `WriteAskOf` / `WriteThingAsk` become `GetAsk`, `ListAsk`
+  and `WriteAsk<RecordT>`. VOCABULARY.md gains **draft**.
+
+### 4. The classifier tidy, and the models off the cache
+
+* `AdapterVaultDB`'s protected `classify*` pass-throughs removed.
+* Each classifier takes one step's fetch as one bag (the hunt's 17, with 11 and 13).
+* Each ask's draft becomes `Z.input` of a defaulted twin of its strict schema, and its builder one `safeParse`.
+* `Bank.queryCacheOpts` removed.
+
+### 5. T3 `bank_box_errors`
+
+* Answers by kind; Bank's box verbs lose the `otherThanBox` check, the `answer.val as BankThing` cast, and the
+  ended-bank check repeated in five methods (`disabledAnswerOf`).
+* `CoreBox`: `nextRevisionOf`, `tombstoneOf`, and the Sealer's members (`tags`, `purposes`, `stampsOf`, `encode`,
+  `decode`, `sealedOf`, `recordOf`), with `CoreBox satisfies Sealer`. The Sealer loses `nextRevisionOf`, and the lease
+  takes the sealer itself, not a kind string, so `sealerkindVals`, `BoxWhisper`, `BoxTombstone` (the sealer) and
+  `sealerOf` go. `sealBox`, `tombstoneBox` and `unsealBox` stay on the bank, which holds the lease.
+* The bank's record verbs: `getBoxRecord`, `putBoxRecord`, `delBoxRecord`, `listBoxRecords` and their `try` twins.
+* The bank and gate stamp pair spelled one way (the hunt's 14), after `notes/guarantees-big.md`'s check.
 
 ## Batch Ask
 
