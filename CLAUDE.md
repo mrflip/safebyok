@@ -127,7 +127,8 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
   `notes/guarantees-big.md` names under *Where the guarantees are kept*, read its *The guarantees*
   section, and check the change against it.** The new core may cite a guarantee by number where it
   keeps it in substance. It never edits `notes/guarantees-big.md`, and any drift is written into
-  `notes/guarantees-drift.md`.
+  `notes/guarantees-drift.md`. `notes/supervising.md`: read it before handing work to a
+  `thread-worker` outside `/sprint`.
 
 ## Reading
 
