@@ -64,7 +64,7 @@ describe("AdapterVaultDB, a step that throws", () => {
     const answer = await vaultDB.tryBirthBank(TH.birthBankAskOf())
     const err = await TH.expectBad(Promise.resolve(answer), 'storage_unavailable')
     expect(err.meta).to.deep.include({ oplabel: 'birthBank' })
-    expect(answer).to.deep.include({ act: 'unclassified_storing', dbhas: null })
+    expect(answer).to.include({ act: 'unclassified_storing' }).and.not.have.property('dbhas')
     expect(answer.ask).to.deep.include({ op: 'birth', ...TH.ThingBank })
   })
 

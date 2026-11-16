@@ -15,7 +15,7 @@ them only in part, and above all where its fix is cheap, it is a defect: fix it,
 
 ### A birth over a deleted bank refuses `stale` when another device built the bank again first
 
-* current outcome: `tryBirthBank` refuses `stale` and writes nothing. Until a birth cites the bank it found, as big's
+* current outcome: `tryBirthBank` answers `noop`, its bank's slot refusing `stale`, and writes nothing. Until a birth cites the bank it found, as big's
   does, every birth over a bank's tombstone refuses so, race or no race: rebirth waits on the coordinated delete.
 * alternatives:
   - retry for the customer: belongs to the customer or to orchestration we provide, never the low-level call.

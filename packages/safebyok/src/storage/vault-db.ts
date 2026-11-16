@@ -2,10 +2,10 @@
 
 import type { EX, Errors } from 'safebyok-big/internals'
 import type {
-  BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, Sparse, Thing, ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAsk,
+  BankThing, BirthBankAsk, BoxThing, GateThing, GetAsk, ListAsk, LoggableAsk, Sparse, Thing, ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAsk,
 } from './shapes-thing'
 
-// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
+// == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, SlotAnswer, BirthSlotAnswers, BirthBankAnswer, ThingNotice
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, its bank's `world`, and the loggable part of its `ask`.
  * `world` is the bank and its main gate as the step left them, read in that step. It is null if either is missing or fails its checks.
@@ -42,14 +42,26 @@ export type ListThingsAnswer<RecordT extends Thing = Thing> =
   | (GoodAnswer<Sparse<RecordT>[], EX.GotAct> & ListedBeside<RecordT>)
   | (BadAnswer<Sparse<RecordT>[] | null>      & ListedBeside<RecordT>)
 
-/** The answer to `tryBirthBank`: the three roots the store wrote (`born`), or found already stored (`passed`). */
-export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
+/** A slot's answer in a birth: the answer its put would give as a lone ask, less the `world` and `tracked` the birth answers once. */
+export type SlotAnswer<RecordT extends Thing = Thing> =
+  | Omit<GoodAnswer<RecordT, EX.PutAct>, 'world' | 'tracked'>
+  | Omit<BadAnswer<RecordT | null>, 'world' | 'tracked'>
+
+/** The slots of a birth's answer, one for each root's put, under the root's labelpath. */
+export type BirthSlotAnswers = Readonly<{ bank: SlotAnswer<BankThing>, gate: SlotAnswer<GateThing>, box: SlotAnswer<BoxThing> }>
+
+/** The answer to `tryBirthBank`: `born` where every root was written, `noop` where a slot refused, and nothing was written. Each slot answers as its lone put would.
+ * Refused only where the step itself failed: then no slot answers, and `ask` is the whole birth ask, loggable.
+ */
+export type BirthBankAnswer =
+  | Omit<BadAnswer, 'dbhas'>
+  | { ok: true, ask: Readonly<{ op: 'birth' }>, act: 'born' | 'noop', world: WorldRecord | null, tracked?: Tracked, val: BirthSlotAnswers }
 
 /** A changed Thing that a watch reports, shaped like a get's answer, with its bank's world as the store last read it. */
 export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val' | 'world'>
 // --
 
-// == [What a store reports]: Actual, ListThingsActual, BirthBankActual
+// == [What a store reports]: Actual, ListThingsActual, SlotActual, BirthSlotActuals, BirthBankActual
 
 /** A store's report of one atomic step: its act, the bank's `world` as the step left it with its `tracked`, and a `record`.
  * `record` is the Thing found at the scope or, after a write, the Thing the store reports writing. The adapter turns it into the answer's `val` when good, its `dbhas` when refused.
@@ -65,10 +77,16 @@ export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: T
   | { ok: false, act: EX.RefusedAct }
 )>
 
-/** A store's report of a bank's birth: the three roots, written or already stored, or the first refused act with the Thing stored at that root. */
-export type BirthBankActual =
-  | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, tracked?: Tracked, things: BankRoots }
-  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
+/** A store's report of one slot of a birth: its put's act, and the Thing stored at its root or, under a write act, the record written. */
+export type SlotActual<RecordT extends Thing = Thing> =
+  | { ok: true,  act: EX.PutAct,      record: RecordT }
+  | { ok: false, act: EX.RefusedAct,  record: RecordT | null }
+
+/** A store's report of each slot of a birth, under its root's labelpath. */
+export type BirthSlotActuals = Readonly<{ bank: SlotActual<BankThing>, gate: SlotActual<GateThing>, box: SlotActual<BoxThing> }>
+
+/** A store's report of a bank's birth: `born` with the three roots as written, or `noop` with each slot's report over the roots stored. */
+export type BirthBankActual = { act: 'born' | 'noop', world: WorldRecord | null, tracked?: Tracked, slots: BirthSlotActuals }
 // --
 
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB
@@ -90,7 +108,7 @@ export interface VaultDB {
   tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope. */
   tryListThings(ask: ListAsk): Promise<ListThingsAnswer>
-  /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
+  /** Write a new bank's three roots (bank, main gate, root box) in one step, all or none, answering each root's put as a lone put would be answered. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onNotice` gets each changed Thing, and each Thing in a verb's answer's `tracked` that is not `'same'`.

@@ -44,13 +44,13 @@ export function describeVaultDBWorld({ fresh, bornBank, withGate, boxesBorn, row
       expect(refusal).to.deep.include({ ok: false, act: 'stale', world: worldWith() })
     })
 
-    it("is the bank and main gate written or found, to a birth, and null to one refused over no bank", async () => {
+    it("is the bank and main gate written or found, to a birth, and null to one that writes nothing over no bank", async () => {
       const vaultDB = await fresh()
       expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: true, act: 'born', world: worldWith() })
       const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }) })
-      expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', world: worldWith() })
+      expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'noop', world: worldWith() })
       const lone = await withGate(gateThingOf({ revtok: 'rev-other' }))
-      expect(await lone.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', world: null })
+      expect(await lone.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: true, act: 'noop', world: null })
     })
 
     it("is the bank and its main gate where no root box is stored", async () => {

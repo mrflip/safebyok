@@ -1,3 +1,4 @@
+import { omit } from 'es-toolkit'
 import type { Consts, EX } from 'safebyok-big/internals'
 import { CX, Clock, Crypto, Errors, Throwers, Validator } from 'safebyok-big/internals'
 import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../minding/shapes-minder'
@@ -14,7 +15,7 @@ import {
   type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
   listAskOf, loggableAskOf, putAskOf, shellOf, sparseOf,
 } from '../storage/shapes-thing'
-import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
+import { type BadAnswer, type BirthBankAnswer, type BirthSlotAnswers, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
 export type { BankRecord, WorldRecord } from '../storage/shapes-thing'
 
@@ -137,8 +138,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const bank = this.make(record, bankOpts)
     const born = await bank.#tryBirth(proving)
     if (! born.ok) { throw born.err }
-    // The user must hear that their passphrase was not set: the bank stored is another's.
-    if (born.val.bank.revtok !== bank.revtok) { throw Throwers.gateMadeElsewhere() }
+    if (born.act !== 'born') { throw birthRefusalOf(born.val) }
     return bank
   }
 
@@ -222,12 +222,12 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   async #tryBirth(proved: Proving): Promise<BirthBankAnswer> {
     const ask = { ...this.scope, op: 'birth' } as const
     const { endCause } = this.#device
-    if (endCause !== null) { return disabledAnswerOf(ask, endCause) }
+    if (endCause !== null) { return omit(disabledAnswerOf(ask, endCause), ['dbhas']) }
     const lease = await Checks.proving.parse(proved).buildLease(this, this.#maingate)
     const root = await lease.seal('BoxWhisper', { ...this.#rootBox, sidecar: {} }, { whisper: {} })
     const answer = await this.#vaultDB.tryBirthBank({ ...ask, bank: this.pickle(), gate: this.#maingate.pickle(), root })
-    if (answer.ok && (answer.val.bank.revtok === this.revtok) && lease.isEnabled) {
-      this.#rootBox = Object.freeze(sparseOf(answer.val.root))
+    if (answer.ok && (answer.act === 'born') && answer.val.box.ok && lease.isEnabled) {
+      this.#rootBox = Object.freeze(sparseOf(answer.val.box.val))
       this.#attachLease(lease)
     } else {
       lease.evict()
@@ -384,6 +384,15 @@ function trackPairOf({ revseq, lifepath }: Pick<Thing, 'revseq' | 'lifepath'>): 
 /** The refused answer to `ask` while the bank's device is disabled: its `err` is the device's `endCause`. */
 function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<null> {
   return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: endCause }
+}
+
+/** The refusal of a birth that wrote nothing, from its slots: `gate_made_elsewhere` over another's live bank, else the first slot's refusal. */
+function birthRefusalOf({ bank, gate, box }: BirthSlotAnswers): Errors.VaultError {
+  // The user must hear that their passphrase was not set: the bank stored is another's.
+  if ((! bank.ok) && (bank.act === 'stale') && (bank.dbhas?.am === 'a')) { return Throwers.gateMadeElsewhere() }
+  for (const slot of [bank, gate, box]) { if (! slot.ok) { return slot.err } }
+  // A noop with no slot refused: the store is broken.
+  return Throwers.storageIssue()
 }
 
 // The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.

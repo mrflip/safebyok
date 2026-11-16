@@ -453,13 +453,11 @@ export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
   return checked
 }
 
-/** The three puts of a bank's birth, each writing a root over the shell.
- * The bank's put returns a live bank (`passed`). The gate's and the root's put refuse over a live Thing.
- */
+/** The three puts of a bank's birth, each writing a root over the shell, and refusing over a live Thing or a tombstone. */
 export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAsk): BirthPuts {
   const flags = { userid, banklabel, op: 'put', ifAbsent: 'add', ifPresent: 'fail' } as const
   return [
-    { ...flags, labelpath: 'bank', modelkind: 'bank', cited: ShellCited, record: bank, ifPresent: 'get' },
+    { ...flags, labelpath: 'bank', modelkind: 'bank', cited: ShellCited, record: bank },
     { ...flags, labelpath: 'gate', modelkind: 'gate', cited: ShellCited, record: gate },
     { ...flags, labelpath: 'box',  modelkind: 'box',  cited: ShellCited, record: root },
   ]
