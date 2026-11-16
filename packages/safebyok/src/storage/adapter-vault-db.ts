@@ -5,7 +5,7 @@ import type * as Z from 'zod'
 import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../phrases'
 import {
-  type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
+  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
   type WriteAsk, birthPutsOf, checkedBirthBankAsk, checkedGetAsk, checkedListAsk, checkedWriteAsk, loggableAskOf, watchArgs,
 } from './shapes-thing'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
@@ -163,16 +163,16 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Tracked]: notifyTrackedRecords
 
   // Each verb calls it last, on the answer it returns. Each watch is called on a later microtask, so nothing it does runs inside the verb.
-  /** Notify each watch of the bank at `bankScope` of each Thing in `answer.tracked` that is not `'same'`, with `answer.world`.
+  /** Notify each watch of `ask`'s bank of each Thing in `answer.tracked` that is not `'same'`, with `answer.world`.
    * Does nothing for a vaultDB made with `doNotifyTracked: false`.
    */
-  protected notifyTrackedRecords(bankScope: ThingWatchScope, { world, tracked }: { world: WorldRecord | null, tracked?: Tracked }): void {
+  protected notifyTrackedRecords(ask: AnyAsk, { world, tracked }: { world: WorldRecord | null, tracked?: Tracked }): void {
     if ((tracked === undefined) || (! this.#doNotifyTracked)) { return }
     // Unspecified for a missing or damaged row: notes/wontfix.md.
     for (const record of Object.values(tracked)) {
       if (record === 'same') { continue }
       for (const { scope, receive } of this.#feeds) {
-        if ((scope.userid === bankScope.userid) && (scope.banklabel === bankScope.banklabel)) {
+        if ((scope.userid === ask.userid) && (scope.banklabel === ask.banklabel)) {
           queueMicrotask(() => { receive({ record: structuredClone(record), world: structuredClone(world) }) })
         }
       }
