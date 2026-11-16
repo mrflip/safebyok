@@ -41,6 +41,6 @@ Nothing on the list was skipped.
     `otherThanBox(ask, row)` / `otherThanBox(answer)`; `demandBornAtKept(ask, stored, raw)` / `(ask, raw)` (one source
     of truth, not two); `#fetchThing(scope, track?)` / `#fetchThing(ask)`; `wayinsOf(main, passkey0)` /
     `wayinsOf(wayins)`.
-  - `buildNovel(bank, gate, passphraseCleartext, device)` still puts the secret before the device (`#big-to-little`);
-    not on the list, left for a ruling.
+  - Ruled by the Coach: the provings' builders take the device first and the cleartext last (`#big-to-little`),
+    `buildNovel(device, bank, gate, cleartext)` and `buildStored(device, gate, cleartext)`; `PasskeyProving.buildStored(gate, cleartext)` unchanged.
   - Safety hatches added: none.
