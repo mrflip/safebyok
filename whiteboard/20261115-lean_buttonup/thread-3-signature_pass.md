@@ -1,7 +1,7 @@
 # Thread 3: signature_pass (2026-11-16)
 
-Branch `20261116-signature_pass`, PR #713, on main. Proved: `safebyok` 822 tests, `safebyok-postgres` 331, typecheck and
-lint in both, per commit; `pnpm justify` at the tip after the catch-up. The step 3 list is in `handoff.md` (same folder).
+Branch `20261116-signature_pass`, PR #713, on main. Proved: `safebyok` 821 tests, `safebyok-postgres` 330, typecheck and
+lint in both, per commit; `pnpm justify` at the tip after the item 10 revert. The step 3 list is in `handoff.md` (same folder).
 Nothing on the list was skipped.
 
 * **Built**, one commit per finding or family:
