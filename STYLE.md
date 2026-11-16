@@ -50,6 +50,9 @@ is someone else's interface, and fine.
 encrypted form -- and those names are used as written, never a synonym. Never `data`, `contents`
 or `payload` for a variable or field we control: it is a whisper, or a whisperCiphered.
 
+**A secret is a `cleartext`, never `clear`.** `passphraseCleartext`, not `passphraseClear`: `clear` reads as a verb, and
+carries no warning. VOCABULARY.md has the term.
+
 **Never bare `key`.** In this package a key is cryptographic until proven otherwise, so:
 
 * a **cryptographic key** is named for its role, as VOCABULARY.md has it: `passphraseKey`,
@@ -296,6 +299,20 @@ is a refusal with a `kind` the caller can branch on.
 
 **A constructor validates its arguments**, in a parse as its first line, even when the `make` or
 `build` that calls it parsed them already: it is an entry point of its own.
+
+**Generous at the customer's door, strict past it.**
+
+* **A customer entry point is generous.** It offers defaults, duck-typed validators, overloads and
+  shorthands where they earn their place, and takes an object or its handle, looking it up for the
+  caller. The simple, common case looks effortless, and the same call reaches full power. A line
+  or so later every detail is met: no undefined, no missing field, no convenience union. That full
+  type is what the code past it uses, with confidence.
+* **A library-internal or public-primitive entry point is strict.** It demands exactly that full
+  type, supplies no friendly default and accepts no elided option. Where it needs a narrower type
+  (a scope), it accepts the full one (a record, an instance, an ask) and picks.
+* **Two exceptions.** A purpose-built entry point is generous: `make` supplies defaults and
+  derives values, so the constructor it calls executes with unambiguous intent. A purpose-built
+  helper is generous too: `putAskOf` fills in an ask's flags.
 
 **For preconditions, one line is the norm.** A function pulls what it needs out of what it was
 handed, and checks it, in one parse: `const { user_id, banklabel } = CX.bankScope.parse(thing)`.
