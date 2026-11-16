@@ -74,7 +74,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
  * The bank must be stored: before its birth, a get or a list refuses.
  */
 export class ThingMinder {
-  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #unpermamentizeRootBox, #isReady
+  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #isReady
   readonly userid:    string
   readonly banklabel: string
   readonly modelkind: Thingkind
@@ -84,7 +84,6 @@ export class ThingMinder {
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   readonly #recordChecker:  typeof KindChecks[Thingkind]['record']
   #unwatch: (() => void) | null = null
-  #unpermamentizeRootBox: (() => void) | null = null
   /** True from `hello` until `goodbye`: the reads answer, and records are cached, only then. */
   #isReady = false
   // --
@@ -111,7 +110,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Starting and ending]: hello, #startVaultDBWatch, #permamentizeRootBox, goodbye
+  // == [Starting and ending]: hello, #startVaultDBWatch, goodbye
 
   // The root box is cached here, not when the minder is made: only a minder minding keeps records, under its defaults.
   /** Start minding: set this minder's defaults on the cache, and watch the bank. A box minder caches its bank's root box until `goodbye`. A second call does nothing. */
@@ -126,8 +125,9 @@ export class ThingMinder {
     })
     this.#isReady = true
     if (this.modelkind === 'box') {
+      // Kept whatever the host's gcTime: its own key's defaults reach no box under it.
+      this.#tsq.setQueryDefaults(this.queryKey(this.#bank.rootBox), { gcTime: Infinity })
       this.#doDeliverSeed(this.#bank.rootBox)
-      this.#unpermamentizeRootBox = this.#permamentizeRootBox()
     }
     this.#startVaultDBWatch()
   }
@@ -141,23 +141,15 @@ export class ThingMinder {
     )
   }
 
-  /** Keep the root box cached whatever the host's `gcTime`. Returns the function that stops observing it. */
-  #permamentizeRootBox(): () => void {
-    // TanStack never collects an entry with an observer, and this one never fetches.
-    const observer = new TSQ.QueryObserver<DeliverableThing>(this.#tsq, { queryKey: this.queryKey(this.#bank.rootBox), enabled: false })
-    return observer.subscribe(noop)
-  }
-
   /** Stop minding, and remove this minder's entries and defaults from the cache. Reads refuse until `hello` is called again. */
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
-    if (this.#unpermamentizeRootBox) { this.#unpermamentizeRootBox() }
-    this.#unwatch      = null
-    this.#unpermamentizeRootBox = null
+    this.#unwatch = null
     this.#tsq.removeQueries({ queryKey: this.keyPrefix })
     // TanStack Query cannot remove a key's defaults: empty ones in their place set nothing.
     this.#tsq.setQueryDefaults(this.keyPrefix, {})
+    if (this.modelkind === 'box') { this.#tsq.setQueryDefaults(this.queryKey(this.#bank.rootBox), {}) }
   }
   // --
 
@@ -287,13 +279,15 @@ export class ThingMinder {
 
   // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #shellAt
 
-  /** The key every one of this minder's cache entries starts with. */
+  /** The key every one of this minder's cache entries starts with: its root's, without the final '.', selecting the root and everything under it. */
   get keyPrefix(): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, this.modelkind] }
 
-  // Each label is a segment of its own, so that a key prefix selects a Thing and everything under it. A labelpath
-  // starts with its modelkind, so the key does too.
+  // Each label is a segment of its own, so that the key without its final '.' selects a Thing and everything under it.
+  // The '.' marks the Thing itself, and can never be a label: TanStack matches query defaults by key prefix, so without
+  // it the root box's key would be the box minder's keyPrefix and start every box's key, and no defaults could single
+  // out the root box. A labelpath starts with its modelkind, so the key does too; do not repeat it.
   /** The key of the cache entry for `scoped`. */
-  queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/')] }
+  queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
 
   /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. TanStack caches its record through `betterRecordOf`. */
   #tsqGetAskOf(ask: GetThingAsk) {
@@ -354,7 +348,7 @@ export class ThingMinder {
 
   /** The scope of the cache entry at `queryKey`, one of this minder's. */
   #scopeOfKey(queryKey: TSQ.QueryKey): ThingScope {
-    return { userid: this.userid, banklabel: this.banklabel, labelpath: queryKey.slice(3).join('/') }
+    return { userid: this.userid, banklabel: this.banklabel, labelpath: queryKey.slice(3, -1).join('/') }
   }
 
   // --

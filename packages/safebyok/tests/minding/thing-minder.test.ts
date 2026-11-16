@@ -207,9 +207,14 @@ describe("ThingMinder.hello", () => {
       const boxMinder = minderOf('box', vaultDB, tsq, { gcTime: 10 })
       boxMinder.hello()
       await boxMinder.list()
+      expect(tsq.getQueryCache().find({ queryKey: boxMinder.queryKey(BoxAsk), exact: true })).to.have.property('gcTime', 10)
       await vi.advanceTimersByTimeAsync(20)
       expect(boxMinder.at(RootAsk)).to.deep.equal(sparseOf(TH.rootBoxOf()))
       expect(boxMinder.at(BoxAsk)).to.be.undefined
+      await boxMinder.list()
+      expect(boxMinder.at(BoxAsk)).to.deep.equal(sparseOf(TH.boxThingOf()))
+      tsq.removeQueries({ queryKey: ['safebyok', 'u1', 'acme', 'box'] })
+      expect([boxMinder.at(RootAsk), boxMinder.at(BoxAsk)]).to.deep.equal([undefined, undefined])
       boxMinder.goodbye()
       expect(tsq.getQueryCache().getAll()).to.have.lengthOf(0)
     } finally {
@@ -739,10 +744,11 @@ describe("Each minder's watch", () => {
 })
 
 describe("ThingMinder keys", () => {
-  it("name the modelkind once, and hold each label of a labelpath as a segment of its own", () => {
+  it("hold each label as a segment of its own, then '.' for the Thing itself, so that the root box's key starts no box's", () => {
     const { minder, boxMinder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
-    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'gate'])
-    expect(boxMinder.queryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', 'openai'])
+    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'gate', '.'])
+    expect(boxMinder.queryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '.'])
+    expect(boxMinder.queryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', 'openai', '.'])
     expect(boxMinder.keyPrefix).to.deep.equal(['safebyok', 'u1', 'acme', 'box'])
   })
 })
