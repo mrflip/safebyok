@@ -104,6 +104,9 @@ export const DelFlagsFixed = "A del's flags are fixed, ifAbsent 'fail' and ifPre
 /** A write naming a storage policy its kind lacks. */
 export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank and a box have none."
 
+/** A live bank stored without one of its roots. */
+export const BankRootsMissing = "A live bank is stored without its main gate or its root box: the store needs mending by hand."
+
 /** The last resort of a vaultDB's error handler. */
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --

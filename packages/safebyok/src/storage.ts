@@ -6,15 +6,15 @@ export {
   type GateThing, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type Sealed, type ShellParent, type ShellScoped, type VoidSentinel, type Wayins,
   type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type Track, type Tracked, type WorldRecord, type WriteAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifepath, ShellLifeseq,
-  ThingFormats, birthPutsOf, boxSparse, childShellCited, delAskOf, getAskOf, isGoneLifeseq, isLabelpathOfKind, lifenumOfLifeseq, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, modelkindOf,
+  ThingFormats, boxSparse, childShellCited, delAskOf, getAskOf, isGoneLifeseq, isLabelpathOfKind, lifenumOfLifeseq, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, modelkindOf,
   putAskOf, sealed, shellOf, sparseOf, thingkindVals, wayins,
 } from './storage/shapes-thing'
 export {
   type BankRootsFetched, type ThingsFetched, type TrackedFetched, type TrackedRows, type UnwrittenWrite, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing,
   demandBornAtKept, demandPolicies, isWriteAct, storedCitedOf, storedThingOf, trackedFieldOf, unwrittenBirthOf, unwrittenWriteOf, worldOf, writeActOf,
-  writtenBirthOf, writtenThingOf,
+  writtenRootsOf, writtenThingOf,
 } from './storage/thing-classifier'
 export {
-  type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type BirthSlotActuals, type BirthSlotAnswers, type DamagedThing, type GetThingAnswer, type GoodAnswer,
-  type ListThingsActual, type ListThingsAnswer, type ListedBeside, type SlotActual, type SlotAnswer, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
+  type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
+  type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'

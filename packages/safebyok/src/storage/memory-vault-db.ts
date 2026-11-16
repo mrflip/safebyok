@@ -2,9 +2,9 @@
 
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
-import { type AnyAsk, type BirthBankAsk, type GetAsk, type ListAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
-  type WriteAsk, MainGateLabelpath, RootBoxLabelpath, birthPutsOf } from './shapes-thing'
-import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenBirthOf, writtenThingOf } from './thing-classifier'
+import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
+  type WriteAsk, MainGateLabelpath, RootBoxLabelpath } from './shapes-thing'
+import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
 /** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
@@ -101,15 +101,15 @@ export class MemoryVaultDB extends AdapterVaultDB {
     return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children }, this.#worldFetchedOf(ask))
   }
 
-  protected doBirthBank(ask: BirthBankAsk): BirthBankActual {
+  protected doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {
     const things = this.#thingsOf(ask)
-    const actual = this.classifyBirthBank(ask, this.#rootsOf(ask))
-    if (actual.act !== 'born') { return actual }
-    for (const { labelpath, record } of birthPutsOf(ask)) { things.set(labelpath, structuredClone(record)) }
-    const slots = writtenBirthOf(ask, this.#rootsOf(ask))
-    const after = this.#worldAfter(ask)
-    for (const { record } of Object.values(slots)) { this.#notify(record, after.world) }
-    return { ...actual, ...after, slots }
+    const actual = this.classifyBirthBank(puts, this.#rootsOf(ask))
+    if (! (actual.ok && (actual.act === 'born'))) { return actual }
+    for (const { labelpath, record } of puts) { things.set(labelpath, structuredClone(record)) }
+    const written = writtenRootsOf(puts, this.#rootsOf(ask))
+    const after   = this.#worldAfter(ask)
+    for (const thing of Object.values(written)) { this.#notify(thing, after.world) }
+    return { ...actual, ...after, things: written }
   }
 
   protected override doWatch(scope: ThingWatchScope, receive: Watcher['receive'], onBadNews: Watcher['onBadNews']): () => void {

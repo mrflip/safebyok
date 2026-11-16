@@ -6,7 +6,6 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
 import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxSparse, boxThing, getAskOf, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
-import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -628,42 +627,41 @@ describe("Bank.birth(record, opts)", () => {
     const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
     expect(answer).to.include({ ok: true, act: 'born' })
     if (! answer.ok) { throw answer.err }
-    const { bank: bankSlot, gate: gateSlot, box: boxSlot } = answer.val
-    if (! (bankSlot.ok && gateSlot.ok && boxSlot.ok)) { throw new Error('a slot refused') }
-    expect(bankSlot.val).to.deep.equal(bank.pickle())
-    expect(gateSlot.val).to.deep.equal(bank.maingate.pickle())
-    expect(boxSlot.val).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0 })
+    expect(answer.val.bank).to.deep.equal(bank.pickle())
+    expect(answer.val.gate).to.deep.equal(bank.maingate.pickle())
+    expect(answer.val.root).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0 })
     expect(births.lockedAtBirths).to.deep.equal([true])
-    expect(bank.rootBox).to.deep.equal(boxSparse.parse(boxSlot.val))
+    expect(bank.rootBox).to.deep.equal(boxSparse.parse(answer.val.root))
     expect(bank.isUnlocked).to.be.true
-    expect(await bank.unsealBox(boxSlot.val)).to.deep.include({ whisper: {} })
+    expect(await bank.unsealBox(answer.val.root)).to.deep.include({ whisper: {} })
   })
 
-  it("refuses gate_made_elsewhere where another bank is stored, leaving its own bank locked", async () => {
+  // The vaultDB answers retcon, not passed, to a birth it stored already; passed on this bank is a vaultDB's answer alone.
+  it("unlocks where the vaultDB passes on this same bank, taking the root box it answers", async () => {
+    const { device, record, opts } = await birthArgsOf()
+    const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
+    const births = TH.spyBirths(device, async (ask) => {
+      const born = await tryBirthBank(ask)
+      return born.ok ? { ...born, act: 'passed' } : born
+    })
+    const bank = await Bank.birth(record, opts)
+    const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
+    expect(answer).to.include({ ok: true, act: 'passed' })
+    expect(bank.isUnlocked).to.be.true
+    expect(bank.rootBox).to.deep.equal(answer.ok && boxSparse.parse(answer.val.root))
+  })
+
+  it("refuses gate_made_elsewhere where the vaultDB passes on another bank, leaving its own bank locked", async () => {
     const { device, record, opts } = await birthArgsOf()
     await Bank.birth(record, opts)
     const theirs = await birthArgsOf(device)
     const births = TH.spyBirths(device)
     const evict = vi.spyOn(Lease.prototype, 'evict')
     await TH.expectRefusal(Bank.birth(theirs.record, theirs.opts), 'gate_made_elsewhere')
-    expect(await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)).to.include({ ok: true, act: 'noop' })
+    expect(await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)).to.include({ ok: true, act: 'passed' })
     expect(births.banks[0]!.isLocked).to.be.true
     expect(births.banks[0]!.rootBox).to.include({ revtok: SX.VoidRevisionTok })
     expect(evict).toHaveBeenCalledTimes(1)
-  })
-
-  it("throws the first refused slot's refusal where a root is stored without its bank, leaving the bank locked", async () => {
-    const { device, record, opts } = await birthArgsOf()
-    await Bank.birth(record, opts)
-    const things = (device.vaultDB as MemoryVaultDB)._cheat_things(record)
-    things.delete('bank')
-    const theirs = await birthArgsOf(device)
-    const births = TH.spyBirths(device)
-    await TH.expectRefusal(Bank.birth(theirs.record, theirs.opts), 'stale_write')
-    const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
-    expect(answer).to.include({ ok: true, act: 'noop' })
-    expect(answer.ok && answer.val.gate).to.include({ ok: false, act: 'stale' })
-    expect(births.banks[0]!.isLocked).to.be.true
   })
 
   it("throws the vaultDB's refusal as it came, evicting the new lease and leaving the bank locked", async () => {

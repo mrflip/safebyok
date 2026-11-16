@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { expectBad } from 'safebyok-big/testing'
 import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
-import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
+import type { VaultDB } from '../../src/storage/vault-db'
 import { BankScope, GateScope, RootScope, bankThingOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, nextOf, rootBoxOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 
@@ -14,85 +14,59 @@ async function expectRootsVoidBut(vaultDB: VaultDB, ...stored: ('bank' | 'gate' 
   }
 }
 
-/** Expect `answer` to be a birth's good answer of `act`, each slot including what `slots` gives under its slotlabel. */
-function expectBirth(answer: BirthBankAnswer, act: 'born' | 'noop', slots: Readonly<Record<'bank' | 'gate' | 'box', object>>): void {
-  expect(answer).to.include({ ok: true, act })
-  if (! answer.ok) { throw answer.err }
-  for (const slotlabel of ['bank', 'gate', 'box'] as const) { expect(answer.val[slotlabel], slotlabel).to.deep.include(slots[slotlabel]) }
-}
-
 /** Register the battery's cases of a bank's birth. */
 export function describeVaultDBBirths({ fresh, bornBank, withGate, gotAt, rowsOf }: VaultDBBatteryWorld): void {
   const roots = { bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf() }
-  const born  = { bank: { ok: true, act: 'born', val: roots.bank }, gate: { ok: true, act: 'born', val: roots.gate }, box: { ok: true, act: 'born', val: roots.root } }
 
   describe("tryBirthBank(ask)", () => {
-    it("writes the bank, its main gate and its root box, answering each slot born with its root", async () => {
+    it("writes the bank, its main gate and its root box, answering with them", async () => {
       const vaultDB = await fresh()
-      expectBirth(await vaultDB.tryBirthBank(birthBankAskOf()), 'born', born)
+      expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: true, act: 'born', val: roots })
       expect(await gotAt(vaultDB, 'bank')).to.deep.equal(roots.bank)
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(roots.gate)
       expect(await gotAt(vaultDB, 'box')).to.deep.equal(roots.root)
     })
 
-    it("answers noop where another's bank is live, each slot stale with the root stored, writing nothing", async () => {
+    it("passes the roots stored back, writing nothing, where the bank is live", async () => {
       const vaultDB = await bornBank()
-      const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }), gate: gateThingOf({ revtok: 'rev-other' }), root: rootBoxOf({ revtok: 'rev-other' }) })
-      expectBirth(await vaultDB.tryBirthBank(other), 'noop', {
-        bank: { ok: false, act: 'stale', dbhas: roots.bank }, gate: { ok: false, act: 'stale', dbhas: roots.gate }, box: { ok: false, act: 'stale', dbhas: roots.root },
-      })
+      const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }), gate: gateThingOf({ revtok: 'rev-other' }) })
+      expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', val: roots })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(roots.gate)
     })
 
-    it("answers noop to the birth already stored, each slot retcon by the put table", async () => {
+    it("answers retcon to the birth already stored, by the put table", async () => {
       const vaultDB = await bornBank()
-      expectBirth(await vaultDB.tryBirthBank(birthBankAskOf()), 'noop', {
-        bank: { ok: false, act: 'retcon', dbhas: roots.bank }, gate: { ok: false, act: 'retcon', dbhas: roots.gate }, box: { ok: false, act: 'retcon', dbhas: roots.root },
-      })
+      expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'retcon', dbhas: roots.bank })
     })
 
-    it("answers noop over a live bank stored without its main gate, the gate's slot born as a lone put, writing nothing", async () => {
+    it("refuses a live bank stored without its main gate as a broken store", async () => {
       const vaultDB = await bornBank()
       await rowsOf(vaultDB).remove(GateScope)
-      const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }), root: rootBoxOf({ revtok: 'rev-other' }) })
-      expectBirth(await vaultDB.tryBirthBank(other), 'noop', {
-        bank: { ok: false, act: 'stale', dbhas: roots.bank }, gate: born.gate, box: { ok: false, act: 'stale', dbhas: roots.root },
-      })
-      await expectRootsVoidBut(vaultDB, 'bank', 'box')
+      const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }) })
+      await expectBad(vaultDB.tryBirthBank(other), 'storage_issue')
     })
 
-    it("answers noop over a bank's tombstone, the bank's slot stale, writing nothing", async () => {
+    it("refuses over a bank's tombstone, writing nothing", async () => {
       const vaultDB = await fresh()
       const life1 = lifeseqOfLifenum(1)
       const bankGone = nextOf(bankThingOf(), { am: 'x', lifeseq: life1, lifepath: life1 })
       await rowsOf(vaultDB).plant(BankScope, bankGone)
-      expectBirth(await vaultDB.tryBirthBank(birthBankAskOf()), 'noop', { ...born, bank: { ok: false, act: 'stale', dbhas: bankGone } })
+      expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: bankGone })
       await expectRootsVoidBut(vaultDB, 'bank')
     })
 
-    it("answers noop over a main gate stored with no bank, the gate's slot stale, writing nothing", async () => {
+    it("refuses over a main gate stored with no bank, writing nothing", async () => {
       const stored  = gateThingOf({ revtok: 'rev-other' })
       const vaultDB = await withGate(stored)
-      expectBirth(await vaultDB.tryBirthBank(birthBankAskOf()), 'noop', { ...born, gate: { ok: false, act: 'stale', dbhas: stored } })
+      expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: stored })
       await expectRootsVoidBut(vaultDB, 'gate')
     })
 
-    it("answers each slot with its put's loggable ask, and a refused slot with the refusal its lone put would give", async () => {
-      const vaultDB = await withGate(gateThingOf({ revtok: 'rev-other' }))
-      const answer  = await vaultDB.tryBirthBank(birthBankAskOf())
-      if (! answer.ok) { throw answer.err }
-      expect(answer).to.not.have.property('dbhas')
-      expect(answer.val.bank.ask).to.deep.include({ op: 'put', modelkind: 'bank', labelpath: 'bank', ifAbsent: 'add', ifPresent: 'fail' })
-      expect(answer.val.box.ask).to.deep.include({ op: 'put', modelkind: 'box', labelpath: 'box' })
-      const err = await expectBad(Promise.resolve(answer.val.gate), 'stale_write')
-      expect(err.meta).to.deep.include({ oplabel: 'writeThing', act: 'stale' })
-    })
-
-    it("answers noop over a root box stored with no bank, the root box's slot stale, writing neither of the others", async () => {
+    it("refuses over a root box stored with no bank, writing neither of the others", async () => {
       const stored  = rootBoxOf({ revtok: 'rev-other' })
       const vaultDB = await fresh()
       await rowsOf(vaultDB).plant(RootScope, stored)
-      expectBirth(await vaultDB.tryBirthBank(birthBankAskOf()), 'noop', { ...born, box: { ok: false, act: 'stale', dbhas: stored } })
+      expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', dbhas: stored })
       await expectRootsVoidBut(vaultDB, 'box')
     })
 

@@ -42,7 +42,7 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       const vaultDB = await fresh()
       expect(await vaultDB.tryBirthBank({ ...birthBankAskOf(), track: BankStaleTrack })).to.deep.include({ ok: true, act: 'born', tracked: { bank: bankThingOf(), gate: 'same', box: 'same' } })
       const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }), track: trackOf() })
-      expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'noop', tracked: { bank: 'same', gate: 'same', box: 'same' } })
+      expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', tracked: { bank: 'same', gate: 'same', box: 'same' } })
     })
 
     it("is not in the answer to an ask that tracks nothing", async () => {

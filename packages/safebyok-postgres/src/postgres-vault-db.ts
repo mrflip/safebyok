@@ -3,10 +3,10 @@
 import { type EX, type Errors, Throwers, Validator } from 'safebyok-big/internals'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type Actual, type AnyAsk, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type GetAsk, type ListThingsActual,
+  type Actual, type AnyAsk, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type ListThingsActual,
   type ListAsk, type Received, type ThingWatchScope, type ThingsFetched, type TrackedFetched, type WorldFetched,
-  type WriteAsk, AdapterVaultDB, ShellCited, birthPutsOf, demandBornAtKept, demandPolicies, isWriteAct, getAskOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
-  unwrittenWriteOf, worldOf, writeActOf, writtenBirthOf, writtenThingOf,
+  type WriteAsk, AdapterVaultDB, ShellCited, demandBornAtKept, demandPolicies, isWriteAct, getAskOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
+  unwrittenWriteOf, worldOf, writeActOf, writtenRootsOf, writtenThingOf,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, unlistenOnceListening } from './postgres-bank-db'
 import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vault-queries'
@@ -158,16 +158,16 @@ export class PostgresVaultDB extends AdapterVaultDB {
     return this.classifyListThings(ask, { parent, children }, { ...world, tracked })
   }
 
-  protected async doBirthBank(ask: BirthBankAsk): Promise<BirthBankActual> {
+  protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {
     // Whether it stored the three roots, each as it now stands, and how they compare with the track.
-    const params  = [...birthPutsOf(ask).map(({ record }) => JSON.stringify(record)), trackParam(ask)]
+    const params  = [...puts.map(({ record }) => JSON.stringify(record)), trackParam(ask)]
     const written = await this.#firstRow<BankRootsFetched & { ok: boolean, tracked: TrackedFetched }>(BirthRootsSql, params)
     if (written.ok) {
-      const slots = writtenBirthOf(ask, written)
-      return { act: 'born', world: { ...slots.bank.record, maingate: slots.gate.record }, ...trackedFieldOf(ask, written.tracked), slots }
+      const things = writtenRootsOf(puts, written)
+      return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, ...trackedFieldOf(ask, written.tracked), things }
     }
-    // The store refused. The act tables name why: a root the birth would write over. Every other check is one a validated ask cannot fail.
-    const unwritten = unwrittenBirthOf(ask, written)
+    // The store refused. The act tables name why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
+    const unwritten = unwrittenBirthOf(puts, written)
     if (unwritten === null) { throw Throwers.storageIssue() }
     return unwritten
   }

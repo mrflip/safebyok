@@ -405,8 +405,8 @@ describe("birthBank(device, cleartexts)", () => {
     expect(err.message).to.match(/another device/)
     expect(births.banks[0]!.isLocked).to.be.true
     const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
-    expect(answer).to.deep.include({ ok: true, act: 'noop' })
-    expect(answer.ok && answer.val.bank).to.deep.include({ ok: false, act: 'stale', dbhas: stored.pickle() })
+    expect(answer).to.deep.include({ ok: true, act: 'passed' })
+    expect(answer.ok && answer.val.bank).to.deep.equal(stored.pickle())
   })
 
   it("passes any refusal of the vaultDB as it came, leaving the bank locked", async () => {

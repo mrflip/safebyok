@@ -2,13 +2,13 @@
 
 import { sortBy } from 'es-toolkit'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
-import { BornAtNotStored } from '../phrases'
+import { BankRootsMissing, BornAtNotStored } from '../phrases'
 import { PoliciedMeta, gateIssue, policyRefusalOf } from './policies'
-import type { Actual, BirthBankActual, DamagedThing, ListThingsActual, SlotActual } from './vault-db'
+import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type AnyAsk, type BankThing, type BirthBankAsk, type BoxThing, type GateThing, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
+  type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
   type Tracked, type WorldRecord, type WriteAsk,
-  KindChecks, MainGateLabelpath, RootBoxLabelpath, birthPutsOf, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
+  KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
 } from './shapes-thing'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
@@ -119,7 +119,7 @@ export function isRefusedAct(act: string): act is EX.RefusedAct { return (EX.ref
 export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeActVals as readonly string[]).includes(act) }
 // --
 
-// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedCitedOf, storedThingOf, writtenThingOf, writtenBirthOf, listedThingOf, watchedThingOf, BankRootsFetched, WorldFetched, worldOf
+// == [Things stored]: RowOfOtherScope, StoredCheck, storedOf, writtenOf, storedCitedOf, storedThingOf, writtenThingOf, writtenRootsOf, listedThingOf, watchedThingOf, BankRootsFetched, WorldFetched, worldOf
 // A Thing that fails its kind's checks is damaged, and refuses `damaged_row`. One that is not an object, or a sound one
 // stored at another scope than the one asked for, means the store or its adapter is broken, and refuses `storage_issue`.
 
@@ -150,16 +150,12 @@ export function storedThingOf(scope: ThingScope, raw: unknown): Thing | null { r
 /** The Thing the store reports writing at `scope`, checked. */
 export function writtenThingOf(scope: ThingScope, raw: unknown): Thing { return writtenOf<Thing>(kindChecksOf(scope.labelpath).stored, scope, raw) }
 
-/** A slot of a birth the store reports writing. */
-type BornSlot<RecordT extends Thing> = Extract<SlotActual<RecordT>, { ok: true }>
-
-/** Each slot of a born `ask`, with the root the store reports writing for it, checked. */
-export function writtenBirthOf(ask: BirthBankAsk, written: BankRootsFetched): Readonly<{ bank: BornSlot<BankThing>, gate: BornSlot<GateThing>, box: BornSlot<BoxThing> }> {
-  const [bankPut, gatePut, rootPut] = birthPutsOf(ask)
+/** The three roots the store reports writing for a birth's `puts`, checked. */
+export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
   return {
-    bank: { ok: true, act: 'born', record: writtenOf(KindChecks.bank.stored, bankPut, written.bank) },
-    gate: { ok: true, act: 'born', record: writtenOf(KindChecks.gate.stored, gatePut, written.gate) },
-    box:  { ok: true, act: 'born', record: writtenOf(KindChecks.box.stored,  rootPut, written.root) },
+    bank: writtenOf(KindChecks.bank.stored, bankPut, written.bank),
+    gate: writtenOf(KindChecks.gate.stored, gatePut, written.gate),
+    root: writtenOf(KindChecks.box.stored,  rootPut, written.root),
   }
 }
 
@@ -300,17 +296,16 @@ function isChildLabelpath(ask: ListAsk, labelpath: string): boolean {
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind(labelpath, ask.modelkind)
 }
 
-/** Classify a bank's birth against the raw roots a store fetched, each root's put as a lone put would be classified.
- * Under `born`, each slot's record and the world are the ask's own, for the store to write in one step. The store then reports
+/** Classify a bank's birth, by its three `puts`, against the raw roots a store fetched.
+ * Under `born`, `things` and `world` are made of the puts' records, for the store to write in one step. The store then reports
  * them as written, with any `tracked` read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
  */
-export function classifyBirthBank(ask: BirthBankAsk, fetched: BankRootsFetched): BirthBankActual {
-  const { bank, gate, root } = ask
-  return unwrittenBirthOf(ask, fetched) ?? {
-    act:   'born',
-    world: { ...bank, maingate: gate },
-    slots: { bank: { ok: true, act: 'born', record: bank }, gate: { ok: true, act: 'born', record: gate }, box: { ok: true, act: 'born', record: root } },
-  }
+export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
+  const unwritten = unwrittenBirthOf(puts, fetched)
+  if (unwritten !== null) { return unwritten }
+  const [bankPut, gatePut, rootPut] = puts
+  const things = { bank: bankPut.record, gate: gatePut.record, root: rootPut.record }
+  return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, things }
 }
 // --
 
@@ -345,23 +340,23 @@ export function demandPolicies(ask: WriteAsk, raw: unknown): void {
   if (why !== null) { throw gateIssue(storedThingOf(ask, raw), why) }
 }
 
-/** The `noop` report of a birth where any root's put refuses over the raw roots fetched, with each slot's report; null where every put is born. */
-export function unwrittenBirthOf(ask: BirthBankAsk, fetched: BankRootsFetched): BirthBankActual | null {
-  const [bankPut, gatePut, rootPut] = birthPutsOf(ask)
-  const slots = {
-    bank: slotActualOf(KindChecks.bank.stored, bankPut, fetched.bank),
-    gate: slotActualOf(KindChecks.gate.stored, gatePut, fetched.gate),
-    box:  slotActualOf(KindChecks.box.stored,  rootPut, fetched.root),
+/** The answer to a birth the fetched roots pass or refuse, or null if the act tables let it write.
+ * Over a live bank the answer is `passed`, with the three roots stored. Otherwise it is the first root's refusal.
+ */
+export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual | null {
+  const [bankPut, gatePut, rootPut] = puts
+  // The bank's put passes over a live bank, whose gate and root must be stored with it.
+  if (putActOf(bankPut, storedCitedOf(bankPut, fetched.bank)) === 'passed') {
+    const bank = storedOf(KindChecks.bank.stored, bankPut, fetched.bank)
+    const gate = storedOf(KindChecks.gate.stored, gatePut, fetched.gate)
+    const root = storedOf(KindChecks.box.stored,  rootPut, fetched.root)
+    if ((bank === null) || (gate === null) || (root === null)) { throw new Errors.VaultError('storage_issue', BankRootsMissing) }
+    return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, things: { bank, gate, root }, ...trackedFieldOf(bankPut, fetched.tracked) }
   }
-  if (slots.bank.ok && slots.gate.ok && slots.box.ok) { return null }
-  return { act: 'noop', world: worldOf(ask, { bank: fetched.bank, maingate: fetched.gate }), ...trackedFieldOf(ask, fetched.tracked), slots }
-}
-
-/** A birth slot's report: `put`'s act over `raw`, the root fetched, with the root stored, checked by `check`, or under `born` the put's record. */
-function slotActualOf<RecordT extends Thing>(check: StoredCheck<RecordT>, put: WriteAsk<RecordT>, raw: unknown): SlotActual<RecordT> {
-  const act = putActOf(put, storedCitedOf(put, raw))
-  if (isRefusedAct(act)) { return { ok: false, act, record: storedOf(check, put, raw) } }
-  // A birth's put cites the shell, adding over none and failing over a live Thing: its one good act is `born`.
-  return { ok: true, act, record: put.record }
+  for (const [put, raw] of [[bankPut, fetched.bank], [gatePut, fetched.gate], [rootPut, fetched.root]] as const) {
+    const act = putActOf(put, storedCitedOf(put, raw))
+    if (isRefusedAct(act)) { return { ok: false, act, world: worldOf(bankPut, { bank: fetched.bank, maingate: fetched.gate }), record: storedThingOf(put, raw), ...trackedFieldOf(bankPut, fetched.tracked) } }
+  }
+  return null
 }
 // --
