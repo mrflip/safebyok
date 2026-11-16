@@ -253,7 +253,7 @@ export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldF
 export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
   const stored = storedCitedOf(ask, raw)
   const act    = writeActOf(ask, stored)
-  if (! isWriteAct(act))  { return unwrittenWriteOf(ask, act, raw, worldFetched) }
+  if (! isWriteAct(act))  { return unwrittenWriteOf(raw, { ask, act, world: worldFetched }) }
   if (act === 'replaced') {
     demandBornAtKept(ask, raw)
     demandPolicies(ask, raw)
@@ -309,16 +309,21 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 }
 // --
 
-// == [Steps]: unwrittenWriteOf, demandBornAtKept, demandPolicies, unwrittenBirthOf
+// == [Steps]: unwrittenWriteOf, UnwrittenWrite, demandBornAtKept, demandPolicies, unwrittenBirthOf
 // The steps of the classifiers above, for a store that checks some preconditions itself to call in its own order.
 
-/** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope and the raw world. */
-export function unwrittenWriteOf(ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
-  const record = storedThingOf(ask, raw)
-  const world  = worldOf(ask, worldFetched)
-  const beside = trackedFieldOf(ask, worldFetched.tracked)
-  return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
+/** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope.
+ * `world` is the raw world the store fetched beside it.
+ */
+export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWrite): Actual<EX.PutAct | EX.DelAct> {
+  const record  = storedThingOf(ask, raw)
+  const checked = worldOf(ask, world)
+  const beside  = trackedFieldOf(ask, world.tracked)
+  return isRefusedAct(act) ? { ok: false, act, world: checked, record, ...beside } : { ok: true, act, world: checked, record, ...beside }
 }
+
+/** What {@link unwrittenWriteOf} answers for: the write, the act the act tables found, and the raw world the store fetched. */
+export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, world: WorldFetched }>
 
 /** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
 export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {

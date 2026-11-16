@@ -10,7 +10,7 @@ export {
   putAskOf, sealed, shellOf, sparseOf, thingkindVals, wayins,
 } from './storage/shapes-thing'
 export {
-  type BankRootsFetched, type ThingsFetched, type TrackedFetched, type TrackedRows, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing,
+  type BankRootsFetched, type ThingsFetched, type TrackedFetched, type TrackedRows, type UnwrittenWrite, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing,
   demandBornAtKept, demandPolicies, isWriteAct, storedCitedOf, storedThingOf, trackedFieldOf, unwrittenBirthOf, unwrittenWriteOf, worldOf, writeActOf,
   writtenRootsOf, writtenThingOf,
 } from './storage/thing-classifier'
