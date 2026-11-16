@@ -145,7 +145,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const stored = storedCitedOf(ask, written.thing)
     const act    = writeActOf(ask, stored)
     if (! isWriteAct(act))             { return unwrittenWriteOf(ask, act, written.thing, { ...written.world, tracked: written.tracked }) }
-    if (! written.born_at_ok)          { demandBornAtKept(ask, stored, written.thing) }
+    if (! written.born_at_ok)          { demandBornAtKept(ask, written.thing) }
     if (written.policies_ok === false) { demandPolicies(ask, written.thing) }
     // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.
     throw Throwers.storageIssue()

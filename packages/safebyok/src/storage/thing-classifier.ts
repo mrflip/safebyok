@@ -255,7 +255,7 @@ export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: Wo
   const act    = writeActOf(ask, stored)
   if (! isWriteAct(act))  { return unwrittenWriteOf(ask, act, raw, worldFetched) }
   if (act === 'replaced') {
-    demandBornAtKept(ask, stored, raw)
+    demandBornAtKept(ask, raw)
     demandPolicies(ask, raw)
   }
   return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
@@ -320,9 +320,9 @@ export function unwrittenWriteOf(ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelA
   return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
 }
 
-/** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces: `stored`, read from `raw`. */
-export function demandBornAtKept(ask: WriteAsk, stored: StoredCited | null, raw: unknown): void {
-  if (ask.record.born_at === stored?.born_at) { return }
+/** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
+export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
+  if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
   throw new Errors.VaultError('bad_record', BornAtNotStored, { rows: { dbhas: storedThingOf(ask, raw) }, meta: PoliciedMeta })
 }
 
