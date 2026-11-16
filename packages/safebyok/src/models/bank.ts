@@ -127,14 +127,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // == [Construction]: make, birth, constructor, mintStamps, makeRecord
 
   /** Make the bank of `record`, with its main gate and root box, on `opts.device`, keeping its boxes in `opts.vaultDB`. */
-  static make(record: BankMakeRecord, opts: BankOpts): Bank {
-    const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
-    const parsed = Checks.bankThing.parse(rest)
-    // The device names its user `user_id`, and the bank's Thing `userid`.
-    Validator.checkedConsistent({ user_id: parsed.userid, banklabel: parsed.banklabel }, checked.device.scope, { kind: 'record_conflict' })
-    Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
-    return new Bank(parsed, { maingate, rootBox }, checked)
-  }
+  static make(record: BankMakeRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   /** Write a new bank of `record`, with its main gate and root box, and return it unlocked under a lease built from `opts.proving`.
    * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.
@@ -149,11 +142,16 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return bank
   }
 
-  private constructor(parsed: BankThing, { maingate, rootBox }: Pick<BankMakeRecord, 'maingate' | 'rootBox'>, opts: BankOpts & { queryCacheOpts: QueryCacheOpts }) {
+  private constructor(record: BankMakeRecord, opts: BankOpts) {
+    const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
+    const parsed = Checks.bankThing.parse(rest)
+    // The device names its user `user_id`, and the bank's Thing `userid`.
+    Validator.checkedConsistent({ user_id: parsed.userid, banklabel: parsed.banklabel }, checked.device.scope, { kind: 'record_conflict' })
+    Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
     super(parsed)
-    this.#device = opts.device
-    this.#vaultDB = opts.vaultDB
-    this.#queryCacheOpts = Object.freeze(opts.queryCacheOpts)
+    this.#device = checked.device
+    this.#vaultDB = checked.vaultDB
+    this.#queryCacheOpts = Object.freeze(checked.queryCacheOpts)
     this.#rootBox = Object.freeze(rootBox)
     this.#maingate = Gate.make(maingate, { bank: this })
     Object.freeze(this)
