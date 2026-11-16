@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
 import type { Bank, BoxShell, BoxUnsealed } from '../../src/models/bank'
 import type { BoxRecord } from '../../src/models/sealers'
-import { type BoxThing, ShellLifeseq, lifeseqOf } from '../../src/storage/shapes-thing'
+import { type BoxThing, ShellLifeseq, getAskOf, lifeseqOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -97,7 +97,7 @@ describe("the bank's box methods refuse, never throwing", () => {
     const answer = await bank.tryPutBox({ cited: prior, record })
     await TH.expectBad(answer, 'disabled')
     expect(answer).to.include({ dbhas: null, err: bank.device.endCause })
-    const got = await bank.device.vaultDB.tryGetThing(bank.device.vaultDB.getAsk({ ...bank.scope, labelpath: Openai }))
+    const got = await bank.device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: Openai }))
     expect(got).to.include({ ok: true, val: null })
   })
 

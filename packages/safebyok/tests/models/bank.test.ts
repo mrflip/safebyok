@@ -5,7 +5,7 @@ import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
-import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxSparse, boxThing, lifeseqOf } from '../../src/storage/shapes-thing'
+import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxSparse, boxThing, getAskOf, lifeseqOf } from '../../src/storage/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -418,7 +418,7 @@ describe("bank.sealBox(prior, cleartexts) and bank.unsealBox(box)", () => {
   // lifeseq is bound; the bank refuses it before any seal.
   it("refuses at the seal, the tombstone and the unseal a box under another life of the root box", async () => {
     const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf({ lifepath: `${Life2}/-1` }), { whisper: TH.Whisper }), 'record_conflict')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf({ lifepath: `${Life2}/${ShellLifeseq}` }), { whisper: TH.Whisper }), 'record_conflict')
     const box = await bank.sealBox(TH.boxShellOf(), { whisper: TH.Whisper })
     const moved = { lifepath: `${Life2}/${box.lifeseq}` }
     await TH.expectRefusal(bank.tombstoneBox({ ...box, ...moved }), 'record_conflict')
@@ -549,13 +549,49 @@ function nextBankThingOf(bank: Bank) {
   return { ...bank.pickle(), revtok: Crypto.randomId(), revseq: bank.revseq + 1, written_at: bank.written_at + 1 }
 }
 
+describe("bank.track, and the asks the bank builds", () => {
+  it("track the revseq and lifepath this object holds of the bank, its main gate and its root box", async () => {
+    const { bank } = await TH.buildBornBank()
+    expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.maingate.pickle(), bank.rootBox as never))
+  })
+
+  it("fill in the bank's scope, the modelkind, the default flags and the track", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { scope, track } = bank
+    expect(bank.makeGetAsk({ labelpath: 'box/openai' })).to.deep.equal({ ...scope, labelpath: 'box/openai', op: 'get', modelkind: 'box', ifAbsent: 'nil', track })
+    expect(bank.makeListAsk({ labelpath: 'box' })).to.deep.equal({ ...scope, labelpath: 'box', op: 'list', modelkind: 'box', ifAbsent: 'fail', track })
+    const record = nextBankThingOf(bank)
+    expect(bank.makePutAsk({ cited: bank.pickle(), record })).to.deep.include({ ...scope, labelpath: 'bank', op: 'put', modelkind: 'bank', ifAbsent: 'add', ifPresent: 'repl', track })
+    const box = TH.boxThingOf()
+    expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track })
+  })
+
+  it("track what this object holds, though the bank stored has moved on: the answer's tracked says so", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const record = nextBankThingOf(bank)
+    await bank.put({ cited: bank.pickle(), record })
+    const answer = await device.vaultDB.tryGetThing(bank.makeGetAsk({ labelpath: 'bank' }))
+    expect(answer).to.deep.include({ ok: true, tracked: { bank: record, gate: 'same', box: 'same' } })
+  })
+})
+
+describe("bank.tellBadNews(badnews)", () => {
+  it("passes the news to its device's onBadNews", async () => {
+    const onBadNews = vi.fn()
+    const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { onBadNews }) })
+    bank.tellBadNews([new Errors.VaultError('storage_unavailable', "Down.")])
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect(onBadNews.mock.calls[0]?.[0]).to.deep.include({ device: bank.device })
+  })
+})
+
 describe("bank.put(args)", () => {
   it("writes the bank's next revision, answering it as stored, and leaves the bank in hand as it was", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     expect(await bank.put({ cited: bank.pickle(), record })).to.deep.equal(record)
     expect(bank.revtok).to.not.eq(record.revtok)
-    const got = await device.vaultDB.tryGetThing(device.vaultDB.getAsk({ ...bank.scope, labelpath: 'bank' }))
+    const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank' }))
     expect(got).to.deep.include({ ok: true, val: record })
   })
 
@@ -569,7 +605,7 @@ describe("bank.put(args)", () => {
     const { bank, device } = await TH.buildBornBank()
     const record = { ...nextBankThingOf(bank), banklabel: 'work' }
     await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), banklabel: 'work' }, record }))
-    const got = await device.vaultDB.tryGetThing(device.vaultDB.getAsk({ ...bank.scope, labelpath: 'bank' }))
+    const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank' }))
     expect(got).to.deep.include({ ok: true, val: bank.pickle() })
   })
 

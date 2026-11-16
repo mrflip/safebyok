@@ -11,8 +11,8 @@ import * as Phrases from '../phrases'
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10
 
-/** The shell's lifeseq, for life -1. It is never stored, and is the only lifeseq that is not 10 digits long. */
-export const ShellLifeseq = '-1'
+/** The shell's lifeseq, for life -1. It is never stored, and sorts below every life's. */
+export const ShellLifeseq = '-000000001'
 /** A root's shell lifepath: the shell's lifeseq alone. */
 export const ShellLifepath = ShellLifeseq
 
@@ -32,7 +32,7 @@ export function lifeseqOfLifepath(lifepath: string): string { return lifepath.sl
 function leadingLifeseqsOf(lifepath: string): string { return lifepath.slice(0, Math.max(0, lifepath.lastIndexOf('/'))) }
 // --
 
-// == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, modelkindOf, isLabelpathOfKind
+// == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, ThingFormats, MainGateLabelpath, RootBoxLabelpath, modelkindOf, isLabelpathOfKind
 
 /** The kinds of Thing: the modelkind at the base of each labelpath. */
 export const thingkindVals = ['bank', 'gate', 'box'] as const satisfies readonly Consts.Modelkind[]
@@ -45,6 +45,9 @@ export const BankThingFormat = 3101
 export const GateThingFormat = 4101
 /** The `fmt` of a box's Thing, distinct from big's box row (5003). */
 export const BoxThingFormat = 5103
+
+/** The `fmt` of each kind of Thing. */
+export const ThingFormats = { bank: BankThingFormat, gate: GateThingFormat, box: BoxThingFormat } as const satisfies Record<Thingkind, number>
 
 /** Where the main gate is stored in its bank, and its key in a `track`. */
 export const MainGateLabelpath = 'gate'
@@ -71,7 +74,7 @@ function isLabelpath(labelpath: string): boolean { return thingkindVals.some((mo
 
 const LifeseqPattern       = /^[0-9a-v]{10}$/
 const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/
-const ShellLifepathPattern = /^(?:[0-9a-v]{10}\/)*-1$/
+const ShellLifepathPattern = /^(?:[0-9a-v]{10}\/)*-000000001$/
 
 type Labelled = { labelpath: string, label: string }
 type Lived    = { lifepath: string, am: string }
@@ -246,9 +249,77 @@ export const ShellCited: ThingCited = Object.freeze({
   revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: ShellLifepath,
 })
 
-/** The citation for the birth of a child of the Thing at `parentLifepath`: the shell, at the parent's lifepath then `-1`. */
+/** The citation for the birth of a child of the Thing at `parentLifepath`: the shell, at the parent's lifepath then the shell's lifeseq. */
 export function childShellCited(parentLifepath: string): ThingCited {
   return Object.freeze({ ...ShellCited, lifepath: `${parentLifepath}/${ShellLifeseq}` })
+}
+// --
+
+// == [Shells]: ShellChecks, VoidSentinel, ShellScoped, ShellParent, shellOf
+// A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
+
+const ShellChecks = Validator.Checkers('bad_option', ({ obj, lit, uint, label, union, str }) => {
+  const fixed = {
+    revtok:     lit(SX.VoidRevisionTok).default(SX.VoidRevisionTok),
+    revseq:     lit(SX.VoidRevisionSeq).default(SX.VoidRevisionSeq),
+    am:         lit('x').default('x'),
+    lifeseq:    lit(ShellLifeseq).default(ShellLifeseq),
+    born_at:    lit(SX.VoidTime).default(SX.VoidTime),
+    written_at: lit(SX.VoidTime).default(SX.VoidTime),
+  }
+  const shellLifepath = str.regex(ShellLifepathPattern, Phrases.LifepathShape)
+  return {
+    shellScoped: obj({
+      userid:    thingScope.shape.userid,
+      banklabel: thingScope.shape.banklabel,
+      labelpath: thingScope.shape.labelpath.optional(),
+      label:     label.optional(),
+      lifepath:  shellLifepath.optional(),
+      fmt:       uint.optional(),
+      ...fixed,
+    }),
+    shellParent: obj({ labelpath: thingScope.shape.labelpath, lifepath: union([thingRecord.shape.lifepath, shellLifepath]) }),
+    // What a shell proposed must meet, of a record's rules.
+    shell: obj({ ...thingScope.shape, label, fmt: uint, lifepath: shellLifepath, ...fixed })
+      .refine(isLabelLast,    Phrases.LabelNotLast)
+      .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
+      .refine(isLifepathDeep, Phrases.LifepathDepth)
+      .refine(isFmtOwn,       Phrases.ShellFmtOfOtherKind),
+  }
+})
+
+/** True when a Thing's fmt is its kind's. */
+function isFmtOwn({ labelpath, fmt }: { labelpath: string, fmt: number }): boolean { return fmt === ThingFormats[modelkindOf(labelpath)] }
+
+/** The shell of a scope, as cached where storage holds nothing: a tombstone with every Thing field and no body.
+ * Its revseq is -1. A write cites it as the Thing it expects to find, to make the Thing's first revision.
+ */
+export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
+
+/** What {@link shellOf} reads of its first argument: the scope, and any other Thing field it proposes for the shell, its labelpath or label among them. */
+export type ShellScoped = Pick<ThingScope, 'userid' | 'banklabel'> & Partial<ThingRecord>
+
+/** What {@link shellOf} reads of a parent: its labelpath and lifepath, from a record, a sparse record, an instance or a literal. */
+export type ShellParent = Pick<ThingRecord, 'labelpath' | 'lifepath'>
+
+/** The shell of the Thing at `scoped`'s scope, the record its first revision cites.
+ * A root's shell needs no life. Below a root, the life comes from `parent`, or from `scoped.lifepath`, the shell's own.
+ * With `parent`, `scoped` may give its `label` in place of its `labelpath`. Each field of `scoped` that the shell has is proposed for it,
+ * and must hold the shell's value; the rest are not read.
+ */
+export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel {
+  const { labelpath: given, label, lifepath: givenLifepath, ...proposed } = ShellChecks.shellScoped.parse(scoped)
+  const kin = (parent === undefined) ? undefined : ShellChecks.shellParent.parse(parent)
+  const labelpath = given ?? (((kin === undefined) || (label === undefined)) ? undefined : `${kin.labelpath}/${label}`)
+  if (labelpath === undefined) { throw new Errors.VaultError('bad_option', Phrases.ShellUnscoped) }
+  const parentpath = labelpath.slice(0, Math.max(0, labelpath.lastIndexOf('/')))
+  if ((kin !== undefined) && (kin.labelpath !== parentpath)) { throw new Errors.VaultError('bad_option', Phrases.ShellNotChild) }
+  const kinLifepath = (kin === undefined) ? undefined : `${kin.lifepath}/${ShellLifeseq}`
+  if ((kinLifepath !== undefined) && (givenLifepath !== undefined) && (givenLifepath !== kinLifepath)) { throw new Errors.VaultError('bad_option', Phrases.ShellOfOtherLife) }
+  const lifepath = givenLifepath ?? kinLifepath ?? ((parentpath === '') ? ShellLifepath : undefined)
+  if (lifepath === undefined) { throw new Errors.VaultError('bad_option', Phrases.ShellLifeless) }
+  const shell = { fmt: ThingFormats[modelkindOf(labelpath)], ...proposed, labelpath, label: label ?? labelpath.slice(labelpath.lastIndexOf('/') + 1), lifepath }
+  return Object.freeze(ShellChecks.shell.parse(shell)) as VoidSentinel
 }
 // --
 
@@ -312,7 +383,7 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
   }
 })
 /** The checks of a watch's scope (a bank) and of its arguments. */
-export const { thingWatchScope, watchArgs } = AskChecks
+export const { thingWatchScope, watchArgs, trackShape } = AskChecks
 
 /** The revseq and lifepath the ask's sender has of its bank, its main gate and its root box. The answer's `tracked` says, for each, whether it is still the one stored. */
 export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>

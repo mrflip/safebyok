@@ -12,7 +12,7 @@ export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its b
 export const GotOtherThanBox = 'A box get was answered with a Thing that is not a box: the vaultDB is broken.'
 // --
 
-// == [Things]: the sentences of a Thing's checks, and of a vaultDB's asks
+// == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks
 
 /** A labelpath that is not a modelkind and then labels. */
 export const LabelpathShape = "A labelpath is a Thing's modelkind (bank, gate or box), then labels, each after a '/': none under bank, at most one under gate or box."
@@ -39,10 +39,25 @@ export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segmen
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
 /** A citation that is half the shell. */
-export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-1' and the void revtok, in all three or in none."
+export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."
 
 /** A sparse record that is half the shell. */
-export const SparseHalfShell = "A sparse record is the shell, at revseq -1, a lifeseq of '-1' and the void revtok, in all three or in none."
+export const SparseHalfShell = "A sparse record is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
+
+/** A shell asked for with neither a labelpath nor a label and its parent. */
+export const ShellUnscoped = "A shell is made from a labelpath, or from a label and its parent."
+
+/** A shell asked for below a root with no life to put it under. */
+export const ShellLifeless = "The shell of a Thing below a root is made from its parent's lifepath, or from its own lifepath."
+
+/** A shell asked for under a parent whose labelpath is not its own less its label. */
+export const ShellNotChild = "A shell's labelpath is its parent's labelpath, a '/', and its label."
+
+/** A shell asked for with a lifepath that is not its own under the parent given beside it. */
+export const ShellOfOtherLife = "A lifepath given for a shell is its parent's lifepath, then the shell's lifeseq."
+
+/** A shell asked for with the fmt of another kind of Thing. */
+export const ShellFmtOfOtherKind = "A shell's fmt is the fmt of its kind of Thing."
 
 /** A tombstone made of a tombstone or the shell. */
 export const TombstoneOfLiveOnly = "Only a live box has a tombstone: a tombstone or the shell has none."
@@ -96,7 +111,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, MinderTrouble, QueryClientExpected, MinderExpected, MinderOfOtherKind, GcTimeShape
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -107,17 +122,8 @@ export const MinderNotStarted = 'This ThingMinder is not minding: call hello bef
 /** A get that storage answered older than the record the minder held when it began. */
 export const StaleRead = 'Storage answered with a revision older than one this device already held. The newer record stays cached, and a later get asks again.'
 
-/** Trouble a minder met with no caller to throw to: its watch's, or a listener's throw. */
-export const MinderTrouble = 'A ThingMinder met trouble with no caller to hand it to.'
-
 /** A minder handed something that is not a TanStack Query client. */
 export const QueryClientExpected = 'A ThingMinder is made with a QueryClient from @tanstack/query-core.'
-
-/** A minder's roster given something that is not a ThingMinder. */
-export const MinderExpected = 'A ThingMinder hands Things on only to another ThingMinder.'
-
-/** A minder's roster with a minder of another kind or another bank. */
-export const MinderOfOtherKind = 'Each minder a ThingMinder hands Things to minds the kind it is given for, in the same bank.'
 
 /** A gcTime that is not Infinity or a whole number of milliseconds up to 2^31 - 1. */
 export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2147483647 (about 24.8 days): a longer timer fires at once.'

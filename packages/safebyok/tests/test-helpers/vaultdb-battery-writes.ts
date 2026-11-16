@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { BW, expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { ShellCited, childShellCited, lifeseqOf, sparseOf } from '../../src/storage/shapes-thing'
+import { ShellCited, childShellCited, delAskOf, getAskOf, lifeseqOf, listAskOf, putAskOf, sparseOf } from '../../src/storage/shapes-thing'
 import {
   GateScope, Life0, RootScope, ThingBank, WithPasskey, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, getGateAskOf,
   nextGateOf, nextOf, replaceAskOf, rootBoxOf,
@@ -292,22 +292,22 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     })
   })
 
-  describe("the ask builders", () => {
+  describe("the ask builders of safebyok/storage", () => {
     it("build asks its verbs accept", async () => {
       const vaultDB = await bornBank()
       const box = boxThingOf()
-      const putAsk = vaultDB.putAsk({ cited: childShellCited(Life0), record: box })
+      const putAsk = putAskOf({ cited: childShellCited(Life0), record: box })
       expect(await vaultDB.tryWriteThing(putAsk)).to.deep.include({ ok: true, act: 'born' })
-      expect(await vaultDB.tryGetThing(vaultDB.getAsk(box))).to.deep.include({ ok: true, act: 'gotlive', val: box })
-      const delAsk = vaultDB.delAsk({ cited: box, record: boxTombOf(box) })
+      expect(await vaultDB.tryGetThing(getAskOf(box))).to.deep.include({ ok: true, act: 'gotlive', val: box })
+      const delAsk = delAskOf({ cited: box, record: boxTombOf(box) })
       expect(await vaultDB.tryWriteThing(delAsk)).to.deep.include({ ok: true, act: 'deleted' })
-      expect(await vaultDB.tryListThings(vaultDB.listAsk(RootScope))).to.deep.include({ ok: true, val: [sparseOf(boxTombOf(box))] })
+      expect(await vaultDB.tryListThings(listAskOf(RootScope))).to.deep.include({ ok: true, val: [sparseOf(boxTombOf(box))] })
     })
 
     it("leave every refusal to the verb, which answers it", async () => {
       const vaultDB = await fresh()
-      await expectBad(vaultDB.tryWriteThing(vaultDB.putAsk({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)), 'bad_option')
-      await expectBad(vaultDB.tryGetThing(vaultDB.getAsk(null as never)), 'bad_option')
+      await expectBad(vaultDB.tryWriteThing(putAskOf({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)), 'bad_option')
+      await expectBad(vaultDB.tryGetThing(getAskOf(null as never)), 'bad_option')
     })
   })
 }

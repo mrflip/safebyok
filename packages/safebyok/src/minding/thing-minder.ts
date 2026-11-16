@@ -9,38 +9,19 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { exactOptional } from 'zod'
-import { Errors, Logger, Outcome, SX, Validator } from 'safebyok-big/internals'
+import { Errors, Outcome, SX, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
-  type GetThingAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type WorldRecord,
-  BankThingFormat, BoxThingFormat, GateThingFormat, KindChecks, ShellCited, ShellLifeseq, checkedGetThingAsk, childShellCited, loggableAskOf, modelkindOf, thingkindVals,
+  type GetThingAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
+  KindChecks, checkedGetThingAsk, listAskOf, loggableAskOf, modelkindOf, shellOf, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
-  type MinderAskOpts, type MinderFriend, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
-  DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, queryCacheOpts, tsqClient,
+  type MinderFriend, type MinderGetAsk, type MinderGetAskArgs, type QueryCacheOpts, type ThingTies,
+  DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskTail, minderFriend, minderListener, queryCacheOpts, tsqClient,
 } from './shapes-minder'
 
-// == [Answers]: VoidSentinel, voidSentinelOf, DeliverableThing, GotAnswer, TSQEntryState, TSQAnswer
-
-/** What the cache holds for a scope where storage holds nothing: the shell of the Thing there, a tombstone with every Thing field and no body.
- * Its revseq is -1. A write cites it as the Thing it expects to find, to make the Thing's first revision.
- */
-export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
-
-/** The `fmt` of each kind of Thing. */
-const ThingFormats = { bank: BankThingFormat, gate: GateThingFormat, box: BoxThingFormat } as const satisfies Record<Thingkind, number>
-
-/** The void sentinel at `scoped`: a root's where `parentLifepath` is null, else that of a Thing under a parent living at `parentLifepath`. */
-export function voidSentinelOf(scoped: ThingScope, parentLifepath: string | null): VoidSentinel {
-  const { userid, banklabel, labelpath } = scoped
-  const cited = (parentLifepath === null) ? ShellCited : childShellCited(parentLifepath)
-  return Object.freeze({
-    userid, banklabel, labelpath, label: labelpath.slice(labelpath.lastIndexOf('/') + 1), fmt: ThingFormats[modelkindOf(labelpath)],
-    ...cited, am: 'x', lifeseq: ShellLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime,
-  })
-}
+// == [Answers]: DeliverableThing, GotAnswer, TSQEntryState, TSQGotAnswer, TSQAnswer
 
 /** A record on its way to the cache: a Thing, whole or sparse, or the void sentinel for a scope where storage holds nothing. */
 export type DeliverableThing = Thing | Sparse<Thing> | VoidSentinel
@@ -56,14 +37,14 @@ type GotAnswer = (
 /** How recent a cache entry is, and how its last get went. */
 interface TSQEntryState { isTimely: boolean, refreshedAt: number, isFetching: boolean, lastErr: Errors.VaultError | null }
 
-/** The cache's answer for a scope, read without waiting on the vaultDB: a get's answer with the entry's freshness (`isTimely`, `refreshedAt`, `isFetching`, `lastErr`), or a refusal. */
-export type TSQAnswer = (GotAnswer & TSQEntryState) | BadAnswer
+/** The cache's record for a scope, shaped like a get's answer, with the entry's freshness (`isTimely`, `refreshedAt`, `isFetching`, `lastErr`). */
+export type TSQGotAnswer = GotAnswer & TSQEntryState
+
+/** The cache's answer for a scope, read without waiting on the vaultDB: its {@link TSQGotAnswer}, or a refusal. */
+export type TSQAnswer = TSQGotAnswer | BadAnswer
 // --
 
-// == [Arguments]: MinderRoster, MinderOpts, Checks, isRosterOwn
-
-/** The minder of each kind of Thing in a bank, to which the bank's minder passes each Thing of that kind that the bank's watch reports. */
-export type MinderRoster = Readonly<Partial<Record<Thingkind, ThingMinder>>>
+// == [Arguments]: MinderOpts, Checks
 
 /** The options of {@link ThingMinder.make}, beside its ties and its bank. */
 export interface MinderOpts {
@@ -73,39 +54,25 @@ export interface MinderOpts {
   tsq:             TSQ.QueryClient
   /** How long a record stays timely, and an entry no one listens to stays cached. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
-  /** The minders of the bank's other kinds of Thing. The bank's minder passes each of them the Things of its kind that the watch reports. */
-  minders?:        MinderRoster
 }
 
-// Defined here, not with the shapes: they name the minder's own class.
 /** The checks of {@link ThingMinder.make}'s arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault }) => {
-  const minder = custom<ThingMinder>((val) => val instanceof ThingMinder, Phrases.MinderExpected)
-  const roster = obj({ bank: exactOptional(minder), gate: exactOptional(minder), box: exactOptional(minder) }).strict()
-  return {
-    minderMakeArgs: obj({
-      ties: obj({ modelkind: oneof(thingkindVals) }),
-      opts: obj({
-        vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
-        tsq:            tsqClient,
-        queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
-        minders:        orDefault(roster, {}),
-      }),
-      bank: minderFriend,
-    }).refine(isRosterOwn, Phrases.MinderOfOtherKind),
-  }
-})
-
-/** True when each minder of `opts.minders` minds the kind it is given for, in `bank`. */
-function isRosterOwn({ opts: { minders }, bank }: { opts: { minders: MinderRoster }, bank: MinderFriend }): boolean {
-  const { userid, banklabel } = bank.scope
-  return Object.entries(minders).every(([modelkind, minder]) => Validator.isConsistent(minder.ties, { userid, banklabel, modelkind }))
-}
+const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault }) => ({
+  minderMakeArgs: obj({
+    ties: obj({ modelkind: oneof(thingkindVals) }),
+    opts: obj({
+      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+      tsq:            tsqClient,
+      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
+    }),
+    bank: minderFriend,
+  }),
+}))
 // --
 
-/** Keeps one kind of Thing in one bank fresh in a TanStack Query cache. The bank's own minder watches the bank for every minder of it. */
+/** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through a watch of the bank of its own. */
 export class ThingMinder {
-  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #minders, #unwatch, #isReady
+  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #isReady
   readonly userid:    string
   readonly banklabel: string
   readonly modelkind: Thingkind
@@ -114,8 +81,6 @@ export class ThingMinder {
   readonly #tsq:            TSQ.QueryClient
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   readonly #recordChecker:  typeof KindChecks[Thingkind]['record']
-  /** The minder each kind of Thing goes to, this one for its own kind. */
-  readonly #minders:        MinderRoster
   #unwatch: (() => void) | null = null
   /** True from `hello` until `goodbye`: the reads answer, and records are cached, only then. */
   #isReady = false
@@ -123,15 +88,13 @@ export class ThingMinder {
 
   // == [Construction]: make, constructor
 
-  /** Make a minder of `ties.modelkind` in `bank`, asking `opts.vaultDB` and caching in `opts.tsq`. Call `hello` to start it.
-   * A bank's minder passes each gate and box the bank's watch reports to `opts.minders`.
-   */
+  /** Make a minder of `ties.modelkind` in `bank`, asking `opts.vaultDB` and caching in `opts.tsq`. Call `hello` to start it. */
   static make(ties: Pick<ThingTies, 'modelkind'>, opts: MinderOpts, bank: MinderFriend): ThingMinder {
     const checked = Checks.minderMakeArgs.parse({ ties, opts, bank })
     return new ThingMinder(checked.ties, checked.opts, checked.bank)
   }
 
-  private constructor(ties: Pick<ThingTies, 'modelkind'>, opts: Required<Omit<MinderOpts, 'queryCacheOpts'>> & { queryCacheOpts: QueryCacheOpts }, bank: MinderFriend) {
+  private constructor(ties: Pick<ThingTies, 'modelkind'>, opts: Omit<MinderOpts, 'queryCacheOpts'> & { queryCacheOpts: QueryCacheOpts }, bank: MinderFriend) {
     const { userid, banklabel } = bank.scope
     this.userid          = userid
     this.banklabel       = banklabel
@@ -141,14 +104,14 @@ export class ThingMinder {
     this.#tsq            = opts.tsq
     this.#queryCacheOpts = Object.freeze(opts.queryCacheOpts)
     this.#recordChecker  = KindChecks[this.modelkind].record
-    this.#minders        = Object.freeze({ ...opts.minders, [this.modelkind]: this })
     Object.freeze(this)
   }
   // --
 
   // == [Starting and ending]: hello, #startVaultDBWatch, goodbye
 
-  /** Start minding: set this minder's defaults on the cache, and for the bank's minder, watch the bank. A second call does nothing. */
+  // The root box is cached here, not when the minder is made: only a minder minding keeps records, under its defaults.
+  /** Start minding: set this minder's defaults on the cache, and watch the bank. A box minder caches its bank's root box. A second call does nothing. */
   hello(): void {
     if (this.#isReady) { return }
     this.#tsq.setQueryDefaults(this.keyPrefix, {
@@ -157,12 +120,13 @@ export class ThingMinder {
       structuralSharing: (prior: unknown, record: unknown) => betterRecordOf(prior, record, (cached) => this.#isWholeRecord(cached)),
     })
     this.#isReady = true
-    if (this.modelkind === 'bank') { this.#startVaultDBWatch() }
+    if (this.modelkind === 'box') { this.#doDeliverSeed(this.#bank.rootBox) }
+    this.#startVaultDBWatch()
   }
 
-  /** Watch the bank: each notice goes to `#receive`, and the watch's trouble to `#reportTrouble`. */
+  /** Watch the bank: each notice goes to `#receive`, and the watch's trouble to the bank's `tellBadNews`. */
   #startVaultDBWatch(): void {
-    this.#unwatch = this.#vaultDB.watch(this.scope, (notice: ThingNotice) => { this.#receive(notice) }, (news) => { this.#reportTrouble(news, 'watch') })
+    this.#unwatch = this.#vaultDB.watch(this.scope, (notice: ThingNotice) => { this.#receive(notice) }, (news) => { this.#bank.tellBadNews([news]) })
   }
 
   /** Stop minding, and remove this minder's entries and defaults from the cache. Reads refuse until `hello` is called again. */
@@ -176,40 +140,43 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, tryAt, get, list, isStaleAt, listen
+  // == [Reading]: at, makeGetAsk, tryAt, get, list, isStaleAt, listen
 
   /** The cached record for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at(scoped: ThingScope): DeliverableThing | undefined {
     return this.#tsq.getQueryData<DeliverableThing>(this.queryKey(scoped))
   }
 
-  /** The cache's answer for `ask`'s scope, and whether it is timely. Never waits on the vaultDB.
-   * - `staleTime`          -- a record older than this (milliseconds) is `untimely`, without its `val`
-   * - `ifStale: 'get'`     -- read the cache alone (default)
-   * - `ifStale: 'refresh'` -- also fetch a stale or vacant record in the background
+  /** The get ask for the Thing at `args.labelpath`: the bank's, with this minder's `staleTime` and `ifStale: 'get'` unless `args` gives them. */
+  makeGetAsk(args: MinderGetAskArgs): MinderGetAsk {
+    const { staleTime = this.#queryCacheOpts.staleTime, ifStale = 'get', ...given } = args
+    // The bank's get ask defaults ifAbsent to 'nil', the only one a minder takes.
+    return { ...this.#bank.makeGetAsk(given), staleTime, ifStale } as MinderGetAsk
+  }
+
+  /** The cache's answer for `ask`'s scope, and whether it is timely within `ask.staleTime`. Never waits on the vaultDB.
+   * Under `ifStale: 'refresh'`, a stale or vacant record is also fetched in the background.
    */
-  tryAt(ask: GetThingAsk & { ifAbsent: 'nil' }, opts: MinderAskOpts = {}): TSQAnswer {
+  tryAt(ask: MinderGetAsk): TSQAnswer {
     try {
-      const { staleTime = this.#queryCacheOpts.staleTime, ifStale = 'get' } = minderAskOpts.parse(opts)
       this.#demandReady()
-      const checked = this.#demandOwnAsk(ask)
-      if (ifStale === 'refresh') { this.#backgroundRefresh(ask, { staleTime }) }
+      const { staleTime, ifStale, ...vaultAsk } = this.#demandOwnAsk(ask)
+      if (ifStale === 'refresh') { this.#backgroundRefresh(vaultAsk, staleTime) }
       // Found after the refresh starts, so that a vacant entry's answer is isFetching.
-      return this.#answerOfTSQ(checked, this.#tsqFind(ask), staleTime)
+      return this.#answerOfTSQ(vaultAsk, this.#tsqFind(vaultAsk), staleTime)
     } catch (err) {
       return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Outcome.storageRefusalOf(err) }
     }
   }
 
-  /** Get the record `ask` names: the cached one if timely, else from the vaultDB. A get already under way is shared.
+  /** Get the record `ask` names: the cached one if timely within `ask.staleTime`, else from the vaultDB. A get already under way is shared.
    * Refuses `stale_read` where storage answers older than the record cached when the get began. That record stays cached, and no longer counts as timely.
    * Refuses `disabled` where `goodbye` is called while it waits.
    */
-  async get(ask: GetThingAsk & { ifAbsent: 'nil' }, opts: MinderGetAskOpts = {}): Promise<DeliverableThing> {
-    const checkedOpts = minderGetAskOpts.parse(opts)
+  async get(ask: MinderGetAsk): Promise<DeliverableThing> {
     this.#demandReady()
-    this.#demandOwnAsk(ask)
-    return this.#doGet(ask, checkedOpts)
+    const { staleTime, ifStale: _ifStale, ...vaultAsk } = this.#demandOwnAsk(ask)
+    return this.#doGet(vaultAsk, staleTime)
   }
 
   /** List the Things one label under this minder's root, tombstones included, and resolve their labelpaths. A box minder lists the boxes under the root box.
@@ -217,10 +184,9 @@ export class ThingMinder {
    */
   async list(): Promise<string[]> {
     this.#demandReady()
-    const answer = await this.#vaultDB.tryListThings(this.#vaultDB.listAsk({ ...this.scope, labelpath: this.modelkind, ifAbsent: 'nil' }))
+    const answer = await this.#vaultDB.tryListThings(listAskOf({ ...this.scope, labelpath: this.modelkind, ifAbsent: 'nil' }))
     if (! answer.ok) { throw answer.err }
     TSQ.notifyManager.batch(() => {
-      this.#routeWorld(answer.world)
       for (const record of answer.val) { this.#doDeliverSeed(record) }
     })
     return answer.val.map((record) => record.labelpath)
@@ -231,18 +197,20 @@ export class ThingMinder {
     return this.#tsqFind(scoped)?.isStaleByTime(staleTime) ?? true
   }
 
-  /** Call `listener` with a scope and the record now cached there, undefined once removed, each time the record or its standing changes.
-   * A record that lands is told even when it changes nothing. So is a get's refusal, or an invalidation, after which the record is no longer timely.
-   * Returns the function that stops it. What the listener throws goes to the default logger, the console unless the host set one, and stops nothing.
+  /** Call `listener` with the answer `tryAt` would give for a scope, under this minder's own `staleTime`, each time its record or its standing changes.
+   * A record that lands is told even when it changes nothing. So is a get's refusal, or an invalidation, after which the answer is `untimely`, and the
+   * entry's removal, after which it is `vacant`. Returns the function that stops it. What the listener throws goes to the device's `onBadNews`, and stops nothing.
    */
-  listen(listener: (scoped: ThingScope, record: DeliverableThing | undefined) => void): () => void {
+  listen(listener: (answer: TSQGotAnswer) => void): () => void {
     const checked = minderListener.parse(listener)
     const { keyPrefix } = this
     return this.#tsq.getQueryCache().subscribe((event) => {
       if (! (isRecordEvent(event) && TSQ.matchQuery({ queryKey: keyPrefix }, event.query))) { return }
       // The cache's events are typed loosely; an entry under this minder's prefix holds a record of its own.
       const entry = event.query as TSQ.Query<DeliverableThing>
-      try { checked(this.#scopeOfKey(entry.queryKey), (event.type === 'removed') ? undefined : entry.state.data) } catch (err) { this.#reportTrouble(err, 'listen') }
+      const ask   = this.#bank.makeGetAsk(this.#scopeOfKey(entry.queryKey))
+      const answer = this.#answerOfTSQ(ask, (event.type === 'removed') ? undefined : entry, this.#queryCacheOpts.staleTime)
+      try { checked(answer) } catch (err) { this.#bank.tellBadNews([Throwers.unexpectedError(err)]) }
     })
   }
   // --
@@ -251,15 +219,15 @@ export class ThingMinder {
 
   // Its refusal lands in the entry, where the next tryAt finds it as `lastErr`.
   /** Initiate fetch of `ask`'s record, if it is stale, without waiting for the result. If a fetch is under way, it will use its result (not starting a new one). */
-  #backgroundRefresh(ask: GetThingAsk & { ifAbsent: 'nil' }, opts: MinderGetAskOpts): void {
-    void this.#doGet(ask, opts).catch(noop)
+  #backgroundRefresh(ask: GetThingAsk, staleTime: number): void {
+    void this.#doGet(ask, staleTime).catch(noop)
   }
 
   /** The record for `ask`'s scope, from the cache if timely within `staleTime`, else from the vaultDB. */
-  async #doGet(ask: GetThingAsk & { ifAbsent: 'nil' }, opts: MinderGetAskOpts): Promise<DeliverableThing> {
+  async #doGet(ask: GetThingAsk, staleTime: number): Promise<DeliverableThing> {
     let fetched: DeliverableThing
     try {
-      fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), ...opts })
+      fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), staleTime })
     } catch (err) {
       // TanStack cancels a get under way when goodbye removes its entry.
       throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
@@ -274,28 +242,11 @@ export class ThingMinder {
   }
   // --
 
-  // == [VaultDB->Minder Delivery]: #receive, #routeWorld, #route, #doDeliverSeed, #doDeliverRecord
+  // == [VaultDB->Minder Delivery]: #receive, #doDeliverSeed, #doDeliverRecord
 
-  /** Cache what a notice of the bank's watch carries, each Thing in the minder of its kind: its world's bank and main gate, then its own Thing. */
+  /** Cache the Thing a notice of the bank's watch carries, where it is of this minder's kind. */
   #receive(notice: ThingNotice): void {
-    TSQ.notifyManager.batch(() => {
-      this.#routeWorld(notice.world)
-      this.#route(notice.val)
-    })
-  }
-
-  /** Hand the bank and the main gate of `world` each to the minder of its kind. */
-  #routeWorld(world: WorldRecord | null): void {
-    if (world === null) { return }
-    const { maingate, ...bank } = world
-    this.#route(bank)
-    this.#route(maingate)
-  }
-
-  /** Hand `record` to the minder of its kind. Skips a Thing of a kind no minder here minds. */
-  #route(record: Thing): void {
-    const minder = this.#minders[modelkindOf(record.labelpath)]
-    if (minder) { minder.#doDeliverRecord(record) }
+    if (modelkindOf(notice.val.labelpath) === this.modelkind) { this.#doDeliverRecord(notice.val) }
   }
 
   // Invalidated, not refetched: the next get, or a listener's next look, fetches it whole.
@@ -314,7 +265,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #voidSentinelAt
+  // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #shellAt
 
   /** The key every one of this minder's cache entries starts with. */
   get keyPrefix(): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, this.modelkind] }
@@ -324,8 +275,8 @@ export class ThingMinder {
   /** The key of the cache entry for `scoped`. */
   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/')] }
 
-  /** TanStack's query options for a get of `ask`. Its record, and the world beside it, go in through `#doDeliverRecord`. */
-  #tsqGetAskOf(ask: GetThingAsk & { ifAbsent: 'nil' }) {
+  /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. Its record goes in through `#doDeliverRecord`. */
+  #tsqGetAskOf(ask: GetThingAsk) {
     return {
       queryKey: this.queryKey(ask),
       queryFn:  async (): Promise<DeliverableThing> => {
@@ -333,13 +284,10 @@ export class ThingMinder {
         const prior  = this.at(ask)
         const answer = await this.#vaultDB.tryGetThing(ask)
         if (! answer.ok) { throw answer.err }
-        const record = answer.val ?? this.#voidSentinelAt(ask)
+        const record = answer.val ?? this.#shellAt(ask)
         // TanStack keeps the entry's record and its time, marks it invalidated, and holds the refusal as the entry's error.
         if ((prior !== undefined) && (cmpRecords(prior, record) < 0)) { throw staleRead(ask) }
-        TSQ.notifyManager.batch(() => {
-          this.#routeWorld(answer.world)
-          this.#doDeliverRecord(record)
-        })
+        this.#doDeliverRecord(record)
         // TanStack writes what this returns over the entry: the record the entry holds changes nothing. After goodbye,
         // nothing was cached, and TanStack drops what this returns.
         return this.at(ask) ?? record
@@ -347,14 +295,18 @@ export class ThingMinder {
     }
   }
 
-  // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The void sentinel at `scoped`: a root's, or that of a box under the bank's root box. */
-  #voidSentinelAt(scoped: ThingScope): VoidSentinel {
-    return voidSentinelOf(scoped, scoped.labelpath.includes('/') ? this.#bank.rootBox.lifepath : null)
+  // Boxes are the only Things under a root, for now: one label under the root box, which `hello` caches.
+  /** The shell at `scoped`: a root's, or that of a Thing under the root of its kind as this minder caches it. */
+  #shellAt(scoped: ThingScope): VoidSentinel {
+    const { labelpath } = scoped
+    if (! labelpath.includes('/')) { return shellOf(scoped) }
+    const parent = this.at({ ...scoped, labelpath: modelkindOf(labelpath) })
+    // With no root cached, shellOf refuses: below a root, a shell needs a life.
+    return (parent === undefined) ? shellOf(scoped) : shellOf(scoped, parent)
   }
   // --
 
-  // == [Checks]: scope, ties, #isWholeRecord, isWholeRecordAt, #demandOwnAsk, #demandReady
+  // == [Checks]: scope, ties, #isWholeRecord, isWholeRecordAt, #demandOwnAsk, #demandReady, #scopeOfKey
 
   /** The bank this minder minds Things of. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
@@ -372,9 +324,13 @@ export class ThingMinder {
     return this.#isWholeRecord(this.at(scoped))
   }
 
-  /** Demand that `rawAsk` is a get ask with `ifAbsent: 'nil'`, for this minder's bank and modelkind. Throws `bad_option`. */
-  #demandOwnAsk(rawAsk: unknown): GetThingAsk {
-    return Validator.checkedConsistent(checkedGetThingAsk(rawAsk), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
+  /** Demand that `rawAsk` is a whole minder's get ask: a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind, and its own two fields. Throws `bad_option`.
+   * Resolves `rawAsk` itself, whose vaultDB part goes to the vaultDB as given.
+   */
+  #demandOwnAsk(rawAsk: MinderGetAsk): MinderGetAsk {
+    const { staleTime: _staleTime, ifStale: _ifStale, ...vaultAsk } = minderAskTail.parse(rawAsk)
+    Validator.checkedConsistent(checkedGetThingAsk(vaultAsk), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
+    return rawAsk
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
@@ -387,16 +343,12 @@ export class ThingMinder {
     return { userid: this.userid, banklabel: this.banklabel, labelpath: queryKey.slice(3).join('/') }
   }
 
-  /** Report `err`, which no caller is waiting to hear, to the console or the logger the host set as the default. */
-  #reportTrouble(err: unknown, oplabel: 'watch' | 'listen'): void {
-    Logger.DefaultLogger.error(Phrases.MinderTrouble, { oplabel: `ThingMinder.${oplabel}`, ...this.ties }, Logger.asError(err))
-  }
   // --
 
   // == [TSQ Helpers]: #answerOfTSQ
 
   /** The {@link TSQAnswer} for `entry`, the cache's entry for `ask`'s scope. */
-  #answerOfTSQ(ask: GetThingAsk, entry: TSQ.Query<DeliverableThing> | undefined, staleTime: number): TSQAnswer {
+  #answerOfTSQ(ask: GetThingAsk, entry: TSQ.Query<DeliverableThing> | undefined, staleTime: number): TSQGotAnswer {
     const state    = entry?.state
     const isTimely = (! (entry?.isStaleByTime(staleTime) ?? true))
     return {
