@@ -74,7 +74,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
  * The bank must be stored: before its birth, a get or a list refuses.
  */
 export class ThingMinder {
-  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #unpinRootBox, #isReady
+  // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #unpermamentizeRootBox, #isReady
   readonly userid:    string
   readonly banklabel: string
   readonly modelkind: Thingkind
@@ -84,7 +84,7 @@ export class ThingMinder {
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   readonly #recordChecker:  typeof KindChecks[Thingkind]['record']
   #unwatch: (() => void) | null = null
-  #unpinRootBox: (() => void) | null = null
+  #unpermamentizeRootBox: (() => void) | null = null
   /** True from `hello` until `goodbye`: the reads answer, and records are cached, only then. */
   #isReady = false
   // --
@@ -111,7 +111,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Starting and ending]: hello, #startVaultDBWatch, #pinRootBox, goodbye
+  // == [Starting and ending]: hello, #startVaultDBWatch, #permamentizeRootBox, goodbye
 
   // The root box is cached here, not when the minder is made: only a minder minding keeps records, under its defaults.
   /** Start minding: set this minder's defaults on the cache, and watch the bank. A box minder caches its bank's root box until `goodbye`. A second call does nothing. */
@@ -120,24 +120,30 @@ export class ThingMinder {
     this.#tsq.setQueryDefaults(this.keyPrefix, {
       ...this.#queryCacheOpts,
       ...FixedQueryCacheOpts,
-      structuralSharing: (prior: unknown, record: unknown) => betterRecordOf(prior, record, (cached) => this.#isWholeRecord(cached)),
+      structuralSharing: (prior: unknown, record: unknown) => (
+        betterRecordOf(prior, record, (cached) => this.#isWholeRecord(cached))
+      ),
     })
     this.#isReady = true
     if (this.modelkind === 'box') {
       this.#doDeliverSeed(this.#bank.rootBox)
-      this.#unpinRootBox = this.#pinRootBox()
+      this.#unpermamentizeRootBox = this.#permamentizeRootBox()
     }
     this.#startVaultDBWatch()
   }
 
   /** Watch the bank: each notice goes to `#receive`, and the watch's trouble to the bank's `tellBadNews`. */
   #startVaultDBWatch(): void {
-    this.#unwatch = this.#vaultDB.watch(this.scope, (notice: ThingNotice) => { this.#receive(notice) }, (news) => { this.#bank.tellBadNews([news]) })
+    this.#unwatch = this.#vaultDB.watch(
+      this.scope,
+      (notice: ThingNotice) => { this.#receive(notice) },
+      (news)                => { this.#bank.tellBadNews([news]) },
+    )
   }
 
-  // Query defaults cannot keep it: the root box's key is the box minder's own keyPrefix, whose defaults they would replace.
-  /** Keep the root box cached whatever the host's `gcTime`: TanStack never collects an entry with an observer, and this one never fetches. Returns the function that lets it go. */
-  #pinRootBox(): () => void {
+  /** Keep the root box cached whatever the host's `gcTime`. Returns the function that stops observing it. */
+  #permamentizeRootBox(): () => void {
+    // TanStack never collects an entry with an observer, and this one never fetches.
     const observer = new TSQ.QueryObserver<DeliverableThing>(this.#tsq, { queryKey: this.queryKey(this.#bank.rootBox), enabled: false })
     return observer.subscribe(noop)
   }
@@ -146,9 +152,9 @@ export class ThingMinder {
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
-    if (this.#unpinRootBox) { this.#unpinRootBox() }
+    if (this.#unpermamentizeRootBox) { this.#unpermamentizeRootBox() }
     this.#unwatch      = null
-    this.#unpinRootBox = null
+    this.#unpermamentizeRootBox = null
     this.#tsq.removeQueries({ queryKey: this.keyPrefix })
     // TanStack Query cannot remove a key's defaults: empty ones in their place set nothing.
     this.#tsq.setQueryDefaults(this.keyPrefix, {})
