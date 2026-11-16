@@ -269,7 +269,8 @@ Use these. Each names one thing:
 
 Avoid these. Each means several things:
 
-* **hold**: wait, adopt, enlist or attach. For what a thing contains, say has, contains or stored, or use the possessive ("this proving's wayin").
+* **hold**, **held**, **keep**, **kept**: wait, adopt, enlist, attach, stow, cache, carry over or leave unchanged. For what a
+  thing contains, say has, contains or stored, or use the possessive ("this proving's wayin").
 * **take**: enlist, adopt, get or peek.
 * **store**: put, stow or storage.
 * **save**: put or stow.
