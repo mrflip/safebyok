@@ -32,7 +32,7 @@ export function lifeseqOfLifepath(lifepath: string): string { return lifepath.sl
 function leadingLifeseqsOf(lifepath: string): string { return lifepath.slice(0, Math.max(0, lifepath.lastIndexOf('/'))) }
 // --
 
-// == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, MainGateLabelpath, modelkindOf, isLabelpathOfKind
+// == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, modelkindOf, isLabelpathOfKind
 
 /** The kinds of Thing: the modelkind at the base of each labelpath. */
 export const thingkindVals = ['bank', 'gate', 'box'] as const satisfies readonly Consts.Modelkind[]
@@ -48,6 +48,8 @@ export const BoxThingFormat = 5103
 
 /** Where the main gate is stored in its bank, and its key in a `track`. */
 export const MainGateLabelpath = 'gate'
+/** Where the root box is stored in its bank, and its key in a `track`. */
+export const RootBoxLabelpath = 'box'
 
 /** The most labels a labelpath of each kind has after its modelkind: none for the bank, one for a gate or a box. */
 const MaxLabelsUnder = { bank: 0, gate: 1, box: 1 } as const satisfies Record<Thingkind, number>
@@ -289,7 +291,7 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
   const trackPair       = obj({ revseq: thingRecord.shape.revseq, lifepath: thingRecord.shape.lifepath }).strict()
-  const trackShape      = obj({ bank: trackPair, [MainGateLabelpath]: trackPair }).strict()
+  const trackShape      = obj({ bank: trackPair, [MainGateLabelpath]: trackPair, [RootBoxLabelpath]: trackPair }).strict()
   const track           = trackShape.optional()
   return {
     thingOptions,
@@ -312,7 +314,7 @@ const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof,
 /** The checks of a watch's scope (a bank) and of its arguments. */
 export const { thingWatchScope, watchArgs } = AskChecks
 
-/** The revseq and lifepath the ask's sender has of its bank and of its main gate. The answer's `tracked` says, for each, whether it is still the one stored. */
+/** The revseq and lifepath the ask's sender has of its bank, its main gate and its root box. The answer's `tracked` says, for each, whether it is still the one stored. */
 export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>
 /** An ask for the Thing at its scope. */
 export type GetThingAsk     = Readonly<Z.infer<typeof AskChecks.getThingAsk>>
@@ -349,7 +351,7 @@ export type BankRecord      = BankThing
 export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
 // Unspecified for a missing or damaged row: notes/wontfix.md.
 /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
-export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same' }>
+export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same', [RootBoxLabelpath]: BoxThing | 'same' }>
 
 /** Check a get `ask`, throwing `bad_option`, and return it typed. */
 export function checkedGetThingAsk(ask: unknown): GetThingAsk { return AskChecks.getThingAsk.parse(ask) }
@@ -528,7 +530,7 @@ export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label
     bank:      citedFields.optional(),
     gate:      citedFields.optional(),
     root:      citedFields.optional(),
-    track:     obj({ bank: trackFields, [MainGateLabelpath]: trackFields }).partial().optional(),
+    track:     obj({ bank: trackFields, [MainGateLabelpath]: trackFields, [RootBoxLabelpath]: trackFields }).partial().optional(),
   }
 }, 'bad_option')
 

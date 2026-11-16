@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import {
-  type BankRecord, type GateThing, type Tracked, type WriteThingAsk, MainGateLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf,
+  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteThingAsk, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf,
   isGoneLifeseq, isLabelpathOfKind, lifeseqOf, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, seqOfLifeseq, childShellCited, sparseOf, boxSparse,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
@@ -355,8 +355,9 @@ describe("loggableAskOf(ask)", () => {
 })
 
 describe("Tracked", () => {
-  it("is, for each of the bank and main gate, its record or 'same'", () => {
+  it("is, for each of the bank, main gate and root box, its record or 'same'", () => {
     expectTypeOf<Tracked['bank']>().toEqualTypeOf<BankRecord | 'same'>()
     expectTypeOf<Tracked[typeof MainGateLabelpath]>().toEqualTypeOf<GateThing | 'same'>()
+    expectTypeOf<Tracked[typeof RootBoxLabelpath]>().toEqualTypeOf<BoxThing | 'same'>()
   })
 })

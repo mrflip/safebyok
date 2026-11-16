@@ -10,7 +10,7 @@ import type {
 
 /** A vaultDB verb's good answer: its `val`, the `act` that says what the store did, its bank's `world`, and the loggable part of its `ask`.
  * `world` is the bank and its main gate as the step left them, read in that step. It is null if either is missing or fails its checks.
- * `tracked`, only for an ask that tracks, says for each of the two whether it is still at the revision the ask tracks ({@link Tracked}).
+ * `tracked`, only for an ask that tracks, says for each of the bank, its main gate and its root box whether it is still at the revision the ask tracks ({@link Tracked}).
  */
 export type GoodAnswer<ValT, ActT extends EX.GoodAct> = { ok: true, ask: LoggableAsk, act: ActT, world: WorldRecord | null, tracked?: Tracked, val: ValT }
 

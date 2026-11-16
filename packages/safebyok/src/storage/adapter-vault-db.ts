@@ -220,8 +220,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
   // fetched. A store that can run code of its own may run the whole step there. For an ask that carries `track`, the step
-  // also compares it with the bank and main gate the world is read from, and reports that as the world's `tracked`
-  // (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
+  // also compares it with the bank and main gate the world is read from, and with the root box read beside them, and reports
+  // that as the answer's `tracked` (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
   //
   // A write checks only its preconditions of the Thing stored: the revision cited, the born_at a live Thing keeps, and the
   // storage policies it names (`classifyWriteThing` reads no more). Where several refusals apply at once, any one of them

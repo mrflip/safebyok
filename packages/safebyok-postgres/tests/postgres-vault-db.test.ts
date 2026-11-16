@@ -91,7 +91,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const notices: unknown[] = []
     vaultDB.watch(VT.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
     const answer = await vaultDB.tryGetThing({ ...VT.getAskAt('box'), track: VT.BankStaleTrack })
-    expect(answer).to.deep.include({ tracked: { bank: VT.bankThingOf(), gate: 'same' } })
+    expect(answer).to.deep.include({ tracked: { bank: VT.bankThingOf(), gate: 'same', box: 'same' } })
     await VT.aWhile()
     expect(notices).to.deep.equal([])
   })

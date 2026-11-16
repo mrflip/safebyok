@@ -16,7 +16,7 @@ function writeFunctionOf({ kind, table, body, policied }: WriteFunctionSpec): st
   const policiesCheck = '((stored.am <> proposed.am) OR safebyok_gate_policies_ok(policies, stored.wayins, cited.wayins, proposed.wayins))'
   return `
 CREATE OR REPLACE FUNCTION safebyok_write_${kind}(proposed_record jsonb, cited_record jsonb${policiesArg})
-RETURNS TABLE (ok boolean, thing jsonb, world jsonb, born_at_ok boolean${policiesOut})
+RETURNS TABLE (ok boolean, thing jsonb, world jsonb, root jsonb, born_at_ok boolean${policiesOut})
 LANGUAGE plpgsql AS $$
 DECLARE
   proposed ${table} := jsonb_populate_record(NULL::${table}, proposed_record);
@@ -56,9 +56,10 @@ BEGIN
 
   IF FOUND THEN
     ok := true;  born_at_ok := true;${policied ? '  policies_ok := true;' : ''}
-    -- The world after the write, in a statement of its own: a statement does not see what it writes itself. Another
-    -- write may land between the two, so at worst this reads a newer world, which a receiver orders by its revisions.
+    -- The world and root box after the write, in statements of their own: a statement does not see what it writes itself.
+    -- Another write may land between, so at worst these read newer rows, which a receiver orders by their revisions.
     world := safebyok_world(proposed.userid, proposed.banklabel);
+    root  := safebyok_root_box(proposed.userid, proposed.banklabel);
     PERFORM safebyok_tell_thing(thing, world);
     RETURN NEXT;  RETURN;
   END IF;
@@ -67,8 +68,9 @@ BEGIN
   SELECT (SELECT safebyok_thing_record(to_jsonb(stored))),
          COALESCE(${bornAtCheck}, true)${policied ? `,
          COALESCE(${policiesCheck}, true)` : ''},
-         safebyok_world(proposed.userid, proposed.banklabel)
-  INTO   thing, born_at_ok${policied ? ', policies_ok' : ''}, world
+         safebyok_world(proposed.userid, proposed.banklabel),
+         safebyok_root_box(proposed.userid, proposed.banklabel)
+  INTO   thing, born_at_ok${policied ? ', policies_ok' : ''}, world, root
   FROM   (SELECT) AS one
   LEFT JOIN ${table} AS stored
     ON   ((stored.userid, stored.banklabel, stored.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath));
@@ -92,9 +94,9 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 --
 -- Each write function stores its record in one statement, which waits only on a writer of the same row. It does not
 -- throw when it stores nothing. It returns one row: whether it stored the record (ok), the row as it now stands, the
--- bank's world (the bank and main gate rows, each null for none), and the verdict of each named check on that row.
--- When it stored the record, the world is read just after, in the same transaction; when it stored nothing, in the
--- statement that reads the row back.
+-- bank's world (the bank and main gate rows, each null for none), its root box row (null for none), and the verdict of
+-- each named check on that row. When it stored the record, the world and root box are read just after, in the same
+-- transaction; when it stored nothing, in the statement that reads the row back.
 --
 -- A function that stores a record notifies the user's channel in the same transaction (see safebyok_tell_thing).
 --
@@ -123,15 +125,25 @@ LANGUAGE sql STABLE AS $$
   )
 $$;
 
--- How the bank and main gate in world compare with track, the revseq and lifepath an ask tracks of each: under bank and
--- gate, the JSON string 'same' where the row has both, else the row. Null where track is null: the ask tracks nothing.
-CREATE OR REPLACE FUNCTION safebyok_tracked(world jsonb, track jsonb) RETURNS jsonb
+-- The root box row of a bank, null for none. STABLE, so it reads in the calling statement's snapshot.
+CREATE OR REPLACE FUNCTION safebyok_root_box(of_userid text, of_banklabel text) RETURNS jsonb
+LANGUAGE sql STABLE AS $$
+  SELECT safebyok_thing_record(to_jsonb(root)) FROM safebyok_box_things AS root
+  WHERE  (root.userid, root.banklabel, root.labelpath) = (of_userid, of_banklabel, 'box')
+$$;
+
+-- How the bank and main gate in world, and the root box row root, compare with track, the revseq and lifepath an ask
+-- tracks of each: under bank, gate and box, the JSON string 'same' where the row has both, else the row. Null where
+-- track is null: the ask tracks nothing.
+CREATE OR REPLACE FUNCTION safebyok_tracked(world jsonb, root jsonb, track jsonb) RETURNS jsonb
 LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
   SELECT jsonb_build_object(
     'bank', CASE WHEN ((world->'bank'->'revseq', world->'bank'->'lifepath') = (track->'bank'->'revseq', track->'bank'->'lifepath'))
                  THEN '"same"'::jsonb ELSE world->'bank' END,
     'gate', CASE WHEN ((world->'maingate'->'revseq', world->'maingate'->'lifepath') = (track->'gate'->'revseq', track->'gate'->'lifepath'))
-                 THEN '"same"'::jsonb ELSE world->'maingate' END
+                 THEN '"same"'::jsonb ELSE world->'maingate' END,
+    'box',  CASE WHEN ((root->'revseq', root->'lifepath') = (track->'box'->'revseq', track->'box'->'lifepath'))
+                 THEN '"same"'::jsonb ELSE root END
   )
   WHERE track IS NOT NULL
 $$;

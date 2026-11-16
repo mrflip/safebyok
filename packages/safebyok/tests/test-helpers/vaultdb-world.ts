@@ -34,9 +34,13 @@ export const Life0 = lifeseqOf(0)
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
 const FirstRevision = { am: 'a', revtok: 'rev-0', revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
 
-/** The track of the bank and main gate `bank` and `gate`: their revseq and lifepath. */
-export function trackOf(bank: Thing = bankThingOf(), gate: Thing = gateThingOf()): Track {
-  return { bank: { revseq: bank.revseq, lifepath: bank.lifepath }, gate: { revseq: gate.revseq, lifepath: gate.lifepath } }
+/** The track of the bank, main gate and root box `bank`, `gate` and `box`: their revseq and lifepath. */
+export function trackOf(bank: Thing = bankThingOf(), gate: Thing = gateThingOf(), box: Thing = rootBoxOf()): Track {
+  return {
+    bank: { revseq: bank.revseq, lifepath: bank.lifepath },
+    gate: { revseq: gate.revseq, lifepath: gate.lifepath },
+    box:  { revseq: box.revseq,  lifepath: box.lifepath },
+  }
 }
 
 /** The bank Thing at revision 0 of life 0, with `overrides` laid over it. */
@@ -124,3 +128,5 @@ export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBank
 export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: lifeseqOf(2) }))
 /** The track of a sender that holds the bank at another revision. */
 export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
+/** The track of a sender that holds the root box at another revision. */
+export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
