@@ -6,13 +6,13 @@ import { type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from 
 import { Wayin } from './wayin'
 import { type GateThing, type ThingScope, type Wayins, GateThingFormat, gateThing, thingScope } from '../storage/shapes-thing'
 
-/** What a new main gate is made of: its stamp, and its wayins. */
+/** The dna of a new main gate: its stamp, and its wayins. */
 export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
 
-/** What a gate is given of its bank: its stamp. */
+/** The part of its bank a gate uses: its stamp. */
 export type GateBank = Pick<Bank, 'stamp'>
 
-/** What {@link Gate.make} is given besides its record. */
+/** The options of {@link Gate.make}, beside its record. */
 export interface GateOpts {
   /** The bank the gate belongs to. */
   bank: GateBank
@@ -62,7 +62,7 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
 
   // == [Construction]: make, constructor, makeRecord
 
-  /** The gate of `record`, which must be of `opts.bank`'s scope. */
+  /** Make the gate of `record`, which must be of `opts.bank`'s scope. */
   static make(record: GateThing, opts: GateOpts): Gate {
     const { record: parsed, opts: checked } = Checks.gateMakeArgs.parse({ record, opts })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
@@ -80,7 +80,7 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
     Object.freeze(this)
   }
 
-  /** The first record of a new main gate, made of `dna`: a root, born when its stamp says. */
+  /** The first record of a new main gate, made from `dna`, born at its stamp's `born_at`. */
   static makeRecord(dna: GateDna): GateThing {
     const { wayins, ...stamp } = Checks.makeRecordArgs.parse(dna)
     return gateThing.parse({
@@ -92,7 +92,7 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
 
   // == [Guards]: demandPasskeyAddable
 
-  /** Throw if this gate already has a passkey. */
+  /** Demand that this gate has no passkey wayin yet. */
   demandPasskeyAddable(): void {
     if (this.#passkey0 !== null) { throw Throwers.passkeyAlreadyAdded() }
   }

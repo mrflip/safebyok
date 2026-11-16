@@ -44,7 +44,7 @@ export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a 
 /** A sparse record that is half the shell. */
 export const SparseHalfShell = "A sparse record is the shell, at revseq -1, a lifeseq of '-1' and the void revtok, in all three or in none."
 
-/** A tombstone asked of a tombstone or the shell. */
+/** A tombstone made of a tombstone or the shell. */
 export const TombstoneOfLiveOnly = "Only a live box has a tombstone: a tombstone or the shell has none."
 
 /** A write whose revseq does not follow. */
@@ -59,19 +59,19 @@ export const RecordOfOtherScope = "A write's record is at the scope its ask name
 /** A write of a tombstone over a tombstone. */
 export const TombstoneOverTombstone = "A tombstone is never written over a tombstone."
 
-/** A write whose record moves the lifeseqs above its own. */
+/** A write that changes the leading lifeseqs of the cited lifepath. */
 export const LifepathNotKept = "A write's record keeps the leading lifeseqs of the lifepath it cites: only the last, its own, may change."
 
 /** A write whose lifeseq does not follow. */
 export const LifeseqNotNext = "A write's record keeps the cited lifeseq when am stays, and has the next one when am flips."
 
-/** A write over a tombstone that is not born as it is written. */
+/** A birth whose born_at is not its written_at. */
 export const BornAtNotNow = "A write over a tombstone or none is a birth: its born_at is its written_at."
 
-/** A write over a live Thing that moves its born_at. */
+/** A write over a live Thing that changes its born_at. */
 export const BornAtNotStored = "A write over a live Thing keeps the stored Thing's born_at."
 
-/** A tombstone of the main gate. */
+/** A deleted main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
 
 /** A policy that needs testimony the citation lacks. */
@@ -107,6 +107,6 @@ export const MinderNotStarted = 'This ThingMinder is not minding: call hello bef
 /** A minder handed something that is not a TanStack Query client. */
 export const QueryClientExpected = 'A ThingMinder is made with a QueryClient from @tanstack/query-core.'
 
-/** A gcTime a timer cannot wait. */
+/** A gcTime that is not Infinity or a whole number of milliseconds up to 2^31 - 1. */
 export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2147483647 (about 24.8 days): a longer timer fires at once.'
 // --

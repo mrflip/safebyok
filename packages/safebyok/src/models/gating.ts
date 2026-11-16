@@ -9,12 +9,13 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 
 /** The kinds of gating: what each asks the user to prove, and for what. */
 export const gatingkindVals = ['birth_bank'] as const
+/** A kind of gating, one of {@link gatingkindVals}. */
 export type Gatingkind = typeof gatingkindVals[number]
 
 /** A gating as a host's dialog renders it: its kind, its token and its bank scope. */
 export type GatingSnapshot = Omit<GX.GatingSnapshot, 'gatingkind'> & { gatingkind: Gatingkind }
 
-/** What a dialog hands `attempt`, for each kind of gating. */
+/** The cleartexts a dialog hands `attempt`, by kind of gating. */
 export interface CleartextsForGatingkind {
   birth_bank: Z.input<typeof GX.bankBuildCleartexts>
 }
@@ -28,22 +29,22 @@ export type GatingAttempt = (cleartexts: unknown) => Promise<Bank>
 /** The host's dialog: show `gating`, and hand what the user types to `gating.attempt`. */
 export type RequestCleartext = (gating: Gating) => unknown
 
-/** The host's `requestCleartext`, guarded: it resolves true once the host's dialog returns, and false if it throws. */
+/** The host's `requestCleartext`, guarded: it resolves true when the host's dialog returns, and false when it throws. */
 export type AskUser = (gating: Gating) => Promise<boolean>
 
-/** What {@link Gating.make} is given besides its record. */
+/** The options of {@link Gating.make}, beside its record. */
 export interface GatingOpts {
   /** The device the gating opens on. */
   device: Device
   /** The bank the gating is for; null for a `birth_bank` gating, whose bank does not exist yet. */
   bank:    Bank | null
-  /** What each attempt runs on the cleartexts it is handed. */
+  /** The work each attempt does on the cleartexts it is handed. */
   attempt: GatingAttempt
   /** The host's dialog, guarded, or null to wait for the host's own `attempt` or `dismiss`. */
   askUser: AskUser | null
 }
 
-/** What a gating is: its kind. */
+/** A gating's record: its kind. */
 export interface GatingRecord<KindT extends Gatingkind = Gatingkind> {
   gatingkind: KindT
 }
@@ -57,22 +58,20 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom, oneof }) => 
   }),
 }))
 
-/** A request to the user for their passphrase or passkey, to birth, unlock, change or delete a bank.
- * A device has one open at a time. A dialog hands what the user typed to `attempt`, as often as the user corrects it,
- * and closes when `whenConcluded` resolves. The gating keeps no cleartext between attempts.
+/** A request to the user for their passphrase or passkey, for the change `gatingkind` names.
+ * A device has one open at a time. The dialog hands what the user typed to `attempt`, and closes when `whenConcluded` resolves.
+ * The gating keeps no cleartext between attempts.
  */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
   // == [Props]: gatingkind, gatingTok, user_id, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isLaunched, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
-  /** A random token unique to this gating.
-   * Key the dialog on it, so that the next gating's form starts empty.
-   */
+  /** A random token unique to this gating. Key the dialog on it: the next gating's form then starts empty. */
   declare readonly gatingTok:     string
   declare readonly user_id:       string
   declare readonly banklabel:     string
   declare readonly bank:          Bank | null
-  /** The header of the gate's passkey wayin at launch, or null for none.
+  /** The header of the main gate's passkey wayin when the gating was made, or null for none.
    * The dialog asks for that passkey by its `credential_id` and `prf_salt_b64`.
    */
   declare readonly passkeyHeader: GX.WayinHeader | null
@@ -111,7 +110,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [Construction and launch]: make, constructor, launch, askHost
 
-  /** A gating of `record.gatingkind` on `opts.device`, not yet open: {@link launch} opens it. */
+  /** Make a gating of `record.gatingkind` on `opts.device`. It is not open until {@link launch}. */
   static make<KindT extends Gatingkind>(record: GatingRecord<KindT>, opts: GatingOpts): Gating<KindT> { return new Gating(record, opts) }
 
   private constructor(record: GatingRecord<KindT>, opts: GatingOpts) {
@@ -126,7 +125,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     Object.freeze(this)
   }
 
-  /** Open this gating on its device and hand it to the host's dialog, resolving the bank once an attempt lands.
+  /** Open this gating on its device and hand it to the host's dialog, resolving the bank once an attempt succeeds.
    * Refuses `already_asking` while another gating is open on the device.
    */
   async launch(): Promise<Bank> {
@@ -151,10 +150,9 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
     return Proving.judgeStrength(passphraseClear, this.scope, this.#device)
   }
 
-  /** Try what the user typed, resolving the outcome rather than throwing. Await one attempt before the next.
-   * A refusal the user can correct, such as `wrong_passphrase`, leaves the gating open for another attempt.
-   * Any other outcome concludes it. A passkey answer's PRF bytes are zeroed once handed in, except after a correctable
-   * refusal: then hand them in again, or zero them yourself. An attempt before {@link launch} refuses `gating_unlaunched`.
+  /** Try what the user typed, resolving an outcome instead of throwing. Call {@link launch} first, and await one attempt before the next.
+   * A correctable refusal, such as `wrong_passphrase`, leaves the gating open for another attempt. Any other outcome concludes it.
+   * A passkey answer's PRF bytes are zeroed once handed in, except after a correctable refusal: hand them in again, or zero them yourself.
    */
   attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome.Outcome<Bank>> {
     const refusal = this.#refusalOfAttempt()
@@ -190,7 +188,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   // == [Concluding]: dismiss, endAsking, concludeOnce
 
   /** Close this gating without the user's cleartext.
-   * It concludes `dismissed`, or, if an attempt is under way, with that attempt's outcome.
+   * It concludes `dismissed`, or if an attempt is under way, with that attempt's outcome.
    */
   dismiss(): void { this.#endAsking(Throwers.gatingDismissed()) }
 
@@ -221,8 +219,8 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 // Each attempt proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving
 // builder, and a proving never leaves the attempt that built it.
 
-/** Birth a bank of `device`'s scope from the user's passphrase and optional passkey, put it, and unlock it.
- * Refuses `gate_made_elsewhere` where a live bank is already stored there.
+/** Birth a bank of `device`'s scope from the user's passphrase and optional passkey: write it, and unlock it.
+ * Refuses `gate_made_elsewhere` if a live bank is already stored there.
  */
 export async function birthBank(device: Device, cleartexts: unknown): Promise<Bank> {
   const { passphraseClear, passkeyClear } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
@@ -240,8 +238,8 @@ export async function birthBank(device: Device, cleartexts: unknown): Promise<Ba
 
 // == [An attempt's helpers]: checkedCleartexts, isCorrectable, spendCleartexts
 
-/** `cleartexts`, checked by `checker`.
- * A throw that is not a VaultError, as from a host's getter, is replaced by one that keeps nothing of it.
+/** Check `cleartexts` with `checker`.
+ * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
  */
 function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT {
   try {

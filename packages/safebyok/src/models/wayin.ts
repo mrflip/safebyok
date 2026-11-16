@@ -11,10 +11,8 @@ export const PurposeForWayinkind = Object.freeze({
   passkey:    'bank_key_passkey_wrapped',
 } as const satisfies Readonly<Record<EX.Wayinkind, string>>)
 
-/** Serialized name/value pairs bound into a wayin's wrapped bankKey as cryptographic context.
- * They are the bank's stamp, the gate's stamp, the wayin's purpose and its header.
- * The bankKey cannot be unwrapped unless the same bytes, unchanged, are independently provided along with the wrapping
- * key. With any change to them, such as another `userid` or a forged `born_at`, it will not unwrap.
+/** The context a wayin's wrapped bankKey is bound to: the bank's stamp, the gate's stamp, the wayin's purpose and its header.
+ * The bankKey unwraps only given the same context: any change, such as another `userid` or a forged `born_at`, prevents it.
  */
 export function wayinCtxOf(bank: BankStamp, gate: GateStamp, header: GX.WayinHeader): Uint8Array {
   const checked = GX.wayinHeader.parse(header)
@@ -45,7 +43,7 @@ export class Wayin {
 
   // == [Construction]: make, constructor
 
-  /** A Wayin of `record`, checked as a {@link GX.WayinRecord}. */
+  /** Make the Wayin of `record`, checked as a {@link GX.WayinRecord}. */
   static make(record: Z.input<typeof GX.wayinRecord>): Wayin { return new Wayin(record) }
 
   private constructor(record: Z.input<typeof GX.wayinRecord>) {

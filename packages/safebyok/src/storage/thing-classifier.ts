@@ -15,10 +15,10 @@ import {
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
-/** A write ask, as the tables read it: its flags, and what its two records cite. */
+/** A write ask reduced to what the act tables read: its flags, and the citations in its `cited` and `record`. */
 type WriteCmpAsk = Pick<WriteThingAsk, 'op' | 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
 
-/** What is stored at a scope: no Thing, a tombstone, or a live Thing. */
+/** A scope's stored Thing, by liveness: none (`void`), a tombstone (`gone`), or a live Thing. */
 type Presence = 'void' | 'gone' | 'live'
 
 /** The presence of `stored`, `'void'` for null. */
@@ -43,14 +43,14 @@ type RevtokCmp = 'birth' | '=next' | 'eq' | 'neq'
  */
 type RevseqCmp = 'birth' | 'eq' | 'stale' | 'ahead'
 
-/** The stored revtok compared with the ask's, as {@link RevtokCmp} reads. */
+/** Compare the stored revtok with the ask's: see {@link RevtokCmp}. */
 function revtokCmpOf({ cited, record }: WriteCmpAsk, stored: ThingCited | null): RevtokCmp {
   if (stored === null)                 { return (cited.revtok === SX.VoidRevisionTok) ? 'birth' : 'neq' }
   if (stored.revtok === record.revtok) { return '=next' }
   return (stored.revtok === cited.revtok) ? 'eq' : 'neq'
 }
 
-/** The ask's cited revseq compared with the stored one, as {@link RevseqCmp} reads. */
+/** Compare the ask's cited revseq with the stored one: see {@link RevseqCmp}. */
 function revseqCmpOf({ cited }: WriteCmpAsk, stored: ThingCited | null): RevseqCmp {
   if (cited.revseq === SX.VoidRevisionSeq) { return 'birth' }
   if (stored === null)                        { return 'ahead' }
@@ -59,7 +59,7 @@ function revseqCmpOf({ cited }: WriteCmpAsk, stored: ThingCited | null): RevseqC
 }
 
 // The lifepath stands where big's life tok stood: it names the Thing's life, and the lives above it.
-/** True when a Thing is stored, and the one cited differs from it in its life or its liveness. */
+/** True when a Thing is stored and differs from the cited one in its life or its liveness. */
 function isLifeOff({ cited }: WriteCmpAsk, stored: ThingCited | null): boolean {
   return (stored !== null) && ((stored.lifepath !== cited.lifepath) || (stored.am !== cited.am))
 }
@@ -141,7 +141,7 @@ function writtenOf<RecordT extends object>(check: StoredCheck<RecordT>, { userid
 
 const StoredCitedCheck = storedCited.refusingAs('damaged_row')
 
-/** What a write reads of the Thing stored at `scope`, checked, or null for none: just what its preconditions compare, the rest unread. */
+/** The part of the Thing stored at `scope` that a write's preconditions compare, checked, or null for none. The rest of the Thing is not read. */
 export function storedCitedOf(scope: ThingScope, raw: unknown): StoredCited | null { return storedOf(StoredCitedCheck, scope, raw) }
 
 /** The Thing stored at `scope`, checked, or null for none. */
@@ -150,7 +150,7 @@ export function storedThingOf(scope: ThingScope, raw: unknown): Thing | null { r
 /** The Thing the store reports writing at `scope`, checked. */
 export function writtenThingOf(scope: ThingScope, raw: unknown): Thing { return writtenOf<Thing>(kindChecksOf(scope.labelpath).stored, scope, raw) }
 
-/** The bank's three roots the store reports writing for a birth's `puts`, checked. */
+/** The three roots the store reports writing for a birth's `puts`, checked. */
 export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
   return {
     bank: writtenOf(KindChecks.bank.stored, bankPut, written.bank),
@@ -166,7 +166,7 @@ function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
   return parsed.success ? Validator.checkedConsistent(parsed.data, scope, RowOfOtherScope) : null
 }
 
-/** The Thing a watch on `bankScope` heard, checked. */
+/** The Thing in a notice from a watch on `bankScope`, checked. */
 export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   // The labelpath is the record's own; the bank is the watch's, so that a Thing of another bank refuses.
@@ -175,10 +175,10 @@ export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing 
   return writtenThingOf(scope.data, raw)
 }
 
-/** What a store fetched of a bank's three roots: the raw bank, main gate and root box, each null for none, and its {@link TrackedFetched}. */
+/** The raw bank, main gate and root box a store fetched for a bank's birth, each null for none, and its {@link TrackedFetched}. */
 export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked?: TrackedFetched }>
 
-/** What a store fetched of a bank's world: the raw bank and main gate, each null for none, and its {@link TrackedFetched}. */
+/** The raw bank and main gate a store fetched for an ask's bank, each null for none, and its {@link TrackedFetched}. */
 export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
 
 // A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
@@ -196,10 +196,10 @@ export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFe
 // The store compares what an ask tracks with the bank and main gate it fetched, in the step that fetched them. The adapter
 // checks each row the store reports in place of 'same'.
 
-/** What a store reports of the bank and main gate an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
+/** A store's report on the bank and main gate an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
 export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown }> | null
 
-/** What a store that compares in TypeScript reports of `track`, against the raw bank and main gate it fetched. */
+/** The {@link TrackedFetched} report of `track` against the raw bank and main gate a store fetched, for a store that compares in TypeScript. */
 export function trackedFetchedOf(track: Track | undefined, { bank, maingate }: WorldFetched): TrackedFetched {
   if (track === undefined) { return null }
   return { bank: trackedRawOf(track.bank, bank), [MainGateLabelpath]: trackedRawOf(track[MainGateLabelpath], maingate) }
@@ -210,7 +210,7 @@ function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
   return (CX.isPlainBag(raw) && (raw['revseq'] === pair.revseq) && (raw['lifepath'] === pair.lifepath)) ? 'same' : raw
 }
 
-/** The answer's `tracked`, as a field to spread into it, from what the store reports for the bank at `bankScope`: none for an ask that tracks nothing. */
+/** The answer's `tracked`, checked, as a field to spread into it, from the store's report for the bank at `bankScope`: none for an ask that tracks nothing. */
 export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched | undefined): { tracked?: Tracked } {
   if ((fetched === null) || (fetched === undefined)) { return {} }
   return { tracked: {
@@ -226,7 +226,8 @@ function trackedEntryOf<RecordT extends Thing>(check: StoredCheck<RecordT>, scop
 // --
 
 // == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, classifyBirthBank
-// Each takes the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`.
+// Each takes the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
+// a birth takes the bank's three roots, and where it is born, reports the world its puts wrote.
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
 export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {
@@ -237,9 +238,9 @@ export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: W
   return isRefusedAct(act) ? { ok: false, act, world, record: stored, ...beside } : { ok: true, act, world, record: stored, ...beside }
 }
 
-/** Classify a write against the raw Thing a store fetched at its scope, null for none, and check its storage policies
- * where it would replace a live Thing. Under a write act, `record` is `ask.record`, which the store writes, then reports
- * the Thing it wrote and the world after it.
+/** Classify a write against the raw Thing a store fetched at its scope, null for none.
+ * Where the write would replace a live Thing, it also checks the born_at and the storage policies. Under a write act, `record`
+ * is `ask.record`: the store writes it, then reports the Thing it wrote and the world after the write.
  */
 export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
   const stored = storedCitedOf(ask, raw)
@@ -252,11 +253,11 @@ export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, worldFetche
   return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
 }
 
-/** What a store fetched for a listing: the raw parent, null for none, and each raw Thing one label under it, with its labelpath. */
+/** The raw rows a store fetched for a listing: the parent (null for none), and each child one label under it, with its labelpath. */
 export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: string, raw: unknown }>[] }>
 
-/** Classify a listing against what a store fetched for it: the parent's get act, the parent, its children of the parent's
- * live life in labelpath order, and the children that fail their checks.
+/** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the parent, the children of its live life in labelpath order,
+ * and the children that fail their checks.
  */
 export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
   const stored = storedThingOf(ask, rawParent)
@@ -287,9 +288,9 @@ function isChildLabelpath(ask: ListThingsAsk, labelpath: string): boolean {
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind(labelpath, ask.modelkind)
 }
 
-/** Classify a bank's birth, by the three `puts` it amounts to, against the roots a store fetched. Under
- * `born`, `things` and `world` are the puts' records, which the store writes in one step and then reports as written, with any `tracked`
- * as read after it; otherwise as {@link unwrittenBirthOf} reads.
+/** Classify a bank's birth, by its three `puts`, against the raw roots a store fetched.
+ * Under `born`, `things` and `world` are made of the puts' records, for the store to write in one step. The store then reports
+ * them as written, with any `tracked` read after the write. Otherwise the answer is {@link unwrittenBirthOf}'s.
  */
 export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual {
   const unwritten = unwrittenBirthOf(puts, fetched)
@@ -301,7 +302,7 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 // --
 
 // == [Steps]: unwrittenWriteOf, demandBornAtKept, demandPolicies, unwrittenBirthOf
-// The steps of the classifiers above, for a store that reaches part of the verdict itself to take in its own order.
+// The steps of the classifiers above, for a store that checks some preconditions itself to call in its own order.
 
 /** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope and the raw world. */
 export function unwrittenWriteOf(ask: WriteThingAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
@@ -319,15 +320,15 @@ export function demandBornAtKept(ask: WriteThingAsk, stored: StoredCited | null,
 
 const StoredWayinsCheck = storedWayins.refusingAs('damaged_row')
 
-/** Throw `gate_issue` where a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only the gate has storage policies. */
+/** Throw `gate_issue` if a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only a gate's writes name storage policies. */
 export function demandPolicies(ask: WriteThingAsk, raw: unknown): void {
   if ((ask.modelkind !== 'gate') || ((ask.options?.policies.length ?? 0) === 0)) { return }
   const why = policyRefusalOf(ask, StoredWayinsCheck.parse(raw).wayins)
   if (why !== null) { throw gateIssue(storedThingOf(ask, raw), why) }
 }
 
-/** The answer to a birth the roots a store fetched leave unwritten, or null where the act tables let it write: `passed`
- * over a live bank, with the roots stored, or the first root's refusal.
+/** The answer to a birth the fetched roots pass or refuse, or null if the act tables let it write.
+ * Over a live bank the answer is `passed`, with the three roots stored. Otherwise it is the first root's refusal.
  */
 export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual | null {
   const [bankPut, gatePut, rootPut] = puts

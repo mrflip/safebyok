@@ -5,21 +5,21 @@ import type { Bank } from './bank'
 import * as Sealers from './sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from './stamps'
 
-/** What a lease is given of its bank: its stamp; its lock, called when the bankKey will not unwrap; and whether its device is enabled. */
+/** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
 /** The sealer of kind `KindT`, in `sealers.ts`. */
 type SealerOf<KindT extends Sealers.Sealerkind> = Sealers.SealerKinds[KindT]
-/** What the sealer of kind `KindT` seals the next revision after. */
+/** The prior revision the sealer of kind `KindT` takes. */
 export type PriorOf<KindT extends Sealers.Sealerkind>      = SealerOf<KindT> extends Sealers.Sealer<infer PriorT, unknown, unknown, unknown> ? PriorT : never
 /** The next revision the sealer of kind `KindT` makes, without its sealed part. */
 type NextOf<KindT extends Sealers.Sealerkind>              = SealerOf<KindT> extends Sealers.Sealer<unknown, infer NextT, unknown, unknown> ? NextT : never
-/** What the sealer of kind `KindT` gives back: its record, sealed. */
+/** The sealed record the sealer of kind `KindT` returns. */
 export type RecordOf<KindT extends Sealers.Sealerkind>     = SealerOf<KindT> extends Sealers.Sealer<unknown, unknown, infer RecordT, unknown> ? RecordT : never
-/** What the sealer of kind `KindT` seals: its cleartexts. */
+/** The cleartexts the sealer of kind `KindT` seals. */
 export type CleartextsOf<KindT extends Sealers.Sealerkind> = SealerOf<KindT> extends Sealers.Sealer<unknown, unknown, unknown, infer CleartextsT> ? CleartextsT : never
 
-/** What {@link Lease.make} is given besides its record. */
+/** The options of {@link Lease.make}, beside its record. */
 export interface LeaseOpts {
   /** The bank the lease is granted to. */
   bank: LeaseBank
@@ -36,10 +36,10 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, oneof }) => {
 })
 
 /** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
- * The bankKey stays wrapped under a non-extractable leaseKey. Each seal or unseal unwraps it for that call alone, and nothing hands it out.
- * What is sealed, and how, is the sealer's in `sealers.ts`, named by its kind: the lease knows nothing of boxes.
- * A lease whose bankKey will not unwrap refuses `damaged_lease`, and its bank locks.
- * Once evicted, or once its bank's device is swept, it refuses every seal and unseal, one in flight included.
+ * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
+ * The lease knows nothing of boxes: the sealer, named by its kind in `sealers.ts`, decides what is sealed and how.
+ * A bankKey that will not unwrap locks the bank, and refuses `damaged_lease`.
+ * Once evicted, or once its device is swept, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
   // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gatelabelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #bank, #record, stamp, toJSON
@@ -60,7 +60,7 @@ export class Lease implements LeaseStamp {
 
   readonly #bank: LeaseBank
 
-  /** The record, with the leaseKey and the wrapped bankKey; null once evicted. */
+  /** The record with the leaseKey and the wrapped bankKey; null after eviction. */
   #record: LeaseRecord | null
 
   /** This lease's stamp: its record without the key material. Every ctx under the lease binds it after the bank's. */
@@ -72,7 +72,7 @@ export class Lease implements LeaseStamp {
 
   // == [Construction]: make, constructor
 
-  /** The lease of `record`, granted to `opts.bank`, which must be the bank `record` is stamped with. */
+  /** Make the lease of `record`, granted to `opts.bank`, which must be the bank `record` is stamped with. */
   static make(record: Z.input<typeof leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
   private constructor(record: Z.input<typeof leaseRecord>, opts: LeaseOpts) {
@@ -93,8 +93,8 @@ export class Lease implements LeaseStamp {
 
   // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
 
-  /** The next revision after `prior`, with the part `sealerkind` names sealed from `cleartexts` under a fresh key.
-   * The seal is bound to the bank's stamp, then to what the sealer stamps the record with, then to the part's tags. The text's bytes are zeroed afterwards, sealed or refused.
+  /** Seal `cleartexts` as the part `sealerkind` names, returning the next revision after `prior`.
+   * The seal is bound to the bank's stamp, the sealer's stamps and the part's tags. The cleartext's bytes are zeroed afterwards.
    */
   async seal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, prior: PriorOf<KindT>, cleartexts: CleartextsOf<KindT>): Promise<RecordOf<KindT>> {
     const sealer = sealerOf(sealerkind)
@@ -103,8 +103,8 @@ export class Lease implements LeaseStamp {
     return sealer.recordOf(next, sealed)
   }
 
-  /** The cleartexts of the part `sealerkind` names in `record`.
-   * Unsealing authenticates the ciphertexts, the stamps and the tags together: a change to any of them refuses as damaged.
+  /** Unseal the part `sealerkind` names in `record`, returning its cleartexts.
+   * Unsealing authenticates the ciphertexts, stamps and tags together: a change to any of them refuses as damaged.
    */
   async unseal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, record: RecordOf<KindT>): Promise<CleartextsOf<KindT>> {
     const sealer = sealerOf(sealerkind)
@@ -112,7 +112,7 @@ export class Lease implements LeaseStamp {
     return sealer.decode(text)
   }
 
-  /** `text`, ciphered under a fresh key, the key wrapped under the bankKey, with `tags` */
+  /** The {@link Sealers.Sealed} form of `text`: ciphered under a fresh key that is wrapped under the bankKey, with `tags`. */
   async #sealText(text: string, stamps: readonly Crypto.CipherCtxRecord[], purposes: Sealers.SealPurposes, tags: Sealers.SealTags): Promise<Sealers.Sealed> {
     const bankKey = await this.#bankKey('wrapKey')
     const partKey = await Crypto.makeBoxKey()
@@ -180,7 +180,7 @@ export class Lease implements LeaseStamp {
   /** True while this lease is not evicted and its bank's device is enabled. */
   get isEnabled(): boolean { return (this.#record !== null) && this.#bank.isEnabled }
 
-  /** Throw the device's refusal once it is swept, or `bank_locked` once this lease is evicted. */
+  /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
     this.#bank.demandEnabled()
     if (this.#record === null) { throw Throwers.leaseNotInForce() }
@@ -196,7 +196,7 @@ export class Lease implements LeaseStamp {
 
 // TypeScript cannot follow a generic kind to its sealer's types: the cast names what the lookup by that kind gives. The
 // lookup is computed, which import-x/namespace cannot check; the sealerkind's check stands in for it.
-/** The sealer of kind `sealerkind`, or throw `bad_option` for a kind there is none of */
+/** The sealer of kind `sealerkind`. Throws `bad_option` for an unknown kind. */
 function sealerOf<KindT extends Sealers.Sealerkind>(sealerkind: KindT): Sealers.Sealer<PriorOf<KindT>, NextOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> {
   return Sealers[Checks.sealerkind.parse(sealerkind)] as Sealers.Sealer<PriorOf<KindT>, NextOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> // eslint-disable-line import-x/namespace
 }
