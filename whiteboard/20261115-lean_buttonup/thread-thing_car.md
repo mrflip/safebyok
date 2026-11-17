@@ -1,6 +1,6 @@
 # Thread thing_car: the ThingMinder caches ThingCars (2026-11-17)
 
-Branch `20261117-thing_car`, [PR #718](https://github.com/mrflip/safebyok/pull/718), stacked on [#716](https://github.com/mrflip/safebyok/pull/716). Proved: safebyok lint and typecheck clean, its tests 922 passed (884 before); `pnpm justify` at the tip (see the PR's **Tests:** line).
+Branch `20261117-thing_car`, [PR #718](https://github.com/mrflip/safebyok/pull/718), stacked on [#716](https://github.com/mrflip/safebyok/pull/716). Proved: safebyok lint and typecheck clean, its tests 938 passed (922 before the review round, 884 before the thread); `pnpm justify` at the tip (see the PR's **Tests:** line).
 
 The design is complete.md's bullet "The ThingCar, the minder's cache value", agreed with the Coach; VOCABULARY.md's `car` and `am` rows are on the plan branch, not this one.
 
@@ -25,8 +25,12 @@ The design is complete.md's bullet "The ThingCar, the minder's cache value", agr
 * **Deviations**:
   - **The root box's seed**: a live root box is seeded `bare` (`carOf(sparseOf(rootBox))`), keeping "sparse and stale". Before the bank's birth, the root is the shell, and nothing is seeded: its car would be `void` and timely, and a `get` of the root box would answer the shell from the cache where today it asks the vaultDB and is refused. A one-line branch in `hello`; test "caches no root box before the bank's birth". (Before: the sparse shell was seeded and invalidated.)
 
-* **Set aside**: `TSQ.replaceEqualDeep` on a car of another Thing (it would build an unfrozen copy); validating `structuralSharing`'s inputs (the design says not to; `isThingCar` only dispatches by `liveness`); seeding a `full` car from the bank's whole root (see *For the Coach*).
+* **Set aside**: `TSQ.replaceEqualDeep` on a car of another Thing (it would build an unfrozen copy); dispatching `structuralSharing` on `liveness` alone (the review round: a selected value may carry one, so `isThingCar` is the car's own check); seeding a `full` car from the bank's whole root (see *For the Coach*).
 
 * **For the Coach**:
   - **Root seed `full` or `bare`?** Kept `bare`. A `full` car would be timely for `staleTime`, so a `get` would answer the bank's copy of the root box, which may predate what storage holds; `bare` fetches it once.
   - **Earlier-life rule** above, and **the shell's seed** above: each a reading, open to a ruling.
+
+## The review round (2026-11-17)
+
+Every directive is built but one: the bare car of the root box at birth, held for the orchestrator, because no seam is small (`Bank.birth` runs on a Bank object no minder holds). `isVaultDBNewer` narrows its parameter rather than checking it; a box's shell now comes from the bank's `rootBox`. Detail, with the birth-seam options: [thread-thing_car-review.md](thread-thing_car-review.md).
