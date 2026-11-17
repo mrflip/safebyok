@@ -124,7 +124,7 @@ function isSameScope(ante: ThingScope, post: ThingScope): boolean {
 }
 // --
 
-// == [Checks]: Checks
+// == [Checks]: isLiveSparse, Checks
 
 /** True when `record` is live, and not whole. */
 function isLiveSparse(record: Sparse<Thing>): boolean { return (record.am === 'a') && (! isWholeRecord(record)) }
