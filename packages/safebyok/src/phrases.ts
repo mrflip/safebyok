@@ -146,17 +146,17 @@ export const CarRecordShape = "A ThingCar's newest record lacks a Thing's scope 
 export const CarFullestShape = "A ThingCar's fullest record is not whole: this is a bug in safebyok."
 
 /** A full car with two records, or a tombstone. */
-export const CarFullSplit = "A full ThingCar holds one live record in both its newest and fullest: this is a bug in safebyok."
+export const CarFullSplit = "A full ThingCar holds one live record in both its newest and fullest, and this one does not: this is a bug in safebyok."
 
 /** A behind or bare car whose newest is whole, or a tombstone. */
-export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is live and sparse: this is a bug in safebyok."
+export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is live and sparse, and this one's is not: this is a bug in safebyok."
 
 /** A behind car whose fullest is not an earlier revision of its newest's life. */
-export const CarBehindOfOtherRevision = "A behind ThingCar's fullest record is an earlier revision of its newest's Thing and life: this is a bug in safebyok."
+export const CarBehindOfOtherRevision = "A behind ThingCar's fullest record is an earlier revision of its newest's Thing and life, and this one's is not: this is a bug in safebyok."
 
 /** A gone car whose newest is not a tombstone. */
-export const CarGoneNotTombstone = "A gone ThingCar's newest record is a tombstone: this is a bug in safebyok."
+export const CarGoneNotTombstone = "A gone ThingCar's newest record is a tombstone, and this one's is not: this is a bug in safebyok."
 
 /** A void car whose newest is not the void sentinel. */
-export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel: this is a bug in safebyok."
+export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel, and this one's is not: this is a bug in safebyok."
 // --
