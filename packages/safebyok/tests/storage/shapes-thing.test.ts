@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
   type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetAsk, checkedListAsk, checkedWriteAsk, delAskOf, getAskOf,
-  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable,
+  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isVoidSentinel,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -347,6 +347,14 @@ describe("the ask builders", () => {
     TH.expectSyncRefusal(() => checkedWriteAsk(noScope), 'bad_option')
     expect(putAskOf(null as never)).to.eq(null)
     expect(listAskOf(7 as never)).to.eq(7)
+  })
+})
+
+describe("isVoidSentinel(record)", () => {
+  it("is true of a shell, and false of a live record, a tombstone or a sparse record", () => {
+    const box = TH.boxThingOf()
+    for (const shell of [shellOf(TH.GateScope), shellOf(TH.BoxScope, TH.rootBoxOf())]) { expect(isVoidSentinel(shell)).to.be.true }
+    for (const record of [box, TH.boxTombOf(box), sparseOf(box)]) { expect(isVoidSentinel(record)).to.be.false }
   })
 })
 
