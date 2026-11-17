@@ -62,10 +62,39 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
     through `structuralSharing`; `cmpRecords` gives NaN, so `prior` is kept). Compare as records only when both are
     records, else `TSQ.replaceEqualDeep`; a test red first. Rides with the minder round.
   * Agreed: `#demandOwnAsk(ask: MinderGetAsk)`, losing the `unknown`, keeping the check and the name.
-  * **Later, a discussion (the Coach, 2026-11-17):** a cache entry that keeps the newest revision heard of and the
-    newest whole record apart, `MindedEntry<RecordT>`: `full` (one record in both), `behind` (newest sparse, whole
-    older), `sparse` (never fetched whole), `gone` (a tombstone), `void` (none stored); the vaultDB is newer when
-    `behind` or `sparse`. It bears on #716's item 7 and the tie rule, and on TanStack's `staleTime` as a function.
+  * **The ThingCar, the minder's cache value (the Coach, 2026-11-17; under discussion).** A host shows the whole
+    record, steady, and writes against the newest revision: the newest heard of and the newest whole record are kept
+    apart, so a sparse revision heard by `list` never blinks a body out. Ruled:
+    * The name is `ThingCar`. `entry` is banned (VOCABULARY.md), and `state` names nothing public (STYLE.md).
+    * The minder serves ThingCars only. It is internal: no `select`, no host-facing portal. Its callers are the
+      ReactBridge and, later, a Listing class. The bridge handles the customer's side, so its contract is not ours here.
+    * The type, as the Coach gave it (the field's name is open, below):
+      ```ts
+      /** Cache value for a ThingRecord: the newest revision heard of (which might be sparse), and the newest whole record seen.
+       * `null` when gone/void, `undefined` for "known to exist but nothing useable cached"
+       */
+      type ThingCar<RecordT extends ThingRecord> = Readonly<
+        | { liveness: 'full',   newest: RecordT,            whole: RecordT   } // the same record in both
+        | { liveness: 'behind', newest: Sparse<RecordT>,    whole: RecordT   } // whole is older
+        | { liveness: 'bare',   newest: Sparse<RecordT>,    whole: undefined } // never fetched whole
+        | { liveness: 'gone',   newest: Tombstone<RecordT>, whole: null      } // a tombstone, sparse or whole
+        | { liveness: 'void',   newest: VoidSentinel,       whole: null      } // none stored
+      >
+      // dbNewer: liveness is 'behind' or 'bare'
+      ```
+      The doc's `null` and `undefined` describe `whole`: gone and void cache a definite "no body", bare a body not held.
+      Claude would name `whole` as the subject of that line.
+    * Agreed: `staleTime` as a function makes a car stale when `behind` or `bare`, so query-core's own refetch fetches
+      it whole. Deliver-then-invalidate and #716's wontfix row go.
+    * Agreed: the merge sits in `structuralSharing`, which query-core calls on every landing (`query.setData`), with
+      `undefined` as the prior on the first.
+    * **Open:** do the `queryFn` and deliveries hand in records, or cars made by `carOf(record)`? Claude recommends cars
+      (moderately firm): the query's types stay honest, and `structuralSharing` also runs on an observer's `select`
+      and `placeholderData`, where turning records into cars would rewrap a `select`'s output.
+    * **Open:** the field's name. `liveness` already names `am` (VOCABULARY.md's `am` and `cited` rows, the classifier).
+      Claude proposes `standing`, holding the collision firmly and the word loosely.
+    * **Open:** a tombstone heard while `behind` drops the old whole record (Claude's lean).
+    * A thread of its own, cut from main after #716 merges; it sweeps `entry` out of `minding/`.
   * **Thread `minder_grain`** (2026-11-17, cut from main; the classifier tidy stays in and around the classifier file).
     From the review: the `select`/`placeholderData` sharing fix (both values revisions of one Thing, by `thingCited` and
     labelpath, else `replaceEqualDeep`); a default `queryFn` in the key defaults, its ask from `makeGetAsk`, `track`
