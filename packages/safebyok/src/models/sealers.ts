@@ -65,9 +65,9 @@ export interface SealPurposes {
 export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
   /** The Thing fields and body of `donorProps`, with every other field dropped. Refuses anything but a record of this kind or its shell. */
   donorPropsOf(donorProps: unknown): Sealable<RecordT>
-  /** The body, `am` and `written_at` of `publicProps`, with every other field dropped. */
+  /** The body, `am` and `written_at` of `publicProps`. Refuses any other field. */
   publicPropsOf(publicProps: unknown): PublicPropsOf<RecordT, CleartextsT>
-  /** The cleartexts in `secretProps`, with every other field dropped. */
+  /** The cleartexts in `secretProps`. Refuses any other field. */
   secretPropsOf(secretProps: unknown): CleartextsT
   /** The next live revision after `donorProps`, updated by `publicProps`, without its sealed part. */
   nextRevisionOf(donorProps: unknown, publicProps: unknown): RevisionOf<LiveOf<RecordT>, CleartextsT>
