@@ -9,6 +9,7 @@ import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import * as SX from './shapes-storage'
 import type { BankScope, Boxscope, VaultScope } from './shapes-core'
+import type { BankTok, Banklabel, Boxlabel, UserID, VaultTok, Vaultlabel } from '../helpers/aliases'
 
 // == [Formats]: BankFormat, GateFormat, VaultFormat, BoxFormat
 
@@ -131,7 +132,7 @@ export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
 /** A bank's box row as stored: live, or a tombstone. */
 export type BoxRow       = BoxRecord | BoxTombstone
 /** A box row that failed its checks, named by where it is stored, under whatever label storage has, with `am` 'd'. */
-export type DamagedBox   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, bank_tok: string, vault_tok: string, am: 'd' }>
+export type DamagedBox   = Readonly<{ user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlabel, boxlabel: Boxlabel, bank_tok: BankTok, vault_tok: VaultTok, am: 'd' }>
 // --
 
 // == [Rows stored]: storedBankRow, storedGateRow, storedVaultRow, storedBoxRow
@@ -149,7 +150,7 @@ export const { storedBankRow, storedGateRow, storedVaultRow, storedBoxRow } = Ch
 
 // A vault is reborn under a new `vault_tok`, and its bank under a new `bank_tok`: a box row under either ended life is no row.
 /** The life of a vault, its bank's included, as one string: a vault row's, or the one a box row or box ask is under. */
-export function vaultLifeOf({ bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): string { return `${bank_tok}/${vault_tok}` }
+export function vaultLifeOf({ bank_tok, vault_tok }: { bank_tok: BankTok, vault_tok: VaultTok }): string { return `${bank_tok}/${vault_tok}` }
 
 const shellTimes = { registered_at: SX.VoidTime, written_at: SX.VoidTime }
 
@@ -172,7 +173,7 @@ export function shellBoxOf({ user_id, banklabel, vaultlabel, boxlabel, bank_tok,
 
 // Its label comes from storage unchecked: it is part of what is reported.
 /** The entry listed for a box row that failed its checks, under the given vault life. */
-export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, { bank_tok, vault_tok }: { bank_tok: string, vault_tok: string }): DamagedBox {
+export function damagedBoxOf({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, { bank_tok, vault_tok }: { bank_tok: BankTok, vault_tok: VaultTok }): DamagedBox {
   return { user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, am: 'd' }
 }
 
@@ -305,7 +306,7 @@ export type BoxQuery   = Readonly<Z.infer<typeof boxQuery>>
 /** A `listBoxes` ask: the vault's scope, and the `bank_tok` and `vault_tok` of the life whose boxes are listed. */
 export type BoxListAsk = Readonly<Z.output<typeof boxList>>
 
-const isExpectedInLife = ({ expected, ...asked }: { bank_tok: string, vault_tok: string, expected: { bank_tok: string, vault_tok: string } }): boolean => vaultLifeOf(expected) === vaultLifeOf(asked)
+const isExpectedInLife = ({ expected, ...asked }: { bank_tok: BankTok, vault_tok: VaultTok, expected: { bank_tok: BankTok, vault_tok: VaultTok } }): boolean => vaultLifeOf(expected) === vaultLifeOf(asked)
 
 // A box ask cites the life of its vault, `bank_tok` and `vault_tok`, as a vault ask cites its bank's `bank_tok`.
 /** The checks of a bankDB box ask: a get, put or del.

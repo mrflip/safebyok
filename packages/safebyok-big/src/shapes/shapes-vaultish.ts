@@ -23,6 +23,7 @@ import * as SX from './shapes-storage'
 import * as BX from './shapes-bankdb'
 import type { AnyGating, AskUser, RequestCleartext } from './shapes-gateish'
 import type { StrengthChecker } from '../helpers/passphrase-strength'
+import type { BankTok, Banklabel, Boxlabel, DeviceTok, EpochMillis, GateTok, RevisionSeq, RevisionTok, UserID, VaultTok } from '../helpers/aliases'
 
 // == [Checks]: Checks
 
@@ -134,14 +135,14 @@ export type ProbeAsked = Z.input<typeof probeAsked>
 export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
-export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: BX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
+export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: BX.BoxSparse, parent: BX.VaultRow, timestamp: EpochMillis }>
 
 /** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box unsealed. */
 export type ProbeReport = Readonly<{
-  timely: Readonly<{ box: BX.BoxSparse | null, vault: BX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
+  timely: Readonly<{ box: BX.BoxSparse | null, vault: BX.VaultSparse, boxRefreshedAt: EpochMillis | null, vaultRefreshedAt: EpochMillis | null, timestamp: EpochMillis }>
   put:    ProbeStep
   fetch:  ProbeStep
-  unseal: Readonly<{ ok: true, timestamp: number }>
+  unseal: Readonly<{ ok: true, timestamp: EpochMillis }>
 }>
 
 /** How fresh the record in hand and its parent must be before a verb goes on. */
@@ -252,13 +253,13 @@ export type ListingOf<ScopeT extends object, RecordT extends SparseT, SparseT ex
 /** A box as a host renders it: its scope, its revision and times, its sidecar, and what it shows. */
 export interface BoxSnapshot extends Boxscope {
   /** The token of the revision in hand, new at each put and del. */
-  readonly revision_tok:  string
+  readonly revision_tok:  RevisionTok
   /** The count of the revision in hand, higher on the later one. */
-  readonly revision_seq:  number
+  readonly revision_seq:  RevisionSeq
   /** When this life of the box began. */
-  readonly registered_at: number
+  readonly registered_at: EpochMillis
   /** When the revision in hand was written; for a box deleted, when it was deleted. */
-  readonly written_at:    number
+  readonly written_at:    EpochMillis
   /** Your app's data beside the whisper, never encrypted, or null until the full record is fetched. */
   readonly sidecar:       Sidecar | null
   /** True when the full record is in hand, false for a box only listed or deleted. */
@@ -317,7 +318,7 @@ export type BoxPatchParsed = Z.output<typeof boxPatch>
 export type BoxPatch = Omit<Z.input<typeof boxPatch>, keyof BoxHalves> & { [Prop in keyof BoxHalves]?: BoxHalves[Prop] | undefined }
 
 /** A host's patch for `vault.putBox`: a {@link BoxPatch} under its `boxlabel`. */
-export type BoxPut = BoxPatch & { boxlabel: string }
+export type BoxPut = BoxPatch & { boxlabel: Boxlabel }
 
 /** What a caller hands `create` for a new box: its scope, whisper and sidecar. */
 export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<BoxHalves>
@@ -327,22 +328,22 @@ export type BoxDna = Omit<Z.input<typeof boxDna>, keyof BoxHalves> & Partial<Box
 // == [The gate's forms]: WayinSnapshot, GateSnapshot
 
 /** A wayin as a gate's snapshot shows it: when it was registered. */
-export type WayinSnapshot = Readonly<{ registered_at: number }>
+export type WayinSnapshot = Readonly<{ registered_at: EpochMillis }>
 
 /** A gate as a dialog renders it: its scope, its life and revision, and which wayins it has, by `wayinlabel`. */
 export interface GateSnapshot extends CX.GateScope {
   /** The life of the bank the gate is of. */
-  readonly bank_tok:      string
+  readonly bank_tok:      BankTok
   /** The life of the gate, kept by every gate verb. */
-  readonly gate_tok:      string
+  readonly gate_tok:      GateTok
   /** The token of the revision in hand, new at each gate verb. */
-  readonly revision_tok:  string
+  readonly revision_tok:  RevisionTok
   /** The count of the revision in hand, higher on the later one. */
-  readonly revision_seq:  number
+  readonly revision_seq:  RevisionSeq
   /** When this life of the gate began. */
-  readonly registered_at: number
+  readonly registered_at: EpochMillis
   /** When the revision in hand was written. */
-  readonly written_at:    number
+  readonly written_at:    EpochMillis
   /** Each wayin the gate has: `main`, and `passkey0` where it has one. */
   readonly wayins:        Readonly<{ main: WayinSnapshot, passkey0?: WayinSnapshot }>
 }
@@ -354,15 +355,15 @@ export interface GateSnapshot extends CX.GateScope {
 /** A vault as a host renders it: its scope, its life and revision, and whether it is present. */
 export interface VaultSnapshot extends VaultScope {
   /** The token of this life of the vault, new when the vault is made again for its scope. */
-  readonly vault_tok:     string
+  readonly vault_tok:     VaultTok
   /** The token of the revision in hand, new at each put and del. */
-  readonly revision_tok:  string
+  readonly revision_tok:  RevisionTok
   /** The count of the revision in hand, higher on the later one. */
-  readonly revision_seq:  number
+  readonly revision_seq:  RevisionSeq
   /** When this life of the vault began. */
-  readonly registered_at: number
+  readonly registered_at: EpochMillis
   /** When the revision in hand was written; for a vault deleted, when it was deleted. */
-  readonly written_at:    number
+  readonly written_at:    EpochMillis
   /** True unless the vault is deleted or damaged. */
   readonly isPresent:     boolean
 }
@@ -412,9 +413,9 @@ export const deviceOpts = objCheck(({ fn, custom, tuple, lit, user_id, banklabel
 /** What a host hands `Device.make`: who the bank is for, where it writes, and the functions it calls back. */
 export interface DeviceOpts {
   /** The signed-in user's stable, opaque id from your own auth, hashed first if it contains anything sensitive. */
-  user_id:              string
+  user_id:              UserID
   /** Your app's own label, so several apps can share one backend. */
-  banklabel:            string
+  banklabel:            Banklabel
   /** The bank's gates: `['main']`, the only list accepted. */
   gates:                readonly ['main']
   /** The BankDB the bank is synchronized through, from a storage adapter. */
@@ -511,13 +512,13 @@ export interface DeviceSnapshot extends BankScope {
   /** The gating open on this device, live, for a dialog to answer; null with none. */
   readonly openGating: AnyGating | null
   /** The life of the bank `device.bank` returns; null while it has none. */
-  readonly bank_tok:   string | null
+  readonly bank_tok:   BankTok | null
 }
 
 /** A bank as a host renders it: its scope, the token of this device's row, and whether it is locked. */
 export interface BankSnapshot extends BankScope {
   /** The token of this device's row in the deviceDB, as the bank was made with it. */
-  readonly device_tok: string
+  readonly device_tok: DeviceTok
   /** True unless this device has a lease granted and in force. */
   readonly isLocked:   boolean
 }

@@ -9,6 +9,7 @@ import { randomId } from '../helpers/crypto'
 import * as EX from './shapes-enums'
 import * as CX from './shapes-core'
 import { type VaultScope, sidecar } from './shapes-core'
+import type { Banklabel, Boxlabel, EpochMillis, UserID, VaultTok, Vaultlabel } from '../helpers/aliases'
 
 // == [Shells and formats]: VoidRevisionTok, VoidRevisionSeq, VoidLifeTok, VoidTime, BoxFormat, VoidRevision
 
@@ -81,7 +82,7 @@ export const { passphraseWayinRecord, passkeyWayinRecord } = Checkers('bad_optio
 // == [Damaged rows]: DamagedVault, DamagedRow
 
 /** A vault row that failed its checks, named by where it is stored, under whatever label storage has, with `am` 'd'. */
-export type DamagedVault   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, am: 'd' }>
+export type DamagedVault   = Readonly<{ user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlabel, am: 'd' }>
 /** A vault row or a box row that failed its checks, named by where it is stored. */
 export type DamagedRow     = DamagedVault | DamagedBox
 // --
@@ -121,7 +122,7 @@ export type BoxTombstone = Readonly<Z.infer<typeof boxTombstone>>
 /** A box row, live or a tombstone, in the base form `BX` extends. */
 export type BoxRow       = BoxRecord | BoxTombstone
 /** A box row that failed its checks, named by where it is stored, under whatever label storage has, with its vault's `vault_tok` and `am` 'd'. */
-export type DamagedBox   = Readonly<{ user_id: string, banklabel: string, vaultlabel: string, boxlabel: string, vault_tok: string, am: 'd' }>
+export type DamagedBox   = Readonly<{ user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlabel, boxlabel: Boxlabel, vault_tok: VaultTok, am: 'd' }>
 // --
 
 // == [Policies]: ifPresent, ifAbsent, putIfAbsent, anyIfAbsent
@@ -185,7 +186,7 @@ export const revisionPins = objStrip(({ int, revision_tok, vault_tok, box_tok })
 export const revisionOf = ({ revision_tok, revision_seq }: Revision): Revision => ({ revision_tok, revision_seq })
 
 /** Fresh revision fields for the next write, written at `written_at`. */
-export function nextRevisionOf({ revision_seq }: Revision, written_at: number) { return { revision_tok: randomId(), revision_seq: revision_seq + 1, written_at } }
+export function nextRevisionOf({ revision_seq }: Revision, written_at: EpochMillis) { return { revision_tok: randomId(), revision_seq: revision_seq + 1, written_at } }
 
 /** The revision, `am` and `vault_tok` of `raw`, or null where it has none. */
 function metaOf(raw: unknown) {
@@ -234,7 +235,7 @@ export type LeaseRow     = Z.infer<typeof leaseRow>
 export const leaseScopepath = Checker(({ tuple, str }) => tuple([str, str]), 'bad_scope')
 
 /** Where a device database files a bank's lease row: its user_id and banklabel, as stored. */
-export type LeaseScopepath = [user_id: string, banklabel: string]
+export type LeaseScopepath = [user_id: UserID, banklabel: Banklabel]
 
 /** A lease row as stored, unchecked, beside the scopepath it is filed under. */
 export type RawLease = { scopepath: LeaseScopepath, row: unknown }

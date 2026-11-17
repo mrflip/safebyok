@@ -29,6 +29,7 @@ import type { GuardedKeyDeriver, Proving } from './proving'
 import { Storable } from './storable'
 import type { Vault } from './vault'
 import { VaultListing } from './vault-listing'
+import type { BankTok, Banklabel, DeviceTok, UserID } from '../helpers/aliases'
 
 // == [Defaults]: DefaultLeaseMillis
 
@@ -44,13 +45,13 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   // == [Props]: user_id, banklabel, bank_tok, listing, #deviceTok, #askUser, #gateListing, #vaultListing, #lease, #leaseFriend
 
   /** The user's id; with `banklabel`, this bank's scope. */
-  declare readonly user_id:   string
-  declare readonly banklabel: string
+  declare readonly user_id:   UserID
+  declare readonly banklabel: Banklabel
   /** This bank's life token, fixed for this object: a bank built again elsewhere has another. */
-  declare readonly bank_tok:  string
+  declare readonly bank_tok:  BankTok
   declare readonly listing:   BankListing
 
-  readonly #deviceTok:    string
+  readonly #deviceTok:    DeviceTok
   /** The host's guarded `requestCleartext`, or null if the host gave none. */
   readonly #askUser:      AskUser | null
   readonly #gateListing:  GateListing
@@ -68,7 +69,7 @@ export class Bank extends Storable<BankScope, BankRecord, BankSparse, BankSnapsh
   get device(): Device { return this.listing.device }
 
   /** The token of this device's row in the deviceDB, which each wayin records. */
-  get device_tok(): string { return this.#deviceTok }
+  get device_tok(): DeviceTok { return this.#deviceTok }
 
   /** The device's key deriver, guarded. */
   get keyDeriver(): GuardedKeyDeriver { return this.device.keyDeriver }

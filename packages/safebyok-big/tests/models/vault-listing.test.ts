@@ -10,6 +10,7 @@ import type { VaultRecord } from '../../src/shapes/shapes-bankdb'
 import type { Vault } from '../../src/models/vault'
 import * as TH from '../test-helpers'
 import { Dna, Passphrase, byPassphrase, makeBornVault, useVaultWorlds } from '../test-helpers/vault-world'
+import type { RevisionSeq } from '../../src/helpers/aliases'
 
 useVaultWorlds()
 
@@ -19,7 +20,7 @@ const BoxDna = { ...Dna, boxlabel: 'anthropic_api_key', whisper: { apiKey: 'sk-t
 function tombstoneOver(record: VaultRecord) { return { ...record, am: 'x' as const, vault_tok: 'life-gone', revision_seq: record.revision_seq + 1, revision_tok: 'rev-gone' } }
 
 /** `record` in another life of its vault, stored at `revision_seq`. */
-function otherLifeAt(record: VaultRecord, revision_seq: number): VaultRecord { return { ...record, vault_tok: `life-other-${String(revision_seq)}`, revision_seq, revision_tok: `rev-other-${String(revision_seq)}` } }
+function otherLifeAt(record: VaultRecord, revision_seq: RevisionSeq): VaultRecord { return { ...record, vault_tok: `life-other-${String(revision_seq)}`, revision_seq, revision_tok: `rev-other-${String(revision_seq)}` } }
 
 /** Past the forget each end state sets going. */
 function forgotten() { return new Promise((yes) => { setTimeout(yes, 0) }) }

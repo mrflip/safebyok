@@ -13,12 +13,13 @@ import type { BoxAct, BoxVaultAct, GotAct, IfAbsent, IfPresent, ListAct, OkAct, 
 import type { Capacity } from '../shapes/shapes-storage'
 import type { BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRecord, BankRow, BoxAsk, BoxListAsk, BoxQuery, BoxRow, GatePutAsk, GateRecord, VaultAsk, VaultRow } from '../shapes/shapes-bankdb'
 import type { BankEnsured, BoxesListed } from './bank-db'
+import type { BankTok, BoxTok, Boxlabel, GateTok, RevisionSeq, RevisionTok, VaultTok, Vaultlabel } from '../helpers/aliases'
 
 // == [Rows and presence]: Meta, presenceVals, Presence, presenceOf, RecordAsk, PutAsk
 // Each function below is given the ask first, and the row stored second, null for none.
 
 /** The fields of a row, stored or expected, that the tables compare: its revision, its liveness, and the life toks it carries. */
-type Meta = Readonly<{ revision_tok: string, revision_seq: number, am: EX.Am, bank_tok?: string, gate_tok?: string, vault_tok?: string, box_tok?: string }>
+type Meta = Readonly<{ revision_tok: RevisionTok, revision_seq: RevisionSeq, am: EX.Am, bank_tok?: BankTok, gate_tok?: GateTok, vault_tok?: VaultTok, box_tok?: BoxTok }>
 
 /** What is stored at a scope: no row, a tombstone, or a live row. */
 export const presenceVals = ['void', 'gone', 'live'] as const
@@ -194,7 +195,7 @@ function boxParentOf(vaultScope: VaultScope, vaultRaw: unknown): VaultRow {
 }
 
 /** Classify the bank row above a gate or vault ask: the act it refuses with, or null when the bank is live in the asked-for life. */
-function parentBankActOf({ bank_tok }: { bank_tok: string }, parent: BankRow): ParentBankAct | null {
+function parentBankActOf({ bank_tok }: { bank_tok: BankTok }, parent: BankRow): ParentBankAct | null {
   if (parent.revision_seq === SX.VoidRevisionSeq) { return 'bank_void' }
   if (parent.am !== 'a')                          { return 'bank_gone' }
   return (parent.bank_tok === bank_tok) ? null : 'bank_reborn'
@@ -268,8 +269,8 @@ export function cappedActOf(act: BoxAct, capacity: Capacity): BoxAct {
 // == [Policies]: BuildPolicies, GatePolicies
 
 // `buildBank` puts over a tombstone or nothing, and answers the live bank it finds; `putGate` replaces a live gate row.
-const BuildPolicies = { ifAbsent: 'add',  ifPresent: 'get'  } as const
-const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const
+const BuildPolicies = { ifAbsent: 'add',  ifPresent: 'get'  } as const satisfies Pick<PutAsk, 'ifAbsent' | 'ifPresent'>
+const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const satisfies Pick<PutAsk, 'ifAbsent' | 'ifPresent'>
 // --
 
 // == [Classifying]: RowOfVault, RowOfBox, BankEnsureFetched, GateFetched, BankFetched, VaultFetched, BoxFetched, BoxesFetched, BankEnsureStored, BankBuildStored, GateStored, BankDelStored, VaultStored, BoxStored, BoxesStored, classifyEnsureBank, classifyBuildBank, classifyStoredGate, classifyDelBank, classifyStoredVault, classifyStoredBox, classifyStoredBoxes
@@ -279,9 +280,9 @@ const GatePolicies  = { ifAbsent: 'fail', ifPresent: 'repl' } as const
 // the datastore reports writing in place of the row fetched (`[Rows written]`).
 
 /** A vault row from storage, unchecked, with its vaultlabel. */
-export type RowOfVault = { vaultlabel: string, vault: unknown }
+export type RowOfVault = { vaultlabel: Vaultlabel, vault: unknown }
 /** A box row from storage, unchecked, with its boxlabel. */
-export type RowOfBox   = { boxlabel: string, box: unknown }
+export type RowOfBox   = { boxlabel: Boxlabel, box: unknown }
 
 /** The rows an adapter fetched for an `ensureBank` ask in one step, unchecked: the bank row and its `main` gate row, each null for none, and the bank's vault rows. */
 export type BankEnsureFetched = Readonly<{ bank: unknown, gate: unknown, vaults: readonly RowOfVault[] }>

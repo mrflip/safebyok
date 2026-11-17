@@ -4,7 +4,6 @@
  */
 
 import { number as num, string as str } from 'zod'
-import type * as Z from 'zod'
 import { FarFuture, FarPast } from '../helpers/consts'
 import * as Phrases from '../helpers/phrases'
 
@@ -61,6 +60,5 @@ export const user_id = str().min(1, { error: Phrases.UserIdMissing, abort: true 
  */
 export const epochMillis = num().gte(FarPast, Phrases.InstantTooEarly).lte(FarFuture, Phrases.InstantTooLate).int()
 
-/** An instant, whole UTC epoch milliseconds, as `Date.now()` gives and {@link epochMillis} checks: a plain number, since a host writes one by hand. */
-export type EpochMillis = Z.infer<typeof epochMillis>
+export type { EpochMillis } from '../helpers/aliases'
 // --

@@ -6,6 +6,7 @@ import type * as SX from '../../src/shapes/shapes-storage'
 import      { toB64 }                               from '../../src/helpers/crypto'
 import type { KeyDeriver }                          from '../../src/deriver/basederiver'
 import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/passphrase-strength'
+import type { UserID } from '../../src/helpers/aliases'
 
 /** A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
  * unlocking runs in milliseconds. Deterministic in passphrase and salt, like the real one; unlike
@@ -47,7 +48,7 @@ export function fakeCiphered(tag: string): FakeCiphered {
  *
  * @example scopeOf('u1')           // => { user_id: 'u1', banklabel: 'acme', vaultlabel: 'main' }
  */
-export function scopeOf(user_id: string, vaultlabel = 'main'): VaultScope { return { user_id, banklabel: 'acme', vaultlabel } }
+export function scopeOf(user_id: UserID, vaultlabel = 'main'): VaultScope { return { user_id, banklabel: 'acme', vaultlabel } }
 
 /** The passphrase wayin a stored gate has. */
 type PassphraseWayin = Z.infer<typeof SX.passphraseWayinRecord>

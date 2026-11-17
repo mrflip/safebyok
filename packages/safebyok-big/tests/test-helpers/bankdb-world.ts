@@ -8,6 +8,7 @@ import type {
   BankBuildAsk, BankDelAsk, BankRecord, BankRow, BankTombstone, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxQuery, BoxRecord, BoxRow, BoxTombstone,
   GatePutAsk, GateRecord, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRecord, VaultRow, VaultTombstone, Wayins,
 } from '../../src/shapes/shapes-bankdb'
+import type { BankTok, Boxlabel, Vaultlabel } from '../../src/helpers/aliases'
 
 /** The bank the rows stand in. */
 export const bankScope  = { user_id: 'u1', banklabel: 'acme' }
@@ -27,12 +28,12 @@ export const boxTidyAsk = { op: 'tidy_gone' as const, ...bankScope }
 export const bankEnsureAsk = { op: 'ensure' as const, ...bankScope, gates: ['main'] as ['main'] }
 
 /** The scope of the vault `vaultlabel` in the bank the rows stand in. */
-export function vaultScopeOf(vaultlabel: string): VaultScope { return { ...bankScope, vaultlabel } }
+export function vaultScopeOf(vaultlabel: Vaultlabel): VaultScope { return { ...bankScope, vaultlabel } }
 /** The moment every row was registered and written at. */
 export const Now = Date.UTC(2026, 9, 15)
 
 /** The scope of the box `boxlabel` in the vault the rows stand in. */
-export function boxscopeOf(boxlabel: string): Boxscope { return { ...vaultScope, boxlabel } }
+export function boxscopeOf(boxlabel: Boxlabel): Boxscope { return { ...vaultScope, boxlabel } }
 
 const ciphered = { cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q' }
 
@@ -86,7 +87,7 @@ export function bankBuildAskOf(record: BankRecord = bankAt(), gate: GateRecord =
 }
 
 /** A `putGate` ask under `policy`: the gate row `stored` at its next revision with `wayins`, under its own bank life unless `bank_tok` is given. */
-export function gatePutAskOf(policy: StoragePolicy, stored: GateRecord, wayins: Wayins, bank_tok: string = stored.bank_tok): GatePutAsk {
+export function gatePutAskOf(policy: StoragePolicy, stored: GateRecord, wayins: Wayins, bank_tok: BankTok = stored.bank_tok): GatePutAsk {
   const record = { ...stored, ...SX.nextRevisionOf(SX.revisionOf(stored), Now + 1), wayins }
   return { op: 'put', ...gateScope, bank_tok, expected: stored, record, options: { policies: [policy] } }
 }

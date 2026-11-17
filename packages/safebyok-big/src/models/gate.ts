@@ -14,6 +14,7 @@ import type { Bank } from './bank'
 import type { GateListing } from './gate-listing'
 import { Storable } from './storable'
 import { Wayin } from './wayin'
+import type { BankTok, Banklabel, GateTok, UserID } from '../helpers/aliases'
 
 // Defined here, not with the shapes: it names a model class.
 /** The checks of {@link Gate.recordOfBirth}'s arguments. */
@@ -29,11 +30,11 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
   // == [Props]: user_id, banklabel, gatelabel, bank_tok, listing, #inHand
 
   // Set at construction: the scope by Storable's constructor, bank_tok by assignInitialProps.
-  declare readonly user_id:   string
-  declare readonly banklabel: string
+  declare readonly user_id:   UserID
+  declare readonly banklabel: Banklabel
   declare readonly gatelabel: GateScope['gatelabel']
   /** Which life of its bank this gate belongs to, fixed for this instance. */
-  declare readonly bank_tok:  string
+  declare readonly bank_tok:  BankTok
   declare readonly listing:   GateListing
 
   /** The current row's wayins, as records and as Wayins, remade when a row brings new ones */
@@ -47,7 +48,7 @@ export class Gate extends Storable<GateScope, GateRecord, GateSparse, GateSnapsh
 
   // A Gate stands for its scope through its lives, as a Box does: its stamp follows the row in hand.
   /** The token of this gate's life, from its current row. No gate verb changes it. */
-  get gate_tok(): string { return this.central.gate_tok }
+  get gate_tok(): GateTok { return this.central.gate_tok }
 
   /** The current row's wayin records, frozen. */
   get wayins(): Wayins { return this.#wayinsInHand().wayins }

@@ -18,17 +18,18 @@ import type { Bank } from './bank'
 import { Box } from './box'
 import { Listing } from './listing'
 import type { Vault } from './vault'
+import type { BankTok, Banklabel, UserID, VaultTok, Vaultlabel } from '../helpers/aliases'
 
 /** One vault's boxes, by boxlabel. */
 export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnapshot, Box, DamagedBox> {
   // == [Props]: user_id, banklabel, vaultlabel, bank_tok, vault_tok, scope, bank, vault
 
   /** The vault's scope, and the bank and vault life this listing was made under (these five fields). */
-  declare readonly user_id:    string
-  declare readonly banklabel:  string
-  declare readonly vaultlabel: string
-  declare readonly bank_tok:   string
-  declare readonly vault_tok:  string
+  declare readonly user_id:    UserID
+  declare readonly banklabel:  Banklabel
+  declare readonly vaultlabel: Vaultlabel
+  declare readonly bank_tok:   BankTok
+  declare readonly vault_tok:  VaultTok
   readonly scope:              VaultScope
   /** The vault's bank. */
   readonly bank:               Bank

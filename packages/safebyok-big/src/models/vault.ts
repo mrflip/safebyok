@@ -17,6 +17,7 @@ import type { Box } from './box'
 import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import type { VaultListing } from './vault-listing'
+import type { BankTok, Banklabel, Boxlabel, UserID, VaultTok, Vaultlabel } from '../helpers/aliases'
 
 /** A vault in this tab, with its record's fields as its own props.
  * Its boxes are sealed under its bank's lease.
@@ -25,11 +26,11 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   // == [Props]: user_id, banklabel, vaultlabel, bank_tok, listing, #boxListing
 
   /** The fields of this vault's scope. */
-  declare readonly user_id:    string
-  declare readonly banklabel:  string
-  declare readonly vaultlabel: string
+  declare readonly user_id:    UserID
+  declare readonly banklabel:  Banklabel
+  declare readonly vaultlabel: Vaultlabel
   /** The life of this vault's bank. It never changes. */
-  declare readonly bank_tok:   string
+  declare readonly bank_tok:   BankTok
   declare readonly listing:    VaultListing
 
   /** The box listing last built by {@link boxListing}, null until then. */
@@ -42,7 +43,7 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   get bank(): Bank { return this.listing.bank }
 
   /** This vault's life, as the record in hand has it. A vault deleted and made again has another. */
-  get vault_tok(): string { return this.central.vault_tok }
+  get vault_tok(): VaultTok { return this.central.vault_tok }
 
   /** The storage format of the record in hand. */
   get fmt(): number { return this.central.fmt }
@@ -120,18 +121,18 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
    *
    * Chute: vault.getBox → listing.get → tryGet → #doTryGetJoined → doTryGet → deliverAnswer → answerDeliveringOf → recordDeliveringOf → doDeliverRecord → thing.receiveRecord
    */
-  async getBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> {
+  async getBox(boxlabel: Boxlabel, opts: FetchOpts = {}): Promise<Box | null> {
     return this.boxListing.get({ ...this.scope, boxlabel }, opts)
   }
 
   /** Non-throwing form of {@link getBox}. */
-  tryGetBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(boxlabel, opts)) }
+  tryGetBox(boxlabel: Boxlabel, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.getBox(boxlabel, opts)) }
 
   /** {@link getBox}, always fetching the box's record. */
-  fetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Box | null> { return this.getBox(boxlabel, { ...opts, maxMillisSinceRefresh: 0 }) }
+  fetchBox(boxlabel: Boxlabel, opts: FetchOpts = {}): Promise<Box | null> { return this.getBox(boxlabel, { ...opts, maxMillisSinceRefresh: 0 }) }
 
   /** Non-throwing form of {@link fetchBox}. */
-  tryFetchBox(boxlabel: string, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
+  tryFetchBox(boxlabel: Boxlabel, opts: FetchOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.fetchBox(boxlabel, opts)) }
 
   /** Seal `patch` over the box at its `boxlabel`, and put it, resolving the box.
    * {@link Box.put} has the options.
@@ -147,14 +148,14 @@ export class Vault extends Storable<VaultScope, VaultRecord, VaultSparse, VaultS
   /** Delete the box at `boxlabel`, resolving it, now with its tombstone.
    * Refuses `absent_box` where the box was never stored, or is already deleted.
    */
-  async delBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Box | null> {
+  async delBox(boxlabel: Boxlabel, opts: TimelyOpts = {}): Promise<Box | null> {
     const scope = { ...this.scope, boxlabel }
     const box = await this.boxListing.deletable(scope).del(scope, opts)
     return SX.isRowAt(box, SX.VoidRevision) ? null : box
   }
 
   /** Non-throwing form of {@link delBox}. */
-  tryDelBox(boxlabel: string, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
+  tryDelBox(boxlabel: Boxlabel, opts: TimelyOpts = {}): Promise<Outcome<Box | null>> { return outcomeOf(() => this.delBox(boxlabel, opts)) }
   // --
 
   // == [Guards]: isLocked, demandWatchable, demandPresent, ensureTimely

@@ -11,6 +11,7 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import * as TH from '../test-helpers'
 import { provingDeviceOf } from '../test-helpers/proving-world'
 import { Dna, LeaseMillis, Passphrase, byPassphrase, makeBornVault, useVaultWorlds, vaultRoundTrip, unlockVerbTyping, unlockTyping } from '../test-helpers/vault-world'
+import type { EpochMillis } from '../../src/helpers/aliases'
 
 useVaultWorlds()
 
@@ -147,7 +148,7 @@ describe("vault.sealStampedString and vault.unsealStampedString", () => {
 describe("Unlocking, by a gating or by the cached lease", () => {
   it("attaches the new lease and caches it over the old one", async () => {
     const { bank, deviceDB, advance } = await makeBornVault()
-    const bornRow = deviceDB.cachedNow() as { proved_at: number }
+    const bornRow = deviceDB.cachedNow() as { proved_at: EpochMillis }
     advance(1)
     await unlockVerbTyping(bank, byPassphrase(Passphrase))
     expect(bank.isUnlocked).to.be.true

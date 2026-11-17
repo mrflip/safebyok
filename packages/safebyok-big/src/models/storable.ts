@@ -11,6 +11,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { Fetched, FetchOpts, ListingOf, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { Revision } from '../shapes/shapes-storage'
+import type { EpochMillis, RevisionSeq, RevisionTok } from '../helpers/aliases'
 
 // == [Revisions]: cmpRevisions
 
@@ -38,10 +39,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
   /** The revision and times of the record in hand, as own props. */
-  declare revision_tok:  string
-  declare revision_seq:  number
-  declare registered_at: number
-  declare written_at:    number
+  declare revision_tok:  RevisionTok
+  declare revision_seq:  RevisionSeq
+  declare registered_at: EpochMillis
+  declare written_at:    EpochMillis
 
   // The scope's fields are own props too, so the thing ducks as its record; `scope` itself is a getter, kept off the duck.
   /** The scope, frozen. */
@@ -52,7 +53,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The snapshot, or null until first asked for. */
   #snapshot: SnapshotT | null = null
   /** When storage last confirmed the record in hand while it was whole, or null. */
-  #refreshedAt: number | null = null
+  #refreshedAt: EpochMillis | null = null
   readonly #listeners = new Set<() => void>()
 
   /** `snapshot`, as a function safe to pass without binding. */
@@ -82,7 +83,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
 
   /** When this thing's record was last refreshed from the bankDB, or null if never. */
-  get refreshedAt(): number | null { return this.#refreshedAt }
+  get refreshedAt(): EpochMillis | null { return this.#refreshedAt }
 
   /** Whether the record in hand is alive, damaged or gone. */
   get am(): Am { return this.#central.am }

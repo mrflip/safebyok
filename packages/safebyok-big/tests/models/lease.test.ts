@@ -7,6 +7,7 @@ import { type BankStamp, type CitedGate, type LeaseGrantOpts, type LeaseRecord, 
 import { bad } from '../../src/refusals/outcome'
 import * as TH from '../test-helpers'
 import { type FakeLeaseFriend, FriendLeaseMillis, GrantedAs, fakeLeaseFriendOf, isZeroed, makeGrantedLease, sealStampOf, sealStampsOf, T0, useFakeClock, WorldBankStamp, WorldGate, WorldVaultStamp } from '../test-helpers/proving-world'
+import type { EpochMillis } from '../../src/helpers/aliases'
 
 useFakeClock()
 
@@ -567,6 +568,6 @@ describe("what a lease shows", () => {
   it("is frozen: its stamp cannot be changed", async () => {
     const { lease } = await grantedWorld()
     expect(Object.isFrozen(lease)).to.be.true
-    expect(() => { (lease as { proved_at: number }).proved_at = T0 + 1 }).to.throw(TypeError)
+    expect(() => { (lease as { proved_at: EpochMillis }).proved_at = T0 + 1 }).to.throw(TypeError)
   })
 })

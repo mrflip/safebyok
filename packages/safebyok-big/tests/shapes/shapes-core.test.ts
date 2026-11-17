@@ -3,6 +3,7 @@ import { LOCKED, PassphraseSaltSize } from '../../src/helpers/consts'
 import * as Phrases from '../../src/helpers/phrases'
 import * as CX from '../../src/shapes/shapes-core'
 import * as TH from '../test-helpers'
+import type { Banklabel } from '../../src/helpers/aliases'
 
 const WhisperCases = [
   // a whisper is an object, of any JSON inside:
@@ -181,7 +182,7 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
       readonly user_id = 'u1'
       readonly #banklabel = 'acme'
       readonly vaultlabel = 'main'
-      get banklabel(): string { return this.#banklabel }
+      get banklabel(): Banklabel { return this.#banklabel }
     }
     expect(CX.vaultScope.parse(new Wrapper())).to.deep.equal(scope)
   })

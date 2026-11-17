@@ -3,14 +3,15 @@ import { PasskeySaltSize } from '../../src/helpers/consts'
 import { randomBytes, toB64 } from '../../src/helpers/crypto'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { DeviceTok, T0 } from '../test-helpers/proving-world'
+import { WorldDeviceTok, T0 } from '../test-helpers/proving-world'
+import type { DeviceTok } from '../../src/helpers/aliases'
 
 const passphraseRecord = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   wayinkind:               'passphrase',
   wayinlabel:              'main',
   key_deriver_label:       'test_digest_v0',
   salt_b64:                toB64(randomBytes(16)),
-  device_tok:              DeviceTok,
+  device_tok:              WorldDeviceTok,
   registered_at:           T0,
   bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pp'),
   ...overrides,
@@ -21,7 +22,7 @@ const passkeyRecord = (overrides: Record<string, unknown> = {}): Record<string, 
   wayinlabel:              'passkey0',
   credential_id:           'cred-test-1',
   prf_salt_b64:            toB64(randomBytes(PasskeySaltSize)),
-  device_tok:              DeviceTok,
+  device_tok:              WorldDeviceTok,
   registered_at:           T0,
   bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pk'),
   ...overrides,
@@ -101,7 +102,7 @@ describe("wayin.pickle(): the stored record", () => {
     const wayin = new Wayin(record)
     expect(Object.keys(wayin)).to.have.members(Object.keys(record))
     expect(wayin.salt_b64).to.eq(record['salt_b64'])
-    expect(() => { (wayin as { device_tok: string }).device_tok = 'device_other' }).to.throw(TypeError)
+    expect(() => { (wayin as { device_tok: DeviceTok }).device_tok = 'device_other' }).to.throw(TypeError)
     expect(Object.isFrozen(wayin)).to.be.true
   })
 })

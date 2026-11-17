@@ -16,6 +16,7 @@ import { describeRaces } from './bank-db-battery-races'
 import { describeIdentity } from './bank-db-battery-identity'
 import { describeFlaws } from './bank-db-battery-flaws'
 import { describeWrittenOtherwise } from './bank-db-battery-stored'
+import type { BankTok, Boxlabel, UserID, VaultTok } from '../../src/helpers/aliases'
 
 // == [The hooks a bankDB hands the battery]: BankDBRowCheats, BankDBBatteryOpts
 
@@ -30,7 +31,7 @@ export type BankDBRowCheats = {
   /** Writes `row` as the vault row at `scope`, unchecked, whether or not a bank row stands over it. */
   plantVaultRow: (scope: VaultScope, row: unknown) => Awaitable<void>
   /** Writes `row` as the box row at `scope` in the vault life `vault_tok` of the bank life `bank_tok`, unchecked, whether or not a vault row stands over it. */
-  plantBoxRow: (scope: Boxscope, bank_tok: string, vault_tok: string, row: unknown) => Awaitable<void>
+  plantBoxRow: (scope: Boxscope, bank_tok: BankTok, vault_tok: VaultTok, row: unknown) => Awaitable<void>
   /** The bank row at `scope` as stored, or null. */
   bankRowOf: (scope: BankScope) => Awaitable<unknown>
   /** The gate row at `scope` as stored, or null. */
@@ -38,7 +39,7 @@ export type BankDBRowCheats = {
   /** The vault row at `scope` as stored, or null. */
   vaultRowOf: (scope: VaultScope) => Awaitable<unknown>
   /** The box rows of the vault at `scope`, in its life `vault_tok` of the bank life `bank_tok`, as stored, by boxlabel. */
-  boxRowsOf: (scope: VaultScope, bank_tok: string, vault_tok: string) => Awaitable<Map<string, unknown>>
+  boxRowsOf: (scope: VaultScope, bank_tok: BankTok, vault_tok: VaultTok) => Awaitable<Map<Boxlabel, unknown>>
 }
 
 /** What a bankDB hands {@link describeBankDBBattery}: how to make one, and the backdoor to its rows. */
@@ -52,7 +53,7 @@ export type BankDBBatteryOpts<DBT extends BankDB = BankDB> = {
   /** A fresh, empty bankDB with at most `maxBoxes` box rows to a vault life, live and deleted; without it, the battery has no cases of a cap. */
   makeCappedBankDB?: (maxBoxes: number) => Awaitable<DBT>
   /** A fresh backend, as a way to make a bankDB over it signed in as a user, or signed out for null; without it, the battery has no cases of who may reach a bank. */
-  makeBankDBFor?: () => Awaitable<(user_id: string | null) => BankDB>
+  makeBankDBFor?: () => Awaitable<(user_id: UserID | null) => BankDB>
   /** Makes the bankDB's next call to its storage fail as its storage would; without it, the battery has no case of that failure. */
   _cheat_failNextCall?: (bankDB: DBT) => Awaitable<void>
   /** Makes the bankDB's storage, from now on, keep each row the bankDB writes as `writtenOtherwiseOf` makes it, and report that row as written,
@@ -101,7 +102,7 @@ export type BatteryWorld = {
   makeCapped:           (maxBoxes: number) => Promise<BankDB>
   /** Whether the bankDB gave {@link BankDBBatteryOpts.makeBankDBFor}; without it, `makeBankDBFor` throws. */
   hasIdentity:          boolean
-  makeBankDBFor:        () => Promise<(user_id: string | null) => BankDB>
+  makeBankDBFor:        () => Promise<(user_id: UserID | null) => BankDB>
   /** Whether the bankDB gave {@link BankDBBatteryOpts._cheat_failNextCall}; without it, `failNextCall` throws. */
   canFail:              boolean
   failNextCall:         (bankDB: BankDB) => Promise<void>

@@ -39,6 +39,7 @@ import { MemoryBankDB } from '../../src/storage/memory-bank-db'
 import type { Notice } from '../../src/storage/bank-db'
 import * as Refuse from '../../src/refusals/throwers'
 import { fakeCiphered } from './builders'
+import type { BankTok, Boxlabel, EpochMillis, VaultTok } from '../../src/helpers/aliases'
 
 // == [Time and builders]: T0, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, shellBoxRecord
 
@@ -159,8 +160,8 @@ export type FakeBank = {
 export type FakeVault = {
   readonly modelkind:  'vault'
   readonly scope:      typeof WorldVault.scope
-  readonly bank_tok:   string
-  readonly vault_tok:  string
+  readonly bank_tok:   BankTok
+  readonly vault_tok:  VaultTok
   readonly isEnabled:  boolean
   readonly bank:       FakeBank
   /** Refuse 'disabled' once {@link ModelsWorld.disable} has run. */
@@ -180,7 +181,7 @@ export type FakeVault = {
 /** How {@link makeModelsWorld} builds the world. */
 export type ModelsWorldOpts = {
   /** The clock's first reading; {@link T0}. */
-  now?:         number
+  now?:         EpochMillis
   /** Whether the vault starts locked; false, unlocked. */
   isLocked?:    boolean
   /** Whether to install vitest's fake timers, in step with the clock; true. */
@@ -206,7 +207,7 @@ export type ModelsWorld = {
   /** What the device was told to announce, oldest first. A live array. */
   announced: readonly DeviceAnnouncement[]
   /** The bankDB's own box rows, by boxlabel: the one vault's boxes. */
-  stored: Map<string, unknown>
+  stored: Map<Boxlabel, unknown>
 
   /** Every watch started, oldest first. A live array. */
   watches: readonly ModelsWatch[]
@@ -217,9 +218,9 @@ export type ModelsWorld = {
   clearCalls(): void
 
   /** The clock reading. */
-  now(): number
+  now(): EpochMillis
   /** Jump the clock to `ms`; no timer fires. */
-  setNow(ms: number): void
+  setNow(ms: EpochMillis): void
   /** Move the clock on by `ms` and, under fake timers, fire every timer that falls due, each with the clock at its due time. */
   advance(ms: number): Promise<void>
   /** Lock or unlock the vault, telling the world's subscribers, then locking each listing over this world, as a bank's lock or unlock does. */
@@ -260,7 +261,7 @@ export type ModelsWorld = {
   /** {@link tombstoneBoxRecord}, in this world's vault. */
   tombstoneBoxRecord(overrides?: Partial<BoxSparse>): Tombstone<BoxSparse>
   /** The scope of the box `boxlabel` in this world's vault. */
-  boxscope(boxlabel: string): Boxscope
+  boxscope(boxlabel: Boxlabel): Boxscope
 }
 
 /** A queue of scripted answers: `dequeue` the next, if any. */
@@ -376,7 +377,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
   shelf.vaultrows.set(WorldVault.scope.vaultlabel, worldVaultRow())
   const stored = bankDB._cheat_boxRowsOf(WorldVault.scope, WorldVault.bank_tok, WorldVault.vault_tok)
   const ensureTimelyScript = new Script<number | undefined>()
-  const scopeFor = (boxlabel: string): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
+  const scopeFor = (boxlabel: Boxlabel): Boxscope => CX.boxscope.parse({ ...WorldVault.scope, boxlabel })
   const refusalOf = (scope: Boxscope, err: VaultError, parent: unknown = null, dbhas?: unknown): BoxAnswer => ({ ok: false, err, parent, act: err.meta?.act ?? 'unclassified_storing', ...factsOf(scope), ...((dbhas !== undefined) && { dbhas }) })
 
   // The fake seal: the text sealed, by the stamp it was sealed under.
@@ -446,7 +447,7 @@ export function makeModelsWorld(opts: ModelsWorldOpts = {}): ModelsWorld {
     if (fakeTimers) { await vi.advanceTimersByTimeAsync(0) } else { await new Promise((resolve) => { setTimeout(resolve, 0) }) }
   }
 
-  const setNow = (ms: number): void => {
+  const setNow = (ms: EpochMillis): void => {
     if (fakeTimers) { vi.setSystemTime(ms) } else { now = ms }
   }
 

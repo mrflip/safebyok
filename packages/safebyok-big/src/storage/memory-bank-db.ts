@@ -13,12 +13,13 @@ import type {
   BankBuildAsk, BankDelAsk, BankEnsureAsk, BankRow, BoxDelAsk, BoxGetAsk, BoxListAsk, BoxPutAsk, BoxRow, GatePutAsk, GateRecord,
   MemoryBankDBOpts, VaultDelAsk, VaultGetAsk, VaultPutAsk, VaultRow,
 } from '../shapes/shapes-bankdb'
+import type { BankTok, Boxlabel, VaultTok, Vaultlabel } from '../helpers/aliases'
 export type { MemoryBankDBOpts } from '../shapes/shapes-bankdb'
 
 /** The rows stored under one bank's scope: its bank row (null for none), its gate rows by gatelabel, and its vault rows by vaultlabel. */
-type Shelf = { bank: unknown, gaterows: Map<string, unknown>, vaultrows: Map<string, unknown> }
+type Shelf = { bank: unknown, gaterows: Map<string, unknown>, vaultrows: Map<Vaultlabel, unknown> }
 /** The box rows of one vault life, by boxlabel. */
-type BoxLife = { scope: VaultScope, life: string, boxrows: Map<string, unknown> }
+type BoxLife = { scope: VaultScope, life: string, boxrows: Map<Boxlabel, unknown> }
 /** A watch: the scope it hears, and the function that hears each change. */
 type Listener = { scope: WatchScope, hear: (heard: Heard) => void }
 
@@ -46,22 +47,22 @@ export class MemoryBankDB extends AdapterBankDB {
   /** For tests: the rows stored under a bank's scope, to read or change in place. */
   _cheat_shelfOf({ user_id, banklabel }: BankScope): Shelf { // eslint-disable-line unicorn/prefer-private-class-fields
     const ckey  = ckeyOf(user_id, banklabel)
-    const shelf = this.#shelves.get(ckey) ?? { bank: null, gaterows: new Map<string, unknown>(), vaultrows: new Map<string, unknown>() }
+    const shelf = this.#shelves.get(ckey) ?? { bank: null, gaterows: new Map<string, unknown>(), vaultrows: new Map<Vaultlabel, unknown>() }
     this.#shelves.set(ckey, shelf)
     return shelf
   }
 
   /** For tests: the map of box rows of one life of a vault, under one life of its bank, by boxlabel. */
-  _cheat_boxRowsOf({ user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string): Map<string, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
+  _cheat_boxRowsOf({ user_id, banklabel, vaultlabel }: VaultScope, bank_tok: BankTok, vault_tok: VaultTok): Map<Boxlabel, unknown> { // eslint-disable-line unicorn/prefer-private-class-fields
     const life = BX.vaultLifeOf({ bank_tok, vault_tok })
     const ckey = ckeyOf(user_id, banklabel, vaultlabel, life)
-    const boxLife = this.#boxLives.get(ckey) ?? { scope: { user_id, banklabel, vaultlabel }, life, boxrows: new Map<string, unknown>() }
+    const boxLife = this.#boxLives.get(ckey) ?? { scope: { user_id, banklabel, vaultlabel }, life, boxrows: new Map<Boxlabel, unknown>() }
     this.#boxLives.set(ckey, boxLife)
     return boxLife.boxrows
   }
 
   /** The box rows of the vault life `ask` names. */
-  #boxRowsOf(ask: VaultScope & { bank_tok: string, vault_tok: string }): Map<string, unknown> { return this._cheat_boxRowsOf(ask, ask.bank_tok, ask.vault_tok) }
+  #boxRowsOf(ask: VaultScope & { bank_tok: BankTok, vault_tok: VaultTok }): Map<Boxlabel, unknown> { return this._cheat_boxRowsOf(ask, ask.bank_tok, ask.vault_tok) }
 
   // Each write reads its row back, so that what it answers and tells is what the store has.
   /** Put a copy of `record` as its bank row, tell the watchers, and return the row stored. */
@@ -92,7 +93,7 @@ export class MemoryBankDB extends AdapterBankDB {
   }
 
   /** Put a copy of `record` in `boxrows`, tell the watchers, and return the row stored. */
-  #writeBoxRow(boxrows: Map<string, unknown>, vault: unknown, record: BoxRow): unknown {
+  #writeBoxRow(boxrows: Map<Boxlabel, unknown>, vault: unknown, record: BoxRow): unknown {
     boxrows.set(record.boxlabel, structuredClone(record))
     const row = boxrows.get(record.boxlabel)
     this.#tell(record, { row, parent: vault })
@@ -101,14 +102,14 @@ export class MemoryBankDB extends AdapterBankDB {
 
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
   /** The capacity of a vault life: its box rows, live and deleted, against `maxBoxes`. */
-  #roomIn(boxrows: Map<string, unknown>): Capacity {
+  #roomIn(boxrows: Map<Boxlabel, unknown>): Capacity {
     return { boxes: { used: boxrows.size, max: this.#maxBoxes }, bytes: { used: 0, max: Infinity } }
   }
 
   // Each listener is called on a later microtask, so nothing it does runs inside the write that notified it. A bank or
   // gate row has no vaultlabel, so only a watch of the whole bank hears it.
   /** Notify each listener watching `scope` of `heard`. */
-  #tell(scope: BankScope & { vaultlabel?: string }, heard: Heard): void {
+  #tell(scope: BankScope & { vaultlabel?: Vaultlabel }, heard: Heard): void {
     for (const { scope: heardScope, hear } of this.#listeners) {
       const isHeard = (heardScope.user_id === scope.user_id) && (heardScope.banklabel === scope.banklabel) && ((heardScope.vaultlabel ?? scope.vaultlabel) === scope.vaultlabel)
       if (isHeard) { queueMicrotask(() => { hear(structuredClone(heard)) }) }

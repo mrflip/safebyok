@@ -11,6 +11,7 @@ import type { LeaseRow, LeaseScopepath } from '../../src/shapes/shapes-storage'
 import type { DeviceDB } from '../../src/storage/device-db'
 import { expectBad, expectGood, expectRefusal } from './refusals'
 import { bankScope, vaultScope } from './bankdb-world'
+import type { Banklabel } from '../../src/helpers/aliases'
 
 // == [The hooks a DeviceDB hands the battery]: DeviceDBRowCheats, DeviceDBBatteryOpts
 
@@ -51,7 +52,7 @@ const Hour = 3_600_000
 const asked = { ...bankScope, bank_tok: 'tok_one' }
 
 /** The bank scope of `banklabel`, for the user of {@link bankScope}. */
-function bankScopeOf(banklabel: string): BankScope { return { ...bankScope, banklabel } }
+function bankScopeOf(banklabel: Banklabel): BankScope { return { ...bankScope, banklabel } }
 
 /** A lease row of the bank `asked` names, its leaseKey a real handle, its other fields opaque. */
 async function leaseRowOf(over: Partial<LeaseRow> = {}): Promise<LeaseRow> { return { ...asked, proved_at: T0, lease_key: await makeLeaseKey(), wrapped: 'opaque', ...over } }

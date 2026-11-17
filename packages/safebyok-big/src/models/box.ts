@@ -20,6 +20,7 @@ import type { BoxListing } from './box-listing'
 import { Storable } from './storable'
 import type { Vault } from './vault'
 import { refusedAnswerOf } from '../storage/bank-db'
+import type { BankTok, Banklabel, BoxTok, Boxlabel, UserID, VaultTok, Vaultlabel } from '../helpers/aliases'
 
 /** A box in this tab, with its record's fields as its own props.
  * It unseals while the bank is unlocked.
@@ -28,14 +29,14 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   // == [Props]: user_id, banklabel, vaultlabel, boxlabel, bank_tok, vault_tok, listing, #exposed, #isVeiled
 
   /** The fields of this box's scope. */
-  declare readonly user_id:    string
-  declare readonly banklabel:  string
-  declare readonly vaultlabel: string
-  declare readonly boxlabel:   string
+  declare readonly user_id:    UserID
+  declare readonly banklabel:  Banklabel
+  declare readonly vaultlabel: Vaultlabel
+  declare readonly boxlabel:   Boxlabel
   /** The life of this box's bank. It never changes. */
-  declare readonly bank_tok:   string
+  declare readonly bank_tok:   BankTok
   /** The life of this box's vault. It never changes. */
-  declare readonly vault_tok:  string
+  declare readonly vault_tok:  VaultTok
 
   declare readonly listing: BoxListing
 
@@ -57,7 +58,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   get fmt(): number { return this.central.fmt }
 
   /** This box's life, as the record in hand has it. A box deleted and put again has another. */
-  get box_tok(): string { return this.central.box_tok }
+  get box_tok(): BoxTok { return this.central.box_tok }
 
   /** The box's {@link Sidecar}, readable while the bank is locked, or null where the record in hand is not full. */
   get sidecar(): Sidecar | null { return this.full?.sidecar ?? null }

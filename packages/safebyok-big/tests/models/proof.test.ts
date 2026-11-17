@@ -16,6 +16,7 @@ import * as TH from '../test-helpers'
 import { AutolockMinutes, VaultScopeGiven, makeBankWorld, useBankWorlds } from '../test-helpers/bank-world'
 import { ticks } from '../test-helpers/timing'
 import { NewPassphrase, Passphrase, byPasskey, byPassphrase } from '../test-helpers/vault-world'
+import type { Boxlabel, Vaultlabel } from '../../src/helpers/aliases'
 
 useBankWorlds()
 
@@ -77,12 +78,12 @@ const bankStatus = ({ isLocked }: BankSnapshot): string => lockWordOf(isLocked)
 
 const gateRevision = ({ revision_seq }: GateSnapshot): string => `revision ${String(revision_seq)}`
 
-const vaultList = (vaultlabels: readonly string[]): string => vaultlabels.join(', ') || 'no vaults'
+const vaultList = (vaultlabels: readonly Vaultlabel[]): string => vaultlabels.join(', ') || 'no vaults'
 
 // A vault has no lock of its own: its component shows whether it stands, and the bank's shows the lock.
 const vaultStatus = ({ vaultlabel, isPresent }: VaultSnapshot): string => `${vaultlabel} ${isPresent ? 'present' : 'deleted'}`
 
-const boxList = (boxlabels: readonly string[]): string => boxlabels.join(', ') || 'no boxes'
+const boxList = (boxlabels: readonly Boxlabel[]): string => boxlabels.join(', ') || 'no boxes'
 
 const boxRow = ({ boxlabel, isPresent, sidecar }: BoxSnapshot): string => `${boxlabel} ${isPresent ? JSON.stringify(sidecar) : 'deleted'}`
 

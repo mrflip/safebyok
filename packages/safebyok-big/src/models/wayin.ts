@@ -4,6 +4,7 @@ import { tattoo } from '../helpers/helpers'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import type * as CX from '../shapes/shapes-core'
 import { type BankStamp, type GateStamp, type WayinHeader, type WayinRecord, bankStamp, gateStamp, wayinHeader, wayinRecord } from '../shapes/shapes-gateish'
+import type { DeviceTok, EpochMillis, KeyDeriverLabel } from '../helpers/aliases'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
@@ -30,11 +31,11 @@ export class Wayin {
 
   declare readonly wayinkind:               Wayinkind
   declare readonly wayinlabel:              'main' | 'passkey0'
-  declare readonly device_tok:              string
-  declare readonly registered_at:           number
+  declare readonly device_tok:              DeviceTok
+  declare readonly registered_at:           EpochMillis
   declare readonly bank_key_wayin_wrapped: CX.BankKeyWayinWrapped
   /** Only on a passphrase wayin. */
-  declare readonly key_deriver_label?:      string
+  declare readonly key_deriver_label?:      KeyDeriverLabel
   /** Only on a passphrase wayin. */
   declare readonly salt_b64?:               CX.PassphraseSalt
   /** Only on a passkey wayin. */

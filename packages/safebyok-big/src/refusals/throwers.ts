@@ -24,6 +24,7 @@ import type * as EX from '../shapes/shapes-enums'
 import * as Phrases   from '../helpers/phrases'
 import type * as SX from '../shapes/shapes-storage'
 import type * as BX from '../shapes/shapes-bankdb'
+import type { Boxlabel, Vaultlabel } from '../helpers/aliases'
 
 // == [Outcome Throwers]: sanitizeForeignError, storageUnavailable, storageBlocked, unexpectedError
 
@@ -108,13 +109,13 @@ export function partialLoad(): VaultError { return new VaultError('bad_option', 
 export function instanceDisabled(): VaultError { return new VaultError('disabled', Phrases.LetGoInstance) }
 
 /** An `absent_box` refusal: no box is stored under the label given. */
-export function boxAbsent({ boxlabel }: { boxlabel: string }): VaultError { return new VaultError('absent_box', Phrases.boxAbsent(boxlabel)) }
+export function boxAbsent({ boxlabel }: { boxlabel: Boxlabel }): VaultError { return new VaultError('absent_box', Phrases.boxAbsent(boxlabel)) }
 
 /** An `absent_box` refusal: no box is listed under the label given, though one may be stored. */
-export function boxNotListed({ boxlabel }: { boxlabel: string }): VaultError { return new VaultError('absent_box', Phrases.boxNotListed(boxlabel)) }
+export function boxNotListed({ boxlabel }: { boxlabel: Boxlabel }): VaultError { return new VaultError('absent_box', Phrases.boxNotListed(boxlabel)) }
 
 /** An `absent_vault` refusal: no vault is stored under the label given. */
-export function vaultAbsent({ vaultlabel }: { vaultlabel: string }): VaultError { return new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel)) }
+export function vaultAbsent({ vaultlabel }: { vaultlabel: Vaultlabel }): VaultError { return new VaultError('absent_vault', Phrases.vaultAbsent(vaultlabel)) }
 
 /** A `vault_gone` refusal: this vault was deleted. */
 export function deletedVault(): VaultError { return new VaultError('vault_gone', Phrases.VaultDeleted) }
