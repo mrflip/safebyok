@@ -97,7 +97,13 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
       "stale". Every use of the word already in the tree (VOCABULARY's `am` and `cited` rows, the classifier, big's
       `Liveness`) is about live, gone or void, which the car's values extend (the Coach's test). VOCABULARY.md has the
       car, and `am`'s row points to it. `standing` was rejected: like `state`, it says only "this is one of those".
-    * **Open:** a tombstone heard while `behind` drops the old whole record (Claude's lean).
+    * Settled: a tombstone heard while `behind` replaces the old whole record, since a tombstone is whole (the Coach).
+    * Agreed (the Coach): the merge (today's `betterRecordOf`) keeps the invariant that the fullest record is the fullest
+      known, and its output is checked by a zod type of the car on the way out. Its inputs are not validated.
+    * **Proposed (the Coach):** rename `whole` to `fullest`, beside `newest`: the most fields we know of, and the most
+      currency, so each name recommends a use (display the fullest, write against the newest). Claude agrees, and reads
+      it as `fullest` always holding a record: the sparse one when `bare`, the tombstone when `gone`, the void sentinel
+      when `void`. The doc's `null`/`undefined` line then goes, and `liveness` alone says whether it has a body.
     * A thread of its own, cut from main after #716 merges; it sweeps `entry` out of `minding/`.
   * **Thread `minder_grain`** (2026-11-17, cut from main; the classifier tidy stays in and around the classifier file).
     From the review: the `select`/`placeholderData` sharing fix (both values revisions of one Thing, by `thingCited` and
