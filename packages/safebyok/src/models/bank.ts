@@ -1,5 +1,5 @@
 import type { Consts, EX } from 'safebyok-big/internals'
-import { CX, Clock, Crypto, Errors, Throwers, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, Errors, Throwers, Validator } from 'safebyok-big/internals'
 import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../minding/shapes-minder'
 import { BaseThing } from './base-thing'
 import { CoreBox } from './core-box'
@@ -148,8 +148,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
     const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
     const parsed = Checks.bankThing.parse(rest)
-    // The device names its user `user_id`, and the bank's Thing `userid`.
-    Validator.checkedConsistent({ user_id: parsed.userid, banklabel: parsed.banklabel }, checked.device.scope, { kind: 'record_conflict' })
+    Validator.checkedConsistent(bankScope.parse(parsed), checked.device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
     super(parsed)
     this.#device = checked.device
@@ -161,12 +160,12 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life. Mint one pair per attempt to birth a bank. */
-  static mintStamps(scope: CX.BankScope): { bankStamp: BankStamp, gateStamp: GateStamp } {
-    const { user_id, banklabel } = CX.bankScope.parse(scope)
+  static mintStamps(scope: BankScope): { bankStamp: BankStamp, gateStamp: GateStamp } {
+    const { userid, banklabel } = bankScope.parse(scope)
     const born_at = Clock.nowMillis()
     return {
-      bankStamp: bankStamp.parse({ userid: user_id, banklabel, lifeseq: lifeseqOfLifenum(0), born_at }),
-      gateStamp: gateStamp.parse({ userid: user_id, banklabel, labelpath: 'gate', lifeseq: lifeseqOfLifenum(0), born_at }),
+      bankStamp: bankStamp.parse({ userid, banklabel, lifeseq: lifeseqOfLifenum(0), born_at }),
+      gateStamp: gateStamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: lifeseqOfLifenum(0), born_at }),
     }
   }
 

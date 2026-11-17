@@ -1,11 +1,11 @@
 import * as CX from '../../src/shapes/shapes-core'
 import type { Ciphered, BoxKeyWrapped, BankKeyLeaseWrapped, BankKeyWayinWrapped, WhisperCiphered, VaultScope } from '../../src/shapes/shapes-core'
-import type { PasskeyAnswer } from '../../src/shapes/shapes-gateish'
+import type { PasskeyAnswer, PassphraseVerdict } from '../../src/shapes/shapes-gateish'
 import type * as Z from 'zod'
 import type * as SX from '../../src/shapes/shapes-storage'
 import      { toB64 }                               from '../../src/helpers/crypto'
 import type { KeyDeriver }                          from '../../src/deriver/basederiver'
-import      { type StrengthChecker, StrongVerdict } from '../../src/helpers/passphrase-strength'
+import      { StrongVerdict } from '../../src/helpers/passphrase-strength'
 import type { UserID } from '../../src/helpers/aliases'
 
 /** A cheap KeyDeriver for tests: one SHA-256 instead of 64 MiB of Argon2id, so a suite full of
@@ -25,10 +25,11 @@ export const testDeriver: KeyDeriver = {
   },
 }
 
+// It reads no scope, so it fits safebyok's new core too, whose scope names the user `userid`.
 /** A strengthChecker for tests, admitting every passphrase, so a suite may unlock with a
  * short one such as 'pw'. Never hand it to a vault that has a real secret.
  */
-export const anyStrengthChecker: StrengthChecker = () => StrongVerdict
+export const anyStrengthChecker = (): PassphraseVerdict => StrongVerdict
 
 /** A Ciphered that deciphers or unwraps under no key, so it stands in any ciphered role: what {@link fakeCiphered} makes. */
 export type FakeCiphered = WhisperCiphered & BoxKeyWrapped & BankKeyWayinWrapped & BankKeyLeaseWrapped

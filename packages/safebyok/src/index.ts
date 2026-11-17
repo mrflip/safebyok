@@ -10,6 +10,7 @@ export type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, Sealable }
 export type { Wayin } from './models/wayin'
 export type { BankScope, BankStamp } from './models/stamps'
 export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './storage/primitives'
+export { DefaultStrengthChecker, type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'
 export { type BoxThing, type DelAskDraft, type PutAskDraft, type VoidSentinel, isVoidSentinel } from './storage/shapes-thing'
 export { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies } from './minding/shapes-minder'
@@ -17,5 +18,5 @@ export { type DeliverableThing, type MinderOpts, type TSQAnswer, type TSQGotAnsw
 
 // From safebyok-big: its refusals, what a device is handed, and what a gating's dialog and a box carry.
 export { IsVaultError, VaultError, isVaultError, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
-export { DefaultLogger, setDefaultLogger, type KeyDeriver, type StrengthChecker, type VaultLogger } from 'safebyok-big'
+export { DefaultLogger, setDefaultLogger, type KeyDeriver, type VaultLogger } from 'safebyok-big'
 export { PrfAnswerSize, type PasskeyAnswer, type PassphraseCleartext, type PassphraseVerdict, type Sidecar, type Whisper } from 'safebyok-big'

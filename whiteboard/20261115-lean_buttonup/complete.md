@@ -52,8 +52,74 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 * **DONE** *Cache options are fixed where hosts can't safely choose them.* `networkMode` is `'always'` and `retry` is
   off; `staleTime` defaults to an hour.
 * **DONE** *Lifecycle.* `hello` is idempotent, and `goodbye` empties the minder's entries and query defaults.
+* **The ThingMinder is a joy at both ends** (the Coach, 2026-11-17; `thing-minder.ts`'s header states it). Toward
+  TanStack Query, it goes with the grain: it throws where query-core expects a throw, calls each complicated method only
+  for its exact purpose, and never hand-rolls a worse or equivalent version of what query-core provides; the chute from
+  the vaultDB, or any query, into the cache is clear and efficient. Toward the host, it is a perfect expression of our
+  API: firmly typed records in our vocabulary, discipline inside the boundaries, and generous DWIM-but-safe portals and
+  helpers. Not yet scoped as a thread: first a review of `minding/` against both ends (running, 2026-11-17).
+  * Known, agreed: `betterRecordOf` freezes an observer's `select` result that is not a record (TanStack passes it
+    through `structuralSharing`; `cmpRecords` gives NaN, so `prior` is kept). Compare as records only when both are
+    records, else `TSQ.replaceEqualDeep`; a test red first. Rides with the minder round.
+  * Agreed: `#demandOwnAsk(ask: MinderGetAsk)`, losing the `unknown`, keeping the check and the name.
+  * **The ThingCar, the minder's cache value (the Coach, 2026-11-17; agreed).** A host shows the whole
+    record, steady, and writes against the newest revision: the newest heard of and the newest whole record are kept
+    apart, so a sparse revision heard by `list` never blinks a body out. Ruled:
+    * The name is `ThingCar`, by kind `BoxCar` and `GateCar`: a silly name for the carrier of two Things, since a
+      record is one Thing as stored and sent over a wire, a pojo. `entry` is banned (VOCABULARY.md), and `state` names
+      nothing public (STYLE.md). The cache holds cars, frozen.
+    * The minder serves ThingCars only. It is internal: no `select`, no host-facing portal. Its callers are the
+      ReactBridge and, later, a Listing class. The bridge handles the customer's side, so its contract is not ours here.
+    * The type, as the Coach gave it (its `whole` is now `fullest`, below):
+      ```ts
+      /** Cache value for a ThingRecord: the newest revision heard of (which might be sparse), and the newest whole record seen.
+       * `null` when gone/void, `undefined` for "known to exist but nothing useable cached"
+       */
+      type ThingCar<RecordT extends ThingRecord> = Readonly<
+        | { liveness: 'full',   newest: RecordT,            whole: RecordT   } // the same record in both
+        | { liveness: 'behind', newest: Sparse<RecordT>,    whole: RecordT   } // whole is older
+        | { liveness: 'bare',   newest: Sparse<RecordT>,    whole: undefined } // never fetched whole
+        | { liveness: 'gone',   newest: Tombstone<RecordT>, whole: null      } // a tombstone, sparse or whole
+        | { liveness: 'void',   newest: VoidSentinel,       whole: null      } // none stored
+      >
+      // dbNewer: liveness is 'behind' or 'bare'
+      ```
+      The doc's `null` and `undefined` describe `whole`: gone and void cache a definite "no body", bare a body not held.
+      Agreed: that line names `whole` as its subject ("`whole` is null when gone or void…"), since a car is never null.
+    * Agreed: `staleTime` as a function makes a car stale when `behind` or `bare`, so query-core's own refetch fetches
+      it whole. Deliver-then-invalidate and #716's wontfix row go.
+    * Agreed: the merge sits in `structuralSharing`, which query-core calls on every landing (`query.setData`), with
+      `undefined` as the prior on the first.
+    * Settled (the Coach: "yes cars"): the `queryFn` and deliveries hand in cars, each made by `carOf(record)` where the
+      vaultDB's answer lands, and `structuralSharing` merges two cars. Only cars enter the cache.
+    * Settled: the field is `liveness`. It says how alive the Thing is, with overtones of how current, without claiming
+      "stale". Every use of the word already in the tree (VOCABULARY's `am` and `cited` rows, the classifier, big's
+      `Liveness`) is about live, gone or void, which the car's values extend (the Coach's test). VOCABULARY.md has the
+      car, and `am`'s row points to it. `standing` was rejected: like `state`, it says only "this is one of those".
+    * Settled: a tombstone heard while `behind` replaces the old whole record, since a tombstone is whole (the Coach).
+    * Agreed (the Coach): the merge (today's `betterRecordOf`) keeps the invariant that the fullest record is the fullest
+      known, and its output is checked by a zod type of the car on the way out. Its inputs are not validated.
+    * Settled (the Coach): `whole` is renamed `fullest`, beside `newest`: the most fields we know of, and the most
+      currency, so each name recommends a use (display the fullest, write against the newest). `fullest` keeps the
+      pasted type's shapes: `null` when `gone` or `void`, `undefined` when `bare`. A sparse record seems full to us, but
+      for the user it is bereft, so `null` and `undefined` are the fullest records we can provide. The doc line names
+      `fullest` as its subject: "`fullest` is null when gone or void, and undefined when bare"
+    * A thread of its own, cut from main after #716 merges; it sweeps `entry` out of `minding/`.
+  * **Thread `minder_grain`** (2026-11-17, cut from main; the classifier tidy stays in and around the classifier file).
+    From the review: the `select`/`placeholderData` sharing fix (both values revisions of one Thing, by `thingCited` and
+    labelpath, else `replaceEqualDeep`); a default `queryFn` in the key defaults, its ask from `makeGetAsk`, `track`
+    included (the Coach: carry on); `at` and `isWholeRecordAt` validate their scope, adding a `bad_option` throw (the
+    Coach: carry on); the `gcTime` and `listen` docs told the truth; `isVoidSentinel` exported; a sparse seed set stale
+    by `updatedAt: 0` if that works, else documented; `#doDeliverRecord` returns the kept record; `#isReady`'s doc.
+    Typing the minder by kind waits for T3b.
 
 ## Not part of this push
+
+* **A generous `recordOf`, and `childRecordOf`** (the Coach, 2026-11-17, held for later): build a record, its shell or its
+  tombstone from a few props, filling in the rest. `recordOf({ modelkind: 'box', label: 'hello' })` gives the labelpath,
+  the shell's lifepath and lifeseq, `sidecar: {}` and the rest; with `am: 'x'`, the tombstone.
+  `childRecordOf(parentProps, { label: 'hello', am: 'x', lifeseq: -1 })` makes the base-32 lifeseq and knows the kind.
+  It may absorb `shellOf`.
 
 * The instance-based model in front of the minder: sugared calls and a sync/async collection interface. Its API is
   designed afterwards, from what this push teaches, and design-minder.md is rewritten then.

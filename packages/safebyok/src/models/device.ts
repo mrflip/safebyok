@@ -1,8 +1,10 @@
-import type { SX } from 'safebyok-big/internals'
-import { CX, Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, Strength, Throwers, VX, Validator } from 'safebyok-big/internals'
+import type * as Z from 'zod'
+import { CX, Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, Throwers, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import { type AskUser, Gating, type RequestCleartext, birthBank } from './gating'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
+import { DefaultStrengthChecker, type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
+import { type BankScope, bankScope } from './stamps'
 import * as Phrases from '../phrases'
 import type { Banklabel, DeviceTok, Userid } from '../storage/primitives'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
@@ -13,7 +15,7 @@ import { type VaultDB, isVaultDB } from '../storage/vault-db'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 
 /** A device's record: the bank scope it serves, and its token there. */
-export type DeviceRecord = Pick<SX.DeviceRow, 'user_id' | 'banklabel' | 'device_tok'>
+export type DeviceRecord = Z.infer<typeof Checks.deviceRecord>
 
 /** What `onBadNews` hears: a refusal no caller waits on, and the device it reached. */
 export interface BadNews {
@@ -31,7 +33,7 @@ export interface DeviceOpts {
   /** Makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
   keyDeriver:       Deriver.KeyDeriver
   /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak. */
-  strengthChecker?: Strength.StrengthChecker | undefined
+  strengthChecker?: StrengthChecker | undefined
   /** Where the device reports what it has no caller to throw to. Default: the console. */
   logger?:          Logger.VaultLogger | undefined
   /** How long a lease lasts on this device, in minutes. `Infinity` lasts until locked. Default: 14 days. */
@@ -42,43 +44,47 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
 }
 
-/** The checks of {@link Device.make}'s arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, arr, fn, custom, user_id, banklabel, device_tok }) => ({
-  requestCleartext: fn<RequestCleartext>(),
-  deviceMakeArgs: obj({
-    record: obj({ user_id, banklabel, device_tok }),
-    opts:   Validator.objCheck(() => ({
-      vaultDB:         custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
-      keyDeriver:      custom<Deriver.KeyDeriver>(),
-      strengthChecker: custom<Strength.StrengthChecker>().optional(),
-      logger:          custom<Logger.VaultLogger>().optional(),
-      autolockMinutes: VX.positiveMinutes.optional(),
-      requestCleartext: custom<RequestCleartext>().optional(),
-      onBadNews:       fn<BadNewsHandler>().optional(),
-    }), { refusalkind: 'bad_option' }),
-  }),
-  tellBadNewsToArgs: obj({
-    onBadNews: fn<BadNewsHandler>(),
-    device:    custom<Device>((val) => val instanceof Device, PhrasesX.DeviceExpected),
-    badnews:   arr(custom<Errors.VaultError>(Errors.isVaultError, PhrasesX.VaultErrorExpected)),
-  }),
-}), [CX])
+/** The checks of a {@link DeviceRecord} and of {@link Device.make}'s arguments. */
+const Checks = Validator.Checkers('bad_option', ({ obj, arr, fn, custom, user_id, banklabel, device_tok }) => {
+  const deviceRecord = obj({ userid: user_id, banklabel, device_tok }).strict()
+  return {
+    deviceRecord,
+    requestCleartext: fn<RequestCleartext>(),
+    deviceMakeArgs: obj({
+      record: deviceRecord,
+      opts:   Validator.objCheck(() => ({
+        vaultDB:         custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+        keyDeriver:      custom<Deriver.KeyDeriver>(),
+        strengthChecker: custom<StrengthChecker>().optional(),
+        logger:          custom<Logger.VaultLogger>().optional(),
+        autolockMinutes: VX.positiveMinutes.optional(),
+        requestCleartext: custom<RequestCleartext>().optional(),
+        onBadNews:       fn<BadNewsHandler>().optional(),
+      }), { refusalkind: 'bad_option' }),
+    }),
+    tellBadNewsToArgs: obj({
+      onBadNews: fn<BadNewsHandler>(),
+      device:    custom<Device>((val) => val instanceof Device, PhrasesX.DeviceExpected),
+      badnews:   arr(custom<Errors.VaultError>(Errors.isVaultError, PhrasesX.VaultErrorExpected)),
+    }),
+  }
+}, [CX])
 // --
 
 /** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and at most one open gating.
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
-  // == [Props]: user_id, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #askUser, #openGating, #endCause, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #askUser, #openGating, #endCause, toJSON
 
-  declare readonly user_id:    Userid
+  declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
   /** This device's token in its bank scope, recorded in each wayin it builds. */
   declare readonly device_tok: DeviceTok
   /** Where this device's banks are stored. */
   readonly vaultDB:            VaultDB
   readonly keyDeriver:         GuardedKeyDeriver
-  readonly strengthChecker:    Strength.GuardedStrengthChecker
+  readonly strengthChecker:    GuardedStrengthChecker
   readonly logger:             Logger.VaultLogger
   /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   readonly leaseMillis:        number
@@ -93,15 +99,15 @@ export class Device {
 
   /** This device's scope and token, for `JSON.stringify`. */
   toJSON(): DeviceRecord {
-    const { user_id, banklabel, device_tok } = this
-    return { user_id, banklabel, device_tok }
+    const { userid, banklabel, device_tok } = this
+    return { userid, banklabel, device_tok }
   }
   // --
 
   // == [Getters]: scope, openGating, autolockMinutes
 
   /** The bank scope this device serves. */
-  get scope(): CX.BankScope { return CX.bankScope.parse(this) }
+  get scope(): BankScope { return bankScope.parse(this) }
 
   /** The gating open on this device, or null. */
   get openGating(): Gating | null { return this.#openGating }
@@ -117,11 +123,11 @@ export class Device {
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
     checkSecureContext()
-    const { record: { user_id, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = Strength.DefaultStrengthChecker, logger, autolockMinutes, requestCleartext, onBadNews = DefaultOnBadNews } } = Checks.deviceMakeArgs.parse({ record, opts })
-    Object.assign(this, { user_id, banklabel, device_tok })
+    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, requestCleartext, onBadNews = DefaultOnBadNews } } = Checks.deviceMakeArgs.parse({ record, opts })
+    Object.assign(this, { userid, banklabel, device_tok })
     this.vaultDB = vaultDB
     this.keyDeriver = guardKeyDeriver(keyDeriver)
-    this.strengthChecker = Strength.guardStrengthChecker(strengthChecker)
+    this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews

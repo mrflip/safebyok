@@ -69,8 +69,6 @@ export const device = Device.make({
   // What this browser keeps for a user: nothing, past_userids, offline_signins or unlocked. The host's
   // decision (internals.md, F13); whether it is one level or a set is open (internals.md, open matter 4).
   keepOnDevice: ['past_userids', 'unlocked'],
-  // Optional: the host's own QueryClient. Left out, the Device makes a private one (internals.md, F7).
-  // queryClient,
 })
 ```
 

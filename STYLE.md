@@ -9,6 +9,12 @@ mechanically enforceable; where it and this document disagree, the linter wins a
 is a bug. These are defaults with reasons. Where one makes a piece of code worse, say so and
 propose the exception.
 
+## Writing
+
+Write for an intelligent React developer in the non-React code, and an intelligent white hat in the react code. The person reading has not seen your reasoning, or wanted to, and may be switching in from other work. Messages should generally be self-contained: the reader should understand what you mean without having to dig for other context. Practice progressive disclosure.
+
+Use plain words, and write in clear, understandable full sentences. (In a doc block, a fragment will do if it says everything and stands alone.) Do not use a term or abbreviation that you made up during the work. Say what the thing is in a way any reader would understand. Write mostly in the style of thoughtful libraries from your memory: Rails, Zod, etc. Use active voice, and consistently use the precise terms from our codebase. Practice concision, but do ensure that your messages have the key context. Aim to make your text as human-readable and clear as possible.
+
 ## Imports
 
 * No barrel files beyond the package's entry points: import from the file that defines the thing.
@@ -83,8 +89,16 @@ about: a thing's stage in its life is its `stage`. A stored field keeps its stor
 
 **A function returning a predicate ends in `Pred`**: `withinVaultScopepathPred(scope)`.
 
-**A boolean says the positive**: `isEnabled`, not `isDisabled`, whose every negation reads as a
-double negative.
+**A boolean is true in the unsafe state, says the positive, and is named for what it means to the
+customer**, wherever a name can manage it:
+
+* **True is the unsafe state**, so that a value left out, or falsy, never trips it: `isRevealed`,
+  true while a whisper shows on screen.
+* **No negation**: no dis-, un- or non-. `isEnabled`, not `isDisabled`, whose every negation reads
+  as a double negative.
+* **Positive valence**, with the grain of the sentence it sits in: `isDBNewer`, not `isBehind`.
+* **Named for its impact on the customer**: `isDBNewer`, not `hasLatestUpdates`, which is true in
+  the safe state, nor `needsRefreshToMergePut`, which names one consequence, and not always truly.
 
 **A validator is named for the parameter it checks**, in that parameter's case (`user_id`,
 `salt_size`); for a function's whole input, `fooArgs` (`leaseSealArgs`); for a shape, its type's
@@ -164,7 +178,7 @@ key material, a model's verb resolves its summary: `vault.putWayin()` resolves t
 else's database, and stay one spelling from the wire to the code. **One name for one thing,
 everywhere**: a field with a stored value keeps its stored spelling wherever it goes, in the
 facades a record passes through, a host's options and a snapshot alike. A key deriver's
-`key_deriver_label` is written into a wayin as it is, and `user_id` is never `userId`. Other
+`key_deriver_label` is written into a wayin as it is, and `box_key_wrapped` is never `boxKeyWrapped`. Other
 names are camelCase: a field with no stored counterpart (a snapshot's `damagedBoxes`), a verb
 (`getUserId`), a concept (`keyDeriverLabel`, "the label of the key deriver").
 The tag smushing above is for a label that names a thing (`boxlabel`).
@@ -347,12 +361,20 @@ has.
 * **Frame a refusal of a host's options in the parse**, `parse(opts, { where, advice })`, not in a
   catch that rethrows. Never `Z.config`: it is the host's Zod too.
 
-**Strict or strip.** A shape parsed out of whatever carries it (a scope, a stamp, a sparse shape)
-strips, so a Vault object, its record or its snapshot passes as any of them, and destructuring the
-parsed output sanitizes it. Three things are strict: a bag of options a person typed, where
-stripping would quietly drop a misspelt option; a stored record, where a field this version does
-not know is damage or a newer format; and a box's stamp, where a field beside its own would be
-shown but not bound. Say why beside any other strict site.
+**Strict for a whole type, duckish for a pick.** A checker for a whole type (an ask, an answer, a
+record, a field, a bag of options) is strict: a key it does not know is a mistake or damage, and it
+refuses. A checker that picks a few fields out of a larger object is duckish (VOCABULARY.md,
+*duckish*). `bankScope` takes any scoped object, passes on only the scope's fields, and refuses when
+a required field is missing, when a field it knows but ignores has the wrong type, or when a field
+it does not know is mixed in. If a real object fails a duckish check, add its fields to the
+checker's ignored set; never convert the checker to strip.
+
+**Declare what they hold** `#declare-what-they-hold`. Consider the type your caller has in hand:
+most likely an ask, an answer, a record, a field, or something scoped. Declare that type. Picking
+or checking is the called function's business, not the caller's. Pick down only when you must, and
+then duckishly. A type used only once complicates your function and every caller's, but if it is
+necessary, use a module-local Checker. If a function's declared type is not what you hold, broaden
+its signature type; don't contort yours.
 
 **No transform that changes a name's value** (trim, lowercase, coerce, normalize): a name is bound
 into storage and crypto, so refuse instead. A structural transform is fine: a scopepath's
@@ -498,6 +520,10 @@ rows with it.
   material in the message, a `cause` or `meta`. Specific: what went wrong, and a `refusalkind` to
   branch on. Actionable: what to do next. Empathetic: a failure (misuse, bad news) speaks to the
   developer integrating the package; a condition speaks, calmly, to the user who will see it.
+* **When two refusals apply, throw the easier one, unless the other is both more likely and more dangerous**
+  (the Coach). The easier one is the one found more cheaply: the earlier check. A stale lease record missing a field
+  refuses `bad_option` at `Lease.make`, not `damaged_lease`: a damaged lease is neither the likelier cause nor the more
+  dangerous one. Never rearrange code for a more punctilious refusal than "a field does not pass its check".
 * **A guard lives in what an entrypoint calls.** A public entrypoint's `demandFooable` includes
   `demandEnabled` and whatever else that entrypoint needs. A primitive, a private helper or a
   method that only prepares another includes none. Demand again only at a critical seam,

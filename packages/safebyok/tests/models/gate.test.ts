@@ -161,7 +161,7 @@ describe("what a gate shows", () => {
     const gate = Gate.make(record, { bank: WorldBank })
     expect(gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
     expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
-    expect(gate.scope).to.deep.equal({ userid: TH.WorldScope.user_id, banklabel: TH.WorldScope.banklabel, labelpath: 'gate' })
+    expect(gate.scope).to.deep.equal({ userid: TH.WorldScope.userid, banklabel: TH.WorldScope.banklabel, labelpath: 'gate' })
     expect([gate.revtok, gate.revseq, gate.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
   })
 

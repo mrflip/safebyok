@@ -9,13 +9,14 @@
 
 import { type Mock, type MockInstance, afterEach, beforeEach, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
-import { Consts, Crypto, GX, SX, Strength } from 'safebyok-big/internals'
+import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank, type BoxShell } from '../../src/models/bank'
 import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/device'
 import { Lease, type LeaseBank } from '../../src/models/lease'
-import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
-import type { BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
+import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, type ProvingDevice, guardKeyDeriver } from '../../src/models/proving'
+import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
+import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
 import { BoxThingFormat, ShellLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -37,10 +38,10 @@ export function useFakeClock(): void {
 // == [The stamps]: WorldScope, WorldBankStamp, WorldGateStamp, WorldGate
 
 /** The bank scope every builder here works in: `u1`'s bank `acme`. */
-export const WorldScope = Object.freeze({ user_id: 'u1', banklabel: 'acme' })
+export const WorldScope: BankScope = Object.freeze({ userid: 'u1', banklabel: 'acme' })
 
 /** The stamp of the bank every builder here makes things in: its first life, born at {@link T0}. */
-export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user_id, banklabel: WorldScope.banklabel, lifeseq: lifeseqOfLifenum(0), born_at: T0 })
+export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.userid, banklabel: WorldScope.banklabel, lifeseq: lifeseqOfLifenum(0), born_at: T0 })
 
 /** The stamp of {@link WorldBankStamp}'s main gate: its first life, born at {@link T0}. */
 export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
@@ -60,13 +61,13 @@ export const DeviceTok = '00000000-0000-4000-8000-00000000000a'
 /** What a test may say of a {@link provingDeviceOf} device: the host's own deriver and checker, which it wraps as a device does. */
 export interface ProvingDeviceGiven {
   keyDeriver?:      Deriver.KeyDeriver | undefined
-  strengthChecker?: Strength.StrengthChecker | undefined
+  strengthChecker?: StrengthChecker | undefined
   device_tok?:      string | undefined
 }
 
 /** A proving device without a Device: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceTok}, each wrapped as a device wraps it. */
-export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingDeviceGiven = {}): GX.ProvingDevice {
-  return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: Strength.guardStrengthChecker(strengthChecker), device_tok }
+export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingDeviceGiven = {}): ProvingDevice {
+  return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), device_tok }
 }
 
 /** A Device of {@link WorldScope} and {@link DeviceTok}, with `record` laid over them, over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those. */
@@ -155,7 +156,7 @@ export const Sidecar = Object.freeze({ account: 'work' })
  */
 export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
   return {
-    userid: WorldScope.user_id, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
+    userid: WorldScope.userid, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
     revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${ShellLifeseq}`,
     born_at: T0, written_at: T0, ...overrides,
   }

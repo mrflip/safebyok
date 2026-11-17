@@ -89,6 +89,12 @@ describe("zxcvbnStrengthChecker", () => {
     }
   })
 
+  it("hears the user named userid, as safebyok's new core names it", async () => {
+    const typed = 'quokkavelodrome'
+    expect(await zxcvbnStrengthChecker(typed, { userid: 'u1', banklabel: 'acme' })).to.eq(StrongVerdict)
+    expect(await zxcvbnStrengthChecker(typed, { userid: typed, banklabel: 'acme' })).to.deep.equal({ strong: false, reason: Phrases.PassphraseGuessable })
+  })
+
   it("never quotes the passphrase in its reason", async () => {
     const weakOnes = VerdictCases.filter(([typed, strong]) => typed && ! strong).map(([typed]) => typed)
     for (const typed of weakOnes) {

@@ -1,10 +1,11 @@
 import type * as Z from 'zod'
 import type { Consts } from 'safebyok-big/internals'
-import { CX, Crypto, EX, Errors, GX, Helpers, Outcome, Throwers, Validator } from 'safebyok-big/internals'
+import { Crypto, EX, Errors, GX, Helpers, Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Device } from './device'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Banklabel, Userid } from '../storage/primitives'
+import { type BankScope, bankScope } from './stamps'
 
 // == [Kinds and forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
 
@@ -14,7 +15,7 @@ export const gatingkindVals = ['birth_bank'] as const
 export type Gatingkind = typeof gatingkindVals[number]
 
 /** A gating as a host's dialog renders it: its kind, its token and its bank scope. */
-export type GatingSnapshot = Omit<GX.GatingSnapshot, 'gatingkind'> & { gatingkind: Gatingkind }
+export type GatingSnapshot = BankScope & { readonly gatingkind: Gatingkind, readonly gatingTok: string }
 
 /** The cleartexts a dialog hands `attempt`, by kind of gating. */
 export interface CleartextsForGatingkind {
@@ -64,12 +65,12 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom, oneof }) => 
  * The gating keeps no cleartext between attempts.
  */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, gatingTok, user_id, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isLaunched, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, userid, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isLaunched, #isAttempting, #isLastAttempt
 
   declare readonly gatingkind:    KindT
   /** A random token unique to this gating. Key the dialog on it: the next gating's form then starts empty. */
   declare readonly gatingTok:     string
-  declare readonly user_id:       Userid
+  declare readonly userid:        Userid
   declare readonly banklabel:     Banklabel
   declare readonly bank:          Bank | null
   /** The header of the main gate's passkey wayin when the gating was made, or null for none.
@@ -100,7 +101,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get whenConcluded(): Promise<Outcome.Outcome<Bank>> { return this.#concluded }
 
   /** This gating's bank scope. */
-  get scope(): CX.BankScope { return CX.bankScope.parse(this) }
+  get scope(): BankScope { return bankScope.parse(this) }
 
   /** This gating's {@link GatingSnapshot}. It never shows a cleartext. */
   toJSON(): GatingSnapshot {
@@ -116,7 +117,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   private constructor(record: GatingRecord<KindT>, opts: GatingOpts) {
     const { opts: { device, bank, attempt, askUser } } = Checks.gatingMakeArgs.parse({ record, opts })
-    Helpers.tattoo(this, { gatingkind: record.gatingkind, gatingTok: Crypto.randomId(), user_id: device.user_id, banklabel: device.banklabel })
+    Helpers.tattoo(this, { gatingkind: record.gatingkind, gatingTok: Crypto.randomId(), userid: device.userid, banklabel: device.banklabel })
     Helpers.adorn(this, 'bank', bank)
     Helpers.adorn(this, 'passkeyHeader', bank?.maingate.passkey0?.toJSON() ?? null)
     this.#device    = device

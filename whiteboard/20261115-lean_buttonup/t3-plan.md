@@ -152,8 +152,61 @@ The Coach's answers, in close to the Coach's words, beside each question.
    classifier tidy reworks, so T3b leaves them as they are: an extra draft key still refuses. Raise it if something
    blocks.
 * **The stamp pair's spelling,** as under item 4: `bankStamp` / `gateStamp` wherever a third party names the pair,
-  `stamp` for a thing's own. The hunt's own text for item 14 was in a session transcript and is lost: confirm this is
-  what it meant.
+  `stamp` for a thing's own. The Coach: lgtm (2026-11-17).
+* **The Sealer's signature, simplified** (the Coach, 2026-11-17, revisiting ruling 4). The Sealer is typed by the record
+  and its cleartexts alone; both directions are derived from them. For a box, `seal` takes the record less its
+  `${keyof CleartextsT}_sealed` fields (`Sparse<BoxRecord> & { sidecar? }`) and gives `BoxRecord`; `unseal` takes
+  `BoxRecord` and gives the record with each `foo_sealed` replaced by `foo` (`UnsealedOf`), not the bare cleartexts.
+  Two ways to spell it: a lookup table by modelkind (`CleartextsOf<RecordT>`, `{ box: BoxCleartexts }`), so the Sealer is
+  generic in the record alone; or hardcode the box's types, since the box is the only thing sealed today.
+  * Claude agrees on deriving both sides and on `unseal` giving the unsealed record (firm): `SealedOf` and `UnsealedOf`
+    already exist, and the spread `unsealBox` does today moves into the lease. On the spelling, Claude recommends
+    `Sealer<RecordT, CleartextsT>` with neither table nor hardcoding (mild): a table whose one row is the box is
+    machinery before its second use, and is a few lines to add then; hardcoding would have the lease import box shapes,
+    where its doc block promises it knows nothing of boxes. `seal<NextT>` keeps ruling 4's no-cast typing.
+  * **Ruled** (the Coach, 2026-11-17): `Sealer<RecordT, CleartextsT>`. "There's no possible reason to ever have it
+    sealing something that lacked a modelkind. By the time it reaches here it has been validated to hellenback."
+  * The Coach, 2026-11-17: "If sealer wants nextRevisionOf why would we take it away? Of course you can have that on
+    the thing." The rulings above came from a session whose context had grown muddy: treat each as possibly the
+    Coach's, possibly that session's invention, and check it.
+
+### The seal path, bulletproof in and out (agreed 2026-11-17, replaces item 3)
+
+The Coach: "Looking at this method, I want to understand well what is going in to the machine. The point here is to
+say 'don't bother, kids: this method is bulletproof on the way in and the way out'." Hence generous on the way in,
+which reverses the usual rule for an internal function.
+
+* `lease.seal(sealer, donorProps, publicProps, secretProps)`; overloaded: `publicProps` `{ am: 'x' }` and no secrets
+  gives the tombstone, else the live next revision. `Bank.sealBox` mirrors it without the sealer; `tombstoneBox(donor)`
+  calls it. The Sealer keeps `nextRevisionOf(donor, publicProps)` and `tombstoneOf(donor)`; the lease calls them, picking
+  by `am`. Claude moved: picking by `am` removes the two-sealer problem that was the only reason to drop them.
+* The donor may be a whole record, sealed or unsealed, a tombstone or the shell. It passes an approvelist and then a
+  banlist: `sealer.donorPropsOf` parses it (stripping, not strict) to its Thing fields and body; the lease then runs
+  `withoutSecrets` on that parsed result, with a banlist the lease owns, never taken from the sealer: the cleartext
+  names, and every `*_sealed` key (confirmed: the lease owns it). The name `withoutSecrets` (the Coach), since it strips
+  ciphertexts too.
+* `sealer.publicPropsOf` slices the body, `am` and `written_at` from `publicProps`; `sealer.secretPropsOf` the
+  cleartexts from `secretProps` (confirmed). A tombstone seals the sealer's own empty cleartexts.
+* `written_at` may be given in `publicProps`, never required (the Coach): a batch of writes may share one. Absent, the
+  clock gives it. It is part of the stamp, so it is signed; a by-the-clock time a host wants is the database's to add,
+  unsigned. A new life's `born_at` follows the `written_at` used, as today.
+* The sidecar may come on the donor or in `publicProps` (which wins), and is required on exit, never defaulted. The
+  birth passes `{ sidecar: {} }`: the shell is a tombstone, which is strict and has no sidecar.
+* `stampOf(record)` gives one bag (not an array): the lease binds `[bank.stamp, sealer.stampOf(record)]`, so no stamp a
+  sealer gives can stand beside the bank's. It parses a new `boxStamp` in `stamps.ts`, today's `boxSparse` fields
+  (no ctx byte moves), refusing the shell. `Lease.#bankKey` binds `bankStamp.parse(this.#bank.stamp)`: binding is the
+  time to over-validate.
+* `recordOf` checks the record strictly on the way out. `unseal` gives the record unsealed (`UnsealedOf`).
+* `BoxSparse` retires: the donor is the one place that admits all three (live, tombstone, shell); listings use
+  `Sparse<BoxThing>`, the ctx `boxStamp`, the bank's root `BoxShell | BoxRecord`.
+* `Bank.sealBox` checks the donor is this bank's (scope and root) before any crypto, with no checker handed in
+  (the checker audit's finding 2).
+* A checker that picks fields is a good use: it names intent (`bankScope.parse(stamp)` says "the scope"). The audit's
+  findings 1 and 3 are withdrawn; the literal `{ userid, banklabel }` a line above `bankScope.parse` in `bank.ts` becomes the checker too.
+  As written this would drop the user check: `device.scope` is big's `{ user_id, banklabel }`, and `checkedConsistent`
+  compares only shared fields. The Coach (2026-11-17): "user_id is wrong, it should be userid there. We have control
+  over the interface: the exercise here is to simplify and untangle." So the new core speaks `userid` throughout
+  (Device, Gating, `Bank.mintStamps`, the strength checker's call), and then the line is `bankScope.parse(parsed)`.
 
 
 ## Decided in the plan, no ruling needed
@@ -165,3 +218,41 @@ The Coach's answers, in close to the Coach's words, beside each question.
   there are no shims (CLAUDE.md). `listBoxRecords` keeps its name though it gives sparse records; its doc block says so.
 * **`GetBoxAnswer` stays,** because a get with `ifAbsent: 'shell'` gives the shell in a `gotvoid` answer, which a plain
   `GetAnswer` types as null.
+
+### The lease's gate fields (the Coach, 2026-11-17; rides T3a with item 1)
+
+* The lease stamp's `gatelabelpath` becomes `gate_labelpath`, beside `gate_lifeseq` and `gate_revtok`. This replaces the
+  earlier line "the lease stamp's flat fields are not renamed". `cipherCtx` stable-JSONs its stamps, keys included, so
+  this moves the `bank_key_lease_wrapped` ctx bytes: `ctx-bytes.test.ts`'s lease literal changes, as directed, and a
+  lease wrapped before the change refuses `damaged_lease` (fails safe; a host's user proves again). The changeset says so.
+* `citedGate` becomes `gateCited`, built from `gateStamp`, with a doc block that points to it ("@see gateStamp").
+  It cannot be an alias of `gateStamp`: a gate's stamp is fixed for its life and has no `revtok`, and the lease pins one
+  gate revision. `buildLease` reads its gate fields from `gateCited.parse(gate)`.
+
+### Routed to T3b (the Coach: "anywhere convenient", 2026-11-17)
+
+* One bank scope: `bankScope` (`models/stamps.ts`) and `thingWatchScope` (`storage/shapes-thing.ts`) have the same
+  fields. One checker, in storage, which the models use.
+* `watchArgs` moves beside `AdapterVaultDB.watch`, its only user, built from that bank scope.
+* T3b already rewrites `bank.ts` and `adapter-vault-db.ts` after the classifier tidy, so neither collides there.
+
+### T3a review round (the Coach, 2026-11-17)
+
+* `tombstoneOf(donor, publicProps)`: a tombstone takes a given `written_at`, for batches ("makes lots of sense, yes").
+* `gateCited` is the cited record of a gate write ask (`shapes-thing.ts`'s). The lease's gate revision is
+  `gateRevisionedStamp`, a module-local checker (its type exported where a signature names it).
+* `BoxDonor` becomes `Sealable<BoxRecord>`.
+* `Bank.rootBox` is a plain object, so it is typed by records: `BoxRecord`, or the shell before the birth; not
+  `Sparse<BoxThing>`.
+* `unseal`'s answer is built from the parsed record, not the caller's.
+* **The general overload stays**, on `Lease.seal` and `Bank.sealBox` both (the Coach): one `sealBox` taking either kind,
+  `am` deciding, is the convenient form, and a list of mixed writes ("this is a tombstone, this isn't, use this over a
+  list") has the union type, which only the general overload takes. Claude moved for that reason. Once `tombstoneOf`
+  takes `publicProps`, nothing is dropped; `sealBox(donor, {})` compiles and refuses at runtime, which is acceptable.
+  `tombstoneBox(donor, publicProps?)` stays as sugar over `sealBox`.
+* `withoutSecrets` stays exported, unvalidated: "This feels like a very handy thing. We can't ban stupid. Export it"
+  (the Coach). A deliberate exception to validating every export.
+* The documentarian may be spawned on a named target without a Coach's request (agent description and PROCESS.md
+  amended in the base checkout).
+* STYLE.md, *Control flow and refusals*: "When two refusals apply, throw the easier one, unless the other is both more
+  likely and more dangerous."
