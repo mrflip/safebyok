@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
 import type { Bank, BoxShell, BoxUnsealed } from '../../src/models/bank'
 import type { BoxRecord } from '../../src/models/sealers'
-import { type BoxThing, ShellLifeseq, getAskOf, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { type BoxThing, ShellLifeseq, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -47,7 +47,7 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
     const listed = await bank.tryListBoxes()
     expect(listed).to.include({ ok: true, act: 'gotlive' })
     expect(listed.ok && listed.val).to.deep.equal([])
-    expect(listed.parent).to.deep.equal(bank.rootBox)
+    expect(listed.parent).to.deep.equal(sparseOf(bank.rootBox))
   })
 
   it("gives the shell of a box not stored, under the root box's life, for its first revision to cite", async () => {

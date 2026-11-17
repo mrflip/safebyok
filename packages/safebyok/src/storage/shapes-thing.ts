@@ -70,7 +70,7 @@ export function isLabelpathOfKind(labelpath: string, modelkind: Thingkind): bool
 function isLabelpath(labelpath: string): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxDonor, StoredCited, Sealed, Wayins, Sparse, sparseOf, ShellCited, childShellCited
+// == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell, StoredCited, Sealed, Wayins, Sparse, sparseOf, ShellCited, childShellCited
 
 const LifeseqPattern       = /^[0-9a-v]{10}$/
 const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/
@@ -103,7 +103,7 @@ function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
 }
 
 /** The checks of a Thing's fields, of each kind of Thing and its citation, and of what a write reads of the Thing stored. */
-export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxDonor } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
+export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
@@ -196,9 +196,9 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isShellWhole,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
-  // What a box's next revision is made from strips: what it keeps is its Thing fields and sidecar, so a sealed or an
-  // unsealed whisper given with it is dropped. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
-  const boxDonor     = obj({
+  // What a box's seal takes its next revision's fields from strips: what it keeps is its Thing fields and sidecar, so a
+  // sealed or an unsealed whisper given with it is dropped. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
+  const boxSealable  = obj({
     ...thingRecord.shape,
     labelpath:      boxLive.shape.labelpath,
     fmt:            lit(BoxThingFormat),
@@ -212,7 +212,33 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
     .refine(isShellWhole,   Phrases.DonorHalfShell)
-  return { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxDonor }
+
+  // A bank keeps its root box whole: live once the bank is born, and its shell before.
+  const boxRecord    = boxLive
+    .refine(isLabelLast,    Phrases.LabelNotLast)
+    .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
+    .refine(isLifepathDeep, Phrases.LifepathDepth)
+    .refine(isParityRight,  Phrases.LifeseqParity)
+  const boxShell     = obj({
+    ...thingRecord.shape,
+    labelpath:      boxLive.shape.labelpath,
+    fmt:            lit(BoxThingFormat),
+    revtok:         lit(SX.VoidRevisionTok),
+    revseq:         lit(SX.VoidRevisionSeq),
+    am:             lit('x'),
+    lifeseq:        lit(ShellLifeseq),
+    lifepath:       str.regex(ShellLifepathPattern, Phrases.LifepathShape),
+    born_at:        lit(SX.VoidTime),
+    written_at:     lit(SX.VoidTime),
+  }).strict()
+    .refine(isLabelLast,    Phrases.LabelNotLast)
+    .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
+    .refine(isLifepathDeep, Phrases.LifepathDepth)
+  const boxRecordOrShell = union([boxRecord, boxShell])
+  return {
+    thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord,
+    boxRecordOrShell,
+  }
 })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */

@@ -3,7 +3,7 @@ import type { BoxThing, Sealed, Sparse, ThingRecord } from '../storage/shapes-th
 
 export type { Sealed } from '../storage/shapes-thing'
 
-// == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, RevisionOf, BodyOf, DonorOf, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
+// == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
 
 /** Each part `CleartextsT` names, sealed, at `<part>_sealed`. */
 export type SealedPartsOf<CleartextsT> = { readonly [PartT in keyof CleartextsT & string as `${PartT}_sealed`]: Sealed }
@@ -28,10 +28,10 @@ export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<Re
 /** The body of a live `RecordT`: its fields other than its Thing fields and its sealed parts, such as a box's sidecar. */
 export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof ThingRecord | keyof SealedPartsOf<CleartextsT>>
 
-/** What a next revision of `RecordT` is made from: its Thing fields and any of its body.
- * A whole record is one, sealed or unsealed, and so are a tombstone and the shell.
+/** What a seal takes the next revision's fields from: a record of `RecordT`'s kind, whole, sparse or unsealed, a tombstone or the shell.
+ * The seal keeps its Thing fields and its body, and never its secrets.
  */
-export type DonorOf<RecordT extends ThingRecord, CleartextsT> = Sparse<RecordT> & Partial<BodyOf<RecordT, CleartextsT>>
+export type Sealable<RecordT extends ThingRecord> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: ThingRecord['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof ThingRecord>>
 
 /** What a seal takes in the clear: any of the body, which wins over the donor's; `am`; and `written_at`, now when left out. */
 export type PublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a' | 'x', written_at?: number }>
@@ -39,8 +39,8 @@ export type PublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, Cleart
 /** What the seal of a live revision takes in the clear: {@link PublicPropsOf}, with `am` live or left out. */
 export type LivePublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a', written_at?: number }>
 
-/** What the seal of a tombstone takes in the clear: `am: 'x'`. */
-export type TombstonePublicProps = Readonly<{ am: 'x' }>
+/** What the seal of a tombstone takes in the clear: `am: 'x'`, and `written_at`, now when left out. */
+export type TombstonePublicProps = Readonly<{ am: 'x', written_at?: number }>
 // --
 
 // == [The Sealer]: SealTags, SealPurposes, Sealer
@@ -59,15 +59,15 @@ export interface SealPurposes {
  */
 export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
   /** The Thing fields and body of `donor`, its other fields dropped. Refuses what is not a record of this kind or its shell. */
-  donorPropsOf(donor: unknown): DonorOf<RecordT, CleartextsT>
+  donorPropsOf(donor: unknown): Sealable<RecordT>
   /** The body, `am` and `written_at` of `publicProps`, its other fields dropped. */
   publicPropsOf(publicProps: unknown): PublicPropsOf<RecordT, CleartextsT>
   /** The cleartexts in `secretProps`, its other fields dropped. */
   secretPropsOf(secretProps: unknown): CleartextsT
   /** The live revision next after `donor`, without its sealed part, with `publicProps` laid over it. */
   nextRevisionOf(donor: unknown, publicProps: unknown): RevisionOf<LiveOf<RecordT>, CleartextsT>
-  /** The tombstone of the live `donor`, without its sealed part. Refuses a tombstone or the shell. */
-  tombstoneOf(donor: unknown): RevisionOf<TombstoneOf<RecordT>, CleartextsT>
+  /** The tombstone of the live `donor`, without its sealed part, written at `publicProps.written_at`. Refuses a tombstone or the shell. */
+  tombstoneOf(donor: unknown, publicProps: unknown): RevisionOf<TombstoneOf<RecordT>, CleartextsT>
   /** The empty cleartexts a tombstone seals, which sign it. */
   readonly tombstoneSecrets: CleartextsT
   /** The stamp the seal of `record` is bound to, after the bank's. A change to it refuses the unseal. */
@@ -87,7 +87,7 @@ export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
 }
 // --
 
-// == [A box's records]: BoxRecord, BoxTombstone, BoxCleartexts, BoxDonor
+// == [A box's records]: BoxRecord, BoxTombstone, BoxCleartexts, BoxPublicProps
 
 /** A live box: its Thing fields, its sidecar and its sealed whisper. */
 export type BoxRecord = LiveOf<BoxThing>
@@ -100,6 +100,6 @@ export interface BoxCleartexts {
   whisper: CX.Whisper
 }
 
-/** What a box's next revision is made from: a box, live, a tombstone or the shell, whole or its Thing fields alone. */
-export type BoxDonor = DonorOf<BoxThing, BoxCleartexts>
+/** What a box's seal takes in the clear: its sidecar, `am` and `written_at`, each optional. */
+export type BoxPublicProps = PublicPropsOf<BoxThing, BoxCleartexts>
 // --

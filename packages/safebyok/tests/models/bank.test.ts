@@ -5,7 +5,7 @@ import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
-import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxThing, getAskOf, sparseOf, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxThing, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -77,7 +77,7 @@ describe("Bank.makeRecord(dna)", () => {
     const { record, bank } = await TH.buildBornBank()
     expect(record.rootBox).to.deep.equal({ ...TH.RootScope, label: 'box', fmt: BoxThingFormat, ...ShellCited, lifeseq: ShellLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime })
     expect(bank.rootBox).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0, written_at: TH.T0 })
-    expect(sparseOf(bank.rootBox)).to.deep.equal(bank.rootBox)
+    expect(bank.rootBox).to.include.keys('sidecar', 'whisper_sealed')
   })
 
   it("refuses a dna with no main gate, a malformed one, or none at all", async () => {
@@ -141,6 +141,8 @@ describe("Bank.make(record, { device, vaultDB })", () => {
     [(record: BankMakeRecord) => ({ ...record, maingate: null }),             'a null main gate'],
     [(record: BankMakeRecord) => TH.omitting(record, 'rootBox'),              'no root box'],
     [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, am: 'd' } }), 'a root box of a damaged row'],
+    [(record: BankMakeRecord) => ({ ...record, rootBox: sparseOf(TH.rootBoxOf()) }), "a live root box's Thing fields alone"],
+    [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, revseq: 0 } }), 'a root box half the shell'],
     [(record: BankMakeRecord) => ({ ...record, born_at: 'yesterday' }),       'a born_at that is not epoch millis'],
     [() => null,                                                          'null'],
   ] as const
@@ -493,6 +495,21 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     expect(boxThing.parse(tombstone)).to.deep.equal(tombstone)
   })
 
+  it("writes the tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {
+    const { bank } = await TH.buildBornBank()
+    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const tombstone = await bank.tombstoneBox(box, { written_at: TH.T0 + 21 })
+    expect(tombstone).to.include({ am: 'x', written_at: TH.T0 + 21 })
+    expect(await bank.unsealBox(tombstone)).to.deep.include({ whisper: {} })
+    await TH.expectRefusal(bank.unsealBox({ ...tombstone, written_at: TH.T0 + 22 }), 'damaged_whisper')
+  })
+
+  it("refuses a tombstone given secret props", async () => {
+    const { bank } = await TH.buildBornBank()
+    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    await TH.expectRefusal(bank.sealBox(box, { am: 'x' }, { whisper: TH.Whisper }), 'bad_option')
+  })
+
   it("unseals a tombstone to its Thing fields and an empty whisper", async () => {
     const { bank } = await TH.buildBornBank()
     const tombstone = await bank.tombstoneBox(await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
@@ -636,7 +653,7 @@ describe("Bank.birth(record, opts)", () => {
     expect(answer.val.gate).to.deep.equal(bank.maingate.pickle())
     expect(answer.val.root).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0 })
     expect(births.lockedAtBirths).to.deep.equal([true])
-    expect(bank.rootBox).to.deep.equal(sparseOf(answer.val.root))
+    expect(bank.rootBox).to.deep.equal(answer.val.root)
     expect(bank.isUnlocked).to.be.true
     expect(await bank.unsealBox(answer.val.root)).to.deep.include({ whisper: {} })
   })
@@ -653,7 +670,7 @@ describe("Bank.birth(record, opts)", () => {
     const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
     expect(answer).to.include({ ok: true, act: 'passed' })
     expect(bank.isUnlocked).to.be.true
-    expect(bank.rootBox).to.deep.equal(answer.ok && sparseOf(answer.val.root))
+    expect(bank.rootBox).to.deep.equal(answer.ok && answer.val.root)
   })
 
   it("refuses gate_made_elsewhere where the vaultDB passes on another bank, leaving its own bank locked", async () => {

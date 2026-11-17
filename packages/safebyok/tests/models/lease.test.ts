@@ -143,6 +143,16 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(Object.isFrozen(opened)).to.be.true
   })
 
+  it("unseals to the record as the sealer checks it, never the object given: a field beside the record refuses", async () => {
+    const { lease } = await leaseWorld()
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const { whisper_sealed: _sealed, ...unsealed } = sealed
+    await TH.expectRefusal(lease.unseal(CoreBox, { ...sealed, extra: 'not a box field' } as never), 'bad_option')
+    const answer = await lease.unseal(CoreBox, sealed)
+    expect(answer).to.not.equal(sealed)
+    expect(answer).to.deep.equal({ ...unsealed, whisper: TH.Whisper })
+  })
+
   it("seals the next revision of a whole unsealed box, or a whole sealed one, carrying nothing of its whisper but the new seal", async () => {
     const { lease } = await leaseWorld()
     const first = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
@@ -186,6 +196,31 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     const tombstone = await lease.seal(CoreBox, live, { am: 'x' })
     await TH.expectRefusal(lease.seal(CoreBox, tombstone, { am: 'x' }), 'bad_option')
     await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), { am: 'x' }), 'bad_option')
+  })
+
+  it("writes a tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {
+    const { lease } = await leaseWorld()
+    const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const tombstone = await lease.seal(CoreBox, live, { am: 'x', written_at: TH.T0 + 7 })
+    expect(tombstone).to.include({ am: 'x', written_at: TH.T0 + 7 })
+    expect(await lease.unseal(CoreBox, tombstone)).to.deep.include({ whisper: {} })
+    await TH.expectRefusal(lease.unseal(CoreBox, { ...tombstone, written_at: TH.T0 + 8 }), 'damaged_whisper')
+  })
+
+  it("refuses a tombstone given a sidecar, as CoreBox makes it", async () => {
+    const { lease } = await leaseWorld()
+    const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    await TH.expectRefusal(lease.seal(CoreBox, live, { am: 'x', sidecar: TH.Sidecar }), 'bad_option')
+  })
+
+  it("refuses a tombstone given secret props, sealing nothing", async () => {
+    const { lease } = await leaseWorld()
+    const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const sealer = { ...BoxSealerBag }
+    const encode = vi.spyOn(sealer, 'encode')
+    const err = await TH.expectRefusal(lease.seal(sealer, live, { am: 'x' }, Cleartexts), 'bad_option')
+    expect(TH.thrownText(err)).to.not.include(TH.Whisper.apiKey)
+    expect(encode).not.toHaveBeenCalled()
   })
 
   it("strips every cleartext and sealed part from what the sealer's donorPropsOf gives, before it makes the revision", async () => {

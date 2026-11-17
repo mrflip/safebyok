@@ -14,8 +14,8 @@ import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testi
 import { Bank, type BoxShell } from '../../src/models/bank'
 import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/device'
 import { Lease, type LeaseBank } from '../../src/models/lease'
-import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
-import type { BankStamp, GateCited, GateStamp, LeaseRecord } from '../../src/models/stamps'
+import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
+import type { BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
 import { BoxThingFormat, ShellLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -46,7 +46,7 @@ export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user
 export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
 
 /** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at a revision of its own. */
-export const WorldGate: GateCited = Object.freeze({ ...WorldGateStamp, revtok: 'gate-revision-tok-1' })
+export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: 'gate-revision-tok-1' })
 // --
 
 // == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, makeDevice, passkeyAnswerOf
@@ -174,7 +174,7 @@ export function fakeLeaseBankOf(overrides: Partial<BankStamp> = {}): FakeLeaseBa
 }
 
 /** A test backdoor: a lease `proving` builds on `bank` citing `gate`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
-export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GateCited = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
+export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
   const lease = await proving.buildLease(bank, gate)
   const [record] = make.mock.calls.at(-1)!

@@ -148,6 +148,16 @@ describe("CoreBox.tombstoneOf(donor)", () => {
     expect(next).to.not.have.property('sidecar')
   })
 
+  it("is written at the written_at given", () => {
+    const next = CoreBox.tombstoneOf(liveRevisionOf(), { written_at: TH.T0 - 3 })
+    expect(next).to.include({ am: 'x', written_at: TH.T0 - 3 })
+  })
+
+  it("refuses a sidecar given, as a tombstone has none", () => {
+    const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(liveRevisionOf(), { sidecar: { account: 'home' } }), 'bad_option')
+    expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarGiven)
+  })
+
   it("refuses a tombstone or the shell", () => {
     const tombstone = CoreBox.tombstoneOf(liveRevisionOf())
     const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(tombstone), 'bad_option')

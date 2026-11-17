@@ -5,19 +5,18 @@ import { CX, GX, Phrases, Validator } from 'safebyok-big/internals'
 import { LabelpathOfOtherKind } from '../phrases'
 import { BoxThingFormat, isLabelpathOfKind, thingRecord, wayins } from '../storage/shapes-thing'
 
-// == [The stamps]: bankScope, bankStamp, gateStamp, gateCited, stampedGate, boxStamp, BankScope, BankStamp, GateStamp, GateCited, StampedGate, BoxStamp
+// == [The stamps]: bankScope, bankStamp, gateStamp, stampedGate, boxStamp, BankScope, BankStamp, GateStamp, StampedGate, BoxStamp
 
-/** The checks of a bank's scope and stamp, a gate's stamp and citation, a {@link StampedGate}, and a box's stamp.
+/** The checks of a bank's scope and stamp, a gate's stamp, a {@link StampedGate}, and a box's stamp.
  * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
  */
-export const { bankScope, bankStamp, gateStamp, gateCited, stampedGate, boxStamp } = Validator.Checkers('bad_option', ({ obj, lit }) => {
+export const { bankScope, bankStamp, gateStamp, stampedGate, boxStamp } = Validator.Checkers('bad_option', ({ obj, lit }) => {
   const bankStamp = thingRecord.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
   const gateStamp = thingRecord.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
   return {
     bankScope:   thingRecord.pick({ userid: true, banklabel: true }),
     bankStamp,
     gateStamp,
-    gateCited:   gateStamp.extend(thingRecord.pick({ revtok: true }).shape),
     stampedGate: obj({ bankStamp, stamp: gateStamp, wayins }),
     // Every Thing field, so a box's revision and its record have the same stamp. The shell has no revision, and refuses.
     boxStamp:    thingRecord.extend({
@@ -33,8 +32,6 @@ export type BankScope   = Z.infer<typeof bankScope>
 export type BankStamp   = Z.infer<typeof bankStamp>
 /** A gate's stamp: its scope, and the lifeseq and `born_at` of its life. A wayin's wrapped bankKey is bound to it. */
 export type GateStamp   = Z.infer<typeof gateStamp>
-/** A gate's stamp and its revision's `revtok`: the gate revision a lease is granted for. @see {@link gateStamp} */
-export type GateCited   = Z.infer<typeof gateCited>
 /** A gate's stamp, its bank's stamp, and its wayins: what a proving of a stored wayin takes. */
 export type StampedGate = Z.infer<typeof stampedGate>
 /** A box's stamp: its Thing fields, without its sidecar or its sealed whisper. The seal of its whisper is bound to it. */
@@ -53,7 +50,7 @@ export const LeaseFormat = 7102
 export const { leaseStamp, leaseRecord } = Validator.Checkers('bad_record', ({ obj, lit, custom, epochMillis, bank_key_lease_wrapped }) => {
   const leaseStamp  = obj({
     fmt: lit(LeaseFormat), ...bankStamp.shape,
-    gate_labelpath: gateStamp.shape.labelpath, gate_lifeseq: gateStamp.shape.lifeseq, gate_revtok: gateCited.shape.revtok,
+    gate_labelpath: gateStamp.shape.labelpath, gate_lifeseq: gateStamp.shape.lifeseq, gate_revtok: thingRecord.shape.revtok,
     proved_at: epochMillis, wayinkind: GX.wayinkind,
   })
   const leaseRecord = leaseStamp.extend({

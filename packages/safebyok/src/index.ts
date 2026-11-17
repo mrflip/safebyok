@@ -6,7 +6,7 @@ export { Bank, type BankAskDraft, type BankMakeRecord, type BankRecord, type Box
 export { type BadNews, type BadNewsHandler, DefaultLeaseMillis, DefaultOnBadNews, Device, type DeviceOpts, type DeviceRecord, tellBadNewsTo } from './models/device'
 export type { Gate } from './models/gate'
 export { type AskUser, type CleartextsForGatingkind, type Gating, type GatingSnapshot, type Gatingkind, type RequestCleartext, gatingkindVals } from './models/gating'
-export type { BoxCleartexts, BoxRecord, BoxDonor, BoxTombstone } from './models/sealers'
+export type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, Sealable } from './models/sealers'
 export type { Wayin } from './models/wayin'
 export type { BankScope, BankStamp } from './models/stamps'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'

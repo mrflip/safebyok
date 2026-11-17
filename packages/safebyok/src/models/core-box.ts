@@ -1,23 +1,20 @@
 import { exactOptional } from 'zod'
 import { CX, Clock, Crypto, Errors, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type BoxThing, type Sealed, boxDonor, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../storage/shapes-thing'
-import type { BoxCleartexts, BoxDonor, BoxRecord, BoxTombstone, PublicPropsOf, RevisionOf, SealTags, Sealer } from './sealers'
+import { type BoxThing, type Sealed, boxSealable, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../storage/shapes-thing'
+import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from './sealers'
 import { type BoxStamp, boxStamp } from './stamps'
-
-/** What a box's seal takes in the clear: its sidecar, `am` and `written_at`, each optional. */
-type BoxPublicProps = PublicPropsOf<BoxThing, BoxCleartexts>
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
 
 /** The checks of what a box's next revision is made from, of what its seal takes, of a box sealed, and of what it seals. */
 const Checks = Validator.Checkers('bad_option', ({ obj, oneof, epochMillis }) => ({
-  boxDonor,
-  liveBoxDonor:   boxDonor.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
-  boxPublicProps: obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }),
+  boxSealable,
+  liveBoxSealable: boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
+  boxPublicProps:  obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }),
   boxThing,
-  boxCleartexts:  obj({ whisper: CX.whisper }),
+  boxCleartexts:   obj({ whisper: CX.whisper }),
 }))
 
 // A sealer is handed to a lease as the class itself, so the class has statics alone.
@@ -28,7 +25,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   // == [What a seal takes]: donorPropsOf, publicPropsOf, secretPropsOf, tombstoneSecrets
 
   /** The Thing fields and sidecar of `donor`, a box live, a tombstone or the shell; the rest, its whisper sealed or not among them, is dropped. */
-  static donorPropsOf(donor: BoxDonor): BoxDonor { return Checks.boxDonor.parse(donor) }
+  static donorPropsOf(donor: Sealable<BoxRecord>): Sealable<BoxRecord> { return Checks.boxSealable.parse(donor) }
 
   /** The sidecar, `am` and `written_at` of `publicProps`; the rest is dropped. */
   static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps { return Checks.boxPublicProps.parse(publicProps) }
@@ -45,8 +42,8 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   /** The live box next after `donor`, without its sealed whisper. Over a tombstone or the shell, it is the first revision of the next life.
    * Its sidecar is `publicProps.sidecar`, or else `donor`'s: one of them must have one. It is written at `publicProps.written_at`, or now.
    */
-  static nextRevisionOf(donor: BoxDonor, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
-    const { sidecar: donorSidecar, ...thing } = Checks.boxDonor.parse(donor)
+  static nextRevisionOf(donor: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
+    const { sidecar: donorSidecar, ...thing } = Checks.boxSealable.parse(donor)
     const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar === undefined) { throw new Errors.VaultError('bad_option', Phrases.SidecarMissing) }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
@@ -54,10 +51,14 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
     return { ...thing, ...nextLifeOf(thing), ...revision, born_at: written_at }
   }
 
-  /** The tombstone of the live box `donor`, without its sealed whisper or its sidecar, written now. Refuses a tombstone or the shell. */
-  static tombstoneOf(donor: BoxDonor): RevisionOf<BoxTombstone, BoxCleartexts> {
-    const { sidecar: _sidecar, ...thing } = Checks.liveBoxDonor.parse(donor)
-    return { ...thing, ...nextLifeOf(thing), revtok: Crypto.randomId(), revseq: thing.revseq + 1, am: 'x', written_at: Clock.nowMillis() }
+  /** The tombstone of the live box `donor`, without its sealed whisper or its sidecar. Refuses a tombstone or the shell.
+   * It is written at `publicProps.written_at`, or now. A sidecar in `publicProps` refuses, as a tombstone has none.
+   */
+  static tombstoneOf(donor: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxTombstone, BoxCleartexts> {
+    const { sidecar: _sidecar, ...thing } = Checks.liveBoxSealable.parse(donor)
+    const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
+    if (sidecar !== undefined) { throw new Errors.VaultError('bad_option', Phrases.TombstoneSidecarGiven) }
+    return { ...thing, ...nextLifeOf(thing), revtok: Crypto.randomId(), revseq: thing.revseq + 1, am: 'x', written_at }
   }
   // --
 

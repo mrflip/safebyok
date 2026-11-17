@@ -1,7 +1,9 @@
+import type * as Z from 'zod'
 import type { Consts, Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases, Throwers, Validator } from 'safebyok-big/internals'
+import { thingRecord } from '../storage/shapes-thing'
 import { Lease, type LeaseBank } from './lease'
-import type { BankStamp, GateCited, GateStamp, StampedGate } from './stamps'
+import type { BankStamp, GateStamp, StampedGate } from './stamps'
 import * as Stamps from './stamps'
 import { Wayin, wayinCtxOf } from './wayin'
 
@@ -23,15 +25,23 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps.
-/** The checks of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => ({
-  wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), 'Expected NOVEL or a proving'),
-  provingLeaseArgs:     obj({ bank: obj({ stamp: Stamps.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: Stamps.gateCited }),
-  passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp }),
-  passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp }),
-  passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate }),
-  passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.stampedGate }),
-}))
+/** The checks of a gate revision, of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' arguments. */
+const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => {
+  // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
+  const gateRevisionedStamp = Stamps.gateStamp.extend(thingRecord.pick({ revtok: true }).shape)
+  return {
+    gateRevisionedStamp,
+    wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), 'Expected NOVEL or a proving'),
+    provingLeaseArgs:     obj({ bank: obj({ stamp: Stamps.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: gateRevisionedStamp }),
+    passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp }),
+    passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp }),
+    passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate }),
+    passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.stampedGate }),
+  }
+})
+
+/** A gate's stamp and its revision's `revtok`: the gate revision a lease is granted for. @see {@link Stamps.gateStamp} */
+export type GateRevisionedStamp = Z.infer<typeof Checks.gateRevisionedStamp>
 // --
 
 /** The parts of a proving: the stamps its wayin is bound to, the wayin's header, and the stored wayin it proves, if any. */
@@ -116,7 +126,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
 
   // The bankKey is unwrapped, wrapped again under the leaseKey and dropped here, crossing no method boundary (G3).
   /** Build a lease on `bank`, citing the gate revision `gate`. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey. */
-  async buildLease(bank: LeaseBank, gate: GateCited): Promise<Lease> {
+  async buildLease(bank: LeaseBank, gate: GateRevisionedStamp): Promise<Lease> {
     const { bank: { stamp: bankStamp }, gate: cited } = Checks.provingLeaseArgs.parse({ bank, gate })
     Validator.checkedConsistent(bankStamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
     Validator.checkedConsistent(cited, this.gateStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
