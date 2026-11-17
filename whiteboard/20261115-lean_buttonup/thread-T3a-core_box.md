@@ -1,61 +1,68 @@
 # Thread T3a: core_box (2026-11-17)
 
-Branch `20261117-core_box`, PR #715, on main (cut at `b70f340e6`). Proved: `safebyok` 829 tests, typecheck and lint
-clean, at the item 2 commit. Not yet `pnpm justify` or the catch-up: item 3 waits on a ruling (below).
+Branch `20261117-core_box`, PR #715, on main (cut at `b70f340e6`). Proved: `safebyok` 857 tests, typecheck and lint
+clean; `pnpm justify` after the catch-up (see the PR's **Tests:** line).
 
 * **Built**:
-  - **Item 1, the stamp pair** (`31ceea800`). A third party names the pair `bankStamp` / `gateStamp`: `ProvingParts`,
-    `buildNovel(device, bankStamp, gateStamp, cleartext)` (both builders), the novel-args checks, `wayinCtxOf(bankStamp,
-    gateStamp, header)`, buildLease's local, `_cheat_bankKeyBytesOf`. A thing's own stamp stays `stamp`
-    (`StampedGate { bankStamp, stamp, wayins }`). The lease stamp's flat fields are not renamed; no ctx byte moved.
-  - **Item 2, `CoreBox`** (`7c74cc4aa`). `src/models/core-box.ts`: a frozen class of statics, `nextRevisionOf` (was
-    `boxWhisperOf`), `tombstoneOf` (was `boxTombstoneOf`), and the sealer members moved verbatim (`tags`, `purposes`,
-    `stampsOf`, `encode`, `decode`, `sealedOf`, `recordOf`), with `nextLifeOf`, `deserializeWhisper` and the box checks.
-    Checked by `Object.freeze(CoreBox satisfies Sealer<BoxSparse, BoxThing, BoxCleartexts>)`. Exported from
-    `src/core.ts` only.
-  - `sealers.ts` keeps the `Sealer` interface (now `Sealer<NextT, RecordT, CleartextsT>`, no `PriorT`, no
-    `nextRevisionOf`; `recordOf<SubT extends NextT>` keeps the revision's type) and the record types. New:
-    `SealedPartsOf<CleartextsT>`, which `SealedOf` is now built from.
-  - The lease: `seal(sealer, nextRevision, cleartexts): Promise<SubT & SealedPartsOf<CleartextsT>>` and
-    `unseal(sealer, record): Promise<CleartextsT>`. Both parse `Checks.sealer` first: a duck check that picks the seven
-    members off the value by name (statics are not enumerable) and checks them with zod, refusing `bad_option` with
-    `Phrases.SealerExpected`. Never `=== CoreBox`. `#sealText` and `#openSealed` changed only their type annotations.
-  - The bank: `lease.seal(CoreBox, CoreBox.nextRevisionOf(prior), cleartexts)`, `lease.seal(CoreBox,
-    CoreBox.tombstoneOf(prior), { whisper: {} })`, and one `lease.unseal(CoreBox, parsed)` in place of the `am` branch.
-    `sealBox` still answers `BoxRecord` and `tombstoneBox` `BoxTombstone`, with no cast.
-  - Deleted: `sealerkindVals`, `Sealerkind`, `SealerKinds`, the `BoxWhisper` / `BoxTombstone` sealer objects,
-    `sealerOf` and its `eslint-disable-line import-x/namespace` and `as` cast, the lease's `PriorOf`, `NextOf`,
-    `RecordOf`, `CleartextsOf` and `Checks.sealerkind`, their core.ts exports, `'sealerkindVals'` in index.test.ts
-    (now `'CoreBox'`: it must not reach the front door).
-  - Tests: `sealers.test.ts` is `core-box.test.ts` (git mv; identifiers changed, plus a `CoreBox` frozen/tags/purposes
-    test in place of the two kind tests). lease.test.ts: a plain-object sealer (`BoxSealerBag`, the statics bound) is
-    taken as the class is; 13 cases refuse `bad_option` at seal and unseal (each of the seven members missing, bad
-    tags, a non-string purpose, a non-function encode, a bare function, a sealer's name, null).
-  - `notes/security.md`: an `amended 2026-11-17 (core_box)` line on the 2026-11-14 lean_gate entry about the sealerkind
-    lookup (its header says to amend the entry that covers the mechanism). It argues the lease gains no capability.
-  - The empty changeset, `.changeset/20261117-core_box.md`.
+  - **Item 1, the stamp pair** (`31ceea800`): a third party names them `bankStamp` / `gateStamp`. No ctx byte moved.
+  - **Item 2, `CoreBox`** (`7c74cc4aa`): a frozen class of statics in `src/models/core-box.ts`, handed to the lease
+    as the sealer itself and duck-checked (`Checks.sealer`, `bad_option`).
+  - **Item 3, the seal path** (`6017225b6`), as the Coach's directives in t3-plan.md "The seal path" lay it out:
+    - `Sealer<RecordT, CleartextsT>` (`sealers.ts`), its forms from `SealedOf` / `UnsealedOf` / `SealedPartsOf`, plus
+      `LiveOf`, `TombstoneOf`, `RevisionOf`, `BodyOf`, `DonorOf`, `PublicPropsOf`, `LivePublicPropsOf`,
+      `TombstonePublicProps`. Thirteen members: `donorPropsOf`, `publicPropsOf`, `secretPropsOf`, `nextRevisionOf`,
+      `tombstoneOf`, `tombstoneSecrets`, `stampOf`, `tags`, `purposes`, `encode`, `decode`, `sealedOf`, `recordOf`.
+    - `lease.seal(sealer, donor, publicProps, secretProps)`: the donor passes `sealer.donorPropsOf` (approvelist,
+      stripping), then `withoutSecrets` (the lease's banlist: `whisper` and `*_sealed`, by pattern, on es-toolkit
+      `omit`); `{ am: 'x' }` picks `tombstoneOf` and `tombstoneSecrets`, else `nextRevisionOf` and `secretPropsOf`.
+      `lease.unseal` answers `UnsealedOf<RecordT, CleartextsT>`, frozen (Bank.unsealBox's spread moved in).
+    - The ctx is `[bankStamp.parse(bank.stamp), sealer.stampOf(record)]`; `CoreBox.stampOf` is the new `boxStamp`
+      (today's sparse fields, refuses the shell). Box ctx bytes unchanged. `#bankKey` binds the parsed bank stamp too.
+    - `gatelabelpath` → `gate_labelpath` (lease ctx moves; an old record refuses `bad_option` at `Lease.make`, a new
+      MalformedCase). `CitedGate` / `citedGate` → `GateCited` / `gateCited` in stamps.ts; `buildLease` parses with it.
+    - `Bank.sealBox(donor, publicProps, secretProps)`, `tombstoneBox(donor)` = `sealBox(donor, { am: 'x' })`,
+      `#demandOwnBox` (scope and root, `record_conflict`, before any crypto). `BoxCheck` and `#demandBox` are gone.
+    - `BoxSparse` retired. What replaced each: index.ts / core.ts export `BoxDonor`; storage.ts drops the type and
+      exports `boxDonor` (for `boxSparse`); shapes-minder uses `boxDonor`; bank.ts types `rootBox` and
+      `BankMakeRecord.rootBox` as `Sparse<BoxThing>` and checks with `boxDonor`; `BoxShell` is `Sparse<BoxTombstone>`;
+      `BoxUnsealed` is `UnsealedOf<BoxThing, BoxCleartexts>`; the ctx uses `boxStamp`. Classifiers and ask builders
+      untouched. `boxDonor` (shapes-thing, `bad_record`) strips and keeps an optional sidecar; `Phrases.SparseHalfShell`
+      → `DonorHalfShell`, new `SidecarMissing`.
+  - Tests: every `sealBox({ ...prior, sidecar }, { whisper })` is `sealBox(prior, { sidecar }, { whisper })`;
+    `CoreBox.nextRevisionOf(TH.boxShellOf())` scaffolding replaced by `TH.boxShellOf(), { sidecar: TH.Sidecar }`.
+    New: whole unsealed / sealed donor; no sidecar anywhere refuses (encode never called); given sidecar wins;
+    written_at used and signed; tombstone of a tombstone or the shell refuses; a leaky `donorPropsOf`'s `whisper` and
+    `notes_sealed` stripped; `withoutSecrets` describe; `stampOf` refuses the shell; the bank's stamp is the ctx's
+    first part (two-stamp order swap refuses); a padded bank stamp binds nothing extra.
+  - `notes/security.md`: four `amended 2026-11-17 (core_box)` lines on the two lean_gate entries (box seal ctx;
+    lease takes a sealer). The changeset names what a host sees.
 * **Decisions made**:
-  - In `buildLease`, `cited` keeps its name: it is a `CitedGate` (a gate stamp and revtok), not the gate stamp, and
-    `citedGate` would collide with the imported checker.
-  - wayin.ts imports `* as Stamps`, so the parameters `bankStamp` / `gateStamp` do not shadow the checkers its body
-    needs. Elsewhere (buildNovel's parameters) the shadowing is harmless and left.
-  - The sealer duck check lives in lease.ts's `Checks` (the lease is the entrypoint that validates), not as an
-    exported `isSealer` in sealers.ts. Exporting one later is a one-line move.
-  - `Lease.seal`'s type parameters `<NextT, RecordT, CleartextsT, SubT extends NextT>` infer from `typeof CoreBox`
-    without help; the interim `NextT` on the Sealer goes in item 3.
-  - Item 1's novel-args checks are `GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp,
-    gateStamp })`: big's shapes carry `bank` / `gate`, and big is frozen.
+  - `rootBox` is `Sparse<BoxThing>`: the narrowest honest type covering the shell and a stored live root. The
+    constructor stores `sparseOf(rootBox)`, so a sidecar `boxDonor` now keeps never reaches `bank.rootBox`.
+  - Sealer parsing members take `unknown` in the interface; CoreBox's statics are typed and satisfy it (bivariance).
+  - A third, general overload on `Lease.seal` and `Bank.sealBox` (`PublicPropsOf`, optional secretProps, answers
+    `RecordT`), so sealBox delegates without branching on `am`.
+  - `bankStamp.parse` sits in `#ctxOf` as well as `#bankKey`, so every ctx binds the parsed stamp.
+  - `TH.boxShellOf()` is now the true shell (no sidecar); `TH.Sidecar` is the publicProps sidecar.
+  - `sparseOf` takes any `ThingRecord`, so it serves a donor.
+  - `unseal`'s spread is of the raw record, after `sealedOf`'s strict `boxThing` parse checked it.
 * **Deviations**:
-  - The three proofs pass with identifiers changed, but the two lease proofs' calls also change shape as item 2's
-    ruled signature demands: `lease.seal('BoxWhisper', TH.boxShellOf(), Cleartexts)` became `lease.seal(CoreBox,
-    liveNext(), Cleartexts)`, where `liveNext()` is `CoreBox.nextRevisionOf(TH.boxShellOf())`. No assertion changed.
-    ctx-bytes.test.ts's byte literals and core-box.test.ts's "quoting none of it" changed identifiers only.
-* **Safety hatches**: removed `eslint-disable-line import-x/namespace` and its `as` cast (`sealerOf`). Added
-  `eslint-disable-line @typescript-eslint/no-extraneous-class` on `CoreBox` (a class of statics was ruled; the reason
-  is a `//` line above its block), and one `as` in lease.ts's `sealerMembersOf` (`val as Partial<Record<keyof
-  AnySealer, unknown>>`, after narrowing to an object or function), to read the members off an unknown value.
-* **Discoveries**: zod's `obj` refuses a function, and a class is one; its static methods are not enumerable, so the
-  duck check reads each member by name into a plain object first. `@typescript-eslint/unbound-method` flags pulling
-  the statics off the class; the test binds them.
-* **For the Coach**: item 3's spelling is held: `Sealer<RecordT, CleartextsT>` (two parameters) or `Sealer<RecordT>`
-  with the cleartexts from a lookup by modelkind, `{ box: BoxCleartexts }`. Item 3 is not built.
+  - unseal's tests read `.deep.include(Cleartexts)` where they read `.deep.equal`, including lease.test's "zeroes the
+    whisper's bytes": forced by the directed change (unseal answers the record). Its byte assertions are unchanged.
+  - Item 12: the `{ user_id: parsed.userid, banklabel }` literal in bank.ts's constructor renames `userid`, so no
+    checker fits and it stays. If the plan meant makeRecord's `shellOf({ userid, banklabel, labelpath })`, that is a
+    one-line follow-up.
+* **Safety hatches**: added two `as` in lease.ts: unseal's `as UnsealedOf<RecordT, CleartextsT>` (TypeScript cannot
+  see a generic spread through the mapped type; removing it gives TS2322), and `withoutSecrets`'s cast of
+  `Object.keys`'s strings to `(keyof BagT & SecretFieldname)[]`. Kept: CoreBox's `no-extraneous-class` disable and
+  `sealerMembersOf`'s `as`.
+* **Discoveries**:
+  - `vi.spyOn(CoreBox, ...)` throws "Cannot redefine property" (CoreBox is frozen): spy on `{ ...BoxSealerBag }`.
+  - shapes-thing.ts has its own `bad_record` `gateCited`, beside stamps.ts's `bad_option` one: same name, two
+    checkers. Not renamed here.
+* **Approaches set aside**: a modelkind lookup table for the cleartexts (ruled out); `omit` from `es-toolkit/compat`
+  (ruled out); a banlist checker rather than a function (ruled: a function).
+* **For the Coach**:
+  - "donor" is a new term, not in VOCABULARY.md.
+  - A tombstone's `written_at` is always now: a given `written_at` with `{ am: 'x' }` is dropped, as are secretProps.
+  - The `gateCited` name collision above.
