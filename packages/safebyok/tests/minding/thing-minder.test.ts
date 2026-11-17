@@ -181,11 +181,11 @@ describe("ThingMinder.hello", () => {
     expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include({ gcTime: Infinity, networkMode: 'always', retry: false })
     const gate = TH.gateThingOf()
     const StaleTimeCases = [
-      [carOf(gate),                                                         5, 'full'],
-      [carOf(sparseOf(gate)),                                               0, 'bare'],
+      [carOf(gate),                                                                  5, 'full'],
+      [carOf(sparseOf(gate)),                                                        0, 'bare'],
       [{ liveness: 'behind', newest: sparseOf(TH.nextGateOf(gate)), fullest: gate }, 0, 'behind'],
-      [carOf(shellOf(TH.GateScope)),                                        5, 'void'],
-      [undefined,                                                           5, 'vacant'],
+      [carOf(shellOf(TH.GateScope)),                                                 5, 'void'],
+      [undefined,                                                                    5, 'vacant'],
     ] as const
     for (const [car, expected, blurb] of StaleTimeCases) {
       expect(staleTimeAt(tsq, minder, car as ThingCar<Thing> | undefined), blurb).to.eq(expected)
