@@ -42,6 +42,7 @@ export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as con
 
 /** The car of `record` alone: `full` for a whole live record, `bare` for a sparse one, `gone` for a tombstone and `void` for the void sentinel. */
 export function carOf(record: DeliverableThing): ThingCar<Thing> {
+  ArgChecks.deliverableThing.parse(record)
   if (isVoidSentinel(record)) { return Object.freeze({ liveness: 'void', newest: record, fullest: null }) }
   // Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
   if (record.am === 'x')      { return Object.freeze({ liveness: 'gone', newest: record as Tombstone<Thing>, fullest: null }) }
@@ -59,14 +60,14 @@ export function mergedCarOf(prior: ThingCar<Thing> | undefined, landed: ThingCar
   return merged
 }
 
-// TanStack also shares an observer's selected and placeholder values, which may be anything.
-/** True when `val` has a car's `liveness`. */
+// TanStack also shares an observer's selected and placeholder values, which may be anything, a `liveness` field included.
+/** True when `val` is a sound car. */
 export function isThingCar(val: unknown): val is ThingCar<Thing> {
-  return (typeof val === 'object') && (val !== null) && (carLivenessVals as readonly unknown[]).includes((val as { liveness?: unknown }).liveness)
+  return Checks.thingCar.safeParse(val).success
 }
 
 /** True when the vaultDB holds a whole record newer than `car`'s fullest: its liveness is `behind` or `bare`. */
-export function isVaultDBNewer(car: ThingCar<Thing>): boolean {
+export function isVaultDBNewer(car: Pick<ThingCar<Thing>, 'liveness'>): boolean {
   return (car.liveness === 'behind') || (car.liveness === 'bare')
 }
 
@@ -125,10 +126,15 @@ function isSameScope(ante: ThingScope, post: ThingScope): boolean {
 }
 // --
 
-// == [Checks]: isLiveSparse, Checks
+// == [Checks]: isLiveSparse, ArgChecks, Checks
 
 /** True when `record` is live, and not whole. */
 function isLiveSparse(record: Sparse<Thing>): boolean { return (record.am === 'a') && (! isWholeRecord(record)) }
+
+/** The check of {@link carOf}'s record: a Thing's scope and revision, as a whole record, a sparse one or the void sentinel has them. */
+const ArgChecks = Validator.Checkers('bad_option', ({ obj }) => ({
+  deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
+}))
 
 /** The check of a car's invariants, on the way out of {@link mergedCarOf}. A car that fails it is a bug in the minder. */
 const Checks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {

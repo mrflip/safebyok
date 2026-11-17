@@ -36,6 +36,19 @@ describe("carOf", () => {
     const car = carOf(Box0)
     expect(car.fullest).to.eq(car.newest)
   })
+
+  const NotRecords = [
+    [undefined,                       'nothing at all'],
+    [42,                              'a number'],
+    [carOf(Box0),                     'a car'],
+    [{ ...Box0, labelpath: 'vault' }, 'a record of a kind no minder serves'],
+    [{ ...sparseOf(Box0), am: 'd' },  'a record marked damaged'],
+  ] as const
+  for (const [val, blurb] of NotRecords) {
+    it(`refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => carOf(val as unknown as Thing), 'bad_option')
+    })
+  }
 })
 
 describe("mergedCarOf", () => {
@@ -110,15 +123,31 @@ describe("mergedCarOf", () => {
 })
 
 describe("isThingCar", () => {
-  it("is true of a car, and false of a record and of other values", () => {
-    expect(isThingCar(carOf(Box0))).to.be.true
-    for (const val of [Box0, null, undefined, 'full', { liveness: 'alive' }]) { expect(isThingCar(val)).to.be.false }
+  it("is true of each car a merge may keep", () => {
+    for (const car of [carOf(Box0), behindOf(Box1, Box0), carOf(sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]) { expect(isThingCar(car)).to.be.true }
   })
+
+  const NotCars = [
+    [Box0,                                                  'a record'],
+    [null,                                                  'null'],
+    ["full",                                                'a liveness alone'],
+    [{ liveness: 'alive' },                                 'an object of another liveness'],
+    [{ liveness: 'full', label: 'openai' },                 'a selected value that carries a liveness'],
+    [{ liveness: 'behind' },                                'a liveness with no records'],
+    [{ liveness: 'full', newest: Box0, fullest: { ...Box0 } }, 'a car that breaks its rules'],
+  ] as const
+  for (const [val, blurb] of NotCars) {
+    it(`is false of ${blurb}`, () => { expect(isThingCar(val)).to.be.false })
+  }
 })
 
 describe("isVaultDBNewer", () => {
   it("is true of a behind or bare car, and false of the rest", () => {
     const cars = [carOf(Box0), behindOf(Box1, Box0), carOf(sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]
     expect(cars.map((car) => [car.liveness, isVaultDBNewer(car)])).to.deep.equal([['full', false], ['behind', true], ['bare', true], ['gone', false], ['void', false]])
+  })
+
+  it("reads the liveness alone", () => {
+    expect([isVaultDBNewer({ liveness: 'bare' }), isVaultDBNewer({ liveness: 'full' })]).to.deep.equal([true, false])
   })
 })
