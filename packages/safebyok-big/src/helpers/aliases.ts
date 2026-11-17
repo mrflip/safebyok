@@ -1,5 +1,5 @@
-/** The names a signature gives the text and numbers that name and stamp a thing: the user's id, the labels, the tokens and the revision count.
- * Each is a plain alias of `string` or `number`, so a host's own string is accepted where one is asked.
+/** Plain aliases for the ids, labels, tokens, revision count and times a signature names.
+ * Each is `string` or `number` underneath, so a host's own string or number is accepted where one is asked.
  */
 
 // == [Names and tokens]: UserID, Banklabel, Vaultlabel, Boxlabel, BankTok, GateTok, VaultTok, BoxTok, RevisionTok, DeviceTok, RevisionSeq, KeyDeriverLabel, EpochMillis
@@ -31,13 +31,13 @@ export type BoxTok = string
 /** A token that changes with each put or del of a record, its `revision_tok`. */
 export type RevisionTok = string
 
-/** A token for this device in a bank's scope, its `device_tok`. */
+/** A random token for this device in a bank's scope, its `device_tok`. */
 export type DeviceTok = string
 
 /** The count of a record's revisions, its `revision_seq`: a higher one is newer. */
 export type RevisionSeq = number
 
-/** The name of how a passphrase wayin's key was derived, its `key_deriver_label`. */
+/** The label of the key deriver's spec that made a passphrase wayin's key, its `key_deriver_label`. */
 export type KeyDeriverLabel = string
 
 /** An instant, whole UTC epoch milliseconds, as `Date.now()` gives and `epochMillis` checks: a plain number, since a host writes one by hand. */
