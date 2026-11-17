@@ -92,7 +92,7 @@ describe("Lease.make(record, { bank })", () => {
   for (const [tamper, blurb] of MalformedCases) {
     it(`refuses a record ${blurb}, quoting none of it`, async () => {
       const { bank, record } = await leaseWorld()
-      const err = TH.expectSyncRefusal(() => Lease.make(tamper(record) as never, { bank }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => Lease.make(tamper(record) as never, { bank }), 'bad_record')
       expect(TH.thrownText(err)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
     })
   }
@@ -100,7 +100,7 @@ describe("Lease.make(record, { bank })", () => {
   it("refuses a record whose leaseKey is an extractable key", async () => {
     const { bank, record } = await leaseWorld()
     const bankKey = await Crypto.makeBankKey()
-    TH.expectSyncRefusal(() => Lease.make({ ...record, lease_key: bankKey }, { bank }), 'bad_option')
+    TH.expectSyncRefusal(() => Lease.make({ ...record, lease_key: bankKey }, { bank }), 'bad_record')
   })
 
   const OtherBankCases = [
@@ -120,10 +120,10 @@ describe("Lease.make(record, { bank })", () => {
   it("refuses a bank with no lock, one with no stamp, one with no enabled check, and no opts at all", async () => {
     const { record } = await leaseWorld()
     const { isEnabled: _isEnabled, demandEnabled: _demandEnabled, ...unchecked } = TH.fakeLeaseBankOf()
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), lock: undefined } } as never), 'bad_option')
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), stamp: undefined } } as never), 'bad_option')
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: unchecked } as never), 'bad_option')
-    TH.expectSyncRefusal(() => Lease.make(record, undefined as never), 'bad_option')
+    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), lock: undefined } } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), stamp: undefined } } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Lease.make(record, { bank: unchecked } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Lease.make(record, undefined as never), 'bad_record')
   })
 })
 
@@ -149,7 +149,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const { whisper_sealed: _sealed, ...unsealed } = sealed
-    await TH.expectRefusal(lease.unseal(CoreBox, { ...sealed, extra: 'not a box field' } as never), 'bad_option')
+    await TH.expectRefusal(lease.unseal(CoreBox, { ...sealed, extra: 'not a box field' } as never), 'bad_record')
     const answer = await lease.unseal(CoreBox, sealed)
     expect(answer).to.not.equal(sealed)
     expect(answer).to.deep.equal({ ...unsealed, whisper: TH.Whisper })
@@ -179,15 +179,15 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
 
   it("refuses a misspelt key in publicProps, and a key beside the whisper in secretProps", async () => {
     const { lease } = await leaseWorld()
-    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), { sidcar: TH.Sidecar } as never, Cleartexts), 'bad_option')
-    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), PublicProps, { ...Cleartexts, sidecar: TH.Sidecar } as never), 'bad_option')
+    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), { sidcar: TH.Sidecar } as never, Cleartexts), 'bad_record')
+    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), PublicProps, { ...Cleartexts, sidecar: TH.Sidecar } as never), 'bad_record')
   })
 
   it("refuses when neither the donor nor the publicProps has a sidecar, sealing nothing", async () => {
     const { lease } = await leaseWorld()
     const sealer = { ...BoxSealerBag }
     const encode = vi.spyOn(sealer, 'encode')
-    await TH.expectRefusal(lease.seal(sealer, TH.boxShellOf(), {}, Cleartexts), 'bad_option')
+    await TH.expectRefusal(lease.seal(sealer, TH.boxShellOf(), {}, Cleartexts), 'bad_record')
     expect(encode).not.toHaveBeenCalled()
   })
 
@@ -202,8 +202,8 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     const { lease } = await leaseWorld()
     const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const tombstone = await lease.seal(CoreBox, live, { am: 'x' })
-    await TH.expectRefusal(lease.seal(CoreBox, tombstone, { am: 'x' }), 'bad_option')
-    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), { am: 'x' }), 'bad_option')
+    await TH.expectRefusal(lease.seal(CoreBox, tombstone, { am: 'x' }), 'bad_record')
+    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), { am: 'x' }), 'bad_record')
   })
 
   it("writes a tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {
@@ -218,7 +218,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
   it("refuses a tombstone given a sidecar, as CoreBox makes it", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
-    await TH.expectRefusal(lease.seal(CoreBox, live, { am: 'x', sidecar: TH.Sidecar }), 'bad_option')
+    await TH.expectRefusal(lease.seal(CoreBox, live, { am: 'x', sidecar: TH.Sidecar }), 'bad_record')
   })
 
   it("refuses a tombstone given secret props, sealing nothing", async () => {
@@ -226,7 +226,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const sealer = { ...BoxSealerBag }
     const encode = vi.spyOn(sealer, 'encode')
-    const err = await TH.expectRefusal(lease.seal(sealer, live, { am: 'x' }, Cleartexts), 'bad_option')
+    const err = await TH.expectRefusal(lease.seal(sealer, live, { am: 'x' }, Cleartexts), 'bad_record')
     expect(TH.thrownText(err)).to.not.include(TH.Whisper.apiKey)
     expect(encode).not.toHaveBeenCalled()
   })
@@ -295,8 +295,8 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     it(`refuses ${blurb} in place of a sealer, at the seal and the unseal`, async () => {
       const { lease } = await leaseWorld()
       const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
-      await TH.expectRefusal(lease.seal(sealer as never, TH.boxShellOf(), PublicProps, Cleartexts), 'bad_option')
-      await TH.expectRefusal(lease.unseal(sealer as never, sealed), 'bad_option')
+      await TH.expectRefusal(lease.seal(sealer as never, TH.boxShellOf(), PublicProps, Cleartexts), 'bad_record')
+      await TH.expectRefusal(lease.unseal(sealer as never, sealed), 'bad_record')
     })
   }
 

@@ -35,7 +35,7 @@ const MaxGcTime = (2 ** 31) - 1
 // == [Checks]: queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts
 
 /** The checks of a ThingMinder's arguments and options. */
-export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts } = Validator.Checkers('bad_option', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
+export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts } = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
   const gcTime           = union([uint.max(MaxGcTime, Phrases.GcTimeShape), lit(Infinity)])
   const queryCacheOpts   = obj({
     staleTime: orDefault(uint, DefaultQueryCacheOpts.staleTime),

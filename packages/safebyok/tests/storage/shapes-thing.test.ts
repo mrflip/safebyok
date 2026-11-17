@@ -108,7 +108,7 @@ describe("shellOf(scoped, parent?)", () => {
 
   for (const [call, said, blurb] of BadShellCases) {
     it(`refuses ${blurb}`, () => {
-      const err = TH.expectSyncRefusal(call, 'bad_option')
+      const err = TH.expectSyncRefusal(call, 'bad_record')
       expect(err.message).to.include(said)
     })
   }
@@ -161,11 +161,11 @@ describe("checkedGetAsk(ask) and checkedListAsk(ask)", () => {
   ] as const
 
   for (const [ask, blurb] of BadGetCases) {
-    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => checkedGetAsk(ask), 'bad_option') })
+    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => checkedGetAsk(ask), 'bad_record') })
   }
 
   it("refuses a list ask that is a get", () => {
-    TH.expectSyncRefusal(() => checkedListAsk(TH.getAskAt('box')), 'bad_option')
+    TH.expectSyncRefusal(() => checkedListAsk(TH.getAskAt('box')), 'bad_record')
   })
 })
 
@@ -241,7 +241,7 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     }
   })
 
-  const BadOptionCases: readonly (readonly [WriteAsk, string, string])[] = [
+  const BadRecordCases: readonly (readonly [WriteAsk, string, string])[] = [
     [{ ...TH.birthAskOf(box, under), modelkind: 'gate' } as never,                   Phrases.ModelkindNotOwn, 'a modelkind not its labelpath\'s'],
     [{ ...TH.birthAskOf(box, under), op: 'del' },                                    Phrases.DelFlagsFixed,   'a del under ifAbsent add'],
     [{ ...TH.delAskFor(box, box) },                                                  Phrases.OpNotOfRecord,   'a del of a live record'],
@@ -249,16 +249,6 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     [{ ...TH.delAskFor(box, tomb), ifPresent: 'fail' },                              Phrases.DelFlagsFixed,   'a del under ifPresent fail'],
     [{ ...TH.delAskFor(box, tomb), options: { policies: [] } },                      Phrases.DelFlagsFixed,   'a del naming storage policies'],
     [TH.replaceAskOf(box, TH.nextOf(box), { policies: ['add_passkey'] }),            Phrases.PolicyNotOwn,    'a box put naming a storage policy'],
-  ]
-
-  for (const [ask, said, blurb] of BadOptionCases) {
-    it(`refuses ${blurb}`, () => {
-      const err = TH.expectSyncRefusal(() => checkedWriteAsk(ask), 'bad_option')
-      expect(err.message).to.include(said)
-    })
-  }
-
-  const BadRecordCases: readonly (readonly [WriteAsk, string, string])[] = [
     [TH.birthAskOf(box),                                                             Phrases.LifepathNotKept,    'a box\'s birth citing a root\'s shell'],
     [TH.birthAskOf(box, childShellCited(lifeseqOfLifenum(2))),                              Phrases.LifepathNotKept,    'a box\'s birth under another life of its parent'],
     [TH.birthAskOf(TH.boxThingOf('openai', { lifepath: Life0 }), under),             Phrases.LifepathDepth,      'a box whose lifepath is shallower than its labelpath'],
@@ -298,12 +288,12 @@ describe("checkedBirthBankAsk(ask)", () => {
   it("refuses a root that is not born live", () => {
     const life1 = lifeseqOfLifenum(1)
     const ask   = TH.birthBankAskOf({ bank: TH.bankThingOf({ am: 'x', lifeseq: life1, lifepath: life1 }) })
-    const err   = TH.expectSyncRefusal(() => checkedBirthBankAsk(ask), 'bad_option')
+    const err   = TH.expectSyncRefusal(() => checkedBirthBankAsk(ask), 'bad_record')
     expect(err.message).to.include(Phrases.OpNotOfRecord)
   })
 
   it("refuses a field it does not accept, and a root of another bank", () => {
-    TH.expectSyncRefusal(() => checkedBirthBankAsk({ ...TH.birthBankAskOf(), extra: 1 }), 'bad_option')
+    TH.expectSyncRefusal(() => checkedBirthBankAsk({ ...TH.birthBankAskOf(), extra: 1 }), 'bad_record')
     TH.expectSyncRefusal(() => checkedBirthBankAsk(TH.birthBankAskOf({ gate: TH.gateThingOf({ banklabel: 'other' }) })), 'bad_record')
   })
 })
@@ -337,14 +327,14 @@ describe("the ask builders", () => {
 
   it("pass through what they do not accept, for the verb's checks to refuse", () => {
     const tomb = TH.boxTombOf(box)
-    TH.expectSyncRefusal(() => checkedWriteAsk(delAskOf({ cited: box, record: tomb, options: { policies: [] } } as never)), 'bad_option')
-    TH.expectSyncRefusal(() => checkedWriteAsk(putAskOf({ cited: box, record: box, extra: 1 } as never)), 'bad_option')
-    TH.expectSyncRefusal(() => checkedGetAsk(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_option')
+    TH.expectSyncRefusal(() => checkedWriteAsk(delAskOf({ cited: box, record: tomb, options: { policies: [] } } as never)), 'bad_record')
+    TH.expectSyncRefusal(() => checkedWriteAsk(putAskOf({ cited: box, record: box, extra: 1 } as never)), 'bad_record')
+    TH.expectSyncRefusal(() => checkedGetAsk(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_record')
   })
 
   it("never throw: a record with no scope, or args that are not a bag, go to the verb as given", () => {
     const noScope = putAskOf({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)
-    TH.expectSyncRefusal(() => checkedWriteAsk(noScope), 'bad_option')
+    TH.expectSyncRefusal(() => checkedWriteAsk(noScope), 'bad_record')
     expect(putAskOf(null as never)).to.eq(null)
     expect(listAskOf(7 as never)).to.eq(7)
   })

@@ -155,7 +155,7 @@ describe("ThingMinder.make", () => {
   for (const [tiesOver, optsOver, bank, blurb] of MakeCases) {
     it(blurb, () => {
       // @ts-expect-error -- sloppy input is the point
-      TH.expectSyncRefusal(() => ThingMinder.make({ modelkind: 'gate', ...tiesOver }, { vaultDB, tsq, ...optsOver }, bank ?? fakeBankOf()), 'bad_option')
+      TH.expectSyncRefusal(() => ThingMinder.make({ modelkind: 'gate', ...tiesOver }, { vaultDB, tsq, ...optsOver }, bank ?? fakeBankOf()), 'bad_record')
     })
   }
 
@@ -324,14 +324,14 @@ describe("ThingMinder.at", () => {
   })
 
   const ForeignScopes = [
-    [TH.BoxScope,                         'refuses bad_option for a scope of another kind'],
-    [{ ...TH.GateScope, userid: 'u2' },   "refuses bad_option for another user's scope"],
-    [{ ...TH.GateScope, banklabel: 'zz' }, "refuses bad_option for another bank's scope"],
+    [TH.BoxScope,                         'refuses bad_record for a scope of another kind'],
+    [{ ...TH.GateScope, userid: 'u2' },   "refuses bad_record for another user's scope"],
+    [{ ...TH.GateScope, banklabel: 'zz' }, "refuses bad_record for another bank's scope"],
   ] as const
   for (const [scoped, blurb] of ForeignScopes) {
     it(blurb, () => {
       const { minder } = minderWorldOf(new MemoryVaultDB())
-      TH.expectSyncRefusal(() => minder.at(scoped), 'bad_option')
+      TH.expectSyncRefusal(() => minder.at(scoped), 'bad_record')
     })
   }
 })
@@ -414,18 +414,18 @@ describe("ThingMinder.tryAt", () => {
 
   const { track: _track, ...noTrack } = GateAsk
   const RefusedAsks = [
-    [{ ...GateAsk, userid: 'u2' },            {},                       'refuses bad_option for an ask of another bank'],
-    [{ ...GateAsk, ifAbsent: 'fail' },        {},                       "refuses bad_option for an ask that is not ifAbsent: 'nil'"],
-    [{ ...GateAsk, labelpath: 'box/openai' }, {},                       'refuses bad_option for a labelpath of another kind'],
-    [noTrack,                                 {},                       'refuses bad_option for an ask that tracks nothing'],
-    [{ ...GateAsk, staleTime: 0 },            {},                       'refuses bad_option for an ask that carries an option'],
-    [GateAsk,                                 { staleTime: undefined }, 'refuses bad_option for a staleTime given as undefined'],
-    [GateAsk,                                 { ifStale: 'keep' },      'refuses bad_option for an ifStale it does not know'],
+    [{ ...GateAsk, userid: 'u2' },            {},                       'refuses bad_record for an ask of another bank'],
+    [{ ...GateAsk, ifAbsent: 'fail' },        {},                       "refuses bad_record for an ask that is not ifAbsent: 'nil'"],
+    [{ ...GateAsk, labelpath: 'box/openai' }, {},                       'refuses bad_record for a labelpath of another kind'],
+    [noTrack,                                 {},                       'refuses bad_record for an ask that tracks nothing'],
+    [{ ...GateAsk, staleTime: 0 },            {},                       'refuses bad_record for an ask that carries an option'],
+    [GateAsk,                                 { staleTime: undefined }, 'refuses bad_record for a staleTime given as undefined'],
+    [GateAsk,                                 { ifStale: 'keep' },      'refuses bad_record for an ifStale it does not know'],
   ] as const
   for (const [ask, opts, blurb] of RefusedAsks) {
     it(blurb, async () => {
       const { minder } = minderWorldOf(new MemoryVaultDB())
-      await TH.expectBad(minder.tryAt(ask as never, opts as never), 'bad_option')
+      await TH.expectBad(minder.tryAt(ask as never, opts as never), 'bad_record')
     })
   }
 
@@ -440,12 +440,12 @@ describe("ThingMinder.tryAt", () => {
 })
 
 describe("ThingMinder.get", () => {
-  it("refuses bad_option for an ask that tracks nothing, or a staleTime given as undefined", async () => {
+  it("refuses bad_record for an ask that tracks nothing, or a staleTime given as undefined", async () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     const { track: _track, ...noTrack } = GateAsk
-    await TH.expectRefusal(minder.get(noTrack as never), 'bad_option')
+    await TH.expectRefusal(minder.get(noTrack as never), 'bad_record')
     // @ts-expect-error -- an explicit undefined is the point
-    await TH.expectRefusal(minder.get(GateAsk, { staleTime: undefined }), 'bad_option')
+    await TH.expectRefusal(minder.get(GateAsk, { staleTime: undefined }), 'bad_record')
   })
 
   it("returns the car of the record stored, and reads the cache after", async () => {
@@ -473,7 +473,7 @@ describe("ThingMinder.get", () => {
   it("refuses a get of an empty box while no car of the root box is cached, saying so", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { boxMinder } = minderWorldOf(vaultDB, { isRootHeard: false })
-    await TH.expectRefusal(boxMinder.get(BoxAsk), 'bad_option')
+    await TH.expectRefusal(boxMinder.get(BoxAsk), 'bad_record')
     await expect(boxMinder.get(BoxAsk)).rejects.toThrow(Phrases.RootNotCached)
   })
 
@@ -759,7 +759,7 @@ describe("ThingMinder.listen", () => {
   it("refuses a listener that is not a function", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     // @ts-expect-error -- sloppy input is the point
-    TH.expectSyncRefusal(() => minder.listen(undefined), 'bad_option')
+    TH.expectSyncRefusal(() => minder.listen(undefined), 'bad_record')
   })
 })
 
@@ -772,11 +772,11 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(GateAsk, { staleTime: 0 })).to.be.true
   })
 
-  it("refuses bad_option for an ask that tracks nothing, or another bank's", () => {
+  it("refuses bad_record for an ask that tracks nothing, or another bank's", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     const { track: _track, ...noTrack } = GateAsk
-    TH.expectSyncRefusal(() => minder.isStaleAt(noTrack as never), 'bad_option')
-    TH.expectSyncRefusal(() => minder.isStaleAt({ ...GateAsk, banklabel: 'other' }), 'bad_option')
+    TH.expectSyncRefusal(() => minder.isStaleAt(noTrack as never), 'bad_record')
+    TH.expectSyncRefusal(() => minder.isStaleAt({ ...GateAsk, banklabel: 'other' }), 'bad_record')
   })
 })
 

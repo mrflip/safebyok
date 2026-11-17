@@ -64,7 +64,7 @@ export interface BirthOpts extends BankOpts {
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Bank.make}'s arguments, of the proving `unlockByProving` is given, and of the box a box method is given. */
-const Checks = Validator.Checkers('bad_option', ({ obj, custom, orDefault }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, custom, orDefault }) => ({
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
     record: obj({ maingate: gateThing, rootBox: boxRecordOrShell }).loose(),

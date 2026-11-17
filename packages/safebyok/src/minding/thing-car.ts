@@ -141,7 +141,7 @@ function isSameScope(ante: ThingScope, post: ThingScope): boolean {
 function isLiveSparse(record: Sparse<Thing>): boolean { return (record.am === 'a') && (! isWholeRecord(record)) }
 
 /** The check of {@link carOf}'s record: a Thing's scope and revision. */
-const ArgChecks = Validator.Checkers('bad_option', ({ obj }) => ({
+const ArgChecks = Validator.Checkers('bad_record', ({ obj }) => ({
   deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
 }))
 

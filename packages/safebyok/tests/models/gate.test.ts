@@ -94,7 +94,7 @@ describe("Gate.make(record, { bank })", () => {
   for (const [recordOf, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, async () => {
       const record = recordOf(await gateRecordOf(true))
-      TH.expectSyncRefusal(() => Gate.make(record as never, { bank: WorldBank }), 'bad_option')
+      TH.expectSyncRefusal(() => Gate.make(record as never, { bank: WorldBank }), 'bad_record')
     })
   }
 
@@ -118,7 +118,7 @@ describe("Gate.make(record, { bank })", () => {
 
   it("refuses a bank with no stamp, and no opts at all", async () => {
     const record = await gateRecordOf()
-    TH.expectSyncRefusal(() => Gate.make(record, { bank: {} } as never), 'bad_option')
+    TH.expectSyncRefusal(() => Gate.make(record, { bank: {} } as never), 'bad_record')
     TH.expectSyncRefusal(() => Gate.make(record, undefined as never))
   })
 

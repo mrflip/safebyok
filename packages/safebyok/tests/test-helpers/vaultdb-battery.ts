@@ -40,7 +40,7 @@ const batteryOpts = Validator.objCheck(({ fn, bool }) => ({
   makeVaultDB:   fn<VaultDBBatteryOpts['makeVaultDB']>(),
   _cheat_rowsOf: fn<VaultDBBatteryOpts['_cheat_rowsOf']>(),
   watches:       bool.optional(),
-}), 'bad_option')
+}), 'bad_record')
 
 // == [The world the cases share]: VaultDBBatteryWorld, worldOf
 

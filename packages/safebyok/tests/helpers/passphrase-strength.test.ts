@@ -45,7 +45,7 @@ describe("guardStrengthChecker", () => {
   })
 
   it("refuses a checker that is no function", () => {
-    TH.expectSyncRefusal(() => guardStrengthChecker({ strong: true } as never), 'bad_option')
+    TH.expectSyncRefusal(() => guardStrengthChecker({ strong: true } as never), 'bad_record')
   })
 
   // StrengthChecker @example 1
@@ -71,7 +71,7 @@ describe("guardStrengthChecker", () => {
 
   it("refuses a passphrase that is not a string, without calling the checker", async () => {
     const checker = vi.fn((_passphrase: string, _scope: BankScope): GX.PassphraseVerdict => StrongVerdict)
-    const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope), 'bad_option')
+    const err = await TH.expectRefusal(guardStrengthChecker(checker)(42 as never, scope), 'bad_record')
     expect(err.message).to.match(/expected string/u)
     expect(checker).not.toHaveBeenCalled()
   })
@@ -109,7 +109,7 @@ describe("guardStrengthChecker", () => {
 
   const Throws = [
     [new Error('could not judge acme acme acme'),                                                  'an Error, quoting the passphrase'],
-    [new VaultError('bad_option', 'acme acme acme is no passphrase I can judge.'),                 'a VaultError of misuse'],
+    [new VaultError('bad_record', 'acme acme acme is no passphrase I can judge.'),                 'a VaultError of misuse'],
     [new VaultError('storage_unavailable', 'The checker could not be loaded: try again shortly.'), 'a VaultError of a condition'],
   ] as const
   for (const [thrown, blurb] of Throws) {

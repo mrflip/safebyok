@@ -20,7 +20,7 @@ export interface GateOpts {
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Gate.make}'s and {@link Gate.makeRecord}'s arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, custom }) => {
+const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
   return {
     gateMakeArgs:   obj({ record: gateThing, opts: obj({ bank: obj({ stamp: bankStamp }) }) }),

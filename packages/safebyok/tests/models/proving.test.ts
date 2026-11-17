@@ -281,7 +281,7 @@ describe("PassphraseProving.buildStored(device, gate, passphraseCleartext)", () 
     const deriveKeyBytes = vi.fn(() => Promise.resolve(Crypto.randomBytes(32)))
     const keyDeriver: Deriver.KeyDeriver = { key_deriver_label: main.key_deriver_label, salt_size: 16, deriveKeyBytes }
     const damaged = { bankStamp: TH.WorldBankStamp, stamp: TH.WorldGateStamp, wayins: { ...gate.wayins, main: { ...main, salt_b64: salt as never } } }
-    const err = await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf({ keyDeriver }), damaged, TH.TestPassphrase), 'bad_option')
+    const err = await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf({ keyDeriver }), damaged, TH.TestPassphrase), 'bad_record')
     expect(TH.thrownText(err)).to.not.include(salt)
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
@@ -373,7 +373,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
 
   for (const [misfit, blurb] of Misfits) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => guardKeyDeriver(misfit as never), 'bad_option')
+      TH.expectSyncRefusal(() => guardKeyDeriver(misfit as never), 'bad_record')
     })
   }
 
@@ -386,7 +386,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
   })
 
   it("replaces a refusal the deriver throws with one that quotes nothing of it", async () => {
-    const hostRefusal = new Errors.VaultError('bad_option', `cannot derive ${TH.TestPassphrase}`, { cause: new TypeError(TH.TestPassphrase), meta: { fieldnames: [TH.TestPassphrase] } })
+    const hostRefusal = new Errors.VaultError('bad_record', `cannot derive ${TH.TestPassphrase}`, { cause: new TypeError(TH.TestPassphrase), meta: { fieldnames: [TH.TestPassphrase] } })
     const deriver = { ...TH.testDeriver, deriveKeyBytes: () => Promise.reject(hostRefusal) }
     const err = await TH.expectRefusal(guardKeyDeriver(deriver).deriveKeyBytes(TH.TestPassphrase, new Uint8Array(16)), 'unexpected_error')
     expect(err).to.not.eq(hostRefusal)

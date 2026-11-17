@@ -21,14 +21,14 @@ describe("HostErrorSanitizer.refusalFor", () => {
   })
 
   it("carries nothing of the foreign error: no cause, no property, no text of it", () => {
-    const refusal = HostErrorSanitizer.refusalFor(quotingError(), 'bad_option', 'The note check threw.')
+    const refusal = HostErrorSanitizer.refusalFor(quotingError(), 'bad_record', 'The note check threw.')
     expect(refusal.cause).to.be.undefined
     expect(Object.getOwnPropertyNames(refusal)).to.have.members(['stack', 'message', 'name', 'refusalkind', 'family'])
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })
 
   it("carries nothing of a foreign value thrown that is not an error", () => {
-    const refusal = HostErrorSanitizer.refusalFor({ note: 'sk-ant-fake-thrown-bag' }, 'bad_option', 'The note check threw.')
+    const refusal = HostErrorSanitizer.refusalFor({ note: 'sk-ant-fake-thrown-bag' }, 'bad_record', 'The note check threw.')
     expect(refusal.cause).to.be.undefined
     expect(TH.thrownText(refusal)).to.not.include('sk-ant-fake')
   })

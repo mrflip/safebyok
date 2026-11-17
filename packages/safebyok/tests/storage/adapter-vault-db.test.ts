@@ -123,6 +123,6 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
 
   it("refuses a watch with no onBadNews", () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
-    TH.expectSyncRefusal(() => vaultDB.watch(TH.ThingBank, () => undefined, undefined as never), 'bad_option')
+    TH.expectSyncRefusal(() => vaultDB.watch(TH.ThingBank, () => undefined, undefined as never), 'bad_record')
   })
 })

@@ -285,7 +285,7 @@ export function childShellCited(parentLifepath: Lifepath): ThingCited {
 // == [Shells]: ShellChecks, VoidSentinel, isVoidSentinel, ShellScoped, ShellParent, shellOf
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
-const ShellChecks = Validator.Checkers('bad_option', ({ obj, lit, uint, label, union, str }) => {
+const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, union, str }) => {
   const fixed = {
     revtok:     lit(SX.VoidRevisionTok).default(SX.VoidRevisionTok),
     revseq:     lit(SX.VoidRevisionSeq).default(SX.VoidRevisionSeq),
@@ -341,13 +341,13 @@ export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel
   const { labelpath: given, label, lifepath: givenLifepath, ...proposed } = ShellChecks.shellScoped.parse(scoped)
   const kin = (parent === undefined) ? undefined : ShellChecks.shellParent.parse(parent)
   const labelpath = given ?? (((kin === undefined) || (label === undefined)) ? undefined : `${kin.labelpath}/${label}`)
-  if (labelpath === undefined) { throw new Errors.VaultError('bad_option', Phrases.ShellUnscoped) }
+  if (labelpath === undefined) { throw new Errors.VaultError('bad_record', Phrases.ShellUnscoped) }
   const parentpath = labelpath.slice(0, Math.max(0, labelpath.lastIndexOf('/')))
-  if ((kin !== undefined) && (kin.labelpath !== parentpath)) { throw new Errors.VaultError('bad_option', Phrases.ShellNotChild) }
+  if ((kin !== undefined) && (kin.labelpath !== parentpath)) { throw new Errors.VaultError('bad_record', Phrases.ShellNotChild) }
   const kinLifepath = (kin === undefined) ? undefined : `${kin.lifepath}/${ShellLifeseq}`
-  if ((kinLifepath !== undefined) && (givenLifepath !== undefined) && (givenLifepath !== kinLifepath)) { throw new Errors.VaultError('bad_option', Phrases.ShellOfOtherLife) }
+  if ((kinLifepath !== undefined) && (givenLifepath !== undefined) && (givenLifepath !== kinLifepath)) { throw new Errors.VaultError('bad_record', Phrases.ShellOfOtherLife) }
   const lifepath = givenLifepath ?? kinLifepath ?? ((parentpath === '') ? ShellLifepath : undefined)
-  if (lifepath === undefined) { throw new Errors.VaultError('bad_option', Phrases.ShellLifeless) }
+  if (lifepath === undefined) { throw new Errors.VaultError('bad_record', Phrases.ShellLifeless) }
   const shell = { fmt: ThingFormats[modelkindOf(labelpath)], ...proposed, labelpath, label: label ?? labelpath.slice(labelpath.lastIndexOf('/') + 1), lifepath }
   return Object.freeze(ShellChecks.shell.parse(shell)) as VoidSentinel
 }
@@ -384,7 +384,7 @@ function isPolicyOwn({ modelkind, options }: Flagged): boolean {
 }
 
 /** The checks of a vaultDB ask, its records aside, and of a watch's scope and handlers. */
-const AskChecks = Validator.Checkers('bad_option', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
+const AskChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
   const modelkind       = oneof(thingkindVals)
   const thingWatchScope = thingScope.pick({ userid: true, banklabel: true })
   const thingOptions    = obj({
@@ -454,13 +454,13 @@ export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
 /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same', [RootBoxLabelpath]: BoxThing | 'same' }>
 
-/** Check a get `ask`, throwing `bad_option`, and return it typed. */
+/** Check a get `ask`, throwing `bad_record`, and return it typed. */
 export function checkedGetAsk(ask: unknown): GetAsk { return AskChecks.getAsk.parse(ask) }
 
-/** Check a list `ask`, throwing `bad_option`, and return it typed. */
+/** Check a list `ask`, throwing `bad_record`, and return it typed. */
 export function checkedListAsk(ask: unknown): ListAsk { return AskChecks.listAsk.parse(ask) }
 
-/** Check a write `ask`, and its records by their kind and against each other, throwing `bad_option` or `bad_record`. Returns it typed. */
+/** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {
   const checked = withRecordsChecked(AskChecks.writeAsk.parse(ask))
   if ((checked.op === 'put') !== (checked.record.am === 'a')) { throw opNotOfRecord(checked) }
@@ -475,7 +475,7 @@ function withRecordsChecked({ cited, record, ...flags }: Z.infer<typeof AskCheck
   return { ...flags, modelkind: 'box', cited: boxCited.parse(cited), record: boxThing.parse(record) }
 }
 
-/** Check a birth `ask`: each of its three records, as the put {@link birthPutsOf} makes of it. Throws `bad_option` or `bad_record`, and returns it typed. */
+/** Check a birth `ask`: each of its three records, as the put {@link birthPutsOf} makes of it. Throws `bad_record`, and returns it typed. */
 export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
   const parsed  = AskChecks.birthBankAsk.parse(ask)
   const checked = { ...parsed, bank: bankThing.parse(parsed.bank), gate: gateThing.parse(parsed.gate), root: boxThing.parse(parsed.root) }
@@ -514,8 +514,8 @@ function checkWriteInvariants(ask: WriteAsk): void {
 // == [Write throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing
 // Each refuses a write ask, and its meta carries the loggable part of the ask.
 
-/** A `bad_option` refusal: a put's record is a tombstone, or a del's is live. */
-function opNotOfRecord(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_option', Phrases.OpNotOfRecord, { meta: { ask: loggableAskOf(ask) } }) }
+/** A `bad_record` refusal: a put's record is a tombstone, or a del's is live. */
+function opNotOfRecord(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.OpNotOfRecord, { meta: { ask: loggableAskOf(ask) } }) }
 
 /** A `bad_record` refusal: the record's revseq is not one past the cited one's. */
 function revseqNotNext(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RevseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
@@ -641,7 +641,7 @@ export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label
     root:      citedFields.optional(),
     track:     obj({ bank: trackFields, [MainGateLabelpath]: trackFields, [RootBoxLabelpath]: trackFields }).partial().optional(),
   }
-}, 'bad_option')
+}, 'bad_record')
 
 /** The part of a vaultDB ask that is safe to log. */
 export type LoggableAsk = Readonly<Z.infer<typeof loggableAsk>>

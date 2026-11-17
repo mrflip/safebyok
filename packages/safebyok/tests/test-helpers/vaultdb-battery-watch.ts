@@ -129,7 +129,7 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
 
     it("refuses a scope that is not a bank's", async () => {
       const vaultDB = await fresh()
-      expectSyncRefusal(() => vaultDB.watch({ userid: 'u1' } as never, () => undefined, () => undefined), 'bad_option')
+      expectSyncRefusal(() => vaultDB.watch({ userid: 'u1' } as never, () => undefined, () => undefined), 'bad_record')
     })
   })
 }

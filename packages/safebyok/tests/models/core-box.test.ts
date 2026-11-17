@@ -47,9 +47,9 @@ describe("CoreBox.donorPropsOf(donor), publicPropsOf(publicProps) and secretProp
   })
 
   it("refuses a field beside the sidecar, am and written_at of publicProps, and beside the whisper of secretProps", () => {
-    TH.expectSyncRefusal(() => CoreBox.publicPropsOf({ sidcar: TH.Sidecar } as never), 'bad_option')
-    TH.expectSyncRefusal(() => CoreBox.publicPropsOf({ sidecar: TH.Sidecar, whisper: TH.Whisper } as never), 'bad_option')
-    TH.expectSyncRefusal(() => CoreBox.secretPropsOf({ whisper: TH.Whisper, sidecar: TH.Sidecar } as never), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.publicPropsOf({ sidcar: TH.Sidecar } as never), 'bad_record')
+    TH.expectSyncRefusal(() => CoreBox.publicPropsOf({ sidecar: TH.Sidecar, whisper: TH.Whisper } as never), 'bad_record')
+    TH.expectSyncRefusal(() => CoreBox.secretPropsOf({ whisper: TH.Whisper, sidecar: TH.Sidecar } as never), 'bad_record')
   })
 
   const PublicPropsCases = [
@@ -61,13 +61,13 @@ describe("CoreBox.donorPropsOf(donor), publicPropsOf(publicProps) and secretProp
 
   for (const [publicProps, blurb] of PublicPropsCases) {
     it(`refuses publicProps with ${blurb}`, () => {
-      TH.expectSyncRefusal(() => CoreBox.publicPropsOf(publicProps as never), 'bad_option')
+      TH.expectSyncRefusal(() => CoreBox.publicPropsOf(publicProps as never), 'bad_record')
     })
   }
 
   it("refuses a donor of another kind, and secretProps with no whisper", () => {
-    TH.expectSyncRefusal(() => CoreBox.donorPropsOf({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'bad_option')
-    TH.expectSyncRefusal(() => CoreBox.secretPropsOf({} as never), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.donorPropsOf({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'bad_record')
+    TH.expectSyncRefusal(() => CoreBox.secretPropsOf({} as never), 'bad_record')
   })
 
   it("gives a frozen empty whisper as the tombstone's secrets", () => {
@@ -98,7 +98,7 @@ describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
   })
 
   it("refuses when neither the donor nor publicProps has a sidecar", () => {
-    const err = TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(TH.boxShellOf(), {}), 'bad_option')
+    const err = TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(TH.boxShellOf(), {}), 'bad_record')
     expect(TH.thrownText(err)).to.include(Phrases.SidecarMissing)
   })
 
@@ -139,7 +139,7 @@ describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
 
   for (const [donorOf, blurb] of DonorCases) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(donorOf() as never, PublicProps), 'bad_option')
+      TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(donorOf() as never, PublicProps), 'bad_record')
     })
   }
 })
@@ -160,15 +160,15 @@ describe("CoreBox.tombstoneOf(donor)", () => {
   })
 
   it("refuses a sidecar given, as a tombstone has none", () => {
-    const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(liveRevisionOf(), { sidecar: { account: 'home' } }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(liveRevisionOf(), { sidecar: { account: 'home' } }), 'bad_record')
     expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarGiven)
   })
 
   it("refuses a tombstone or the shell", () => {
     const tombstone = CoreBox.tombstoneOf(liveRevisionOf())
-    const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(tombstone), 'bad_option')
+    const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(tombstone), 'bad_record')
     expect(TH.thrownText(err)).to.include(Phrases.TombstoneOfLiveOnly)
-    TH.expectSyncRefusal(() => CoreBox.tombstoneOf(TH.boxShellOf()), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.tombstoneOf(TH.boxShellOf()), 'bad_record')
   })
 })
 
@@ -194,7 +194,7 @@ describe("CoreBox.stampOf(record)", () => {
   })
 
   it("refuses the shell, which has no revision to bind", () => {
-    TH.expectSyncRefusal(() => CoreBox.stampOf(TH.boxShellOf()), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.stampOf(TH.boxShellOf()), 'bad_record')
   })
 })
 
@@ -257,12 +257,12 @@ describe("CoreBox.sealedOf(record) and recordOf(next, sealed)", () => {
   })
 
   it("refuses to lay in a sealed whisper that is not ciphertexts and tags", () => {
-    TH.expectSyncRefusal(() => CoreBox.recordOf(liveRevisionOf(), { ...Sealed, key_wrapped: 'k' } as never), 'bad_option')
-    TH.expectSyncRefusal(() => CoreBox.recordOf(liveRevisionOf(), TH.omitting(Sealed, 'codectag')), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.recordOf(liveRevisionOf(), { ...Sealed, key_wrapped: 'k' } as never), 'bad_record')
+    TH.expectSyncRefusal(() => CoreBox.recordOf(liveRevisionOf(), TH.omitting(Sealed, 'codectag')), 'bad_record')
   })
 
   it("refuses to make a record of the shell", () => {
-    TH.expectSyncRefusal(() => CoreBox.recordOf(TH.boxShellOf(), Sealed), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.recordOf(TH.boxShellOf(), Sealed), 'bad_record')
   })
 
   it("refuses 'damaged_whisper' for a sealed whisper of other tags, quoting none of it", () => {
@@ -274,7 +274,7 @@ describe("CoreBox.sealedOf(record) and recordOf(next, sealed)", () => {
   })
 
   it("refuses to pick the sealed whisper of the shell or of null", () => {
-    TH.expectSyncRefusal(() => CoreBox.sealedOf(TH.boxShellOf() as never), 'bad_option')
-    TH.expectSyncRefusal(() => CoreBox.sealedOf(null as never), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.sealedOf(TH.boxShellOf() as never), 'bad_record')
+    TH.expectSyncRefusal(() => CoreBox.sealedOf(null as never), 'bad_record')
   })
 })

@@ -58,7 +58,7 @@ describe("Device.make(record, opts)", () => {
   })
 
   it("refuses a vaultDB missing a verb, naming it", () => {
-    const err = TH.expectSyncRefusal(() => TH.makeDevice({}, { vaultDB: { tryGetThing: vi.fn() } } as never), 'bad_option')
+    const err = TH.expectSyncRefusal(() => TH.makeDevice({}, { vaultDB: { tryGetThing: vi.fn() } } as never), 'bad_record')
     expect(err.message).to.include('vaultDB: ')
   })
 
@@ -101,7 +101,7 @@ describe("Device.make(record, opts)", () => {
 
   for (const [fieldname, moved] of OptsCases) {
     it(`refuses a ${fieldname} of the wrong type, naming it`, () => {
-      const err = TH.expectSyncRefusal(() => TH.makeDevice({}, moved as never), 'bad_option')
+      const err = TH.expectSyncRefusal(() => TH.makeDevice({}, moved as never), 'bad_record')
       expect(err.message.startsWith(`${fieldname}: `)).to.be.true
     })
   }
@@ -116,7 +116,7 @@ describe("Device.make(record, opts)", () => {
 
   for (const [moved, blurb] of OtherOptsCases) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => TH.makeDevice({}, moved as never), 'bad_option')
+      TH.expectSyncRefusal(() => TH.makeDevice({}, moved as never), 'bad_record')
     })
   }
 
@@ -132,7 +132,7 @@ describe("Device.make(record, opts)", () => {
 
   for (const [moved, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, () => {
-      TH.expectSyncRefusal(() => TH.makeDevice(moved as never), 'bad_option')
+      TH.expectSyncRefusal(() => TH.makeDevice(moved as never), 'bad_record')
     })
   }
 
@@ -176,7 +176,7 @@ describe("guardRequestCleartext(requestCleartext)", () => {
   })
 
   it("refuses a dialog that is not a function, naming it", () => {
-    const err = TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_option')
+    const err = TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_record')
     expect(err.message).to.match(/^requestCleartext: /)
   })
 })
@@ -285,9 +285,9 @@ describe("tellBadNewsTo", () => {
     const device = TH.makeDevice()
     const onBadNews = vi.fn()
     const news = new Errors.VaultError('storage_unavailable', "Down.")
-    TH.expectSyncRefusal(() => { tellBadNewsTo('tell me' as never, device, [news]) }, 'bad_option')
-    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_option')
-    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, device, [new Error("Down.") as never]) }, 'bad_option')
+    TH.expectSyncRefusal(() => { tellBadNewsTo('tell me' as never, device, [news]) }, 'bad_record')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_record')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, device, [new Error("Down.") as never]) }, 'bad_record')
     expect(onBadNews).not.toHaveBeenCalled()
   })
 })

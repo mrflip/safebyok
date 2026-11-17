@@ -92,7 +92,7 @@ describe("Bank.makeRecord(dna)", () => {
     const { record, device } = await TH.buildBornBank()
     const bank = Bank.make(record, { device, vaultDB: device.vaultDB })
     const dna = { ...TH.omitting(TH.WorldBankStamp, 'lifeseq'), maingate: { ...TH.WorldGateStamp, wayins: { main: bank.maingate.main, passkey0: null } } }
-    TH.expectSyncRefusal(() => Bank.makeRecord(dna), 'bad_option')
+    TH.expectSyncRefusal(() => Bank.makeRecord(dna), 'bad_record')
   })
 })
 
@@ -151,7 +151,7 @@ describe("Bank.make(record, { device, vaultDB })", () => {
   for (const [recordOf, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, async () => {
       const { record, device } = await TH.buildBornBank()
-      TH.expectSyncRefusal(() => Bank.make(recordOf(record) as never, { device, vaultDB: device.vaultDB }), 'bad_option')
+      TH.expectSyncRefusal(() => Bank.make(recordOf(record) as never, { device, vaultDB: device.vaultDB }), 'bad_record')
     })
   }
 
@@ -201,10 +201,10 @@ describe("Bank.make(record, { device, vaultDB })", () => {
 
   it("refuses a device that is not a Device, a vaultDB that is not a VaultDB, and no opts at all", async () => {
     const { record, device } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Bank.make(record, { device: { ...device.toJSON(), scope: device.scope, isEnabled: true }, vaultDB: device.vaultDB } as never), 'bad_option')
-    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: { ...device.vaultDB, tryGetThing: null } } as never), 'bad_option')
-    TH.expectSyncRefusal(() => Bank.make(record, { device } as never), 'bad_option')
-    TH.expectSyncRefusal(() => Bank.make(record, undefined as never), 'bad_option')
+    TH.expectSyncRefusal(() => Bank.make(record, { device: { ...device.toJSON(), scope: device.scope, isEnabled: true }, vaultDB: device.vaultDB } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: { ...device.vaultDB, tryGetThing: null } } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(record, { device } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(record, undefined as never), 'bad_record')
   })
 })
 
@@ -256,8 +256,8 @@ describe("bank.unlockByProving(proved, cited) and bank.lock()", () => {
   it("refuses what is not a Proving, and stays locked", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
-    await TH.expectRefusal(bank.unlockByProving({ wayinkind: 'passphrase' } as never), 'bad_option')
-    await TH.expectRefusal(bank.unlockByProving(null as never), 'bad_option')
+    await TH.expectRefusal(bank.unlockByProving({ wayinkind: 'passphrase' } as never), 'bad_record')
+    await TH.expectRefusal(bank.unlockByProving(null as never), 'bad_record')
     expect(bank.isLocked).to.be.true
   })
 
@@ -373,7 +373,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     it(`refuses a box with ${blurb}, before unsealing`, async () => {
       const { bank } = await TH.buildBornBank()
       const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-      await TH.expectRefusal(bank.unsealBox(alter(box) as never), 'bad_option')
+      await TH.expectRefusal(bank.unsealBox(alter(box) as never), 'bad_record')
     })
   }
 
@@ -460,19 +460,19 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   for (const [donorOf, blurb] of DonorCases) {
     it(`refuses to seal ${blurb}`, async () => {
       const { bank } = await TH.buildBornBank()
-      await TH.expectRefusal(bank.sealBox(donorOf() as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_option')
+      await TH.expectRefusal(bank.sealBox(donorOf() as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
     })
   }
 
   it("refuses a misspelt key in publicProps, and a key beside the whisper in secretProps", async () => {
     const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidcar: TH.Sidecar } as never, { whisper: TH.Whisper }), 'bad_option')
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper, sidecar: TH.Sidecar } as never), 'bad_option')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidcar: TH.Sidecar } as never, { whisper: TH.Whisper }), 'bad_record')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper, sidecar: TH.Sidecar } as never), 'bad_record')
   })
 
   it("refuses to seal a box when neither the donor nor publicProps has a sidecar", async () => {
     const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), {}, { whisper: TH.Whisper }), 'bad_option')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), {}, { whisper: TH.Whisper }), 'bad_record')
   })
 
   const WhisperCases = [
@@ -515,7 +515,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
   it("refuses a tombstone given secret props", async () => {
     const { bank } = await TH.buildBornBank()
     const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await TH.expectRefusal(bank.sealBox(box, { am: 'x' }, { whisper: TH.Whisper }), 'bad_option')
+    await TH.expectRefusal(bank.sealBox(box, { am: 'x' }, { whisper: TH.Whisper }), 'bad_record')
   })
 
   it("unseals a tombstone to its Thing fields and an empty whisper", async () => {
@@ -537,8 +537,8 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
   it("refuses the tombstone of a tombstone or of the shell", async () => {
     const { bank } = await TH.buildBornBank()
     const tombstone = await bank.tombstoneBox(await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
-    await TH.expectRefusal(bank.tombstoneBox(tombstone), 'bad_option')
-    await TH.expectRefusal(bank.tombstoneBox(TH.boxShellOf()), 'bad_option')
+    await TH.expectRefusal(bank.tombstoneBox(tombstone), 'bad_record')
+    await TH.expectRefusal(bank.tombstoneBox(TH.boxShellOf()), 'bad_record')
   })
 
   // A tombstone's signature is its sealed empty whisper, and the unseal is its check.
@@ -704,9 +704,9 @@ describe("Bank.birth(record, opts)", () => {
     expect(evict).toHaveBeenCalledTimes(1)
   })
 
-  it("refuses bad_option where opts has no proving", async () => {
+  it("refuses bad_record where opts has no proving", async () => {
     const { record, opts } = await birthArgsOf()
-    await TH.expectRefusal(Bank.birth(record, { ...opts, proving: {} as Proving }), 'bad_option')
+    await TH.expectRefusal(Bank.birth(record, { ...opts, proving: {} as Proving }), 'bad_record')
   })
 
   it("throws the device's refusal on a swept device, building no lease and writing nothing", async () => {

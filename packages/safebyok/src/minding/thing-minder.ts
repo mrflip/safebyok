@@ -74,7 +74,7 @@ export interface MinderOpts {
 }
 
 /** The checks of {@link ThingMinder.make}'s arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, oneof, custom, orDefault }) => ({
   minderMakeArgs: obj({
     ties: obj({ modelkind: oneof(thingkindVals) }),
     opts: obj({
@@ -326,12 +326,12 @@ export class ThingMinder {
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The shell at `scoped`. Below a root, it has the life of its root's cached car, and refuses `bad_option` where none is cached. */
+  /** The shell at `scoped`. Below a root, it has the life of its root's cached car, and refuses `bad_record` where none is cached. */
   #shellAt(scoped: ThingScope): VoidSentinel {
     const { labelpath } = scoped
     if (! labelpath.includes('/')) { return shellOf(scoped) }
     const parent = this.#cachedAt({ ...scoped, labelpath: modelkindOf(labelpath) })?.newest
-    if (parent === undefined) { throw new Errors.VaultError('bad_option', Phrases.RootNotCached) }
+    if (parent === undefined) { throw new Errors.VaultError('bad_record', Phrases.RootNotCached) }
     return shellOf(scoped, parent)
   }
   // --
@@ -350,13 +350,13 @@ export class ThingMinder {
   /** Demand that `ask` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. */
   #demandOwnAsk(ask: MinderGetAsk): void {
     minderTrack.parse(ask)
-    Validator.checkedConsistent(checkedGetAsk(ask), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
+    Validator.checkedConsistent(checkedGetAsk(ask), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_record' })
   }
 
   /** Demand that `scoped` is a scope in this minder's bank, of its modelkind. */
   #demandOwnScope(scoped: ThingScope): void {
     const { labelpath, ...bankScope } = minderScope.parse(scoped)
-    Validator.checkedConsistent({ ...bankScope, modelkind: modelkindOf(labelpath) }, this.ties, { kind: 'bad_option' })
+    Validator.checkedConsistent({ ...bankScope, modelkind: modelkindOf(labelpath) }, this.ties, { kind: 'bad_record' })
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */

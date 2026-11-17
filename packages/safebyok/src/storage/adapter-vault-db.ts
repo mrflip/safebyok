@@ -22,7 +22,7 @@ export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 const adapterVaultDBOpts = Validator.Checker(({ obj, bool }) => obj({
   /** False to notify no watch of the Things in an answer's `tracked` ({@link AdapterVaultDB.notifyTrackedRecords}). Default true. */
   doNotifyTracked: bool.optional(),
-}).strict(), 'bad_option')
+}).strict(), 'bad_record')
 
 /** The options of a vaultDB that extends {@link AdapterVaultDB}. */
 export type AdapterVaultDBOpts = Readonly<Z.infer<typeof adapterVaultDBOpts>>
@@ -61,7 +61,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   readonly #doNotifyTracked: boolean
   readonly #feeds = new Set<Feed>()
 
-  /** Throws `bad_option` for opts it does not know. */
+  /** Throws `bad_record` for opts it does not know. */
   constructor(opts: AdapterVaultDBOpts = {}) {
     const { doNotifyTracked = true } = adapterVaultDBOpts.parse(opts)
     this.#doNotifyTracked = doNotifyTracked

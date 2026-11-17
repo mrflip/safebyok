@@ -46,7 +46,7 @@ describe("carOf", () => {
   ] as const
   for (const [val, blurb] of NotRecords) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => carOf(val as unknown as Thing), 'bad_option')
+      TH.expectSyncRefusal(() => carOf(val as unknown as Thing), 'bad_record')
     })
   }
 })

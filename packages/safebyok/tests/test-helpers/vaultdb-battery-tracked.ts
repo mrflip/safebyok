@@ -54,9 +54,9 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
     it("refuses a track that is not the revseq and lifepath of the bank, the main gate and the root box", async () => {
       const vaultDB = await bornBank()
       const { bank, gate, box } = trackOf()
-      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate } } as never), 'bad_option')
-      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate, box, vault: box } } as never), 'bad_option')
-      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank: { ...bank, lifeseq: lifeseqOfLifenum(0) }, gate, box } } as never), 'bad_option')
+      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate } } as never), 'bad_record')
+      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate, box, vault: box } } as never), 'bad_record')
+      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank: { ...bank, lifeseq: lifeseqOfLifenum(0) }, gate, box } } as never), 'bad_record')
     })
   })
 }
