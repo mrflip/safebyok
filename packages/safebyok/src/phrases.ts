@@ -122,7 +122,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarGoneNotTombstone, CarVoidNotShell
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -138,4 +138,25 @@ export const QueryClientExpected = 'A ThingMinder is made with a QueryClient fro
 
 /** A gcTime that is not Infinity or a whole number of milliseconds up to 2^31 - 1. */
 export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2147483647 (about 24.8 days): a longer timer fires at once.'
+
+/** A car whose newest is not a Thing's scope and revision. */
+export const CarRecordShape = "A ThingCar's newest record lacks a Thing's scope or revision: this is a bug in safebyok."
+
+/** A car whose fullest is not a whole record. */
+export const CarFullestShape = "A ThingCar's fullest record is not whole: this is a bug in safebyok."
+
+/** A full car with two records, or a tombstone. */
+export const CarFullSplit = "A full ThingCar holds one live record in both its newest and fullest: this is a bug in safebyok."
+
+/** A behind or bare car whose newest is whole, or a tombstone. */
+export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is live and sparse: this is a bug in safebyok."
+
+/** A behind car whose fullest is not an earlier revision of its newest's life. */
+export const CarBehindOfOtherRevision = "A behind ThingCar's fullest record is an earlier revision of its newest's Thing and life: this is a bug in safebyok."
+
+/** A gone car whose newest is not a tombstone. */
+export const CarGoneNotTombstone = "A gone ThingCar's newest record is a tombstone: this is a bug in safebyok."
+
+/** A void car whose newest is not the void sentinel. */
+export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel: this is a bug in safebyok."
 // --

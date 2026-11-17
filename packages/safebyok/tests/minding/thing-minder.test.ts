@@ -3,9 +3,10 @@ import { Errors } from 'safebyok-big/internals'
 import { noop } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
-import { type DeliverableThing, type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
+import { type DeliverableThing, type ThingCar, carOf } from '../../src/minding/thing-car'
+import { type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateThing, type GetAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, isVoidSentinel, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetAsk, type Thing, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, isVoidSentinel, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -124,9 +125,9 @@ function noticeOf(thing: ThingNotice['val'], world: ThingNotice['world'] = null)
   return { ok: true, act: (thing.am === 'a') ? 'gotlive' : 'gotgone', val: thing, world }
 }
 
-/** The revtok of what the minder holds for the main gate, or undefined for nothing or the void sentinel. */
+/** The revtok of the newest record the minder holds for the main gate, or undefined for nothing or the void sentinel. */
 function revtokAt(minder: ThingMinder): string | undefined {
-  const record: DeliverableThing | undefined = minder.at(GateAsk)
+  const record: DeliverableThing | undefined = minder.at(GateAsk)?.newest
   return ((record === undefined) || isVoidSentinel(record)) ? undefined : record.revtok
 }
 
@@ -164,17 +165,30 @@ describe("ThingMinder.make", () => {
 })
 
 describe("ThingMinder.hello", () => {
-  it("sets the cache options, and those no host sets, as the defaults of the minder's entries", () => {
+  it("sets the cache options, and those no host sets, as the defaults of the minder's cars", () => {
     const { tsq, minder } = minderWorldOf(new MemoryVaultDB())
-    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include({ ...DefaultQueryCacheOpts, ...FixedQueryCacheOpts })
+    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include({ gcTime: DefaultQueryCacheOpts.gcTime, ...FixedQueryCacheOpts })
+    const car = carOf(TH.gateThingOf())
+    expect(staleTimeAt(tsq, minder, car)).to.eq(60 * 60 * 1000)
     expect(DefaultQueryCacheOpts.staleTime).to.eq(60 * 60 * 1000)
   })
 
-  it("sets the staleTime the minder was made with", () => {
+  it("sets the staleTime the minder was made with, and 0 for a car that lacks the newest record whole", () => {
     const tsq    = new TSQ.QueryClient()
     const minder = minderOf('gate', new MemoryVaultDB(), tsq, { staleTime: 5 })
     minder.hello()
-    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include({ staleTime: 5, gcTime: Infinity, networkMode: 'always', retry: false })
+    expect(tsq.getQueryDefaults(minder.queryKey(TH.GateScope))).to.include({ gcTime: Infinity, networkMode: 'always', retry: false })
+    const gate = TH.gateThingOf()
+    const StaleTimeCases = [
+      [carOf(gate),                                                         5, 'full'],
+      [carOf(sparseOf(gate)),                                               0, 'bare'],
+      [{ liveness: 'behind', newest: sparseOf(TH.nextGateOf(gate)), fullest: gate }, 0, 'behind'],
+      [carOf(shellOf(TH.GateScope)),                                        5, 'void'],
+      [undefined,                                                           5, 'vacant'],
+    ] as const
+    for (const [car, expected, blurb] of StaleTimeCases) {
+      expect(staleTimeAt(tsq, minder, car as ThingCar<Thing> | undefined), blurb).to.eq(expected)
+    }
   })
 
   it("watches the bank from each minder", () => {
@@ -192,11 +206,19 @@ describe("ThingMinder.hello", () => {
     expect(watching.mock.calls).to.have.lengthOf(3)
   })
 
-  it("caches the bank's root box in the box minder, sparse and stale, so that the next get of it fetches it whole", () => {
+  it("caches the bank's root box in the box minder, bare and stale, so that the next get of it fetches it whole", () => {
     const { boxMinder, minder } = minderWorldOf(new MemoryVaultDB())
-    expect(boxMinder.at(TH.RootScope)).to.deep.equal(sparseOf(TH.rootBoxOf()))
+    expect(boxMinder.at(TH.RootScope)).to.deep.equal({ liveness: 'bare', newest: sparseOf(TH.rootBoxOf()), fullest: undefined })
     expect(boxMinder.isStaleAt(RootAsk)).to.be.true
     expect(minder.at(TH.GateScope)).to.be.undefined
+  })
+
+  it("caches no root box before the bank's birth, when the root box is the shell", () => {
+    const tsq       = new TSQ.QueryClient()
+    const bank      = { ...fakeBankOf(), rootBox: shellOf({ ...TH.ThingBank, labelpath: 'box' }) }
+    const boxMinder = minderOf('box', new MemoryVaultDB(), tsq, {}, bank as MinderFriend)
+    boxMinder.hello()
+    expect(boxMinder.at(TH.RootScope)).to.be.undefined
   })
 
   it("keeps the root box cached past the host's gcTime, which collects the boxes under it, until goodbye", async () => {
@@ -210,10 +232,11 @@ describe("ThingMinder.hello", () => {
       await boxMinder.list()
       expect(tsq.getQueryCache().find({ queryKey: boxMinder.queryKey(BoxAsk), exact: true })).to.have.property('gcTime', 10)
       await vi.advanceTimersByTimeAsync(20)
-      expect(boxMinder.at(RootAsk)).to.deep.equal(sparseOf(TH.rootBoxOf()))
+      expect(boxMinder.at(RootAsk)?.newest).to.deep.equal(sparseOf(TH.rootBoxOf()))
       expect(boxMinder.at(BoxAsk)).to.be.undefined
       await boxMinder.list()
-      expect(boxMinder.at(BoxAsk)).to.deep.equal(sparseOf(TH.boxThingOf()))
+      const bare = carOf(sparseOf(TH.boxThingOf()))
+      expect(boxMinder.at(BoxAsk)).to.deep.equal(bare)
       tsq.removeQueries({ queryKey: ['safebyok', 'u1', 'acme', 'box'] })
       expect([boxMinder.at(RootAsk), boxMinder.at(BoxAsk)]).to.deep.equal([undefined, undefined])
       boxMinder.goodbye()
@@ -270,7 +293,7 @@ describe("ThingMinder.goodbye", () => {
     const { minder } = minderWorldOf(vaultDB)
     minder.goodbye()
     minder.hello()
-    expect(await minder.get(GateAsk)).to.deep.equal(gate)
+    expect(await minder.get(GateAsk)).to.deep.equal(carOf(gate))
   })
 })
 
@@ -280,13 +303,16 @@ describe("ThingMinder.at", () => {
     expect(minder.at(GateAsk)).to.be.undefined
   })
 
-  it("holds the record however old it is", async () => {
+  it("holds the car however old it is, its record in both newest and fullest", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
     expect(minder.isStaleAt(GateAsk, { staleTime: 0 })).to.be.true
-    expect(minder.at(GateAsk)).to.deep.equal(gate)
+    const car = minder.at(GateAsk)
+    expect(car).to.deep.equal({ liveness: 'full', newest: gate, fullest: gate })
+    expect(car?.newest).to.eq(car?.fullest)
+    expect(Object.isFrozen(car)).to.be.true
   })
 
   const ForeignScopes = [
@@ -298,7 +324,6 @@ describe("ThingMinder.at", () => {
     it(blurb, () => {
       const { minder } = minderWorldOf(new MemoryVaultDB())
       TH.expectSyncRefusal(() => minder.at(scoped), 'bad_option')
-      TH.expectSyncRefusal(() => minder.isWholeRecordAt(scoped), 'bad_option')
     })
   }
 })
@@ -306,7 +331,7 @@ describe("ThingMinder.at", () => {
 describe("ThingMinder.tryAt", () => {
   it("answers vacant where the cache holds nothing", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
-    expect(minder.tryAt(GateAsk)).to.deep.include({ ok: true, act: 'vacant', val: undefined, isTimely: false, refreshedAt: 0, isFetching: false, lastErr: null })
+    expect(minder.tryAt(GateAsk)).to.deep.include({ ok: true, act: 'vacant', val: undefined, car: undefined, isTimely: false, refreshedAt: 0, isFetching: false, lastErr: null })
   })
 
   it("answers gotlive with the record where it is timely", async () => {
@@ -314,16 +339,16 @@ describe("ThingMinder.tryAt", () => {
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
-    expect(minder.tryAt(GateAsk)).to.deep.include({ ok: true, act: 'gotlive', val: gate, isTimely: true, isFetching: false, lastErr: null })
+    expect(minder.tryAt(GateAsk)).to.deep.include({ ok: true, act: 'gotlive', val: gate, car: carOf(gate), isTimely: true, isFetching: false, lastErr: null })
   })
 
-  it("answers untimely, without the record, where it is older than staleTime", async () => {
+  it("answers untimely, without the record but with its car, where it is older than staleTime", async () => {
     const vaultDB = new MemoryVaultDB()
-    await storedGateOf(vaultDB, 0)
+    const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
     const answer = minder.tryAt(GateAsk, { staleTime: 0 })
-    expect(answer).to.deep.include({ ok: true, act: 'untimely', val: undefined, isTimely: false })
+    expect(answer).to.deep.include({ ok: true, act: 'untimely', val: undefined, car: carOf(gate), isTimely: false })
     expect(answer).to.have.property('refreshedAt').above(0)
   })
 
@@ -356,7 +381,7 @@ describe("ThingMinder.tryAt", () => {
     const { minder } = minderWorldOf(vaultDB)
     expect(minder.tryAt(GateAsk, { ifStale: 'refresh' })).to.deep.include({ act: 'vacant', isFetching: true })
     await TH.eventually(() => actOf(minder.tryAt(GateAsk)) === 'gotlive')
-    expect(minder.at(GateAsk)).to.deep.equal(gate)
+    expect(minder.at(GateAsk)).to.deep.equal(carOf(gate))
   })
 
   it("fetches nothing under ifStale: 'refresh' while the record is timely", async () => {
@@ -415,20 +440,21 @@ describe("ThingMinder.get", () => {
     await TH.expectRefusal(minder.get(GateAsk, { staleTime: undefined }), 'bad_option')
   })
 
-  it("returns the record stored, and reads the cache after", async () => {
+  it("returns the car of the record stored, and reads the cache after", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 1)
     const { minder } = minderWorldOf(vaultDB)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
-    expect(await minder.get(GateAsk)).to.deep.equal(gate)
-    expect(await minder.get(GateAsk)).to.deep.equal(gate)
+    expect(await minder.get(GateAsk)).to.deep.equal(carOf(gate))
+    expect(await minder.get(GateAsk)).to.deep.equal(carOf(gate))
     expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
   it("returns, for a box under the root box, its shell under the root box it caches, which the box's birth cites", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { boxMinder } = minderWorldOf(vaultDB)
-    const shell = await boxMinder.get(BoxAsk)
+    const { liveness, newest: shell } = await boxMinder.get(BoxAsk)
+    expect(liveness).to.eq('void')
     expect(shell).to.deep.equal(shellOf(TH.BoxScope, TH.rootBoxOf()))
     expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/${ShellLifeseq}` })
     expect(boxSealable.safeParse(shell).success).to.be.true
@@ -462,9 +488,9 @@ describe("ThingMinder.get", () => {
     const { minder, bankMinder } = minderWorldOf(vaultDB)
     await TH.wakeupAtNextTick()
     expect(minder.at(TH.GateScope)).to.be.undefined
-    expect(await bankMinder.get(BankAsk)).to.have.property('labelpath', 'bank')
+    expect(await bankMinder.get(BankAsk)).to.have.nested.property('newest.labelpath', 'bank')
     await TH.eventually(() => revtokAt(minder) === gate1.revtok)
-    expect(minder.at(TH.GateScope)).to.deep.equal(gate1)
+    expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate1))
   })
 
   it("returns a notice that lands during the get over the get's older answer", async () => {
@@ -477,7 +503,7 @@ describe("ThingMinder.get", () => {
     await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(gate0, gate1)))
     await TH.eventually(() => revtokAt(minder) === gate1.revtok)
     vaultDB.release()
-    expect(await getting).to.deep.equal(gate1)
+    expect(await getting).to.deep.equal(carOf(gate1))
   })
 
   it("returns a birth that lands during the get over the get's void", async () => {
@@ -488,9 +514,9 @@ describe("ThingMinder.get", () => {
     const box   = TH.boxThingOf()
     const shell = shellOf(TH.BoxScope, TH.rootBoxOf())
     await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(box, shell)))
-    await TH.eventually(() => boxMinder.at(BoxAsk)?.revtok === box.revtok)
+    await TH.eventually(() => boxMinder.at(BoxAsk)?.newest.revtok === box.revtok)
     vaultDB.release()
-    expect(await getting).to.deep.equal(box)
+    expect(await getting).to.deep.equal(carOf(box))
   })
 
   // A box, which no ask tracks: a tracked Thing stored is never missing (notes/wontfix.md).
@@ -508,7 +534,7 @@ describe("ThingMinder.get", () => {
       await boxMinder.get(BoxAsk)
       goBack(vaultDB, box0)
       await TH.expectRefusal(boxMinder.get(BoxAsk, { staleTime: 0 }), 'stale_read')
-      expect(boxMinder.at(BoxAsk)).to.deep.equal(box1)
+      expect(boxMinder.at(BoxAsk)).to.deep.equal(carOf(box1))
       expect(boxMinder.tryAt(BoxAsk)).to.deep.include({ act: 'untimely', isTimely: false })
       expect(boxMinder.tryAt(BoxAsk)).to.have.nested.property('lastErr.refusalkind', 'stale_read')
       const asked = vi.spyOn(vaultDB, 'tryGetThing')
@@ -535,7 +561,7 @@ describe("ThingMinder.get", () => {
     const { minder } = minderWorldOf(vaultDB)
     TSQ.onlineManager.setOnline(false)
     try {
-      expect(await minder.get(GateAsk)).to.deep.equal(gate)
+      expect(await minder.get(GateAsk)).to.deep.equal(carOf(gate))
     } finally { TSQ.onlineManager.setOnline(true) }
   })
 
@@ -550,36 +576,55 @@ describe("ThingMinder.get", () => {
 })
 
 describe("ThingMinder.list", () => {
-  it("lists the boxes under the root box, and caches each sparse and stale", async () => {
+  it("lists the boxes under the root box, and caches each bare and stale", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { boxMinder } = minderWorldOf(vaultDB)
     expect(await boxMinder.list()).to.deep.equal([TH.BoxScope.labelpath])
-    expect(boxMinder.at(BoxAsk)).to.deep.equal(sparseOf(box))
+    expect(boxMinder.at(BoxAsk)).to.deep.equal({ liveness: 'bare', newest: sparseOf(box), fullest: undefined })
     expect(boxMinder.isStaleAt(BoxAsk)).to.be.true
-    expect(await boxMinder.get(BoxAsk)).to.deep.equal(box)
+    expect(await boxMinder.get(BoxAsk)).to.deep.equal(carOf(box))
   })
 
   it("leaves a box the cache holds whole as it is, and timely", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { boxMinder } = minderWorldOf(vaultDB)
-    await boxMinder.get(BoxAsk)
+    const held = await boxMinder.get(BoxAsk)
     await boxMinder.list()
-    expect(boxMinder.at(BoxAsk)).to.deep.equal(box)
+    expect(boxMinder.at(BoxAsk)).to.eq(held)
+    expect(held).to.deep.equal(carOf(box))
     expect(boxMinder.isStaleAt(BoxAsk)).to.be.false
   })
 
-  it("leaves a listener's last word on a listed box untimely, its record sparse", async () => {
+  it("leaves a box the cache holds at an older revision behind and stale, still showing the older record whole", async () => {
     const vaultDB = new MemoryVaultDB()
-    const box     = await storedBoxOf(vaultDB)
+    const box0    = await storedBoxOf(vaultDB)
     const { boxMinder } = minderWorldOf(vaultDB)
+    await boxMinder.get(BoxAsk)
+    const box1 = TH.nextOf(box0)
+    vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box1)
+    await boxMinder.list()
+    expect(boxMinder.at(BoxAsk)).to.deep.equal({ liveness: 'behind', newest: sparseOf(box1), fullest: box0 })
+    expect(boxMinder.isStaleAt(BoxAsk)).to.be.true
+    expect(await boxMinder.get(BoxAsk)).to.deep.equal(carOf(box1))
+  })
+
+  it("tells a listener of a listed box once, untimely, with its bare or behind car", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box0    = await storedBoxOf(vaultDB)
+    const box1    = TH.nextOf(box0)
+    await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(box0, box1)))
+    const otherShell = shellOf({ ...TH.ThingBank, labelpath: 'box/anthropic' }, TH.rootBoxOf())
+    const otherBirth = TH.birthAskOf(TH.boxThingOf('anthropic'), otherShell)
+    await TH.expectGood(vaultDB.tryWriteThing(otherBirth))
+    const { boxMinder, receive } = minderWorldOf(vaultDB)
+    receive(noticeOf(box0))
     const heard = listenerOf()
     boxMinder.listen(heard)
     await boxMinder.list()
-    expect(heard.mock.calls.length).to.be.above(0)
-    expect(heard.mock.calls.at(-1)![0]).to.include({ act: 'untimely', isTimely: false })
-    expect(boxMinder.at(BoxAsk)).to.deep.equal(sparseOf(box))
+    const told = heard.mock.calls.map(([answer]) => [answer.ask.labelpath, answer.act, answer.car?.liveness])
+    expect(told).to.deep.equal([['box/anthropic', 'untimely', 'bare'], ['box/openai', 'untimely', 'behind']])
   })
 
   it("lists nothing under a root box with no boxes under it", async () => {
@@ -609,7 +654,7 @@ describe("ThingMinder.listen", () => {
     const unlisten = minder.listen(heard)
     await boxMinder.get(BoxAsk)
     expect(heard.mock.calls).to.have.lengthOf(0)
-    const gate = await minder.get(GateAsk)
+    const { newest: gate } = await minder.get(GateAsk)
     expect(toldOf(heard)).to.deep.include(['gotlive', 'gate', gate])
     expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ ok: true, ask: getAskOf({ ...TH.GateScope, track: TH.trackOf() }), isTimely: true, lastErr: null })
     unlisten()
@@ -710,7 +755,7 @@ describe("Each minder's watch", () => {
     const { minder } = minderWorldOf(vaultDB)
     const gate = await storedGateOf(vaultDB, 0)
     await TH.eventually(() => revtokAt(minder) === gate.revtok)
-    expect(minder.at(GateAsk)).to.deep.equal(gate)
+    expect(minder.at(GateAsk)).to.deep.equal(carOf(gate))
   })
 
   it("caches the Thing of its own kind that a notice carries, and drops the rest, the world beside it among them", () => {
@@ -719,7 +764,7 @@ describe("Each minder's watch", () => {
     receive(noticeOf(box, { ...bank, maingate: gate }))
     expect(bankMinder.at(BankAsk)).to.be.undefined
     expect(minder.at(GateAsk)).to.be.undefined
-    expect(boxMinder.at(BoxAsk)).to.deep.equal(box)
+    expect(boxMinder.at(BoxAsk)).to.deep.equal(carOf(box))
   })
 
   it("skips a Thing while its minder is not minding", () => {
@@ -753,19 +798,20 @@ describe("Each minder's watch", () => {
     await boxMinder.get(BoxAsk)
     const box = TH.boxThingOf()
     receive(noticeOf(box))
-    expect(boxMinder.at(BoxAsk)).to.deep.equal(box)
+    expect(boxMinder.at(BoxAsk)).to.deep.equal(carOf(box))
   })
 
   it("keeps the unchanged parts of a newer record as they were", () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
     const gate0 = TH.gateThingOf()
     receive(noticeOf(gate0))
-    const held0 = minder.at(GateAsk) as GateThing
+    const held0 = minder.at(GateAsk)?.newest as GateThing
     const gate1 = structuredClone(TH.nextGateOf(gate0))
     receive(noticeOf(gate1))
     const held1 = minder.at(GateAsk)
-    expect(held1).to.have.property('revseq', 1)
-    expect(held1).to.have.property('wayins').that.eq(held0.wayins)
+    expect(held1).to.have.nested.property('newest.revseq', 1)
+    expect(held1).to.have.nested.property('newest.wayins').that.eq(held0.wayins)
+    expect(held1?.newest).to.eq(held1?.fullest)
   })
 })
 
@@ -775,17 +821,17 @@ describe("A host's QueryObserver on a minder's key", () => {
     const gate    = await storedGateOf(vaultDB, 0)
     const { tsq, minder } = minderWorldOf(vaultDB)
     const asked    = vi.spyOn(vaultDB, 'tryGetThing')
-    const observer = new TSQ.QueryObserver<DeliverableThing>(tsq, { queryKey: minder.queryKey(TH.GateScope) })
+    const observer = new TSQ.QueryObserver<ThingCar<Thing>>(tsq, { queryKey: minder.queryKey(TH.GateScope) })
     const unsubscribe = observer.subscribe(noop)
     await TH.eventually(() => observer.getCurrentResult().isSuccess)
-    expect(observer.getCurrentResult()).to.deep.include({ data: gate, error: null })
+    expect(observer.getCurrentResult()).to.deep.include({ data: carOf(gate), error: null })
     expect(asked.mock.calls).to.deep.equal([[GateAsk]])
     unsubscribe()
   })
 
   it("follows each new revision through its select", () => {
     const { tsq, minder, receive } = minderWorldOf(new MemoryVaultDB())
-    const observer = new TSQ.QueryObserver<DeliverableThing, Error, string>(tsq, { queryKey: minder.queryKey(TH.GateScope), enabled: false, select: (record) => record.revtok })
+    const observer = new TSQ.QueryObserver<ThingCar<Thing>, Error, string>(tsq, { queryKey: minder.queryKey(TH.GateScope), enabled: false, select: (car) => car.newest.revtok })
     const unsubscribe = observer.subscribe(noop)
     const gate0 = TH.gateThingOf()
     receive(noticeOf(gate0))
@@ -800,13 +846,13 @@ describe("A host's QueryObserver on a minder's key", () => {
     const { tsq, bank, boxMinder, receive } = minderWorldOf(new MemoryVaultDB())
     const box = TH.boxThingOf()
     receive(noticeOf(box))
-    const observer = new TSQ.QueryObserver<DeliverableThing>(tsq, { queryKey: boxMinder.queryKey(TH.BoxScope), enabled: false })
+    const observer = new TSQ.QueryObserver<ThingCar<Thing>>(tsq, { queryKey: boxMinder.queryKey(TH.BoxScope), enabled: false })
     const unsubscribe = observer.subscribe(noop)
-    expect(observer.getCurrentResult().data).to.deep.equal(box)
+    expect(observer.getCurrentResult().data).to.deep.equal(carOf(box))
     const otherScope = { ...TH.ThingBank, labelpath: 'box/anthropic' }
-    const shell      = shellOf(otherScope, bank.rootBox)
-    observer.setOptions({ queryKey: boxMinder.queryKey(otherScope), enabled: false, placeholderData: shell })
-    expect(observer.getCurrentResult()).to.deep.include({ data: shell, isPlaceholderData: true })
+    const shellCar   = carOf(shellOf(otherScope, bank.rootBox))
+    observer.setOptions({ queryKey: boxMinder.queryKey(otherScope), enabled: false, placeholderData: shellCar })
+    expect(observer.getCurrentResult()).to.deep.include({ data: shellCar, isPlaceholderData: true })
     unsubscribe()
   })
 
@@ -814,7 +860,7 @@ describe("A host's QueryObserver on a minder's key", () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)
     const { tsq, minder } = minderWorldOf(vaultDB)
-    const observer = new TSQ.QueryObserver<DeliverableThing>(tsq, { queryKey: minder.queryKey(TH.GateScope) })
+    const observer = new TSQ.QueryObserver<ThingCar<Thing>>(tsq, { queryKey: minder.queryKey(TH.GateScope) })
     const unsubscribe = observer.subscribe(noop)
     await TH.eventually(() => observer.getCurrentResult().isSuccess)
     minder.goodbye()
@@ -827,42 +873,50 @@ describe("A host's QueryObserver on a minder's key", () => {
 })
 
 /** The structuralSharing a started gate minder sets in its defaults. */
-function shareOf(): (prior: unknown, record: unknown) => unknown {
+function shareOf(): (prior: unknown, landed: unknown) => unknown {
   const { tsq, minder } = minderWorldOf(new MemoryVaultDB())
-  return tsq.getQueryDefaults(minder.queryKey(TH.GateScope)).structuralSharing as (prior: unknown, record: unknown) => unknown
+  return tsq.getQueryDefaults(minder.queryKey(TH.GateScope)).structuralSharing as (prior: unknown, landed: unknown) => unknown
 }
 
 describe("ThingMinder's structural sharing", () => {
-  it("keeps the later revision of a Thing, whichever comes first", () => {
+  it("keeps the car of the later revision of a Thing, whichever comes first", () => {
     const share = shareOf()
-    const [gate0, gate1] = [TH.gateThingOf(), TH.nextGateOf(TH.gateThingOf())]
-    expect(share(gate0, gate1)).to.deep.equal(gate1)
-    expect(share(gate1, gate0)).to.eq(gate1)
+    const [car0, car1] = [carOf(TH.gateThingOf()), carOf(TH.nextGateOf(TH.gateThingOf()))]
+    expect(share(car0, car1)).to.deep.equal(car1)
+    expect(share(car1, car0)).to.eq(car1)
   })
 
-  it("keeps a whole record over a sparse one of the same revision", () => {
+  it("keeps a full car over a bare one of the same revision", () => {
     const share = shareOf()
     const gate  = TH.gateThingOf()
-    expect(share(gate, sparseOf(gate))).to.eq(gate)
-    expect(share(sparseOf(gate), gate)).to.deep.equal(gate)
+    const [full, bare] = [carOf(gate), carOf(sparseOf(gate))]
+    expect(share(full, bare)).to.eq(full)
+    expect(share(bare, full)).to.deep.equal(full)
   })
 
-  it("shares any other pair as TanStack's default does", () => {
+  it("shares any value that is not a car as TanStack's default does", () => {
     const share = shareOf()
-    const gate  = TH.gateThingOf()
+    const car   = carOf(TH.gateThingOf())
     expect(share('a', 'b')).to.eq('b')
-    expect(share(undefined, gate)).to.eq(gate)
-    expect(share(gate, TH.boxThingOf())).to.deep.equal(TH.boxThingOf())
+    expect(share(car, 'b')).to.eq('b')
+    expect(share(undefined, car)).to.eq(car)
+    expect(share({ revtok: 'r1' }, { revtok: 'r1' })).to.deep.equal({ revtok: 'r1' })
   })
 
-  it("takes the Thing at one labelpath of another user or bank, whatever its revision", () => {
+  it("takes the car of the Thing at one labelpath of another user or bank, whatever its revision", () => {
     const share = shareOf()
-    const ours  = TH.nextGateOf(TH.gateThingOf())
-    for (const theirs of [{ ...TH.gateThingOf(), userid: 'u2' }, { ...TH.gateThingOf(), banklabel: 'zz' }]) {
-      expect(share(ours, theirs)).to.deep.equal(theirs)
+    const ours  = carOf(TH.nextGateOf(TH.gateThingOf()))
+    for (const theirs of [carOf({ ...TH.gateThingOf(), userid: 'u2' }), carOf({ ...TH.gateThingOf(), banklabel: 'zz' })]) {
+      expect(share(ours, theirs)).to.eq(theirs)
     }
   })
 })
+
+/** The staleTime that `minder`'s defaults give a car cached under its key. */
+function staleTimeAt(tsq: TSQ.QueryClient, minder: ThingMinder, car: ThingCar<Thing> | undefined): number {
+  const staleTimeFn = tsq.getQueryDefaults(minder.queryKey(TH.GateScope)).staleTime as (carQuery: { state: { data: unknown } }) => number
+  return staleTimeFn({ state: { data: car } })
+}
 
 describe("ThingMinder keys", () => {
   it("hold each label as a segment of its own, then '.' for the Thing itself, so that the root box's key starts no box's", () => {
