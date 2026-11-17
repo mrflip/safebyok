@@ -1,10 +1,11 @@
 import * as TSQ from '@tanstack/query-core'
 import { Errors } from 'safebyok-big/internals'
+import { noop } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateThing, type GetAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, isVoidSentinel, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -126,7 +127,7 @@ function noticeOf(thing: ThingNotice['val'], world: ThingNotice['world'] = null)
 /** The revtok of what the minder holds for the main gate, or undefined for nothing or the void sentinel. */
 function revtokAt(minder: ThingMinder): string | undefined {
   const record: DeliverableThing | undefined = minder.at(GateAsk)
-  return ((record === undefined) || (record.revseq === -1)) ? undefined : record.revtok
+  return ((record === undefined) || isVoidSentinel(record)) ? undefined : record.revtok
 }
 
 /** The act of `answer`, a tryAt's answer. */
@@ -287,6 +288,19 @@ describe("ThingMinder.at", () => {
     expect(minder.isStaleAt(GateAsk, { staleTime: 0 })).to.be.true
     expect(minder.at(GateAsk)).to.deep.equal(gate)
   })
+
+  const ForeignScopes = [
+    [TH.BoxScope,                         'refuses bad_option for a scope of another kind'],
+    [{ ...TH.GateScope, userid: 'u2' },   "refuses bad_option for another user's scope"],
+    [{ ...TH.GateScope, banklabel: 'zz' }, "refuses bad_option for another bank's scope"],
+  ] as const
+  for (const [scoped, blurb] of ForeignScopes) {
+    it(blurb, () => {
+      const { minder } = minderWorldOf(new MemoryVaultDB())
+      TH.expectSyncRefusal(() => minder.at(scoped), 'bad_option')
+      TH.expectSyncRefusal(() => minder.isWholeRecordAt(scoped), 'bad_option')
+    })
+  }
 })
 
 describe("ThingMinder.tryAt", () => {
@@ -556,6 +570,17 @@ describe("ThingMinder.list", () => {
     expect(boxMinder.isStaleAt(BoxAsk)).to.be.false
   })
 
+  it("tells a listener each listed box untimely, never timely while it is sparse", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { boxMinder } = minderWorldOf(vaultDB)
+    const heard = listenerOf()
+    boxMinder.listen(heard)
+    await boxMinder.list()
+    expect(heard.mock.calls.length).to.be.above(0)
+    expect(heard.mock.calls.map(([answer]) => [answer.act, answer.isTimely])).to.deep.equal(heard.mock.calls.map(() => ['untimely', false]))
+  })
+
   it("lists nothing under a root box with no boxes under it", async () => {
     const { boxMinder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     expect(await boxMinder.list()).to.deep.equal([])
@@ -740,6 +765,78 @@ describe("Each minder's watch", () => {
     const held1 = minder.at(GateAsk)
     expect(held1).to.have.property('revseq', 1)
     expect(held1).to.have.property('wayins').that.eq(held0.wayins)
+  })
+})
+
+describe("A host's QueryObserver on a minder's key", () => {
+  it("fetches the record through the vaultDB, with no queryFn of its own", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { tsq, minder } = minderWorldOf(vaultDB)
+    const asked    = vi.spyOn(vaultDB, 'tryGetThing')
+    const observer = new TSQ.QueryObserver<DeliverableThing>(tsq, { queryKey: minder.queryKey(TH.GateScope) })
+    const unsubscribe = observer.subscribe(noop)
+    await TH.eventually(() => observer.getCurrentResult().isSuccess)
+    expect(observer.getCurrentResult()).to.deep.include({ data: gate, error: null })
+    expect(asked.mock.calls).to.deep.equal([[GateAsk]])
+    unsubscribe()
+  })
+
+  it("follows each new revision through its select", () => {
+    const { tsq, minder, receive } = minderWorldOf(new MemoryVaultDB())
+    const observer = new TSQ.QueryObserver<DeliverableThing, Error, string>(tsq, { queryKey: minder.queryKey(TH.GateScope), enabled: false, select: (record) => record.revtok })
+    const unsubscribe = observer.subscribe(noop)
+    const gate0 = TH.gateThingOf()
+    receive(noticeOf(gate0))
+    expect(observer.getCurrentResult().data).to.eq(gate0.revtok)
+    const gate1 = TH.nextGateOf(gate0)
+    receive(noticeOf(gate1))
+    expect(observer.getCurrentResult().data).to.eq(gate1.revtok)
+    unsubscribe()
+  })
+
+  it("shows the placeholder of the box it moves to, not the box it showed", () => {
+    const { tsq, bank, boxMinder, receive } = minderWorldOf(new MemoryVaultDB())
+    const box = TH.boxThingOf()
+    receive(noticeOf(box))
+    const observer = new TSQ.QueryObserver<DeliverableThing>(tsq, { queryKey: boxMinder.queryKey(TH.BoxScope), enabled: false })
+    const unsubscribe = observer.subscribe(noop)
+    expect(observer.getCurrentResult().data).to.deep.equal(box)
+    const otherScope = { ...TH.ThingBank, labelpath: 'box/anthropic' }
+    const shell      = shellOf(otherScope, bank.rootBox)
+    observer.setOptions({ queryKey: boxMinder.queryKey(otherScope), enabled: false, placeholderData: shell })
+    expect(observer.getCurrentResult()).to.deep.include({ data: shell, isPlaceholderData: true })
+    unsubscribe()
+  })
+})
+
+/** The structuralSharing a started gate minder sets in its defaults. */
+function shareOf(): (prior: unknown, record: unknown) => unknown {
+  const { tsq, minder } = minderWorldOf(new MemoryVaultDB())
+  return tsq.getQueryDefaults(minder.queryKey(TH.GateScope)).structuralSharing as (prior: unknown, record: unknown) => unknown
+}
+
+describe("ThingMinder's structural sharing", () => {
+  it("keeps the later revision of a Thing, whichever comes first", () => {
+    const share = shareOf()
+    const [gate0, gate1] = [TH.gateThingOf(), TH.nextGateOf(TH.gateThingOf())]
+    expect(share(gate0, gate1)).to.deep.equal(gate1)
+    expect(share(gate1, gate0)).to.eq(gate1)
+  })
+
+  it("keeps a whole record over a sparse one of the same revision", () => {
+    const share = shareOf()
+    const gate  = TH.gateThingOf()
+    expect(share(gate, sparseOf(gate))).to.eq(gate)
+    expect(share(sparseOf(gate), gate)).to.deep.equal(gate)
+  })
+
+  it("shares any other pair as TanStack's default does", () => {
+    const share = shareOf()
+    const gate  = TH.gateThingOf()
+    expect(share('a', 'b')).to.eq('b')
+    expect(share(undefined, gate)).to.eq(gate)
+    expect(share(gate, TH.boxThingOf())).to.deep.equal(TH.boxThingOf())
   })
 })
 
