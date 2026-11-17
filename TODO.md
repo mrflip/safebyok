@@ -13,5 +13,9 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   born, so a box can be born under a deleted root box. Whatever checks it belongs in the store's write, beside the other
   preconditions, not in a check before it.
 
+* **A sealed part is not branded.** `seal`'s exit check (`recordOf`'s strict parse) checks a record's shape, not where it
+  came from, so nothing in the types tells a record the lease sealed from one assembled by hand. A brand would have to be
+  set by the store's parse on read as well. Held while the seal path is in flux (the Coach, 2026-11-17).
+
 * If a request has any kind of `world` error it must not return anything in `val` or `dbhas`
 
