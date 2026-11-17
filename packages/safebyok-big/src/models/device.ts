@@ -353,7 +353,7 @@ export class Device {
 
 // == [Host functions]: HostChecks, DefaultOnBadNews, tellBadNewsTo, reportAtError, heedRevokeFailed, DefaultOnLifecycle, guardRequestCleartext, guardOnLifecycle, Handlers, DefaultHandlers
 
-const HostChecks = Checkers('bad_option', ({ fn }) => ({
+const HostChecks = Checkers('bad_record', ({ fn }) => ({
   requestCleartext: fn<RequestCleartext>(),
   onLifecycle:      fn<LifecycleHandler>(),
 }))

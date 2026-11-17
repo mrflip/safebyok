@@ -21,7 +21,7 @@ export interface IdbDeviceDBOpts {
 }
 
 /** The check of an IdbDeviceDB's options, which `browserOpts` accepts too. */
-export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_option')
+export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optional() }), 'bad_record')
 // --
 
 // == [The databases]: DeviceRowScopepath, leaseScopepathOf, deviceRowScopepathOf, leaseShelfOf, deviceRowShelfOf

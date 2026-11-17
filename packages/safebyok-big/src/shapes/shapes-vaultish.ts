@@ -37,7 +37,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 // == [Record forms]: storableBase, liveness, tombstone, isTombstone, Liveness, SparseBase, Tombstone, Fetched, Dna
 
 /** The check of what every stored row has: its revision, its times and its `am`. */
-export const storableBase = Checker(({ obj }) => obj({ ...SX.revision.shape, ...SX.times.shape, am: SX.am }), 'bad_option')
+export const storableBase = Checker(({ obj }) => obj({ ...SX.revision.shape, ...SX.times.shape, am: SX.am }), 'bad_record')
 
 /** The checks of a record's `am`, and of a tombstone's fields. */
 export const { liveness, tombstone } = Checkers('bad_record', ({ obj, lit }) => ({
@@ -73,7 +73,7 @@ export function isTombstone<SparseT extends Liveness>(fetched: SparseT): fetched
 export const Promptly = 3_600_000
 
 /** The checks of the options a storable's verbs accept: how fresh the record in hand must be, a get's and a put's policies, and a listener. */
-export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_option', ({ obj, num, union, lit, orDefault, fn }) => {
+export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxCreateOpts, listener } = Checkers('bad_record', ({ obj, num, union, lit, orDefault, fn }) => {
   // A caller's Infinity, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
   const horizonMillis = union([num.nonnegative(), lit(Infinity)]).transform((most) => Math.min(most, ForeverMillis))
   const maxMillis     = horizonMillis.optional()
@@ -114,7 +114,7 @@ export const { horizonMillis, maxMillis, timelyOpts, fetchOpts, boxPutOpts, boxC
 })
 
 /** The checks of what `bank.tryProbe` is handed: where its trial box goes and what it has, and how fresh its record must be. */
-export const { probeAsked, probeOpts } = Checkers('bad_option', ({ obj, vaultlabel, boxlabel }) => ({
+export const { probeAsked, probeOpts } = Checkers('bad_record', ({ obj, vaultlabel, boxlabel }) => ({
   probeAsked: obj({
     vaultlabel: vaultlabel.default('home'),
     boxlabel:   boxlabel.default('box1'),
@@ -180,21 +180,21 @@ function answersEachVerb(val: object): boolean {
 }
 
 /** The check of a bankDB handed to a model: branded by any copy of safebyok, with a function for each verb. */
-export const brandedBankDB = Checker(({ custom }) => custom<BankDB>((val) => isBankDB(val) && answersEachVerb(val), Phrases.BankDBExpected), 'bad_option')
+export const brandedBankDB = Checker(({ custom }) => custom<BankDB>((val) => isBankDB(val) && answersEachVerb(val), Phrases.BankDBExpected), 'bad_record')
 
 /** The check of a listing's options. Checks only. */
 export const listingOpts = objCheck(() => ({
   bankDB:                brandedBankDB,
   maxMillisSinceRefresh: horizonMillis,
-}), 'bad_option')
+}), 'bad_record')
 
 /** The check of a bank listing's options: a listing's, and the host's dialog as `Device.make` wraps it. Checks only. */
 export const bankListingOpts = Checker(({ custom }) => listingOpts.extend({
   askUser: custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
-}), 'bad_option')
+}), 'bad_record')
 
 /** The checks of what a listing is made under: the device for its bank, the bank for its gate and vaults, the vault for its boxes. Checks only. */
-export const listedUnder = Checkers('bad_option', ({ custom }) => ({
+export const listedUnder = Checkers('bad_record', ({ custom }) => ({
   device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
   bank:   custom<Bank>((val) => hasModelkind(val, 'bank'), Phrases.BankExpected),
   vault:  custom<Vault>((val) => hasModelkind(val, 'vault'), Phrases.VaultExpected),
@@ -208,7 +208,7 @@ export const listedUnder = Checkers('bad_option', ({ custom }) => ({
 export const storableArgs = objCheck(({ custom }) => ({
   listing: custom<object>((val) => hasModelkind(val, 'bank_listing', 'gate_listing', 'vault_listing', 'box_listing'), Phrases.ListingExpected),
   central: storableBase,
-}), 'bad_option')
+}), 'bad_record')
 
 // --
 
@@ -285,7 +285,7 @@ export type BoxHalves = { whisper: Whisper, sidecar: Sidecar }
 const namesAHalf = ({ whisper, sidecar }: { whisper?: unknown, sidecar?: unknown }): boolean => (whisper !== undefined) || (sidecar !== undefined)
 
 /** The checks of what a caller hands `create` (`boxDna`) and `put` (`boxPatch`, and `boxPatchNew` where `ifPresent` is 'fail'). */
-export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, oneof, user_id, banklabel, vaultlabel, boxlabel }) => {
+export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_record', ({ lit, oneof, user_id, banklabel, vaultlabel, boxlabel }) => {
   const factory = BX.boxSparse.pick({ fmt: true, am: true, bank_tok: true, vault_tok: true, box_tok: true, revision_tok: true, registered_at: true, written_at: true }).partial()
   const boxDna  = factory.extend({
     user_id, banklabel, vaultlabel, boxlabel,
@@ -303,13 +303,13 @@ export const { boxDna, boxPatch, boxPatchNew } = Checkers('bad_option', ({ lit, 
 })
 
 /** The check of what `box.putExposed` accepts: a sidecar, if any, and never a whisper. */
-export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.optional() }), { refusalkind: 'bad_option' }, [CX])
+export const boxExposedPatch = objCheck(({ sidecar }) => ({ sidecar: sidecar.optional() }), { refusalkind: 'bad_record' }, [CX])
 
 /** A host's patch for `box.putExposed`, which seals the whisper exposed. */
 export type BoxExposedPatch = Z.input<typeof boxExposedPatch>
 
 /** The check of what `box.patchWhisper` accepts: a whisper, to merge over the one exposed. */
-export const whisperPatch = Checker(() => CX.whisper, 'bad_option')
+export const whisperPatch = Checker(() => CX.whisper, 'bad_record')
 
 /** A box's patch as {@link boxPatch} hands it back: the whisper and the sidecar, each undefined where kept, and the scope's fields as given. */
 export type BoxPatchParsed = Z.output<typeof boxPatch>
@@ -373,20 +373,20 @@ export interface VaultSnapshot extends VaultScope {
 // == [The bank's making]: brandedDeviceDB, bankArgs
 
 /** The check of a deviceDB handed to a model, by its brand: an instance of a class extending DeviceDB, from any copy of safebyok. */
-export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_option')
+export const brandedDeviceDB = Checker(({ custom }) => custom<DeviceDB>(isDeviceDB, Phrases.DeviceDBExpected), 'bad_record')
 
 /** The check of what a bank is made with, besides its listing's options: its device, and the `device_tok` of this device's row. */
 export const bankArgs = objCheck(({ custom, device_tok }) => ({
   device: custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
   device_tok,
-}), 'bad_option', [CX])
+}), 'bad_record', [CX])
 
 // --
 
 // == [The device]: positiveMinutes, refreshMinutes, deviceOpts, DeviceOpts, vacateStory, VacateStory, BadNews, BadNewsHandler, RevokeSite, DeviceAnnouncement, DeviceEvent, LifecycleHandler, GuardedLifecycleHandler, DeviceStage, DeviceSnapshot, BankSnapshot
 
 /** The checks of a device's durations in minutes: `positiveMinutes` for the autolock, and `refreshMinutes` for a refresh interval, which may be zero. */
-export const { positiveMinutes, refreshMinutes } = Checkers('bad_option', ({ num, union, lit }) => ({
+export const { positiveMinutes, refreshMinutes } = Checkers('bad_record', ({ num, union, lit }) => ({
   positiveMinutes: union([num.positive(), lit(Infinity)], Phrases.PositiveMinutesShape),
   refreshMinutes:  union([num.nonnegative(), lit(Infinity)], Phrases.MinutesShape),
 }))
@@ -408,7 +408,7 @@ export const deviceOpts = objCheck(({ fn, custom, tuple, lit, user_id, banklabel
   boxRefreshMinutes:   refreshMinutes.optional(),
   onBadNews:           fn<BadNewsHandler>().optional(),
   onLifecycle:         fn<LifecycleHandler>().optional(),
-}), { refusalkind: 'bad_option' }, [CX])
+}), { refusalkind: 'bad_record' }, [CX])
 
 /** What a host hands `Device.make`: who the bank is for, where it writes, and the functions it calls back. */
 export interface DeviceOpts {
@@ -447,7 +447,7 @@ export interface DeviceOpts {
 true satisfies Z.core.util.AssertEqual<DeviceOpts, Z.input<typeof deviceOpts>>
 
 /** The check of what `device.vacate` may be told. */
-export const vacateStory = objCheck(({ vaultError }) => ({ cause: vaultError.optional() }), 'bad_option', [Checks])
+export const vacateStory = objCheck(({ vaultError }) => ({ cause: vaultError.optional() }), 'bad_record', [Checks])
 
 /** What `device.vacate` may be told: the refusal that called for it, which its snapshot then shows. */
 export interface VacateStory {
@@ -471,7 +471,7 @@ export const tellBadNewsToArgs = objCheck(({ fn, custom, arr }) => ({
   onBadNews: fn<BadNewsHandler>(),
   device:    custom<Device>((val) => hasModelkind(val, 'device'), Phrases.DeviceExpected),
   badnews:   arr(custom<VaultError>(isVaultError, Phrases.VaultErrorExpected)),
-}), 'bad_option')
+}), 'bad_record')
 
 /** Where a cached lease outlived its revoke:
  * - `'lock'`      -- the bank's lock

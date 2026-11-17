@@ -271,7 +271,7 @@ export class Box extends Storable<Boxscope, BoxRecord, BoxSparse, BoxSnapshot> {
   /** `patch`, parsed for a put under `ifPresent` and checked against this box's scope. */
   #givenOf(patch: BoxPatch, ifPresent?: BoxPutOpts['ifPresent']): BoxPatchParsed {
     const patchCheck = (ifPresent === 'fail') ? VX.boxPatchNew : VX.boxPatch
-    return patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+    return patchCheck.parseConsistent(patch, this.scope, { kind: 'bad_record', message: Phrases.patchOfOtherScope })
   }
 
   /** Throw unless `isEnabled` and unlocked. */

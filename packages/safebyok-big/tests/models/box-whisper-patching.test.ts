@@ -66,7 +66,7 @@ describe("box.patchWhisper", () => {
   it("refuses while not exposed", async () => {
     const box = await unexposedOf()
 
-    const err = TH.expectSyncRefusal(() => box.patchWhisper({ apiKey: 'x' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => box.patchWhisper({ apiKey: 'x' }), 'bad_record')
     expect(err.message).to.eq(Phrases.NotExposed)
   })
 
@@ -89,7 +89,7 @@ describe("box.patchWhisper", () => {
     const box = await unexposedOf()
 
     lock()
-    const err = TH.expectSyncRefusal(() => box.patchWhisper({ apiKey: 'x' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => box.patchWhisper({ apiKey: 'x' }), 'bad_record')
     expect(err.message).to.eq(Phrases.NotExposed)
   })
 
@@ -107,7 +107,7 @@ describe("box.patchWhisper", () => {
 
       await box.expose()
       const was = box.whisper
-      TH.expectSyncRefusal(() => box.patchWhisper(patch), 'bad_option')
+      TH.expectSyncRefusal(() => box.patchWhisper(patch), 'bad_record')
       expect(box.whisper).to.eq(was)
     })
   }

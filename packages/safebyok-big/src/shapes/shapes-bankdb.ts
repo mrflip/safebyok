@@ -27,7 +27,7 @@ export { BoxFormat } from './shapes-storage'
 
 // A bank row has nothing encrypted, so its record and its tombstone have the same fields.
 /** The checks of a bank's stored forms: its sparse fields, its live record, its tombstone, and a row of either. */
-export const { bankSparse, bankRecord, bankTombstone, bankRow } = Checkers('bad_option', ({ lit, discrim, bank_tok }) => {
+export const { bankSparse, bankRecord, bankTombstone, bankRow } = Checkers('bad_record', ({ lit, discrim, bank_tok }) => {
   const bankSparse    = CX.bankScope.unwrap().extend({
     fmt: lit(BankFormat), ...SX.revision.shape, ...SX.times.shape, am: SX.am,
     /** The life of the bank under its banklabel: minted at `buildBank`, and kept until `delBank` leaves a tombstone under a new one. */
@@ -56,7 +56,7 @@ export const BankTop = 'main'
 
 // A gate row is deleted with its bank, never tombstoned: a stored gate row is live.
 /** The checks of a gate's wayins, each with its `wayinlabel`, its bag of them, its stored row, and its sparse form. */
-export const { passphraseWayin, passkeyWayin, wayins, gateRecord, gateSparse } = Checkers('bad_option', ({ obj, lit, bank_tok, gate_tok }) => {
+export const { passphraseWayin, passkeyWayin, wayins, gateRecord, gateSparse } = Checkers('bad_record', ({ obj, lit, bank_tok, gate_tok }) => {
   const passphraseWayin = SX.passphraseWayinRecord.extend({ wayinlabel: lit('main') }).strict()
   const passkeyWayin    = SX.passkeyWayinRecord.extend({ wayinlabel: lit('passkey0') }).strict()
   const wayins          = obj({ main: passphraseWayin, passkey0: passkeyWayin.optional() }).strict()
@@ -91,7 +91,7 @@ export type Wayins     = Readonly<Z.infer<typeof wayins>>
 
 // A bank's vault row has nothing encrypted, so its record is its sparse form, and its tombstone has the same fields.
 /** The checks of a bank's vault rows: its sparse fields, its live record, its tombstone, and a row of either. */
-export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_option', ({ lit, discrim, bank_tok, vault_tok }) => {
+export const { vaultSparse, vaultRecord, vaultTombstone, vaultRow } = Checkers('bad_record', ({ lit, discrim, bank_tok, vault_tok }) => {
   const vaultSparse    = CX.vaultScope.unwrap().extend({ fmt: lit(VaultFormat), ...SX.revision.shape, ...SX.times.shape, am: SX.am, bank_tok, vault_tok })
   const vaultRecord    = vaultSparse.extend({ am: lit('a') }).strict()
   const vaultTombstone = vaultSparse.extend({ am: lit('x') }).strict()
@@ -114,7 +114,7 @@ export type VaultRow       = VaultRecord | VaultTombstone
 // A bank's box row is the one in `SX`, with its bank's `bank_tok` beside its vault's `vault_tok`: the two name the life of
 // the vault it is under (`vaultLifeOf`).
 /** The checks of a bank's box rows: its sparse fields, its live record, its tombstone, and a row of either. */
-export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_option', ({ discrim, bank_tok }) => {
+export const { boxSparse, boxRecord, boxTombstone, boxRow } = Checkers('bad_record', ({ discrim, bank_tok }) => {
   const banked       = { bank_tok }
   const boxSparse    = SX.boxSparse.extend(banked)
   const boxRecord    = SX.boxRecord.extend(banked).strict()
@@ -370,7 +370,7 @@ export const loggableAsk = objStrip(({ obj, arr, oneof, lit, user_id, banklabel,
     record:     meta.optional(),
     gate:       meta.optional(),
   }
-}, 'bad_option', [CX])
+}, 'bad_record', [CX])
 
 /** What a bankDB answer and its refusal carry of their ask: its `op`, address, policies, and the revisions of its rows. */
 export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
@@ -378,18 +378,18 @@ export type LoggableAsk = Readonly<Z.output<typeof loggableAsk>>
 
 // == [Adapters]: adapterBankDBOpts, memoryBankDBOpts, AdapterBankDBOpts, MemoryBankDBOpts, noticedRow, noticedParent
 
-/** The check of an `AdapterBankDB`'s options, refusing 'bad_option'. */
+/** The check of an `AdapterBankDB`'s options, refusing 'bad_record'. */
 export const adapterBankDBOpts = objCheck(({ num }) => ({
   /** The most bytes a box record's JSON may weigh (default `DefaultMaxRecordSizeEst`). */
   maxRecordSizeEst: num.positive().optional(),
-}), 'bad_option')
-/** The check of a `MemoryBankDB`'s options, refusing 'bad_option'. */
+}), 'bad_record')
+/** The check of a `MemoryBankDB`'s options, refusing 'bad_record'. */
 export const memoryBankDBOpts = objCheck(({ int }) => ({
   ...adapterBankDBOpts.shape,
   // Best effort, not a hard cap: exact at moderate write rates; a strict cap would need concurrency machinery in every adapter.
   /** A soft cap on the box rows of one vault life, live and deleted together (default `DefaultMaxBoxes`). */
   maxBoxes: int.positive().optional(),
-}), 'bad_option')
+}), 'bad_record')
 
 /** An `AdapterBankDB`'s options: `maxRecordSizeEst`, the most bytes a box record's JSON may weigh. */
 export type AdapterBankDBOpts = Readonly<Z.input<typeof adapterBankDBOpts>>

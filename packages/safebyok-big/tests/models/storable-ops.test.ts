@@ -264,8 +264,8 @@ describe("storable.del()", () => {
 
   it("refuses a malformed revision, deleting nothing", async () => {
     const { box } = timelyBoxOf()
-    await TH.expectRefusal(box.del({ ...box.sparse, revision_seq: 1.5 }), 'bad_option')
-    await TH.expectRefusal(box.del({ ...box.sparse, revision_tok: 42 } as never), 'bad_option')
+    await TH.expectRefusal(box.del({ ...box.sparse, revision_seq: 1.5 }), 'bad_record')
+    await TH.expectRefusal(box.del({ ...box.sparse, revision_tok: 42 } as never), 'bad_record')
     expect(world.mw.callsOf('del')).to.deep.equal([])
     expect(box.isPresent).to.be.true
   })

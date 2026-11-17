@@ -4,7 +4,7 @@ import { Checker } from './validator'
 import * as UX from '../shapes/shapes-utils'
 import type { MaskOpts } from '../shapes/shapes-utils'
 
-const maskArgs = Checker(({ str }) => str, 'bad_option')
+const maskArgs = Checker(({ str }) => str, 'bad_record')
 
 /** The stars-and-dots a masked text collapses to once the result would pass `maxLen`. */
 const Collapsed = '***...***'

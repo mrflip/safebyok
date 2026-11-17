@@ -46,8 +46,8 @@ describe("what a model accepts as a BankDB", () => {
 
   it("refuses a brand without the verbs, the verbs without a brand, or a verb that is no function", () => {
     const verbs = verbsOf(new MemoryBankDB())
-    expect(() => brandedBankDB.parse(brand)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
-    expect(() => brandedBankDB.parse(verbs)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
-    expect(() => brandedBankDB.parse({ ...brand, ...verbs, watch: 'soon' })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    expect(() => brandedBankDB.parse(brand)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
+    expect(() => brandedBankDB.parse(verbs)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
+    expect(() => brandedBankDB.parse({ ...brand, ...verbs, watch: 'soon' })).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 })

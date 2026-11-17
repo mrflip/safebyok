@@ -21,7 +21,7 @@ import * as BX from './shapes-bankdb'
 // == [Wayin kinds]: wayinkind, isPrfSalt
 
 /** The check of a wayin's kind: one of {@link EX.wayinkindVals}. */
-export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_option')
+export const wayinkind = Checker(({ oneof }) => oneof(EX.wayinkindVals), 'bad_record')
 
 /** True for base64url text of {@link PasskeySaltSize} bytes, as a passkey wayin's salt must be. */
 export function isPrfSalt(prf_salt_b64: string): boolean { return fromB64OrNull(prf_salt_b64)?.length === PasskeySaltSize }
@@ -60,7 +60,7 @@ export type WayinRecord           = Z.infer<typeof wayinRecord>
 /** The check of a passphrase's cleartext, the text the user typed: any string, blank included. No refusal quotes it.
  * Whether a blank one will do is the gating's call.
  */
-export const passphraseCleartext = Checker(({ str }) => str.brand<'PassphraseCleartext'>(), 'bad_option')
+export const passphraseCleartext = Checker(({ str }) => str.brand<'PassphraseCleartext'>(), 'bad_record')
 
 /** A passphrase's cleartext once {@link passphraseCleartext} has parsed it: the only text the key deriver is handed. */
 export type PassphraseCleartext = Z.infer<typeof passphraseCleartext>
@@ -80,7 +80,7 @@ export const passkeyAnswer = objCheck(({ str, bytes, credential_id }) => ({
   prf_salt_b64:  str.min(1),
   /** 32 bytes, as good as the passphrase for this bank: hand them to the gating, then drop them. */
   prfBytes:      bytes(PrfAnswerSize).refine((prfBytes) => prfBytes.reduce((seen, byte) => seen | byte, 0) !== 0, Phrases.PasskeyAnswerUsed),
-}), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
 /** A passkey's answer when asked for a vault's PRF: the cleartext a gating accepts for a passkey. `safebyok-react`'s `askPasskey` makes one.
  * An `unlock_bank` gating accepts it as `passkeyClear` in `attempt`, in place of the passphrase.
@@ -97,7 +97,7 @@ export type PasskeyAnswer = Z.infer<typeof passkeyAnswer>
  */
 export const freshPasskeyAnswer = Checker(() => (
   passkeyAnswer.refine(({ prf_salt_b64: prfSalt }) => isPrfSalt(prfSalt), { error: Phrases.prfSaltShape(PasskeySaltSize), path: ['prf_salt_b64'] })
-), 'bad_option')
+), 'bad_record')
 // --
 
 // == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict
@@ -108,7 +108,7 @@ export const isStrengthChecker = (candidate: unknown): candidate is StrengthChec
 )
 
 /** The checks of a `strengthChecker` and of the verdict it returns. */
-export const { strengthChecker, passphraseVerdict } = Checkers('bad_option', ({ custom, union, obj, lit, str }) => ({
+export const { strengthChecker, passphraseVerdict } = Checkers('bad_record', ({ custom, union, obj, lit, str }) => ({
   strengthChecker: custom<StrengthChecker>(isStrengthChecker, Phrases.StrengthCheckerShape),
   passphraseVerdict: union([
     obj({ strong: lit(true) }),
@@ -132,7 +132,7 @@ export const bankStamp = objCheck(({ bankScope, bank_tok, epochMillis }) => ({
   ...bankScope.unwrap().shape,
   bank_tok,
   registered_at: epochMillis,
-}), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
 /** The check of a gate's stamp: its scope, `gate_tok` and `registered_at`, fixed for its life and bound into the ctx of each of its wayins.
  * Anything carrying those fields passes, such as a Gate or its record, and the rest is dropped.
@@ -141,7 +141,7 @@ export const gateStamp = objCheck(({ gateScope, gate_tok, epochMillis }) => ({
   ...gateScope.unwrap().shape,
   gate_tok,
   registered_at: epochMillis,
-}), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
 /** The check of a vault's stamp: its scope, `vault_tok` and `registered_at`, fixed for its life and bound into every ctx under it.
  * Anything carrying those fields passes, such as a Vault, and the rest is dropped.
@@ -150,7 +150,7 @@ export const vaultStamp = objCheck(({ vaultScope, vault_tok, epochMillis }) => (
   ...vaultScope.unwrap().shape,
   vault_tok,
   registered_at: epochMillis,
-}), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
 /** The check of what a lease cites of the gate it was granted under: its label, its `gate_tok`, and its row's `revision_tok`.
  * A Gate or its record passes. Every gate verb puts a new `revision_tok`, so a lease citing the old one is forgotten.
@@ -159,7 +159,7 @@ export const citedGate = objCheck(({ gateScope, gate_tok, revision_tok }) => ({
   gatelabel: gateScope.unwrap().shape.gatelabel,
   gate_tok,
   revision_tok,
-}), { refusalkind: 'bad_option', extras: 'strip' }, [CX])
+}), { refusalkind: 'bad_record', extras: 'strip' }, [CX])
 
 /** A bank's stamp, as {@link bankStamp} checks it. */
 export type BankStamp = Z.infer<typeof bankStamp>
@@ -181,7 +181,7 @@ export const provingDevice = objStrip(({ custom, device_tok }) => ({
   strengthChecker: custom<GuardedStrengthChecker>(isGuarded, Phrases.GuardedExpected),
   /** This device's token, written into the wayin header a proving mints. */
   device_tok,
-}), 'bad_option', [CX])
+}), 'bad_record', [CX])
 
 /** What a proving is given of its bank: two wrapped host functions and this device's token. */
 export type ProvingDevice = Z.infer<typeof provingDevice>
@@ -190,7 +190,7 @@ export type ProvingDevice = Z.infer<typeof provingDevice>
  * A `bank`, or a new wayin's `gate`, is anything carrying its stamp. A stored wayin's `gate` is anything carrying a
  * {@link bankStamp} as `bankStamp`, a {@link gateStamp} as `stamp`, and the gate row's `wayins`, as a `Gate` does.
  */
-export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs } = Checkers('bad_option', ({ obj }) => {
+export const { stampedGate, passphraseNovelArgs, passkeyNovelArgs, passphraseStoredArgs, passkeyStoredArgs, strengthArgs } = Checkers('bad_record', ({ obj }) => {
   const stampedGate = obj({ bankStamp, stamp: gateStamp, wayins: BX.wayins })
   return {
     stampedGate,
@@ -261,10 +261,10 @@ export const sealedWhisper = objCheck(({ box_key_wrapped, whisper_ciphered }) =>
 export type SealedWhisper = Z.infer<typeof sealedWhisper>
 
 /** The check of the autolock duration in milliseconds, at most {@link ForeverMillis}. */
-export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis), 'bad_option')
+export const leaseMillis = Checker(({ int }) => int.positive().max(ForeverMillis), 'bad_record')
 
 /** The check of a logger wrapped by `parseLogger`. */
-export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_option')
+export const guardedLogger = Checker(({ custom }) => custom<VaultLogger>(isGuardedLogger, Phrases.GuardedLoggerExpected), 'bad_record')
 
 /** The check of all a lease or a proving is given of its bank: the bank's stamp, and the deviceDB's lease verbs bound to its scope and `bank_tok`.
  * It has no key, and reaches neither the bankDB nor the boxes.
@@ -286,7 +286,7 @@ export const leaseFriend = objCheck(({ fn }) => ({
   tryForgetLease:  fn<() => Promise<Outcome<void>>>(),
   /** Tell the host what went wrong in a lease's cache put. */
   tellBadNews:     fn<(badnews: readonly unknown[]) => unknown>(),
-}), { refusalkind: 'bad_option', extras: 'strip' })
+}), { refusalkind: 'bad_record', extras: 'strip' })
 
 /** All a lease or a proving is given of its bank, as {@link leaseFriend} checks it. */
 export type LeaseFriend = Z.infer<typeof leaseFriend>
@@ -295,7 +295,7 @@ export type LeaseFriend = Z.infer<typeof leaseFriend>
 export const leaseGrantOpts = objCheck(() => ({
   gate:      citedGate,
   wayinkind: wayinkind,
-}), 'bad_option')
+}), 'bad_record')
 
 /** The gate a lease is granted under, as it cites it, and the kind of wayin proved. */
 export type LeaseGrantOpts = Z.infer<typeof leaseGrantOpts>
@@ -309,7 +309,7 @@ const isCtxStamp = (val: unknown): boolean => (
 /** The checks of each lease verb's arguments, and of one stamp a caller hands a seal.
  * Each ctx under the lease binds the bank's stamp, then the caller's stamps, in order.
  */
-export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_option', ({ obj, custom, str }) => {
+export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs, leaseSealArgs, leaseUnsealArgs } = Checkers('bad_record', ({ obj, custom, str }) => {
   const cryptoKey = custom<CryptoKey>((val) => val instanceof CryptoKey, 'Expected a CryptoKey')
   const ctxStamp  = custom<CipherCtxRecord>(isCtxStamp, Phrases.CtxStampExpected)
   return {
@@ -328,7 +328,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // A cleartext is only ever checked here, in the attempt's own call.
 /** The checks of what the user hands an attempt, by the kind of gating. */
-export const { gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, bankDelCleartexts } = Checkers('bad_option', ({ oneof, obj }) => ({
+export const { gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, bankDelCleartexts } = Checkers('bad_record', ({ oneof, obj }) => ({
   gatingkind:              oneof(EX.gatingkindVals),
   bankBuildCleartexts:         obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   bankUnlockCleartexts:        obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
@@ -350,7 +350,7 @@ export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({
   bank:            custom<Bank>((val) => hasModelkind(val, 'bank'), Phrases.BankExpected),
   unlockByProving: fn<UnlockByProving>(),
   askUser:         custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
-}), 'bad_option')
+}), 'bad_record')
 
 /** The arguments that launch a `build_bank` gating: the bank listing, the row the bank is built over, `unlockByProving`, and the device's dialog or null. */
 export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
@@ -358,7 +358,7 @@ export const gatingLaunchBirthArgs = objStrict(({ custom, fn }) => ({
   expected:        BX.bankSparse,
   unlockByProving: fn<UnlockByProving>(),
   askUser:         custom<AskUser>(isGuarded, Phrases.GuardedExpected).nullable(),
-}), 'bad_option')
+}), 'bad_record')
 
 /** What an attempt is given, by the kind of gating. */
 export type CleartextsForGatingkind = {

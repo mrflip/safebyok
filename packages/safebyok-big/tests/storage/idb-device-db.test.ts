@@ -80,7 +80,7 @@ describe("IdbDeviceDB's options", () => {
 
   it("refuses a dbName or a field it cannot use", () => {
     for (const opts of [{ dbName: '' }, { dbName: 7 }, { dbname: 'mine' }]) {
-      expect(() => new IdbDeviceDB(opts as never)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => new IdbDeviceDB(opts as never)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
     }
   })
 })

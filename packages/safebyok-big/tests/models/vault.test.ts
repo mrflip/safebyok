@@ -42,14 +42,14 @@ describe("VaultListing.build of a record, and its constructor", () => {
     const { bank } = born
     const { bankDB, maxMillisSinceRefresh } = listingOptsOf(born)
     expect(new VaultListing(bank, { bankDB, maxMillisSinceRefresh })).to.be.instanceOf(VaultListing)
-    TH.expectSyncRefusal(() => new VaultListing(bank.device as never, { bankDB, maxMillisSinceRefresh }), 'bad_option')
-    TH.expectSyncRefusal(() => new VaultListing(bank, { bankDB, maxMillisSinceRefresh, askUser: null } as never), 'bad_option')
+    TH.expectSyncRefusal(() => new VaultListing(bank.device as never, { bankDB, maxMillisSinceRefresh }), 'bad_record')
+    TH.expectSyncRefusal(() => new VaultListing(bank, { bankDB, maxMillisSinceRefresh, askUser: null } as never), 'bad_record')
   })
 
   it("refuses what is not a listing, and a central that fails its check, where a vault is made", async () => {
     const { vault, listing } = await makeBornVault()
-    TH.expectSyncRefusal(() => new Vault(listing.bank as never, vault.toJSON()), 'bad_option')
-    TH.expectSyncRefusal(() => new Vault(listing, { am: 'a' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => new Vault(listing.bank as never, vault.toJSON()), 'bad_record')
+    TH.expectSyncRefusal(() => new Vault(listing, { am: 'a' } as never), 'bad_record')
   })
 })
 

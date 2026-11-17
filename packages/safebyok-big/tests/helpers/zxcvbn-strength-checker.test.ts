@@ -108,8 +108,8 @@ describe("zxcvbnStrengthChecker", () => {
   })
 
   it("refuses a non-string passphrase or an invalid scope", async () => {
-    await TH.expectRefusal(judgedAsync(42 as never, scope), 'bad_option')
-    await TH.expectRefusal(judgedAsync('mauve lantern quietly orbits', { banklabel: 'acme' } as never), 'bad_option')
+    await TH.expectRefusal(judgedAsync(42 as never, scope), 'bad_record')
+    await TH.expectRefusal(judgedAsync('mauve lantern quietly orbits', { banklabel: 'acme' } as never), 'bad_record')
   })
 
   it("keeps to the strength checker contract under the bank's guard", async () => {

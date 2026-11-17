@@ -17,7 +17,7 @@ function freshDbName(): string { return `test-${crypto.randomUUID()}` }
 
 describe("makeArgon2idDeriver and the reserved labels", () => {
   it("refuses a label of the reserved namespace that safebyok does not supply, however well-formed the spec", () => {
-    const err = TH.expectSyncRefusal(() => makeArgon2idDeriver({ ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }), 'bad_option')
+    const err = TH.expectSyncRefusal(() => makeArgon2idDeriver({ ...CheapSpec, key_deriver_label: 'argon2id_web_v2' }), 'bad_record')
     expect(err.message).to.match(/reserved/u)
   })
 })
@@ -89,7 +89,7 @@ describe("safebyok-big/browser", () => {
 
   it("refuses a spec under a reserved label that safebyok does not supply, whatever its case", () => {
     for (const key_deriver_label of ['argon2id_web_v2', 'ARGON2ID_WEB_V2']) {
-      const err = TH.expectSyncRefusal(() => parseKeyDeriverSpec({ ...CheapSpec, key_deriver_label }), 'bad_option')
+      const err = TH.expectSyncRefusal(() => parseKeyDeriverSpec({ ...CheapSpec, key_deriver_label }), 'bad_record')
       expect(err.message).to.include('argon2id_web_')
     }
   })
@@ -126,10 +126,10 @@ describe("browserOpts", () => {
   })
 
   it("refuses a dbName that is not non-empty text, and an option it does not accept", () => {
-    TH.expectSyncRefusal(() => browserOpts({ dbName: '' }), 'bad_option')
-    TH.expectSyncRefusal(() => browserOpts({ dbName: 3 } as never), 'bad_option')
-    TH.expectSyncRefusal(() => browserOpts({ dbname: 'acme' } as never), 'bad_option')
-    TH.expectSyncRefusal(() => browserOpts('acme' as never), 'bad_option')
+    TH.expectSyncRefusal(() => browserOpts({ dbName: '' }), 'bad_record')
+    TH.expectSyncRefusal(() => browserOpts({ dbName: 3 } as never), 'bad_record')
+    TH.expectSyncRefusal(() => browserOpts({ dbname: 'acme' } as never), 'bad_record')
+    TH.expectSyncRefusal(() => browserOpts('acme' as never), 'bad_record')
   })
 
   it("makes a bank whose vault is created under the zxcvbn checker and kept in IndexedDB", async () => {
