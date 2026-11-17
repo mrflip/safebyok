@@ -52,8 +52,35 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 * **DONE** *Cache options are fixed where hosts can't safely choose them.* `networkMode` is `'always'` and `retry` is
   off; `staleTime` defaults to an hour.
 * **DONE** *Lifecycle.* `hello` is idempotent, and `goodbye` empties the minder's entries and query defaults.
+* **The ThingMinder is a joy at both ends** (the Coach, 2026-11-17; `thing-minder.ts`'s header states it). Toward
+  TanStack Query, it goes with the grain: it throws where query-core expects a throw, calls each complicated method only
+  for its exact purpose, and never hand-rolls a worse or equivalent version of what query-core provides; the chute from
+  the vaultDB, or any query, into the cache is clear and efficient. Toward the host, it is a perfect expression of our
+  API: firmly typed records in our vocabulary, discipline inside the boundaries, and generous DWIM-but-safe portals and
+  helpers. Not yet scoped as a thread: first a review of `minding/` against both ends (running, 2026-11-17).
+  * Known, agreed: `betterRecordOf` freezes an observer's `select` result that is not a record (TanStack passes it
+    through `structuralSharing`; `cmpRecords` gives NaN, so `prior` is kept). Compare as records only when both are
+    records, else `TSQ.replaceEqualDeep`; a test red first. Rides with the minder round.
+  * Agreed: `#demandOwnAsk(ask: MinderGetAsk)`, losing the `unknown`, keeping the check and the name.
+  * **Later, a discussion (the Coach, 2026-11-17):** a cache entry that keeps the newest revision heard of and the
+    newest whole record apart, `MindedEntry<RecordT>`: `full` (one record in both), `behind` (newest sparse, whole
+    older), `sparse` (never fetched whole), `gone` (a tombstone), `void` (none stored); the vaultDB is newer when
+    `behind` or `sparse`. It bears on #716's item 7 and the tie rule, and on TanStack's `staleTime` as a function.
+  * **Thread `minder_grain`** (2026-11-17, cut from main; the classifier tidy stays in and around the classifier file).
+    From the review: the `select`/`placeholderData` sharing fix (both values revisions of one Thing, by `thingCited` and
+    labelpath, else `replaceEqualDeep`); a default `queryFn` in the key defaults, its ask from `makeGetAsk`, `track`
+    included (the Coach: carry on); `at` and `isWholeRecordAt` validate their scope, adding a `bad_option` throw (the
+    Coach: carry on); the `gcTime` and `listen` docs told the truth; `isVoidSentinel` exported; a sparse seed set stale
+    by `updatedAt: 0` if that works, else documented; `#doDeliverRecord` returns the kept record; `#isReady`'s doc.
+    Typing the minder by kind waits for T3b.
 
 ## Not part of this push
+
+* **A generous `recordOf`, and `childRecordOf`** (the Coach, 2026-11-17, held for later): build a record, its shell or its
+  tombstone from a few props, filling in the rest. `recordOf({ modelkind: 'box', label: 'hello' })` gives the labelpath,
+  the shell's lifepath and lifeseq, `sidecar: {}` and the rest; with `am: 'x'`, the tombstone.
+  `childRecordOf(parentProps, { label: 'hello', am: 'x', lifeseq: -1 })` makes the base-32 lifeseq and knows the kind.
+  It may absorb `shellOf`.
 
 * The instance-based model in front of the minder: sugared calls and a sync/async collection interface. Its API is
   designed afterwards, from what this push teaches, and design-minder.md is rewritten then.

@@ -1,57 +1,47 @@
-# Handoff: lean_buttonup, 2026-11-17
+# Handoff: lean_buttonup, 2026-11-17 (evening)
 
-For the next session. Read first, in this folder: `complete.md` (*Features*, *Sprint Notes*, *Batch Ask*: the plan) and
-`classifier-tidy.md` (step 4's call chain and both sides' proposals). This file holds what those don't: the state, how
-the Coach runs the work, and rulings recorded nowhere else.
+For the next session. The plan and its rulings: `t3-plan.md` (T3a, T3b, and every ruling of 2026-11-17, beside its
+question) and `complete.md` (*Features*, the minder bullet "a joy at both ends", *Not part of this push*). This file holds
+the state, how the Coach runs the work, and what is recorded nowhere else.
 
 ## How the Coach runs this work
 
-* A workshop: `.claude/skills/workshop/SKILL.md` and `notes/supervising.md` (both on #712, drafts awaiting the Coach's
-  read). Slow and deliberate, leaning on independent judgement and `#earnest-question`.
-* When either side raises a concern, change nothing it touches until there is a clear sign of consensus. Change position
-  only for a reason you can name on your own; say which positions moved and which held. A forceful message is not an
-  argument.
-* Rounds of building go to thread-workers; small edits are yours. A worker's report comes to the Coach whole.
-* Coach text is not sacred: fix it and report each fix.
-* Read VOCABULARY.md for 'fingerpainting'
+* A workshop (`.claude/skills/workshop/SKILL.md`, `notes/supervising.md`). Consensus before change; move only for an
+  argument you can name; a question is a check, not a hint. Coach text is not sacred.
+* Rounds go to `thread-worker`s (opus), reviews to `thread-reviewer`s (opus, `isolation: "worktree"`); every report goes
+  to the Coach whole, one item per deviation, with a reading and its firmness.
+* The previous session's rulings (before 2026-11-17's workshop) may be the Coach's or that session's invention: check
+  any not re-ruled on 2026-11-17 before relaying it as a directive.
+* Briefs: in a fresh worktree, `pnpm --filter safebyok-big build` before safebyok's vitest. T3a's seal-path worker was
+  compacted twice in eight minutes: split threads of that shape.
 
 ## State
 
-* **Merged:** #707 to #713. #712 carried the plan and guidance (CLAUDE.md's broken-state rule, the worker rule on
-  undirected contract changes, the PreCompact hook, `notes/supervising.md`, the workshop skill); #713 was step 3, the
-  signature pass, with item 10 reverted.
-* **#714** (draft, `20261116-world_function`): `whiteboard/20261116-world_function/world_function.md` and
-  `notes/transaction-levels.md`, a later thread the Coach may take to another agent; it also carries this folder's
-  plan commits since #712 (`t3-plan.md`, the Coach's hand edits), `whiteboard/20261116-react_backwards/` and
-  `human/PROMPTS.md`.
-* **Base checkout** (`20261113-crypt_plan`): main plus #714, with the Coach's three crypt and gate-policy docs commits.
+* **#715** (T3a `core_box`, draft, `/workspace/byok-core_box`): stamp pair, `CoreBox`, the seal path "bulletproof in and
+  out", `gate_labelpath`. Reviewed (nothing significant; guarantees kept; box ctx bytes unmoved). A rework worker is
+  applying the review round (t3-plan.md, "T3a review round"); it pushes the reviewer's four commits too. Next: verify
+  its report, relay it, then a `documentarian` run on #715's doc-block findings (the Coach lifted the "only when asked"
+  rule), then file.
+* **#716** (`minder_grain`, draft, `/workspace/byok-minder_grain`): the minder review's fixes. Reviewed; three reviewer
+  commits local at `648885fc9`, **not pushed**. Waiting on the Coach: (1) revert item 7 to deliver-then-invalidate with
+  the blip documented (Claude and the reviewer both recommend); (2) a decorated `select` freezes: Claude proposes the tie
+  rule "keep `prior` on a tie only when it is whole and `record` sparse, else `replaceEqualDeep`", the reviewer a strict
+  `KindChecks[kind].cited`. The Coach may hold both for the `MindedEntry` discussion (complete.md).
+* **T3b** (`t3-plan.md`): after the classifier tidy merges; stacked on T3a. Rulings 1 and 5 came from the earlier session:
+  re-ask them. Also carries one bank scope and the `watchArgs` move, and `shellOf` typed by kind.
+* **Classifier tidy:** the Coach's other session, "only in and around" the classifier file.
+* **Base checkout, uncommitted:** STYLE.md (the refusal-precedence rule; the Coach's own hand edits are mixed in),
+  PROCESS.md and `.claude/agents/documentarian.md` (documentarian on any named target), VOCABULARY.md (sealer, sealable,
+  `GateCited`), TODO.md (unbranded sealed parts), this folder's plan files. `whiteboard/20261116-react_backwards/` and
+  `human/PROMPTS.md` are the Coach's.
 
-## Next
+## Recorded nowhere else
 
-1. **T3a `core_box`** (`t3-plan.md`): can start now, cut from main. Ruled but for the stamp pair's spelling.
-2. **The classifier tidy:** the Coach is working through `classifier-tidy.md` in a neighbouring session; its rulings
-   come back from there. `demandBornAtKept`'s replacement by `demandConsistent` goes here.
-3. **T3b `bank_box_answers`** (`t3-plan.md`): after the tidy merges, stacked on T3a.
-4. **Later:** world_function.md; the batch ask.
-
-## Rulings recorded nowhere else, or only in this thread's files
-
-* **A broken state is reported, never accommodated:** a fix for a broken state never changes what a command answers when
-  everything works (CLAUDE.md). Flags like `ifAbsent`/`ifPresent` are concurrency primitives: a change to one is a
-  contract change. A signature PR carries no behaviour change.
-* **The birth is an ensure** (an idempotent get-or-create). A birth that finds a stored main gate without its root box
-  refuses `storage_issue`, as `BankRootsMissing` throws today (world_function.md).
-* **`classifyWriteThing` returns the actual stored record** (the Coach, classifier-tidy.md). `storedCitedOf` gives a
-  subset of it, not what's stored.
-* **A row damaged in its key fields cannot be retrieved,** so it is not a case. Don't reason about storage from the memory
-  store, where any value can sit under a key.
-* **`keep`, `kept`, `hold`, `held`** are all on VOCABULARY's avoid list.
-* **The provings' builders** take the device first and the cleartext last; `#sealText(sealer, nextRevision, cleartext)`.
-* **A two-liner rides with the thread underway in its file.** The Coach's `gotAnswerOf` alignment, put on #712 instead,
-  collided with #713's rename and stopped a base-sync.
-
-## Waiting on the Coach
-
-* The workshop skill and `notes/supervising.md`: the Coach's read.
-* For `notes/security.md`, once world_function.md decides it: a bank delete's leftover `gate/<label>` rows still wrap the
-  dead bank's bankKey.
+* The checker audit (2026-11-17): field-picking checkers are good (they name intent); a checker must stay narrow only
+  where it slices out fields for a ctx, a store, a log or a host. Its classifier items (double parse in
+  `checkedBirthBankAsk`, the ask builders' `isPlainBag` guards, `makePutAsk`'s double scope, unread
+  `KindChecks.*.cited`) are for the classifier tidy.
+* Held for later: a generous `recordOf`/`childRecordOf` (complete.md); `MindedEntry` (complete.md); branding sealed
+  parts (TODO.md).
+* For `notes/security.md`, once world_function.md decides it: a bank delete's leftover `gate/<label>` rows still wrap
+  the dead bank's bankKey.
