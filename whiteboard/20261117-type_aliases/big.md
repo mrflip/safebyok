@@ -1,6 +1,6 @@
 # Thread: type aliases in safebyok-big (2026-11-17)
 
-Branch `20261117-type_aliases_big`, cut from origin/main (193708df9), outside any sprint. The adapters and `safebyok-react` follow in a later thread stacked on this one. Proved: `pnpm --filter safebyok-big typecheck`, `lint` and `test` (3025 passed) before `pnpm justify` (see the PR for that run).
+Branch `20261117-type_aliases_big`, PR #720, cut from origin/main (193708df9), outside any sprint. The adapters and `safebyok-react` follow in a later thread stacked on this one. Proved: `pnpm --filter safebyok-big typecheck`, `lint` and `test` (3025 passed) before `pnpm justify` (see the PR for that run).
 
 * **Built**: `packages/safebyok-big/src/helpers/aliases.ts`, plain aliases with a one-line doc block each: `UserID`, `Banklabel`, `Vaultlabel`, `Boxlabel`, `BankTok`, `GateTok`, `VaultTok`, `BoxTok`, `RevisionTok`, `DeviceTok`, `RevisionSeq` (number), `KeyDeriverLabel`, `EpochMillis` (number). Exported as types from `src/index.ts` and, flat, from `src/internals.ts`. `EpochMillis` moved there from `shapes/primitives.ts` (which re-exports it) and is now `number`, no longer `Z.infer<typeof epochMillis>`.
   Used in field declarations of the model classes, record, snapshot and ask shapes, bank-classifier, memory-bank-db (`Map<Boxlabel, ...>`, `Map<Vaultlabel, ...>`), `nowMillis` and the clock, the `Phrases` and throwers' label parameters, and the test helpers (worlds, batteries, builders).
