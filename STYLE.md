@@ -562,7 +562,7 @@ A member that will not describe in a line is a smell: report it.
 
   When that noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
   member's name against that sentence (*Naming*). It carries one qualifier at most; anything more is a sentence of its own.
-* **Replace multiple fragments with a sentence** `#use-sentences`. The usual signs: a semicolon joining two facts, a list with its verb gapped out (`a row or record, 'bad_record'; a cutoff,
+* **Replace multiple fragments with a sentence** `#use-sentences`. The usual signs: a semicolon joining two facts, a list with its verb gapped out (`a row, 'damaged_row'; a cutoff,
   'bad_record'`), a clause hung on "as", "so", "once", "since" or "which", and "one" standing in for a noun you cut. Each
   is a cue to rewrite as a sentence, not a ban.
 * **A member's block names no refusal catalog** `#no-refusal-catalog`. The thrower's doc and the `Outcome` type carry the
