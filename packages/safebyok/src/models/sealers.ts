@@ -85,7 +85,7 @@ export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
   readonly purposes: SealPurposes
   /** `cleartexts` as the text to cipher. */
   encode(cleartexts: CleartextsT): string
-  /** The cleartexts in `text`. Refuses as damaged when the text does not parse or check. */
+  /** The cleartexts in `text`. Refuses as damaged when the text does not parse or check. A refusal must not quote `text`, which holds cleartext. */
   decode(text: string): CleartextsT
   /** The sealed part of `record`. Refuses as damaged when its tags are not this sealer's. */
   sealedOf(record: RecordT): Sealed

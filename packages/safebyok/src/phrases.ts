@@ -50,7 +50,7 @@ export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tomb
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."
 
 /** A sealable box that matches the shell in some of its revseq, lifeseq and revtok, but not all three. */
-export const DonorHalfShell = "A box a revision is made from is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
+export const SealableHalfShell = "A box a revision is made from is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
 
 /** A shell asked for with neither a labelpath nor a label and its parent. */
 export const ShellUnscoped = "A shell is made from a labelpath, or from a label and its parent."

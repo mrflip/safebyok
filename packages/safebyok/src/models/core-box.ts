@@ -12,9 +12,10 @@ const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisp
 const Checks = Validator.Checkers('bad_option', ({ obj, oneof, epochMillis }) => ({
   boxSealable,
   liveBoxSealable: boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
-  boxPublicProps:  obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }),
+  // Strict, since a misspelt key in either bag would otherwise be dropped without a word.
+  boxPublicProps:  obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
   boxThing,
-  boxCleartexts:   obj({ whisper: CX.whisper }),
+  boxCleartexts:   obj({ whisper: CX.whisper }).strict(),
 }))
 
 // A sealer is handed to a lease as the class itself, so the class has statics alone.
@@ -29,10 +30,10 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
    */
   static donorPropsOf(donorProps: Sealable<BoxRecord>): Sealable<BoxRecord> { return Checks.boxSealable.parse(donorProps) }
 
-  /** The sidecar, `am` and `written_at` of `publicProps`. Any other field is dropped. */
+  /** The sidecar, `am` and `written_at` of `publicProps`. Refuses any other field. */
   static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps { return Checks.boxPublicProps.parse(publicProps) }
 
-  /** The whisper of `secretProps`. Any other field is dropped. */
+  /** The whisper of `secretProps`. Refuses any other field. */
   static secretPropsOf(secretProps: BoxCleartexts): BoxCleartexts { return Checks.boxCleartexts.parse(secretProps) }
 
   /** The empty whisper a tombstone seals. */

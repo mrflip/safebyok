@@ -267,7 +267,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // == [Boxes]: sealBox, tombstoneBox, unsealBox
 
   /** Seal and return the next revision of the box `donorProps`, with `publicProps` applied and the whisper of `secretProps` encrypted. Needs the bank unlocked.
-   * The seal checks its arguments and the box it returns, so pass `donorProps` as you have it: whole, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
+   * The seal checks its arguments (an unknown key in `publicProps` or `secretProps` refuses) and the box it returns, so pass `donorProps` as you have it: whole, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
    * After a tombstone or the shell, the revision begins the box's next life. Its sidecar is `publicProps.sidecar`, or else the sidecar of `donorProps`.
    * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead ({@link tombstoneBox}), and refuses a sidecar or `secretProps`.
    * Its `written_at` is `publicProps.written_at`, or now.

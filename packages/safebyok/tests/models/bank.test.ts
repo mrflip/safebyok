@@ -462,6 +462,12 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     })
   }
 
+  it("refuses a misspelt key in publicProps, and a key beside the whisper in secretProps", async () => {
+    const { bank } = await TH.buildBornBank()
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidcar: TH.Sidecar } as never, { whisper: TH.Whisper }), 'bad_option')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper, sidecar: TH.Sidecar } as never), 'bad_option')
+  })
+
   it("refuses to seal a box when neither the donor nor publicProps has a sidecar", async () => {
     const { bank } = await TH.buildBornBank()
     await TH.expectRefusal(bank.sealBox(TH.boxShellOf(), {}, { whisper: TH.Whisper }), 'bad_option')

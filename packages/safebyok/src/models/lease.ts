@@ -110,7 +110,7 @@ export class Lease implements LeaseStamp {
   // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
 
   /** Seal and return the next revision after `donorProps`, with `publicProps` applied and `secretProps` encrypted.
-   * The seal checks its arguments and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
+   * The seal checks its arguments (`CoreBox` refuses an unknown key in `publicProps` or `secretProps`) and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
    * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live `donorProps` instead, and refuses any `secretProps`. The sealer may refuse body fields there too: `CoreBox` refuses a sidecar.
    * The seal is bound to the bank's stamp, the revision's stamp and the sealer's tags. The cleartext's bytes are zeroed afterwards.
    * @example

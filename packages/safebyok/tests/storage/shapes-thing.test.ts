@@ -376,8 +376,8 @@ describe("boxSealable", () => {
   })
 
   const BadSparseCases = [
-    [{ ...shell, revseq: 0 },                                     Phrases.DonorHalfShell,  'half the shell: its revseq moved'],
-    [{ ...shell, revtok: 'rev-0' },                               Phrases.DonorHalfShell,  'half the shell: its revtok moved'],
+    [{ ...shell, revseq: 0 },                                     Phrases.SealableHalfShell,  'half the shell: its revseq moved'],
+    [{ ...shell, revtok: 'rev-0' },                               Phrases.SealableHalfShell,  'half the shell: its revtok moved'],
     [{ ...shell, lifeseq: Life0, lifepath: `${Life0}/${Life0}` }, Phrases.LifeseqParity,   'the shell made live in its lifeseq alone'],
     [{ ...shell, lifeseq: Life0 },                                Phrases.LifeseqNotOwn,   'a lifeseq not the last of its lifepath'],
     [{ ...shell, revseq: -2 },                                    'revseq',                'a revseq below the shell\'s'],

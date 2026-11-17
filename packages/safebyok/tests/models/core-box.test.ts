@@ -41,9 +41,15 @@ describe("CoreBox.donorPropsOf(donor), publicPropsOf(publicProps) and secretProp
     expect(CoreBox.donorPropsOf(TH.boxShellOf())).to.deep.equal(TH.boxShellOf())
   })
 
-  it("keeps the sidecar, am and written_at of publicProps, and the whisper of secretProps, dropping the rest", () => {
-    expect(CoreBox.publicPropsOf({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0, whisper: TH.Whisper } as never)).to.deep.equal({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0 })
-    expect(CoreBox.secretPropsOf({ whisper: TH.Whisper, sidecar: TH.Sidecar } as never)).to.deep.equal({ whisper: TH.Whisper })
+  it("keeps the sidecar, am and written_at of publicProps, and the whisper of secretProps", () => {
+    expect(CoreBox.publicPropsOf({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0 })).to.deep.equal({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0 })
+    expect(CoreBox.secretPropsOf({ whisper: TH.Whisper })).to.deep.equal({ whisper: TH.Whisper })
+  })
+
+  it("refuses a field beside the sidecar, am and written_at of publicProps, and beside the whisper of secretProps", () => {
+    TH.expectSyncRefusal(() => CoreBox.publicPropsOf({ sidcar: TH.Sidecar } as never), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.publicPropsOf({ sidecar: TH.Sidecar, whisper: TH.Whisper } as never), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.secretPropsOf({ whisper: TH.Whisper, sidecar: TH.Sidecar } as never), 'bad_option')
   })
 
   const PublicPropsCases = [

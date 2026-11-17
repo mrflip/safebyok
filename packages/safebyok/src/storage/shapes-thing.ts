@@ -211,7 +211,7 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
-    .refine(isShellWhole,   Phrases.DonorHalfShell)
+    .refine(isShellWhole,   Phrases.SealableHalfShell)
 
   // A bank keeps its root box whole: live once the bank is born, and its shell before.
   const boxRecord    = boxLive

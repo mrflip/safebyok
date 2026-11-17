@@ -175,6 +175,12 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(next.sidecar).to.deep.equal({ account: 'home' })
   })
 
+  it("refuses a misspelt key in publicProps, and a key beside the whisper in secretProps", async () => {
+    const { lease } = await leaseWorld()
+    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), { sidcar: TH.Sidecar } as never, Cleartexts), 'bad_option')
+    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), PublicProps, { ...Cleartexts, sidecar: TH.Sidecar } as never), 'bad_option')
+  })
+
   it("refuses when neither the donor nor the publicProps has a sidecar, sealing nothing", async () => {
     const { lease } = await leaseWorld()
     const sealer = { ...BoxSealerBag }
