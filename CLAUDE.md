@@ -174,7 +174,7 @@ STYLE.md *Naming* is the source; these few shape code too deeply to fix in revie
 * Smush the tags `name`, `kind`, `label`, `path` and `bag` into one word: `vaultlabel`,
   `woodkind`. `type` is only a datatype; a menu choice is a `kind` or a `flavor`.
 * Stored fields are underbar_case (`salt_b64`), and so is a host-facing field containing one
-  (`user_id`, never `userId`); everything else camelCase. Times are integer UTC epoch
+  (`box_key_wrapped`, never `boxKeyWrapped`); everything else camelCase. Times are integer UTC epoch
   milliseconds, never strings or `Date`s.
 
 ## Doc blocks at a glance

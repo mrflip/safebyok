@@ -178,7 +178,7 @@ key material, a model's verb resolves its summary: `vault.putWayin()` resolves t
 else's database, and stay one spelling from the wire to the code. **One name for one thing,
 everywhere**: a field with a stored value keeps its stored spelling wherever it goes, in the
 facades a record passes through, a host's options and a snapshot alike. A key deriver's
-`key_deriver_label` is written into a wayin as it is, and `user_id` is never `userId`. Other
+`key_deriver_label` is written into a wayin as it is, and `box_key_wrapped` is never `boxKeyWrapped`. Other
 names are camelCase: a field with no stored counterpart (a snapshot's `damagedBoxes`), a verb
 (`getUserId`), a concept (`keyDeriverLabel`, "the label of the key deriver").
 The tag smushing above is for a label that names a thing (`boxlabel`).
