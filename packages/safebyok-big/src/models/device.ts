@@ -19,6 +19,7 @@ import { alreadyAsking, deviceDisabled, insecureContext, unexpectedError } from 
 import { Bank, DefaultLeaseMillis, listOwnLeases } from './bank'
 import { BankListing } from './bank-listing'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
+import type { Banklabel, DeviceTok, UserID } from '../helpers/aliases'
 
 // == [Given to a device]: DefaultRefreshMillis
 
@@ -32,8 +33,8 @@ export const DefaultRefreshMillis = 5 * MinuteMillis
 export class Device {
   // == [Props]: user_id, banklabel, scope, gates, keyDeriver, deviceDB, logger, strengthChecker, leaseMillis, boxRefreshMillis, #bankDB, #hostHandlers, #askUser, #vaultRefreshMillis, #bankListing, #listeners, #deviceTok, #openGating, #endCause, #vacating, #isReady, #snapshot, #getSnapshot, #subscribe
 
-  declare readonly user_id:   string
-  declare readonly banklabel: string
+  declare readonly user_id:   UserID
+  declare readonly banklabel: Banklabel
   readonly scope:            BankScope
   /** The bank's gates, as `Device.make` was given them. */
   readonly gates:            readonly ['main']
@@ -57,7 +58,7 @@ export class Device {
   /** The listing the bank is made in, made anew once the bank listed there has ended. */
   #bankListing:         BankListing
   /** The token of this device's row in the deviceDB, once an `ensureBank` has ensured the row; null until then. */
-  #deviceTok:           string | null = null
+  #deviceTok:           DeviceTok | null = null
   #openGating:          AnyGating | null = null
   /** Why a sweep or a vacate disabled the device, shown as its snapshot's `err`; null while it is enabled. */
   #endCause:            VaultError | null = null
@@ -85,7 +86,7 @@ export class Device {
   }
 
   /** The token of this device's row in the deviceDB, which each wayin records; null until an `ensureBank` has ensured the row. */
-  get device_tok(): string | null { return this.#deviceTok }
+  get device_tok(): DeviceTok | null { return this.#deviceTok }
 
   /** The gating open on this device, or null. */
   get openGating(): AnyGating | null { return this.#openGating }

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { adorn, decorate, nextMicrotask, tattoo, tattooProp } from '../../src/helpers/helpers'
+import type { VaultTok } from '../../src/helpers/aliases'
 
-type Handle = { label: string, vault?: { vault_tok: string } }
+type Handle = { label: string, vault?: { vault_tok: VaultTok } }
 
 function decorated() { return decorate<Handle>({ label: 'anthropic' }, { vault: { vault_tok: 'v1' } }) }
 
@@ -94,7 +95,7 @@ describe("tattoo", () => {
   })
 
   it("throws on assigning to a readonly prop", () => {
-    const handle: { vault_tok?: string } = {}
+    const handle: { vault_tok?: VaultTok } = {}
     tattoo(handle, { vault_tok: 'v1' })
     expect(() => { handle.vault_tok = 'v2' }).to.throw(TypeError)
     adorn(handle, 'vault_tok', 'v2')

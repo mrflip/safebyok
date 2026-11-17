@@ -8,6 +8,7 @@ import { type Outcome, outcomeOf } from '../refusals/outcome'
 import { damagedLease, leaseNotInForce, undecipheredWhisper } from '../refusals/throwers'
 import type { Wayinkind } from '../shapes/shapes-enums'
 import { type BankStamp, type CitedGate, type LeaseFriend, type LeaseGrantOpts, type LeaseRecord, type LeaseSparse, type LeaseStamp, type SealedWhisper, LeaseFormat, bankStamp, leaseFriend, leaseFromCacheArgs, leaseGrantedArgs, leaseRecord, leaseSealArgs, leaseStamp, leaseUnsealArgs, sealedWhisper } from '../shapes/shapes-gateish'
+import type { BankTok, Banklabel, EpochMillis, GateTok, RevisionTok, UserID } from '../helpers/aliases'
 
 /** A grant that lets this device seal and unseal whispers without asking the user, for one revision of its bank's gate.
  * The bankKey stays wrapped under a non-extractable leaseKey. Each seal or unseal unwraps it for that call alone, and nothing hands it out.
@@ -17,14 +18,14 @@ export class Lease implements LeaseStamp {
   // == [Props]: fmt, user_id, banklabel, bank_tok, registered_at, gatelabel, gate_tok, gate_revision_tok, proved_at, wayinkind, #bankFriend, #record, #bankStamp, #isFromCache, #leaseStamp, toJSON
 
   declare readonly fmt:               typeof LeaseFormat
-  declare readonly user_id:           string
-  declare readonly banklabel:         string
-  declare readonly bank_tok:          string
-  declare readonly registered_at:     number
+  declare readonly user_id:           UserID
+  declare readonly banklabel:         Banklabel
+  declare readonly bank_tok:          BankTok
+  declare readonly registered_at:     EpochMillis
   declare readonly gatelabel:         LeaseStamp['gatelabel']
-  declare readonly gate_tok:          string
-  declare readonly gate_revision_tok: string
-  declare readonly proved_at:         number
+  declare readonly gate_tok:          GateTok
+  declare readonly gate_revision_tok: RevisionTok
+  declare readonly proved_at:         EpochMillis
   declare readonly wayinkind:         Wayinkind
 
   /** What this lease is given of its bank: see {@link LeaseFriend}. */

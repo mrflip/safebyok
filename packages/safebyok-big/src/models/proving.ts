@@ -14,6 +14,7 @@ import { type BankStamp, type CitedGate, type GateStamp, type LeaseFriend, type 
 import { keyDeriverLoadFailed, keyDeriverThrew, noPasskeyWayin, notKeyBytes, otherPasskey, otherPrfSalt, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPasskey, wrongPassphrase } from '../refusals/throwers'
 import { Lease } from './lease'
 import { Wayin, wayinCtxOf } from './wayin'
+import type { KeyDeriverLabel } from '../helpers/aliases'
 
 // == [NOVEL and the checks]: NOVEL, RewrapUsage, CheckUsage, Checks
 
@@ -242,7 +243,7 @@ function mintPasskeyHeader({ device_tok }: ProvingDevice, { credential_id, prf_s
 
 /** The host's key deriver, wrapped by {@link guardKeyDeriver}. */
 export type GuardedKeyDeriver = Readonly<{
-  key_deriver_label: string
+  key_deriver_label: KeyDeriverLabel
   salt_size:        typeof PassphraseSaltSize
   deriveKeyBytes:    (passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array) => Promise<unknown>
   load:              () => Promise<void>

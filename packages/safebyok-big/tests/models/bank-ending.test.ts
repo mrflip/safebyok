@@ -17,6 +17,7 @@ import { AutolockMinutes, BankScopeGiven, OtherScopeGiven, VaultScopeGiven, make
 import { Dna, NewPassphrase, Passphrase, T0, bankTyping, boxlabel, byPassphrase, delTyping, makeWorldWithBox, useVaultWorlds } from '../test-helpers/vault-world'
 import { parseLogger } from '../../src/helpers/logger'
 import type { MemoryBankDB } from '../../src/storage/memory-bank-db'
+import type { Banklabel, UserID } from '../../src/helpers/aliases'
 
 useBankWorlds()
 useVaultWorlds()
@@ -166,7 +167,7 @@ describe("bank.autolock", () => {
     world.advance(AutolockMillis + 1)
     await ours.autolock()
     await TH.eventually(() => world.leaseRows().length === 2)
-    expect(world.leaseRows().map((row) => (row as { user_id: string, banklabel: string }).user_id + (row as { banklabel: string }).banklabel)).to.have.members(['u2acme', 'u1other_app'])
+    expect(world.leaseRows().map((row) => (row as { user_id: UserID, banklabel: Banklabel }).user_id + (row as { banklabel: Banklabel }).banklabel)).to.have.members(['u2acme', 'u1other_app'])
     for (const other of others) { expect(other.isUnlocked).to.be.true }
     expect(ours.isLocked).to.be.true
   })
@@ -285,7 +286,7 @@ describe("bank.lock, device.vacate, device.sweep", () => {
     await elsewhere.ensureVault(VaultScopeGiven)
     await world.deviceOn().vacate()
     await TH.eventually(() => world.leaseRows().length === 1)
-    expect((world.leaseRows()[0] as { user_id: string }).user_id).to.eq('u2')
+    expect((world.leaseRows()[0] as { user_id: UserID }).user_id).to.eq('u2')
   })
 
   it("a vacate reports a lease it cannot forget, then the vacate itself, to onLifecycle", async () => {

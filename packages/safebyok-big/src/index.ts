@@ -14,6 +14,7 @@ export { VaultError, isVaultError, type RefusalFamily, type RefusalFamilyForKind
 export * as HostErrorSanitizer from './refusals/host-error-sanitizer'
 export { correctablekindVals, type Gatingkind, type Wayinkind, boxExposureVals, type BoxExposure } from './shapes/shapes-enums'
 export type { BadOutcome, GoodOutcome, Outcome } from './refusals/outcome'
+export type { BankTok, Banklabel, BoxTok, Boxlabel, DeviceTok, EpochMillis, GateTok, KeyDeriverLabel, RevisionSeq, RevisionTok, UserID, VaultTok, Vaultlabel } from './helpers/aliases'
 export { MaxLabelChars, MaxUserIdChars, Patterns } from './shapes/primitives'
 export type { BankedVaultScope, VaultScope, Whisper } from './shapes/shapes-core'
 export { PrfAnswerSize, type AnyGating, type AskUser, type PasskeyAnswer, type PasskeyWayinHeader, type PassphraseCleartext, type PassphraseVerdict, type PassphraseWayinHeader, type RequestCleartext, type WayinHeader } from './shapes/shapes-gateish'

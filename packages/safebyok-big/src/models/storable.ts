@@ -11,6 +11,7 @@ import * as VX from '../shapes/shapes-vaultish'
 import type { Fetched, FetchOpts, ListingOf, SparseBase, TimelyOpts, Tombstone } from '../shapes/shapes-vaultish'
 import * as SX from '../shapes/shapes-storage'
 import type { Revision } from '../shapes/shapes-storage'
+import type { EpochMillis, RevisionSeq, RevisionTok } from '../helpers/aliases'
 
 // == [Revisions]: cmpRevisions
 
@@ -38,10 +39,10 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   declare readonly listing: ListingOf<ScopeT, RecordT, SparseT>
 
   /** The revision and times of the record in hand, as own props. */
-  declare revision_tok:  string
-  declare revision_seq:  number
-  declare registered_at: number
-  declare written_at:    number
+  declare revision_tok:  RevisionTok
+  declare revision_seq:  RevisionSeq
+  declare registered_at: EpochMillis
+  declare written_at:    EpochMillis
 
   // The scope's fields are own props too, so the thing ducks as its record; `scope` itself is a getter, kept off the duck.
   /** The scope, frozen. */

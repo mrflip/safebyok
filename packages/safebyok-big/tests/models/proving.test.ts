@@ -10,7 +10,7 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } fr
 import { VaultError } from '../../src/refusals/errors'
 import { Wayin } from '../../src/models/wayin'
 import * as TH from '../test-helpers'
-import { _cheat_bankKeyBytesOf, builtGateOf, listedGateOf, DeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingDeviceOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
+import { _cheat_bankKeyBytesOf, builtGateOf, listedGateOf, WorldDeviceTok, fakeLeaseFriendOf, isZeroed, passkeyAnswerOf, provingDeviceOf, sealStampsOf, T0, TestPassphrase, useFakeClock, WorldBankStamp, WorldGate, WorldGateStamp } from '../test-helpers/proving-world'
 
 useFakeClock()
 
@@ -413,7 +413,7 @@ describe("a proving's header", () => {
   it("of a passphrase proving: the deriver's label, a fresh salt, the device's device_tok, and registered_at from the time now", async () => {
     vi.setSystemTime(T0 + 5)
     const { header } = await novelPassphrase(provingDeviceOf())
-    expect(header).to.deep.include({ wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label: 'test_digest_v0', device_tok: DeviceTok, registered_at: T0 + 5 })
+    expect(header).to.deep.include({ wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label: 'test_digest_v0', device_tok: WorldDeviceTok, registered_at: T0 + 5 })
     expect(Object.keys(header)).to.have.members(['wayinkind', 'wayinlabel', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'])
     expect(fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_size)
     expect(Object.isFrozen(header)).to.be.true
@@ -423,7 +423,7 @@ describe("a proving's header", () => {
     const answer = passkeyAnswerOf()
     const { credential_id, prf_salt_b64 } = answer
     const { header } = await novelPasskey(answer)
-    expect(header).to.deep.equal({ wayinkind: 'passkey', wayinlabel: 'passkey0', credential_id, prf_salt_b64, device_tok: DeviceTok, registered_at: T0 })
+    expect(header).to.deep.equal({ wayinkind: 'passkey', wayinlabel: 'passkey0', credential_id, prf_salt_b64, device_tok: WorldDeviceTok, registered_at: T0 })
   })
 
   it("draws a fresh salt for each passphrase proving", async () => {

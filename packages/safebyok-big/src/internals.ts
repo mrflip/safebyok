@@ -21,3 +21,5 @@ export * as EX from './shapes/shapes-enums'
 export * as GX from './shapes/shapes-gateish'
 export * as SX from './shapes/shapes-storage'
 export * as VX from './shapes/shapes-vaultish'
+// The plain aliases of ids, labels, tokens and times, flat: each name is unique across the namespaces.
+export type { BankTok, Banklabel, BoxTok, Boxlabel, DeviceTok, EpochMillis, GateTok, KeyDeriverLabel, RevisionSeq, RevisionTok, UserID, VaultTok, Vaultlabel } from './helpers/aliases'

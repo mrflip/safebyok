@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cipherCtx, cipherBytes, decipherBytes, deriveWrappingKey, fromB64, fromB64OrNull, importWrappingKeyBytes, makeLeaseKey, makeBoxKey, makeLifeTok, makeBankKey, randomBytes, randomId, toB64, unwrapKeyUnder, wrapKeyUnder, type CipherCtxRecord } from '../../src/helpers/crypto'
 import * as TH from '../test-helpers'
 import { vault_tok } from '../../src/shapes/shapes-core'
+import type { DeviceTok } from '../../src/helpers/aliases'
 
 function utf8(text: string) { return new TextEncoder().encode(text) }
 
@@ -192,7 +193,7 @@ describe("wrap and unwrap", () => {
 function hexBytes(hex: string) { return Uint8Array.from(hex.match(/../gu) ?? [], (pair) => Number.parseInt(pair, 16)) }
 
 /** The info of a passkey wayin's passkeyKey, for the header of the device `device_tok`. */
-function infoOf(device_tok: string) { return cipherCtx(vaultStamp, 'bank_key_passkey_wrapped', { ...header, device_tok }) }
+function infoOf(device_tok: DeviceTok) { return cipherCtx(vaultStamp, 'bank_key_passkey_wrapped', { ...header, device_tok }) }
 
 describe("deriveWrappingKey", () => {
   // deriveWrappingKey @example

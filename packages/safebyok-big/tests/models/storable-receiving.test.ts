@@ -22,11 +22,11 @@ const NewerRev   = { revision_seq: 3, revision_tok: 'rev-n3', written_at: T0 + 3
 const Later = T0 + 3_600_000
 
 /** The central set, by shape, at revision 2 under 'rev-c2'. */
-const Centrals: Readonly<Record<RecordShape, () => Rec>> = {
+const Centrals = {
   full:   () => fullBoxRecord(CentralRev),
   sparse: () => sparseBoxRecord(CentralRev),
   gone:   () => tombstoneBoxRecord(CentralRev),
-}
+} as const satisfies Readonly<Record<RecordShape, () => Rec>>
 
 /** A record storage delivers, by shape, at the revision given; a full one carries a sidecar of its own. */
 function rcvdOf(shape: RecordShape, rev: Partial<BoxSparse>): Rec {

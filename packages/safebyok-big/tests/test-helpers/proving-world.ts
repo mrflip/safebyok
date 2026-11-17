@@ -27,6 +27,7 @@ import { anyStrengthChecker, testDeriver } from './builders'
 import { parseLogger } from '../../src/helpers/logger'
 import { type LoggedCall, quietLogger, spyLogger } from './logging'
 import { T0 } from './models-world'
+import type { Boxlabel, DeviceTok } from '../../src/helpers/aliases'
 
 export { T0 } from './models-world'
 
@@ -114,25 +115,25 @@ export async function makeGrantedLease(friend: FakeLeaseFriend, opts: LeaseGrant
 }
 
 /** The two stamps a box hands the lease to seal its whisper under, its own fields, flat: `boxlabel` and `box_tok` for the boxKey's wrap, the same and `revision_seq` for the whisper's cipher. `overrides` lays fields over both. */
-export function sealStampOf(boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord { return { boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides } }
+export function sealStampOf(boxlabel: Boxlabel, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord { return { boxlabel, box_tok: `box-tok-${boxlabel}`, revision_seq: 1, ...overrides } }
 
 /** The stamps a box hands the lease to seal under: {@link WorldVaultStamp}, then {@link sealStampOf} `boxlabel` and `overrides`. */
-export function sealStampsOf(boxlabel: string, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord[] { return [WorldVaultStamp, sealStampOf(boxlabel, overrides)] }
+export function sealStampsOf(boxlabel: Boxlabel, overrides: Readonly<Record<string, string | number>> = {}): CipherCtxRecord[] { return [WorldVaultStamp, sealStampOf(boxlabel, overrides)] }
 // --
 
-// == [Provings]: TestPassphrase, DeviceTok, provingDeviceOf, passkeyAnswerOf, builtGateOf
+// == [Provings]: TestPassphrase, WorldDeviceTok, provingDeviceOf, passkeyAnswerOf, builtGateOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
 
 /** The `device_tok` a {@link provingDeviceOf} carries. */
-export const DeviceTok = '00000000-0000-4000-8000-00000000000a'
+export const WorldDeviceTok = '00000000-0000-4000-8000-00000000000a'
 
 /** What a test may say of a {@link provingDeviceOf} device: the host's own deriver and checker, which it wraps as a bank does. */
-export type ProvingDeviceGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_tok?: string | undefined }
+export type ProvingDeviceGiven = { keyDeriver?: KeyDeriver | undefined, strengthChecker?: StrengthChecker | undefined, device_tok?: DeviceTok | undefined }
 
-/** A proving device: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceTok}, each wrapped as a bank wraps it. */
-export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingDeviceGiven = {}): ProvingDevice {
+/** A proving device: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link WorldDeviceTok}, each wrapped as a bank wraps it. */
+export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = WorldDeviceTok }: ProvingDeviceGiven = {}): ProvingDevice {
   return {
     keyDeriver:      guardKeyDeriver(keyDeriver),
     strengthChecker: guardStrengthChecker(strengthChecker),

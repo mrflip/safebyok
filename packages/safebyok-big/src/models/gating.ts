@@ -17,6 +17,7 @@ import type { BankListing } from './bank-listing'
 import type { Device } from './device'
 import { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
+import type { Banklabel, UserID } from '../helpers/aliases'
 
 /** An attempt's work: prove the user's cleartexts, then make the change its gating is for. */
 type Act = (cleartexts: unknown) => Promise<Bank>
@@ -33,8 +34,8 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
    * Key the dialog on it, so that the next gating's form starts empty.
    */
   declare readonly gatingTok:     string
-  declare readonly user_id:       string
-  declare readonly banklabel:     string
+  declare readonly user_id:       UserID
+  declare readonly banklabel:     Banklabel
   declare readonly bank:          BankForGatingkind[KindT]
   /** The header of the gate's passkey wayin at launch, or null for none.
    * The dialog asks for that passkey by its `credential_id` and `prf_salt_b64`.
@@ -274,13 +275,13 @@ async function delBank(bank: Bank, cleartexts: unknown): Promise<Bank> {
   return bank
 }
 
-const ActOnBank: Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving) => Promise<Bank>> = {
+const ActOnBank = {
   unlock_bank:        unlockBank,
   replace_passphrase: replacePassphrase,
   add_passkey:        addPasskey,
   revoke_passkey:     revokePasskey,
   del_bank:           delBank,
-}
+} as const satisfies Record<BankGatingkind, (bank: Bank, cleartexts: unknown, unlockByProving: UnlockByProving) => Promise<Bank>>
 // --
 
 // == [An act's helpers]: timelyGate, timelyAnte, checkedCleartexts, isCorrectable, spendCleartexts

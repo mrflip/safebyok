@@ -10,6 +10,7 @@ import { DeviceDBVersion, DeviceRowDBVersion } from '../helpers/consts'
 import { DeviceDB } from './device-db'
 import { dbprefixOf, versionedShelfOf } from './idb-shelf'
 import { inOneStep, rowAt } from './idb-transaction'
+import type { Banklabel, UserID } from '../helpers/aliases'
 
 // == [Options]: IdbDeviceDBOpts, idbDeviceDBOpts
 
@@ -26,7 +27,7 @@ export const idbDeviceDBOpts = objCheck(({ str }) => ({ dbName: str.min(1).optio
 // == [The databases]: DeviceRowScopepath, leaseScopepathOf, deviceRowScopepathOf, leaseShelfOf, deviceRowShelfOf
 
 /** Where the device row shelf files a bank's row. */
-type DeviceRowScopepath = [user_id: string, banklabel: string]
+type DeviceRowScopepath = [user_id: UserID, banklabel: Banklabel]
 
 /** The scopepath of the lease row at `scope`. */
 function leaseScopepathOf({ user_id, banklabel }: BankScope): LeaseScopepath { return [user_id, banklabel] }

@@ -5,6 +5,7 @@
 // In one file so that wording and tone are reviewed together, and so is the rule that no phrase quotes the input.
 
 import { PassphraseSaltSize } from './consts'
+import type { Boxlabel, Vaultlabel } from './aliases'
 
 // == [Names]: LabelShape, DeviceTokShape, UserIdMissing, UserIdChars
 
@@ -278,13 +279,13 @@ export const LeaseNotInForce = "This lease is out of force, as the bank locked o
 export const LetGoInstance = "This object was let go: its bank or its vault ended, or its row was found damaged, so it answers nothing more: ask the device for its bank, and the bank for the vault, again."
 
 /** Why a vault absent from storage is refused, by its vaultlabel. */
-export function vaultAbsent(vaultlabel: string): string { return `No vault is stored under the label ${vaultlabel}.` }
+export function vaultAbsent(vaultlabel: Vaultlabel): string { return `No vault is stored under the label ${vaultlabel}.` }
 
 /** Why a box absent from storage is refused, by its boxlabel. */
-export function boxAbsent(boxlabel: string): string { return `No box is stored under the label ${boxlabel}.` }
+export function boxAbsent(boxlabel: Boxlabel): string { return `No box is stored under the label ${boxlabel}.` }
 
 /** Why a put that must find a box refuses where none is listed, with nothing fetched. */
-export function boxNotListed(boxlabel: string): string { return `No box is listed under the label ${boxlabel}, though one may be stored: call vault.beginWatch() to list what is stored.` }
+export function boxNotListed(boxlabel: Boxlabel): string { return `No box is listed under the label ${boxlabel}, though one may be stored: call vault.beginWatch() to list what is stored.` }
 
 /** Why a call on a vault that was deleted is refused. */
 export const VaultDeleted = "This vault was deleted. Ask the bank for the vault again (bank.ensureVault) to make it anew."
@@ -357,10 +358,10 @@ export const DeviceLetGo = "This device was let go, by a sweep or a vacate, so i
 export const GatesShape = "gates is ['main']: a bank has its main gate and no other"
 
 /** Bad news of a vault row `listVaults` set aside. */
-export function vaultStoredDamaged(vaultlabel: string): string { return `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.` }
+export function vaultStoredDamaged(vaultlabel: Vaultlabel): string { return `The vault ${vaultlabel} is stored damaged, so it can't be read. It was left as it is.` }
 
 /** Bad news of a box row `listBoxes` set aside. */
-export function boxStoredDamaged(boxlabel: string): string { return `The box ${boxlabel} is stored damaged, so it can't be read. It was left as it is.` }
+export function boxStoredDamaged(boxlabel: Boxlabel): string { return `The box ${boxlabel} is stored damaged, so it can't be read. It was left as it is.` }
 // --
 
 // == [Refusals: outcomes and helpers]: NoErrorGiven, nonErrorThrown, StorageUnavailable, UnexpectedError, UnboundCipherCtx, NoJsonText, StrengthCheckerMisanswered, StrengthCheckerLoadFailed, KeyDeriverLoadFailed

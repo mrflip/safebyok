@@ -6,6 +6,7 @@ import { cmpRevisions, Storable } from '../../src/models/storable'
 import * as Phrases from '../../src/helpers/phrases'
 import * as TH from '../test-helpers'
 import { type BoxAnswer, TestableBox, boxListingOf, fullBoxRecord, sparseBoxRecord, tombstoneBoxRecord, useModelsWorld, T0 } from '../test-helpers/models-world'
+import type { RevisionSeq, RevisionTok } from '../../src/helpers/aliases'
 
 const world = useModelsWorld()
 
@@ -36,7 +37,7 @@ function pendingNextDel(box: TestableBox): { entered: Promise<void>, release: ()
 
 describe("cmpRevisions(ante, post)", () => {
   const ante = { revision_seq: 2, revision_tok: 'rev-c2' }
-  const cases: readonly (readonly [post: { revision_seq: number, revision_tok: string }, age: string, blurb: string])[] = [
+  const cases: readonly (readonly [post: { revision_seq: RevisionSeq, revision_tok: RevisionTok }, age: string, blurb: string])[] = [
     [{ revision_seq: 1, revision_tok: 'rev-o1' }, "older", 'a lower seq is older, whatever its tok'],
     [{ revision_seq: 1, revision_tok: 'rev-c2' }, "older", 'a lower seq under the same tok is still older'],
     [{ revision_seq: 3, revision_tok: 'rev-n3' }, "newer", 'a higher seq is newer, whatever its tok'],
