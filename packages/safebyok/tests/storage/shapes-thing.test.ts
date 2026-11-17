@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteThingAsk, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetThingAsk, checkedListThingsAsk, checkedWriteThingAsk, delAskOf, getAskOf,
+  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetAsk, checkedListAsk, checkedWriteAsk, delAskOf, getAskOf,
   isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSparse,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
@@ -141,11 +141,11 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
   })
 })
 
-describe("checkedGetThingAsk(ask) and checkedListThingsAsk(ask)", () => {
+describe("checkedGetAsk(ask) and checkedListAsk(ask)", () => {
   it("accepts an ask of each kind", () => {
     for (const labelpath of ['bank', 'gate', 'gate/second', 'box', 'box/openai']) {
-      expect(checkedGetThingAsk(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
-      expect(checkedListThingsAsk(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
+      expect(checkedGetAsk(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
+      expect(checkedListAsk(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
     }
   })
 
@@ -161,29 +161,29 @@ describe("checkedGetThingAsk(ask) and checkedListThingsAsk(ask)", () => {
   ] as const
 
   for (const [ask, blurb] of BadGetCases) {
-    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => checkedGetThingAsk(ask), 'bad_option') })
+    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => checkedGetAsk(ask), 'bad_option') })
   }
 
   it("refuses a list ask that is a get", () => {
-    TH.expectSyncRefusal(() => checkedListThingsAsk(TH.getAskAt('box')), 'bad_option')
+    TH.expectSyncRefusal(() => checkedListAsk(TH.getAskAt('box')), 'bad_option')
   })
 })
 
-describe("checkedWriteThingAsk(ask), of the main gate", () => {
+describe("checkedWriteAsk(ask), of the main gate", () => {
   const stored = TH.gateThingOf()
   const next   = TH.nextGateOf(stored)
   // The helper builds an ask of any kind: this one is the gate's.
   const good   = TH.replaceAskOf(stored, next)
 
   it("accepts a birth and a replacement", () => {
-    expect(checkedWriteThingAsk(TH.birthAskOf())).to.deep.equal(TH.birthAskOf())
-    expect(checkedWriteThingAsk(good)).to.deep.equal(good)
+    expect(checkedWriteAsk(TH.birthAskOf())).to.deep.equal(TH.birthAskOf())
+    expect(checkedWriteAsk(good)).to.deep.equal(good)
   })
 
   const lifeseq1 = lifeseqOfLifenum(1)
   const lifeseq2 = lifeseqOfLifenum(2)
   const noTestimony = { revtok: stored.revtok, revseq: 0, am: 'a' as const, lifepath: stored.lifepath }
-  const BadRecordCases: readonly (readonly [WriteThingAsk, string, string])[] = [
+  const BadRecordCases: readonly (readonly [WriteAsk, string, string])[] = [
     // the record does not follow the one cited:
     [{ ...good, record: { ...next, revseq: 2 } },                                    Phrases.RevseqNotNext,      'a revseq that skips one'],
     [{ ...good, record: { ...next, revtok: stored.revtok } },                        Phrases.RevtokNotNew,       'a revtok that is not new'],
@@ -211,37 +211,37 @@ describe("checkedWriteThingAsk(ask), of the main gate", () => {
 
   for (const [ask, said, blurb] of BadRecordCases) {
     it(`refuses ${blurb}`, () => {
-      const err = TH.expectSyncRefusal(() => checkedWriteThingAsk(ask), 'bad_record')
+      const err = TH.expectSyncRefusal(() => checkedWriteAsk(ask), 'bad_record')
       expect(err.message).to.include(said)
     })
   }
 })
 
-describe("checkedWriteThingAsk(ask), of each kind", () => {
+describe("checkedWriteAsk(ask), of each kind", () => {
   const box   = TH.boxThingOf()
   const tomb  = TH.boxTombOf(box)
   const under = childShellCited(Life0)
 
   it("accepts a box's birth under its parent's life, its deletion, and its rebirth", () => {
     for (const ask of [TH.birthAskOf(box, under), TH.delAskFor(box, tomb), TH.replaceAskOf(tomb, TH.boxRebornOf(tomb))]) {
-      expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
+      expect(checkedWriteAsk(ask)).to.deep.equal(ask)
     }
   })
 
   it("accepts a box's birth citing its whole shell, as a bank gives it", () => {
     const ask = TH.birthAskOf(box, TH.boxShellOf({ labelpath: box.labelpath, label: box.label }))
-    expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
+    expect(checkedWriteAsk(ask)).to.deep.equal(ask)
   })
 
   it("accepts the bank's and the root box's births, and a further gate's deletion", () => {
     const second = TH.gateThingOf({ labelpath: 'gate/second', label: 'second', lifepath: `${Life0}/${Life0}` })
     const secondGone = TH.nextOf(second, { am: 'x', lifeseq: lifeseqOfLifenum(1), lifepath: `${Life0}/${lifeseqOfLifenum(1)}` })
     for (const ask of [TH.birthAskOf(TH.bankThingOf()), TH.birthAskOf(TH.rootBoxOf()), TH.delAskFor(second, secondGone)]) {
-      expect(checkedWriteThingAsk(ask)).to.deep.equal(ask)
+      expect(checkedWriteAsk(ask)).to.deep.equal(ask)
     }
   })
 
-  const BadOptionCases: readonly (readonly [WriteThingAsk, string, string])[] = [
+  const BadOptionCases: readonly (readonly [WriteAsk, string, string])[] = [
     [{ ...TH.birthAskOf(box, under), modelkind: 'gate' } as never,                   Phrases.ModelkindNotOwn, 'a modelkind not its labelpath\'s'],
     [{ ...TH.birthAskOf(box, under), op: 'del' },                                    Phrases.DelFlagsFixed,   'a del under ifAbsent add'],
     [{ ...TH.delAskFor(box, box) },                                                  Phrases.OpNotOfRecord,   'a del of a live record'],
@@ -253,12 +253,12 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
 
   for (const [ask, said, blurb] of BadOptionCases) {
     it(`refuses ${blurb}`, () => {
-      const err = TH.expectSyncRefusal(() => checkedWriteThingAsk(ask), 'bad_option')
+      const err = TH.expectSyncRefusal(() => checkedWriteAsk(ask), 'bad_option')
       expect(err.message).to.include(said)
     })
   }
 
-  const BadRecordCases: readonly (readonly [WriteThingAsk, string, string])[] = [
+  const BadRecordCases: readonly (readonly [WriteAsk, string, string])[] = [
     [TH.birthAskOf(box),                                                             Phrases.LifepathNotKept,    'a box\'s birth citing a root\'s shell'],
     [TH.birthAskOf(box, childShellCited(lifeseqOfLifenum(2))),                              Phrases.LifepathNotKept,    'a box\'s birth under another life of its parent'],
     [TH.birthAskOf(TH.boxThingOf('openai', { lifepath: Life0 }), under),             Phrases.LifepathDepth,      'a box whose lifepath is shallower than its labelpath'],
@@ -274,14 +274,14 @@ describe("checkedWriteThingAsk(ask), of each kind", () => {
 
   for (const [ask, said, blurb] of BadRecordCases) {
     it(`refuses ${blurb}`, () => {
-      const err = TH.expectSyncRefusal(() => checkedWriteThingAsk(ask), 'bad_record')
+      const err = TH.expectSyncRefusal(() => checkedWriteAsk(ask), 'bad_record')
       expect(err.message).to.include(said)
     })
   }
 
   it("refuses a del citing a tombstone as the act dubdel", () => {
     const tomb = TH.boxTombOf(box)
-    const err  = TH.expectSyncRefusal(() => checkedWriteThingAsk(TH.delAskFor(tomb, TH.nextOf(tomb))), 'absent_vault')
+    const err  = TH.expectSyncRefusal(() => checkedWriteAsk(TH.delAskFor(tomb, TH.nextOf(tomb))), 'absent_vault')
     expect(err.message).to.include(Phrases.TombstoneOverTombstone)
     expect(err.meta).to.deep.include({ act: 'dubdel' })
   })
@@ -327,7 +327,7 @@ describe("the ask builders", () => {
   it("fix a del's flags", () => {
     const tomb = TH.boxTombOf(box)
     expect(delAskOf({ cited: box, record: tomb })).to.deep.equal(TH.delAskFor(box, tomb))
-    expect(checkedWriteThingAsk(delAskOf({ cited: box, record: tomb }))).to.deep.equal(TH.delAskFor(box, tomb))
+    expect(checkedWriteAsk(delAskOf({ cited: box, record: tomb }))).to.deep.equal(TH.delAskFor(box, tomb))
   })
 
   it("write a del's fixed flags over any given", () => {
@@ -337,14 +337,14 @@ describe("the ask builders", () => {
 
   it("pass through what they do not accept, for the verb's checks to refuse", () => {
     const tomb = TH.boxTombOf(box)
-    TH.expectSyncRefusal(() => checkedWriteThingAsk(delAskOf({ cited: box, record: tomb, options: { policies: [] } } as never)), 'bad_option')
-    TH.expectSyncRefusal(() => checkedWriteThingAsk(putAskOf({ cited: box, record: box, extra: 1 } as never)), 'bad_option')
-    TH.expectSyncRefusal(() => checkedGetThingAsk(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_option')
+    TH.expectSyncRefusal(() => checkedWriteAsk(delAskOf({ cited: box, record: tomb, options: { policies: [] } } as never)), 'bad_option')
+    TH.expectSyncRefusal(() => checkedWriteAsk(putAskOf({ cited: box, record: box, extra: 1 } as never)), 'bad_option')
+    TH.expectSyncRefusal(() => checkedGetAsk(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_option')
   })
 
   it("never throw: a record with no scope, or args that are not a bag, go to the verb as given", () => {
     const noScope = putAskOf({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)
-    TH.expectSyncRefusal(() => checkedWriteThingAsk(noScope), 'bad_option')
+    TH.expectSyncRefusal(() => checkedWriteAsk(noScope), 'bad_option')
     expect(putAskOf(null as never)).to.eq(null)
     expect(listAskOf(7 as never)).to.eq(7)
   })

@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateThing, type GetThingAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSparse, getAskOf, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSparse, getAskOf, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -45,7 +45,7 @@ class LateVaultDB extends MemoryVaultDB {
   /** True while a get has read the store and waits to answer. */
   get isHolding(): boolean { return this.#releases.length > 0 }
 
-  override async tryGetThing(ask: GetThingAsk): Promise<GetThingAnswer> {
+  override async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
     const answer = await super.tryGetThing(ask)
     await new Promise<void>((resolve) => { this.#releases.push(resolve) })
     return answer

@@ -10,8 +10,8 @@ import type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone, UnsealedOf } fr
 import { type BankScope, type BankStamp, type CitedGate, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import * as Phrases from '../phrases'
 import {
-  type BankThing, type BoxThing, type DelAsk, type GetThingAsk, type ListThingsAsk, type LoggableAsk, type PutAsk, type Thing, type Track, type WorldRecord,
-  type WriteAskOf, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
+  type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
+  type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
   listAskOf, loggableAskOf, putAskOf, shellOf, sparseOf,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
@@ -30,15 +30,15 @@ export type BoxUnsealed = UnsealedOf<BoxRecord | BoxTombstone, BoxCleartexts>
 /** A box's shell: the void sparse record a box's first revision is sealed over and cites. */
 export type BoxShell = BoxSparse & Readonly<{ am: 'x' }>
 
-/** A box's get ask as a caller of {@link Bank.tryGetBox} states it: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`).
- * Its defaulted field may be left out, and the bank fills in the rest of the whole {@link GetThingAsk}.
+/** The draft of a box's get ask, for {@link Bank.tryGetBox}: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`).
+ * The bank fills in the rest of the {@link GetAsk}.
  */
-export type GetBoxAsk = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent | 'shell' }>
+export type GetBoxAskDraft = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent | 'shell' }>
 
-/** A get or list ask as a caller of {@link Bank.makeGetAsk} or {@link Bank.makeListAsk} states it: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
- * Its defaulted field may be left out, and the bank fills in the rest of the whole {@link GetThingAsk} or {@link ListThingsAsk}.
+/** The draft of a get or list ask, for {@link Bank.makeGetAsk} or {@link Bank.makeListAsk}: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
+ * The bank fills in the rest of the {@link GetAsk} or {@link ListAsk}.
  */
-export type BankAsk = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent }>
+export type BankAskDraft = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent }>
 
 /** The answer of {@link Bank.tryGetBox}: the box, what `ifAbsent` gives when none is stored, or a refusal. */
 export type GetBoxAnswer<ValT> = GoodAnswer<ValT, EX.GotAct> | BadAnswer
@@ -127,14 +127,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // == [Construction]: make, birth, constructor, mintStamps, makeRecord
 
   /** Make the bank of `record`, with its main gate and root box, on `opts.device`, keeping its boxes in `opts.vaultDB`. */
-  static make(record: BankMakeRecord, opts: BankOpts): Bank {
-    const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
-    const parsed = Checks.bankThing.parse(rest)
-    // The device names its user `user_id`, and the bank's Thing `userid`.
-    Validator.checkedConsistent({ user_id: parsed.userid, banklabel: parsed.banklabel }, checked.device.scope, { kind: 'record_conflict' })
-    Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
-    return new Bank(parsed, { maingate, rootBox }, checked)
-  }
+  static make(record: BankMakeRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   /** Write a new bank of `record`, with its main gate and root box, and return it unlocked under a lease built from `opts.proving`.
    * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.
@@ -149,11 +142,16 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return bank
   }
 
-  private constructor(parsed: BankThing, { maingate, rootBox }: Pick<BankMakeRecord, 'maingate' | 'rootBox'>, opts: BankOpts & { queryCacheOpts: QueryCacheOpts }) {
+  private constructor(record: BankMakeRecord, opts: BankOpts) {
+    const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
+    const parsed = Checks.bankThing.parse(rest)
+    // The device names its user `user_id`, and the bank's Thing `userid`.
+    Validator.checkedConsistent({ user_id: parsed.userid, banklabel: parsed.banklabel }, checked.device.scope, { kind: 'record_conflict' })
+    Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
     super(parsed)
-    this.#device = opts.device
-    this.#vaultDB = opts.vaultDB
-    this.#queryCacheOpts = Object.freeze(opts.queryCacheOpts)
+    this.#device = checked.device
+    this.#vaultDB = checked.vaultDB
+    this.#queryCacheOpts = Object.freeze(checked.queryCacheOpts)
     this.#rootBox = Object.freeze(rootBox)
     this.#maingate = Gate.make(maingate, { bank: this })
     Object.freeze(this)
@@ -187,18 +185,18 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** The get ask for the Thing at `ask.labelpath` in this bank.
    * A ThingMinder sends it to the vaultDB exactly as given, in the get ask it is handed.
    */
-  makeGetAsk(ask: BankAsk): GetThingAsk { return getAskOf({ ...ask, ...this.scope, track: this.track }) }
+  makeGetAsk(ask: BankAskDraft): GetAsk { return getAskOf({ ...ask, ...this.scope, track: this.track }) }
 
   /** The list ask for the children of the Thing at `ask.labelpath` in this bank. */
-  makeListAsk(ask: BankAsk): ListThingsAsk { return listAskOf({ ...ask, ...this.scope, track: this.track }) }
+  makeListAsk(ask: BankAskDraft): ListAsk { return listAskOf({ ...ask, ...this.scope, track: this.track }) }
 
   /** The put ask writing `ask.record` over `ask.cited`, in this bank. */
-  makePutAsk<RecordT extends Thing>(ask: Omit<PutAsk<RecordT>, 'track'>): WriteAskOf<RecordT> {
+  makePutAsk<RecordT extends Thing>(ask: Omit<PutAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
     return { ...putAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
   }
 
   /** The del ask writing the tombstone `ask.record` over `ask.cited`, in this bank. */
-  makeDelAsk<RecordT extends Thing>(ask: Omit<DelAsk<RecordT>, 'track'>): WriteAskOf<RecordT> {
+  makeDelAsk<RecordT extends Thing>(ask: Omit<DelAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
     return { ...delAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
   }
 
@@ -209,7 +207,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // == [Methods]: put
 
   /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing. This Bank object is not updated. */
-  async put(ask: PutAsk<BankThing>): Promise<BankThing> {
+  async put(ask: PutAskDraft<BankThing>): Promise<BankThing> {
     this.demandEnabled()
     const answer = await this.#vaultDB.tryWriteThing({ ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
     if (! answer.ok) { throw answer.err }
@@ -307,9 +305,9 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   /** The box at `ask.labelpath`. If none is stored, `ifAbsent: 'shell'` answers its shell, which a first revision is sealed over and cites. */
-  tryGetBox(ask: GetBoxAsk & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxThing | BoxShell>>
-  tryGetBox(ask: GetBoxAsk): Promise<GetBoxAnswer<BoxThing | null>>
-  async tryGetBox(ask: GetBoxAsk): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
+  tryGetBox(ask: GetBoxAskDraft & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxThing | BoxShell>>
+  tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer<BoxThing | null>>
+  async tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
     const { ifAbsent, ...given } = { ...ask }
     const thingAsk = { ...this.makeGetAsk({ ...given, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
     const { endCause } = this.#device
@@ -318,12 +316,12 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     if (! answer.ok) { return answer }
     // A box's labelpath, so its shell is a box's.
     if (answer.val === null) { return { ...answer, val: (ifAbsent === 'shell') ? shellOf({ ...this.scope, labelpath: given.labelpath }, this.#rootBox) as BoxShell : null } }
-    if (answer.val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer.ask, answer.val) } }
+    if (answer.val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer) } }
     return { ...answer, val: answer.val }
   }
 
   /** Write the live box `ask.record` over the box `ask.cited` cites: the one stored at its scope, or its shell. */
-  tryPutBox(ask: PutAsk<BoxThing>): Promise<WriteThingAnswer> {
+  tryPutBox(ask: PutAskDraft<BoxThing>): Promise<WriteThingAnswer> {
     const thingAsk = { ...this.makePutAsk(ask), modelkind: 'box' } as const
     const { endCause } = this.#device
     if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
@@ -331,7 +329,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   /** Write the tombstone `ask.record` over the live box `ask.cited` cites. */
-  tryDelBox(ask: DelAsk<BoxThing>): Promise<WriteThingAnswer> {
+  tryDelBox(ask: DelAskDraft<BoxThing>): Promise<WriteThingAnswer> {
     const thingAsk = { ...this.makeDelAsk(ask), modelkind: 'box' } as const
     const { endCause } = this.#device
     if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
@@ -389,8 +387,8 @@ function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<
 }
 
 // The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.
-/** A `storage_issue` refusal: the vaultDB answered `row`, which is not a box, to a box's get. */
-function otherThanBox(ask: LoggableAsk, row: Thing): Errors.VaultError {
-  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: row } })
+/** A `storage_issue` refusal of `answer`, the vaultDB's to a box's get, whose Thing is not a box. */
+function otherThanBox({ ask, val }: GoodAnswer<Thing, EX.GotAct>): Errors.VaultError {
+  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
 }
 // --

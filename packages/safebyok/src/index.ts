@@ -2,7 +2,7 @@
 // stays behind the subpaths: `safebyok/core` keeps every class and the lease, proving and sealer machinery, and
 // `safebyok/storage` the vaultDB. What a host needs that
 // safebyok-big defines is re-exported from it, so that `VaultError` stays one class across both packages.
-export { Bank, type BankAsk, type BankMakeRecord, type BankRecord, type BoxShell, type BoxUnsealed, type GetBoxAnswer, type GetBoxAsk } from './models/bank'
+export { Bank, type BankAskDraft, type BankMakeRecord, type BankRecord, type BoxShell, type BoxUnsealed, type GetBoxAnswer, type GetBoxAskDraft } from './models/bank'
 export { type BadNews, type BadNewsHandler, DefaultLeaseMillis, DefaultOnBadNews, Device, type DeviceOpts, type DeviceRecord, tellBadNewsTo } from './models/device'
 export type { Gate } from './models/gate'
 export { type AskUser, type CleartextsForGatingkind, type Gating, type GatingSnapshot, type Gatingkind, type RequestCleartext, gatingkindVals } from './models/gating'
@@ -10,7 +10,7 @@ export type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone } from './models
 export type { Wayin } from './models/wayin'
 export type { BankScope, BankStamp } from './models/stamps'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'
-export type { BoxThing, DelAsk, PutAsk, VoidSentinel } from './storage/shapes-thing'
+export type { BoxThing, DelAskDraft, PutAskDraft, VoidSentinel } from './storage/shapes-thing'
 export { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies } from './minding/shapes-minder'
 export { type DeliverableThing, type MinderOpts, type TSQAnswer, type TSQGotAnswer, ThingMinder } from './minding/thing-minder'
 

@@ -145,9 +145,9 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
 
   // == [The attempt]: judgeStrength, attempt, refusalOfAttempt, attemptOnce
 
-  /** The strength checker's verdict on `passphraseClear`, for a dialog to show as the user types. */
-  async judgeStrength(passphraseClear: string): Promise<GX.PassphraseVerdict> {
-    return Proving.judgeStrength(passphraseClear, this.scope, this.#device)
+  /** The strength checker's verdict on `passphraseCleartext`, for a dialog to show as the user types. */
+  async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> {
+    return Proving.judgeStrength(this.#device, this.scope, passphraseCleartext)
   }
 
   /** Try what the user typed, resolving an outcome instead of throwing. Call {@link launch} first, and await one attempt before the next.
@@ -223,11 +223,11 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
  * Refuses `gate_made_elsewhere` if a live bank is already stored there.
  */
 export async function birthBank(device: Device, cleartexts: unknown): Promise<Bank> {
-  const { passphraseClear, passkeyClear } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
+  const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
   // A birth's stamps are minted here, one pair per attempt.
   const { bankStamp, gateStamp } = Bank.mintStamps(device)
-  const passphraseProving = await PassphraseProving.buildNovel(bankStamp, gateStamp, passphraseClear, device)
-  const passkeyProving    = passkeyClear ? await PasskeyProving.buildNovel(bankStamp, gateStamp, passkeyClear, device) : null
+  const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
+  const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext) : null
 
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null

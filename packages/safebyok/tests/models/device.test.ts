@@ -10,15 +10,15 @@ import * as TH from '../test-helpers'
 /** A host's dialog that types `passphrases` into the gating it is shown, one attempt each, until one lands, keeping each outcome. */
 function typingDialog(...passphrases: string[]) {
   const outcomes: unknown[] = []
-  const passkeyClears = passphrases.map(() => TH.passkeyAnswerOf())
+  const passkeyCleartexts = passphrases.map(() => TH.passkeyAnswerOf())
   async function requestCleartext(gating: Gating): Promise<void> {
-    for (const [ii, passphraseClear] of passphrases.entries()) {
-      const outcome = await gating.attempt({ passphraseClear, passkeyClear: passkeyClears[ii]! })
+    for (const [ii, passphraseCleartext] of passphrases.entries()) {
+      const outcome = await gating.attempt({ passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartexts[ii]! })
       outcomes.push(outcome)
       if (! gating.isOpen) { return }
     }
   }
-  return { requestCleartext, outcomes, passkeyClears }
+  return { requestCleartext, outcomes, passkeyCleartexts }
 }
 
 /** A strength checker that finds `'weak'` weak and every other passphrase strong. */
@@ -297,8 +297,8 @@ describe("device.birthBankPrompt()", () => {
     expect(bank.isUnlocked).to.be.true
     expect(bank.device).to.equal(device)
     expect(bank.maingate.main.wayinkind).to.eq('passphrase')
-    expect(bank.maingate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: dialog.passkeyClears[0]!.credential_id })
-    expect(TH.isZeroed(dialog.passkeyClears[0]!.prfBytes)).to.be.true
+    expect(bank.maingate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: dialog.passkeyCleartexts[0]!.credential_id })
+    expect(TH.isZeroed(dialog.passkeyCleartexts[0]!.prfBytes)).to.be.true
     expect(device.openGating).to.be.null
     const box = await bank.sealBox(TH.boxShellOf(), { whisper: TH.Whisper })
     const { whisper } = await bank.unsealBox(box)
@@ -341,7 +341,7 @@ describe("device.birthBankPrompt()", () => {
     const births = TH.spyBirths(device)
     const bank = await device.birthBankPrompt()
     await TH.expectBad(dialog.outcomes[0] as never, 'weak_passphrase')
-    expect(TH.isZeroed(dialog.passkeyClears[0]!.prfBytes)).to.be.false
+    expect(TH.isZeroed(dialog.passkeyCleartexts[0]!.prfBytes)).to.be.false
     expect(bank.isUnlocked).to.be.true
     expect(births.tryBirthBank).toHaveBeenCalledTimes(1)
   })

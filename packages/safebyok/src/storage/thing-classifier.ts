@@ -6,8 +6,8 @@ import { BankRootsMissing, BornAtNotStored } from '../phrases'
 import { PoliciedMeta, gateIssue, policyRefusalOf } from './policies'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type BankRoots, type BirthPuts, type GetThingAsk, type ListThingsAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
-  type Tracked, type WorldRecord, type WriteThingAsk,
+  type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
+  type Tracked, type WorldRecord, type WriteAsk,
   KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
 } from './shapes-thing'
 
@@ -16,7 +16,7 @@ import {
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
 /** A write ask reduced to what the act tables read: its flags, and the citations in its `cited` and `record`. */
-type WriteCmpAsk = Pick<WriteThingAsk, 'op' | 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
+type WriteCmpAsk = Pick<WriteAsk, 'op' | 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
 
 /** A scope's stored Thing, by liveness: none (`void`), a tombstone (`gone`), or a live Thing. */
 type Presence = 'void' | 'gone' | 'live'
@@ -68,7 +68,7 @@ function isLifeMismatch({ cited }: WriteCmpAsk, stored: ThingCited | null): bool
 // == [Tables]: getActOf, putActOf, delActOf, writeActOf, isRefusedAct, isWriteAct
 
 /** Classify a get: see the get table in `notes/answer-contract.md`. */
-function getActOf({ ifAbsent }: Pick<GetThingAsk, 'ifAbsent'>, stored: ThingCited | null): EX.GotAct | 'void' | 'gone' {
+function getActOf({ ifAbsent }: Pick<GetAsk, 'ifAbsent'>, stored: ThingCited | null): EX.GotAct | 'void' | 'gone' {
   const presence = presenceOf(stored)
   if (presence === 'live') { return 'gotlive' }
   if (presence === 'void') { return (ifAbsent === 'nil') ? 'gotvoid' : 'void' }
@@ -202,8 +202,8 @@ export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unkn
 /** The raw bank, main gate and root box a store fetched, each null for none, under its key in a `track`. */
 export type TrackedRows = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown, [RootBoxLabelpath]: unknown }>
 
-/** The {@link TrackedFetched} report of `track` against the raw rows a store fetched, for a store that compares in TypeScript. */
-export function trackedFetchedOf(track: Track | undefined, rows: TrackedRows): TrackedFetched {
+/** The {@link TrackedFetched} report of what `ask` tracks against the raw rows a store fetched, for a store that compares in TypeScript. */
+export function trackedFetchedOf({ track }: AnyAsk, rows: TrackedRows): TrackedFetched {
   if (track === undefined) { return null }
   return {
     bank:               trackedRawOf(track.bank, rows.bank),
@@ -238,7 +238,7 @@ function trackedEntryOf<RecordT extends Thing>(check: StoredCheck<RecordT>, scop
 // a birth takes the bank's three roots, and where it is born, reports the world its puts wrote.
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
-export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {
+export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {
   const stored = storedThingOf(ask, raw)
   const act    = getActOf(ask, stored)
   const world  = worldOf(ask, worldFetched)
@@ -250,12 +250,12 @@ export function classifyGetThing(ask: GetThingAsk, raw: unknown, worldFetched: W
  * Where the write would replace a live Thing, it also checks the born_at and the storage policies. Under a write act, `record`
  * is `ask.record`: the store writes it, then reports the Thing it wrote and the world after the write.
  */
-export function classifyWriteThing(ask: WriteThingAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
+export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
   const stored = storedCitedOf(ask, raw)
   const act    = writeActOf(ask, stored)
-  if (! isWriteAct(act))  { return unwrittenWriteOf(ask, act, raw, worldFetched) }
+  if (! isWriteAct(act))  { return unwrittenWriteOf(raw, { ask, act, world: worldFetched }) }
   if (act === 'replaced') {
-    demandBornAtKept(ask, stored, raw)
+    demandBornAtKept(ask, raw)
     demandPolicies(ask, raw)
   }
   return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
@@ -267,7 +267,7 @@ export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Reado
 /** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the parent, the children of its live life in labelpath order,
  * and the children that fail their checks.
  */
-export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
+export function classifyListThings(ask: ListAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
   const stored = storedThingOf(ask, rawParent)
   const act    = getActOf(ask, stored)
   const parent = (stored === null) ? null : sparseOf(stored)
@@ -291,7 +291,7 @@ export function classifyListThings(ask: ListThingsAsk, { parent: rawParent, chil
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
-function isChildLabelpath(ask: ListThingsAsk, labelpath: string): boolean {
+function isChildLabelpath(ask: ListAsk, labelpath: string): boolean {
   const label = labelpath.slice(ask.labelpath.length + 1)
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind(labelpath, ask.modelkind)
 }
@@ -309,27 +309,32 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 }
 // --
 
-// == [Steps]: unwrittenWriteOf, demandBornAtKept, demandPolicies, unwrittenBirthOf
+// == [Steps]: unwrittenWriteOf, UnwrittenWrite, demandBornAtKept, demandPolicies, unwrittenBirthOf
 // The steps of the classifiers above, for a store that checks some preconditions itself to call in its own order.
 
-/** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope and the raw world. */
-export function unwrittenWriteOf(ask: WriteThingAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
-  const record = storedThingOf(ask, raw)
-  const world  = worldOf(ask, worldFetched)
-  const beside = trackedFieldOf(ask, worldFetched.tracked)
-  return isRefusedAct(act) ? { ok: false, act, world, record, ...beside } : { ok: true, act, world, record, ...beside }
+/** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope.
+ * `world` is the raw world the store fetched beside it.
+ */
+export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWrite): Actual<EX.PutAct | EX.DelAct> {
+  const record  = storedThingOf(ask, raw)
+  const checked = worldOf(ask, world)
+  const beside  = trackedFieldOf(ask, world.tracked)
+  return isRefusedAct(act) ? { ok: false, act, world: checked, record, ...beside } : { ok: true, act, world: checked, record, ...beside }
 }
 
-/** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces: `stored`, read from `raw`. */
-export function demandBornAtKept(ask: WriteThingAsk, stored: StoredCited | null, raw: unknown): void {
-  if (ask.record.born_at === stored?.born_at) { return }
+/** What {@link unwrittenWriteOf} answers for: the write, the act the act tables found, and the raw world the store fetched. */
+export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, world: WorldFetched }>
+
+/** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
+export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
+  if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
   throw new Errors.VaultError('bad_record', BornAtNotStored, { rows: { dbhas: storedThingOf(ask, raw) }, meta: PoliciedMeta })
 }
 
 const StoredWayinsCheck = storedWayins.refusingAs('damaged_row')
 
 /** Throw `gate_issue` if a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only a gate's writes name storage policies. */
-export function demandPolicies(ask: WriteThingAsk, raw: unknown): void {
+export function demandPolicies(ask: WriteAsk, raw: unknown): void {
   if ((ask.modelkind !== 'gate') || ((ask.options?.policies.length ?? 0) === 0)) { return }
   const why = policyRefusalOf(ask, StoredWayinsCheck.parse(raw).wayins)
   if (why !== null) { throw gateIssue(storedThingOf(ask, raw), why) }

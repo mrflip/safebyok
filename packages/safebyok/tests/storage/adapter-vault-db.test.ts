@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { type EX, Errors } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB, type Received } from '../../src/storage/adapter-vault-db'
-import type { BirthBankAsk, GetThingAsk, ListThingsAsk, ThingWatchScope, WriteThingAsk } from '../../src/storage/shapes-thing'
+import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/storage/shapes-thing'
 import type { Actual, BirthBankActual, ListThingsActual, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -16,9 +16,9 @@ class ScriptedVaultDB extends AdapterVaultDB {
     this.step = step
   }
 
-  protected doGetThing(_ask: GetThingAsk): Actual<EX.GotAct> { return this.step() as Actual<EX.GotAct> }
-  protected doWriteThing(_ask: WriteThingAsk): Actual<EX.PutAct | EX.DelAct> { return this.step() as Actual<EX.PutAct | EX.DelAct> }
-  protected doListThings(_ask: ListThingsAsk): ListThingsActual { return this.step() as unknown as ListThingsActual }
+  protected doGetThing(_ask: GetAsk): Actual<EX.GotAct> { return this.step() as Actual<EX.GotAct> }
+  protected doWriteThing(_ask: WriteAsk): Actual<EX.PutAct | EX.DelAct> { return this.step() as Actual<EX.PutAct | EX.DelAct> }
+  protected doListThings(_ask: ListAsk): ListThingsActual { return this.step() as unknown as ListThingsActual }
   protected doBirthBank(_ask: BirthBankAsk): BirthBankActual { return this.step() as unknown as BirthBankActual }
   protected override doWatch(_scope: ThingWatchScope, receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void {
     this.receive = receive

@@ -17,7 +17,7 @@ const Cleartexts = Object.freeze({ whisper: TH.Whisper })
 
 /** A passphrase proving of {@link TH.WorldGateStamp} with a wayin under a new bankKey: each lease it builds holds that bankKey. */
 async function provingWithWayin(): Promise<PassphraseProving> {
-  const proving = await PassphraseProving.buildNovel(TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase, TH.provingDeviceOf())
+  const proving = await PassphraseProving.buildNovel(TH.provingDeviceOf(), TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase)
   await proving.buildWayin(NOVEL)
   return proving
 }

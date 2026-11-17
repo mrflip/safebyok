@@ -2,7 +2,7 @@
 
 import type { EX, Errors } from 'safebyok-big/internals'
 import type {
-  BankRoots, BirthBankAsk, GetThingAsk, ListThingsAsk, LoggableAsk, Sparse, Thing, ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteThingAsk,
+  BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, Sparse, Thing, ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAsk,
 } from './shapes-thing'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
@@ -78,7 +78,7 @@ export type BirthBankActual =
  */
 export interface VaultDB {
   /** The Thing at `ask`'s scope. */
-  tryGetThing(ask: GetThingAsk): Promise<GetThingAnswer>
+  tryGetThing(ask: GetAsk): Promise<GetThingAnswer>
   /** Write `ask.record` over the Thing stored, if it matches `ask.cited`.
    * - The write is stored when its preconditions hold: the exact revision cited and, for a put that replaces a live Thing, the
    *   born_at kept and the storage policies it names. Nothing else of the Thing stored is checked.
@@ -87,9 +87,9 @@ export interface VaultDB {
    *   `storage_issue`, or the failed precondition's own refusal.
    * - The record carries every field, so a store may write it by replacing the Thing stored whole.
    */
-  tryWriteThing(ask: WriteThingAsk): Promise<WriteThingAnswer>
+  tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer>
   /** The children of the Thing at `ask`'s scope. */
-  tryListThings(ask: ListThingsAsk): Promise<ListThingsAnswer>
+  tryListThings(ask: ListAsk): Promise<ListThingsAnswer>
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.

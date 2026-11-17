@@ -1081,8 +1081,27 @@ shellOf({ ...scope, labelpath, lifepath })
 shellOf({ ...scope, label }, { labelpath, lifepath })
 ```
 
-*Status: the minder's two are fixed on #709. Elsewhere Open: a sweep of the new core found the rest, listed for the
-signature PR in `whiteboard/20261115-lean_buttonup/complete.md`.*
+**Goofus, from the signature hunt:** the parts of one cast member, passed one by one.
+
+```ts
+#sealText(text, stamps, purposes, tags)   // the stamps, purposes and tags all come from one sealer
+otherThanBox(ask, row)                    // a get's ask and its answer's row: pass the answer
+demandBornAtKept(ask, stored, raw)        // stored is parsed from raw: two arguments that must agree
+#fetchThing(scope, track?)                // the scope and the track of one ask
+wayinsOf(main, passkey0)                  // two fields of one wayins
+```
+
+**Gallant:** each passed whole.
+
+```ts
+#sealText(sealer, nextRevision, cleartext)
+otherThanBox(answer)
+demandBornAtKept(ask, raw)
+#fetchThing(ask)
+wayinsOf(wayins)
+```
+
+*Status: the minder's two are fixed on #709, and the signature hunt's five on #713.*
 
 ---
 
@@ -1129,10 +1148,10 @@ Proving.judgeStrength(device, scope, cleartext)
 **Goofus:** the secret first, then the scope its device already carries.
 
 ```ts
-Proving.judgeStrength(passphraseClear, scope, device)
+Proving.judgeStrength(passphraseCleartext, scope, device)
 ```
 
-*Status: `judgeStrength` is Open, for the signature PR after #709.*
+*Status: `judgeStrength`, Fixed, in #713.*
 
 ---
 
