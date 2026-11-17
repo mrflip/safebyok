@@ -1,6 +1,6 @@
 # Thread minder_grain: the ThingMinder goes with TanStack's grain (2026-11-17)
 
-Branch `20261117-minder_grain`, [PR #716](https://github.com/mrflip/safebyok/pull/716), on main. Proved: safebyok lint and typecheck clean, its tests 832 passed; `pnpm justify` after the catch-up rebase (see the PR's **Tests:** line).
+Branch `20261117-minder_grain`, [PR #716](https://github.com/mrflip/safebyok/pull/716), on main. Proved: safebyok lint and typecheck clean, its tests 834 passed; `pnpm justify` after the catch-up rebase (see the PR's **Tests:** line).
 
 The nine directives agreed with the Coach for "The ThingMinder is a joy at both ends" (`complete.md`). Every new test was red before its change, for the reason its directive gave.
 
@@ -11,19 +11,21 @@ The nine directives agreed with the Coach for "The ThingMinder is a joy at both 
   4. **`at` and `isWholeRecordAt` validate their scope** (`#demandOwnScope`, checker `minderScope` = `obj(thingScope.shape)` in shapes-minder.ts): user, bank and the labelpath's modelkind must match `ties`, else `bad_option`. Internal callers use `#cachedAt`. Tests: a foreign kind, userid and banklabel each refuse, on both.
   5. **`listen`'s doc** names what it tells (a record lands, a get is refused, invalidated, removed) and that ageing past `staleTime` is not told. No timer.
   6. **`isVoidSentinel`** moved beside `VoidSentinel` in shapes-thing.ts, exported from `safebyok/storage` and `src/index.ts`; the minder's local copy removed; the test's `revtokAt` uses it. Test in shapes-thing.test.ts.
-  7. **A listed sparse record is never told timely**: see *Decisions*. Test: "tells a listener each listed box untimely, never timely while it is sparse".
+  7. **A listed sparse record ends untimely and sparse** (deliver, then invalidate, as main did): see *Review rework*. Test: "leaves a listener's last word on a listed box untimely, its record sparse".
   8. **`#isReady`'s doc** made true: "records are cached, and `tryAt`, `get` and `list` answer, only then". See *Deviations* for the return value.
   9. **`#demandOwnAsk(ask: MinderGetAsk)`**: the `unknown` gone, the runtime check and name kept.
 
+* **Review rework** (the reviewer's three commits, kept: `#fetchRecord` refuses after `goodbye`; the revision pair compares `userid` and `banklabel`; the changeset's `queryFn` line; then the Coach's rulings):
+  - **Item 7 reverted to main's deliver-then-invalidate.** `#doDeliverSeed` delivers the record, then invalidates it with `refetchType: 'none'` unless `#isWholeRecord(#cachedAt(record))`. The first version (`updatedAt: 0` plus a prediction by `#betterRecordOf`, so no listener hears `timely`) was set aside by the Coach as more machinery than the case earns. `#doDeliverRecord` lost its `opts`. Its overclaims are gone (the comment, the changeset line, the test title).
+  - **The blip is documented, not fixed**: a listed sparse record lands timely and is invalidated before `list` returns, so a listener may hear `timely`, then `untimely`. `listen`'s doc says so in one line; `notes/wontfix.md` has a row (ruled by the Coach, 2026-11-17). `refreshedAt` of a listed sparse record is the list's time again, as on main.
+  - **A decorated `select`** (`(gate) => ({ ...gate, isUnlocked })`) freezes on a tie under the revision pair: not fixed, by ruling (the customer does not reach the minder, and a solution lies elsewhere). `isRevisionPair`'s doc claims no more than its check does.
+
 * **Decisions made**:
-  - **Item 7 keeps the invalidate beside `updatedAt: 0`.** `setQueryData(key, record, { updatedAt: 0 })` alone makes the record stale only where `staleTime` is shorter than the epoch's age; `staleTime` is a `uint` and may be `MAX_SAFE_INTEGER`, under which `get` would answer the sparse record, breaking `list`'s "the next get fetches it whole". With both, the listener hears `untimely` twice (the success, then the invalidate) and never `timely`. Whether to deliver plainly or at time 0 is decided before delivery, through the minder's own sharing function on what is cached: a record the cache already holds whole is delivered as before and stays timely (the existing test "leaves a box the cache holds whole as it is, and timely").
-  - **Set aside for item 7**: `updatedAt: 0` always (makes a whole cached record stale, against `list`'s doc); skipping delivery where the cache holds it whole (changes what `list` leaves timely in the working case); `updatedAt: -Infinity` or `MIN_SAFE_INTEGER` (a hack that a JSON persister breaks on); documenting the blip (not needed once the fix was clean).
   - **`minderScope` parses the scope's fields alone** (non-strict `obj`), so an ask or a record passes as its scope, as `at`'s callers hand it.
   - **`isRevisionPair` returns `boolean`**, with casts at the one call: a type predicate narrows only one parameter.
+  - **Set aside for item 7, with the reasons the Coach heard**: `updatedAt: 0` always (makes a whole cached record stale); skipping delivery where the cache holds it whole (changes what `list` leaves timely); `updatedAt: -Infinity` (a JSON persister breaks on it); a `staleTime` cap.
 
 * **Deviations**:
-  - **Item 8's return is moot.** `#doDeliverRecord` returns nothing: `#doDeliverSeed` now looks the cache up before delivering, to choose between plain and time-0 delivery, so it has no second lookup to spare.
-  - **`refreshedAt` of a listed sparse record is 0**, where it was the list's time. Named in the changeset.
   - **`at`'s promise gains a throw** (item 4), as directed: its doc is unchanged, "The cached record for `scoped`, however old, or undefined for none".
 
 * **Discoveries**:
@@ -31,5 +33,4 @@ The nine directives agreed with the Coach for "The ThingMinder is a joy at both 
   - `get` turns any `CancelledError` into "not minding" (out of scope, noted only).
   - `pnpm --filter safebyok-big build` is needed in a fresh worktree before safebyok's vitest finds `safebyok-big/internals`.
 
-* **For the Coach**:
-  - Item 7: the double `untimely` a listener hears for a listed sparse record, and `refreshedAt: 0`. Fine by me; the alternative is a staleTime cap.
+* **For the Coach**: nothing open.

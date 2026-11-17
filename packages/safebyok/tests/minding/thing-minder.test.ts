@@ -570,15 +570,16 @@ describe("ThingMinder.list", () => {
     expect(boxMinder.isStaleAt(BoxAsk)).to.be.false
   })
 
-  it("tells a listener each listed box untimely, never timely while it is sparse", async () => {
+  it("leaves a listener's last word on a listed box untimely, its record sparse", async () => {
     const vaultDB = new MemoryVaultDB()
-    await storedBoxOf(vaultDB)
+    const box     = await storedBoxOf(vaultDB)
     const { boxMinder } = minderWorldOf(vaultDB)
     const heard = listenerOf()
     boxMinder.listen(heard)
     await boxMinder.list()
     expect(heard.mock.calls.length).to.be.above(0)
-    expect(heard.mock.calls.map(([answer]) => [answer.act, answer.isTimely])).to.deep.equal(heard.mock.calls.map(() => ['untimely', false]))
+    expect(heard.mock.calls.at(-1)![0]).to.include({ act: 'untimely', isTimely: false })
+    expect(boxMinder.at(BoxAsk)).to.deep.equal(sparseOf(box))
   })
 
   it("lists nothing under a root box with no boxes under it", async () => {
