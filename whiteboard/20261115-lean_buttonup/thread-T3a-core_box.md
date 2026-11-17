@@ -1,7 +1,7 @@
 # Thread T3a: core_box (2026-11-17)
 
-Branch `20261117-core_box`, PR #715, on main (cut at `b70f340e6`). Proved: `safebyok` 857 tests, typecheck and lint
-clean; `pnpm justify` after the catch-up (see the PR's **Tests:** line).
+Branch `20261117-core_box`, PR #715, on main (cut at `b70f340e6`). Proved: `pnpm justify` green after the catch-up
+(still as cut): `safebyok` 858 tests, every other package and e2e passing, typecheck and lint clean.
 
 * **Built**:
   - **Item 1, the stamp pair** (`31ceea800`): a third party names them `bankStamp` / `gateStamp`. No ctx byte moved.
