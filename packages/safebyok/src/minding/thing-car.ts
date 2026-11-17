@@ -136,7 +136,7 @@ const Checks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, cust
   const cited = custom<Sparse<Thing>>((val) => citedShape.safeParse(val).success, Phrases.CarRecordShape)
   const whole = custom<Thing>((val) => citedShape.safeParse(val).success && isWholeRecord(val as Sparse<Thing>), Phrases.CarFullestShape)
   const thingCar = discrim('liveness', [
-    obj({ liveness: lit('full'), newest: whole, fullest: whole })
+    obj({ liveness: lit('full'), newest: cited, fullest: whole })
       .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit),
     obj({ liveness: lit('behind'), newest: cited, fullest: whole })
       .refine(({ newest }) => isLiveSparse(newest), Phrases.CarNewestNotSparse)
