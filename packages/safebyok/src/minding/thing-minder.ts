@@ -304,8 +304,10 @@ export class ThingMinder {
     return { queryKey: this.queryKey(ask), queryFn: () => this.#fetchRecord(ask) }
   }
 
+  // A host's observer keeps the default queryFn past goodbye, and would cache what it fetches.
   /** The record for `ask`'s scope from the vaultDB, or its shell where storage holds nothing. Refuses `stale_read` where it is older than the record cached when it began. */
   async #fetchRecord(ask: GetAsk): Promise<DeliverableThing> {
+    this.#demandReady()
     // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
     const prior  = this.#cachedAt(ask)
     const answer = await this.#vaultDB.tryGetThing(ask)

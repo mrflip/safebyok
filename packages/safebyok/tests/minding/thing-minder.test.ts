@@ -809,6 +809,21 @@ describe("A host's QueryObserver on a minder's key", () => {
     expect(observer.getCurrentResult()).to.deep.include({ data: shell, isPlaceholderData: true })
     unsubscribe()
   })
+
+  it("refuses its refetch disabled after goodbye, asking the vaultDB nothing and caching nothing", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedGateOf(vaultDB, 0)
+    const { tsq, minder } = minderWorldOf(vaultDB)
+    const observer = new TSQ.QueryObserver<DeliverableThing>(tsq, { queryKey: minder.queryKey(TH.GateScope) })
+    const unsubscribe = observer.subscribe(noop)
+    await TH.eventually(() => observer.getCurrentResult().isSuccess)
+    minder.goodbye()
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    await TH.expectRefusal(observer.refetch({ throwOnError: true }), 'disabled')
+    expect(asked.mock.calls).to.deep.equal([])
+    expect(minder.at(GateAsk)).to.be.undefined
+    unsubscribe()
+  })
 })
 
 /** The structuralSharing a started gate minder sets in its defaults. */
