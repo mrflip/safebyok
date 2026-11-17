@@ -206,7 +206,7 @@ its own: it percent-encodes (RFC 3986) any name that falls outside the package's
 | **EpochMillis**                 | Every time value in safebyok: whole UTC milliseconds since 1970, from `FarPast` (1981) to `FarFuture` (2255). The bounds catch seconds and microseconds passed by mistake.      |
 | **fmt**                         | The number at the start of every stored record, which identifies its format: `3001` for a bank (`BankFormat`), `4001` for a gate (`GateFormat`), `6003` for a vault (`VaultFormat`), `5003` for a box (`BoxFormat`), `7003` for a lease (`LeaseFormat`). A box's stamp has its `fmt`, and a lease's stamp has the lease's. A box binds its bank's and its vault's stamps, and a lease its bank's, none of which has a `fmt`, so a new bank or vault format still unseals them. Any change to what a record may contain gives it a new format number. |
 | **scopepath**                   | The kind of a thing, then its scope's names in order, joined on `^`, which no name may contain: `vault^u1^acme^main`, `box^u1^acme^main^anthropic`. A listing finds each thing it has by its scopepath. |
-| **ckey**                        | A generic map key: an entry's name in a map, or an index in an array. It is never a storage address, which is a scopepath. |
+| **ckey**                        | A generic map key: a member's name in a map, or an index in an array. It is never a storage address, which is a scopepath. |
 | **logger**                      | An option your app may pass to `Device.make` (`VaultLogger`). The vault reports to it whatever it has no caller to throw to. |
 | **story**                       | A controlled record of what is happening, suitable for logs or refusals (`Story`). A validator's `parse(val, story?)` takes one, `{ where, advice }`. `where` says where the input was judged, and goes before the failures. `advice` says what to do, and goes after them. Neither quotes the input. |
 
@@ -296,8 +296,11 @@ Use these only where the precise word does not apply:
 
 ## Words safebyok does not use
 
-* **key, alone.** A key is always one of the five above, by name, or a wayinKey. An entry's name
+* **key, alone.** A key is always one of the five above, by name, or a wayinKey. A member's name
   in a map is a `ckey`. A storage address is a scopepath.
+* **entry.** It says everything and means nothing: an item, a text box, a way in, a submission?
+  Name the thing for what it holds: a ThingMinder's cache value is a ThingCar. If no name suits, make
+  a long one up (`NewestAndWholeCarrier`), and report it.
 * **data, contents, payload.** The secret is a whisper. Encrypted, it is a whisperCiphered.
 * **open, as a verb on a key, a whisper or a box.** Name the operation instead. A key is
   unwrapped (`unwrap`). A whisper is deciphered (`decipher`). A box is unsealed (`unseal`). A
