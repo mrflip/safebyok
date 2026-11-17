@@ -1,23 +1,16 @@
 import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
 import { Crypto, Helpers, Throwers, Validator } from 'safebyok-big/internals'
+import * as Phrases from '../phrases'
 import type { Bank } from './bank'
-import * as Sealers from './sealers'
+import type * as Sealers from './sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from './stamps'
 
 /** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
-/** The sealer of kind `KindT`, in `sealers.ts`. */
-type SealerOf<KindT extends Sealers.Sealerkind> = Sealers.SealerKinds[KindT]
-/** The prior revision the sealer of kind `KindT` takes. */
-export type PriorOf<KindT extends Sealers.Sealerkind>      = SealerOf<KindT> extends Sealers.Sealer<infer PriorT, unknown, unknown, unknown> ? PriorT : never
-/** The next revision the sealer of kind `KindT` makes, without its sealed part. */
-type NextOf<KindT extends Sealers.Sealerkind>              = SealerOf<KindT> extends Sealers.Sealer<unknown, infer NextT, unknown, unknown> ? NextT : never
-/** The sealed record the sealer of kind `KindT` returns. */
-export type RecordOf<KindT extends Sealers.Sealerkind>     = SealerOf<KindT> extends Sealers.Sealer<unknown, unknown, infer RecordT, unknown> ? RecordT : never
-/** The cleartexts the sealer of kind `KindT` seals. */
-export type CleartextsOf<KindT extends Sealers.Sealerkind> = SealerOf<KindT> extends Sealers.Sealer<unknown, unknown, unknown, infer CleartextsT> ? CleartextsT : never
+/** Any sealer, as a lease takes it: the lease is generic over what it seals. */
+type AnySealer = Sealers.Sealer<never, never, never>
 
 /** The options of {@link Lease.make}, beside its record. */
 export interface LeaseOpts {
@@ -26,18 +19,27 @@ export interface LeaseOpts {
 }
 
 // Defined here, not with the shapes: it names a model class.
-/** The checks of {@link Lease.make}'s arguments, and of the sealerkind a seal or unseal is given. */
-const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, oneof }) => {
+/** The checks of {@link Lease.make}'s arguments, and of the sealer a seal or unseal is given. */
+const Checks = Validator.Checkers('bad_option', ({ obj, str, fn, bool, custom }) => {
   const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() })
+  const sealerMembers = obj({
+    tags:     obj({ codectag: str, schematag: str }),
+    purposes: obj({ key: str, cipher: str }),
+    stampsOf: fn(),
+    encode:   fn(),
+    decode:   fn(),
+    sealedOf: fn(),
+    recordOf: fn(),
+  })
   return {
     leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank }) }),
-    sealerkind:    oneof(Sealers.sealerkindVals),
+    sealer:        custom<AnySealer>((val) => sealerMembers.safeParse(sealerMembersOf(val)).success, Phrases.SealerExpected),
   }
 })
 
 /** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
- * The lease knows nothing of boxes: the sealer, named by its kind in `sealers.ts`, decides what is sealed and how.
+ * The lease knows nothing of boxes: the sealer it is handed, such as `CoreBox`, decides what is sealed and how.
  * A bankKey that will not unwrap locks the bank, and refuses `damaged_lease`.
  * Once evicted, or once its device is swept, it refuses every seal and unseal, even one in flight.
  */
@@ -93,27 +95,28 @@ export class Lease implements LeaseStamp {
 
   // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
 
-  /** Seal `cleartexts` as the part `sealerkind` names, returning the next revision after `prior`.
+  /** Seal `cleartexts` as the part `sealer` seals, adding it to `nextRevision`.
    * The seal is bound to the bank's stamp, the sealer's stamps and the part's tags. The cleartext's bytes are zeroed afterwards.
    */
-  async seal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, prior: PriorOf<KindT>, cleartexts: CleartextsOf<KindT>): Promise<RecordOf<KindT>> {
-    const sealer = sealerOf(sealerkind)
-    const nextRevision = sealer.nextRevisionOf(prior)
+  async seal<NextT, RecordT, CleartextsT, SubT extends NextT>(
+    sealer: Sealers.Sealer<NextT, RecordT, CleartextsT>, nextRevision: SubT, cleartexts: CleartextsT,
+  ): Promise<SubT & Sealers.SealedPartsOf<CleartextsT>> {
+    Checks.sealer.parse(sealer)
     const sealed = await this.#sealText(sealer, nextRevision, sealer.encode(cleartexts))
     return sealer.recordOf(nextRevision, sealed)
   }
 
-  /** Unseal the part `sealerkind` names in `record`, returning its cleartexts.
+  /** Unseal the part `sealer` seals in `record`, returning its cleartexts.
    * Unsealing authenticates the ciphertexts, stamps and tags together: a change to any of them refuses as damaged.
    */
-  async unseal<KindT extends Sealers.Sealerkind>(sealerkind: KindT, record: RecordOf<KindT>): Promise<CleartextsOf<KindT>> {
-    const sealer = sealerOf(sealerkind)
+  async unseal<NextT, RecordT, CleartextsT>(sealer: Sealers.Sealer<NextT, RecordT, CleartextsT>, record: RecordT): Promise<CleartextsT> {
+    Checks.sealer.parse(sealer)
     const cleartext = await this.#openSealed(sealer, record)
     return sealer.decode(cleartext)
   }
 
   /** The {@link Sealers.Sealed} form of `cleartext`, for `sealer` to add to `nextRevision`: ciphered under a fresh key that is wrapped under the bankKey, with the sealer's tags. */
-  async #sealText<NextT>(sealer: Sealers.Sealer<unknown, NextT, unknown, unknown>, nextRevision: NextT, cleartext: string): Promise<Sealers.Sealed> {
+  async #sealText<NextT>(sealer: Sealers.Sealer<NextT, unknown, unknown>, nextRevision: NextT, cleartext: string): Promise<Sealers.Sealed> {
     const { purposes, tags } = sealer
     const stamps  = sealer.stampsOf(nextRevision)
     const bankKey = await this.#bankKey('wrapKey')
@@ -130,7 +133,7 @@ export class Lease implements LeaseStamp {
   }
 
   /** The cleartext sealed in `record`, the part `sealer` seals. */
-  async #openSealed<RecordT>(sealer: Sealers.Sealer<unknown, unknown, RecordT, unknown>, record: RecordT): Promise<string> {
+  async #openSealed<RecordT>(sealer: Sealers.Sealer<unknown, RecordT, unknown>, record: RecordT): Promise<string> {
     const { key_wrapped, ciphered, ...tags } = sealer.sealedOf(record)
     const stamps  = sealer.stampsOf(record)
     const { purposes } = sealer
@@ -196,12 +199,13 @@ export class Lease implements LeaseStamp {
   get modelkind(): 'lease' { return 'lease' satisfies Consts.Modelkind }
 }
 
-// == [Helpers]: sealerOf
+// == [Helpers]: sealerMembersOf
 
-// TypeScript cannot follow a generic kind to its sealer's types: the cast names what the lookup by that kind gives. The
-// lookup is computed, which import-x/namespace cannot check; the sealerkind's check stands in for it.
-/** The sealer of kind `sealerkind`. Throws `bad_option` for an unknown kind. */
-function sealerOf<KindT extends Sealers.Sealerkind>(sealerkind: KindT): Sealers.Sealer<PriorOf<KindT>, NextOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> {
-  return Sealers[Checks.sealerkind.parse(sealerkind)] as Sealers.Sealer<PriorOf<KindT>, NextOf<KindT>, RecordOf<KindT>, CleartextsOf<KindT>> // eslint-disable-line import-x/namespace
+// A class's static methods are its own but not enumerable, so a spread would miss them: each member is read by name.
+/** The members of a sealer read off `val`, an object or a class; null for anything else */
+function sealerMembersOf(val: unknown): Partial<Record<keyof AnySealer, unknown>> | null {
+  if ((val === null) || ((typeof val !== 'object') && (typeof val !== 'function'))) { return null }
+  const { tags, purposes, stampsOf, encode, decode, sealedOf, recordOf } = val as Partial<Record<keyof AnySealer, unknown>>
+  return { tags, purposes, stampsOf, encode, decode, sealedOf, recordOf }
 }
 // --

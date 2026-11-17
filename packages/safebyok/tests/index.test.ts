@@ -18,6 +18,6 @@ describe("the front door, safebyok", () => {
   })
 
   it("keeps the lease, proving and sealer machinery behind safebyok/core", () => {
-    for (const internal of ['Lease', 'Gating', 'Gate', 'Wayin', 'sealerkindVals', 'guardRequestCleartext']) { expect(Front).to.not.have.property(internal) }
+    for (const internal of ['Lease', 'Gating', 'Gate', 'Wayin', 'CoreBox', 'guardRequestCleartext']) { expect(Front).to.not.have.property(internal) }
   })
 })

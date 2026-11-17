@@ -2,7 +2,8 @@
 
 import { describe, expect, it } from 'vitest'
 import { Crypto } from 'safebyok-big/internals'
-import { type BoxRecord, BoxWhisper } from '../../src/models/sealers'
+import { CoreBox } from '../../src/models/core-box'
+import type { BoxRecord } from '../../src/models/sealers'
 import { LeaseFormat, type LeaseRecord } from '../../src/models/stamps'
 import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
@@ -42,12 +43,12 @@ function changed(val: unknown): unknown { return ((typeof val === 'number') ? va
 async function sealedWorld() {
   const { bank } = await TH.buildBornBank()
   const box = await bank.sealBox(TH.boxShellOf(), { whisper: TH.Whisper })
-  const [boxStamp] = BoxWhisper.stampsOf(box)
+  const [boxStamp] = CoreBox.stampsOf(box)
   return { bank, box, boxStamp: boxStamp!, bankKey: await TH._cheat_bankKeyOf(bank) }
 }
 
 /** The whisper text of `box`, unsealed by hand under `bankKey` with the ctx of `bankStamp`, `boxStamp` and `tags` (the box's own by default); rejects with WebCrypto's error when it will not unseal. */
-async function unsealByHand(bankKey: CryptoKey, box: BoxRecord, bankStamp: Crypto.CipherCtxRecord, boxStamp: Crypto.CipherCtxRecord, tags: Crypto.CipherCtxRecord = BoxWhisper.tags): Promise<string> {
+async function unsealByHand(bankKey: CryptoKey, box: BoxRecord, bankStamp: Crypto.CipherCtxRecord, boxStamp: Crypto.CipherCtxRecord, tags: Crypto.CipherCtxRecord = CoreBox.tags): Promise<string> {
   const { key_wrapped, ciphered } = box.whisper_sealed
   const partKey = await Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([bankStamp, boxStamp], 'whisper_sealed.key_wrapped', tags), { extractable: false, usage: ['decrypt'] })
   return new TextDecoder().decode(await Crypto.decipherBytes(partKey, ciphered, Crypto.cipherCtx([bankStamp, boxStamp], 'whisper_sealed.ciphered', tags)))
@@ -148,7 +149,7 @@ describe("each ctx binds every field of its stamps", () => {
   for (const fieldname of SealTagFields) {
     it(`keeps a box shut under tags with another ${fieldname}`, async () => {
       const { box, boxStamp, bankKey } = await sealedWorld()
-      await expect(unsealByHand(bankKey, box, TH.WorldBankStamp, boxStamp, { ...BoxWhisper.tags, [fieldname]: changed(BoxWhisper.tags[fieldname]) as string })).rejects.toThrow()
+      await expect(unsealByHand(bankKey, box, TH.WorldBankStamp, boxStamp, { ...CoreBox.tags, [fieldname]: changed(CoreBox.tags[fieldname]) as string })).rejects.toThrow()
     })
   }
 
@@ -156,7 +157,7 @@ describe("each ctx binds every field of its stamps", () => {
     const { box, boxStamp, bankKey } = await sealedWorld()
     const { key_wrapped } = box.whisper_sealed
     await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped'), DecipherUsage)).rejects.toThrow()
-    await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped', BoxWhisper.tags), DecipherUsage)).resolves.toBeInstanceOf(CryptoKey)
+    await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped', CoreBox.tags), DecipherUsage)).resolves.toBeInstanceOf(CryptoKey)
   })
 
   for (const fieldname of BankStampFields) {
@@ -194,7 +195,7 @@ describe("each ctx binds every field of its stamps", () => {
   it("gives a box's two purposes different ctxs", async () => {
     const { boxStamp } = await sealedWorld()
     const decoder = new TextDecoder()
-    const [keyPurpose, cipherPurpose] = [BoxWhisper.purposes.key, BoxWhisper.purposes.cipher]
-    expect(decoder.decode(Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], keyPurpose, BoxWhisper.tags))).to.not.eq(decoder.decode(Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], cipherPurpose, BoxWhisper.tags)))
+    const [keyPurpose, cipherPurpose] = [CoreBox.purposes.key, CoreBox.purposes.cipher]
+    expect(decoder.decode(Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], keyPurpose, CoreBox.tags))).to.not.eq(decoder.decode(Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], cipherPurpose, CoreBox.tags)))
   })
 })

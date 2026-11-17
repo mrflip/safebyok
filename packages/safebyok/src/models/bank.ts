@@ -2,6 +2,7 @@ import type { Consts, EX } from 'safebyok-big/internals'
 import { CX, Clock, Crypto, Errors, Throwers, Validator } from 'safebyok-big/internals'
 import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../minding/shapes-minder'
 import { BaseThing } from './base-thing'
+import { CoreBox } from './core-box'
 import { Device } from './device'
 import { Gate, type GateDna } from './gate'
 import type { Lease } from './lease'
@@ -224,7 +225,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const { endCause } = this.#device
     if (endCause !== null) { return disabledAnswerOf(ask, endCause) }
     const lease = await Checks.proving.parse(proved).buildLease(this, this.#maingate)
-    const root = await lease.seal('BoxWhisper', { ...this.#rootBox, sidecar: {} }, { whisper: {} })
+    const root = await lease.seal(CoreBox, CoreBox.nextRevisionOf({ ...this.#rootBox, sidecar: {} }), { whisper: {} })
     const answer = await this.#vaultDB.tryBirthBank({ ...ask, bank: this.pickle(), gate: this.#maingate.pickle(), root })
     if (answer.ok && (answer.val.bank.revtok === this.revtok) && lease.isEnabled) {
       this.#rootBox = Object.freeze(sparseOf(answer.val.root))
@@ -270,14 +271,14 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   async sealBox(prior: BoxSparse & Pick<BoxRecord, 'sidecar'>, cleartexts: BoxCleartexts): Promise<BoxRecord> {
     const lease = this.#demandLease()
     this.#demandBox(prior, Checks.boxSparse)
-    return lease.seal('BoxWhisper', prior, cleartexts)
+    return lease.seal(CoreBox, CoreBox.nextRevisionOf(prior), cleartexts)
   }
 
   /** Seal a tombstone for the live box `prior`, signed by an empty whisper ciphered under a fresh boxKey. Needs the bank unlocked. */
   async tombstoneBox(prior: BoxSparse): Promise<BoxTombstone> {
     const lease = this.#demandLease()
     this.#demandBox(prior, Checks.boxSparse)
-    return lease.seal('BoxTombstone', prior, { whisper: {} })
+    return lease.seal(CoreBox, CoreBox.tombstoneOf(prior), { whisper: {} })
   }
 
   /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
@@ -286,7 +287,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   async unsealBox(box: BoxRecord | BoxTombstone): Promise<BoxUnsealed> {
     const lease = this.#demandLease()
     const parsed = this.#demandBox(box, Checks.boxThing)
-    const { whisper } = (parsed.am === 'a') ? await lease.unseal('BoxWhisper', parsed) : await lease.unseal('BoxTombstone', parsed)
+    const { whisper } = await lease.unseal(CoreBox, parsed)
     const { whisper_sealed: _sealed, ...unsealed } = parsed
     return Object.freeze({ ...unsealed, whisper })
   }

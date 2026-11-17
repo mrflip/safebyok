@@ -1,6 +1,7 @@
 import { describe, expect, it, type Mock, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
 import { CX, Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
+import { CoreBox } from '../../src/models/core-box'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { StampedGate } from '../../src/models/stamps'
@@ -70,8 +71,8 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   const bank = TH.fakeLeaseBankOf()
   const sealer = await one.buildLease(bank, TH.WorldGate)
   const opener = await other.buildLease(bank, TH.WorldGate)
-  const sealed = await sealer.seal('BoxWhisper', TH.boxShellOf(), { whisper: { apiKey: 'sk-test-5678' } })
-  expect(await opener.unseal('BoxWhisper', sealed)).to.deep.equal({ whisper: { apiKey: 'sk-test-5678' } })
+  const sealed = await sealer.seal(CoreBox, CoreBox.nextRevisionOf(TH.boxShellOf()), { whisper: { apiKey: 'sk-test-5678' } })
+  expect(await opener.unseal(CoreBox, sealed)).to.deep.equal({ whisper: { apiKey: 'sk-test-5678' } })
 }
 
 /** A checker whose answer throws the passphrase it heard, when its verdict is read. */
