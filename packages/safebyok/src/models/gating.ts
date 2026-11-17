@@ -4,6 +4,7 @@ import { CX, Crypto, EX, Errors, GX, Helpers, Outcome, Throwers, Validator } fro
 import { Bank } from './bank'
 import { Device } from './device'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
+import type { Banklabel, Userid } from '../storage/primitives'
 
 // == [Kinds and forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
 
@@ -68,8 +69,8 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   declare readonly gatingkind:    KindT
   /** A random token unique to this gating. Key the dialog on it: the next gating's form then starts empty. */
   declare readonly gatingTok:     string
-  declare readonly user_id:       string
-  declare readonly banklabel:     string
+  declare readonly user_id:       Userid
+  declare readonly banklabel:     Banklabel
   declare readonly bank:          Bank | null
   /** The header of the main gate's passkey wayin when the gating was made, or null for none.
    * The dialog asks for that passkey by its `credential_id` and `prf_salt_b64`.
