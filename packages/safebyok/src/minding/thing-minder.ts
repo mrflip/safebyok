@@ -212,7 +212,7 @@ export class ThingMinder {
 
   /** Call `listener` with the answer `tryAt` would give for an entry, under this minder's own `staleTime`, each time a record lands in it, a get of it is refused, or it is invalidated or removed.
    * A record that lands is told even when it changes nothing. A record that ages past `staleTime` is not told, and listening keeps nothing cached: a TanStack observer does both.
-   * A box that `list` caches sparse may be told timely, then untimely, in one step.
+   * A listener may hear of a box that `list` caches sparse as timely, then untimely, in one step.
    * Returns the function that stops it. What the listener throws goes to the device's `onBadNews`, and stops nothing.
    */
   listen(listener: (answer: TSQGotAnswer) => void): () => void {
