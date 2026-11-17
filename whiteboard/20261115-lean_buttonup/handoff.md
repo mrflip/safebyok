@@ -19,21 +19,22 @@ the state, how the Coach runs the work, and what is recorded nowhere else.
 
 * **#715** (T3a `core_box`, draft, `/workspace/byok-core_box`): stamp pair, `CoreBox`, the seal path "bulletproof in and
   out", `gate_labelpath`. Reviewed (nothing significant; guarantees kept; box ctx bytes unmoved). A rework worker is
-  applying the review round (t3-plan.md, "T3a review round"); it pushes the reviewer's four commits too. Next: verify
+  applying the review round (t3-plan.md, "T3a review round"), plus the Coach's later ruling that `secretProps` given
+  with `{ am: 'x' }` refuses; it pushes the reviewer's four commits too. Next: verify
   its report, relay it, then a `documentarian` run on #715's doc-block findings (the Coach lifted the "only when asked"
   rule), then file.
-* **#716** (`minder_grain`, draft, `/workspace/byok-minder_grain`): the minder review's fixes. Reviewed; three reviewer
-  commits local at `648885fc9`, **not pushed**. Waiting on the Coach: (1) revert item 7 to deliver-then-invalidate with
-  the blip documented (Claude and the reviewer both recommend); (2) a decorated `select` freezes: Claude proposes the tie
-  rule "keep `prior` on a tie only when it is whole and `record` sparse, else `replaceEqualDeep`", the reviewer a strict
-  `KindChecks[kind].cited`. The Coach may hold both for the `MindedEntry` discussion (complete.md).
+* **#716** (`minder_grain`, draft, `/workspace/byok-minder_grain`): the minder review's fixes. A close-out worker
+  (sonnet) is reverting item 7 to deliver-then-invalidate, documenting the blip in `listen` and `notes/wontfix.md`, and
+  pushing the reviewer's three commits (the Coach: "revert, close out the work on the PR without hurry"). **No fix for a
+  decorated `select`**: the customer will not access the minder, and the Coach has a solution elsewhere. Next: verify
+  its report, relay it, file.
+* **Next with the Coach: the `MindedEntry` discussion** (complete.md, the minder bullet). It bears on item 7's blip.
 * **T3b** (`t3-plan.md`): after the classifier tidy merges; stacked on T3a. Rulings 1 and 5 came from the earlier session:
   re-ask them. Also carries one bank scope and the `watchArgs` move, and `shellOf` typed by kind.
 * **Classifier tidy:** the Coach's other session, "only in and around" the classifier file.
-* **Base checkout, uncommitted:** STYLE.md (the refusal-precedence rule; the Coach's own hand edits are mixed in),
-  PROCESS.md and `.claude/agents/documentarian.md` (documentarian on any named target), VOCABULARY.md (sealer, sealable,
-  `GateCited`), TODO.md (unbranded sealed parts), this folder's plan files. `whiteboard/20261116-react_backwards/` and
-  `human/PROMPTS.md` are the Coach's.
+* **Base checkout:** committed (`8d110e030`..`07dbf928b`): STYLE.md (the Coach's boolean rule; the refusal-precedence
+  rule), VOCABULARY.md, the documentarian's scope, TODO.md, this folder's plan. `whiteboard/20261116-react_backwards/` is
+  the Coach's, uncommitted.
 
 ## Recorded nowhere else
 
