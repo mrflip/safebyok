@@ -4,6 +4,7 @@ import { promisifyRequest, type UseStore } from 'idb-keyval'
 import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
 import type { BankScope, VaultScope, WatchScope } from 'safebyok-big/storage'
+import type { Vaultlabel } from 'safebyok-big'
 import { bankScopepathOf, boxesRangeOf, boxPlaceOf, boxScopepathOf, filedIn, gatesRangeOf, gateScopepathOf, lifeRangeOf, shelfOf, vaultlabelOf, vaultScopepathOf, vaultsRangeOf } from './bank-shelf'
 
 // == [Options]: IdbBankDBOpts, idbBankDBOpts
@@ -20,7 +21,7 @@ const idbBankDBOpts = DB.objCheck(({ str, uint }) => ({ ...BX.adapterBankDBOpts.
 // == [Helpers]: Rung, isHeardBy, bankScopeOf, vaultScopeOf, putAt
 
 /** A notice of one write, broadcast to every watch on the database: the scope written under, and the row written. A bank or gate row has no vaultlabel. */
-type Rung = { scope: BankScope & { vaultlabel?: string }, heard: BX.Heard }
+type Rung = { scope: BankScope & { vaultlabel?: Vaultlabel }, heard: BX.Heard }
 
 /** True when a write under `scope` falls within the `watched` scope. */
 function isHeardBy(watched: WatchScope, scope: Rung['scope']): boolean {
@@ -196,7 +197,7 @@ export class IdbBankDB extends DB.AdapterBankDB {
       const [bankRaw, vaults, boxes] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), filedIn(store, vaultsRangeOf(ask)), filedIn(store, boxesRangeOf(ask))])
       const bank = bankRaw as BX.BankRow | null
       const bank_tok = (bank?.am === 'a') ? bank.bank_tok : null
-      const vaultOfLabel = new Map<string, BX.VaultRow>()
+      const vaultOfLabel = new Map<Vaultlabel, BX.VaultRow>()
       for (const { scopepath, row } of vaults) {
         const vault = row as BX.VaultRow
         if (vault.bank_tok === bank_tok) { vaultOfLabel.set(vaultlabelOf(scopepath), vault) } else { store.delete(scopepath) }

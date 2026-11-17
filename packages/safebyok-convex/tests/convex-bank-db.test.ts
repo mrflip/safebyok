@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { anyApi } from 'convex/server'
 import type { ConvexClient } from 'convex/browser'
 import type { BankScope, BX, VaultScope } from 'safebyok-big/storage'
+import type { BankTok, VaultTok } from 'safebyok-big'
 import * as TH from './test-helpers'
 import { ConvexBankDB } from '../src/index'
 import type { ConvexBankDBOpts } from '../src/index'
@@ -59,7 +60,7 @@ async function getVaultDoc(db: ComponentDb, { user_id, banklabel, vaultlabel }: 
   return await db.query('safebyok_vaults').withIndex('by_scope', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel)).unique()
 }
 
-function lifeBoxQuery(db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string) {
+function lifeBoxQuery(db: ComponentDb, { user_id, banklabel, vaultlabel }: VaultScope, bank_tok: BankTok, vault_tok: VaultTok) {
   return db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok))
 }

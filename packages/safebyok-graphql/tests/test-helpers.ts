@@ -8,6 +8,7 @@ import { executeExchange } from '@urql/exchange-execute'
 import type { Operation } from '@urql/core'
 import type { GraphQLSchema } from 'graphql'
 import type { AdapterBankDB, BankScope, Boxscope, BX, VaultScope } from 'safebyok-big/storage'
+import type { BankTok, Boxlabel, UserID, VaultTok } from 'safebyok-big'
 import * as TH from 'safebyok-big/testing'
 import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf } from 'safebyok-postgres'
 import type { PostgresBankDBOpts, PostgresListen } from 'safebyok-postgres'
@@ -93,7 +94,7 @@ export const listen: PostgresListen = async (channel, onNotify) => {
 // == [The server]: TestContext, serverOver, schemaOver
 
 /** The test server's per-request context: the signed-in user's id, or null. */
-export type TestContext = { user_id: string | null }
+export type TestContext = { user_id: UserID | null }
 
 /** Make the server's PostgresBankDB on this file's PGlite. */
 export async function serverOver(opts: Omit<PostgresBankDBOpts, 'client'> = {}): Promise<PostgresBankDB> {
@@ -115,11 +116,11 @@ export function schemaOver(bankDB: AdapterBankDB): GraphQLSchema {
 export type Signing = (operation: Operation) => TestContext
 
 /** Sign every operation in as `user_id`, or leave it signed out for null. */
-export function signedInAs(user_id: string | null): Signing { return () => ({ user_id }) }
+export function signedInAs(user_id: UserID | null): Signing { return () => ({ user_id }) }
 
 /** Sign each operation in as the user named in its variables: its scope's or its ask's. The server's sign-in check stays on, and the battery's users pass it. */
 export const signedInAsAsked: Signing = ({ variables }) => {
-  const { user_id, ask } = variables as { user_id?: string, ask?: { user_id?: string } }
+  const { user_id, ask } = variables as { user_id?: UserID, ask?: { user_id?: UserID } }
   return { user_id: user_id ?? ask?.user_id ?? null }
 }
 
@@ -248,7 +249,7 @@ export function rowsOf(): TH.BankDBRowCheats {
       const address = [user_id, banklabel, vaultlabel]
       await planting([[UnplantVaultSql, address], [PlantVaultSql, [...address, JSON.stringify(row)]]])
     },
-    plantBoxRow: async ({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, bank_tok: string, vault_tok: string, row: unknown) => {
+    plantBoxRow: async ({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, bank_tok: BankTok, vault_tok: VaultTok, row: unknown) => {
       const params = [user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, JSON.stringify(row)]
       await planting([[UnplantBoxSql, params], [PlantBoxSql, params]])
     },
@@ -270,8 +271,8 @@ export function rowsOf(): TH.BankDBRowCheats {
       )
       return (found === undefined) ? null : recordOf(found.row)
     },
-    boxRowsOf: async ({ user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string) => {
-      const found = await sql<{ boxlabel: string, row: Record<string, unknown> }>(
+    boxRowsOf: async ({ user_id, banklabel, vaultlabel }: VaultScope, bank_tok: BankTok, vault_tok: VaultTok) => {
+      const found = await sql<{ boxlabel: Boxlabel, row: Record<string, unknown> }>(
         'SELECT boxlabel, to_jsonb(stored) AS row FROM safebyok_boxes AS stored WHERE (user_id, banklabel, vaultlabel, bank_tok, vault_tok) = ($1, $2, $3, $4, $5)',
         [user_id, banklabel, vaultlabel, bank_tok, vault_tok],
       )

@@ -6,6 +6,7 @@ import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
 import type { BoxTidyAsk, Tidied, VaultError, WatchScope } from 'safebyok-big/storage'
+import type { Boxlabel, Vaultlabel } from 'safebyok-big'
 import * as Phrases from './phrases'
 import { isSafebyokRefusal, safebyokRefusal } from './refusals'
 import type { SafebyokBankApi } from './server'
@@ -57,8 +58,8 @@ export type ConvexBankDBOpts = BX.AdapterBankDBOpts & {
 type RowsWatched = {
   bank:   unknown,
   gates:  { gatelabel: string, gate: unknown }[],
-  vaults: { vaultlabel: string, vault: unknown }[],
-  boxes:  { vaultlabel: string, boxlabel: string, box: unknown }[],
+  vaults: { vaultlabel: Vaultlabel, vault: unknown }[],
+  boxes:  { vaultlabel: Vaultlabel, boxlabel: Boxlabel, box: unknown }[],
 }
 // --
 

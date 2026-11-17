@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure, type LifecycleHandler } from 'safebyok-big'
+import { Vault, VaultError, type Box, type BoxSnapshot, type RequestCleartext, type Whisper, type BoxExposure, type LifecycleHandler, type Boxlabel } from 'safebyok-big'
 import { MemoryBankDB, type BX } from 'safebyok-big/storage'
 import { BankProvider } from '../src/provider/bank-provider'
 import { useBank, useBankSnapshot, useDevice, useDeviceSnapshot, useBox, useBoxIsShowing, useBoxSnapshot, useBoxExposure, useBoxes, useVault, useVaultSnapshot, useWhisper } from '../src/hooks/hooks'
@@ -192,7 +192,7 @@ const NoBox = () => {
 const seenBoxes: Box[] = []
 
 /** Render what the box hooks return for `boxlabel` in the vault `main`, with the buttons a host's page would have. */
-const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: string }) => {
+const BoxPage = ({ boxlabel = 'anthropic' }: { boxlabel?: Boxlabel }) => {
   const bank = useBank()
   const { vault } = useVault('main')
   const boxes = useBoxes('main')

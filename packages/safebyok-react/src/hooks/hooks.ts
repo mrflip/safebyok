@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react'
-import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type Device, type DeviceSnapshot, type BoxSnapshot, type Vault, type VaultSnapshot, type Whisper, type BoxExposure } from 'safebyok-big'
+import { ENCRYPTED, type Bank, type BankSnapshot, type Box, type Device, type DeviceSnapshot, type BoxSnapshot, type Vault, type VaultSnapshot, type Whisper, type BoxExposure, type Boxlabel, type Vaultlabel, type VaultTok } from 'safebyok-big'
 import { useProvided } from '../provider/bank-provider'
 import type { VaultLifecycle } from '../shapes'
 
@@ -52,15 +52,15 @@ const AbsentLifecycle: VaultLifecycle = Object.freeze({ stage: 'absent', vault: 
 // A Vault stands for its scope through its lives, and the watch on its boxes is of one life: a vault deleted and put
 // again, here or elsewhere, needs its watch begun again.
 /** For each Vault, the `vault_tok` of the life whose boxes a hook has begun watching. */
-const watchedLives = new WeakMap<Vault, string>()
+const watchedLives = new WeakMap<Vault, VaultTok>()
 
 /** Return the signed-in user's vault named `vaultlabel`, with its lifecycle stage.
  * While the vault is present, the hook begins watching its boxes, so you need not call `vault.beginWatch()`.
  */
-export const useVault = (vaultlabel: string): VaultLifecycle => useVaultFor('useVault', vaultlabel)
+export const useVault = (vaultlabel: Vaultlabel): VaultLifecycle => useVaultFor('useVault', vaultlabel)
 
 /** {@link useVault}, naming `hookname` in the error when there is no provider. */
-const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
+const useVaultFor = (hookname: string, vaultlabel: Vaultlabel): VaultLifecycle => {
   const device = useProvided(hookname)
   const snapshot = useSyncExternalStore(device?.subscribe ?? subscribeToNothing, device?.getSnapshot ?? getNothing, getNothing)
   // The device's snapshot changes with its bank, the vault listing's with each vault's presence, and the vault's own with its life.
@@ -85,7 +85,7 @@ const useVaultFor = (hookname: string, vaultlabel: string): VaultLifecycle => {
 }
 
 /** Return the live snapshot of the signed-in user's vault named `vaultlabel`, or null while the vault is not `present`. */
-export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
+export const useVaultSnapshot = (vaultlabel: Vaultlabel): VaultSnapshot | null => {
   const { vault } = useVaultFor('useVaultSnapshot', vaultlabel)
   return useSyncExternalStore(vault?.subscribe ?? subscribeToNothing, vault?.getSnapshot ?? getNothing, getNothing)
 }
@@ -94,14 +94,14 @@ export const useVaultSnapshot = (vaultlabel: string): VaultSnapshot | null => {
 // == [Box hooks]: useBoxes, useBox, useBoxSnapshot, useBoxIsShowing, useBoxExposure, useWhisper
 
 /** Return the boxlabels of the present boxes in the signed-in user's vault named `vaultlabel`, or null while the vault is not `present`. */
-export const useBoxes = (vaultlabel: string): readonly string[] | null => {
+export const useBoxes = (vaultlabel: Vaultlabel): readonly Boxlabel[] | null => {
   const { vault } = useVaultFor('useBoxes', vaultlabel)
   const boxes = vault?.boxListing ?? null
   return useSyncExternalStore(boxes?.subscribe ?? subscribeToNothing, boxes?.getSnapshot ?? getNothing, getNothing)
 }
 
 /** Return the Box named `boxlabel` in the signed-in user's vault named `vaultlabel`, or null while the vault does not list it as present. */
-export const useBox = (vaultlabel: string, boxlabel: string): Box | null => {
+export const useBox = (vaultlabel: Vaultlabel, boxlabel: Boxlabel): Box | null => {
   const { vault } = useVaultFor('useBox', vaultlabel)
   const boxes = vault?.boxListing ?? null
   const presentBox = useCallback(() => {

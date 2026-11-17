@@ -1,4 +1,5 @@
 import * as DB from 'safebyok-big/storage'
+import type { BankTok, Banklabel, UserID, VaultTok, Vaultlabel } from 'safebyok-big'
 import { getDocumentSize } from 'convex/values'
 import type { Value } from 'convex/values'
 import type { WithoutSystemFields } from 'convex/server'
@@ -68,7 +69,7 @@ export function spend(budget: Budget, size: number): void {
 // == [Tallies]: Life, Tally, Reckoning, BoxDocGiven, sizeOf, tallyOf, growthOf, capacityOf, reckon, wouldPassLimit, record, forget, countBoxes, drop
 
 /** One life of a vault: its scope, its bank's `bank_tok` and its own `vault_tok`. */
-export type Life = { user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string }
+export type Life = { user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlabel, bank_tok: BankTok, vault_tok: VaultTok }
 
 /** The count and byte size of a life's box rows:
  * - `all_count`, `all_size`   -- every row, tombstones included

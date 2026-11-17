@@ -1,6 +1,7 @@
 /** SafebyokBankComponent: each of the host's functions serves the user its call names, and no one else. */
 
 import { describe, expect, it } from 'vitest'
+import type { UserID } from 'safebyok-big'
 import { SafebyokBankComponent } from '../src/server'
 import * as TH from './test-helpers'
 
@@ -165,9 +166,9 @@ describe("SafebyokBankComponent, at setup", () => {
 
 /** An options object whose `getUserId` reads from `this`, so it fails if called detached from the object. */
 class SignedInAs {
-  readonly #user_id: string
+  readonly #user_id: UserID
 
-  constructor(user_id: string) { this.#user_id = user_id }
+  constructor(user_id: UserID) { this.#user_id = user_id }
 
   getUserId() { return this.#user_id }
 }

@@ -1,7 +1,7 @@
 // All the text safebyok-react shows to a user is in this file. A sentence with a variable part is one template
 // function, so a translation can reorder it. Messages meant for developers stay next to the code that uses them.
 
-import type { Gatingkind } from 'safebyok-big'
+import type { Banklabel, Gatingkind, UserID } from 'safebyok-big'
 
 /** The locale of the built-in dialogs' text. */
 export const Locale = 'en'
@@ -17,7 +17,7 @@ export const Messages = {
   passphrasesDiffer: "The new passphrase does not match its confirmation",
   passphrasesMatch:  'The passphrases match',
   capsLockOn:        'Caps Lock is on',
-  passphraseUsername: (user_id: string, banklabel: string) => `${user_id} (${banklabel} vault)`,
+  passphraseUsername: (user_id: UserID, banklabel: Banklabel) => `${user_id} (${banklabel} vault)`,
   showPassphrase:    'Show',
   hidePassphrase:    'Hide',
   createButton:      'Create vault',
@@ -72,11 +72,11 @@ export const Messages = {
 } as const
 
 /** A phrase for what each kind of gating does, to end a sentence such as "Could not ...". */
-export const Doing: Record<Gatingkind, string> = {
+export const Doing = {
   build_bank:         'create your vault',
   unlock_bank:        'unlock your vault',
   replace_passphrase: 'change your passphrase',
   add_passkey:        'add the passkey',
   revoke_passkey:     'remove the passkey',
   del_bank:           'delete your secrets',
-}
+} as const satisfies Record<Gatingkind, string>

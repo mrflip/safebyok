@@ -1,6 +1,7 @@
 import { GraphQLError, GraphQLScalarType, Kind, valueFromASTUntyped } from 'graphql'
 import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
+import type { EpochMillis, UserID, Vaultlabel } from 'safebyok-big'
 
 // == [Types]: BankResolversOpts, BankFieldArgs, CrossingAnswer, CrossingNotice, BankFieldResolver, BankResolvers
 
@@ -9,7 +10,7 @@ export type BankResolversOpts<ContextT> = {
   /** The bankDB that serves every request, such as a `PostgresBankDB`. */
   bankDB:    DB.AdapterBankDB
   /** Return the `user_id` your own auth signed this request in as, or null when signed out. */
-  getUserId: (context: ContextT) => DB.Awaitable<string | null>
+  getUserId: (context: ContextT) => DB.Awaitable<UserID | null>
 }
 
 /** Each root field's arguments, as GraphQL coerced them, keyed by the field's name. */
@@ -26,7 +27,7 @@ export type BankFieldArgs = {
   safebyokPutBox:            { ask: BX.BoxPutAsk }
   safebyokDelBox:            { ask: BX.BoxDelAsk }
   safebyokTidyGone:          DB.BankScope
-  safebyokWatch:             DB.BankScope & { vaultlabel?: string | null }
+  safebyokWatch:             DB.BankScope & { vaultlabel?: Vaultlabel | null }
 }
 
 /** A bankDB answer in wire form: every field of its schema type is present, and null where the answer has no value. */
@@ -57,7 +58,7 @@ export type BankFieldResolver<ContextT, FieldnameT extends keyof BankFieldArgs> 
 /** The resolver map {@link bankResolvers} returns, keyed by the type and root field names in `BankSchemaSdl`. */
 export type BankResolvers<ContextT> = {
   SafebyokJson:        GraphQLScalarType
-  SafebyokEpochMillis: GraphQLScalarType<number, number>
+  SafebyokEpochMillis: GraphQLScalarType<EpochMillis, EpochMillis>
   SafebyokBoxRow:      { __resolveType: (row: BX.BoxRow) => string }
   SafebyokParentRow:   { __resolveType: (row: BX.BankRow | BX.VaultRow) => string }
   SafebyokRow:         { __resolveType: (row: NoticedRow) => string }
@@ -103,7 +104,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
   const { bankDB, getUserId } = bankResolversOpts.parse(opts)
 
   /** Return null if the request is signed in as `user_id`, else the refusal to send back. */
-  async function signInRefusalOf(context: ContextT, user_id: string): Promise<DB.VaultError | null> {
+  async function signInRefusalOf(context: ContextT, user_id: UserID): Promise<DB.VaultError | null> {
     const signedIn = await DB.outcomeOf(() => getUserId(context))
     if (! signedIn.ok) { return signedIn.err }
     return (signedIn.val === user_id) ? null : DB.identityRevoked()
@@ -112,7 +113,7 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
   /** Run `verb` if the request is signed in as `user_id`, and return its answer in wire form.
    * Otherwise return a bad answer in wire form: the refusal from checking `ask` if it fails, else the sign-in refusal.
    */
-  async function serveSignedIn(context: ContextT, user_id: string, ask: object, verb: () => Promise<BX.Answer<unknown, DB.GoodAct, unknown>>): Promise<CrossingAnswer> {
+  async function serveSignedIn(context: ContextT, user_id: UserID, ask: object, verb: () => Promise<BX.Answer<unknown, DB.GoodAct, unknown>>): Promise<CrossingAnswer> {
     const refusal = await signInRefusalOf(context, user_id)
     if (refusal === null) { return crossingOf(await verb()) }
     const loggableAsk = await DB.outcomeOf(() => BX.loggableAsk.parse(ask))
@@ -203,14 +204,14 @@ const safebyokJson = new GraphQLScalarType({
 })
 
 /** Return `val` if it is a safe integer, else throw a GraphQLError. */
-const epochMillisOf = (val: unknown): number => {
-  if (Number.isSafeInteger(val)) { return val as number }
+const epochMillisOf = (val: unknown): EpochMillis => {
+  if (Number.isSafeInteger(val)) { return val as EpochMillis }
   throw new GraphQLError('SafebyokEpochMillis is a time in integer UTC epoch milliseconds')
 }
 
 // GraphQL's own Int is 32-bit, too small for a time in milliseconds.
 /** `SafebyokEpochMillis`: a time in integer UTC epoch milliseconds. */
-const safebyokEpochMillis = new GraphQLScalarType<number, number>({
+const safebyokEpochMillis = new GraphQLScalarType<EpochMillis, EpochMillis>({
   name:               'SafebyokEpochMillis',
   coerceOutputValue:  epochMillisOf,
   coerceInputValue:   epochMillisOf,
