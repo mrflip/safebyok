@@ -13,10 +13,11 @@ call it, what do I get, and what would I otherwise get wrong.
 
 **Examine every sentence: is it clear, and plainly stated?**
 
-**The rules are STYLE.md's.** Read its *Comments and doc blocks* and *Naming* sections first,
-whole. They bind anyone who writes a doc block, and this brief adds only what a pass over a whole
-target needs. They outrank the current code: the blocks you are fixing are not the house style, in
-shape, length or tone.
+**The rules are STYLE.md's.** Read its *Writing*, *Comments and doc blocks* and *Naming*
+sections first, whole. They bind anyone who writes a doc block, and this brief adds only what a
+pass over a whole target needs. They outrank the current code: the blocks you are fixing are not
+the house style, in shape, length or tone. Then read `notes/gallant-docblocks.md` whole, before
+your first file: it pairs a bad block with a good one for each rule, by tag.
 
 Change doc blocks only. Behaviour, names, the code of `@example`s and running `//` comments stay
 as they are, with two exceptions. A maintainer's invariant that you move out of a doc block
@@ -44,8 +45,8 @@ into groups of a few related files, a spawn for each, all committing to the one 
   `human/` entry, so a Coach can put back what matters.
 
 A long file lists its sections in `rg -n '// == ' <file>`. Do not read `whiteboard/`, `winboard/`
-or `human/`. The worked examples are STYLE.md's two pairs and `notes/gallant.md` *Words*.
-`notes/gallant-docblocks.md` is the bestiary.
+or `human/`. The worked examples are STYLE.md's two pairs, `notes/gallant-docblocks.md`, and
+`notes/gallant.md` *Words*.
 
 ## Done
 
