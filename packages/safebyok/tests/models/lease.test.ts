@@ -158,6 +158,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
   })
 
   it("lays the sidecar given over the donor's", async () => {
+    // seal @example
     const { lease } = await leaseWorld()
     const first = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const next = await lease.seal(CoreBox, first, { sidecar: { account: 'home' } }, Cleartexts)
@@ -205,6 +206,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
   })
 
   it("round-trips a tombstone's empty whisper", async () => {
+    // seal @example
     const { lease } = await leaseWorld()
     const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const tombstone = await lease.seal(CoreBox, live, { am: 'x' })

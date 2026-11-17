@@ -299,6 +299,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   })
 
   it("seals the next revision of a live box, keeping its life, from the stored box with a new sidecar", async () => {
+    // sealBox @example
     const { bank } = await TH.buildBornBank()
     const first = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     vi.setSystemTime(TH.T0 + 9)
@@ -444,18 +445,18 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     await TH.expectRefusal(bank.tombstoneBox(box), 'disabled')
   })
 
-  const PriorCases = [
-    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a prior of a damaged row'],
+  const DonorCases = [
+    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of a damaged row'],
     [() => ({ ...TH.boxShellOf(), revseq: 0 }),              'half the shell: its revseq moved, its revtok and lifeseq not'],
-    [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a prior of another kind'],
+    [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a donor of another kind'],
     [() => ({ ...TH.boxShellOf(), revseq: -2 }),             'a revseq below the shell'],
     [() => null,                                             'null'],
   ] as const
 
-  for (const [priorOf, blurb] of PriorCases) {
+  for (const [donorOf, blurb] of DonorCases) {
     it(`refuses to seal ${blurb}`, async () => {
       const { bank } = await TH.buildBornBank()
-      await TH.expectRefusal(bank.sealBox(priorOf() as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_option')
+      await TH.expectRefusal(bank.sealBox(donorOf() as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_option')
     })
   }
 

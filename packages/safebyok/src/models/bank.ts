@@ -272,7 +272,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
    * Over a tombstone or the shell, it is the first revision of the next life. Its sidecar is `publicProps.sidecar`, or else `donor`'s.
    * `donor` may be a whole box, sealed or unsealed: only its Thing fields and sidecar are read.
    * @example
-   *   await bank.sealBox(prior, { sidecar: { account: 'work' } }, { whisper })
+   *   await bank.sealBox(box, { sidecar: { account: 'work' } }, { whisper })
    */
   sealBox(donor: BoxDonor, publicProps: TombstonePublicProps): Promise<BoxTombstone>
   sealBox(donor: BoxDonor, publicProps: LivePublicPropsOf<BoxThing, BoxCleartexts>, secretProps: BoxCleartexts): Promise<BoxRecord>
