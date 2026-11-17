@@ -59,7 +59,8 @@ export function mergedCarOf(prior: ThingCar<Thing> | undefined, landed: ThingCar
   return merged
 }
 
-/** True when `val` has a car's `liveness`. TanStack also shares an observer's selected and placeholder values, which may be anything. */
+// TanStack also shares an observer's selected and placeholder values, which may be anything.
+/** True when `val` has a car's `liveness`. */
 export function isThingCar(val: unknown): val is ThingCar<Thing> {
   return (typeof val === 'object') && (val !== null) && (carLivenessVals as readonly unknown[]).includes((val as { liveness?: unknown }).liveness)
 }

@@ -276,7 +276,7 @@ export class ThingMinder {
     if (modelkindOf(notice.val.labelpath) === this.modelkind) { this.#doDeliverRecord(notice.val) }
   }
 
-  /** Land the car of `record` in the cache, while this minder is minding. TanStack merges it into the car cached through {@link mergedCarOf}. */
+  /** Land the car of `record` in the cache, while this minder is minding. */
   #doDeliverRecord(record: DeliverableThing): void {
     if (! this.#isReady) { return }
     this.#tsq.setQueryData(this.queryKey(record), carOf(record))
@@ -295,7 +295,7 @@ export class ThingMinder {
   /** The key `scoped`'s car is cached under. */
   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
 
-  /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. TanStack merges its car into the cache through `mergedCarOf`. */
+  /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. */
   #tsqGetAskOf(ask: GetAsk) {
     return { queryKey: this.queryKey(ask), queryFn: () => this.#fetchCar(ask) }
   }
