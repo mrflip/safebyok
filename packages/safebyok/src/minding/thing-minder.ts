@@ -436,11 +436,11 @@ function betterRecordOf(prior: unknown, record: unknown, isWholeRecord: (cached:
   return (cmp > 0) ? TSQ.replaceEqualDeep(prior, record) : prior
 }
 
-/** True when `prior` and `record` are revisions of one Thing, each whole, sparse or a shell, at one labelpath. */
+/** True when `prior` and `record` are revisions of one Thing, each whole, sparse or a shell, at one labelpath of one bank. */
 function isRevisionPair(prior: unknown, record: unknown): boolean {
   if (! (thingCited.safeParse(prior).success && thingCited.safeParse(record).success)) { return false }
-  const { labelpath } = prior as Partial<ThingScope>
-  return (labelpath !== undefined) && (labelpath === (record as Partial<ThingScope>).labelpath)
+  const [ante, post] = [prior as Partial<ThingScope>, record as Partial<ThingScope>]
+  return (ante.labelpath !== undefined) && (ante.labelpath === post.labelpath) && (ante.userid === post.userid) && (ante.banklabel === post.banklabel)
 }
 
 // The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0. Lifeseqs are
