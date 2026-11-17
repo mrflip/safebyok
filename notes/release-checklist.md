@@ -36,7 +36,7 @@ real thing: a current release of Chrome, Firefox and Safari on a desktop, and Sa
   shelf's cross-tab forget).
 * [ ] A private window: the vault opens, or refuses calmly, with no stray console output.
 * [ ] `safebyok-fastkey` where WebAssembly runs. Under a Content-Security-Policy without
-  `'wasm-unsafe-eval'`, it refuses with `bad_option`, and the message says why.
+  `'wasm-unsafe-eval'`, it refuses with `bad_record`, and the message says why.
 * [ ] The passphrase dialog with each browser's own password manager and autofill: it neither fills
   nor offers to save the whisper.
 

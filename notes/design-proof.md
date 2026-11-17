@@ -402,7 +402,7 @@ each gate change's act, past its provings
 * **The bankDB applies the gating's storage policy, in the step that puts the record.** The record is built from
   `ante`, so it changes only its gating's wayin, and the policy refuses one that changes more (`gate_issue`). The device
   never meets that refusal: `add_passkey` refuses before proving when the gate the attempt read has a passkey
-  (`bad_option`). The bankDB cannot tell whether a wrap unwraps, so a bad `bank_key_wayin_wrapped` is still written.
+  (`bad_record`). The bankDB cannot tell whether a wrap unwraps, so a bad `bank_key_wayin_wrapped` is still written.
 
 Each prompt is the gate's, and starts the same way:
 
@@ -438,7 +438,7 @@ passphrase only from someone who has proved the current one.
 
 ```text
 gate.addPasskeyPrompt()
-├─ gate.demandPasskeyAddable                         one already there → refused 'bad_option', without asking
+├─ gate.demandPasskeyAddable                         one already there → refused 'bad_record', without asking
 └─ bank.prompt('add_passkey')
    →→→ user hits enter key →→→
 gating.attempt({ passphraseClear, passkeyClear })
@@ -451,7 +451,7 @@ gating.attempt({ passphraseClear, passkeyClear })
    ├─ passkeyWayin = passkeyProving.buildWayin(proved)   unwrap the bankKey; wrap; dropped
    └─ gateListing.putGate, then unlockByProving(bank, proved, written)
       commit: gateListing.putGate(ante, { ...ante.wayins, passkey0 }, { policies: ['add_passkey'] })    ← the commit; passkey0 is passkeyWayin.pickle()
-           one added before the attempt read ante → 'bad_option', nothing proved; after it → 'stale_write'
+           one added before the attempt read ante → 'bad_record', nothing proved; after it → 'stale_write'
 ```
 
 ### `revoke_passkey`

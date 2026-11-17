@@ -522,7 +522,7 @@ rows with it.
   developer integrating the package; a condition speaks, calmly, to the user who will see it.
 * **When two refusals apply, throw the easier one, unless the other is both more likely and more dangerous**
   (the Coach). The easier one is the one found more cheaply: the earlier check. A stale lease record missing a field
-  refuses `bad_option` at `Lease.make`, not `damaged_lease`: a damaged lease is neither the likelier cause nor the more
+  refuses `bad_record` at `Lease.make`, not `damaged_lease`: a damaged lease is neither the likelier cause nor the more
   dangerous one. Never rearrange code for a more punctilious refusal than "a field does not pass its check".
 * **A guard lives in what an entrypoint calls.** A public entrypoint's `demandFooable` includes
   `demandEnabled` and whatever else that entrypoint needs. A primitive, a private helper or a
@@ -563,7 +563,7 @@ A member that will not describe in a line is a smell: report it.
   When that noun needs a clause to describe it, open with the verb instead: `Classify a vault request's outcome, based on the stored row`. Read the
   member's name against that sentence (*Naming*). It carries one qualifier at most; anything more is a sentence of its own.
 * **Replace multiple fragments with a sentence** `#use-sentences`. The usual signs: a semicolon joining two facts, a list with its verb gapped out (`a row or record, 'bad_record'; a cutoff,
-  'bad_option'`), a clause hung on "as", "so", "once", "since" or "which", and "one" standing in for a noun you cut. Each
+  'bad_record'`), a clause hung on "as", "so", "once", "since" or "which", and "one" standing in for a noun you cut. Each
   is a cue to rewrite as a sentence, not a ban.
 * **A member's block names no refusal catalog** `#no-refusal-catalog`. The thrower's doc and the `Outcome` type carry the
   kinds, and a class or module doc may say in one sentence what misuse refuses. The only kind worth naming is a condition the
@@ -602,7 +602,7 @@ tested, in proportion to what it does and what a caller could get wrong.
 * **A helper named `expect...` must assert**: the linter counts a call to one as the test's
   assertion. A helper that doesn't assert gets another name (`check...`, `read...`).
 * **A title is one plain clause naming the behaviour**: `it("refuses a misspelt field")`, not
-  `"refuses a misspelt field as 'bad_option', as its second example shows"`. It quotes a refusal
+  `"refuses a misspelt field as 'bad_record', as its second example shows"`. It quotes a refusal
   kind only where a customer checks for it (`stale_write` is API, `bad_record` is not); the linter
   has that list. A test that covers an `@example` says so on its first line,
   `// putBox @example 2`. `notes/gallant-test_titles.md` has the pairs.
