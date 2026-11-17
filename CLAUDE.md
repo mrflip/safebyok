@@ -92,9 +92,11 @@ govern how code is changed:
   stored shapes. An old record that fails today's validation fails safe (it reads as absent or
   corrupt), and the changeset says what a host will see.
 * **The bankDB is the ground truth; what the local instance keeps is a cache.** A
-  data-integrity failure met in a consistent state is reported by throwing. Insert no
-  retry logic, abort controllers or other whizbangs into the critical path of a primitive
-  operation: the customer, or orchestration code we provide, can add them as warranted.
+  data-integrity failure met in a consistent state is reported by throwing. A broken state
+  is reported, never accommodated: a fix for a broken state never changes what a command
+  answers when everything works. Insert no retry logic, abort controllers or other
+  whizbangs into the critical path of a primitive operation: the customer, or orchestration
+  code we provide, can add them as warranted.
   A lock where none was needed before is a last resort too.
 
 ## Commands
@@ -125,7 +127,8 @@ pnpm changeset                     # a PR's release note; `--empty` when it need
   `notes/guarantees-big.md` names under *Where the guarantees are kept*, read its *The guarantees*
   section, and check the change against it.** The new core may cite a guarantee by number where it
   keeps it in substance. It never edits `notes/guarantees-big.md`, and any drift is written into
-  `notes/guarantees-drift.md`.
+  `notes/guarantees-drift.md`. `notes/supervising.md`: read it before handing work to a
+  `thread-worker` outside `/sprint`.
 
 ## Reading
 

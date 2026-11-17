@@ -123,6 +123,11 @@ a safe, committed stopping point, push it, lead the PR's body with the question,
 thread file well enough that a fresh agent could finish the thread from your worktree if you are
 never resumed. Smaller open questions do not block: syndicate them and carry on.
 
+Never make an undirected change to the contract of what you are directly working on: what it
+promises its callers, as a comment or a test states it. When every fix you can find for a
+problem changes that contract or works around it, that is a significant question: report
+`blocked`, quoting the contract.
+
 ## Syndication
 
 The same facts, to different readers, at different altitudes.
