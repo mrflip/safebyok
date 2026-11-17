@@ -1,6 +1,6 @@
 # Thread minder_grain: the ThingMinder goes with TanStack's grain (2026-11-17)
 
-Branch `20261117-minder_grain`, PR pending, on main. Proved: safebyok's lint and typecheck clean; `tests/minding`, `tests/storage/shapes-thing.test.ts` and `tests/index.test.ts`, 199 passed. `pnpm justify` runs at ready.
+Branch `20261117-minder_grain`, [PR #716](https://github.com/mrflip/safebyok/pull/716), on main. Proved: safebyok lint and typecheck clean, its tests 832 passed; `pnpm justify` after the catch-up rebase (see the PR's **Tests:** line).
 
 The nine directives agreed with the Coach for "The ThingMinder is a joy at both ends" (`complete.md`). Every new test was red before its change, for the reason its directive gave.
 
