@@ -853,6 +853,14 @@ describe("ThingMinder's structural sharing", () => {
     expect(share(undefined, gate)).to.eq(gate)
     expect(share(gate, TH.boxThingOf())).to.deep.equal(TH.boxThingOf())
   })
+
+  it("takes the Thing at one labelpath of another user or bank, whatever its revision", () => {
+    const share = shareOf()
+    const ours  = TH.nextGateOf(TH.gateThingOf())
+    for (const theirs of [{ ...TH.gateThingOf(), userid: 'u2' }, { ...TH.gateThingOf(), banklabel: 'zz' }]) {
+      expect(share(ours, theirs)).to.deep.equal(theirs)
+    }
+  })
 })
 
 describe("ThingMinder keys", () => {
