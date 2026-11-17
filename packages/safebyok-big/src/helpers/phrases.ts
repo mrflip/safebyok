@@ -5,7 +5,7 @@
 // In one file so that wording and tone are reviewed together, and so is the rule that no phrase quotes the input.
 
 import { PassphraseSaltSize } from './consts'
-import type { Boxlabel, Vaultlabel } from './aliases'
+import type { Boxlabel, KeyDeriverLabel, Vaultlabel } from './aliases'
 
 // == [Names]: LabelShape, DeviceTokShape, UserIdMissing, UserIdChars
 
@@ -343,7 +343,7 @@ export const SamePassphrase = "The new passphrase is the one the vault has alrea
 export function reservedDeriverLabel(prefix: string): string { return `Labels beginning ${prefix} are reserved for the specs safebyok supplies, present and future: choose a label of your own, naming your app, say.` }
 
 /** A key deriver under a supplied spec's `label` whose parameters differ from that spec's. */
-export function suppliedSpecChanged(label: string): string { return `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.` }
+export function suppliedSpecChanged(label: KeyDeriverLabel): string { return `A key deriver labelled ${label} must carry that spec's parameters exactly, or vaults made under it will not open elsewhere: spread the exported spec into yours, or choose a label of your own.` }
 
 /** The warning logged when a device is made with a test deriver, whose label begins `test_`. */
 export const TestDeriverNotice = "The keyDeriver's label begins test_, the mark of a deriver made cheap for tests: it gives a passphrase next to no protection against guessing. If this vault has real secrets, open it with argon2idWebV1Deriver (from safebyok-big/browser), or another vetted Argon2id deriver."

@@ -53,7 +53,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   /** The snapshot, or null until first asked for. */
   #snapshot: SnapshotT | null = null
   /** When storage last confirmed the record in hand while it was whole, or null. */
-  #refreshedAt: number | null = null
+  #refreshedAt: EpochMillis | null = null
   readonly #listeners = new Set<() => void>()
 
   /** `snapshot`, as a function safe to pass without binding. */
@@ -83,7 +83,7 @@ export abstract class Storable<ScopeT extends object, RecordT extends SparseT, S
   get sparse(): SparseT { return this.listing.sparseOf(this.#central) }
 
   /** When this thing's record was last refreshed from the bankDB, or null if never. */
-  get refreshedAt(): number | null { return this.#refreshedAt }
+  get refreshedAt(): EpochMillis | null { return this.#refreshedAt }
 
   /** Whether the record in hand is alive, damaged or gone. */
   get am(): Am { return this.#central.am }

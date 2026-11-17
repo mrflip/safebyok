@@ -135,14 +135,14 @@ export type ProbeAsked = Z.input<typeof probeAsked>
 export type ProbeOpts = Z.input<typeof probeOpts>
 
 /** One storage verb's answer as `bank.tryProbe` reports it: sparse rows, no wrapped key or ciphertext, and when it came back. */
-export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: BX.BoxSparse, parent: BX.VaultRow, timestamp: number }>
+export type ProbeStep = Readonly<{ ok: true, act: EX.GoodAct, ask: BX.LoggableAsk, val: BX.BoxSparse, parent: BX.VaultRow, timestamp: EpochMillis }>
 
 /** How `bank.tryProbe` went, step by step: the box and vault as found, the put, the fetch back, and that the box unsealed. */
 export type ProbeReport = Readonly<{
-  timely: Readonly<{ box: BX.BoxSparse | null, vault: BX.VaultSparse, boxRefreshedAt: number | null, vaultRefreshedAt: number | null, timestamp: number }>
+  timely: Readonly<{ box: BX.BoxSparse | null, vault: BX.VaultSparse, boxRefreshedAt: EpochMillis | null, vaultRefreshedAt: EpochMillis | null, timestamp: EpochMillis }>
   put:    ProbeStep
   fetch:  ProbeStep
-  unseal: Readonly<{ ok: true, timestamp: number }>
+  unseal: Readonly<{ ok: true, timestamp: EpochMillis }>
 }>
 
 /** How fresh the record in hand and its parent must be before a verb goes on. */
