@@ -117,7 +117,7 @@ describe("fakeDeployment", () => {
 
   it("refuses a host or options it cannot run, quoting none of what it was given", () => {
     const host = TH.bankHostWith(TH.bySubject)
-    function refuse(attempt: () => unknown) { return TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_option')) }
+    function refuse(attempt: () => unknown) { return TH.thrownText(TH.expectSyncRefusal(attempt, 'bad_record')) }
     refuse(() => fakeDeployment({ api: host.api } as never))
     refuse(() => fakeDeployment({ createTest: host.createTest } as never))
     refuse(() => fakeDeployment(null as never))

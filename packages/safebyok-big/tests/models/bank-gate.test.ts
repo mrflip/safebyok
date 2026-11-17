@@ -321,7 +321,7 @@ describe("gate.addPasskeyPrompt()", () => {
     const elsewhere = withPasskey.demandStoredGate().wayins.passkey0!
     const born = await makeBornVault()
     const { gatingAt } = dialogOf(born)
-    const adding = TH.expectRefusal(born.bank.maingate.addPasskeyPrompt(), 'bad_option')
+    const adding = TH.expectRefusal(born.bank.maingate.addPasskeyPrompt(), 'bad_record')
     const gating = await gatingAt<'add_passkey'>()
     const moved = born.putGateBehindOurBack({ ...born.demandStoredGate(), wayins: { main: born.demandStoredGate().wayins.main, passkey0: elsewhere } })
     born.advance(Promptly + 1)

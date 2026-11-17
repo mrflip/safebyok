@@ -659,13 +659,13 @@ strongest where the helper is one grep away.
 **Goofus:**
 
 ```ts
-verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope })
+verifyConsistent(MSX.boxPatch.parse(patch, { advice: Phrases.BoxPatchAdvice }), this.scope, { kind: 'bad_record', message: Phrases.patchOfOtherScope })
 ```
 
 **Gallant:**
 
 ```ts
-MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_option', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
+MSX.boxPatch.parseConsistent(patch, this.scope, { kind: 'bad_record', message: Phrases.patchOfOtherScope, advice: Phrases.BoxPatchAdvice })
 ```
 
 **Goofus:** `deliver` asks whether a refusal's `dbhas` belongs to this listing by listing refusal kinds. Each new case adds an
@@ -917,7 +917,7 @@ box.put({ whisper: { a: 7 } })            // refused
 
 ```ts
 box.put({ whisper: { a: 7 } })            // seals '{"a":7}'
-box.put({ whisper: 7 })                   // refused 'bad_option'
+box.put({ whisper: 7 })                   // refused 'bad_record'
 ```
 
 **Goofus again:** `Aligned` promises refusals for the host, and nothing ever puts one in it. Every `receive` and `align` returns an
@@ -1232,7 +1232,7 @@ line each, the default marked. A term defined elsewhere ("sealed", "encrypted") 
 **Goofus:**
 
 ```ts
-/** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_option', naming the field, a dna that fails {@link boxDna}; 'bank_locked' while the vault is locked, the seal's end included; 'bad_option' a scope already held; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
+/** Seal the box of `input`, under a `box_tok` fresh from {@link makeLifeTok}, and store it over no record; resolves the instance held once it lands. Refuses 'bad_record', naming the field, a dna that fails {@link boxDna}, or a scope already held; 'bank_locked' while the vault is locked, the seal's end included; and 'stale_write' where storage holds a record, delivered first, or what `opts.ifPresent` says of a live one. */
 async create(input: BoxDna, opts: PutListingOpts = {}): Promise<Box>
 ```
 
@@ -1251,7 +1251,7 @@ async create(input: BoxDna, opts: BoxCreateOpts = {}): Promise<Box>
 **Goofus again:** a guard as a catalog, with a pointer to the ensure that cures one entry.
 
 ```ts
-/** Throws unless unlocked with a full, healthy record: refuses 'bank_locked', 'absent_box' for a box gone, or 'bad_option' for a sparse record not yet filled, which `ensureReadyToUnsealWhisper` fetches first. */
+/** Throws unless unlocked with a full, healthy record: refuses 'bank_locked', 'absent_box' for a box gone, or 'bad_record' for a sparse record not yet filled, which `ensureReadyToUnsealWhisper` fetches first. */
 demandReadyToUnsealWhisper(): this
 ```
 

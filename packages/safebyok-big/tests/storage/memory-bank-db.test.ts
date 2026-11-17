@@ -106,7 +106,7 @@ describe("MemoryBankDB", () => {
   })
 
   it("refuses options it does not know", () => {
-    expect(() => new MemoryBankDB({ maxBoxs: 3 } as never)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    expect(() => new MemoryBankDB({ maxBoxs: 3 } as never)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 })
 

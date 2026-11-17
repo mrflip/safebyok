@@ -62,7 +62,7 @@ type QueryModification =
   | { type: 'QueryRemoved', queryId: number }
 
 // These only validate the host and the options. The deployment keeps the caller's own objects, so their methods keep their `this`.
-const { fakeHost, fakeDeploymentOpts } = Checkers('bad_option', ({ obj, custom }) => {
+const { fakeHost, fakeDeploymentOpts } = Checkers('bad_record', ({ obj, custom }) => {
   const fn = custom<(...args: never[]) => unknown>((candidate) => typeof candidate === 'function')
   const logger = obj({ log: fn, warn: fn, error: fn, logVerbose: fn.optional() })
   return {

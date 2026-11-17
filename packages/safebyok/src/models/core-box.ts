@@ -9,7 +9,7 @@ import { type BoxStamp, boxStamp } from './stamps'
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
 
 /** Checks for what a box's seal takes and makes: the sealable, a live sealable for a tombstone, the public and secret props, and the stored record. */
-const Checks = Validator.Checkers('bad_option', ({ obj, oneof, epochMillis }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, oneof, epochMillis }) => ({
   boxSealable,
   liveBoxSealable: boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
   // Strict, since a misspelt key in either bag would otherwise be dropped without a word.
@@ -50,7 +50,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static nextRevisionOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
     const { sidecar: donorSidecar, ...thing } = Checks.boxSealable.parse(donorProps)
     const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar === undefined) { throw new Errors.VaultError('bad_option', Phrases.SidecarMissing) }
+    if (sidecar === undefined) { throw new Errors.VaultError('bad_record', Phrases.SidecarMissing) }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
     if (thing.am === 'a') { return { ...thing, ...revision } }
     return { ...thing, ...nextLifeOf(thing), ...revision, born_at: written_at }
@@ -63,7 +63,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static tombstoneOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxTombstone, BoxCleartexts> {
     const { sidecar: _sidecar, ...thing } = Checks.liveBoxSealable.parse(donorProps)
     const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar !== undefined) { throw new Errors.VaultError('bad_option', Phrases.TombstoneSidecarGiven) }
+    if (sidecar !== undefined) { throw new Errors.VaultError('bad_record', Phrases.TombstoneSidecarGiven) }
     return { ...thing, ...nextLifeOf(thing), revtok: Crypto.randomId(), revseq: thing.revseq + 1, am: 'x', written_at }
   }
   // --

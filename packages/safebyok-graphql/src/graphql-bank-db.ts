@@ -26,7 +26,7 @@ const isGraphQLBankClient = (candidate: unknown): candidate is GraphQLBankClient
 // `custom` returns the same client object it was given, so the client's methods keep their `this`.
 const graphQLBankDBOpts = DB.objCheck(({ custom }) => ({
   client: custom<GraphQLBankClient>(isGraphQLBankClient, 'Expected an urql Client, with query, mutation and subscription functions'),
-}), 'bad_option')
+}), 'bad_record')
 
 true satisfies Z.core.util.AssertEqual<GraphQLBankDBOpts, Z.input<typeof graphQLBankDBOpts>>
 // --

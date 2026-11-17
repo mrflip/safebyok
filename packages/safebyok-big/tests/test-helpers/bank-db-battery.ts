@@ -81,7 +81,7 @@ const batteryOpts = objCheck(({ fn, bool }) => ({
   _cheat_adapterOf:      fn<NonNullable<BankDBBatteryOpts['_cheat_adapterOf']>>().optional(),
   watches:               bool.optional(),
   boxNoticesCarryVault:  bool.optional(),
-}), 'bad_option')
+}), 'bad_record')
 
 // == [The world the cases share]: Built, BatteryWorld, worldOf
 

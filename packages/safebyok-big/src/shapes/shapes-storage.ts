@@ -31,7 +31,7 @@ export const VoidRevision = { revision_tok: VoidRevisionTok, revision_seq: VoidR
 // == [Record bases]: am, revision, times, vaulted, sparseBase, Revision, Times
 
 /** The checks of the fields stored rows share: `am`, the revision, the times, a vault's `vault_tok`, and `sparseBase`, the four together. */
-export const { am, revision, times, vaulted, sparseBase } = Checkers('bad_option', ({ obj, int, oneof, epochMillis, revision_tok, vault_tok }) => {
+export const { am, revision, times, vaulted, sparseBase } = Checkers('bad_record', ({ obj, int, oneof, epochMillis, revision_tok, vault_tok }) => {
   const revision = obj({
     revision_tok,
     /** A counter that goes up by one at every put and del: of two revisions, the higher is the newer. */
@@ -73,7 +73,7 @@ export type BoxTidyAsk = Readonly<Z.output<typeof boxTidy>>
 // == [Wayins]: passphraseWayinRecord, passkeyWayinRecord
 
 /** The checks of a passphrase wayin and a passkey wayin as stored, before `BX` adds their `wayinlabel`. */
-export const { passphraseWayinRecord, passkeyWayinRecord } = Checkers('bad_option', ({ obj, lit, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_tok, bank_key_wayin_wrapped }) => ({
+export const { passphraseWayinRecord, passkeyWayinRecord } = Checkers('bad_record', ({ obj, lit, epochMillis, key_deriver_label, credential_id, salt_b64, prfSalt, device_tok, bank_key_wayin_wrapped }) => ({
   passphraseWayinRecord: obj({ wayinkind: lit('passphrase'), key_deriver_label, salt_b64, device_tok, registered_at: epochMillis, bank_key_wayin_wrapped }).strict(),
   passkeyWayinRecord:    obj({ wayinkind: lit('passkey'), credential_id, prf_salt_b64: prfSalt, device_tok, registered_at: epochMillis, bank_key_wayin_wrapped }).strict(),
 }), [CX])
@@ -90,7 +90,7 @@ export type DamagedRow     = DamagedVault | DamagedBox
 // == [Box forms]: boxSparse, boxRecord, boxTombstone, BoxSparse, BoxRecord, BoxTombstone, BoxRow, DamagedBox
 
 /** The checks of a box's stored forms, which `BX` extends into a bank's box rows: its sparse fields, its live record and its tombstone. */
-export const { boxSparse, boxRecord, boxTombstone } = Checkers('bad_option', ({ lit, box_tok, box_key_wrapped, whisper_ciphered }) => {
+export const { boxSparse, boxRecord, boxTombstone } = Checkers('bad_record', ({ lit, box_tok, box_key_wrapped, whisper_ciphered }) => {
   const boxSparse = CX.boxscope.unwrap().extend({
     fmt: lit(BoxFormat),
     ...sparseBase.shape,
@@ -128,7 +128,7 @@ export type DamagedBox   = Readonly<{ user_id: UserID, banklabel: Banklabel, vau
 // == [Policies]: ifPresent, ifAbsent, putIfAbsent, anyIfAbsent
 
 /** The checks of an ask's policies: `ifPresent`, a get's `ifAbsent`, a put's `ifAbsent`, and either `ifAbsent`, as an answer's ask may carry. */
-export const { ifPresent, ifAbsent, putIfAbsent, anyIfAbsent } = Checkers('bad_option', ({ oneof, union }) => {
+export const { ifPresent, ifAbsent, putIfAbsent, anyIfAbsent } = Checkers('bad_record', ({ oneof, union }) => {
   const ifAbsent    = oneof(EX.ifAbsentVals)
   const putIfAbsent = oneof(EX.putIfAbsentVals)
   return { ifPresent: oneof(EX.ifPresentVals), ifAbsent, putIfAbsent, anyIfAbsent: union([ifAbsent, putIfAbsent]) }
@@ -143,7 +143,7 @@ export const putOpts = objCheck(({ obj, orDefault }) => ({
   expected:  obj({ ...revision.shape, am }).loose(),
   ifAbsent:  orDefault(putIfAbsent, 'add'),
   ifPresent: orDefault(ifPresent, 'repl'),
-}), 'bad_option', [CX])
+}), 'bad_record', [CX])
 
 /** A put's options through a listing: `expected`, `ifAbsent` (default `'add'`) and `ifPresent` (default `'repl'`). */
 export type PutOpts = Readonly<Z.input<typeof putOpts>>
@@ -171,7 +171,7 @@ export type Capacity = Z.infer<typeof capacity>
 // == [Row helpers]: rowMeta, revisionPins, revisionOf, nextRevisionOf, isRowAt, isLiveRow, damagedVaultOf
 
 /** The check that reads a row's revision and liveness without judging the rest. */
-export const rowMeta = objStrip(({ vault_tok }) => ({ ...revision.shape, am, vault_tok }), 'bad_option', [CX])
+export const rowMeta = objStrip(({ vault_tok }) => ({ ...revision.shape, am, vault_tok }), 'bad_record', [CX])
 
 // Not an ask: what a caller pins when it names a row by a scope or a record of any form.
 /** The check of the revision and life tokens a scope or record carries, each one optional, every other field dropped. */
@@ -180,7 +180,7 @@ export const revisionPins = objStrip(({ int, revision_tok, vault_tok, box_tok })
   revision_seq: int.optional(),
   vault_tok:    vault_tok.optional(),
   box_tok:      box_tok.optional(),
-}), 'bad_option', [CX])
+}), 'bad_record', [CX])
 
 /** The {@link Revision} fields of a row. */
 export const revisionOf = ({ revision_tok, revision_seq }: Revision): Revision => ({ revision_tok, revision_seq })
@@ -217,7 +217,7 @@ export function damagedVaultOf({ user_id, banklabel, vaultlabel }: VaultScope): 
  * Only the fields a row is filed by are checked here: the rest is carried as it came, a `lease_key`
  * handle included, for the lease to check.
  */
-export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_option', ({ epochMillis, bankScope, bank_tok }) => {
+export const { leaseQuery, leaseDated, leaseRow } = Checkers('bad_record', ({ epochMillis, bankScope, bank_tok }) => {
   const leaseQuery = bankScope.unwrap().extend({ bank_tok })
   const leaseDated = leaseQuery.extend({ proved_at: epochMillis })
   return { leaseQuery, leaseDated, leaseRow: leaseDated.loose() }

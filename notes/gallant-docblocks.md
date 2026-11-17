@@ -96,7 +96,7 @@ pointer to where the terms are defined, and a list of the option values, as `#no
 **Goofus:**
 
 ```ts
-/** Seal `patch` over the record in hand and put it over that record's revision, resolving once storage's answer is received; a snapshot shows the change only then. A half the patch leaves out is kept: the sidecar is read off the record, and the whisper unsealed and resealed, as the stamp binds the sidecar. Refuses 'bad_option', naming the field, `opts` or a patch that fails {@link MSX.boxPatch}, before any guard; 'bank_locked', at the seal's end too, storing nothing; and 'stale_write' where the record moved, the record stored delivered first. On a box gone, this is its rebirth, its sidecar `{}` where left out, and a whisper left out refuses 'no_whisper'. A refusal leaves nothing behind.
+/** Seal `patch` over the record in hand and put it over that record's revision, resolving once storage's answer is received; a snapshot shows the change only then. A half the patch leaves out is kept: the sidecar is read off the record, and the whisper unsealed and resealed, as the stamp binds the sidecar. Refuses 'bad_record', naming the field, `opts` or a patch that fails {@link MSX.boxPatch}, before any guard; 'bank_locked', at the seal's end too, storing nothing; and 'stale_write' where the record moved, the record stored delivered first. On a box gone, this is its rebirth, its sidecar `{}` where left out, and a whisper left out refuses 'no_whisper'. A refusal leaves nothing behind.
  * Over a live record, storage decides by {@link MSX.ifPresentVals}; under `get`, the put resolves with the box holding what storage holds, `patch` discarded.
  */
 async put(patch: BoxPatch, opts: SendOpts = {}): Promise<this>
@@ -406,7 +406,7 @@ A stand-in "one" inside a participle.
 
 ```ts
 // checks/validator.ts
-  /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; 'bad_option' for a story that is none, whatever `val`. */
+  /** `val`, parsed: the call's kind otherwise, its message framed as `story` asks; 'bad_record' for a story that is none, whatever `val`. */
   parse: (val: unknown, story?: Story) => Z.output<SchemaT>
 ```
 
@@ -428,10 +428,10 @@ The first pairs (`create`, `demandUnsealable`) are in `notes/gallant.md`.
 // vault-opts.ts
 /** Device.make's options, checked and read, before storage is touched.
  * Refuses 'insecure_context' first, in a page the browser says is not a secure context. Then
- * 'bad_option' for anything but a bag, or for an option it does not take, of the wrong type or out
+ * 'bad_record' for anything but a bag, or for an option it does not take, of the wrong type or out
  * of range, every one it finds named in one refusal led by "In Device.make's options"; then
  * 'bad_scope' for a `user_id` that fails its check or a `banklabel` that is not a label; then
- * 'bad_option' for a key deriver a vault does not keep, or a clock that throws or reads out of
+ * 'bad_record' for a key deriver a vault does not keep, or a clock that throws or reads out of
  * bounds. The limits are held to the default `bankDB`'s here, and to a vault's own at its birth.
  */
 export function parseMakeBankOpts(opts: MakeBankOpts): ParsedBankOpts {

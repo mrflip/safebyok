@@ -438,8 +438,8 @@ describe("bank.lock, device.vacate, device.sweep", () => {
 
   it("a vacate refuses a story whose cause is not a VaultError or that has an unknown field", () => {
     const device = makeBankWorld().deviceOn()
-    TH.expectSyncRefusal(() => device.vacate({ cause: new Error('signed out') as VaultError }), 'bad_option')
-    TH.expectSyncRefusal(() => device.vacate({ reason: 'signed out' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => device.vacate({ cause: new Error('signed out') as VaultError }), 'bad_record')
+    TH.expectSyncRefusal(() => device.vacate({ reason: 'signed out' } as never), 'bad_record')
     expect(device.isEnabled).to.be.true
   })
 

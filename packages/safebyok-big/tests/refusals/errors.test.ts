@@ -84,7 +84,6 @@ describe("RefusalFamilyForKind", () => {
   })
 
   it("sorts each kind into its family", () => {
-    expect(RefusalFamilyForKind.bad_option).to.eq('misuse')
     expect(RefusalFamilyForKind.bad_record).to.eq('misuse')
     expect(RefusalFamilyForKind.storage_unavailable).to.eq('condition')
     expect(RefusalFamilyForKind.damaged_whisper).to.eq('bad_news')
@@ -94,8 +93,7 @@ describe("RefusalFamilyForKind", () => {
 const FamilyCases = [
   // misuse: the host developer's code is wrong, and no user action fixes it
   ["bad_scope",           "misuse",    'a label the app chose that breaks the rules is a bug'],
-  ["bad_option",          "misuse",    'a Device.make option out of range is a bug'],
-  ["bad_record",          "misuse",    'handing a BankDB a record this package does not build is a bug'],
+  ["bad_record",          "misuse",    'a Device.make option out of range, or a record this package does not build handed to a BankDB, is a bug'],
   ["insecure_context",    "misuse",    'serving the app over plain http is a deployment bug'],
   ["unexpected_error",    "misuse",    'a throw that is no refusal is a bug, in safebyok or in a function the app handed it'],
   // conditions: normal operation, which may reach the user; bad news: told to the user, nobody's bug
@@ -179,7 +177,7 @@ describe("isCondition", () => {
     }
     handle(new VaultError('box_too_large', 'That box is over the limit.'))
     expect(shown).to.deep.equal(['That box is over the limit.'])
-    expect(() => { handle(new VaultError('bad_option', 'A whisper must be a JSON value.')) }).to.throw('A whisper must be a JSON value.')
+    expect(() => { handle(new VaultError('bad_record', 'A whisper must be a JSON value.')) }).to.throw('A whisper must be a JSON value.')
   })
 })
 

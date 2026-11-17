@@ -39,7 +39,7 @@ export type GuardedStrengthChecker = {
 }
 
 /** The check of a host's {@link StrengthChecker}. */
-export const { strengthChecker } = Validator.Checkers('bad_option', ({ custom }) => ({
+export const { strengthChecker } = Validator.Checkers('bad_record', ({ custom }) => ({
   strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, Phrases.StrengthCheckerShape),
 }))
 // --

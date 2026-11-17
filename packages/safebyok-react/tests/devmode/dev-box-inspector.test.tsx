@@ -96,7 +96,7 @@ describe("DevBoxInspector", () => {
   it("shows a refusal by its kind", async () => {
     await renderOverBox()
     click('unveil')
-    await waitFor(() => { expect(lastCall()).to.match(/^unveil refused:bad_option: /) })
+    await waitFor(() => { expect(lastCall()).to.match(/^unveil refused:bad_record: /) })
   })
 
   it("offers a hint, not its buttons, for a label the core refuses", async () => {

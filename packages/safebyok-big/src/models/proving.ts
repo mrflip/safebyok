@@ -31,7 +31,7 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 
 // Defined here, not with the shapes: it names a model class.
 /** The check of {@link Proving.buildWayin}'s `source`. */
-const Checks = Checkers('bad_option', ({ custom }) => ({
+const Checks = Checkers('bad_record', ({ custom }) => ({
   wayinSource: custom<Novel | Proving>((val) => val === NOVEL || hasModelkind(val, 'proving'), 'Expected NOVEL or a proving'),
 }))
 // --

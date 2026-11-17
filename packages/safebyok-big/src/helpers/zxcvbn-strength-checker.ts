@@ -26,7 +26,7 @@ type EitherBankScope = BankScope | { readonly userid: string, readonly banklabel
 const checkerArgs = objCheck(({ passphraseCleartext, bankScope, obj, union, user_id, banklabel }) => ({
   typed: passphraseCleartext,
   scope: union([bankScope, obj({ userid: user_id, banklabel })]),
-}), 'bad_option', [GX, CX])
+}), 'bad_record', [GX, CX])
 
 // Intl.Segmenter is missing from browsers before 2024 and from React Native's Hermes; there each code point counts as one.
 /** How many characters `typed` contains, as its reader counts them. */

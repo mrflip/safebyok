@@ -141,7 +141,7 @@ const askAuthenticator = async (call: () => Promise<Credential | null>): Promise
     // By design, the browser reports NotAllowedError for a dismissal, a timeout and "no matching passkey" alike.
     if (err instanceof DOMException && (err.name === 'NotAllowedError' || err.name === 'AbortError')) { return null }
     if (err instanceof DOMException && err.name === 'SecurityError') {
-      throw new VaultError('bad_option', "The browser refused the passkey's relying party: its id must be this page's domain, or one it belongs to.", { cause: err })
+      throw new VaultError('bad_record', "The browser refused the passkey's relying party: its id must be this page's domain, or one it belongs to.", { cause: err })
     }
     throw new VaultError('passkey_unavailable', Messages.passkeyAskFailed, { cause: err })
   }

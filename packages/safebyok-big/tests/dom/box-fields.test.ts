@@ -29,7 +29,7 @@ describe("BoxFields.of", () => {
   })
 
   it("refuses what is not a box", () => {
-    const err = TH.expectSyncRefusal(() => BoxFields.of({ whisper: {} } as never), 'bad_option')
+    const err = TH.expectSyncRefusal(() => BoxFields.of({ whisper: {} } as never), 'bad_record')
     expect(err.message).to.include(Phrases.BoxExpected)
   })
 })
@@ -82,7 +82,7 @@ describe("fields.bind: what an element shows", () => {
   it("refuses an empty path", async () => {
     const box = await unexposedOf()
 
-    TH.expectSyncRefusal(() => BoxFields.of(box).bind(''), 'bad_option')
+    TH.expectSyncRefusal(() => BoxFields.of(box).bind(''), 'bad_record')
   })
 })
 
@@ -251,21 +251,21 @@ describe("fields.put", () => {
     const el = elOf()
     BoxFields.of(box).bind('apiKey')(el)
     el.value = 'sk-unsaved'
-    await TH.expectRefusal(BoxFields.of(box).put({ ifPresent: 'nonesuch' as 'repl' }), 'bad_option')
+    await TH.expectRefusal(BoxFields.of(box).put({ ifPresent: 'nonesuch' as 'repl' }), 'bad_record')
     expect(box.whisper).to.deep.include({ apiKey: 'sk-unsaved' })
   })
 
   it("refuses with no field bound, with none exposed, while veiled, and while locked", async () => {
     const box = await unexposedOf()
 
-    const noFields = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_option')
+    const noFields = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_record')
     expect(noFields.message).to.eq(Phrases.NoFieldsBound)
     BoxFields.of(box).bind('apiKey')(elOf())
-    const notExposed = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_option')
+    const notExposed = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_record')
     expect(notExposed.message).to.eq(Phrases.NotExposed)
     await box.expose()
     box.veil()
-    const veiled = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_option')
+    const veiled = await TH.expectRefusal(BoxFields.of(box).put(), 'bad_record')
     expect(veiled.message).to.eq(Phrases.PuttingVeiledFields)
     box.unveil()
     world.mw.setLocked(true)

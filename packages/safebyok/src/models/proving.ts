@@ -27,7 +27,7 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
 /** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, {@link Proving.buildWayin}'s `source`, {@link Proving.buildLease}'s arguments, and the static builders' and `judgeStrength`'s arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => {
+const Checks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => {
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
   const gateRevisionedStamp = Stamps.gateStamp.extend(thingRecord.pick({ revtok: true }).shape)
   const provingDevice = GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(ConstsX.isGuarded, Phrases.GuardedExpected) })

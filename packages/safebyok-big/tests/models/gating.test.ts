@@ -299,8 +299,8 @@ describe("a launcher reached through a live gating", () => {
     const first = TH.expectRefusal(device.ensureBank(), 'dismissed')
     const gating = await gatingAt<'build_bank'>()
     const launchers = gating.constructor as typeof Gating
-    await TH.expectRefusal(launchers.launchOn({} as never, 'unlock_bank', neverUnlocks, null), 'bad_option')
-    await TH.expectRefusal(launchers.launchBirth({} as never, BX.shellBankOf(BankScope), neverUnlocks, null), 'bad_option')
+    await TH.expectRefusal(launchers.launchOn({} as never, 'unlock_bank', neverUnlocks, null), 'bad_record')
+    await TH.expectRefusal(launchers.launchBirth({} as never, BX.shellBankOf(BankScope), neverUnlocks, null), 'bad_record')
     expect(device.openGating).to.eq(gating)
     gating.dismiss()
     await first

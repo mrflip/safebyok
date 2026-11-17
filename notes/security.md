@@ -41,6 +41,9 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-17 (option_record, branch `20261117-option_record`): **The refusal kind `bad_option` is merged into `bad_record`, in the new core and `safebyok-big` alike, so in `safebyok-convex` a refusal inside the component of an argument or option that fails its check now crosses to the client as a `ConvexError`.**
+  `crossingOf` (`packages/safebyok-convex/src/component/banks.ts`) turns a refusal into a client-visible `ConvexError`, with the core's message, only for the kinds in `sentenceKindVals` (`packages/safebyok-convex/src/refusals.ts`), which has `bad_record`; as `bad_option` such a refusal reached the client as an ordinary thrown error. This widens what error text crosses the component's boundary: the text describes only the caller's own arguments, in the core's phrases, which never quote values, and a refusal of a stored record already crossed this way.
+
 * 2026-11-17 (core_box, PR #715, branch `20261117-core_box`): **In the new core, `packages/safebyok` (not `safebyok-big`), a sealer's `decode` refuses without quoting the text it is handed, which holds the cleartext.**
   The text `decode` receives is the cleartext as cipher input (for a box, the whisper as JSON). `CoreBox.decode` (`models/core-box.ts`) refuses `damaged_whisper` for text that does not parse or check, through `Throwers.undecodedWhisper()`, whose message and `meta` carry none of the text; the `SyntaxError` `JSON.parse` throws, which can quote the text it failed on, is replaced and not kept as a cause. The `Sealer` interface's `decode` doc block (`models/sealers.ts`) requires the same of every sealer; nothing in the lease checks it (`Checks.sealer`, `models/lease.ts`, only duck-checks the members' presence).
 

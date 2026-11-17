@@ -10,7 +10,7 @@ export type { MaskOpts } from './shapes/shapes-utils'
 export { fromB64, toB64 } from './helpers/crypto'
 export { WhisperFieldAttributes } from './helpers/whisper-field'
 
-const mashArgs = Checker(({ str }) => str, 'bad_option')
+const mashArgs = Checker(({ str }) => str, 'bad_record')
 
 /** The SHA-256 of `text` as 43 characters of unpadded base64url: a one-way stand-in for an id you would rather not hand over, such as `user_id: await mash(email)`.
  * It is unsalted, so equal text always mashes alike. Its 43 characters pass `user_id` but never `label`, which stops at 40.

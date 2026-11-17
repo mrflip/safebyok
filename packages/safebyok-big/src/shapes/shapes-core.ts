@@ -111,7 +111,7 @@ export function isPlainBag(val: unknown): val is Record<string, unknown> {
  * @example whisper.safeParse(null).success              // false: emptying a box is delBox's job
  * @example whisper.safeParse({ orgId: null }).success   // true: null inside a structure is JSON
  */
-export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
+export const { whisper, whisperBag } = Checkers('bad_record', ({ lazy, union, str, num, bool, lit, arr, custom }) => {
   const whisperJson: Z.ZodType<WhisperJson> = lazy(() => union([str, num, bool, lit(null), whisperArr, plainBag]))
   // An object is judged whole, so a refusal's path never contains one of its keys, which are the caller's own.
   const whisperMembers = record(str, whisperJson)
@@ -136,7 +136,7 @@ export const { whisper, whisperBag } = Checkers('bad_option', ({ lazy, union, st
  *
  * @example sidecar.safeParse('work account').success  // false: a sidecar is an object -- { note: 'work account' }
  */
-export const sidecar = Checker(() => whisperBag, 'bad_option')
+export const sidecar = Checker(() => whisperBag, 'bad_record')
 /** A box's sidecar, as {@link sidecar} checks it. */
 export type Sidecar = Z.infer<typeof sidecar>
 // --
@@ -196,7 +196,7 @@ export const keyDeriverShape = Checker(({ obj, fn, str, lit }) => obj({
   salt_size:        lit(PassphraseSaltSize),
   deriveKeyBytes:    fn<KeyDeriver['deriveKeyBytes']>(),
   load:              fn<NonNullable<KeyDeriver['load']>>().optional(),
-}, Phrases.KeyDeriverShape), 'bad_option')
+}, Phrases.KeyDeriverShape), 'bad_record')
 
 true satisfies Z.core.util.AssertEqual<KeyDeriver, Readonly<Z.input<typeof keyDeriverShape>>>
 
@@ -204,7 +204,7 @@ true satisfies Z.core.util.AssertEqual<KeyDeriver, Readonly<Z.input<typeof keyDe
 export const loggerShape = Checker(({ obj, fn }) => {
   const loggerCall = fn<VaultLogger['log']>()
   return obj({ log: loggerCall, warn: loggerCall, error: loggerCall }, Phrases.LoggerShape)
-}, 'bad_option')
+}, 'bad_record')
 
 true satisfies Z.core.util.AssertEqual<VaultLogger, Z.input<typeof loggerShape>>
 // --

@@ -209,7 +209,7 @@ describe("box.put(patch): a patch naming a half", () => {
 
   it("names the failing field of a patch that fails its check", async () => {
     const box = builtOf(fullBoxRecord())
-    const err = await TH.expectRefusal(box.put({ whisper: null } as never), 'bad_option')
+    const err = await TH.expectRefusal(box.put({ whisper: null } as never), 'bad_record')
     expect(err.message).to.contain('whisper')
   })
 

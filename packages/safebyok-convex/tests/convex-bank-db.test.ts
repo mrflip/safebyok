@@ -200,18 +200,18 @@ describe("ConvexBankDB's refusals", () => {
 
 describe("ConvexBankDB's constructor", () => {
   it("refuses a client that is not a Convex client", () => {
-    TH.expectSyncRefusal(() => new ConvexBankDB({ client: {} as never, api: TH.rootBankApi }), 'bad_option')
+    TH.expectSyncRefusal(() => new ConvexBankDB({ client: {} as never, api: TH.rootBankApi }), 'bad_record')
   })
 
   it("refuses the whole generated api in place of its safebyokBank module", () => {
     const deployment = deploy(TH.componentHost())
-    TH.expectSyncRefusal(() => new ConvexBankDB({ client: deployment.client(null), api: anyApi as never }), 'bad_option')
+    TH.expectSyncRefusal(() => new ConvexBankDB({ client: deployment.client(null), api: anyApi as never }), 'bad_record')
   })
 
   it("refuses a maxBoxes it cannot use", () => {
     const deployment = deploy(TH.componentHost())
     for (const maxBoxes of [-1, 0, 1.5, NaN]) {
-      TH.expectSyncRefusal(() => new ConvexBankDB({ client: deployment.client(null), api: TH.rootBankApi, maxBoxes }), 'bad_option')
+      TH.expectSyncRefusal(() => new ConvexBankDB({ client: deployment.client(null), api: TH.rootBankApi, maxBoxes }), 'bad_record')
     }
   })
 })

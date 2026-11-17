@@ -106,7 +106,7 @@ export function Checkers<ValsT extends Record<string, Z.ZodType>, const SourcesT
  *
  * @example
  *   export const prfSalt = Checker(() => prf_salt_b64.refine((salt) => fromB64OrNull(salt)?.length === PasskeySaltSize, Phrases.prfSaltShape(PasskeySaltSize)), 'bad_record')
- * @example export const callback = Checker(({ fn }) => fn(), 'bad_option')
+ * @example export const callback = Checker(({ fn }) => fn(), 'bad_record')
  */
 export function Checker<SchemaT extends Z.ZodType, const SourcesT extends readonly object[] = readonly []>(
   build: (kit: KitWith<SourcesT>) => SchemaT, kind: Refusalkind = 'bad_record', sources?: SourcesT,
@@ -306,7 +306,7 @@ function disagreeing(bag: object, other: object): readonly string[] {
 
 // Made below Checkers and its refusals, which the call needs.
 /** This module's own checks: a bag, a {@link ConsistencyRefusal}, a {@link Story}, and the options of {@link objCheck}, {@link objStrict} and {@link objStrip}. */
-const Checks = Checkers('bad_option', ({ custom, obj, oneof, str, union }) => ({
+const Checks = Checkers('bad_record', ({ custom, obj, oneof, str, union }) => ({
   /** Any object, kept as it is, so a getter still reads. */
   bag:                custom<object>((val) => typeof val === 'object' && val !== null, Phrases.BagNotObject),
   consistencyRefusal: obj({

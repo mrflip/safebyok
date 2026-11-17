@@ -50,7 +50,7 @@ describe("a page that is not a secure context", () => {
 
 describe("Device.make", () => {
   it("refuses a null requestCleartext", () => {
-    const refusal = TH.expectSyncRefusal(() => makeBankWorld().deviceOn({ requestCleartext: null as never }), 'bad_option')
+    const refusal = TH.expectSyncRefusal(() => makeBankWorld().deviceOn({ requestCleartext: null as never }), 'bad_record')
     expect(refusal.message).to.match(/^requestCleartext: /)
   })
 
@@ -71,7 +71,7 @@ describe("Device.make", () => {
     ['the main gate twice',           ["main", "main"]],
     ['a string, not a list',          "main"],
   ])("refuses gates that are %s", (_what, gates) => {
-    TH.expectSyncRefusal(() => makeBankWorld().deviceOn({ gates: gates as never }), 'bad_option')
+    TH.expectSyncRefusal(() => makeBankWorld().deviceOn({ gates: gates as never }), 'bad_record')
   })
 
   it("rounds a fraction of a minute to the nearest millisecond, and turns Infinity into ForeverMillis", () => {
@@ -310,8 +310,8 @@ describe("the host's functions inside a device", () => {
   })
 
   it("refuses a requestCleartext or an onLifecycle that is not a function", () => {
-    TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_option')
-    TH.expectSyncRefusal(() => guardOnLifecycle('call me' as never), 'bad_option')
+    TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_record')
+    TH.expectSyncRefusal(() => guardOnLifecycle('call me' as never), 'bad_record')
   })
 })
 
@@ -601,9 +601,9 @@ describe("tellBadNewsTo", () => {
     const device = makeBankWorld().deviceOn()
     const onBadNews = vi.fn()
     const news = new VaultError('storage_unavailable', "Down.")
-    TH.expectSyncRefusal(() => { tellBadNewsTo('tell me' as never, device, [news]) }, 'bad_option')
-    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_option')
-    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, device, [new Error("Down.") as never]) }, 'bad_option')
+    TH.expectSyncRefusal(() => { tellBadNewsTo('tell me' as never, device, [news]) }, 'bad_record')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_record')
+    TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, device, [new Error("Down.") as never]) }, 'bad_record')
     expect(onBadNews).not.toHaveBeenCalled()
   })
 })

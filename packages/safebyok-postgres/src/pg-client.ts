@@ -17,7 +17,7 @@ const isPgPool = (candidate: unknown): candidate is PgPool => (
   && ('connect' in candidate) && (typeof candidate.connect === 'function')
 )
 
-const pgPool = DB.Checker(({ custom }) => custom<PgPool>(isPgPool, 'Expected a pg Pool, with query and connect functions'), 'bad_option')
+const pgPool = DB.Checker(({ custom }) => custom<PgPool>(isPgPool, 'Expected a pg Pool, with query and connect functions'), 'bad_record')
 // --
 
 /** Roll back the transaction on `conn`. Returns false if the ROLLBACK itself failed. */

@@ -187,10 +187,10 @@ export type SafebyokBankApi = {
 // == [Checks]: componentCheck, safebyokApiOpts, scopeUser
 
 /** Validator for the component handed to {@link SafebyokBankComponent}: an object or a function, not null. */
-const componentCheck = DB.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_option')
+const componentCheck = DB.Checker(({ custom }) => custom<ComponentApi>((candidate) => ((typeof candidate === 'object') || (typeof candidate === 'function')) && (candidate !== null), Phrases.ComponentExpected), 'bad_record')
 
 /** Validator for {@link SafebyokApiOpts}. */
-const safebyokApiOpts = DB.objCheck(({ fn }) => ({ getUserId: fn<GetUserId>() }), 'bad_option')
+const safebyokApiOpts = DB.objCheck(({ fn }) => ({ getUserId: fn<GetUserId>() }), 'bad_record')
 
 /** Validator for the `user_id` an ask or a watch's scope names. It strips the other fields, which the component checks. */
 const scopeUser = DB.objCheck(({ user_id }) => ({ user_id }), { refusalkind: 'identity_revoked', extras: 'strip' })

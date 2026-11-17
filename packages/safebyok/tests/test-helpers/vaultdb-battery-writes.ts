@@ -32,14 +32,14 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("refuses an ask for a labelpath of no kind of Thing, or past its kind's depth", async () => {
       const vaultDB = await fresh()
-      await expectBad(vaultDB.tryGetThing({ ...getGateAskOf(), labelpath: 'vault/main' }), 'bad_option')
-      await expectBad(vaultDB.tryGetThing(getAskAt('gate/a/b')), 'bad_option')
-      await expectBad(vaultDB.tryGetThing(getAskAt('box/aa/deep')), 'bad_option')
+      await expectBad(vaultDB.tryGetThing({ ...getGateAskOf(), labelpath: 'vault/main' }), 'bad_record')
+      await expectBad(vaultDB.tryGetThing(getAskAt('gate/a/b')), 'bad_record')
+      await expectBad(vaultDB.tryGetThing(getAskAt('box/aa/deep')), 'bad_record')
     })
 
     it("refuses, never throws, for an ask that is not one", async () => {
       const vaultDB = await fresh()
-      await expectBad(vaultDB.tryGetThing(null as never), 'bad_option')
+      await expectBad(vaultDB.tryGetThing(null as never), 'bad_record')
     })
   })
 
@@ -261,20 +261,20 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const deep = boxThingOf('deep', { labelpath: 'box/aa/deep', lifepath: `${Life0}/${Life0}/${Life0}` })
       const vaultDB = await fresh()
       const ask = birthAskOf(deep, childShellCited(`${Life0}/${Life0}`))
-      await expectBad(vaultDB.tryWriteThing(ask), 'bad_option')
+      await expectBad(vaultDB.tryWriteThing(ask), 'bad_record')
     })
 
     it("refuses a storage policy on a box's put", async () => {
       const vaultDB = await fresh()
       await boxesBorn(vaultDB, box)
       const ask = replaceAskOf(box, nextOf(box), { policies: ['add_passkey'] })
-      await expectBad(vaultDB.tryWriteThing(ask), 'bad_option')
+      await expectBad(vaultDB.tryWriteThing(ask), 'bad_record')
     })
 
     it("keeps the kinds apart: a gate's ask names no box", async () => {
       const ask = { ...birthAskOf(box, childShellCited(Life0)), modelkind: 'gate' }
       const vaultDB = await fresh()
-      await expectBad(vaultDB.tryWriteThing(ask as never), 'bad_option')
+      await expectBad(vaultDB.tryWriteThing(ask as never), 'bad_record')
     })
 
     it("refuses a damaged box as damaged, to a get", async () => {
@@ -306,8 +306,8 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("leave every refusal to the verb, which answers it", async () => {
       const vaultDB = await fresh()
-      await expectBad(vaultDB.tryWriteThing(putAskOf({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)), 'bad_option')
-      await expectBad(vaultDB.tryGetThing(getAskOf(null as never)), 'bad_option')
+      await expectBad(vaultDB.tryWriteThing(putAskOf({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)), 'bad_record')
+      await expectBad(vaultDB.tryGetThing(getAskOf(null as never)), 'bad_record')
     })
   })
 }

@@ -18,7 +18,7 @@ import type { BankTok, Banklabel, GateTok, UserID } from '../helpers/aliases'
 
 // Defined here, not with the shapes: it names a model class.
 /** The checks of {@link Gate.recordOfBirth}'s arguments. */
-const Checks = Checkers('bad_option', ({ obj, custom }) => {
+const Checks = Checkers('bad_record', ({ obj, custom }) => {
   const wayin = custom<Wayin>((val) => hasModelkind(val, 'wayin'), 'Expected a Wayin')
   return { recordOfBirthArgs: obj({ bank: bankStamp, gate: gateStamp, main: wayin, passkey0: wayin.nullable() }) }
 })

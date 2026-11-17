@@ -10,7 +10,7 @@ import { BoxThingFormat, isLabelpathOfKind, thingRecord, wayins } from '../stora
 /** The checks of a bank's scope and stamp, a gate's stamp, a {@link StampedGate}, and a box's stamp.
  * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
  */
-export const { bankScope, bankStamp, gateStamp, stampedGate, boxStamp } = Validator.Checkers('bad_option', ({ obj, lit }) => {
+export const { bankScope, bankStamp, gateStamp, stampedGate, boxStamp } = Validator.Checkers('bad_record', ({ obj, lit }) => {
   const bankStamp = thingRecord.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
   const gateStamp = thingRecord.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
   return {

@@ -8,7 +8,7 @@ import { objCheck } from '../helpers/validator'
 /** The most characters `head`, `tail` or `minStars` may ask for: a whiff, not a copy. */
 const MaxShown = 1000
 
-/** The check of `mask`'s options, each defaulted, a field it does not accept refused. Its `parse` refuses 'bad_option'. */
+/** The check of `mask`'s options, each defaulted, a field it does not accept refused. Its `parse` refuses 'bad_record'. */
 export const maskOpts = objCheck(({ union, lit, uint }) => {
   const shownCount = uint.lte(MaxShown)
   const resultLen  = union([lit(Infinity), uint])
@@ -22,7 +22,7 @@ export const maskOpts = objCheck(({ union, lit, uint }) => {
     /** Longest result, in code points. Default 15. `Infinity` never collapses. */
     maxLen:   resultLen.default(15),
   }
-}, 'bad_option')
+}, 'bad_record')
 
 /** How `mask` shows a text: how many characters to reveal, and how many stars to hide it behind. */
 export type MaskOpts = Z.input<typeof maskOpts>

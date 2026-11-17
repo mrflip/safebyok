@@ -72,7 +72,7 @@ describe("versionedShelfOf(spec)", () => {
   ] as const
 
   it.each(RefusedCases)("refuses %s", (_what, over) => {
-    expect(() => versionedShelfOf(specOf(over as unknown as Partial<VersionedShelfSpec>))).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    expect(() => versionedShelfOf(specOf(over as unknown as Partial<VersionedShelfSpec>))).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 
   it("refuses a spec that is not an object, or has an unknown field", () => {
@@ -89,7 +89,7 @@ describe("dbprefixOf(dbName)", () => {
 
   it("refuses an empty dbName, or one that is no string", () => {
     for (const bad of ['', 7, null]) {
-      expect(() => dbprefixOf(bad as never)).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => dbprefixOf(bad as never)).to.throw(VaultError).with.property('refusalkind', 'bad_record')
     }
   })
 })

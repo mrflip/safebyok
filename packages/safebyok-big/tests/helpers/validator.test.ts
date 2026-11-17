@@ -20,7 +20,7 @@ import * as TH from '../test-helpers'
 
 // A module of validators, as a star import would hand one in `sources`: made in a call of its own
 // kind, to show a validator nested in another refuses with the outer one's.
-const GateChecks = Checkers('bad_option', ({ obj, str, uint }) => {
+const GateChecks = Checkers('bad_record', ({ obj, str, uint }) => {
   const passphraseWayinRecord = obj({ salt_b64: str.min(1), memory_kib: uint }).strict()
   const gateRecord            = obj({ passphrase: passphraseWayinRecord }).strict()
   return { passphraseWayinRecord, gateRecord }
@@ -80,13 +80,13 @@ describe("Checkers", () => {
   })
 
   it("names the input's keys in the refusal for a record schema", () => {
-    const { tagged } = Checkers('bad_option', ({ label }) => ({ tagged: Zod.record(Zod.string(), label) }))
-    const err = TH.expectSyncRefusal(() => tagged.parse({ host_chosen_key: 'Not A Label' }), 'bad_option')
+    const { tagged } = Checkers('bad_record', ({ label }) => ({ tagged: Zod.record(Zod.string(), label) }))
+    const err = TH.expectSyncRefusal(() => tagged.parse({ host_chosen_key: 'Not A Label' }), 'bad_record')
     expect(err.meta?.fieldnames).to.deep.equal(['host_chosen_key'])
   })
 
   it("refuses a module's own validator with its own call's kind", () => {
-    TH.expectSyncRefusal(() => GateChecks.gateRecord.parse({ passphrase: { salt_b64: '', memory_kib: 1 } }), 'bad_option')
+    TH.expectSyncRefusal(() => GateChecks.gateRecord.parse({ passphrase: { salt_b64: '', memory_kib: 1 } }), 'bad_record')
   })
 
   it("names every failing field, each with its check's sentence, in the message and meta.fieldnames", () => {
@@ -97,14 +97,14 @@ describe("Checkers", () => {
   })
 
   it("names eight failures at most, counting the rest", () => {
-    const { tenFields } = Checkers('bad_option', ({ obj, label }) => ({
+    const { tenFields } = Checkers('bad_record', ({ obj, label }) => ({
       tenFields: obj(Object.fromEntries(Array.from({ length: 10 }, (_field, ii) => [`field${String(ii)}`, label]))),
     }))
-    const err = TH.expectSyncRefusal(() => tenFields.parse({}), 'bad_option')
+    const err = TH.expectSyncRefusal(() => tenFields.parse({}), 'bad_record')
     expect(err.message.split('; ')).to.have.lengthOf(9)
     expect(err.message).to.match(/; and 2 more failures$/)
     expect(err.meta?.fieldnames).to.have.lengthOf(8)
-    const nine = TH.expectSyncRefusal(() => tenFields.parse({ field0: 'ok' }), 'bad_option')
+    const nine = TH.expectSyncRefusal(() => tenFields.parse({ field0: 'ok' }), 'bad_record')
     expect(nine.message).to.match(/; and 1 more failure$/)
     expect(nine.message).to.not.include('failure;')
   })
@@ -127,12 +127,12 @@ describe("Checkers", () => {
   })
 
   it("names an unknown field's place by its path, never its name, and says when an object accepts no fields", () => {
-    const { strictBag, outer } = Checkers('bad_option', ({ obj }) => {
+    const { strictBag, outer } = Checkers('bad_record', ({ obj }) => {
       const strictBag = obj({}).strict()
       return { strictBag, outer: obj({ inner: strictBag }) }
     })
-    expect(TH.expectSyncRefusal(() => strictBag.parse({ salt_b64: 1 }), 'bad_option').message).to.eq("There is a field it does not accept (its name is not repeated): it accepts no fields. Check the spelling, or leave it out")
-    const nested = TH.expectSyncRefusal(() => outer.parse({ inner: { staleMinute: 1, [`ghp_${'aB3'.repeat(12)}`]: 2 } }), 'bad_option')
+    expect(TH.expectSyncRefusal(() => strictBag.parse({ salt_b64: 1 }), 'bad_record').message).to.eq("There is a field it does not accept (its name is not repeated): it accepts no fields. Check the spelling, or leave it out")
+    const nested = TH.expectSyncRefusal(() => outer.parse({ inner: { staleMinute: 1, [`ghp_${'aB3'.repeat(12)}`]: 2 } }), 'bad_record')
     expect(nested.message).to.match(/^inner: There are 2 fields it does not accept/)
     expect(nested.message).to.not.include('staleMinute')
     expect(nested.meta?.fieldnames).to.deep.equal(['inner'])
@@ -201,10 +201,10 @@ describe("Checkers", () => {
   })
 
   it("lets a name the kit gives win over a module's, and a later module's over an earlier one's", () => {
-    const { checked } = Checkers('bad_option', ({ uint, extra }) => ({ checked: Zod.object({ count: uint, extra }) }), [{ uint: Zod.string(), extra: Zod.number() }, { extra: Zod.boolean() }])
+    const { checked } = Checkers('bad_record', ({ uint, extra }) => ({ checked: Zod.object({ count: uint, extra }) }), [{ uint: Zod.string(), extra: Zod.number() }, { extra: Zod.boolean() }])
     expect(checked.parse({ count: 3, extra: true })).to.deep.equal({ count: 3, extra: true })
-    TH.expectSyncRefusal(() => checked.parse({ count: 'three', extra: true }), 'bad_option')
-    TH.expectSyncRefusal(() => checked.parse({ count: 3, extra: 1 }), 'bad_option')
+    TH.expectSyncRefusal(() => checked.parse({ count: 'three', extra: true }), 'bad_record')
+    TH.expectSyncRefusal(() => checked.parse({ count: 3, extra: 1 }), 'bad_record')
   })
 
   it("throws a VaultError, never a ZodError, from parse", () => {
@@ -266,7 +266,7 @@ describe("Checkers", () => {
   })
 
   it("gives parseConsistent only to a validator of an object, by its type", () => {
-    const { checked } = Checkers('bad_option', ({ str }) => ({ checked: str }))
+    const { checked } = Checkers('bad_record', ({ str }) => ({ checked: str }))
     expectTypeOf(boxSparse.parseConsistent).returns.toEqualTypeOf<Zod.output<typeof boxSparse>>()
     expectTypeOf(checked).not.toHaveProperty('parseConsistent')
   })
@@ -289,9 +289,9 @@ describe("Checker", () => {
 
   // Checker @example 2
   it("refuses the kind it is given", () => {
-    const callback = Checker(({ fn }) => fn(), 'bad_option')
+    const callback = Checker(({ fn }) => fn(), 'bad_record')
     expect(callback.parse(Math.max)).to.eq(Math.max)
-    TH.expectSyncRefusal(() => callback.parse('listener'), 'bad_option')
+    TH.expectSyncRefusal(() => callback.parse('listener'), 'bad_record')
   })
 
   it("spreads a module of validators into the kit, a nested one refusing with the outer call's kind", () => {
@@ -309,24 +309,24 @@ describe("Checker", () => {
 
 describe("refusingAs", () => {
   it("makes a validator's schema refuse another kind, naming the same failing fields", () => {
-    const asOption = boxSparse.refusingAs('bad_option')
+    const asDamaged = boxSparse.refusingAs('damaged_row')
     const refused = TH.expectSyncRefusal(() => boxSparse.parse({ ...sparse, written_at: -1 }), 'bad_record')
-    const reRefused = TH.expectSyncRefusal(() => asOption.parse({ ...sparse, written_at: -1 }), 'bad_option')
+    const reRefused = TH.expectSyncRefusal(() => asDamaged.parse({ ...sparse, written_at: -1 }), 'damaged_row')
     expect(reRefused.meta?.fieldnames).to.deep.equal(refused.meta?.fieldnames)
-    expect(asOption.parse(sparse)).to.deep.equal(sparse)
+    expect(asDamaged.parse(sparse)).to.deep.equal(sparse)
   })
 
   it("leaves the first validator refusing its own kind, and keeps what the schema does: a strict object refuses a stray field", () => {
-    const asOption = boxRecord.refusingAs('bad_option')
-    TH.expectSyncRefusal(() => asOption.parse({ ...sparse, whisper_ciphered: 'w', extra: 1 }), 'bad_option')
+    const asDamaged = boxRecord.refusingAs('damaged_row')
+    TH.expectSyncRefusal(() => asDamaged.parse({ ...sparse, whisper_ciphered: 'w', extra: 1 }), 'damaged_row')
     TH.expectSyncRefusal(() => boxRecord.parse({ ...sparse, whisper_ciphered: 'w', extra: 1 }), 'bad_record')
   })
 
   it("gives parseConsistent and refusingAs to what it makes, each refusing the new kind", () => {
-    const asOption = boxSparse.refusingAs('bad_option')
-    TH.expectSyncRefusal(() => asOption.parseConsistent(sparse, { user_id: 'u2' }), 'bad_option')
-    TH.expectSyncRefusal(() => asOption.refusingAs('bad_scope').parse({ ...sparse, written_at: -1 }), 'bad_scope')
-    expectTypeOf(asOption).toEqualTypeOf<typeof boxSparse>()
+    const asDamaged = boxSparse.refusingAs('damaged_row')
+    TH.expectSyncRefusal(() => asDamaged.parseConsistent(sparse, { user_id: 'u2' }), 'damaged_row')
+    TH.expectSyncRefusal(() => asDamaged.refusingAs('bad_scope').parse({ ...sparse, written_at: -1 }), 'bad_scope')
+    expectTypeOf(asDamaged).toEqualTypeOf<typeof boxSparse>()
   })
 })
 
@@ -361,9 +361,9 @@ describe("objCheck", () => {
   })
 
   it("accepts a kind and a module of validators", () => {
-    const outer = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
+    const outer = objCheck(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_record', [GateChecks])
     expect(outer.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
-    TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_option')
+    TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_record')
   })
 })
 
@@ -378,13 +378,13 @@ describe("objStrict", () => {
 
   it("refuses the kind it is told, given alone or as refusalkind", () => {
     TH.expectSyncRefusal(() => objStrict(bankScopeOf, 'bad_scope').parse({ ...scope }), 'bad_scope')
-    TH.expectSyncRefusal(() => objStrict(bankScopeOf, { refusalkind: 'bad_option' }).parse({ ...scope }), 'bad_option')
+    TH.expectSyncRefusal(() => objStrict(bankScopeOf, { refusalkind: 'bad_record' }).parse({ ...scope }), 'bad_record')
   })
 
   it("accepts a kind and a module of validators", () => {
-    const outer = objStrict(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_option', [GateChecks])
+    const outer = objStrict(({ gateRecord, uint }) => ({ gate: gateRecord, gate_epoch: uint }), 'bad_record', [GateChecks])
     expect(outer.parse({ gate, gate_epoch: 1 })).to.deep.equal({ gate, gate_epoch: 1 })
-    TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_option')
+    TH.expectSyncRefusal(() => outer.parse({ gate, gate_epoch: -1 }), 'bad_record')
   })
 })
 
@@ -575,7 +575,7 @@ describe("every checker a shapes module exports", () => {
 
   for (const [checkername, checker] of Object.entries(ExportedCheckers)) {
     it(`${checkername} quotes no value it refuses`, () => {
-      const parts = partsOf(checker).map((part) => Checker(() => part, 'bad_option'))
+      const parts = partsOf(checker).map((part) => Checker(() => part, 'bad_record'))
       const refusals = parts.flatMap((part) => MarkedInputs.map((input) => refusalTextOf(() => part.parse(input)))).filter((text) => text !== null)
       expect(refusals, checkername).to.not.be.empty
       for (const text of refusals) { expect(text, checkername).to.not.include(Marker) }

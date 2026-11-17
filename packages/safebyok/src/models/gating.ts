@@ -53,7 +53,7 @@ export interface GatingRecord<KindT extends Gatingkind = Gatingkind> {
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Gating.make}'s arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, fn, custom, oneof }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, fn, custom, oneof }) => ({
   gatingMakeArgs: obj({
     record: obj({ gatingkind: oneof(gatingkindVals) }),
     opts:   obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device'), bank: custom<Bank | null>(), attempt: fn<GatingAttempt>(), askUser: fn<AskUser>().nullable() }),

@@ -18,10 +18,10 @@ export type BoxFieldEl = { value: string }
 export type BoxFieldRef = (el: BoxFieldEl | null) => (() => void) | undefined
 
 /** The check of `BoxFields.of`'s box. */
-const fieldsBox = Checker(({ custom }) => custom<Box>((val) => hasModelkind(val, 'box'), Phrases.BoxExpected), 'bad_option')
+const fieldsBox = Checker(({ custom }) => custom<Box>((val) => hasModelkind(val, 'box'), Phrases.BoxExpected), 'bad_record')
 
 /** The check of `fields.bind`'s path, dotted into the whisper. */
-const fieldPath = Checker(({ str }) => str.min(1), 'bad_option')
+const fieldPath = Checker(({ str }) => str.min(1), 'bad_record')
 
 /** An element bound, and the text it was last given: null while hidden, so that what is typed there is never read back. */
 interface BoundField {
@@ -140,7 +140,7 @@ const fieldTextOf = (leaf: unknown): string => {
   return ((typeof leaf === 'number') || (typeof leaf === 'boolean')) ? String(leaf) : ''
 }
 
-const noFieldsBound = (): VaultError => new VaultError('bad_option', Phrases.NoFieldsBound)
+const noFieldsBound = (): VaultError => new VaultError('bad_record', Phrases.NoFieldsBound)
 
-const puttingVeiledFields = (): VaultError => new VaultError('bad_option', Phrases.PuttingVeiledFields)
+const puttingVeiledFields = (): VaultError => new VaultError('bad_record', Phrases.PuttingVeiledFields)
 // --

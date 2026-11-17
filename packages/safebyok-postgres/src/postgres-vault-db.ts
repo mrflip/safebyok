@@ -29,7 +29,7 @@ const postgresVaultDBOpts = Validator.objCheck(({ custom, fn, bool }) => ({
   client:          custom<PostgresQueryable>(isPostgresQueryable, 'Expected a client with a query function'),
   listen:          fn<PostgresListen>().optional(),
   doNotifyTracked: bool.optional(),
-}), 'bad_option')
+}), 'bad_record')
 // --
 
 // == [Notices]: thingsChannelOf, Told, toldOf

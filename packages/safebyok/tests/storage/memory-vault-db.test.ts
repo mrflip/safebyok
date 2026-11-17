@@ -64,8 +64,8 @@ describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
   })
 
   it("refuses an opt it does not know, or one of the wrong type", () => {
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTracked: 'no' } as never), 'bad_option')
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTrack: false } as never), 'bad_option')
+    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTracked: 'no' } as never), 'bad_record')
+    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTrack: false } as never), 'bad_record')
   })
 })
 

@@ -45,6 +45,6 @@ describe("pgClientOf", () => {
   })
 
   it("refuses what is not a pool", () => {
-    for (const notPool of [null, {}, { query: () => null }]) { TH.expectSyncRefusal(() => pgClientOf(notPool as never), 'bad_option') }
+    for (const notPool of [null, {}, { query: () => null }]) { TH.expectSyncRefusal(() => pgClientOf(notPool as never), 'bad_record') }
   })
 })

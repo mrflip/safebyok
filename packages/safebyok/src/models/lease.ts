@@ -29,7 +29,7 @@ export interface LeaseOpts {
 
 // Defined here, not with the shapes: it names a model class.
 /** The checks of {@link Lease.make}'s arguments, and of the sealer a seal or unseal is given. */
-const Checks = Validator.Checkers('bad_option', ({ obj, str, fn, bool, custom }) => {
+const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, bool, custom }) => {
   const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() })
   const sealerMembers = obj({
     donorPropsOf:     fn(),
@@ -134,7 +134,7 @@ export class Lease implements LeaseStamp {
     const kept = withoutSecrets(sealer.donorPropsOf(donorProps))
     const given = sealer.publicPropsOf(publicProps)
     const isTombstone = (given.am === 'x')
-    if (isTombstone && (secretProps !== undefined)) { throw new Errors.VaultError('bad_option', Phrases.TombstoneSecretsGiven) }
+    if (isTombstone && (secretProps !== undefined)) { throw new Errors.VaultError('bad_record', Phrases.TombstoneSecretsGiven) }
     const revision = isTombstone ? sealer.tombstoneOf(kept, given) : sealer.nextRevisionOf(kept, given)
     const cleartexts = isTombstone ? sealer.tombstoneSecrets : sealer.secretPropsOf(secretProps)
     const sealed = await this.#sealText(sealer, revision, sealer.encode(cleartexts))

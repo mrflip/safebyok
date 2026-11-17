@@ -33,7 +33,7 @@ export const Argon2idWebV1 = Object.freeze({
 export const SuppliedSpecs: readonly KeyDeriverSpec[] = Object.freeze([Argon2idWebV1])
 
 /** The label and Argon2id settings of a key deriver, each within its bounds, a supplied spec's settings kept and a label under {@link ReservedLabelPrefix} refused. */
-export const { keyDeriverSpec } = Checkers('bad_option', ({ obj, str, int, lit }) => ({
+export const { keyDeriverSpec } = Checkers('bad_record', ({ obj, str, int, lit }) => ({
   keyDeriverSpec: obj({
     algorithm:         lit('argon2id'),
     key_deriver_label: str.min(1),

@@ -28,7 +28,7 @@ describe("guardedLogger", () => {
   })
 
   it("refuses a bare logger", () => {
-    TH.expectSyncRefusal(() => GX.guardedLogger.parse(bare), 'bad_option')
+    TH.expectSyncRefusal(() => GX.guardedLogger.parse(bare), 'bad_record')
   })
 })
 
@@ -48,7 +48,7 @@ describe("gatingLaunchOnArgs", () => {
       { ...args, gatingkind: 'build_bank' }, { ...args, gatingkind: 'open_sesame' }, { ...args, bank: { modelkind: 'vault' } },
       { ...args, unlockByProving: null }, { ...args, askUser: () => Promise.resolve(true) }, { ...args, prior: VoidRevision },
     ]) {
-      TH.expectSyncRefusal(() => GX.gatingLaunchOnArgs.parse(bad), 'bad_option')
+      TH.expectSyncRefusal(() => GX.gatingLaunchOnArgs.parse(bad), 'bad_record')
     }
   })
 })
@@ -70,7 +70,7 @@ describe("gatingLaunchBirthArgs", () => {
       { ...args, listing: { modelkind: 'vault_listing' } }, { ...args, expected: { revision_seq: 'one' } },
       { ...args, unlockByProving: 'unlock' }, { ...args, askUser: () => Promise.resolve(true) },
     ]) {
-      TH.expectSyncRefusal(() => GX.gatingLaunchBirthArgs.parse(bad), 'bad_option')
+      TH.expectSyncRefusal(() => GX.gatingLaunchBirthArgs.parse(bad), 'bad_record')
     }
   })
 })

@@ -151,14 +151,14 @@ describe("SafebyokBankComponent, at setup", () => {
 
   for (const [opts, blurb] of BadOptsCases) {
     it(`refuses ${blurb}, saying what to pass`, () => {
-      const refusal = TH.expectSyncRefusal(() => component.api(opts as never), 'bad_option')
+      const refusal = TH.expectSyncRefusal(() => component.api(opts as never), 'bad_record')
       expect(refusal.message).to.include('{ getUserId }')
     })
   }
 
   for (const [forgotten, blurb] of [[undefined, 'undefined'], [null, 'null'], ['safebyok', 'text']] as const) {
     it(`refuses ${blurb} for the component, saying how to install it`, () => {
-      const refusal = TH.expectSyncRefusal(() => new SafebyokBankComponent(forgotten as never), 'bad_option')
+      const refusal = TH.expectSyncRefusal(() => new SafebyokBankComponent(forgotten as never), 'bad_record')
       expect(refusal.message).to.include('app.use(safebyok)')
     })
   }

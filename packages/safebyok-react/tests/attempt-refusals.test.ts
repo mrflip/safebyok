@@ -17,7 +17,7 @@ describe("gripeOfRefusal", () => {
     expect(gripeOf(Open, new VaultError('attempt_in_flight', 'A refusal.'))).to.be.null
   })
 
-  const ConcludedKinds: readonly Refusalkind[] = ['absent_wayin', 'gating_concluded', 'dismissed', 'storage_unavailable', 'vault_gone', 'bad_option']
+  const ConcludedKinds: readonly Refusalkind[] = ['absent_wayin', 'gating_concluded', 'dismissed', 'storage_unavailable', 'vault_gone', 'bad_record']
   for (const refusalkind of ConcludedKinds) {
     it(`says nothing of ${refusalkind} on a concluded gating`, () => {
       expect(gripeOf(Concluded, new VaultError(refusalkind, 'A refusal.'))).to.be.null
@@ -25,7 +25,7 @@ describe("gripeOfRefusal", () => {
   }
 
   it("throws anything else met while the gating is open, for the boundary", () => {
-    expect(() => gripeOf(Open, new VaultError('bad_option', 'A refusal.'))).to.throw('A refusal.')
+    expect(() => gripeOf(Open, new VaultError('bad_record', 'A refusal.'))).to.throw('A refusal.')
     expect(() => gripeOf(Open, new TypeError('fell over'))).to.throw(VaultError)
   })
 })

@@ -66,19 +66,19 @@ describe("boundaryRefusalOf", () => {
   const meta = { capacity: { boxes: { used: 1, max: 100 }, bytes: { used: 48, max: 1000 } } }
 
   it("gives React a VaultError's kind, message and meta, but not its cause", () => {
-    const misuse = new VaultError('bad_option', 'A bad option.', { cause: new Error('could not derive from pw-the-passphrase'), meta })
+    const misuse = new VaultError('bad_record', 'A bad option.', { cause: new Error('could not derive from pw-the-passphrase'), meta })
     const { reported } = TH.renderReporting(<Boundary fallback={<p>Something went wrong.</p>}><ForBoundaryThrower err={misuse} /></Boundary>)
     expect(screen.queryByText('Something went wrong.')).to.not.be.null
     expect(reported).to.have.lengthOf(1)
     const told = reported[0] as VaultError
-    expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'bad_option' })
+    expect(told).to.be.instanceOf(VaultError).and.to.include({ refusalkind: 'bad_record' })
     expect(told.message).to.match(/^A bad option\. \(safebyok-react's PassphraseModal left this error's cause out of its report to React/)
     expect(told.meta).to.deep.equal(meta)
     expect(told.cause).to.be.undefined
   })
 
   it("returns a VaultError with no cause unchanged", () => {
-    const misuse = new VaultError('bad_option', 'A bad option.', { meta })
+    const misuse = new VaultError('bad_record', 'A bad option.', { meta })
     expect(boundaryRefusalOf(misuse, 'PassphraseModal')).to.equal(misuse)
   })
 

@@ -92,7 +92,7 @@ describe("GraphQLBankDB's constructor", () => {
   it("refuses a client it cannot use, or an option it does not accept", () => {
     const client = new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] })
     const unusable = [{}, { client: { query: () => client } }, { client: 'urql' }, { client, maxRecordSizeEst: 0 }]
-    for (const opts of unusable) { TH.expectSyncRefusal(() => new GraphQLBankDB(opts as never), 'bad_option') }
+    for (const opts of unusable) { TH.expectSyncRefusal(() => new GraphQLBankDB(opts as never), 'bad_record') }
   })
 })
 

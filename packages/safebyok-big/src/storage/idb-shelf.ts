@@ -6,7 +6,7 @@ import { Checker, objCheck } from '../helpers/validator'
 
 // == [The versioned shelf]: dbprefixOf, VersionedShelfSpec, VersionPattern, versionedShelfSpec, shelves, versionedShelfOf, isOlderDBName, wipeOlderDBs
 
-const dbprefixOfArgs = Checker(({ str }) => str.min(1).optional(), 'bad_option')
+const dbprefixOfArgs = Checker(({ str }) => str.min(1).optional(), 'bad_record')
 
 // Every database this library writes starts `safebyok`, so a host can tell them from its own. Nothing else scopes a name: every row's key begins `user_id`, `banklabel`.
 /** The start of every IndexedDB database name for the host's `dbName`: `safebyok`, or `safebyok-<dbName>` when there is one. */
@@ -38,7 +38,7 @@ const versionedShelfSpec = objCheck(({ str, arr }) => ({
   version:   str.regex(VersionPattern),
   storename: str.min(1),
   oldnames:  arr(str.min(1)),
-}), 'bad_option')
+}), 'bad_record')
 
 // One shelf per database per page: a shelf's connection stays open for the page's life, and its wipe runs once.
 /** The shelf of each database this page has made one for, by the database's name. */

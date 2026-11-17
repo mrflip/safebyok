@@ -21,14 +21,14 @@ Contents: `#kind-is-the-assertion`, `#no-as-trailer`, `#outcome-not-action`, `#i
 
 A kind in the title repeats the `expectRefusal` one line below. Keep it only where the customer checks for that kind and
 reacts to it, as with a `stale_write` race or a `wrong_passphrase`. Those kinds are part of our API, and `CustomerKinds` in
-the lint lists them. A *misuse* kind (`bad_option`, `bad_scope`, `bad_record`) is never one of them. Three or more
+the lint lists them. A *misuse* kind (`bad_record`, `bad_scope`) is never one of them. Three or more
 contiguous siblings refusing a listed kind are grouped under a `describe` that names it once. Any other kind is dropped from
 the title, and what its siblings share moves up into a `describe`.
 
 | Goofus | Gallant |
 |---|---|
-| [vault.ensureTimely(maxMillis)] "refuses a maxMillis out of range as 'bad_option'" | "refuses a maxMillis out of range" |
-| three siblings each ending "as 'bad_option'" | `describe("refuses a stamp", ...)` over `it("with no vault_tok")` and the rest |
+| [vault.ensureTimely(maxMillis)] "refuses a maxMillis out of range as 'bad_record'" | "refuses a maxMillis out of range" |
+| three siblings each ending "as 'bad_record'" | `describe("refuses a stamp", ...)` over `it("with no vault_tok")` and the rest |
 | `it("refuses a row moved since the attempt read it", async () => {` | `it("refuses 'stale_write' a row moved since the attempt read it", async () => {`: the customer checks for this particular exception and reacts to it, so it is part of our API |
 
 ## No "as" trailer `#no-as-trailer`
@@ -53,7 +53,7 @@ list those rather than split them.
 | "lets a listener go, and tells none after" | "stops telling a listener once it unsubscribes" |
 | [bank.maingate.revokePasskeyPrompt()] "answers at once with no passkey held: nobody asked, nothing moved" | "is a no-op with no passkey held" |
 | [align] "notifies nobody when it changes nothing, and keeps the snapshot" | "changes nothing when there is nothing to settle" |
-| "refuses 'bad_option' fed a put's ifAbsent, and 'disabled' once vacated" | two tests: "refuses a put's ifAbsent" and "refuses once vacated" |
+| "refuses 'bad_record' fed a put's ifAbsent, and 'disabled' once vacated" | two tests: "refuses a put's ifAbsent" and "refuses once vacated" |
 
 ## The invariant, not the trace `#invariant-not-trace`
 

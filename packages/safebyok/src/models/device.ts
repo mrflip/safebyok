@@ -45,7 +45,7 @@ export interface DeviceOpts {
 }
 
 /** The checks of a {@link DeviceRecord} and of {@link Device.make}'s arguments. */
-const Checks = Validator.Checkers('bad_option', ({ obj, arr, fn, custom, user_id, banklabel, device_tok }) => {
+const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, user_id, banklabel, device_tok }) => {
   const deviceRecord = obj({ userid: user_id, banklabel, device_tok }).strict()
   return {
     deviceRecord,
@@ -60,7 +60,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, arr, fn, custom, user_id
         autolockMinutes: VX.positiveMinutes.optional(),
         requestCleartext: custom<RequestCleartext>().optional(),
         onBadNews:       fn<BadNewsHandler>().optional(),
-      }), { refusalkind: 'bad_option' }),
+      }), { refusalkind: 'bad_record' }),
     }),
     tellBadNewsToArgs: obj({
       onBadNews: fn<BadNewsHandler>(),

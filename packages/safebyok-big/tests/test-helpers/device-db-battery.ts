@@ -43,7 +43,7 @@ const batteryOpts = objCheck(({ fn }) => ({
   makeDeviceDB:        fn<DeviceDBBatteryOpts['makeDeviceDB']>(),
   _cheat_rowsOf:       fn<NonNullable<DeviceDBBatteryOpts['_cheat_rowsOf']>>().optional(),
   _cheat_failNextCall: fn<NonNullable<DeviceDBBatteryOpts['_cheat_failNextCall']>>().optional(),
-}), 'bad_option')
+}), 'bad_record')
 
 // == [The rows the cases share]: T0, Hour, asked, bankScopeOf, leaseRowOf, scopepathOf, bagOf
 

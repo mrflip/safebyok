@@ -87,7 +87,7 @@ describe("Gating.make(record, opts)", () => {
   for (const [record, moved, blurb] of OptsCases) {
     it(`refuses ${blurb}`, () => {
       const opts = { device: TH.makeDevice(), bank: null, askUser: null, attempt: neverAttempts, ...moved }
-      TH.expectSyncRefusal(() => Gating.make(record as never, opts as never), 'bad_option')
+      TH.expectSyncRefusal(() => Gating.make(record as never, opts as never), 'bad_record')
     })
   }
 })
@@ -444,7 +444,7 @@ describe("birthBank(device, cleartexts)", () => {
     it(`refuses ${blurb}, quoting no passphrase, before it makes a bank`, async () => {
       const device = TH.makeDevice()
       const births = TH.spyBirths(device)
-      const err = await TH.expectRefusal(birthBank(device, cleartexts), 'bad_option')
+      const err = await TH.expectRefusal(birthBank(device, cleartexts), 'bad_record')
       expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
       expect(births.banks).to.be.empty
     })

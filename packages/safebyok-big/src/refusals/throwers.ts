@@ -96,14 +96,14 @@ export function vaultStoredDamaged({ vaultlabel }: SX.DamagedVault): VaultError 
 /** A `storage_issue` refusal: storage answered a row whose `tokname` is not that of the thing above it, such as a box of another vault life. */
 export function rowOfOtherLife(received: unknown, tokname: 'bank_tok' | 'vault_tok'): VaultError { return new VaultError('storage_issue', Phrases.rowOfOtherAddress([tokname]), { rows: { dbhas: received } }) }
 
-/** A `bad_option` refusal: a bank's row or its gate's is written only by the bank's own verbs, never put or deleted through its listing. */
-export function writtenByOwnVerbs(): VaultError { return new VaultError('bad_option', Phrases.WrittenByOwnVerbs) }
+/** A `bad_record` refusal: a bank's row or its gate's is written only by the bank's own verbs, never put or deleted through its listing. */
+export function writtenByOwnVerbs(): VaultError { return new VaultError('bad_record', Phrases.WrittenByOwnVerbs) }
 // --
 
 // == [Storable Throwers]: partialLoad, instanceDisabled, boxAbsent, boxNotListed, vaultAbsent, deletedVault, oneRevisionTwoToks, oneRevisionTwoLives, oneRevisionTwoFates, nothingStoredWhereLive, deliveredNotAsSent
 
-/** A `bad_option` refusal: the record in hand is not full, and needs hydrating first. */
-export function partialLoad(): VaultError { return new VaultError('bad_option', Phrases.PartialLoad) }
+/** A `bad_record` refusal: the record in hand is not full, and needs hydrating first. */
+export function partialLoad(): VaultError { return new VaultError('bad_record', Phrases.PartialLoad) }
 
 /** A `disabled` refusal: this object was let go, because its bank or vault life ended or its row was found damaged. */
 export function instanceDisabled(): VaultError { return new VaultError('disabled', Phrases.LetGoInstance) }
@@ -158,8 +158,8 @@ export function boxStoredDamaged({ boxlabel }: SX.DamagedBox): VaultError { retu
 /** A `damaged_whisper` refusal: the box unsealed, but what is inside is not a whisper this package can read. */
 export function undecodedWhisper(): VaultError { return new VaultError('damaged_whisper', Phrases.UndecodedWhisper) }
 
-/** A `bad_option` refusal: the box has no exposed whisper to work on. */
-export function notExposed(): VaultError { return new VaultError('bad_option', Phrases.NotExposed) }
+/** A `bad_record` refusal: the box has no exposed whisper to work on. */
+export function notExposed(): VaultError { return new VaultError('bad_record', Phrases.NotExposed) }
 // --
 
 // == [Lease Throwers]: damagedLease, undecipheredWhisper, leaseNotInForce
@@ -207,14 +207,14 @@ export function gatingUnlaunched(): VaultError { return new VaultError('gating_u
 
 // == [Gate Throwers]: passkeyAlreadyAdded
 
-/** A `bad_option` refusal: this vault already has a passkey. */
-export function passkeyAlreadyAdded(): VaultError { return new VaultError('bad_option', Phrases.PasskeyAlreadyAdded) }
+/** A `bad_record` refusal: this vault already has a passkey. */
+export function passkeyAlreadyAdded(): VaultError { return new VaultError('bad_record', Phrases.PasskeyAlreadyAdded) }
 // --
 
 // == [Proving Throwers]: notKeyBytes, wayinNotMadeYet, wayinMadeAlready, keyDeriverThrew, keyDeriverLoadFailed, weakPassphrase, wrongPassphrase, wrongPasskey, noPasskeyWayin, otherPasskey, otherPrfSalt, unknownKeyDeriver
 
-/** A `bad_option` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
-export function notKeyBytes(): VaultError { return new VaultError('bad_option', Phrases.notKeyBytes(PassphraseKeySize)) }
+/** A `bad_record` refusal: the key deriver handed back something other than fresh key bytes of the right length. */
+export function notKeyBytes(): VaultError { return new VaultError('bad_record', Phrases.notKeyBytes(PassphraseKeySize)) }
 
 /** An `unexpected_error` refusal: a proving was asked for the bankKey before it made or unwrapped a wayin. */
 export function wayinNotMadeYet(): VaultError { return new VaultError('unexpected_error', Phrases.WayinNotMadeYet) }

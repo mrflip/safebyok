@@ -40,12 +40,12 @@ const postgresBankDBOpts = DB.objCheck(({ custom, fn, int }) => ({
   client:   custom<PostgresClient>(isPostgresClient, 'Expected a client with query and transaction functions'),
   listen:   fn<PostgresListen>().optional(),
   maxBoxes: int.positive().optional(),
-}), 'bad_option')
+}), 'bad_record')
 // --
 
 // == [Notices]: bankChannelOf, channelOf, Told, toldOf
 
-const bankChannelOfArgs = DB.Checker(({ user_id }) => user_id, 'bad_option')
+const bankChannelOfArgs = DB.Checker(({ user_id }) => user_id, 'bad_record')
 
 /** Return the notification channel for `user_id`'s writes: the channel a `PostgresListen` subscribes to. */
 export function bankChannelOf(user_id: UserID): string { return channelOf(bankChannelOfArgs.parse(user_id, { where: 'bankChannelOf' })) }

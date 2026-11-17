@@ -55,7 +55,7 @@ describe("PostgresBankDB's constructor", () => {
   it("refuses a client, listen or maxBoxes it cannot use", async () => {
     const client = TH.flakyClientOf(await BH.database())
     const unusable = [{}, { client: { query: client.query } }, { client, listen: 'yes' }, { client, maxBoxes: -1 }, { client, maxRecordSizeEst: 0 }]
-    for (const opts of unusable) { TH.expectSyncRefusal(() => new PostgresBankDB(opts as never), 'bad_option') }
+    for (const opts of unusable) { TH.expectSyncRefusal(() => new PostgresBankDB(opts as never), 'bad_record') }
   })
 })
 
@@ -154,7 +154,7 @@ describe("PostgresBankDB's channels", () => {
 
   it("refuses a user_id that fails its check", () => {
     for (const user_id of ['', 'a b', 'a/b', '..', 'caf\u{E9}', 7 as never]) {
-      TH.expectSyncRefusal(() => bankChannelOf(user_id), 'bad_option')
+      TH.expectSyncRefusal(() => bankChannelOf(user_id), 'bad_record')
     }
   })
 

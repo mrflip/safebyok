@@ -95,7 +95,7 @@ type NoticedRow = BX.BankRow | BX.GateRecord | BX.VaultRow | BX.BoxRow
 const bankResolversOpts = DB.objCheck(({ custom, fn }) => ({
   bankDB:    custom<DB.AdapterBankDB>(DB.isAdapterBankDB, 'Expected an AdapterBankDB from safebyok-big/storage'),
   getUserId: fn<BankResolversOpts<unknown>['getUserId']>(),
-}), 'bad_option')
+}), 'bad_record')
 
 /** Make the resolvers for `BankSchemaSdl`, once when your server starts.
  * A request can reach only the bank of the user it is signed in as.

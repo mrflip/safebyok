@@ -16,7 +16,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *
  * * **Misuse**: a programming error, the host developer's to fix. Let it reach an error boundary
  *   or the dev overlay. Never show it to the user, and never retry it. `bad_scope`,
- *   `bad_option`, `bad_record`, `insecure_context`, `unexpected_error`, `gate_issue`, `disabled`, `gating_unlaunched`.
+ *   `bad_record`, `insecure_context`, `unexpected_error`, `gate_issue`, `disabled`, `gating_unlaunched`.
  * * **Condition**: something the app handles at run time, which may reach the user: ask again,
  *   show a message, retry, or have the user free room. `bank_locked`, `wrong_passphrase`,
  *   `weak_passphrase`, `wrong_passkey`, `passkey_unavailable`,
@@ -29,7 +29,7 @@ import type { Capacity } from '../shapes/shapes-storage'
  *   `identity_revoked`, `damaged_row`, `damaged_vault`, `storage_issue`.
  *
  * A record that fails its checks is named for its direction: `damaged_row` for one read from
- * storage, `bad_option` for one handed in, and `bad_record` where one check serves both ways. A
+ * storage, and `bad_record` for one handed in or where one check serves both ways. A
  * damaged row is thrown by the bankDB that reads the datastore, and never stands for a newer format.
  * A whisper that will not decipher under the lease in hand, or deciphers to no whisper, is
  * `damaged_whisper`. A storage adapter's answer that cannot be, such as one revision under two toks,
@@ -50,8 +50,7 @@ export const refusalkindVals = [
   'bad_scope',           // a name in a scope -- a label, or the user_id -- that fails its check
   'box_too_large',       // a box -- whisper, names and sidecar together -- over what storage allows in one record
   'vault_full',          // a new box in a vault already at its maxBoxes (a best-effort cap), or a write storage has no room for
-  'bad_option',          // an option, argument or record handed in that fails its check: Device.make's, makeArgon2idDeriver's, a bankDB verb's, a putBox()'s sidecar
-  'bad_record',          // a record that fails a check serving both ways, a record handed in and one read back
+  'bad_record',          // a record, option or argument that fails its check, handed in or read back: Device.make's, makeArgon2idDeriver's, a bankDB verb's, a putBox()'s sidecar
   'damaged_whisper',     // a box's whisper would not decipher under the vault's lease, or deciphered to no whisper this package knows
   'newer_format',        // a stored wayin naming a key deriver this handle was not built with: update safebyok
   'insecure_context',    // the page is not a secure context (plain http), where the browser withholds WebCrypto
@@ -100,7 +99,6 @@ export const RefusalFamilyForKind = {
   bad_scope:           'misuse',
   box_too_large:       'condition',
   vault_full:          'condition',
-  bad_option:          'misuse',
   bad_record:          'misuse',
   damaged_whisper:     'bad_news',
   newer_format:        'bad_news',

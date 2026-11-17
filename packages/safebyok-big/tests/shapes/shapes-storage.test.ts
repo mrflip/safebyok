@@ -40,7 +40,7 @@ describe("SX.putOpts", () => {
     expect(SX.putOpts.parse({ expected: shell }).expected).to.deep.equal(shell)
     const { vault_tok: _vault_tok, ...bankish } = box
     expect(SX.putOpts.parse({ expected: bankish }).expected).to.deep.equal(bankish)
-    expect(() => SX.putOpts.parse({ expected: SX.VoidRevision })).to.throw(VaultError).with.property('refusalkind', 'bad_option')
+    expect(() => SX.putOpts.parse({ expected: SX.VoidRevision })).to.throw(VaultError).with.property('refusalkind', 'bad_record')
   })
 })
 
