@@ -182,7 +182,7 @@ export class PassphraseProving extends Proving<GX.PassphraseWayinHeader> {
   /** Make the proving of `parts`, under `opts.wayinKey`. */
   static make(parts: ProvingParts<GX.PassphraseWayinHeader>, opts: ProvingOpts): PassphraseProving { return new PassphraseProving(parts, opts) }
 
-  /** Build a proving for a new passphrase wayin of the gate and bank `gateStamp` and `bankStamp` stamp, under a fresh salt.
+  /** Build a proving for a new passphrase wayin of the gate stamped `gateStamp`, in the bank stamped `bankStamp`, under a fresh salt.
    * Throws `weak_passphrase` if the strength checker judges the passphrase weak.
    */
   static async buildNovel(device: GX.ProvingDevice, bankStamp: BankStamp, gateStamp: GateStamp, passphraseCleartext: GX.PassphraseCleartext): Promise<PassphraseProving> {
@@ -218,7 +218,7 @@ export class PasskeyProving extends Proving<GX.PasskeyWayinHeader> {
   /** Make the proving of `parts`, under `opts.wayinKey`. */
   static make(parts: ProvingParts<GX.PasskeyWayinHeader>, opts: ProvingOpts): PasskeyProving { return new PasskeyProving(parts, opts) }
 
-  /** Build a proving for a new passkey wayin of the gate and bank `gateStamp` and `bankStamp` stamp. */
+  /** Build a proving for a new passkey wayin of the gate stamped `gateStamp`, in the bank stamped `bankStamp`. */
   static async buildNovel(device: GX.ProvingDevice, bankStamp: BankStamp, gateStamp: GateStamp, passkeyCleartext: GX.PasskeyAnswer): Promise<PasskeyProving> {
     const { bankStamp: checkedBank, gateStamp: checkedGate, passkeyClear: answer } = Checks.passkeyNovelArgs.parse({ device, bankStamp, gateStamp, passkeyClear: passkeyCleartext })
     const header = mintPasskeyHeader(device, answer)
