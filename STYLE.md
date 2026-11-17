@@ -83,8 +83,16 @@ about: a thing's stage in its life is its `stage`. A stored field keeps its stor
 
 **A function returning a predicate ends in `Pred`**: `withinVaultScopepathPred(scope)`.
 
-**A boolean says the positive**: `isEnabled`, not `isDisabled`, whose every negation reads as a
-double negative.
+**A boolean is true in the unsafe state, says the positive, and is named for what it means to the
+customer**, wherever a name can manage it:
+
+* **True is the unsafe state**, so that a value left out, or falsy, never trips it: `isRevealed`,
+  true while a whisper shows on screen.
+* **No negation**: no dis-, un- or non-. `isEnabled`, not `isDisabled`, whose every negation reads
+  as a double negative.
+* **Positive valence**, with the grain of the sentence it sits in: `isDBNewer`, not `isBehind`.
+* **Named for its impact on the customer**: `isDBNewer`, not `hasLatestUpdates`, which is true in
+  the safe state, nor `needsRefreshToMergePut`, which names one consequence, and not always truly.
 
 **A validator is named for the parameter it checks**, in that parameter's case (`user_id`,
 `salt_size`); for a function's whole input, `fooArgs` (`leaseSealArgs`); for a shape, its type's
@@ -498,6 +506,10 @@ rows with it.
   material in the message, a `cause` or `meta`. Specific: what went wrong, and a `refusalkind` to
   branch on. Actionable: what to do next. Empathetic: a failure (misuse, bad news) speaks to the
   developer integrating the package; a condition speaks, calmly, to the user who will see it.
+* **When two refusals apply, throw the easier one, unless the other is both more likely and more dangerous**
+  (the Coach). The easier one is the one found more cheaply: the earlier check. A stale lease record missing a field
+  refuses `bad_option` at `Lease.make`, not `damaged_lease`: a damaged lease is neither the likelier cause nor the more
+  dangerous one. Never rearrange code for a more punctilious refusal than "a field does not pass its check".
 * **A guard lives in what an entrypoint calls.** A public entrypoint's `demandFooable` includes
   `demandEnabled` and whatever else that entrypoint needs. A primitive, a private helper or a
   method that only prepares another includes none. Demand again only at a critical seam,
