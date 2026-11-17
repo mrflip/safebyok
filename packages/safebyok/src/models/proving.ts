@@ -1,7 +1,8 @@
 import type { Consts, Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases, Throwers, Validator } from 'safebyok-big/internals'
 import { Lease, type LeaseBank } from './lease'
-import { type BankStamp, type GateCited, type GateStamp, type StampedGate, LeaseFormat, bankStamp, gateCited, gateStamp, stampedGate } from './stamps'
+import type { BankStamp, GateCited, GateStamp, StampedGate } from './stamps'
+import * as Stamps from './stamps'
 import { Wayin, wayinCtxOf } from './wayin'
 
 // == [NOVEL and the checks]: NOVEL, Novel, RewrapUsage, CheckUsage, Checks
@@ -25,11 +26,11 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 /** The checks of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' arguments. */
 const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => ({
   wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), 'Expected NOVEL or a proving'),
-  provingLeaseArgs:     obj({ bank: obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: gateCited }),
-  passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp, gateStamp }),
-  passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp, gateStamp }),
-  passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: stampedGate }),
-  passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: stampedGate }),
+  provingLeaseArgs:     obj({ bank: obj({ stamp: Stamps.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: Stamps.gateCited }),
+  passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp }),
+  passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp }),
+  passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate }),
+  passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.stampedGate }),
 }))
 // --
 
@@ -120,7 +121,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
     Validator.checkedConsistent(bankStamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
     Validator.checkedConsistent(cited, this.gateStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
     const granted = {
-      fmt: LeaseFormat, ...bankStamp, gate_labelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
+      fmt: Stamps.LeaseFormat, ...bankStamp, gate_labelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
     } as const
     const bankKey = await this.#unwrapBankKey()
     const leaseKey = await Crypto.makeLeaseKey()
