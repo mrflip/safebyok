@@ -5,13 +5,13 @@ export type { Sealed } from '../storage/shapes-thing'
 
 // == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
 
-/** Each part `CleartextsT` names, sealed, at `<part>_sealed`. */
+/** A {@link Sealed} field at `<part>_sealed` for each part that `CleartextsT` names. */
 export type SealedPartsOf<CleartextsT> = { readonly [PartT in keyof CleartextsT & string as `${PartT}_sealed`]: Sealed }
 
-/** `RecordT` with each part `CleartextsT` names sealed, at `<part>_sealed`. A union is mapped member by member. */
+/** `RecordT` with each part that `CleartextsT` names replaced by its sealed form, at `<part>_sealed`. A union is mapped member by member. */
 export type SealedOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<RecordT, keyof CleartextsT> & SealedPartsOf<CleartextsT> : never
 
-/** `RecordT` with each `<part>_sealed` that `CleartextsT` names unsealed, at `<part>`. A union is mapped member by member. */
+/** `RecordT` with each `<part>_sealed` that `CleartextsT` names replaced by its cleartext, at `<part>`. A union is mapped member by member. */
 export type UnsealedOf<RecordT, CleartextsT> = RecordT extends unknown
   ? Omit<RecordT, `${keyof CleartextsT & string}_sealed`> & CleartextsT
   : never
@@ -22,30 +22,34 @@ export type LiveOf<RecordT> = Exclude<RecordT, { am: 'x' }>
 /** The tombstones of `RecordT`. */
 export type TombstoneOf<RecordT> = Extract<RecordT, { am: 'x' }>
 
-/** A revision of `RecordT` before its seal: without the sealed parts `CleartextsT` names. A union is mapped member by member. */
+/** A revision of `RecordT` before it is sealed, without the sealed parts that `CleartextsT` names. A union is mapped member by member. */
 export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<RecordT, keyof SealedPartsOf<CleartextsT>> : never
 
 /** The body of a live `RecordT`: its fields other than its Thing fields and its sealed parts, such as a box's sidecar. */
 export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof ThingRecord | keyof SealedPartsOf<CleartextsT>>
 
-/** What a seal takes the next revision's fields from: a record of `RecordT`'s kind, whole, sparse or unsealed, a tombstone or the shell.
+/** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
  * The seal keeps its Thing fields and its body, and never its secrets.
  */
 export type Sealable<RecordT extends ThingRecord> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: ThingRecord['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof ThingRecord>>
 
-/** What a seal takes in the clear: any of the body, which wins over the donor's; `am`; and `written_at`, now when left out. */
+/** A seal's public props: the fields it is given that are not secret, each optional.
+ * - the body's fields -- replace those of the sealable
+ * - `am`              -- `'a'` for a live revision (default), or `'x'` for a tombstone
+ * - `written_at`      -- the revision's time (default: now)
+ */
 export type PublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a' | 'x', written_at?: number }>
 
-/** What the seal of a live revision takes in the clear: {@link PublicPropsOf}, with `am` live or left out. */
+/** {@link PublicPropsOf} for a live revision: `am` is `'a'` or left out. */
 export type LivePublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a', written_at?: number }>
 
-/** What the seal of a tombstone takes in the clear: `am: 'x'`, and `written_at`, now when left out. */
+/** The public props of a tombstone's seal: `am: 'x'`, and `written_at` (default: now). */
 export type TombstonePublicProps = Readonly<{ am: 'x', written_at?: number }>
 // --
 
 // == [The Sealer]: SealTags, SealPurposes, Sealer
 
-/** The tags a sealed part carries in the clear, which its seal binds. */
+/** The tags of a sealed part, stored unencrypted and bound into its seal. */
 export type SealTags = Pick<Sealed, 'codectag' | 'schematag'>
 
 /** The ctx purposes a sealed part's two ciphertexts are bound to. */
@@ -54,23 +58,26 @@ export interface SealPurposes {
   cipher: string
 }
 
-/** The interface a lease seals one part of a record through, so the lease itself knows nothing of the record.
- * `RecordT` is the record as stored, its part sealed; `CleartextsT` is what that part seals. Each member checks what it is given.
+/** The interface through which a lease seals and unseals one part of a record.
+ * `RecordT` is the record as stored, with its part sealed. `CleartextsT` is the part's cleartexts.
+ * Each member must check what it is given: the lease passes its caller's arguments on unchecked.
  */
 export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
-  /** The Thing fields and body of `donorProps`, its other fields dropped. Refuses what is not a record of this kind or its shell. */
+  /** The Thing fields and body of `donorProps`, with every other field dropped. Refuses anything but a record of this kind or its shell. */
   donorPropsOf(donorProps: unknown): Sealable<RecordT>
-  /** The body, `am` and `written_at` of `publicProps`, its other fields dropped. */
+  /** The body, `am` and `written_at` of `publicProps`, with every other field dropped. */
   publicPropsOf(publicProps: unknown): PublicPropsOf<RecordT, CleartextsT>
-  /** The cleartexts in `secretProps`, its other fields dropped. */
+  /** The cleartexts in `secretProps`, with every other field dropped. */
   secretPropsOf(secretProps: unknown): CleartextsT
-  /** The live revision next after `donorProps`, without its sealed part, with `publicProps` laid over it. */
+  /** The next live revision after `donorProps`, updated by `publicProps`, without its sealed part. */
   nextRevisionOf(donorProps: unknown, publicProps: unknown): RevisionOf<LiveOf<RecordT>, CleartextsT>
-  /** The tombstone of the live `donorProps`, without its sealed part, written at `publicProps.written_at`. Refuses a tombstone or the shell. */
+  /** The tombstone of the live `donorProps`, without its sealed part. Refuses a tombstone or the shell.
+   * Its `written_at` is `publicProps.written_at`, or now.
+   */
   tombstoneOf(donorProps: unknown, publicProps: unknown): RevisionOf<TombstoneOf<RecordT>, CleartextsT>
-  /** The empty cleartexts a tombstone seals, which sign it. */
+  /** The empty cleartexts a tombstone seals. Their seal authenticates the tombstone. */
   readonly tombstoneSecrets: CleartextsT
-  /** The stamp the seal of `record` is bound to, after the bank's. A change to it refuses the unseal. */
+  /** The stamp of `record` that its seal is bound to, after the bank's. Any change to it makes the unseal refuse. */
   stampOf(record: unknown): Crypto.CipherCtxRecord
   /** The tags each seal carries. */
   readonly tags: SealTags
@@ -78,9 +85,9 @@ export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
   readonly purposes: SealPurposes
   /** `cleartexts` as the text to cipher. */
   encode(cleartexts: CleartextsT): string
-  /** The cleartexts in `text`, refusing as damaged when it will not parse or check. */
+  /** The cleartexts in `text`. Refuses as damaged when the text does not parse or check. */
   decode(text: string): CleartextsT
-  /** The sealed part of `record`, refusing as damaged when its tags are not this sealer's. */
+  /** The sealed part of `record`. Refuses as damaged when its tags are not this sealer's. */
   sealedOf(record: RecordT): Sealed
   /** `next` with `sealed` added, checked as a stored record. */
   recordOf(next: unknown, sealed: Sealed): RecordT
@@ -100,6 +107,6 @@ export interface BoxCleartexts {
   whisper: CX.Whisper
 }
 
-/** What a box's seal takes in the clear: its sidecar, `am` and `written_at`, each optional. */
+/** The public props of a box's seal ({@link PublicPropsOf}): its sidecar, `am` and `written_at`, each optional. */
 export type BoxPublicProps = PublicPropsOf<BoxThing, BoxCleartexts>
 // --

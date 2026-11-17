@@ -25,7 +25,7 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps.
-/** The checks of a gate revision, of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' arguments. */
+/** The checks of a {@link GateRevisionedStamp}, of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' arguments. */
 const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => {
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
   const gateRevisionedStamp = Stamps.gateStamp.extend(thingRecord.pick({ revtok: true }).shape)
@@ -40,7 +40,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => {
   }
 })
 
-/** A gate's stamp and its revision's `revtok`: the gate revision a lease is granted for. @see {@link Stamps.gateStamp} */
+/** A {@link GateStamp} with the `revtok` of one revision of the gate: the revision a lease is granted under. */
 export type GateRevisionedStamp = Z.infer<typeof Checks.gateRevisionedStamp>
 // --
 

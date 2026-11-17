@@ -11,13 +11,13 @@ import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRe
 /** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
-/** Any sealer, as a lease takes it: the lease is generic over what it seals. */
+/** Any sealer, whatever it seals. */
 type AnySealer = Sealers.Sealer<never, never>
 
 /** A field that holds a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
 export type SecretFieldname = 'whisper' | `${string}_sealed`
 
-/** The names of the cleartexts a sealer seals, which a sealable never carries into a revision. */
+/** The fieldnames that hold a cleartext. */
 const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
 
 /** The options of {@link Lease.make}, beside its record. */
@@ -53,7 +53,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, str, fn, bool, custom })
 
 /** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
- * The lease knows which field names hold secrets, and nothing else of a record: the sealer it is handed, such as `CoreBox`, decides what is sealed and how.
+ * The sealer passed to each call, such as `CoreBox`, decides what is sealed and how. The lease itself knows only which fieldnames hold secrets.
  * A bankKey that will not unwrap locks the bank, and refuses `damaged_lease`.
  * Once evicted, or once its device is swept, it refuses every seal and unseal, even one in flight.
  */
@@ -109,10 +109,10 @@ export class Lease implements LeaseStamp {
 
   // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
 
-  /** Seal the revision next after `donorProps`, as `sealer` makes it: with `publicProps` over it and `secretProps` sealed.
-   * With `publicProps` of `{ am: 'x' }`, it is the tombstone of the live `donorProps`, sealing the sealer's empty cleartexts: `secretProps` given refuses `bad_option`, and so does a body in `publicProps` where the sealer refuses it, as `CoreBox` does.
-   * `donorProps` may be a whole record, sealed or unsealed: only its Thing fields and body are read, and no cleartext or sealed part reaches the revision.
-   * The seal is bound to the bank's stamp, the revision's stamp and the part's tags. The cleartext's bytes are zeroed afterwards.
+  /** Seal and return the next revision after `donorProps`, with `publicProps` applied and `secretProps` encrypted.
+   * The seal checks its arguments and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
+   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live `donorProps` instead, and refuses any `secretProps`. The sealer may refuse body fields there too: `CoreBox` refuses a sidecar.
+   * The seal is bound to the bank's stamp, the revision's stamp and the sealer's tags. The cleartext's bytes are zeroed afterwards.
    * @example
    *   await lease.seal(CoreBox, box, { sidecar: { account: 'work' } }, { whisper })  // its next revision
    *   await lease.seal(CoreBox, box, { am: 'x' })                                     // its tombstone
@@ -140,8 +140,9 @@ export class Lease implements LeaseStamp {
     return sealer.recordOf(revision, sealed)
   }
 
-  /** `record` unsealed: the part `sealer` seals, opened, in place of its sealed form.
-   * Unsealing authenticates the ciphertexts, stamp and tags together: a change to any of them refuses as damaged.
+  /** Unseal `record`, returning it with the part `sealer` seals in cleartext, in place of its sealed form.
+   * The answer is a new, frozen record built from `record` as checked, not `record` itself.
+   * Unsealing authenticates the ciphertexts, the stamp and the tags together: a change to any of them refuses as damaged.
    */
   async unseal<RecordT extends ThingRecord, CleartextsT>(sealer: Sealers.Sealer<RecordT, CleartextsT>, record: RecordT): Promise<Sealers.UnsealedOf<RecordT, CleartextsT>> {
     Checks.sealer.parse(sealer)
@@ -152,7 +153,7 @@ export class Lease implements LeaseStamp {
     return Object.freeze({ ...withoutSecrets(parsed), ...cleartexts }) as Sealers.UnsealedOf<RecordT, CleartextsT>
   }
 
-  /** The {@link Sealers.Sealed} form of `cleartext`, for `sealer` to add to `revision`: ciphered under a fresh key that is wrapped under the bankKey, with the sealer's tags. */
+  /** Encrypt `cleartext` for `revision` under a fresh key wrapped under the bankKey, as a {@link Sealers.Sealed} with the sealer's tags. */
   async #sealText(sealer: Pick<AnySealer, 'stampOf' | 'purposes' | 'tags'>, revision: unknown, cleartext: string): Promise<Sealers.Sealed> {
     const { purposes, tags } = sealer
     const stamp   = sealer.stampOf(revision)
@@ -238,7 +239,9 @@ export class Lease implements LeaseStamp {
 
 // == [Helpers]: withoutSecrets, sealerMembersOf
 
-/** `bag` without its secrets: each cleartext, such as `whisper`, and each sealed part, at a name ending `_sealed`. */
+/** A copy of `bag` without its secret fields: `whisper`, and every field whose name ends in `_sealed`.
+ * It checks nothing else of `bag`.
+ */
 export function withoutSecrets<BagT extends object>(bag: BagT): Omit<BagT, keyof BagT & SecretFieldname> {
   const secretFieldnames = Object.keys(bag).filter((fieldname) => fieldname.endsWith('_sealed') || CleartextFieldnames.has(fieldname))
   // Object.keys loses the fieldnames' type: the cast restores it.
@@ -246,7 +249,7 @@ export function withoutSecrets<BagT extends object>(bag: BagT): Omit<BagT, keyof
 }
 
 // A class's static methods are its own but not enumerable, so a spread would miss them: each member is read by name.
-/** The members of a sealer read off `val`, an object or a class; null for anything else */
+/** The sealer members of `val`, an object or a class, or null for anything else */
 function sealerMembersOf(val: unknown): Partial<Record<keyof AnySealer, unknown>> | null {
   if ((val === null) || ((typeof val !== 'object') && (typeof val !== 'function'))) { return null }
   const {

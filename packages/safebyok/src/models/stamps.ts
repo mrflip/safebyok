@@ -34,7 +34,9 @@ export type BankStamp   = Z.infer<typeof bankStamp>
 export type GateStamp   = Z.infer<typeof gateStamp>
 /** A gate's stamp, its bank's stamp, and its wayins: what a proving of a stored wayin takes. */
 export type StampedGate = Z.infer<typeof stampedGate>
-/** A box's stamp: its Thing fields, without its sidecar or its sealed whisper. The seal of its whisper is bound to it. */
+/** A box's stamp: its Thing fields, not its sidecar or its sealed whisper.
+ * Its whisper's seal is bound to it: the whisper unseals only within the revision it was sealed in.
+ */
 export type BoxStamp    = Z.infer<typeof boxStamp>
 // --
 
