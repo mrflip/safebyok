@@ -31,7 +31,7 @@ import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpRecords
  * * `vacant`   -- nothing is cached
  * * `untimely` -- the car is older than `staleTime`, is `behind` or `bare`, or its last get was refused
  */
-type GotAnswer = (
+export type GotAnswer = (
   | GoodAnswer<Thing, 'gotlive'>
   | GoodAnswer<Tombstone<Thing>, 'gotgone'>
   | GoodAnswer<null, 'gotvoid'>
@@ -39,7 +39,7 @@ type GotAnswer = (
 ) & { ask: GetAsk }
 
 /** The car cached for a scope, however old, and the state of its gets. */
-interface CarFreshness {
+export interface CarFreshness {
   /** The cached car, or undefined for none. */
   car:         ThingCar<Thing> | undefined
   /** False where the act is `vacant` or `untimely`. */

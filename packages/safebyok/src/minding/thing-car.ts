@@ -16,6 +16,7 @@ export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Spa
 
 // The vaultDB holds a newer whole record when liveness is 'behind' or 'bare' (isVaultDBNewer).
 /** A ThingMinder's frozen cache value for one scope: the newest revision heard of, perhaps sparse, and the fullest record seen.
+ * Show the fullest record, and write against the newest.
  * `fullest` is null when gone or void, and undefined when bare.
  */
 export type ThingCar<RecordT extends ThingRecord> = Readonly<
