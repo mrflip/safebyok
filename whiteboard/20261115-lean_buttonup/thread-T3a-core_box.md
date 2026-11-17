@@ -1,6 +1,6 @@
 # Thread T3a: core_box (2026-11-17)
 
-Branch `20261117-core_box`, PR #TBD, on main (cut at `b70f340e6`). Proved: `safebyok` 829 tests, typecheck and lint
+Branch `20261117-core_box`, PR #715, on main (cut at `b70f340e6`). Proved: `safebyok` 829 tests, typecheck and lint
 clean, at the item 2 commit. Not yet `pnpm justify` or the catch-up: item 3 waits on a ruling (below).
 
 * **Built**:
