@@ -6,6 +6,7 @@ import { buildSchema, graphql, isObjectType, parse, subscribe, validate } from '
 import type { GraphQLSchema } from 'graphql'
 import { makeExecutableSchema } from '@graphql-tools/schema'
 import { BX } from 'safebyok-big/storage'
+import type { UserID } from 'safebyok-big'
 import { PostgresBankDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
 import { BankSchemaSdl, bankResolvers } from '../src/server'
@@ -32,7 +33,7 @@ function overTheWire(val: unknown): unknown {
 }
 
 /** Run `source` against `schema` signed in as `user_id`, and return its one root field's answer after a JSON round trip. */
-async function runSource(schema: GraphQLSchema, source: string, variableValues: object, user_id: string | null = 'u1'): Promise<unknown> {
+async function runSource(schema: GraphQLSchema, source: string, variableValues: object, user_id: UserID | null = 'u1'): Promise<unknown> {
   const result = await graphql({ schema, source, variableValues: { ...variableValues }, contextValue: { user_id } satisfies TH.TestContext })
   expect(result.errors, source).to.be.undefined
   const [answer] = Object.values(overTheWire(result.data) as Record<string, unknown>)

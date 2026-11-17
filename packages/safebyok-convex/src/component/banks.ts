@@ -1,6 +1,7 @@
 import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
 import type { BankScope, VaultScope, WatchScope } from 'safebyok-big/storage'
+import type { BankTok, Boxlabel, Vaultlabel } from 'safebyok-big'
 import { ConvexError, getDocumentSize } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
@@ -228,7 +229,7 @@ export const tidyGone = mutation({
     const bank_tok = liveBankTokOf(bankDoc?.bank ?? null)
     const vaultDocs = await listVaultDocs(ctx.db, ask)
     const lives: Life[] = []
-    const damagedlabels: string[] = []
+    const damagedlabels: Vaultlabel[] = []
     for (const vaultDoc of vaultDocs) {
       const { vaultlabel } = vaultDoc
       const vault = BX.vaultRow.safeParse(vaultDoc.vault)
@@ -264,7 +265,7 @@ export const watchRows = query({
     const bank_tok = liveBankTokOf(bankDoc?.bank ?? null)
     const gateDocs = (scope.vaultlabel === undefined) ? await listGateDocs(ctx.db, scope) : []
     const vaultDocs = await listVaultDocs(ctx.db, scope)
-    const boxes: { vaultlabel: string, boxlabel: string, box: unknown }[] = []
+    const boxes: { vaultlabel: Vaultlabel, boxlabel: Boxlabel, box: unknown }[] = []
     for (const { vaultlabel, vault } of vaultDocs) {
       const live = BX.vaultRecord.safeParse(vault)
       if ((! live.success) || (live.data.bank_tok !== bank_tok)) { continue }
@@ -387,7 +388,7 @@ function lifeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life): 
 function ckeyOfLife({ vaultlabel, bank_tok, vault_tok }: Life): string { return DB.ckeyOf(vaultlabel, bank_tok, vault_tok) }
 
 /** The `bank_tok` of `bankRaw` when it is a live bank row, else null. */
-function liveBankTokOf(bankRaw: unknown): string | null {
+function liveBankTokOf(bankRaw: unknown): BankTok | null {
   const bank = BX.bankRecord.safeParse(bankRaw)
   return bank.success ? bank.data.bank_tok : null
 }
@@ -408,7 +409,7 @@ async function getVaultDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel 
     .unique()
 }
 
-async function getBoxDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life, boxlabel: string): Promise<BoxDoc | null> {
+async function getBoxDoc(db: DatabaseReader, { user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life, boxlabel: Boxlabel): Promise<BoxDoc | null> {
   return await db.query('safebyok_boxes')
     .withIndex('by_box', (idx) => idx.eq('user_id', user_id).eq('banklabel', banklabel).eq('vaultlabel', vaultlabel).eq('bank_tok', bank_tok).eq('vault_tok', vault_tok).eq('boxlabel', boxlabel))
     .unique()

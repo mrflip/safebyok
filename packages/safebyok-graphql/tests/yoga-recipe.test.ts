@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { Client, fetchExchange } from '@urql/core'
 import { createSchema, createYoga } from 'graphql-yoga'
 import { BX } from 'safebyok-big/storage'
+import type { UserID } from 'safebyok-big'
 import { PostgresBankDB } from 'safebyok-postgres'
 import type { PostgresClient, PostgresListen } from 'safebyok-postgres'
 import { GraphQLBankDB } from '../src/index'
@@ -19,9 +20,9 @@ TH.bootDatabaseFirst()
 // == [The recipe]: bankRoute, browserBankDB
 
 /** Build the README's route for `bankDB`. `signedInUserId` returns each request's signed-in user. */
-function bankRoute(bankDB: PostgresBankDB, signedInUserId: (request: Request) => Promise<string | null>, isDev = false) {
+function bankRoute(bankDB: PostgresBankDB, signedInUserId: (request: Request) => Promise<UserID | null>, isDev = false) {
   /** The per-request context the resolvers see: the user your own auth signed in, or null. */
-  type BankContext = { user_id: string | null }
+  type BankContext = { user_id: UserID | null }
   const schema = createSchema<BankContext>({
     typeDefs:  [BankSchemaSdl],
     resolvers: [bankResolvers({ bankDB, getUserId: ({ user_id }: BankContext) => user_id })],
@@ -69,7 +70,7 @@ function overTheNetwork(request: Request, response: Response): Response {
 }
 
 /** Make a browser-side bankDB whose fetch calls `route` in-process. `signedInAs` picks each operation's user from its variables. */
-function browserFor(route: Route, signedInAs: (variables: Record<string, unknown>) => string | null) {
+function browserFor(route: Route, signedInAs: (variables: Record<string, unknown>) => UserID | null) {
   return browserBankDB(async (url, init) => {
     const request = new Request(url, init)
     const user_id = signedInAs(await variablesOf(request.clone()))
@@ -86,7 +87,7 @@ async function variablesOf(request: Request): Promise<Record<string, unknown>> {
 }
 
 /** Sign each operation in as the user named in its variables, by the same rule as TH.signedInAsAsked. */
-const signedInAsAsked = (variables: Record<string, unknown>): string | null => (
+const signedInAsAsked = (variables: Record<string, unknown>): UserID | null => (
   TH.signedInAsAsked({ variables } as unknown as Parameters<TH.Signing>[0]).user_id
 )
 

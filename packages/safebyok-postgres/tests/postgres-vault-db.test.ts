@@ -2,7 +2,7 @@
 
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { type ThingScope, lifeseqOfLifenum, modelkindOf } from 'safebyok/storage'
+import { type ThingScope, type Thingkind, lifeseqOfLifenum, modelkindOf } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
 import type { PostgresListen } from '../src/postgres-bank-db'
@@ -15,7 +15,7 @@ import * as TH from './test-helpers'
 
 // == [The database]: database, listen, vaultDBOver, makeVaultDB, rowsOf
 
-const ThingTables = { bank: 'safebyok_bank_things', gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const
+const ThingTables = { bank: 'safebyok_bank_things', gate: 'safebyok_gate_things', box: 'safebyok_box_things' } as const satisfies Record<Thingkind, string>
 
 const made: { db?: Promise<PGlite> } = {}
 const onNotifies = new Set<(text: string) => void>()

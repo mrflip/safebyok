@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { StrictMode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { Device, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler, type Bank, type LifecycleHandler } from 'safebyok-big'
+import { Device, MemoryDeviceDB, VaultError, type AnyGating, type BadNewsHandler, type Bank, type Banklabel, type LifecycleHandler, type UserID } from 'safebyok-big'
 import { BX } from 'safebyok-big/storage'
 import { BankProvider } from '../src/provider/bank-provider'
 import { useBank, useBankSnapshot } from '../src/hooks/hooks'
@@ -36,7 +36,7 @@ const provided = async (overrides: Partial<Props> = {}, given?: TH.BankWorld) =>
 }
 
 /** Make a MemoryDeviceDB whose ensureCachedDevice waits, for `user_id` only, until the test calls `answer`. Other users get their result at once. */
-const deviceDBPending = (user_id: string) => {
+const deviceDBPending = (user_id: UserID) => {
   const deviceDB = new MemoryDeviceDB()
   const answering = TH.makePending()
   const ensureCachedDevice = deviceDB.ensureCachedDevice.bind(deviceDB)
@@ -641,7 +641,7 @@ function UnlocksNearest({ testid }: Readonly<{ testid: string }>) {
 }
 
 /** The dialog open for the bank named `banklabel`, found by the username its passphrase is saved under. */
-function dialogOfBank(banklabel: string): HTMLElement {
+function dialogOfBank(banklabel: Banklabel): HTMLElement {
   const dialog = screen.getAllByRole('dialog').find((shown) => within(shown).queryByDisplayValue(`u1 (${banklabel} vault)`) !== null)
   if (dialog === undefined) { throw new Error(`no dialog open for ${banklabel}`) }
   return dialog

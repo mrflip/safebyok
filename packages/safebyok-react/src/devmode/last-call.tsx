@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { MaxLabelChars, Patterns, isVaultError } from 'safebyok-big'
+import { MaxLabelChars, Patterns, isVaultError, type EpochMillis } from 'safebyok-big'
 import type { LastCall, PanelListing } from '../shapes'
 
 /** Track an inspector's most recent call: `call(verbname, work)` runs `work` and records what it returned, or how it refused. */
@@ -42,7 +42,7 @@ export const jsonOf = (answer: unknown): string => JSON.stringify(answer, null, 
 
 // A damaged row's time can be any number. toISOString throws for a number outside a Date's range, and that would happen during render.
 /** Format epoch milliseconds as an ISO time, or as the bare number when a Date cannot represent it. */
-export const timeOf = (millis: number): string => {
+export const timeOf = (millis: EpochMillis): string => {
   const when = new Date(millis)
   return Number.isNaN(when.getTime()) ? String(millis) : when.toISOString()
 }

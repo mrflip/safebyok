@@ -1,5 +1,5 @@
 import { useId, useRef, useState, useSyncExternalStore } from 'react'
-import type { BoxPutOpts, BoxSnapshot, Whisper } from 'safebyok-big'
+import type { BoxPutOpts, Boxlabel, BoxSnapshot, Vaultlabel, Whisper } from 'safebyok-big'
 import { WhisperField } from '../components/whisper-field'
 import { Messages } from '../helpers/messages'
 import { subscribeToNothing, useBank, useBankSnapshot, useBox, useBoxes, useBoxSnapshot, useBoxExposure, useVault, useWhisper } from '../hooks/hooks'
@@ -46,7 +46,7 @@ const VaultlabelOptions = ({ listId }: { listId: string }) => {
   return <datalist id={listId}>{vaultlabels.map((vaultlabel) => <option key={vaultlabel} value={vaultlabel} />)}</datalist>
 }
 
-const BoxlabelOptions = ({ listId, vaultlabel }: { listId: string, vaultlabel: string }) => {
+const BoxlabelOptions = ({ listId, vaultlabel }: { listId: string, vaultlabel: Vaultlabel }) => {
   const boxlabels = useBoxes(vaultlabel) ?? NoLabels
   return <datalist id={listId}>{boxlabels.map((boxlabel) => <option key={boxlabel} value={boxlabel} />)}</datalist>
 }
@@ -54,7 +54,7 @@ const BoxlabelOptions = ({ listId, vaultlabel }: { listId: string, vaultlabel: s
 
 // == [Verbs]: BoxVerbs, boxWordsOf, WhisperShown
 
-const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: string, boxlabel: string }) => {
+const BoxVerbs = ({ vaultlabel, boxlabel }: { vaultlabel: Vaultlabel, boxlabel: Boxlabel }) => {
   const bank = useBank()
   const { stage, vault } = useVault(vaultlabel)
   const box = useBox(vaultlabel, boxlabel)

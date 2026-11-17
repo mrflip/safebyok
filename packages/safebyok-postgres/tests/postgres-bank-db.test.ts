@@ -3,6 +3,7 @@
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as DB from 'safebyok-big/storage'
 import type { Notice } from 'safebyok-big/storage'
+import type { UserID } from 'safebyok-big'
 import { PostgresBankDB, bankChannelOf } from '../src/index'
 import type { PostgresListen } from '../src/index'
 import * as BH from './bank-helpers'
@@ -29,7 +30,7 @@ function watching(bankDB: PostgresBankDB, scope: DB.WatchScope = BW.vaultScope) 
 }
 
 /** The ask to build the bank of `user_id`, made at the bank's own revision and life. */
-function buildAskFor(user_id: string) {
+function buildAskFor(user_id: UserID) {
   return BW.bankBuildAskOf({ ...BW.bankAt(), user_id }, { ...BW.gateAt(), user_id })
 }
 

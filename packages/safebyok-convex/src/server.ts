@@ -4,6 +4,7 @@ import { mutationGeneric, queryGeneric } from 'convex/server'
 import type { FunctionReference, GenericDataModel, GenericQueryCtx, MutationBuilder, QueryBuilder } from 'convex/server'
 import { ConvexError } from 'convex/values'
 import * as DB from 'safebyok-big/storage'
+import type { UserID } from 'safebyok-big'
 import type { ComponentApi } from './component-api'
 import * as CVX from './component/validators'
 import * as Phrases from './phrases'
@@ -20,7 +21,7 @@ export type { SafebyokRefusal, SafebyokErrorKind } from './refusals'
  * @example async (ctx) => (await ctx.auth.getUserIdentity())?.subject ?? null
  */
 export type GetUserId<DataModel extends GenericDataModel = GenericDataModel> =
-  (ctx: GenericQueryCtx<DataModel>) => Promise<string | null | undefined> | string | null | undefined
+  (ctx: GenericQueryCtx<DataModel>) => Promise<UserID | null | undefined> | UserID | null | undefined
 
 /** Options for {@link SafebyokBankComponent.api}. */
 export type SafebyokApiOpts<DataModel extends GenericDataModel = GenericDataModel> = {

@@ -3,6 +3,7 @@
 import { promisifyRequest, type UseStore } from 'idb-keyval'
 import { dbprefixOf, versionedShelfOf } from 'safebyok-big/storage'
 import type { BankScope, BX, VaultScope } from 'safebyok-big/storage'
+import type { BankTok, Banklabel, Boxlabel, UserID, VaultTok, Vaultlabel } from 'safebyok-big'
 
 // == [The database]: BankDBVersion, shelfOf, filedIn, Filed
 
@@ -31,17 +32,17 @@ export async function filedIn(store: IDBObjectStore, range: IDBKeyRange): Promis
 // IndexedDB sorts any array after every string, so `[...prefix, []]` is an upper bound for every scopepath that starts with `prefix`.
 
 /** The scopepath of a bank row. */
-export type BankScopepath = [tag: 'bank', user_id: string, banklabel: string]
+export type BankScopepath = [tag: 'bank', user_id: UserID, banklabel: Banklabel]
 
 /** The scopepath of a gate row. */
-export type GateScopepath = [tag: 'gate', user_id: string, banklabel: string, gatelabel: string]
+export type GateScopepath = [tag: 'gate', user_id: UserID, banklabel: Banklabel, gatelabel: string]
 
 /** The scopepath of a vault row. */
-export type VaultScopepath = [tag: 'vault', user_id: string, banklabel: string, vaultlabel: string]
+export type VaultScopepath = [tag: 'vault', user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlabel]
 
 // The scopepath has both toks, so a box row under any other pair of lives is at another scopepath, and a put under one cannot overwrite it.
 /** The scopepath of a box row. Each vault life has its own box rows. */
-export type BoxScopepath = [tag: 'box', user_id: string, banklabel: string, vaultlabel: string, bank_tok: string, vault_tok: string, boxlabel: string]
+export type BoxScopepath = [tag: 'box', user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlabel, bank_tok: BankTok, vault_tok: VaultTok, boxlabel: Boxlabel]
 
 /** The scopepath of the bank row at `scope`. */
 export function bankScopepathOf({ user_id, banklabel }: BankScope): BankScopepath { return ['bank', user_id, banklabel] }
@@ -58,10 +59,10 @@ export function boxScopepathOf({ user_id, banklabel, vaultlabel, bank_tok, vault
 }
 
 /** The vaultlabel in a vault row's `scopepath`. */
-export function vaultlabelOf(scopepath: IDBValidKey): string { return (scopepath as VaultScopepath)[3] }
+export function vaultlabelOf(scopepath: IDBValidKey): Vaultlabel { return (scopepath as VaultScopepath)[3] }
 
 /** The vaultlabel, `bank_tok`, `vault_tok` and boxlabel in a box row's `scopepath`. */
-export function boxPlaceOf(scopepath: IDBValidKey): { vaultlabel: string, bank_tok: string, vault_tok: string, boxlabel: string } {
+export function boxPlaceOf(scopepath: IDBValidKey): { vaultlabel: Vaultlabel, bank_tok: BankTok, vault_tok: VaultTok, boxlabel: Boxlabel } {
   const filed = scopepath as BoxScopepath
   return { vaultlabel: filed[3], bank_tok: filed[4], vault_tok: filed[5], boxlabel: filed[6] }
 }
@@ -79,7 +80,7 @@ export function vaultsRangeOf({ user_id, banklabel }: BankScope): IDBKeyRange { 
 export function boxesRangeOf({ user_id, banklabel }: BankScope): IDBKeyRange { return rangeUnder(['box', user_id, banklabel]) }
 
 /** The key range of every box row of one vault life. */
-export function lifeRangeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: VaultScope & { bank_tok: string, vault_tok: string }): IDBKeyRange {
+export function lifeRangeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: VaultScope & { bank_tok: BankTok, vault_tok: VaultTok }): IDBKeyRange {
   return rangeUnder(['box', user_id, banklabel, vaultlabel, bank_tok, vault_tok])
 }
 // --

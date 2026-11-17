@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
+import type { Banklabel } from 'safebyok-big'
 import { ckeyOf } from 'safebyok-big/storage'
 import { DevDeviceDBInspector } from '../../src/devmode'
 import * as TH from '../test-helpers'
@@ -15,7 +16,7 @@ const renderOverLease = async () => {
 }
 
 /** Return the table row for the lease of the bank named `banklabel`. */
-const leaseRow = (banklabel: string) => screen.getByText(banklabel).closest('tr') as HTMLElement
+const leaseRow = (banklabel: Banklabel) => screen.getByText(banklabel).closest('tr') as HTMLElement
 const includingDamaged = () => { fireEvent.click(screen.getByLabelText('Include damaged rows')) }
 
 describe("DevDeviceDBInspector", () => {

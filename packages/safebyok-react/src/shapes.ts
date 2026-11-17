@@ -1,5 +1,5 @@
 import type { ComponentPropsWithoutRef, ComponentPropsWithRef, ReactNode, Ref } from 'react'
-import type { AnyGating, BadNewsHandler, Box, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, Vault, VaultError } from 'safebyok-big'
+import type { AnyGating, BadNewsHandler, Boxlabel, Box, DeviceDB, DeviceOpts, Gating, LifecycleHandler, RequestCleartext, UserID, Vault, VaultError, Vaultlabel } from 'safebyok-big'
 import { Checker, Checkers, deviceOpts, type AssertEqual, type CheckerInput, type LeaseQuery, type LeaseScopepath } from 'safebyok-big/storage'
 import { fromB64, type WhisperFieldAttributes } from 'safebyok-big/utils'
 
@@ -11,7 +11,7 @@ import { fromB64, type WhisperFieldAttributes } from 'safebyok-big/utils'
 /** BankProvider's props: every `Device.make` option except `gates`, with a `user_id` that may be null, and props for the built-in dialogs. */
 export interface BankProviderProps extends Omit<DeviceOpts, 'user_id' | 'gates' | 'requestCleartext'> {
   /** The signed-in user's id, or null while nobody is signed in. Null does not remove cached leases: call `useDevice()`'s `vacate()` at sign-out. */
-  user_id:             string | null
+  user_id:             UserID | null
   /** Your own function to ask the user for a passphrase or passkey. When omitted, the provider shows its built-in dialogs. */
   requestCleartext?:   RequestCleartext | undefined
   /** The username a password manager saves the bank's passphrase under. */
@@ -34,7 +34,7 @@ export const bankProviderProps = Checker(({ fn, custom, str }) => deviceOpts.omi
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof bankProviderProps>>
 
 /** The `Device.make` options the provider passes through: all but `gates` and the handlers, with a `user_id` that may be null. */
-export type ProviderDeviceOpts = Omit<DeviceOpts, 'user_id' | 'gates' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: string | null }
+export type ProviderDeviceOpts = Omit<DeviceOpts, 'user_id' | 'gates' | 'onLifecycle' | 'onBadNews' | 'requestCleartext'> & { user_id: UserID | null }
 
 /** The host's callbacks for the provider's device, as of the latest render. */
 export type Handlers = { onLifecycle: LifecycleHandler, onBadNews: BadNewsHandler, requestCleartext: RequestCleartext | undefined }
@@ -165,7 +165,7 @@ export type PasskeyUnlockButtonProps = {
 }
 
 /** CreateVaultButton's props: the vaultlabel of the vault it creates. */
-export type CreateVaultButtonProps = { vaultlabel: string }
+export type CreateVaultButtonProps = { vaultlabel: Vaultlabel }
 // --
 
 // == [Modals]: PassphraseFieldname, Gripe, ModalFormProps, PassphraseGating, PassphraseModalProps, ReplacePassphraseModalProps, AddPasskeyModalProps, RevokePasskeyModalProps, DelBankModalProps, DelVaultModalProps
@@ -268,7 +268,7 @@ export type DelVaultModalProps = {
 // == [Devmode]: DevBoxInspectorProps, DevDeviceDBInspectorProps, LastCall, PanelListing, ListedLease, LeaseRowLineProps
 
 /** DevBoxInspector's props: the vaultlabel and boxlabel its fields start with. */
-export type DevBoxInspectorProps = { defaultVaultlabel?: string, defaultBoxlabel?: string }
+export type DevBoxInspectorProps = { defaultVaultlabel?: Vaultlabel, defaultBoxlabel?: Boxlabel }
 
 /** DevDeviceDBInspector's props: the deviceDB whose rows it shows. */
 export type DevDeviceDBInspectorProps = { deviceDB: DeviceDB }

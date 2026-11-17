@@ -4,6 +4,7 @@ import { afterAll, beforeAll, onTestFinished } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
 import type { BankScope, Boxscope, BX, VaultScope } from 'safebyok-big/storage'
 import * as TH from 'safebyok-big/testing'
+import type { BankTok, Boxlabel, VaultTok } from 'safebyok-big'
 import { BankFunctionsSql, BankTablesSql, PostgresBankDB, bankChannelOf } from '../src/index'
 import type { PostgresBankDBOpts, PostgresListen } from '../src/index'
 import { BootMillis, flakyClientOf } from './test-helpers'
@@ -178,7 +179,7 @@ export function rowsOf(): TH.BankDBRowCheats {
       const address = [user_id, banklabel, vaultlabel]
       await planting([[UnplantVaultSql, address], [PlantVaultSql, [...address, JSON.stringify(row)]]])
     },
-    plantBoxRow: async ({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, bank_tok: string, vault_tok: string, row: unknown) => {
+    plantBoxRow: async ({ user_id, banklabel, vaultlabel, boxlabel }: Boxscope, bank_tok: BankTok, vault_tok: VaultTok, row: unknown) => {
       const params = [user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel, JSON.stringify(row)]
       await planting([[UnplantBoxSql, params], [PlantBoxSql, params]])
     },
@@ -200,8 +201,8 @@ export function rowsOf(): TH.BankDBRowCheats {
       )
       return (found === undefined) ? null : recordOf(found.row)
     },
-    boxRowsOf: async ({ user_id, banklabel, vaultlabel }: VaultScope, bank_tok: string, vault_tok: string) => {
-      const found = await sql<{ boxlabel: string, row: Record<string, unknown> }>(
+    boxRowsOf: async ({ user_id, banklabel, vaultlabel }: VaultScope, bank_tok: BankTok, vault_tok: VaultTok) => {
+      const found = await sql<{ boxlabel: Boxlabel, row: Record<string, unknown> }>(
         'SELECT boxlabel, to_jsonb(stored) AS row FROM safebyok_boxes AS stored WHERE (user_id, banklabel, vaultlabel, bank_tok, vault_tok) = ($1, $2, $3, $4, $5)',
         [user_id, banklabel, vaultlabel, bank_tok, vault_tok],
       )

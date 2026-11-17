@@ -3,6 +3,7 @@
 import * as DB from 'safebyok-big/storage'
 import type { Awaitable, BankScope, BoxTidyAsk, Capacity, Tidied, VaultError, VaultScope, WatchScope } from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
+import type { BankTok, Boxlabel, UserID, VaultTok, Vaultlabel } from 'safebyok-big'
 import {
   BirthBankSql, BirthBoxSql, BirthVaultSql, CountBoxesSql, DeleteEndedBoxesSql, DeleteEndedVaultsSql, EnsureBankSql, GetBankSql, GetBoxWithVaultSql,
   GetGateWithBankSql, GetVaultWithBankSql, ListBoxesWithVaultSql, PutGateSql, ReviseBankSql, ReviseBoxSql, ReviseVaultSql,
@@ -47,11 +48,11 @@ const postgresBankDBOpts = DB.objCheck(({ custom, fn, int }) => ({
 const bankChannelOfArgs = DB.Checker(({ user_id }) => user_id, 'bad_option')
 
 /** Return the notification channel for `user_id`'s writes: the channel a `PostgresListen` subscribes to. */
-export function bankChannelOf(user_id: string): string { return channelOf(bankChannelOfArgs.parse(user_id, { where: 'bankChannelOf' })) }
+export function bankChannelOf(user_id: UserID): string { return channelOf(bankChannelOfArgs.parse(user_id, { where: 'bankChannelOf' })) }
 
 // Postgres identifiers are at most 63 bytes. A user_id whose channel name is longer cannot be notified, so a write that would notify for it fails.
 /** The notification channel for `user_id`. */
-function channelOf(user_id: string): string { return `safebyok_${user_id}` }
+function channelOf(user_id: UserID): string { return `safebyok_${user_id}` }
 
 // Each notice comes from `safebyok_tell` in `bank-functions.ts`: a JSON object with the stored row's address under `at`,
 // the row under `row` and the row above it under `parent`, whichever fit. A box row's address carries its vault's life.
@@ -59,10 +60,10 @@ function channelOf(user_id: string): string { return `safebyok_${user_id}` }
 /** A parsed notice: the stored row's address, and the rows that fit the byte-size limit. */
 type Told = BankScope & {
   gatelabel?:  string | undefined
-  vaultlabel?: string | undefined
-  bank_tok?:   string | undefined
-  vault_tok?:  string | undefined
-  boxlabel?:   string | undefined
+  vaultlabel?: Vaultlabel | undefined
+  bank_tok?:   BankTok | undefined
+  vault_tok?:  VaultTok | undefined
+  boxlabel?:   Boxlabel | undefined
   heard?:      BX.Heard | undefined
 }
 
