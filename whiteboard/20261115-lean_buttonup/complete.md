@@ -62,7 +62,7 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
     through `structuralSharing`; `cmpRecords` gives NaN, so `prior` is kept). Compare as records only when both are
     records, else `TSQ.replaceEqualDeep`; a test red first. Rides with the minder round.
   * Agreed: `#demandOwnAsk(ask: MinderGetAsk)`, losing the `unknown`, keeping the check and the name.
-  * **The ThingCar, the minder's cache value (the Coach, 2026-11-17; under discussion).** A host shows the whole
+  * **The ThingCar, the minder's cache value (the Coach, 2026-11-17; agreed).** A host shows the whole
     record, steady, and writes against the newest revision: the newest heard of and the newest whole record are kept
     apart, so a sparse revision heard by `list` never blinks a body out. Ruled:
     * The name is `ThingCar`, by kind `BoxCar` and `GateCar`: a silly name for the carrier of two Things, since a
@@ -70,7 +70,7 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
       nothing public (STYLE.md). The cache holds cars, frozen.
     * The minder serves ThingCars only. It is internal: no `select`, no host-facing portal. Its callers are the
       ReactBridge and, later, a Listing class. The bridge handles the customer's side, so its contract is not ours here.
-    * The type, as the Coach gave it (the field's name is open, below):
+    * The type, as the Coach gave it (its `whole` is now `fullest`, below):
       ```ts
       /** Cache value for a ThingRecord: the newest revision heard of (which might be sparse), and the newest whole record seen.
        * `null` when gone/void, `undefined` for "known to exist but nothing useable cached"
@@ -90,9 +90,8 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
       it whole. Deliver-then-invalidate and #716's wontfix row go.
     * Agreed: the merge sits in `structuralSharing`, which query-core calls on every landing (`query.setData`), with
       `undefined` as the prior on the first.
-    * **Open:** do the `queryFn` and deliveries hand in records, or cars made by `carOf(record)`? Claude recommends cars
-      (moderately firm): the query's types stay honest, and `structuralSharing` also runs on an observer's `select`
-      and `placeholderData`, where turning records into cars would rewrap a `select`'s output.
+    * Settled (the Coach: "yes cars"): the `queryFn` and deliveries hand in cars, each made by `carOf(record)` where the
+      vaultDB's answer lands, and `structuralSharing` merges two cars. Only cars enter the cache.
     * Settled: the field is `liveness`. It says how alive the Thing is, with overtones of how current, without claiming
       "stale". Every use of the word already in the tree (VOCABULARY's `am` and `cited` rows, the classifier, big's
       `Liveness`) is about live, gone or void, which the car's values extend (the Coach's test). VOCABULARY.md has the
@@ -100,10 +99,11 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
     * Settled: a tombstone heard while `behind` replaces the old whole record, since a tombstone is whole (the Coach).
     * Agreed (the Coach): the merge (today's `betterRecordOf`) keeps the invariant that the fullest record is the fullest
       known, and its output is checked by a zod type of the car on the way out. Its inputs are not validated.
-    * **Proposed (the Coach):** rename `whole` to `fullest`, beside `newest`: the most fields we know of, and the most
-      currency, so each name recommends a use (display the fullest, write against the newest). Claude agrees, and reads
-      it as `fullest` always holding a record: the sparse one when `bare`, the tombstone when `gone`, the void sentinel
-      when `void`. The doc's `null`/`undefined` line then goes, and `liveness` alone says whether it has a body.
+    * Settled (the Coach): `whole` is renamed `fullest`, beside `newest`: the most fields we know of, and the most
+      currency, so each name recommends a use (display the fullest, write against the newest). `fullest` keeps the
+      pasted type's shapes: `null` when `gone` or `void`, `undefined` when `bare`. A sparse record seems full to us, but
+      for the user it is bereft, so `null` and `undefined` are the fullest records we can provide. The doc line names
+      `fullest` as its subject: "`fullest` is null when gone or void, and undefined when bare"
     * A thread of its own, cut from main after #716 merges; it sweeps `entry` out of `minding/`.
   * **Thread `minder_grain`** (2026-11-17, cut from main; the classifier tidy stays in and around the classifier file).
     From the review: the `select`/`placeholderData` sharing fix (both values revisions of one Thing, by `thingCited` and
