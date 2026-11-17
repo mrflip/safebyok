@@ -123,6 +123,9 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 
 ### 4. The classifier tidy, and the models off the cache
 
+The call chain and both sides' proposals are in `classifier-tidy.md` (same folder); the Coach's rulings on them come
+from a neighbouring session.
+
 * `AdapterVaultDB`'s protected `classify*` pass-throughs removed.
 * Each classifier takes one step's fetch as one bag (the hunt's 17, with 11 and 13).
 * Each ask's draft becomes `Z.input` of a defaulted twin of its strict schema, and its builder one `safeParse`.
