@@ -130,7 +130,7 @@ describe("IdbBankDB's options", () => {
 
   it("refuses a dbName, a maxRecordSizeEst or a field it cannot use", () => {
     for (const opts of [{ dbName: '' }, { dbName: 7 }, { maxRecordSizeEst: -1 }, { dbname: 'mine' }]) {
-      expect(() => new IdbBankDB(opts as never)).to.throw(DB.VaultError).with.property('refusalkind', 'bad_option')
+      expect(() => new IdbBankDB(opts as never)).to.throw(DB.VaultError).with.property('refusalkind', 'bad_record')
     }
   })
 })

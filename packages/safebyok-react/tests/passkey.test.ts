@@ -55,7 +55,7 @@ describe("createPasskey's options", () => {
   for (const [given, blurb] of SloppyMakingCases) {
     it(`refuses ${blurb}, before the browser is asked`, async () => {
       const authenticator = TH.installFakeAuthenticator()
-      expect(await refusalOf(createPasskey(given as never))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+      expect(await refusalOf(createPasskey(given as never))).to.include({ refusalkind: 'bad_record', family: 'misuse' })
       expect(authenticator.calls.create).to.have.lengthOf(0)
     })
   }
@@ -123,7 +123,7 @@ describe("createPasskey", () => {
   it("refuses a relying party the page cannot claim as misuse, and any other browser failure in words a dialog shows", async () => {
     const authenticator = TH.installFakeAuthenticator()
     authenticator.refuseNext('SecurityError')
-    expect(await refusalOf(createPasskey(TH.PasskeyMaking))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+    expect(await refusalOf(createPasskey(TH.PasskeyMaking))).to.include({ refusalkind: 'bad_record', family: 'misuse' })
     authenticator.refuseNext('UnknownError')
     const failed = await refusalOf(createPasskey(TH.PasskeyMaking))
     expect(failed).to.include({ refusalkind: 'passkey_unavailable', message: Messages.passkeyAskFailed })
@@ -200,7 +200,7 @@ describe("askPasskey's header and options", () => {
   for (const [header, opts, blurb] of SloppyAskingCases) {
     it(`refuses ${blurb}, before the browser is asked`, async () => {
       const authenticator = TH.installFakeAuthenticator()
-      expect(await refusalOf(askPasskey(header as never, opts as never))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+      expect(await refusalOf(askPasskey(header as never, opts as never))).to.include({ refusalkind: 'bad_record', family: 'misuse' })
       expect(authenticator.calls.get).to.have.lengthOf(0)
     })
   }
@@ -209,7 +209,7 @@ describe("askPasskey's header and options", () => {
   it("refuses a salt that is not base64url", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const refused = await refusalOf(askPasskey(headerOf('AAAA', 'not base64url!')))
-    expect(refused).to.include({ refusalkind: 'bad_option' })
+    expect(refused).to.include({ refusalkind: 'bad_record' })
     expect(refused.message).to.include('prf_salt_b64')
     expect(authenticator.calls.get).to.have.lengthOf(0)
   })
@@ -225,14 +225,14 @@ describe("attemptThenZero's answer", () => {
   it("refuses an answer without bytes, never calling the attempt", async () => {
     const attempt = vi.fn(() => Promise.resolve(true))
     for (const passkey of [null, {}, { credential_id: 'AAAA', prfBytes: [1, 2, 3] }]) {
-      expect(await refusalOf(attemptThenZero(passkey as never, attempt))).to.include({ refusalkind: 'bad_option', family: 'misuse' })
+      expect(await refusalOf(attemptThenZero(passkey as never, attempt))).to.include({ refusalkind: 'bad_record', family: 'misuse' })
     }
     expect(attempt).not.toHaveBeenCalled()
   })
 
   it("zeroes the answer's bytes when it refuses an attempt that is no function", async () => {
     const passkey = { credential_id: 'AAAA', prf_salt_b64: 'AAAA', prfBytes: crypto.getRandomValues(new Uint8Array(PrfAnswerSize)) }
-    expect(await refusalOf(attemptThenZero(passkey, 'attempt' as never))).to.include({ refusalkind: 'bad_option' })
+    expect(await refusalOf(attemptThenZero(passkey, 'attempt' as never))).to.include({ refusalkind: 'bad_record' })
     expect(passkey.prfBytes.every((byte) => byte === 0)).to.be.true
   })
 

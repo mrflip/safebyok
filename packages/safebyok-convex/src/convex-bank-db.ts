@@ -326,5 +326,5 @@ const convexBankDBOpts = DB.objCheck(({ custom, int }) => ({
   client:   custom<ConvexBankClient>(isConvexClient, Phrases.ClientExpected),
   api:      custom<SafebyokBankApi>(isSafebyokBankApi, Phrases.ApiExpected),
   maxBoxes: int.positive().optional(),
-}), 'bad_option')
+}), 'bad_record')
 // --

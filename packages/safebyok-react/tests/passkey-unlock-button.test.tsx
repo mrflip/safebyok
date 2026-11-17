@@ -113,7 +113,7 @@ describe("PasskeyUnlockButton", () => {
 
   it("on misuse, hides itself, points to the passphrase, and reports the error to React", async () => {
     const { gating } = await passkeyedUnlock()
-    const misuse = new VaultError('bad_option', 'misused')
+    const misuse = new VaultError('bad_record', 'misused')
     refusingAttempts(gating, misuse)
     const { gripes, reported } = buttonFor(gating)
     fireEvent.click(screen.getByText(Messages.passkeyButton))
@@ -191,7 +191,7 @@ describe("PassphraseModal, for a vault with a passkey", () => {
   it("keeps the passphrase when the passkey meets misuse: the button goes, and the dialog says why", async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { /* React reports what its Boundary caught */ })
     const { gating } = await dialogFor()
-    refusingAttempts(gating, new VaultError('bad_option', 'misused'))
+    refusingAttempts(gating, new VaultError('bad_record', 'misused'))
     fireEvent.click(screen.getByText(Messages.passkeyButton))
     await screen.findByText(Messages.passkeyTrouble)
     expect(screen.queryByText(Messages.passkeyButton)).to.be.null

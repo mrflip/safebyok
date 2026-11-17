@@ -14,8 +14,8 @@ function specOf({ deriveKeyBytes: _dropped, ...spec }: { deriveKeyBytes: unknown
 /** Make `saltBytes` bytes of varied salt, so a test catches a byte read from the wrong position. */
 function saltOf(saltBytes: number): Uint8Array { return Uint8Array.from({ length: saltBytes }, (_unused, ii) => ((ii * 37) + 11) % 256) }
 
-/** The message of the `bad_option` refusal that `attempt` throws. */
-function refusalOf(attempt: () => unknown): string { return TH.expectSyncRefusal(attempt, 'bad_option').message }
+/** The message of the `bad_record` refusal that `attempt` throws. */
+function refusalOf(attempt: () => unknown): string { return TH.expectSyncRefusal(attempt, 'bad_record').message }
 
 /** Return what `attempt` rejects with. Throws if it resolves instead. */
 async function rejectionOf(attempt: Promise<unknown>): Promise<unknown> {
@@ -151,12 +151,12 @@ describe("makeArgon2idWasmDeriver", () => {
 
   it("refuses a spec Argon2id cannot run, before deriving anything", () => {
     expect(() => makeArgon2idWasmDeriver({ ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', salt_size: 4 } as unknown as KeyDeriverSpec))
-      .to.throw(/salt_size/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
+      .to.throw(/salt_size/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_record'))
   })
 
   it("refuses the supplied spec's label on other parameters", () => {
     expect(() => makeArgon2idWasmDeriver({ ...Argon2idWebV1, iterations: 4 }))
-      .to.throw(/argon2id_web_v1/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_option'))
+      .to.throw(/argon2id_web_v1/u).that.satisfies((err: unknown) => isVaultError(err, 'bad_record'))
   })
 
   it("refuses an empty passphrase as unlock() does, rather than with hash-wasm's plain Error", async () => {
@@ -278,7 +278,7 @@ describe("where WebAssembly cannot run", () => {
     // A fresh import also loads a fresh copy of safebyok, and the error thrown is that copy's VaultError.
     const FreshCore = await import('safebyok-big')
     const refusal = await rejectionOf(Fresh.argon2idWasmWebV1Deriver.deriveKeyBytes('correct horse battery staple', saltOf(16)))
-    expect(FreshCore.isVaultError(refusal, 'bad_option')).to.be.true
+    expect(FreshCore.isVaultError(refusal, 'bad_record')).to.be.true
     expect((refusal as VaultError).message).to.include("'wasm-unsafe-eval'")
     expect((refusal as VaultError).cause).to.be.instanceOf(WebAssembly.CompileError)
   })

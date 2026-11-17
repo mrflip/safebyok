@@ -28,7 +28,7 @@ export const bankProviderProps = Checker(({ fn, custom, str }) => deviceOpts.omi
   passphraseUsername: str.optional(),
   passkeyRpId:        str.optional(),
   children:           custom<ReactNode>(),
-}), 'bad_option')
+}), 'bad_record')
 
 // The interface is written by hand so that each prop has a doc comment. This line fails to compile if it and the checker drift apart.
 true satisfies AssertEqual<BankProviderProps, CheckerInput<typeof bankProviderProps>>
@@ -115,7 +115,7 @@ const isB64 = (text: string): boolean => {
 // The core checks credential_id only as text, so one that is not base64url passes here and is refused
 // later as a damaged record (credentialBytesOf).
 /** Checkers for the arguments of the passkey helpers. */
-export const PasskeyChecks = Checkers('bad_option', ({ obj, discrim, lit, str, int, bytes, fn }) => {
+export const PasskeyChecks = Checkers('bad_record', ({ obj, discrim, lit, str, int, bytes, fn }) => {
   const timeout = int.positive().optional()
   const named = str.min(1)
   const passphraseHeader = obj({ wayinkind: lit('passphrase') })

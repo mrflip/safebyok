@@ -145,7 +145,7 @@ describe("bankResolvers", () => {
   it("refuses a malformed request signed in as another user for what is malformed", async () => {
     const schema = TH.schemaOver(await TH.serverOver())
     const answer = BX.getBoxAnswer.parse(await runSource(schema, BankOperations.getBox, { ask: { ...BX.boxGet.parse(boxGetAsk), vault_tok: '' } }, 'u2')) as BX.BadAnswer
-    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', parent: null }).and.to.have.nested.property('err.refusalkind', 'bad_option')
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', parent: null }).and.to.have.nested.property('err.refusalkind', 'bad_record')
   })
 
   it("returns for each verb what the bankDB's own try* verb returns", async () => {
@@ -259,7 +259,7 @@ describe("bankResolvers", () => {
     const bankDB = await TH.serverOver()
     const client = new GraphQLBankDB({ client: new Client({ url: 'https://app.example.test/api/graphql', exchanges: [] }) })
     const unusable = [{}, { bankDB }, { bankDB: {}, getUserId: () => 'u1' }, { bankDB, getUserId: 'u1' }, { bankDB: client, getUserId: () => 'u1' }]
-    for (const opts of unusable) { TH.expectSyncRefusal(() => bankResolvers(opts as never), 'bad_option') }
+    for (const opts of unusable) { TH.expectSyncRefusal(() => bankResolvers(opts as never), 'bad_record') }
   })
 })
 

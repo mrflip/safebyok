@@ -47,7 +47,7 @@ const spec = { ...Argon2idWebV1, key_deriver_label: 'acme_argon2id_v1', memory_k
 const keyDeriver = makeArgon2idWasmDeriver(spec)  // derives what makeArgon2idDeriver(spec) does
 ```
 
-`makeArgon2idWasmDeriver` refuses with `bad_option` exactly the specs the core's factory refuses: a spec
+`makeArgon2idWasmDeriver` refuses with `bad_record` exactly the specs the core's factory refuses: a spec
 Argon2id cannot run, or one that has a supplied spec's label but other parameters. It calls the
 core's `parseKeyDeriverSpec` (from `safebyok/browser`), so its messages are the core's own.
 
@@ -72,7 +72,7 @@ supplied one, consider unlocking the bank where a pause does not show.
   'wasm-unsafe-eval'`. hash-wasm embeds its WebAssembly in its JavaScript, so nothing else is
   fetched.
 
-Where WebAssembly is missing or will not compile, `deriveKeyBytes` refuses with `bad_option` (the
+Where WebAssembly is missing or will not compile, `deriveKeyBytes` refuses with `bad_record` (the
 host's to fix), and its message says which. The core keeps nothing of what a deriver throws,
 because a throw may quote the passphrase: unlocking the bank (`bank.ensureUnlocked`, `bank.unlock`)
 refuses `unexpected_error`, carrying neither the deriver's message nor its kind. Calling
@@ -81,7 +81,7 @@ own: choose one per platform yourself, as `keyDeriver`.
 
 ## Errors
 
-* `bad_option` -- from `makeArgon2idWasmDeriver(spec)`, for a spec it cannot run (the message names the
+* `bad_record` -- from `makeArgon2idWasmDeriver(spec)`, for a spec it cannot run (the message names the
   field). From `deriveKeyBytes` called directly, when the platform has no WebAssembly, or when a
   Content-Security-Policy lacks `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
   Through the bank, this arrives as `unexpected_error`, with no `cause`.

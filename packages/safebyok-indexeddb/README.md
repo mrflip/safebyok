@@ -34,7 +34,7 @@ Hand it to the core wherever a `BankDB` is asked for.
   refused with `vault_full`. A deleted box's tombstone still counts, so deleting a box frees no room. A vault made anew
   starts at zero. This adapter currently enforces the cap exactly, because IndexedDB runs one readwrite transaction at a
   time, but the contract is a soft cap: do not rely on that.
-* An option it cannot use is refused with `bad_option`.
+* An option it cannot use is refused with `bad_record`.
 
 ## What it promises
 

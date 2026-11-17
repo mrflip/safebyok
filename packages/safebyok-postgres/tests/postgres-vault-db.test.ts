@@ -145,6 +145,6 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
   it("refuses a client, listen or opt it cannot use", async () => {
     const client = await database()
     const unusable = [{}, { client: {} }, { client, listen: 'yes' }, { client, doNotifyTracked: 'no' }, { client, pushWorld: true }]
-    for (const opts of unusable) { TH.expectSyncRefusal(() => new PostgresVaultDB(opts as never), 'bad_option') }
+    for (const opts of unusable) { TH.expectSyncRefusal(() => new PostgresVaultDB(opts as never), 'bad_record') }
   })
 })
