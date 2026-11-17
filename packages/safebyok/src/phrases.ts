@@ -44,8 +44,8 @@ export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tomb
 /** A citation that is half the shell. */
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."
 
-/** A sparse record that is half the shell. */
-export const SparseHalfShell = "A sparse record is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
+/** A box a revision is made from that is half the shell. */
+export const DonorHalfShell = "A box a revision is made from is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
 
 /** A shell asked for with neither a labelpath nor a label and its parent. */
 export const ShellUnscoped = "A shell is made from a labelpath, or from a label and its parent."
@@ -61,6 +61,9 @@ export const ShellOfOtherLife = "A lifepath given for a shell is its parent's li
 
 /** A shell asked for with the fmt of another kind of Thing. */
 export const ShellFmtOfOtherKind = "A shell's fmt is the fmt of its kind of Thing."
+
+/** A live box's revision made with no sidecar, given or kept. */
+export const SidecarMissing = "A live box has a sidecar: give one, or make the revision from a box that has one."
 
 /** A tombstone made of a tombstone or the shell. */
 export const TombstoneOfLiveOnly = "Only a live box has a tombstone: a tombstone or the shell has none."

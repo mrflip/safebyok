@@ -71,8 +71,8 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   const bank = TH.fakeLeaseBankOf()
   const sealer = await one.buildLease(bank, TH.WorldGate)
   const opener = await other.buildLease(bank, TH.WorldGate)
-  const sealed = await sealer.seal(CoreBox, CoreBox.nextRevisionOf(TH.boxShellOf()), { whisper: { apiKey: 'sk-test-5678' } })
-  expect(await opener.unseal(CoreBox, sealed)).to.deep.equal({ whisper: { apiKey: 'sk-test-5678' } })
+  const sealed = await sealer.seal(CoreBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: { apiKey: 'sk-test-5678' } })
+  expect(await opener.unseal(CoreBox, sealed)).to.deep.include({ whisper: { apiKey: 'sk-test-5678' } })
 }
 
 /** A checker whose answer throws the passphrase it heard, when its verdict is read. */
@@ -617,7 +617,7 @@ describe("proving.buildLease(bank, gate)", () => {
     const bank = TH.fakeLeaseBankOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(bank, gate)
-    expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gatelabelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
+    expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gate_labelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
     expect(lease.isEvicted).to.be.false
     expect(bank.lock).not.toHaveBeenCalled()
   })

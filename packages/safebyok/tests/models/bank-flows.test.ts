@@ -35,7 +35,7 @@ async function bumpApicalls(bank: Bank): Promise<BoxRecord> {
   const prior    = await priorOf(bank)
   const old      = (prior.am === 'a') ? await bank.unsealBox(prior) : null
   const apicalls = Number(old?.whisper['apicalls'] ?? 0) + 1
-  const record   = await bank.sealBox({ ...prior, sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
+  const record   = await bank.sealBox(prior, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
   const answer   = await bank.tryPutBox({ cited: prior, record })
   if (! answer.ok) { throw answer.err }
   return record
@@ -92,7 +92,7 @@ describe("the bank's box methods refuse, never throwing", () => {
   it("tryPutBox answers the device's refusal while it is disabled, and writes nothing", async () => {
     const bank = await storedBank()
     const prior = await priorOf(bank)
-    const record = await bank.sealBox({ ...prior, sidecar: {} }, { whisper: TH.Whisper })
+    const record = await bank.sealBox(prior, { sidecar: {} }, { whisper: TH.Whisper })
     bank.device.sweep()
     const answer = await bank.tryPutBox({ cited: prior, record })
     await TH.expectBad(answer, 'disabled')
@@ -139,7 +139,7 @@ describe("the bank's box methods refuse, never throwing", () => {
   it("tryPutBox refuses a record of another bank, and writes nothing", async () => {
     const bank = await storedBank()
     const prior = await priorOf(bank)
-    const record = await bank.sealBox({ ...prior, sidecar: {} }, { whisper: TH.Whisper })
+    const record = await bank.sealBox(prior, { sidecar: {} }, { whisper: TH.Whisper })
     const answer = await bank.tryPutBox({ cited: prior, record: { ...record, banklabel: 'other' } })
     expect(answer.ok).to.equal(false)
     expect(await bank.tryGetBox({ labelpath: Openai })).to.include({ ok: true, val: null })

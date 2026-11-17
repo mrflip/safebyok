@@ -1,7 +1,9 @@
+import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
 import { Crypto, Helpers, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import type { ThingRecord } from '../storage/shapes-thing'
 import type { Bank } from './bank'
 import type * as Sealers from './sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from './stamps'
@@ -10,7 +12,13 @@ import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRe
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
 /** Any sealer, as a lease takes it: the lease is generic over what it seals. */
-type AnySealer = Sealers.Sealer<never, never, never>
+type AnySealer = Sealers.Sealer<never, never>
+
+/** A field that holds a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
+export type SecretFieldname = 'whisper' | `${string}_sealed`
+
+/** The names of the cleartexts a sealer seals, which a donor never carries into a revision. */
+const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
 
 /** The options of {@link Lease.make}, beside its record. */
 export interface LeaseOpts {
@@ -23,13 +31,19 @@ export interface LeaseOpts {
 const Checks = Validator.Checkers('bad_option', ({ obj, str, fn, bool, custom }) => {
   const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() })
   const sealerMembers = obj({
-    tags:     obj({ codectag: str, schematag: str }),
-    purposes: obj({ key: str, cipher: str }),
-    stampsOf: fn(),
-    encode:   fn(),
-    decode:   fn(),
-    sealedOf: fn(),
-    recordOf: fn(),
+    donorPropsOf:     fn(),
+    publicPropsOf:    fn(),
+    secretPropsOf:    fn(),
+    nextRevisionOf:   fn(),
+    tombstoneOf:      fn(),
+    tombstoneSecrets: obj({}),
+    stampOf:          fn(),
+    tags:             obj({ codectag: str, schematag: str }),
+    purposes:         obj({ key: str, cipher: str }),
+    encode:           fn(),
+    decode:           fn(),
+    sealedOf:         fn(),
+    recordOf:         fn(),
   })
   return {
     leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank }) }),
@@ -44,21 +58,21 @@ const Checks = Validator.Checkers('bad_option', ({ obj, str, fn, bool, custom })
  * Once evicted, or once its device is swept, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gatelabelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #bank, #record, stamp, toJSON
+  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gate_labelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #bank, #record, stamp, toJSON
 
-  declare readonly fmt:           LeaseStamp['fmt']
-  declare readonly userid:        string
-  declare readonly banklabel:     string
-  declare readonly lifeseq:       string
-  declare readonly born_at:       number
+  declare readonly fmt:            LeaseStamp['fmt']
+  declare readonly userid:         string
+  declare readonly banklabel:      string
+  declare readonly lifeseq:        string
+  declare readonly born_at:        number
   /** The labelpath of the gate the lease was granted under. */
-  declare readonly gatelabelpath: string
+  declare readonly gate_labelpath: string
   /** The lifeseq of that gate's life. */
-  declare readonly gate_lifeseq:  string
+  declare readonly gate_lifeseq:   string
   /** The revision of that gate the lease was granted under. */
-  declare readonly gate_revtok:   string
-  declare readonly proved_at:     number
-  declare readonly wayinkind:     EX.Wayinkind
+  declare readonly gate_revtok:    string
+  declare readonly proved_at:      number
+  declare readonly wayinkind:      EX.Wayinkind
 
   readonly #bank: LeaseBank
 
@@ -95,36 +109,56 @@ export class Lease implements LeaseStamp {
 
   // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
 
-  /** Seal `cleartexts` as the part `sealer` seals, adding it to `nextRevision`.
-   * The seal is bound to the bank's stamp, the sealer's stamps and the part's tags. The cleartext's bytes are zeroed afterwards.
+  /** Seal the revision next after `donor`, as `sealer` makes it: with `publicProps` over it and `secretProps` sealed.
+   * With `publicProps` of `{ am: 'x' }` alone, it is the tombstone of the live `donor`, sealing the sealer's empty cleartexts.
+   * `donor` may be a whole record, sealed or unsealed: only its Thing fields and body are read, and no cleartext or sealed part reaches the revision.
+   * The seal is bound to the bank's stamp, the revision's stamp and the part's tags. The cleartext's bytes are zeroed afterwards.
+   * @example
+   *   await lease.seal(CoreBox, box, { sidecar: { account: 'work' } }, { whisper })  // its next revision
+   *   await lease.seal(CoreBox, box, { am: 'x' })                                     // its tombstone
    */
-  async seal<NextT, RecordT, CleartextsT, SubT extends NextT>(
-    sealer: Sealers.Sealer<NextT, RecordT, CleartextsT>, nextRevision: SubT, cleartexts: CleartextsT,
-  ): Promise<SubT & Sealers.SealedPartsOf<CleartextsT>> {
+  seal<RecordT extends ThingRecord, CleartextsT>(
+    sealer: Sealers.Sealer<RecordT, CleartextsT>, donor: Sealers.DonorOf<RecordT, CleartextsT>, publicProps: Sealers.TombstonePublicProps,
+  ): Promise<Sealers.TombstoneOf<RecordT>>
+  seal<RecordT extends ThingRecord, CleartextsT>(
+    sealer: Sealers.Sealer<RecordT, CleartextsT>, donor: Sealers.DonorOf<RecordT, CleartextsT>, publicProps: Sealers.LivePublicPropsOf<RecordT, CleartextsT>, secretProps: CleartextsT,
+  ): Promise<Sealers.LiveOf<RecordT>>
+  seal<RecordT extends ThingRecord, CleartextsT>(
+    sealer: Sealers.Sealer<RecordT, CleartextsT>, donor: Sealers.DonorOf<RecordT, CleartextsT>, publicProps: Sealers.PublicPropsOf<RecordT, CleartextsT>, secretProps?: CleartextsT,
+  ): Promise<RecordT>
+  async seal<RecordT extends ThingRecord, CleartextsT>(
+    sealer: Sealers.Sealer<RecordT, CleartextsT>, donor: Sealers.DonorOf<RecordT, CleartextsT>, publicProps: Sealers.PublicPropsOf<RecordT, CleartextsT>, secretProps?: CleartextsT,
+  ): Promise<RecordT> {
     Checks.sealer.parse(sealer)
-    const sealed = await this.#sealText(sealer, nextRevision, sealer.encode(cleartexts))
-    return sealer.recordOf(nextRevision, sealed)
+    const donorProps = withoutSecrets(sealer.donorPropsOf(donor))
+    const given = sealer.publicPropsOf(publicProps)
+    const isTombstone = (given.am === 'x')
+    const revision = isTombstone ? sealer.tombstoneOf(donorProps) : sealer.nextRevisionOf(donorProps, given)
+    const cleartexts = isTombstone ? sealer.tombstoneSecrets : sealer.secretPropsOf(secretProps)
+    const sealed = await this.#sealText(sealer, revision, sealer.encode(cleartexts))
+    return sealer.recordOf(revision, sealed)
   }
 
-  /** Unseal the part `sealer` seals in `record`, returning its cleartexts.
-   * Unsealing authenticates the ciphertexts, stamps and tags together: a change to any of them refuses as damaged.
+  /** `record` unsealed: the part `sealer` seals, opened, in place of its sealed form.
+   * Unsealing authenticates the ciphertexts, stamp and tags together: a change to any of them refuses as damaged.
    */
-  async unseal<NextT, RecordT, CleartextsT>(sealer: Sealers.Sealer<NextT, RecordT, CleartextsT>, record: RecordT): Promise<CleartextsT> {
+  async unseal<RecordT extends ThingRecord, CleartextsT>(sealer: Sealers.Sealer<RecordT, CleartextsT>, record: RecordT): Promise<Sealers.UnsealedOf<RecordT, CleartextsT>> {
     Checks.sealer.parse(sealer)
-    const cleartext = await this.#openSealed(sealer, record)
-    return sealer.decode(cleartext)
+    const cleartexts = sealer.decode(await this.#openSealed(sealer, record))
+    // The spread's type is UnsealedOf's, which TypeScript cannot see through for a record of any kind.
+    return Object.freeze({ ...withoutSecrets(record), ...cleartexts }) as Sealers.UnsealedOf<RecordT, CleartextsT>
   }
 
-  /** The {@link Sealers.Sealed} form of `cleartext`, for `sealer` to add to `nextRevision`: ciphered under a fresh key that is wrapped under the bankKey, with the sealer's tags. */
-  async #sealText<NextT>(sealer: Sealers.Sealer<NextT, unknown, unknown>, nextRevision: NextT, cleartext: string): Promise<Sealers.Sealed> {
+  /** The {@link Sealers.Sealed} form of `cleartext`, for `sealer` to add to `revision`: ciphered under a fresh key that is wrapped under the bankKey, with the sealer's tags. */
+  async #sealText(sealer: Pick<AnySealer, 'stampOf' | 'purposes' | 'tags'>, revision: unknown, cleartext: string): Promise<Sealers.Sealed> {
     const { purposes, tags } = sealer
-    const stamps  = sealer.stampsOf(nextRevision)
+    const stamp   = sealer.stampOf(revision)
     const bankKey = await this.#bankKey('wrapKey')
     const partKey = await Crypto.makeBoxKey()
-    const key_wrapped = await Crypto.wrapKeyUnder(bankKey, partKey, this.#ctxOf(stamps, purposes.key, tags))
+    const key_wrapped = await Crypto.wrapKeyUnder(bankKey, partKey, this.#ctxOf(stamp, purposes.key, tags))
     const bytes = new TextEncoder().encode(cleartext)
     try {
-      const ciphered = await Crypto.cipherBytes(partKey, bytes, this.#ctxOf(stamps, purposes.cipher, tags))
+      const ciphered = await Crypto.cipherBytes(partKey, bytes, this.#ctxOf(stamp, purposes.cipher, tags))
       this.demandEnabled()
       return { key_wrapped, ciphered, ...tags }
     } finally {
@@ -133,13 +167,13 @@ export class Lease implements LeaseStamp {
   }
 
   /** The cleartext sealed in `record`, the part `sealer` seals. */
-  async #openSealed<RecordT>(sealer: Sealers.Sealer<unknown, RecordT, unknown>, record: RecordT): Promise<string> {
+  async #openSealed<RecordT extends ThingRecord>(sealer: Pick<Sealers.Sealer<RecordT, unknown>, 'sealedOf' | 'stampOf' | 'purposes'>, record: RecordT): Promise<string> {
     const { key_wrapped, ciphered, ...tags } = sealer.sealedOf(record)
-    const stamps  = sealer.stampsOf(record)
+    const stamp   = sealer.stampOf(record)
     const { purposes } = sealer
     const bankKey = await this.#bankKey('unwrapKey')
-    const keyCtx    = this.#ctxOf(stamps, purposes.key, tags)
-    const cipherCtx = this.#ctxOf(stamps, purposes.cipher, tags)
+    const keyCtx    = this.#ctxOf(stamp, purposes.key, tags)
+    const cipherCtx = this.#ctxOf(stamp, purposes.cipher, tags)
     let bytes: Uint8Array
     // Only these two WebCrypto calls are trapped: their rejection is how a damaged seal is learned. The calls above refuse as they are, or are bugs.
     try {
@@ -156,9 +190,9 @@ export class Lease implements LeaseStamp {
     }
   }
 
-  /** The ctx for `purpose`: the bank's stamp, then `stamps`, with `tags` as its visible header. */
-  #ctxOf(stamps: readonly Crypto.CipherCtxRecord[], purpose: string, tags: Sealers.SealTags): Uint8Array {
-    return Crypto.cipherCtx([this.#bank.stamp, ...stamps], purpose, tags)
+  /** The ctx for `purpose`: the bank's stamp, then `stamp`, with `tags` as its visible header. */
+  #ctxOf(stamp: Crypto.CipherCtxRecord, purpose: string, tags: Sealers.SealTags): Uint8Array {
+    return Crypto.cipherCtx([bankStamp.parse(this.#bank.stamp), stamp], purpose, tags)
   }
 
   /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing keeps it between calls. */
@@ -166,7 +200,7 @@ export class Lease implements LeaseStamp {
     this.demandEnabled()
     // demandEnabled refuses an evicted lease, whose record is null.
     const { lease_key, bank_key_lease_wrapped } = this.#record!
-    const ctx = Crypto.cipherCtx([this.#bank.stamp, this.stamp], 'bank_key_lease_wrapped')
+    const ctx = Crypto.cipherCtx([bankStamp.parse(this.#bank.stamp), this.stamp], 'bank_key_lease_wrapped')
     // Only this WebCrypto call is trapped: its rejection is how a damaged lease is learned.
     try {
       return await Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
@@ -199,13 +233,22 @@ export class Lease implements LeaseStamp {
   get modelkind(): 'lease' { return 'lease' satisfies Consts.Modelkind }
 }
 
-// == [Helpers]: sealerMembersOf
+// == [Helpers]: withoutSecrets, sealerMembersOf
+
+/** `bag` without its secrets: each cleartext, such as `whisper`, and each sealed part, at a name ending `_sealed`. */
+export function withoutSecrets<BagT extends object>(bag: BagT): Omit<BagT, keyof BagT & SecretFieldname> {
+  const secretFieldnames = Object.keys(bag).filter((fieldname) => fieldname.endsWith('_sealed') || CleartextFieldnames.has(fieldname))
+  // Object.keys loses the fieldnames' type: the cast restores it.
+  return omit(bag, secretFieldnames as (keyof BagT & SecretFieldname)[])
+}
 
 // A class's static methods are its own but not enumerable, so a spread would miss them: each member is read by name.
 /** The members of a sealer read off `val`, an object or a class; null for anything else */
 function sealerMembersOf(val: unknown): Partial<Record<keyof AnySealer, unknown>> | null {
   if ((val === null) || ((typeof val !== 'object') && (typeof val !== 'function'))) { return null }
-  const { tags, purposes, stampsOf, encode, decode, sealedOf, recordOf } = val as Partial<Record<keyof AnySealer, unknown>>
-  return { tags, purposes, stampsOf, encode, decode, sealedOf, recordOf }
+  const {
+    donorPropsOf, publicPropsOf, secretPropsOf, nextRevisionOf, tombstoneOf, tombstoneSecrets, stampOf, tags, purposes, encode, decode, sealedOf, recordOf,
+  } = val as Partial<Record<keyof AnySealer, unknown>>
+  return { donorPropsOf, publicPropsOf, secretPropsOf, nextRevisionOf, tombstoneOf, tombstoneSecrets, stampOf, tags, purposes, encode, decode, sealedOf, recordOf }
 }
 // --

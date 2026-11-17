@@ -6,7 +6,7 @@ import { exactOptional } from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, boxSparse, thingWatchScope, trackShape } from '../storage/shapes-thing'
+import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, boxDonor, thingWatchScope, trackShape } from '../storage/shapes-thing'
 import type { TSQGotAnswer } from './thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
@@ -42,7 +42,7 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderTr
     gcTime:    orDefault(gcTime, DefaultQueryCacheOpts.gcTime),
   }).strict()
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
-  const friendFields     = obj({ scope: thingWatchScope, rootBox: boxSparse, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
+  const friendFields     = obj({ scope: thingWatchScope, rootBox: boxDonor, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn(), invalidateQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)

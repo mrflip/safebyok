@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { type GateThing, type GetAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSparse, getAskOf, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetAsk, type ThingScope, type Thingkind, ShellLifeseq, boxDonor, getAskOf, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -417,7 +417,7 @@ describe("ThingMinder.get", () => {
     const shell = await boxMinder.get(BoxAsk)
     expect(shell).to.deep.equal(shellOf(TH.BoxScope, TH.rootBoxOf()))
     expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/${ShellLifeseq}` })
-    expect(boxSparse.safeParse(shell).success).to.be.true
+    expect(boxDonor.safeParse(shell).success).to.be.true
     const birth = TH.birthAskOf(TH.boxThingOf(), shell)
     await TH.expectGood(vaultDB.tryWriteThing(birth))
   })

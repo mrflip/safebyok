@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Crypto, GX } from 'safebyok-big/internals'
 import { CoreBox } from '../../src/models/core-box'
-import { Lease } from '../../src/models/lease'
+import { Lease, withoutSecrets } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import { LeaseFormat, type LeaseRecord } from '../../src/models/stamps'
 import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
@@ -9,27 +9,35 @@ import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gatelabelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind']
+const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind']
 
-const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gatelabelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: TH.WorldGate.revtok, proved_at: TH.T0, wayinkind: 'passphrase' }
+const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gate_labelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: TH.WorldGate.revtok, proved_at: TH.T0, wayinkind: 'passphrase' }
 
 const Cleartexts = Object.freeze({ whisper: TH.Whisper })
 
-const SealerMembernames = ['tags', 'purposes', 'stampsOf', 'encode', 'decode', 'sealedOf', 'recordOf'] as const
+/** What a box's first seal takes in the clear: its sidecar. */
+const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
+
+const SealerMembernames = [
+  'donorPropsOf', 'publicPropsOf', 'secretPropsOf', 'nextRevisionOf', 'tombstoneOf', 'tombstoneSecrets', 'stampOf', 'tags', 'purposes', 'encode', 'decode', 'sealedOf', 'recordOf',
+] as const
 
 /** CoreBox's members, as a plain object. */
 const BoxSealerBag = Object.freeze({
-  tags:     CoreBox.tags,
-  purposes: CoreBox.purposes,
-  stampsOf: CoreBox.stampsOf.bind(CoreBox),
-  encode:   CoreBox.encode.bind(CoreBox),
-  decode:   CoreBox.decode.bind(CoreBox),
-  sealedOf: CoreBox.sealedOf.bind(CoreBox),
-  recordOf: CoreBox.recordOf.bind(CoreBox),
+  donorPropsOf:     CoreBox.donorPropsOf.bind(CoreBox),
+  publicPropsOf:    CoreBox.publicPropsOf.bind(CoreBox),
+  secretPropsOf:    CoreBox.secretPropsOf.bind(CoreBox),
+  nextRevisionOf:   CoreBox.nextRevisionOf.bind(CoreBox),
+  tombstoneOf:      CoreBox.tombstoneOf.bind(CoreBox),
+  tombstoneSecrets: CoreBox.tombstoneSecrets,
+  stampOf:          CoreBox.stampOf.bind(CoreBox),
+  tags:             CoreBox.tags,
+  purposes:         CoreBox.purposes,
+  encode:           CoreBox.encode.bind(CoreBox),
+  decode:           CoreBox.decode.bind(CoreBox),
+  sealedOf:         CoreBox.sealedOf.bind(CoreBox),
+  recordOf:         CoreBox.recordOf.bind(CoreBox),
 })
-
-/** A live box at its first revision, as a seal over {@link TH.boxShellOf}'s shell leaves it, without its sealed whisper. */
-function liveNext() { return CoreBox.nextRevisionOf(TH.boxShellOf()) }
 
 /** A passphrase proving of {@link TH.WorldGateStamp} with a wayin under a new bankKey: each lease it builds holds that bankKey. */
 async function provingWithWayin(): Promise<PassphraseProving> {
@@ -65,8 +73,8 @@ describe("Lease.make(record, { bank })", () => {
 
   it("opens what another lease of the same record sealed", async () => {
     const { bank, lease, record } = await leaseWorld()
-    const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
-    expect(await Lease.make(record, { bank }).unseal(CoreBox, sealed)).to.deep.equal(Cleartexts)
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    expect(await Lease.make(record, { bank }).unseal(CoreBox, sealed)).to.deep.include(Cleartexts)
   })
 
   const MalformedCases = [
@@ -75,6 +83,7 @@ describe("Lease.make(record, { bank })", () => {
     [(record: LeaseRecord) => ({ ...record, proved_at: undefined }),                                  'with no proved_at'],
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'carrier_pigeon' }),                           'of an unknown wayinkind'],
     [(record: LeaseRecord) => ({ ...record, extra: 'field' }),                                        'with a field no lease has'],
+    [({ gate_labelpath, ...record }: LeaseRecord) => ({ ...record, gatelabelpath: gate_labelpath }),  'with its gate labelpath at gatelabelpath'],
     [() => 'a lease',                                                                                    'that is not a record at all'],
   ] as const
 
@@ -116,21 +125,91 @@ describe("Lease.make(record, { bank })", () => {
   })
 })
 
-describe("lease.seal(sealer, nextRevision, cleartexts) and lease.unseal(sealer, record)", () => {
+describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(sealer, record)", () => {
   it("round-trips a box's whisper, its sealed part carrying the sealer's tags", async () => {
     const { lease } = await leaseWorld()
-    const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     expect(sealed.whisper_sealed).to.include(CoreBox.tags)
     expect(sealed.whisper_sealed).to.have.all.keys('key_wrapped', 'ciphered', 'codectag', 'schematag')
-    expect(await lease.unseal(CoreBox, sealed)).to.deep.equal(Cleartexts)
+    expect(await lease.unseal(CoreBox, sealed)).to.deep.include(Cleartexts)
+  })
+
+  it("unseals to the record, its whisper in place of its sealed whisper", async () => {
+    const { lease } = await leaseWorld()
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const { whisper_sealed: _sealed, ...unsealed } = sealed
+    const opened = await lease.unseal(CoreBox, sealed)
+    expect(opened).to.deep.equal({ ...unsealed, whisper: TH.Whisper })
+    expect(Object.isFrozen(opened)).to.be.true
+  })
+
+  it("seals the next revision of a whole unsealed box, or a whole sealed one, carrying nothing of its whisper but the new seal", async () => {
+    const { lease } = await leaseWorld()
+    const first = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const unsealed = await lease.unseal(CoreBox, first)
+    const whisper = { apiKey: 'sk-test-1111' }
+    for (const donor of [unsealed, first]) {
+      const next = await lease.seal(CoreBox, donor, {}, { whisper })
+      expect(next).to.include({ revseq: first.revseq + 1, lifeseq: first.lifeseq })
+      expect(next).to.not.have.property('whisper')
+      expect(next.whisper_sealed).to.not.deep.equal(first.whisper_sealed)
+      expect(await lease.unseal(CoreBox, next)).to.deep.include({ whisper, sidecar: TH.Sidecar })
+    }
+  })
+
+  it("lays the sidecar given over the donor's", async () => {
+    const { lease } = await leaseWorld()
+    const first = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const next = await lease.seal(CoreBox, first, { sidecar: { account: 'home' } }, Cleartexts)
+    expect(next.sidecar).to.deep.equal({ account: 'home' })
+  })
+
+  it("refuses when neither the donor nor the publicProps has a sidecar, sealing nothing", async () => {
+    const { lease } = await leaseWorld()
+    const sealer = { ...BoxSealerBag }
+    const encode = vi.spyOn(sealer, 'encode')
+    await TH.expectRefusal(lease.seal(sealer, TH.boxShellOf(), {}, Cleartexts), 'bad_option')
+    expect(encode).not.toHaveBeenCalled()
+  })
+
+  it("writes the box at the written_at given, and signs it: a box whose written_at moved will not unseal", async () => {
+    const { lease } = await leaseWorld()
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), { ...PublicProps, written_at: TH.T0 - 5 }, Cleartexts)
+    expect(sealed).to.include({ written_at: TH.T0 - 5, born_at: TH.T0 - 5 })
+    await TH.expectRefusal(lease.unseal(CoreBox, { ...sealed, written_at: TH.T0 }), 'damaged_whisper')
+  })
+
+  it("refuses the tombstone of a tombstone, or of the shell", async () => {
+    const { lease } = await leaseWorld()
+    const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const tombstone = await lease.seal(CoreBox, live, { am: 'x' })
+    await TH.expectRefusal(lease.seal(CoreBox, tombstone, { am: 'x' }), 'bad_option')
+    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), { am: 'x' }), 'bad_option')
+  })
+
+  it("strips every cleartext and sealed part from what the sealer's donorPropsOf gives, before it makes the revision", async () => {
+    const { lease } = await leaseWorld()
+    const leaky = { ...BoxSealerBag, donorPropsOf: (donor: unknown) => ({ ...CoreBox.donorPropsOf(donor as never), whisper: TH.Whisper, notes_sealed: 'sealed notes' }) }
+    const nextRevisionOf = vi.spyOn(leaky, 'nextRevisionOf')
+    await lease.seal(leaky, TH.boxShellOf(), PublicProps, Cleartexts)
+    expect(nextRevisionOf.mock.calls[0]?.[0]).to.not.have.any.keys('whisper', 'notes_sealed')
+  })
+
+  it("binds the bank's stamp first, its fields alone: a field beside them on the bank binds nothing", async () => {
+    const proving = await provingWithWayin()
+    const { lease: plain } = await TH._cheat_grantedLease(proving, TH.fakeLeaseBankOf())
+    const padded = TH.fakeLeaseBankOf()
+    const { lease } = await TH._cheat_grantedLease(proving, { ...padded, stamp: { ...padded.stamp, lifepath: 'not-a-stamp-field' } } as never)
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    expect(await plain.unseal(CoreBox, sealed)).to.deep.include(Cleartexts)
   })
 
   it("round-trips a tombstone's empty whisper", async () => {
     const { lease } = await leaseWorld()
-    const live = await lease.seal(CoreBox, liveNext(), Cleartexts)
-    const tombstone = await lease.seal(CoreBox, CoreBox.tombstoneOf(live), { whisper: {} })
+    const live = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const tombstone = await lease.seal(CoreBox, live, { am: 'x' })
     expect(tombstone).to.include({ am: 'x', revseq: live.revseq + 1 })
-    expect(await lease.unseal(CoreBox, tombstone)).to.deep.equal({ whisper: {} })
+    expect(await lease.unseal(CoreBox, tombstone)).to.deep.include({ whisper: {} })
   })
 
   it("zeroes the whisper's bytes once each has sealed or opened them", async () => {
@@ -138,8 +217,8 @@ describe("lease.seal(sealer, nextRevision, cleartexts) and lease.unseal(sealer, 
     const text = CoreBox.encode(Cleartexts)
     const encode = vi.spyOn(TextEncoder.prototype, 'encode')
     const decode = vi.spyOn(TextDecoder.prototype, 'decode')
-    const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
-    expect(await lease.unseal(CoreBox, sealed)).to.deep.equal(Cleartexts)
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    expect(await lease.unseal(CoreBox, sealed)).to.deep.include(Cleartexts)
     const sealedBytes = encode.mock.results[encode.mock.calls.findIndex(([encoded]) => encoded === text)]?.value as Uint8Array
     const openedBytes = decode.mock.calls[decode.mock.results.findIndex((decoded) => decoded.value === text)]?.[0] as Uint8Array
     encode.mockRestore()
@@ -152,9 +231,9 @@ describe("lease.seal(sealer, nextRevision, cleartexts) and lease.unseal(sealer, 
 
   it("takes any value with a sealer's members, as it takes the class", async () => {
     const { lease } = await leaseWorld()
-    const sealed = await lease.seal(BoxSealerBag, liveNext(), Cleartexts)
-    expect(await lease.unseal(BoxSealerBag, sealed)).to.deep.equal(Cleartexts)
-    expect(await lease.unseal(CoreBox, sealed)).to.deep.equal(Cleartexts)
+    const sealed = await lease.seal(BoxSealerBag, TH.boxShellOf(), PublicProps, Cleartexts)
+    expect(await lease.unseal(BoxSealerBag, sealed)).to.deep.include(Cleartexts)
+    expect(await lease.unseal(CoreBox, sealed)).to.deep.include(Cleartexts)
   })
 
   const SealerCases = [
@@ -170,8 +249,8 @@ describe("lease.seal(sealer, nextRevision, cleartexts) and lease.unseal(sealer, 
   for (const [sealer, blurb] of SealerCases) {
     it(`refuses ${blurb} in place of a sealer, at the seal and the unseal`, async () => {
       const { lease } = await leaseWorld()
-      const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
-      await TH.expectRefusal(lease.seal(sealer as never, liveNext(), Cleartexts), 'bad_option')
+      const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+      await TH.expectRefusal(lease.seal(sealer as never, TH.boxShellOf(), PublicProps, Cleartexts), 'bad_option')
       await TH.expectRefusal(lease.unseal(sealer as never, sealed), 'bad_option')
     })
   }
@@ -179,20 +258,27 @@ describe("lease.seal(sealer, nextRevision, cleartexts) and lease.unseal(sealer, 
   it("refuses 'damaged_whisper' for what another bankKey sealed, and locks nothing", async () => {
     const { bank, lease } = await leaseWorld()
     const { lease: other } = await TH._cheat_grantedLease(await provingWithWayin(), TH.fakeLeaseBankOf())
-    const sealed = await other.seal(CoreBox, liveNext(), Cleartexts)
+    const sealed = await other.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await TH.expectRefusal(lease.unseal(CoreBox, sealed), 'damaged_whisper')
     expect(bank.lock).not.toHaveBeenCalled()
     expect(lease.isEvicted).to.be.false
   })
 })
 
+describe("withoutSecrets(bag)", () => {
+  it("drops the whisper and every field ending _sealed, keeping the rest", () => {
+    const bag = { label: 'k', whisper: TH.Whisper, whisper_sealed: 'sealed', notes_sealed: 'sealed notes', notes: 'kept', sealed_at: 1 }
+    expect(withoutSecrets(bag)).to.deep.equal({ label: 'k', notes: 'kept', sealed_at: 1 })
+  })
+})
+
 describe("lease.evict() and isEvicted", () => {
   it("drops the keys, so that a seal or an unseal refuses 'bank_locked', and locks nothing", async () => {
     const { bank, lease } = await leaseWorld()
-    const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     lease.evict()
     expect(lease.isEvicted).to.be.true
-    await TH.expectRefusal(lease.seal(CoreBox, liveNext(), Cleartexts), 'bank_locked')
+    await TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts), 'bank_locked')
     await TH.expectRefusal(lease.unseal(CoreBox, sealed), 'bank_locked')
     expect(bank.lock).not.toHaveBeenCalled()
   })
@@ -206,7 +292,7 @@ describe("lease.evict() and isEvicted", () => {
 
   it("refuses 'bank_locked' for a seal already under way when it lands", async () => {
     const { lease } = await leaseWorld()
-    const sealing = lease.seal(CoreBox, liveNext(), Cleartexts)
+    const sealing = lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     lease.evict()
     await TH.expectRefusal(sealing, 'bank_locked')
   })
@@ -241,18 +327,18 @@ describe("lease.isEnabled and lease.demandEnabled(), over its bank's device", ()
 
   it("refuses a seal and an unseal with the device's refusal once the device is swept", async () => {
     const { device, lease } = await bornLeaseWorld()
-    const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const shell = TH.boxShellOf()
     device.sweep()
-    const next = liveNext()
-    expect(await TH.expectRefusal(lease.seal(CoreBox, next, Cleartexts), 'disabled')).to.equal(device.endCause)
+    expect(await TH.expectRefusal(lease.seal(CoreBox, shell, PublicProps, Cleartexts), 'disabled')).to.equal(device.endCause)
     expect(await TH.expectRefusal(lease.unseal(CoreBox, sealed), 'disabled')).to.equal(device.endCause)
   })
 
   // As a lock refuses a seal or an unseal under way, so does a sweep.
   it("refuses a seal and an unseal already under way when the device is swept as they run", async () => {
     const { device, lease } = await bornLeaseWorld()
-    const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
-    const sealing = TH.expectRefusal(lease.seal(CoreBox, liveNext(), Cleartexts), 'disabled')
+    const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
+    const sealing = TH.expectRefusal(lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts), 'disabled')
     const unsealing = TH.expectRefusal(lease.unseal(CoreBox, sealed), 'disabled')
     device.sweep()
     expect(await sealing).to.equal(device.endCause)
@@ -266,7 +352,7 @@ describe("a tampered lease record", () => {
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                       'its wayinkind changed'],
     [(record: LeaseRecord) => ({ ...record, gate_revtok: 'gate-revision-tok-2' }),                         'its gate_revtok changed'],
     [(record: LeaseRecord) => ({ ...record, gate_lifeseq: lifeseqOfLifenum(1) }),                                 'its gate_lifeseq changed'],
-    [(record: LeaseRecord) => ({ ...record, gatelabelpath: 'gate/passkeys' }),                             'its gatelabelpath changed'],
+    [(record: LeaseRecord) => ({ ...record, gate_labelpath: 'gate/passkeys' }),                            'its gate_labelpath changed'],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }),          "another lease's leaseKey"],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],
   ] as const
@@ -274,14 +360,14 @@ describe("a tampered lease record", () => {
   for (const [tamper, blurb] of TamperCases) {
     it(`with ${blurb} locks its bank at its first unseal, and is evicted`, async () => {
       const { proving, bank, lease, record } = await leaseWorld()
-      const sealed = await lease.seal(CoreBox, liveNext(), Cleartexts)
+      const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
       const { record: other } = await TH._cheat_grantedLease(proving, bank)
       const tampered = Lease.make(tamper(record, other) as LeaseRecord, { bank })
       const err = await TH.expectRefusal(tampered.unseal(CoreBox, sealed), 'damaged_lease')
       expect(TH.thrownText(err)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
       expect(bank.lock).toHaveBeenCalledTimes(1)
       expect(tampered.isEvicted).to.be.true
-      await TH.expectRefusal(tampered.seal(CoreBox, liveNext(), Cleartexts), 'bank_locked')
+      await TH.expectRefusal(tampered.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts), 'bank_locked')
       expect(bank.lock).toHaveBeenCalledTimes(1)
     })
   }
@@ -289,7 +375,7 @@ describe("a tampered lease record", () => {
   it("refuses at its first seal too, sealing nothing", async () => {
     const { bank, record } = await leaseWorld()
     const tampered = Lease.make({ ...record, proved_at: TH.T0 + 1 }, { bank })
-    await TH.expectRefusal(tampered.seal(CoreBox, liveNext(), Cleartexts), 'damaged_lease')
+    await TH.expectRefusal(tampered.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts), 'damaged_lease')
     expect(bank.lock).toHaveBeenCalledTimes(1)
   })
 })

@@ -1,7 +1,7 @@
 import type { Consts, Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases, Throwers, Validator } from 'safebyok-big/internals'
 import { Lease, type LeaseBank } from './lease'
-import { type BankStamp, type CitedGate, type GateStamp, type StampedGate, LeaseFormat, bankStamp, citedGate, gateStamp, stampedGate } from './stamps'
+import { type BankStamp, type GateCited, type GateStamp, type StampedGate, LeaseFormat, bankStamp, gateCited, gateStamp, stampedGate } from './stamps'
 import { Wayin, wayinCtxOf } from './wayin'
 
 // == [NOVEL and the checks]: NOVEL, Novel, RewrapUsage, CheckUsage, Checks
@@ -25,7 +25,7 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 /** The checks of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' arguments. */
 const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => ({
   wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), 'Expected NOVEL or a proving'),
-  provingLeaseArgs:     obj({ bank: obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: citedGate }),
+  provingLeaseArgs:     obj({ bank: obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: gateCited }),
   passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp, gateStamp }),
   passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp, gateStamp }),
   passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: stampedGate }),
@@ -115,12 +115,12 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
 
   // The bankKey is unwrapped, wrapped again under the leaseKey and dropped here, crossing no method boundary (G3).
   /** Build a lease on `bank`, citing the gate revision `gate`. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey. */
-  async buildLease(bank: LeaseBank, gate: CitedGate): Promise<Lease> {
+  async buildLease(bank: LeaseBank, gate: GateCited): Promise<Lease> {
     const { bank: { stamp: bankStamp }, gate: cited } = Checks.provingLeaseArgs.parse({ bank, gate })
     Validator.checkedConsistent(bankStamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
     Validator.checkedConsistent(cited, this.gateStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
     const granted = {
-      fmt: LeaseFormat, ...bankStamp, gatelabelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
+      fmt: LeaseFormat, ...bankStamp, gate_labelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
     } as const
     const bankKey = await this.#unwrapBankKey()
     const leaseKey = await Crypto.makeLeaseKey()

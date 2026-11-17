@@ -70,7 +70,7 @@ export function isLabelpathOfKind(labelpath: string, modelkind: Thingkind): bool
 function isLabelpath(labelpath: string): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse, StoredCited, Sealed, Wayins, Sparse, BoxSparse, sparseOf, ShellCited, childShellCited
+// == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxDonor, StoredCited, Sealed, Wayins, Sparse, sparseOf, ShellCited, childShellCited
 
 const LifeseqPattern       = /^[0-9a-v]{10}$/
 const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/
@@ -103,7 +103,7 @@ function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
 }
 
 /** The checks of a Thing's fields, of each kind of Thing and its citation, and of what a write reads of the Thing stored. */
-export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
+export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxDonor } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
@@ -196,21 +196,23 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isShellWhole,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
-  // A shape made of a record's fields strips. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
-  const boxSparse    = obj({
+  // What a box's next revision is made from strips: what it keeps is its Thing fields and sidecar, so a sealed or an
+  // unsealed whisper given with it is dropped. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
+  const boxDonor     = obj({
     ...thingRecord.shape,
     labelpath:      boxLive.shape.labelpath,
     fmt:            lit(BoxThingFormat),
     revseq:         thingCited.shape.revseq,
     lifeseq:        lifeseqOrShell,
     lifepath:       thingCited.shape.lifepath,
+    sidecar:        exactOptional(CX.sidecar),
   })
     .refine(isLabelLast,    Phrases.LabelNotLast)
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
-    .refine(isShellWhole,   Phrases.SparseHalfShell)
-  return { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSparse }
+    .refine(isShellWhole,   Phrases.DonorHalfShell)
+  return { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxDonor }
 })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
@@ -233,8 +235,6 @@ export type Thing        = BankThing | GateThing | BoxThing
 export type Sealed       = Readonly<Z.infer<typeof sealed>>
 /** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin or null for none. */
 export type Wayins       = Readonly<Z.infer<typeof wayins>>
-/** A box's Thing fields, without its body: live, a tombstone, or the shell. */
-export type BoxSparse    = Readonly<Z.infer<typeof boxSparse>>
 
 /** A record's Thing fields, without its body: what a listing returns for each Thing. */
 export type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecord>
@@ -242,7 +242,7 @@ export type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecor
 const ThingFieldnames = Object.keys(thingRecord.shape) as (keyof ThingRecord)[]
 
 /** The Thing fields of `record`, without its body. */
-export function sparseOf<RecordT extends Thing>(record: RecordT): Sparse<RecordT> { return pick(record, ThingFieldnames) }
+export function sparseOf<RecordT extends ThingRecord>(record: RecordT): Sparse<RecordT> { return pick(record, ThingFieldnames) }
 
 /** The citation for a root's birth: the shell, the void sentinel for no Thing stored. */
 export const ShellCited: ThingCited = Object.freeze({

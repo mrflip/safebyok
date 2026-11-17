@@ -7,29 +7,32 @@ import { Device } from './device'
 import { Gate, type GateDna } from './gate'
 import type { Lease } from './lease'
 import { Proving } from './proving'
-import type { BoxCleartexts, BoxRecord, BoxSparse, BoxTombstone, UnsealedOf } from './sealers'
-import { type BankScope, type BankStamp, type CitedGate, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
+import type { BoxCleartexts, BoxDonor, BoxRecord, BoxTombstone, LivePublicPropsOf, PublicPropsOf, TombstonePublicProps, UnsealedOf } from './sealers'
+import { type BankScope, type BankStamp, type GateCited, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import * as Phrases from '../phrases'
 import {
   type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
-  type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxSparse, boxThing, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
+  type Sparse, type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxDonor, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
   listAskOf, loggableAskOf, putAskOf, shellOf, sparseOf,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
 export type { BankRecord, WorldRecord } from '../storage/shapes-thing'
 
-/** The record {@link Bank.make} and {@link Bank.birth} take: the bank's Thing, with its main gate's Thing as `maingate` and its root box's sparse record as `rootBox`. */
-export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: BoxSparse }>
+/** The record {@link Bank.make} and {@link Bank.birth} take: the bank's Thing, with its main gate's Thing as `maingate` and its root box's Thing fields as `rootBox`. */
+export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: Sparse<BoxThing> }>
 
 /** The dna of a new bank: its stamp, and its main gate's dna. */
 export type BankDna = BankStamp & { maingate: GateDna }
 
 /** A box unsealed: its record with its whisper in place of the sealed one. A tombstone's whisper is empty. */
-export type BoxUnsealed = UnsealedOf<BoxRecord | BoxTombstone, BoxCleartexts>
+export type BoxUnsealed = UnsealedOf<BoxThing, BoxCleartexts>
 
 /** A box's shell: the void sparse record a box's first revision is sealed over and cites. */
-export type BoxShell = BoxSparse & Readonly<{ am: 'x' }>
+export type BoxShell = Sparse<BoxTombstone>
+
+/** What a box's seal takes in the clear: its sidecar, `am` and `written_at`. */
+type BoxPublicProps = PublicPropsOf<BoxThing, BoxCleartexts>
 
 /** The draft of a box's get ask, for {@link Bank.tryGetBox}: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`).
  * The bank fills in the rest of the {@link GetAsk}.
@@ -60,11 +63,11 @@ export interface BirthOpts extends BankOpts {
 }
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, of the proving `unlockByProving` is given, and of the boxes a box method is given. */
+/** The checks of {@link Bank.make}'s arguments, of the proving `unlockByProving` is given, and of the box a box method is given. */
 const Checks = Validator.Checkers('bad_option', ({ obj, custom, orDefault }) => ({
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
-    record: obj({ maingate: gateThing, rootBox: boxSparse }).loose(),
+    record: obj({ maingate: gateThing, rootBox: boxDonor }).loose(),
     opts:   obj({
       device:         custom<Device>((val) => val instanceof Device, 'Expected a Device'),
       vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
@@ -73,8 +76,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, custom, orDefault }) => 
   }),
   bankThing,
   proving: custom<Proving>((val) => val instanceof Proving, 'Expected a Proving'),
-  boxSparse,
-  boxThing,
+  boxDonor,
 }))
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
@@ -89,8 +91,8 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   readonly #maingate: Gate
 
   // Set once more, where the bank's birth lands: from the shell to the root box stored.
-  /** The root box's sparse record. */
-  #rootBox: BoxSparse
+  /** The root box's Thing fields. */
+  #rootBox: Sparse<BoxThing>
 
   /** The attached lease, null while locked. */
   #lease: Lease | null = null
@@ -113,8 +115,8 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** The bank's main gate: the wayins a user unlocks with. */
   get maingate(): Gate { return this.#maingate }
 
-  /** The root box's sparse record: its shell until the bank is born. Every box of this bank is under it. */
-  get rootBox(): BoxSparse { return this.#rootBox }
+  /** The root box's Thing fields: its shell until the bank is born. Every box of this bank is under it. */
+  get rootBox(): Sparse<BoxThing> { return this.#rootBox }
 
   /** The revseq and lifepath this object holds of the bank, its main gate and its root box, which every ask it makes tracks. */
   get track(): Track {
@@ -153,7 +155,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     this.#device = checked.device
     this.#vaultDB = checked.vaultDB
     this.#queryCacheOpts = Object.freeze(checked.queryCacheOpts)
-    this.#rootBox = Object.freeze(rootBox)
+    this.#rootBox = Object.freeze(sparseOf(rootBox))
     this.#maingate = Gate.make(maingate, { bank: this })
     Object.freeze(this)
   }
@@ -174,7 +176,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const bank = bankThing.parse({
       userid, banklabel, labelpath: 'bank', label: 'bank', fmt: BankThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
     })
-    const rootBox = boxSparse.parse(shellOf({ userid, banklabel, labelpath: RootBoxLabelpath }))
+    const rootBox = boxDonor.parse(shellOf({ userid, banklabel, labelpath: RootBoxLabelpath }))
     return { ...bank, maingate: Gate.makeRecord(dna.maingate), rootBox }
   }
   // --
@@ -225,7 +227,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const { endCause } = this.#device
     if (endCause !== null) { return disabledAnswerOf(ask, endCause) }
     const lease = await Checks.proving.parse(proved).buildLease(this, this.#maingate)
-    const root = await lease.seal(CoreBox, CoreBox.nextRevisionOf({ ...this.#rootBox, sidecar: {} }), { whisper: {} })
+    const root = await lease.seal(CoreBox, this.#rootBox, { sidecar: {} }, { whisper: {} })
     const answer = await this.#vaultDB.tryBirthBank({ ...ask, bank: this.pickle(), gate: this.#maingate.pickle(), root })
     if (answer.ok && (answer.val.bank.revtok === this.revtok) && lease.isEnabled) {
       this.#rootBox = Object.freeze(sparseOf(answer.val.root))
@@ -242,7 +244,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** Unlock this bank with `proved`, a proving of its gate, built in the gating attempt underway.
    * The lease cites `cited`, by default this bank's main gate.
    */
-  async unlockByProving(proved: Proving, cited: CitedGate = this.maingate): Promise<this> {
+  async unlockByProving(proved: Proving, cited: GateCited = this.maingate): Promise<this> {
     this.demandEnabled()
     const lease = await Checks.proving.parse(proved).buildLease(this, cited)
     this.#attachLease(lease)
@@ -265,31 +267,32 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   // == [Boxes]: sealBox, tombstoneBox, unsealBox
 
-  /** Seal the box next after `prior`, ciphering its whisper under a fresh boxKey wrapped under the bankKey. Needs the bank unlocked.
-   * Over a tombstone or the shell, it is the first revision of the next life. Only `prior`'s Thing fields and sidecar are read.
+  /** Seal the box next after `donor`, with `publicProps` over it and the whisper of `secretProps`. Needs the bank unlocked.
+   * With `publicProps` of `{ am: 'x' }` alone, it is the tombstone of the live `donor` ({@link tombstoneBox}).
+   * Over a tombstone or the shell, it is the first revision of the next life. Its sidecar is `publicProps.sidecar`, or else `donor`'s.
+   * `donor` may be a whole box, sealed or unsealed: only its Thing fields and sidecar are read.
+   * @example
+   *   await bank.sealBox(prior, { sidecar: { account: 'work' } }, { whisper })
    */
-  async sealBox(prior: BoxSparse & Pick<BoxRecord, 'sidecar'>, cleartexts: BoxCleartexts): Promise<BoxRecord> {
+  sealBox(donor: BoxDonor, publicProps: TombstonePublicProps): Promise<BoxTombstone>
+  sealBox(donor: BoxDonor, publicProps: LivePublicPropsOf<BoxThing, BoxCleartexts>, secretProps: BoxCleartexts): Promise<BoxRecord>
+  sealBox(donor: BoxDonor, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxThing>
+  async sealBox(donor: BoxDonor, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxThing> {
     const lease = this.#demandLease()
-    this.#demandBox(prior, Checks.boxSparse)
-    return lease.seal(CoreBox, CoreBox.nextRevisionOf(prior), cleartexts)
+    this.#demandOwnBox(donor)
+    return lease.seal(CoreBox, donor, publicProps, secretProps)
   }
 
-  /** Seal a tombstone for the live box `prior`, signed by an empty whisper ciphered under a fresh boxKey. Needs the bank unlocked. */
-  async tombstoneBox(prior: BoxSparse): Promise<BoxTombstone> {
-    const lease = this.#demandLease()
-    this.#demandBox(prior, Checks.boxSparse)
-    return lease.seal(CoreBox, CoreBox.tombstoneOf(prior), { whisper: {} })
-  }
+  /** Seal a tombstone for the live box `donor`, signed by an empty whisper ciphered under a fresh boxKey. Needs the bank unlocked. */
+  tombstoneBox(donor: BoxDonor): Promise<BoxTombstone> { return this.sealBox(donor, { am: 'x' }) }
 
   /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
    * It authenticates the box, all but its sidecar. For a tombstone, that checks its signature.
    */
-  async unsealBox(box: BoxRecord | BoxTombstone): Promise<BoxUnsealed> {
+  async unsealBox(box: BoxThing): Promise<BoxUnsealed> {
     const lease = this.#demandLease()
-    const parsed = this.#demandBox(box, Checks.boxThing)
-    const { whisper } = await lease.unseal(CoreBox, parsed)
-    const { whisper_sealed: _sealed, ...unsealed } = parsed
-    return Object.freeze({ ...unsealed, whisper })
+    this.#demandOwnBox(box)
+    return lease.unseal(CoreBox, box)
   }
   // --
 
@@ -338,7 +341,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
   // --
 
-  // == [Guards]: isEnabled, isLocked, isUnlocked, demandEnabled, demandBox, demandLease
+  // == [Guards]: isEnabled, isLocked, isUnlocked, demandEnabled, demandOwnBox, demandLease
 
   /** True while this bank's device is enabled. */
   get isEnabled(): boolean { return this.#device.isEnabled }
@@ -355,11 +358,10 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return this
   }
 
-  /** Parse `box` with `check`, demanding that it is of this bank's scope and under its root box. */
-  #demandBox<BoxT extends BoxSparse>(box: unknown, check: BoxCheck<BoxT>): BoxT {
-    const parsed = check.parseConsistent(box, this.scope, { kind: 'record_conflict' })
-    if (parsed.lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
-    return parsed
+  /** Demand that `box` is a box of this bank's scope, under its root box: `record_conflict` if not, `bad_option` if it is no box. */
+  #demandOwnBox(box: unknown): void {
+    const { lifepath } = Checks.boxDonor.parseConsistent(box, this.scope, { kind: 'record_conflict' })
+    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
   }
 
   /** The attached lease. Demands that the bank is enabled and unlocked. */
@@ -374,10 +376,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   get modelkind(): 'bank' { return 'bank' satisfies Consts.Modelkind }
 }
 
-// == [Helpers]: BoxCheck, trackPairOf, disabledAnswerOf, otherThanBox
-
-/** The `parseConsistent` of a box validator, which `#demandBox` takes. */
-type BoxCheck<BoxT extends BoxSparse> = Readonly<{ parseConsistent: (val: unknown, other: object, refusal: Partial<Validator.ConsistencyRefusal>) => BoxT }>
+// == [Helpers]: trackPairOf, disabledAnswerOf, otherThanBox
 
 /** The revseq and lifepath of a Thing, as a `track` holds them. */
 function trackPairOf({ revseq, lifepath }: Pick<Thing, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }

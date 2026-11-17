@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CoreBox } from '../../src/models/core-box'
 import * as Phrases from '../../src/phrases'
-import { boxSparse, boxThing, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import type { BoxCleartexts, BoxRecord, RevisionOf } from '../../src/models/sealers'
+import { boxThing, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -14,8 +15,13 @@ const Life0 = lifeseqOfLifenum(0)
 const Life1 = lifeseqOfLifenum(1)
 const Life2 = lifeseqOfLifenum(2)
 
-/** A live box at its first revision, as a seal over {@link TH.boxShellOf}'s shell leaves it, without its sealed whisper. */
-function liveNext() { return CoreBox.nextRevisionOf(TH.boxShellOf()) }
+/** What a box's first seal takes in the clear: its sidecar. */
+const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
+
+/** A live box at its first revision, without its sealed whisper: the first revision over {@link TH.boxShellOf}'s shell. */
+function liveRevisionOf(): RevisionOf<BoxRecord, BoxCleartexts> {
+  return { ...TH.boxShellOf(), revtok: 'box-revision-tok-1', revseq: 0, am: 'a', lifeseq: Life0, lifepath: `${Life0}/${Life0}`, sidecar: TH.Sidecar }
+}
 
 describe("CoreBox", () => {
   it("is frozen, its purposes and tags too", () => {
@@ -27,17 +33,71 @@ describe("CoreBox", () => {
   })
 })
 
-describe("CoreBox.nextRevisionOf(prior)", () => {
+describe("CoreBox.donorPropsOf(donor), publicPropsOf(publicProps) and secretPropsOf(secretProps)", () => {
+  it("keeps a donor's Thing fields and sidecar, dropping its whisper, sealed or not, and any other field", () => {
+    const live = liveRevisionOf()
+    const donor = { ...live, whisper: TH.Whisper, whisper_sealed: Sealed, notes: 'dropped' }
+    expect(CoreBox.donorPropsOf(donor)).to.deep.equal(live)
+    expect(CoreBox.donorPropsOf(TH.boxShellOf())).to.deep.equal(TH.boxShellOf())
+  })
+
+  it("keeps the sidecar, am and written_at of publicProps, and the whisper of secretProps, dropping the rest", () => {
+    expect(CoreBox.publicPropsOf({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0, whisper: TH.Whisper } as never)).to.deep.equal({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0 })
+    expect(CoreBox.secretPropsOf({ whisper: TH.Whisper, sidecar: TH.Sidecar } as never)).to.deep.equal({ whisper: TH.Whisper })
+  })
+
+  const PublicPropsCases = [
+    [{ am: 'd' },                 'an am that is neither live nor a tombstone'],
+    [{ written_at: 'now' },       'a written_at that is not epoch millis'],
+    [{ sidecar: 'work' },         'a sidecar that is not an object'],
+    [null,                        'null'],
+  ] as const
+
+  for (const [publicProps, blurb] of PublicPropsCases) {
+    it(`refuses publicProps with ${blurb}`, () => {
+      TH.expectSyncRefusal(() => CoreBox.publicPropsOf(publicProps as never), 'bad_option')
+    })
+  }
+
+  it("refuses a donor of another kind, and secretProps with no whisper", () => {
+    TH.expectSyncRefusal(() => CoreBox.donorPropsOf({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.secretPropsOf({} as never), 'bad_option')
+  })
+
+  it("gives a frozen empty whisper as the tombstone's secrets", () => {
+    expect(CoreBox.tombstoneSecrets).to.deep.equal({ whisper: {} })
+    expect(Object.isFrozen(CoreBox.tombstoneSecrets)).to.be.true
+    expect(Object.isFrozen(CoreBox.tombstoneSecrets.whisper)).to.be.true
+  })
+})
+
+describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
   it("starts the first life over the shell: born now, at revseq 0, keeping the shell's root lifeseq", () => {
     vi.setSystemTime(TH.T0 + 3)
     const shell = TH.boxShellOf()
-    const next = CoreBox.nextRevisionOf(shell)
-    expect(next).to.deep.include({ am: 'a', revseq: 0, lifeseq: Life0, lifepath: `${Life0}/${Life0}`, born_at: TH.T0 + 3, written_at: TH.T0 + 3, sidecar: shell.sidecar })
+    const next = CoreBox.nextRevisionOf(shell, PublicProps)
+    expect(next).to.deep.include({ am: 'a', revseq: 0, lifeseq: Life0, lifepath: `${Life0}/${Life0}`, born_at: TH.T0 + 3, written_at: TH.T0 + 3, sidecar: TH.Sidecar })
     expect(next.revtok).to.not.eq(shell.revtok)
   })
 
+  it("writes it at the written_at given, born then in a new life", () => {
+    const next = CoreBox.nextRevisionOf(TH.boxShellOf(), { ...PublicProps, written_at: TH.T0 - 5 })
+    expect(next).to.include({ written_at: TH.T0 - 5, born_at: TH.T0 - 5 })
+  })
+
+  it("keeps the donor's sidecar unless publicProps gives one, which wins", () => {
+    const live = liveRevisionOf()
+    expect(CoreBox.nextRevisionOf(live).sidecar).to.deep.equal(TH.Sidecar)
+    expect(CoreBox.nextRevisionOf(live, { sidecar: { account: 'home' } }).sidecar).to.deep.equal({ account: 'home' })
+  })
+
+  it("refuses when neither the donor nor publicProps has a sidecar", () => {
+    const err = TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(TH.boxShellOf(), {}), 'bad_option')
+    expect(TH.thrownText(err)).to.include(Phrases.SidecarMissing)
+  })
+
   it("keeps a live box's life, at the next revision, written now", () => {
-    const live = liveNext()
+    const live = liveRevisionOf()
     vi.setSystemTime(TH.T0 + 5)
     const next = CoreBox.nextRevisionOf(live)
     expect(next).to.include({ lifeseq: live.lifeseq, lifepath: live.lifepath, born_at: live.born_at, revseq: live.revseq + 1, written_at: TH.T0 + 5, am: 'a' })
@@ -45,18 +105,18 @@ describe("CoreBox.nextRevisionOf(prior)", () => {
   })
 
   it("starts the next life over a tombstone: the next lifeseq, born now, the revseq still counting up", () => {
-    const tombstone = CoreBox.tombstoneOf(liveNext())
+    const tombstone = CoreBox.tombstoneOf(liveRevisionOf())
     vi.setSystemTime(TH.T0 + 7)
-    const next = CoreBox.nextRevisionOf({ ...tombstone, sidecar: { account: 'home' } })
+    const next = CoreBox.nextRevisionOf(tombstone, { sidecar: { account: 'home' } })
     expect(next).to.deep.include({ am: 'a', revseq: 2, lifeseq: Life2, lifepath: `${Life0}/${Life2}`, born_at: TH.T0 + 7, sidecar: { account: 'home' } })
   })
 
   it("leaves the prior it was handed as it was, and keeps none of a stored box's sealed whisper", () => {
     const shell = TH.boxShellOf()
     const copy = structuredClone(shell)
-    CoreBox.nextRevisionOf(shell)
+    CoreBox.nextRevisionOf(shell, PublicProps)
     expect(shell).to.deep.equal(copy)
-    const stored = CoreBox.recordOf(liveNext(), Sealed)
+    const stored = CoreBox.recordOf(liveRevisionOf(), Sealed)
     const next = CoreBox.nextRevisionOf(stored)
     expect(next).to.not.have.property('whisper_sealed')
   })
@@ -68,20 +128,19 @@ describe("CoreBox.nextRevisionOf(prior)", () => {
     [() => ({ ...TH.boxShellOf(), fmt: 5000 }),              'a prior of another fmt'],
     [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a prior of another kind'],
     [() => TH.omitting(TH.boxShellOf(), 'lifepath'),         'a prior with no lifepath'],
-    [() => TH.omitting(TH.boxShellOf(), 'sidecar'),          'a prior with no sidecar'],
     [() => null,                                             'null'],
   ] as const
 
   for (const [priorOf, blurb] of PriorCases) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(priorOf() as never), 'bad_option')
+      TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(priorOf() as never, PublicProps), 'bad_option')
     })
   }
 })
 
-describe("CoreBox.tombstoneOf(prior)", () => {
+describe("CoreBox.tombstoneOf(donor)", () => {
   it("makes the tombstone of a live box: its next revision, at the next lifeseq, written now, with no sidecar", () => {
-    const live = liveNext()
+    const live = liveRevisionOf()
     vi.setSystemTime(TH.T0 + 5)
     const next = CoreBox.tombstoneOf(live)
     expect(next).to.include({ am: 'x', revseq: live.revseq + 1, lifeseq: Life1, lifepath: `${Life0}/${Life1}`, born_at: live.born_at, written_at: TH.T0 + 5 })
@@ -90,32 +149,36 @@ describe("CoreBox.tombstoneOf(prior)", () => {
   })
 
   it("refuses a tombstone or the shell", () => {
-    const tombstone = CoreBox.tombstoneOf(liveNext())
+    const tombstone = CoreBox.tombstoneOf(liveRevisionOf())
     const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(tombstone), 'bad_option')
     expect(TH.thrownText(err)).to.include(Phrases.TombstoneOfLiveOnly)
     TH.expectSyncRefusal(() => CoreBox.tombstoneOf(TH.boxShellOf()), 'bad_option')
   })
 })
 
-describe("CoreBox.stampsOf(record)", () => {
+describe("CoreBox.stampOf(record)", () => {
   it("is the box's Thing fields alone: no sidecar and no sealed whisper", () => {
-    const live = liveNext()
-    const stamps = CoreBox.stampsOf(live)
-    expect(stamps).to.have.lengthOf(1)
-    expect(stamps[0]).to.deep.equal(boxSparse.parse(live))
-    expect(Object.keys(stamps[0] ?? {})).to.have.members(['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'])
+    const live = liveRevisionOf()
+    const { sidecar: _sidecar, ...thing } = live
+    const stamp = CoreBox.stampOf(live)
+    expect(stamp).to.deep.equal(thing)
+    expect(Object.keys(stamp)).to.have.members(['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'])
   })
 
   it("is the same for a record and its next revision without its seal", () => {
-    const live = liveNext()
+    const live = liveRevisionOf()
     const record = CoreBox.recordOf(live, Sealed)
-    expect(CoreBox.stampsOf(record)).to.deep.equal(CoreBox.stampsOf(live))
+    expect(CoreBox.stampOf(record)).to.deep.equal(CoreBox.stampOf(live))
   })
 
   it("is the same whatever the sidecar", () => {
-    const live = liveNext()
+    const live = liveRevisionOf()
     const resided = { ...live, sidecar: { account: 'home' } }
-    expect(CoreBox.stampsOf(resided)).to.deep.equal(CoreBox.stampsOf(live))
+    expect(CoreBox.stampOf(resided)).to.deep.equal(CoreBox.stampOf(live))
+  })
+
+  it("refuses the shell, which has no revision to bind", () => {
+    TH.expectSyncRefusal(() => CoreBox.stampOf(TH.boxShellOf()), 'bad_option')
   })
 })
 
@@ -164,7 +227,7 @@ describe("CoreBox.encode(cleartexts) and decode(text)", () => {
 
 describe("CoreBox.sealedOf(record) and recordOf(next, sealed)", () => {
   it("lays the sealed whisper into the record, and picks it out again", () => {
-    const record = CoreBox.recordOf(liveNext(), Sealed)
+    const record = CoreBox.recordOf(liveRevisionOf(), Sealed)
     expect(record.whisper_sealed).to.deep.equal(Sealed)
     expect(Object.isFrozen(record)).to.be.true
     expect(boxThing.parse(record)).to.deep.equal(record)
@@ -172,14 +235,14 @@ describe("CoreBox.sealedOf(record) and recordOf(next, sealed)", () => {
   })
 
   it("lays a sealed empty whisper into a tombstone, and picks it out again", () => {
-    const record = CoreBox.recordOf(CoreBox.tombstoneOf(liveNext()), OtherSealed)
+    const record = CoreBox.recordOf(CoreBox.tombstoneOf(liveRevisionOf()), OtherSealed)
     expect(record).to.include({ am: 'x' })
     expect(CoreBox.sealedOf(record)).to.deep.equal(OtherSealed)
   })
 
   it("refuses to lay in a sealed whisper that is not ciphertexts and tags", () => {
-    TH.expectSyncRefusal(() => CoreBox.recordOf(liveNext(), { ...Sealed, key_wrapped: 'k' } as never), 'bad_option')
-    TH.expectSyncRefusal(() => CoreBox.recordOf(liveNext(), TH.omitting(Sealed, 'codectag')), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.recordOf(liveRevisionOf(), { ...Sealed, key_wrapped: 'k' } as never), 'bad_option')
+    TH.expectSyncRefusal(() => CoreBox.recordOf(liveRevisionOf(), TH.omitting(Sealed, 'codectag')), 'bad_option')
   })
 
   it("refuses to make a record of the shell", () => {
@@ -188,7 +251,7 @@ describe("CoreBox.sealedOf(record) and recordOf(next, sealed)", () => {
 
   it("refuses 'damaged_whisper' for a sealed whisper of other tags, quoting none of it", () => {
     for (const tags of [{ codectag: 'json_v2' }, { schematag: 'whisper_v2' }]) {
-      const record = CoreBox.recordOf(liveNext(), { ...Sealed, ...tags })
+      const record = CoreBox.recordOf(liveRevisionOf(), { ...Sealed, ...tags })
       const err = TH.expectSyncRefusal(() => CoreBox.sealedOf(record), 'damaged_whisper')
       expect(TH.thrownText(err)).to.not.include(Sealed.ciphered.ciphertext_b64)
     }
