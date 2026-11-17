@@ -135,31 +135,35 @@ input, once Q7 is ruled.
   are a line or two each, and nothing conflicts if T3 lands first.
 * Sibling PRs changing the same lines stop base-sync: stack T3b on T3a.
 
-## Questions for the Coach
+## Rulings, 2026-11-17
 
-Each with the survey's recommendation and mine where they differ.
+The Coach's answers, in close to the Coach's words, beside each question.
 
-1. **How the verbs become typed by kind.** Generic in `ask.modelkind` through a `{ bank, gate, box }` map, or
-   `GetAsk<RecordT>` / `ListAsk<RecordT>` mirroring `WriteAsk<RecordT>`. The survey: the modelkind map, medium. Mine:
-   the `RecordT` form, since complete.md's Feature names `GetAnswer<RecordT>`, `WriteAnswer<RecordT>`, `WriteAsk<RecordT>`
-   and `WriteAsk<RecordT>` already exists; the worker reports if the types fight. Medium.
-2. **The ended check:** one private helper covering all five, `#tryBirth` included. Firm.
-3. **The `as` in `answerOf`:** accept it as a reported safety hatch, and state the by-kind promise on the `VaultDB`
-   interface's doc. Medium.
-4. **Does the lease check the sealer it is handed?** A duck `Checks.sealer` (functions where functions belong, `tags`
-   and `purposes` objects) refusing `bad_option`, and `SealerkindCases` become "not a sealer" cases; never `=== CoreBox`,
-   which would teach the lease about boxes. Medium. With no check, a guarantees-drift line under G7 and G9.
-5. **Where `CoreBox` lives:** `src/models/box.ts`, exported from `safebyok/core` only. Medium-low.
-6. **The lease's typing once `nextRevisionOf` goes:** `Sealer<NextT, RecordT, CleartextsT>` and `seal<NextT>(sealer,
+1. **How the verbs become typed by kind:** `FooAsk<RecordT>` feels right (`GetAsk<RecordT>`, `ListAsk<RecordT>`,
+   mirroring `WriteAsk<RecordT>`). It should let the verbs overload by `op` and by `modelkind`, and the answers by
+   those and by `act`. Advise once it comes together.
+2. **Does the lease check the sealer it is handed:** yes, a duck check for the functions it expects, refusing
+   `bad_option`; or brand the class. Never `=== CoreBox`.
+3. **Where `CoreBox` lives:** `src/models/core-box.ts`, exported from `safebyok/core` only.
+4. **The lease's typing once `nextRevisionOf` goes:** `Sealer<NextT, RecordT, CleartextsT>` and `seal<NextT>(sealer,
    nextRevision: NextT, cleartexts): Promise<NextT & SealedOf<…>>`, so `sealBox` and `tombstoneBox` keep `BoxRecord` and
-   `BoxTombstone` with no cast. Medium.
-7. **What "accepts a duck record" means for put and del.** The bank picks the ask's fields out of the draft, so an extra
-   draft key is dropped where today it refuses; the `record` itself is never stripped, and the vaultDB checks it
-   strictly. Dropping turns a refusal into a success, so it needs a yes. "Generous at the customer's door, strict past
-   it" points to yes; the handoff's ruling names `putAskOf` among "the exceptions", which may point the other way.
-   Medium.
-8. **The old names** go, with no aliases. Firm. `listBoxRecords` gives sparse records; keep the name, with a doc line.
-   Low.
-9. **`GetBoxAnswer`** stays, for the shell riding in a `gotvoid` answer that `GetAnswer` types as null. Low.
-10. **The stamp pair's spelling,** as under item 4. Medium: the hunt's own text for item 14 was in a session
-    transcript and is lost, so confirm this is what it meant.
+   `BoxTombstone` with no cast: lgtm.
+5. **"Accepts a duck record" for put and del:** the ask builders (`putAskOf`, `makePutAsk`) are in the chain the
+   classifier tidy reworks, so T3b leaves them as they are: an extra draft key still refuses. Raise it if something
+   blocks.
+
+## Open
+
+* **The stamp pair's spelling,** as under item 4: `bankStamp` / `gateStamp` wherever a third party names the pair,
+  `stamp` for a thing's own. The hunt's own text for item 14 was in a session transcript and is lost: confirm this is
+  what it meant.
+
+## Decided in the plan, no ruling needed
+
+* **The ended check** is one private helper, called first in each of the five verbs, `#tryBirth` included.
+* **The `as` in the adapter's `answerOf`** is a safety hatch, reported, with the by-kind promise stated on the `VaultDB`
+  interface's doc.
+* **The old verbs** (`tryGetBox`, `tryPutBox`, `tryDelBox`, `tryListBoxes`) are removed with no aliases: before 1.0
+  there are no shims (CLAUDE.md). `listBoxRecords` keeps its name though it gives sparse records; its doc block says so.
+* **`GetBoxAnswer` stays,** because a get with `ifAbsent: 'shell'` gives the shell in a `gotvoid` answer, which a plain
+  `GetAnswer` types as null.
