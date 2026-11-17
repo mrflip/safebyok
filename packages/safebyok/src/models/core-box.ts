@@ -8,7 +8,7 @@ import { type BoxStamp, boxStamp } from './stamps'
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
 
-/** The checks of a box's sealable, live or any, of its public and secret props, and of its stored record. */
+/** Checks for what a box's seal takes and makes: the sealable, a live sealable for a tombstone, the public and secret props, and the stored record. */
 const Checks = Validator.Checkers('bad_option', ({ obj, oneof, epochMillis }) => ({
   boxSealable,
   liveBoxSealable: boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),

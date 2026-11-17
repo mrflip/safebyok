@@ -196,8 +196,8 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isShellWhole,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
-  // What a box's seal takes its next revision's fields from strips: what it keeps is its Thing fields and sidecar, so a
-  // sealed or an unsealed whisper given with it is dropped. The shell has no record, so its revseq, lifeseq and lifepath may be its -1.
+  // A box's sealable keeps only its Thing fields and sidecar, so a whisper given with it, sealed or not, is dropped. The
+  // shell has no stored row, so its revseq, lifeseq and lifepath may be the shell's.
   const boxSealable  = obj({
     ...thingRecord.shape,
     labelpath:      boxLive.shape.labelpath,
