@@ -281,7 +281,7 @@ export function childShellCited(parentLifepath: string): ThingCited {
 }
 // --
 
-// == [Shells]: ShellChecks, VoidSentinel, ShellScoped, ShellParent, shellOf
+// == [Shells]: ShellChecks, VoidSentinel, isVoidSentinel, ShellScoped, ShellParent, shellOf
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
 const ShellChecks = Validator.Checkers('bad_option', ({ obj, lit, uint, label, union, str }) => {
@@ -321,6 +321,9 @@ function isFmtOwn({ labelpath, fmt }: { labelpath: string, fmt: number }): boole
  * Its revseq is -1. A write cites it as the Thing it expects to find, to make the Thing's first revision.
  */
 export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
+
+/** True when `record` is a void sentinel: its revseq is the shell's -1. */
+export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
 
 /** What {@link shellOf} reads of its first argument: the scope, and any other Thing field it proposes for the shell, its labelpath or label among them. */
 export type ShellScoped = Pick<ThingScope, 'userid' | 'banklabel'> & Partial<ThingRecord>
