@@ -50,7 +50,7 @@ would put a comparison outside `structuralSharing`. Ruled by the Coach, 2026-11-
 
 ### The ThingMinder detects no conflict among the records it holds
 
-* current outcome: `mergedCarOf` keeps the later record by lifepath and then revseq. Two records of one revision
+* current outcome: `mergedCarOf` returns the later record by lifepath and then revseq. Two records of one revision
   with different revtoks keep whichever landed first. A get that storage answers older than the record cached when
   the get began refuses `stale_read`, and the cached record stays.
 * alternatives:

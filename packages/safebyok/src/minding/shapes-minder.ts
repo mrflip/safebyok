@@ -15,11 +15,11 @@ import type { TSQGotAnswer } from './thing-minder'
 export interface QueryCacheOpts {
   /** How long a car stays timely, in milliseconds. A `behind` or `bare` car is never timely. */
   staleTime: number
-  /** How long a car stays in the cache once no TanStack observer uses it, in milliseconds. `Infinity` keeps it until `goodbye`. */
+  /** How long a car stays in the cache once no TanStack observer uses it, in milliseconds. `Infinity` means until `goodbye`. */
   gcTime:    number
 }
 
-/** The default {@link QueryCacheOpts}: a car stays timely for an hour, and cached until `goodbye`. */
+/** The default {@link QueryCacheOpts}: a car stays timely for an hour, and stays cached until `goodbye`. */
 export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ staleTime: 60 * 60 * 1000, gcTime: Infinity })
 
 // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its
@@ -62,9 +62,9 @@ export type MinderGetAsk     = GetAsk & Readonly<{ ifAbsent: 'nil', track: Track
 /** A get's options: `staleTime` overrides the minder's own. */
 export type MinderGetAskOpts = Z.input<typeof minderGetAskOpts>
 /** `tryAt`'s options:
- * * `staleTime`          -- overrides the minder's own
- * * `ifStale: 'get'`     -- read the cache alone (default)
- * * `ifStale: 'refresh'` -- also fetch a stale or missing car in the background
+ * - `staleTime`          -- overrides the minder's own
+ * - `ifStale: 'get'`     -- read the cache alone (default)
+ * - `ifStale: 'refresh'` -- also fetch a stale or missing car in the background
  */
 export type MinderAskOpts    = Z.input<typeof minderAskOpts>
 /** The parts of a {@link Bank} a minder uses: its scope, its ask builders, and where trouble no caller waits on goes. */

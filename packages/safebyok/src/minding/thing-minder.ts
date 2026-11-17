@@ -5,7 +5,7 @@
 // Where a ruling, a design note or this code seems to serve one end at the other's expense, report it rather than split
 // the difference.
 
-/** `ThingMinder`, which keeps one kind of Thing in one bank fresh in a TanStack Query cache. */
+/** `ThingMinder`, which minds one kind of Thing in one bank in a TanStack Query cache. */
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
@@ -28,8 +28,8 @@ import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpRecords
 // `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
 // A timely car is full, gone or void: a behind or bare car is never timely.
 /** A get's answer, read from the cache. Beside a get's own acts:
- * * `vacant`   -- nothing is cached
- * * `untimely` -- the car is older than `staleTime`, is `behind` or `bare`, or its last get was refused
+ * - `vacant`   -- nothing is cached
+ * - `untimely` -- the car is older than `staleTime`, is `behind` or `bare`, or its last get was refused
  */
 export type GotAnswer = (
   | GoodAnswer<Thing, 'gotlive'>
@@ -44,7 +44,7 @@ export interface CarFreshness {
   car:         ThingCar<Thing> | undefined
   /** False where the act is `vacant` or `untimely`. */
   isTimely:    boolean
-  /** When a record last landed in the car, or 0 for none. */
+  /** When a record last arrived in the car, or 0 for none. */
   refreshedAt: EpochMillis
   /** True while a get of the car is under way. */
   isFetching:  boolean
@@ -65,9 +65,9 @@ export type TSQAnswer = TSQGotAnswer | BadAnswer
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
-  /** The TanStack Query client whose cache holds the cars. A host may share its own. */
+  /** The TanStack Query client whose cache has the cars. A host may share its own. */
   tsq:             TSQ.QueryClient
-  /** The cache's timings ({@link QueryCacheOpts}). A field left out takes its value from {@link DefaultQueryCacheOpts}. */
+  /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
@@ -85,7 +85,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
 }))
 // --
 
-/** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through its own watch of the bank.
+/** Minds one kind of Thing in one bank in a TanStack Query cache, through its own watch of the bank.
  * Internal: the layers above the core build on it, and a host does not call it.
  * It reads only its bank's scope and ask builders, so it may be made before the bank's birth.
  * It answers `get`, `tryAt` and `list` only between `hello` and `goodbye`, and refuses `disabled` outside them.
@@ -138,10 +138,10 @@ export class ThingMinder {
       ...FixedQueryCacheOpts,
       staleTime:         staleTimeFnOf(staleTime),
       queryFn:           ({ queryKey }) => this.#fetchCar(this.#bank.makeGetAsk(this.#scopeOfKey(queryKey))),
-      structuralSharing: keptValOf,
+      structuralSharing: mergedValOf,
     })
     this.#isReady = true
-    // Kept whatever the host's gcTime: its own key's defaults reach no box under it.
+    // The root box's car stays, whatever the host's gcTime: its own query key's defaults reach no box under it.
     if (this.modelkind === 'box') { this.#tsq.setQueryDefaults(this.queryKey(this.#rootBoxScope), { gcTime: Infinity }) }
     this.#startVaultDBWatch()
   }
@@ -193,7 +193,7 @@ export class ThingMinder {
 
   /** Get `ask`'s car: the cached one if timely, else from the vaultDB. A get already under way is shared.
    * Refuses `stale_read` when the vaultDB answers with a revision older than one cached when the get began. A later get asks again.
-   * With no root car cached, a get of a box the vaultDB holds nothing for refuses: get the root box first.
+   * With no root car cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
    */
   async get(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): Promise<ThingCar<Thing>> {
     const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
@@ -224,9 +224,9 @@ export class ThingMinder {
   }
 
   /** Call `listener` each time a car changes, with the answer for its scope. Returns the function that stops it.
-   * A car changes when a record lands in it (even one that changes nothing), a get of it is refused, or it is invalidated
+   * A car changes when a record arrives in it (even one that changes nothing), a get of it is refused, or it is invalidated
    * or removed. The answer's `isTimely` uses the minder's own `staleTime`.
-   * Nothing is called when a car ages past `staleTime`, and listening keeps no car cached: use a TanStack observer for either.
+   * Nothing is called when a car ages past `staleTime`, and listening caches no car: use a TanStack observer for either.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
   listen(listener: (answer: TSQGotAnswer) => void): () => void {
@@ -234,7 +234,7 @@ export class ThingMinder {
     const { keyPrefix } = this
     return this.#tsq.getQueryCache().subscribe((event) => {
       if (! (isCarEvent(event) && TSQ.matchQuery({ queryKey: keyPrefix }, event.query))) { return }
-      // The cache's events are typed loosely; a query under this minder's prefix holds a car of its own.
+      // The cache's events are typed loosely; a query under this minder's prefix has a car of its own.
       const carQuery = event.query as TSQ.Query<ThingCar<Thing>>
       const ask      = this.#bank.makeGetAsk(this.#scopeOfKey(carQuery.queryKey))
       const answer   = this.#answerOfTSQ(ask, this.#queryCacheOpts)
@@ -245,7 +245,7 @@ export class ThingMinder {
 
   // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #cachedAt, #tsqFind
 
-  // Its refusal lands beside the car, where the next tryAt finds it as `lastErr`.
+  // Its refusal is cached beside the car, where the next tryAt finds it as `lastErr`.
   /** Fetch `ask`'s car in the background, if it is stale. */
   #backgroundRefresh(ask: GetAsk, staleTime: number): void {
     void this.#doGet(ask, staleTime).catch(noop)
@@ -270,7 +270,7 @@ export class ThingMinder {
     return this.#tsq.getQueryData<ThingCar<Thing>>(this.queryKey(scoped))
   }
 
-  /** The cache's query holding `scoped`'s car, or undefined for none. */
+  /** The cache's query of `scoped`'s car, or undefined for none. */
   #tsqFind(scoped: ThingScope): TSQ.Query<ThingCar<Thing>> | undefined {
     return this.#tsq.getQueryCache().find<ThingCar<Thing>>({ queryKey: this.queryKey(scoped), exact: true })
   }
@@ -292,14 +292,14 @@ export class ThingMinder {
 
   // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #fetchCar, #shellAt
 
-  /** The start of the key every one of this minder's cars is cached under. */
+  /** The start of the query key every one of this minder's cars is cached under. */
   get keyPrefix(): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, this.modelkind] }
 
   // Each label is a segment of its own, so that the key without its final '.' selects a Thing and everything under it.
   // The '.' marks the Thing itself, and can never be a label: TanStack matches query defaults by key prefix, so without
   // it the root box's key would be the box minder's keyPrefix and start every box's key, and no defaults could single
   // out the root box. A labelpath starts with its modelkind, so the key does too; do not repeat it.
-  /** The key `scoped`'s car is cached under. */
+  /** The query key `scoped`'s car is cached under. */
   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
 
   /** TanStack's query options for a get of `ask`. */
@@ -308,7 +308,7 @@ export class ThingMinder {
   }
 
   // A host's observer keeps the default queryFn past goodbye, and would cache what it fetches.
-  /** Fetch `ask`'s car from the vaultDB, made of its shell where storage holds nothing.
+  /** Fetch `ask`'s car from the vaultDB, made of its shell where storage has nothing.
    * Refuses `stale_read` for an answer older than the revision cached when it began.
    */
   async #fetchCar(ask: GetAsk): Promise<ThingCar<Thing>> {
@@ -318,13 +318,13 @@ export class ThingMinder {
     const answer = await this.#vaultDB.tryGetThing(ask)
     if (! answer.ok) { throw answer.err }
     const record = answer.val ?? this.#shellAt(ask)
-    // TanStack keeps the car and its time, marks it invalidated, and holds the refusal beside it as its error.
+    // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
     if ((prior !== undefined) && (cmpRecords(prior.newest, record) < 0)) { throw staleRead(ask) }
     return carOf(record)
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The shell at `scoped`. Below a root, it takes the life of its root's cached car, and refuses `bad_option` where none is cached. */
+  /** The shell at `scoped`. Below a root, it has the life of its root's cached car, and refuses `bad_option` where none is cached. */
   #shellAt(scoped: ThingScope): VoidSentinel {
     const { labelpath } = scoped
     if (! labelpath.includes('/')) { return shellOf(scoped) }
@@ -362,7 +362,7 @@ export class ThingMinder {
     if (! this.#isReady) { throw minderNotStarted() }
   }
 
-  /** The scope whose car is cached under `queryKey`, one of this minder's keys. */
+  /** The scope whose car is cached under `queryKey`, one of this minder's query keys. */
   #scopeOfKey(queryKey: TSQ.QueryKey): ThingScope {
     return { userid: this.userid, banklabel: this.banklabel, labelpath: queryKey.slice(3, -1).join('/') }
   }
@@ -389,7 +389,7 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: minderNotStarted, staleRead, isCarEvent, gotAnswerOf, staleTimeFnOf, isStaleQuery, keptValOf
+// == [Helpers]: minderNotStarted, staleRead, isCarEvent, gotAnswerOf, staleTimeFnOf, isStaleQuery, mergedValOf
 
 /** The refusal of a read on a minder that is not minding. */
 function minderNotStarted(): Errors.VaultError {
@@ -401,7 +401,7 @@ function staleRead(ask: GetAsk): Errors.VaultError {
   return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
 }
 
-// A record lands (success), a get is refused or the car invalidated (both leave the car untimely), or the car is
+// A record arrives (success), a get is refused or the car invalidated (both leave the car untimely), or the car is
 // removed. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.
 /** True for a cache event that changes a car, or whether it is timely. */
 function isCarEvent(event: TSQ.QueryCacheNotifyEvent): boolean {
@@ -419,7 +419,7 @@ function gotAnswerOf(ask: GetAsk, car: ThingCar<Thing> | undefined, isTimely: bo
   return                                                  { ok: true, ask, act: 'untimely', world: null, val: undefined }
 }
 
-// A query under this minder's prefix holds a car this minder cached.
+// A query under this minder's prefix has a car this minder cached.
 /** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link isVaultDBNewer}. */
 function staleTimeFnOf(staleTime: number): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => number {
   return (carQuery) => {
@@ -434,9 +434,9 @@ function isStaleQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTim
 }
 
 // TanStack also calls it on an observer's selected and placeholder values, which may be anything.
-/** The value TanStack keeps when `landed` lands over `prior`: the merged car ({@link mergedCarOf}) for a car, else TanStack's default sharing. */
-function keptValOf(prior: unknown, landed: unknown): unknown {
-  if (! isThingCar(landed)) { return TSQ.replaceEqualDeep(prior, landed) }
-  return mergedCarOf(isThingCar(prior) ? prior : undefined, landed)
+/** The value TanStack caches when `delivered` arrives over `prior`: the merged car ({@link mergedCarOf}) for a car, else TanStack's default sharing. */
+function mergedValOf(prior: unknown, delivered: unknown): unknown {
+  if (! isThingCar(delivered)) { return TSQ.replaceEqualDeep(prior, delivered) }
+  return mergedCarOf(isThingCar(prior) ? prior : undefined, delivered)
 }
 // --

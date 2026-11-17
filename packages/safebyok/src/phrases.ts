@@ -127,7 +127,7 @@ export const AnswerNotMade = "The vaultDB could not make an answer for a failure
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
 
-/** A get of an empty Thing below a root, before the minder holds that root. */
+/** A get of an empty Thing below a root, before the minder has that root. */
 export const RootNotCached = "This ThingMinder has not cached the root box yet, so it cannot make the shell of a Thing below it: its notice or a get of the root box comes first."
 
 /** A minder read before `hello`, or after `goodbye`. */
@@ -149,7 +149,7 @@ export const CarRecordShape = "A ThingCar's newest record lacks a Thing's scope 
 export const CarFullestShape = "A ThingCar's fullest record is not whole: this is a bug in safebyok."
 
 /** A full car with two records, or a tombstone. */
-export const CarFullSplit = "A full ThingCar holds one live record in both its newest and fullest, and this one does not: this is a bug in safebyok."
+export const CarFullSplit = "A full ThingCar has one live record in both its newest and fullest, and this one does not: this is a bug in safebyok."
 
 /** A behind or bare car whose newest is whole, or a tombstone. */
 export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is live and sparse, and this one's is not: this is a bug in safebyok."
