@@ -199,9 +199,9 @@ export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
  * It exists only so a test can show two wayins have one bankKey, or read what a seal is bound to; no model hands out a bankKey.
  * Rejects with WebCrypto's error when the wayin will not unwrap.
  */
-export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
+export async function _cheat_bankKeyBytesOf(bankStamp: BankStamp, gateStamp: GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
   const header = wayin.toJSON()
-  const ctx = wayinCtxOf(bank, gate, header)
+  const ctx = wayinCtxOf(bankStamp, gateStamp, header)
   async function wayinKeyOf(): Promise<CryptoKey> {
     if ('prfBytes' in secret) { return Crypto.deriveWrappingKey(secret.prfBytes, ctx) }
     if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase unwraps a passphrase wayin alone.') }

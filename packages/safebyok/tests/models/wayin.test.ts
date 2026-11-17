@@ -128,7 +128,7 @@ describe("wayin.toJSON()", () => {
   })
 })
 
-describe("wayinCtxOf(bank, gate, header)", () => {
+describe("wayinCtxOf(bankStamp, gateStamp, header)", () => {
   const BadHeaderCases = [
     [{ wayinkind: 'telepathy' }, 'of an unknown kind'],
     [{ wayinlabel: 'passkey0' }, "under the other kind's wayinlabel"],
