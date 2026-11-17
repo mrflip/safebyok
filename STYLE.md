@@ -9,6 +9,12 @@ mechanically enforceable; where it and this document disagree, the linter wins a
 is a bug. These are defaults with reasons. Where one makes a piece of code worse, say so and
 propose the exception.
 
+## Writing
+
+Write for an intelligent React developer in the non-React code, and an intelligent white hat in the react code. The person reading has not seen your reasoning, or wanted to, and may be switching in from other work. Messages should generally be self-contained: the reader should understand what you mean without having to dig for other context. Practice progressive disclosure.
+
+Use plain words, and write in clear, understandable full sentences. (In a doc block, a fragment will do if it says everything and stands alone.) Do not use a term or abbreviation that you made up during the work. Say what the thing is in a way any reader would understand. Write mostly in the style of thoughtful libraries from your memory: Rails, Zod, etc. Use active voice, and consistently use the precise terms from our codebase. Practice concision, but do ensure that your messages have the key context. Aim to make your text as human-readable and clear as possible.
+
 ## Imports
 
 * No barrel files beyond the package's entry points: import from the file that defines the thing.
