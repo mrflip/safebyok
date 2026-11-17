@@ -361,12 +361,20 @@ has.
 * **Frame a refusal of a host's options in the parse**, `parse(opts, { where, advice })`, not in a
   catch that rethrows. Never `Z.config`: it is the host's Zod too.
 
-**Strict or strip.** A shape parsed out of whatever carries it (a scope, a stamp, a sparse shape)
-strips, so a Vault object, its record or its snapshot passes as any of them, and destructuring the
-parsed output sanitizes it. Three things are strict: a bag of options a person typed, where
-stripping would quietly drop a misspelt option; a stored record, where a field this version does
-not know is damage or a newer format; and a box's stamp, where a field beside its own would be
-shown but not bound. Say why beside any other strict site.
+**Strict for a whole type, duckish for a pick.** A checker for a whole type (an ask, an answer, a
+record, a field, a bag of options) is strict: a key it does not know is a mistake or damage, and it
+refuses. A checker that picks a few fields out of a larger object is duckish (VOCABULARY.md,
+*duckish*). `bankScope` takes any scoped object, passes on only the scope's fields, and refuses when
+a required field is missing, when a field it knows but ignores has the wrong type, or when a field
+it does not know is mixed in. If a real object fails a duckish check, add its fields to the
+checker's ignored set; never convert the checker to strip.
+
+**Declare what they hold** `#declare-what-they-hold`. Consider the type your caller has in hand:
+most likely an ask, an answer, a record, a field, or something scoped. Declare that type. Picking
+or checking is the called function's business, not the caller's. Pick down only when you must, and
+then duckishly. A type used only once complicates your function and every caller's, but if it is
+necessary, use a module-local Checker. If a function's declared type is not what you hold, broaden
+its signature type; don't contort yours.
 
 **No transform that changes a name's value** (trim, lowercase, coerce, normalize): a name is bound
 into storage and crypto, so refuse instead. A structural transform is fine: a scopepath's
