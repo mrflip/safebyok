@@ -44,7 +44,7 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderSc
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
   const friendFields     = obj({ scope: thingWatchScope, rootBox: boxRecordOrShell, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
-  const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn(), invalidateQueries: fn() })
+  const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)
   const minderListener   = fn<(answer: TSQGotAnswer) => void>()
   // Its fields alone: an ask or a record passes, and is read as its scope.

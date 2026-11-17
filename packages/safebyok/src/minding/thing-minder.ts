@@ -121,8 +121,7 @@ export class ThingMinder {
     this.#tsq.setQueryDefaults(this.keyPrefix, {
       ...this.#queryCacheOpts,
       ...FixedQueryCacheOpts,
-      // A car under this minder's prefix is one this minder cached.
-      staleTime:         (carQuery) => staleTimeOf(carQuery.state.data as ThingCar<Thing> | undefined, staleTime),
+      staleTime:         staleTimeFnOf(staleTime),
       queryFn:           ({ queryKey }) => this.#fetchCar(this.#bank.makeGetAsk(this.#scopeOfKey(queryKey))),
       structuralSharing: keptValOf,
     })
@@ -209,7 +208,7 @@ export class ThingMinder {
   isStaleAt(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): boolean {
     const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
     this.#demandOwnAsk(ask)
-    return this.#isStale(ask, staleTime)
+    return isStaleQuery(this.#tsqFind(ask), staleTime)
   }
 
   /** Call `listener` with the answer `tryAt` would give for a scope, under this minder's own `staleTime`, each time a record lands in its car, a get of it is refused, or the car is invalidated or removed.
@@ -230,7 +229,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #cachedAt, #tsqFind, #isStale
+  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #cachedAt, #tsqFind
 
   // Its refusal lands beside the car, where the next tryAt finds it as `lastErr`.
   /** Initiate fetch of `ask`'s record, if its car is stale, without waiting for the result. If a fetch is under way, it will use its result (not starting a new one). */
@@ -242,7 +241,7 @@ export class ThingMinder {
   async #doGet(ask: GetAsk, staleTime: number): Promise<ThingCar<Thing>> {
     let fetched: ThingCar<Thing>
     try {
-      fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), staleTime: (carQuery) => staleTimeOf(carQuery.state.data, staleTime) })
+      fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), staleTime: staleTimeFnOf(staleTime) })
     } catch (err) {
       // TanStack cancels a get under way when goodbye removes its car.
       throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
@@ -260,12 +259,6 @@ export class ThingMinder {
   /** The cache's query for `scoped`, which holds its car, or undefined for none. */
   #tsqFind(scoped: ThingScope): TSQ.Query<ThingCar<Thing>> | undefined {
     return this.#tsq.getQueryCache().find<ThingCar<Thing>>({ queryKey: this.queryKey(scoped), exact: true })
-  }
-
-  /** True when no car is cached for `scoped`, or the car cached is not timely within `staleTime`. */
-  #isStale(scoped: ThingScope, staleTime: number): boolean {
-    const carQuery = this.#tsqFind(scoped)
-    return carQuery?.isStaleByTime(staleTimeOf(carQuery.state.data, staleTime)) ?? true
   }
   // --
 
@@ -314,12 +307,13 @@ export class ThingMinder {
     return carOf(record)
   }
 
-  // Boxes are the only Things under a root, for now: one label under the root box, which `hello` caches.
-  /** The shell at `scoped`: a root's, or that of a Thing under the root of its kind as this minder caches it. */
+  // A box's shell comes from the bank's root box, not the car cached for it, so that it is the same whether or not the
+  // root box's notice has landed.
+  /** The shell at `scoped`: a root's, a box's under the bank's root box, or that of another Thing under its root's car. */
   #shellAt(scoped: ThingScope): VoidSentinel {
     const { labelpath } = scoped
     if (! labelpath.includes('/')) { return shellOf(scoped) }
-    const parent = this.#cachedAt({ ...scoped, labelpath: modelkindOf(labelpath) })?.newest
+    const parent = (modelkindOf(labelpath) === 'box') ? this.#bank.rootBox : this.#cachedAt({ ...scoped, labelpath: modelkindOf(labelpath) })?.newest
     // With no root cached, shellOf refuses: below a root, a shell needs a life.
     return (parent === undefined) ? shellOf(scoped) : shellOf(scoped, parent)
   }
@@ -363,7 +357,7 @@ export class ThingMinder {
   /** The {@link TSQGotAnswer} the cache gives for `ask`'s scope, timely within `opts.staleTime`. */
   #answerOfTSQ(ask: GetAsk, opts: Readonly<{ staleTime: number }>): TSQGotAnswer {
     const carQuery = this.#tsqFind(ask)
-    const isTimely = (! this.#isStale(ask, opts.staleTime))
+    const isTimely = (! isStaleQuery(carQuery, opts.staleTime))
     const lastErr  = carQuery?.state.error ?? null
     return {
       ...gotAnswerOf(ask, carQuery?.state.data, isTimely),
@@ -377,7 +371,7 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: minderNotStarted, staleRead, isCarEvent, gotAnswerOf, staleTimeOf, keptValOf
+// == [Helpers]: minderNotStarted, staleRead, isCarEvent, gotAnswerOf, staleTimeFnOf, isStaleQuery, keptValOf
 
 /** The refusal of a read on a minder that is not minding. */
 function minderNotStarted(): Errors.VaultError {
@@ -407,9 +401,18 @@ function gotAnswerOf(ask: GetAsk, car: ThingCar<Thing> | undefined, isTimely: bo
   return                                                  { ok: true, ask, act: 'untimely', world: null, val: undefined }
 }
 
-/** `staleTime`, or 0 where the vaultDB holds a newer whole record than `car`'s, so that the next get fetches it. */
-function staleTimeOf(car: ThingCar<Thing> | undefined, staleTime: number): number {
-  return ((car !== undefined) && isVaultDBNewer(car)) ? 0 : staleTime
+// A query under this minder's prefix holds a car this minder cached.
+/** TanStack's staleTime for a car's query: `staleTime`, or 0 where the vaultDB holds a newer whole record, so that the next get fetches it. */
+function staleTimeFnOf(staleTime: number): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => number {
+  return (carQuery) => {
+    const car = carQuery.state.data as ThingCar<Thing> | undefined
+    return ((car !== undefined) && isVaultDBNewer(car)) ? 0 : staleTime
+  }
+}
+
+/** True when `carQuery` is absent, or its car is not timely within `staleTime`. */
+function isStaleQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTime: number): boolean {
+  return carQuery?.isStaleByTime(staleTimeFnOf(staleTime)(carQuery)) ?? true
 }
 
 // TanStack also calls it on an observer's selected and placeholder values, which may be anything.
