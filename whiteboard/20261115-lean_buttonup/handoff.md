@@ -13,28 +13,26 @@ the Coach runs the work, and rulings recorded nowhere else.
   argument.
 * Rounds of building go to thread-workers; small edits are yours. A worker's report comes to the Coach whole.
 * Coach text is not sacred: fix it and report each fix.
+* Read VOCABULARY.md for 'fingerpainting'
 
 ## State
 
-* **Merged:** #707 to #711.
-* **#712** (open, `20261116-complete_plan`): complete.md reorganized; CLAUDE.md's broken-state rule; the worker rule on
-  undirected contract changes; the PreCompact hook (`.claude/compact-instructions.md`); `notes/supervising.md`; the
-  workshop skill; this file and `classifier-tidy.md`.
-* **#713** (ready, `20261116-signature_pass`): step 3, the signature pass. Reviewed (no behaviour change), CI green.
-  Item 10 (the birth's batch-shaped answer) was reverted from it.
+* **Merged:** #707 to #713. #712 carried the plan and guidance (CLAUDE.md's broken-state rule, the worker rule on
+  undirected contract changes, the PreCompact hook, `notes/supervising.md`, the workshop skill); #713 was step 3, the
+  signature pass, with item 10 reverted.
 * **#714** (draft, `20261116-world_function`): `whiteboard/20261116-world_function/world_function.md` and
-  `notes/transaction-levels.md`. A later thread; the Coach may take it to another agent.
-* **Base checkout** (`20261113-crypt_plan`): main plus #712, #714 and #713, with the Coach's three crypt and
-  gate-policy docs commits on top, then copies of #713's last three commits and the plan commits since. The last
-  base-sync snapshot is `.git/base-sync/20261116T224912Z`. `human/PROMPTS.md` and `whiteboard/20261116-react_backwards/`
-  are untracked and not this thread's: leave them.
+  `notes/transaction-levels.md`, a later thread the Coach may take to another agent; it also carries this folder's
+  plan commits since #712 (`t3-plan.md`, the Coach's hand edits), `whiteboard/20261116-react_backwards/` and
+  `human/PROMPTS.md`.
+* **Base checkout** (`20261113-crypt_plan`): main plus #714, with the Coach's three crypt and gate-policy docs commits.
 
 ## Next
 
-1. **Step 4, the classifier tidy.** The Coach is working through `classifier-tidy.md` in a neighbouring session; its
-   rulings come back from there. `demandBornAtKept`'s replacement by `demandConsistent` goes here, not in #713.
-2. **Step 5, T3** (`bank_box_errors`), as complete.md lists it.
-3. **Later:** world_function.md; the batch ask.
+1. **T3a `core_box`** (`t3-plan.md`): can start now, cut from main. Ruled but for the stamp pair's spelling.
+2. **The classifier tidy:** the Coach is working through `classifier-tidy.md` in a neighbouring session; its rulings
+   come back from there. `demandBornAtKept`'s replacement by `demandConsistent` goes here.
+3. **T3b `bank_box_answers`** (`t3-plan.md`): after the tidy merges, stacked on T3a.
+4. **Later:** world_function.md; the batch ask.
 
 ## Rulings recorded nowhere else, or only in this thread's files
 
@@ -57,10 +55,3 @@ the Coach runs the work, and rulings recorded nowhere else.
 * The workshop skill and `notes/supervising.md`: the Coach's read.
 * For `notes/security.md`, once world_function.md decides it: a bank delete's leftover `gate/<label>` rows still wrap the
   dead bank's bankKey.
-
-## Gotchas learned
-
-* Before cherry-picking onto a PR branch, check the local ref against origin: `git worktree add` on an existing branch
-  takes the local ref, which can be behind.
-* base-sync stops when two sibling PRs change the same lines. Keep a PR's files disjoint from its siblings', or stack it.
-* The Coach merges mid-flight: `gh pr view N --json state` immediately before every push.
