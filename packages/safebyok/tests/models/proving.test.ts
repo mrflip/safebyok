@@ -3,7 +3,7 @@ import type { Deriver } from 'safebyok-big/internals'
 import { Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { CoreBox } from '../../src/models/core-box'
 import { Gate } from '../../src/models/gate'
-import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
+import { NOVEL, PasskeyProving, PassphraseProving, Proving, type ProvingDevice, guardKeyDeriver } from '../../src/models/proving'
 import type { StampedGate } from '../../src/models/stamps'
 import { Wayin } from '../../src/models/wayin'
 import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
@@ -20,7 +20,7 @@ function deriverHanding(handBack: () => unknown): Deriver.KeyDeriver {
   }
 }
 
-function novelPassphrase(device: GX.ProvingDevice = TH.provingDeviceOf()): Promise<PassphraseProving> {
+function novelPassphrase(device: ProvingDevice = TH.provingDeviceOf()): Promise<PassphraseProving> {
   return PassphraseProving.buildNovel(device, TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase)
 }
 
@@ -32,7 +32,7 @@ async function novelWithWayin(): Promise<{ proving: PassphraseProving, wayin: Wa
   return { proving, wayin: await proving.buildWayin(NOVEL) }
 }
 
-function novelPasskey(answer = TH.passkeyAnswerOf(), device: GX.ProvingDevice = TH.provingDeviceOf()): Promise<PasskeyProving> {
+function novelPasskey(answer = TH.passkeyAnswerOf(), device: ProvingDevice = TH.provingDeviceOf()): Promise<PasskeyProving> {
   return PasskeyProving.buildNovel(device, TH.WorldBankStamp, TH.WorldGateStamp, answer)
 }
 
@@ -81,7 +81,7 @@ describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {
     const strengthChecker = vi.fn(() => ({ strong: false as const, reason: 'too short' }))
     const verdict = await Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), TH.WorldScope, TH.TestPassphrase)
     expect(verdict).to.deep.equal({ strong: false, reason: 'too short' })
-    expect(strengthChecker).toHaveBeenCalledWith(TH.TestPassphrase, { user_id: TH.WorldScope.userid, banklabel: TH.WorldScope.banklabel })
+    expect(strengthChecker).toHaveBeenCalledWith(TH.TestPassphrase, TH.WorldScope)
   })
 
   it("awaits a checker that returns a promise", async () => {
@@ -140,7 +140,7 @@ describe("PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseC
   for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb}`, async () => {
       const { bankStamp = TH.WorldBankStamp, gateStamp = TH.WorldGateStamp, passphraseCleartext = TH.TestPassphrase, device = TH.provingDeviceOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildNovel(device as GX.ProvingDevice, bankStamp as never, gateStamp as never, passphraseCleartext as never))
+      await TH.expectRefusal(PassphraseProving.buildNovel(device as ProvingDevice, bankStamp as never, gateStamp as never, passphraseCleartext as never))
     })
   }
 

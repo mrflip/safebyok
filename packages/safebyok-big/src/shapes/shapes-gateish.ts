@@ -103,7 +103,7 @@ export const freshPasskeyAnswer = Checker(() => (
 // == [Strength]: isStrengthChecker, strengthChecker, passphraseVerdict, PassphraseVerdict
 
 /** True for a {@link StrengthChecker}: a function, whose `load`, if it carries one, is a function too. */
-const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
+export const isStrengthChecker = (candidate: unknown): candidate is StrengthChecker => (
   typeof candidate === 'function' && ['undefined', 'function'].includes(typeof (candidate as { load?: unknown }).load)
 )
 

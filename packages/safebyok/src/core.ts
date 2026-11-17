@@ -7,7 +7,7 @@ export { CoreBox } from './models/core-box'
 export { Gate, type GateBank, type GateDna, type GateOpts } from './models/gate'
 export { type AskUser, type CleartextsForGatingkind, Gating, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, type RequestCleartext, gatingkindVals } from './models/gating'
 export { type Lease, type LeaseBank, type LeaseOpts, type SecretFieldname, withoutSecrets } from './models/lease'
-export type { GateRevisionedStamp, PasskeyProving, PassphraseProving, Proving } from './models/proving'
+export type { GateRevisionedStamp, PasskeyProving, PassphraseProving, Proving, ProvingDevice } from './models/proving'
 export type {
   BodyOf, BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LiveOf, LivePublicPropsOf, PublicPropsOf, RevisionOf, SealPurposes, SealTags, Sealable, Sealed,
   SealedOf, SealedPartsOf, Sealer, TombstoneOf, TombstonePublicProps, UnsealedOf,

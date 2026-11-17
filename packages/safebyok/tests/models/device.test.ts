@@ -126,11 +126,13 @@ describe("Device.make(record, opts)", () => {
     [{ banklabel: '' },                    'an empty banklabel'],
     [{ userid: 42 },                       'a userid that is not a string'],
     [{ userid: undefined, user_id: 'u1' }, 'its user named user_id, as safebyok-big names it'],
+    [{ user_id: 'u1' },                    'a user_id beside its userid'],
+    [{ gates: ['main'] },                  'a field a device record does not have'],
   ] as const
 
   for (const [moved, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, () => {
-      TH.expectSyncRefusal(() => TH.makeDevice(moved as never))
+      TH.expectSyncRefusal(() => TH.makeDevice(moved as never), 'bad_option')
     })
   }
 

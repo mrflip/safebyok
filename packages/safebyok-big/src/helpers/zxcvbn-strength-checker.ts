@@ -1,6 +1,6 @@
 import { ZxcvbnFactory } from '@zxcvbn-ts/core'
 import * as Phrases from './phrases'
-import { StrongVerdict, type StrengthChecker } from './passphrase-strength'
+import { StrongVerdict } from './passphrase-strength'
 import { objCheck } from './validator'
 import * as CX from '../shapes/shapes-core'
 import type { BankScope } from '../shapes/shapes-core'
@@ -18,8 +18,15 @@ export const MinZxcvbnScore = 3
 
 // == [The checker]: checkerArgs, graphemeCount, makeZxcvbnStrengthChecker, zxcvbnStrengthChecker
 
+/** A bank's scope, its user named `user_id`, as here, or `userid`, as in safebyok's new core. */
+type EitherBankScope = BankScope | { readonly userid: string, readonly banklabel: string }
+
+// The new core names the user `userid`; a scope naming it `user_id` is read as that, and one without, as `userid`.
 /** What the checker is handed: the passphrase as typed, and the scope of its bank. */
-const checkerArgs = objCheck(({ passphraseCleartext, bankScope }) => ({ typed: passphraseCleartext, scope: bankScope }), 'bad_option', [GX, CX])
+const checkerArgs = objCheck(({ passphraseCleartext, bankScope, obj, union, user_id, banklabel }) => ({
+  typed: passphraseCleartext,
+  scope: union([bankScope, obj({ userid: user_id, banklabel })]),
+}), 'bad_option', [GX, CX])
 
 // Intl.Segmenter is missing from browsers before 2024 and from React Native's Hermes; there each code point counts as one.
 /** How many characters `typed` contains, as its reader counts them. */
@@ -39,8 +46,8 @@ function makeZxcvbnStrengthChecker() {
     }
     return judgeLoaded
   }
-  const judgeStrength = async (passphrase: string, bankScope: BankScope): Promise<PassphraseVerdict> => {
-    const { typed, scope: { user_id, banklabel } } = checkerArgs.parse({ typed: passphrase, scope: bankScope })
+  const judgeStrength = async (passphrase: string, bankScope: EitherBankScope): Promise<PassphraseVerdict> => {
+    const { typed, scope } = checkerArgs.parse({ typed: passphrase, scope: bankScope })
     if (graphemeCount(typed) < MinPassphraseChars) { return { strong: false, reason: Phrases.passphraseTooShort(MinPassphraseChars) } }
     let judge: ZxcvbnFactory
     try {
@@ -48,13 +55,16 @@ function makeZxcvbnStrengthChecker() {
     } catch {
       return { strong: false, reason: Phrases.PassphraseUnjudged }
     }
-    const { score } = judge.check(typed, [user_id, banklabel])
+    const user = ('user_id' in scope) ? scope.user_id : scope.userid
+    const { score } = judge.check(typed, [user, scope.banklabel])
     return score >= MinZxcvbnScore ? StrongVerdict : { strong: false, reason: Phrases.PassphraseGuessable }
   }
   const load = async (): Promise<void> => { await loadJudge() }
   return Object.freeze(Object.assign(judgeStrength, { load }))
 }
 
-/** The strength checker a browser app hands `Device.make`: {@link MinPassphraseChars} characters, then a zxcvbn score of {@link MinZxcvbnScore}. */
-export const zxcvbnStrengthChecker: StrengthChecker & { readonly load: () => Promise<void> } = /* @__PURE__ */ makeZxcvbnStrengthChecker()
+/** The strength checker a browser app hands `Device.make`: {@link MinPassphraseChars} characters, then a zxcvbn score of {@link MinZxcvbnScore}.
+ * It fits safebyok's new core too, whose scope names the user `userid`.
+ */
+export const zxcvbnStrengthChecker: { (passphrase: string, scope: EitherBankScope): Promise<PassphraseVerdict>, readonly load: () => Promise<void> } = /* @__PURE__ */ makeZxcvbnStrengthChecker()
 // --

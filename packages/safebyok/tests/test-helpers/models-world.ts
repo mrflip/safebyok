@@ -9,12 +9,13 @@
 
 import { type Mock, type MockInstance, afterEach, beforeEach, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
-import { Consts, Crypto, GX, SX, Strength } from 'safebyok-big/internals'
+import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank, type BoxShell } from '../../src/models/bank'
 import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/device'
 import { Lease, type LeaseBank } from '../../src/models/lease'
-import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
+import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, type ProvingDevice, guardKeyDeriver } from '../../src/models/proving'
+import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
 import { BoxThingFormat, ShellLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
@@ -60,13 +61,13 @@ export const DeviceTok = '00000000-0000-4000-8000-00000000000a'
 /** What a test may say of a {@link provingDeviceOf} device: the host's own deriver and checker, which it wraps as a device does. */
 export interface ProvingDeviceGiven {
   keyDeriver?:      Deriver.KeyDeriver | undefined
-  strengthChecker?: Strength.StrengthChecker | undefined
+  strengthChecker?: StrengthChecker | undefined
   device_tok?:      string | undefined
 }
 
 /** A proving device without a Device: the one-SHA-256 `testDeriver`, a strength checker that passes everything, and {@link DeviceTok}, each wrapped as a device wraps it. */
-export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingDeviceGiven = {}): GX.ProvingDevice {
-  return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: Strength.guardStrengthChecker(strengthChecker), device_tok }
+export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = anyStrengthChecker, device_tok = DeviceTok }: ProvingDeviceGiven = {}): ProvingDevice {
+  return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), device_tok }
 }
 
 /** A Device of {@link WorldScope} and {@link DeviceTok}, with `record` laid over them, over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those. */

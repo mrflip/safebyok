@@ -1,8 +1,9 @@
 import type * as Z from 'zod'
-import { CX, Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, Strength, Throwers, VX, Validator } from 'safebyok-big/internals'
+import { CX, Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, Throwers, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import { type AskUser, Gating, type RequestCleartext, birthBank } from './gating'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
+import { DefaultStrengthChecker, type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { type BankScope, bankScope } from './stamps'
 import * as Phrases from '../phrases'
 import type { Banklabel, DeviceTok, Userid } from '../storage/primitives'
@@ -32,7 +33,7 @@ export interface DeviceOpts {
   /** Makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
   keyDeriver:       Deriver.KeyDeriver
   /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak. */
-  strengthChecker?: Strength.StrengthChecker | undefined
+  strengthChecker?: StrengthChecker | undefined
   /** Where the device reports what it has no caller to throw to. Default: the console. */
   logger?:          Logger.VaultLogger | undefined
   /** How long a lease lasts on this device, in minutes. `Infinity` lasts until locked. Default: 14 days. */
@@ -45,7 +46,7 @@ export interface DeviceOpts {
 
 /** The checks of a {@link DeviceRecord} and of {@link Device.make}'s arguments. */
 const Checks = Validator.Checkers('bad_option', ({ obj, arr, fn, custom, user_id, banklabel, device_tok }) => {
-  const deviceRecord = obj({ userid: user_id, banklabel, device_tok })
+  const deviceRecord = obj({ userid: user_id, banklabel, device_tok }).strict()
   return {
     deviceRecord,
     requestCleartext: fn<RequestCleartext>(),
@@ -54,7 +55,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, arr, fn, custom, user_id
       opts:   Validator.objCheck(() => ({
         vaultDB:         custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
         keyDeriver:      custom<Deriver.KeyDeriver>(),
-        strengthChecker: custom<Strength.StrengthChecker>().optional(),
+        strengthChecker: custom<StrengthChecker>().optional(),
         logger:          custom<Logger.VaultLogger>().optional(),
         autolockMinutes: VX.positiveMinutes.optional(),
         requestCleartext: custom<RequestCleartext>().optional(),
@@ -83,7 +84,7 @@ export class Device {
   /** Where this device's banks are stored. */
   readonly vaultDB:            VaultDB
   readonly keyDeriver:         GuardedKeyDeriver
-  readonly strengthChecker:    Strength.GuardedStrengthChecker
+  readonly strengthChecker:    GuardedStrengthChecker
   readonly logger:             Logger.VaultLogger
   /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   readonly leaseMillis:        number
@@ -122,11 +123,11 @@ export class Device {
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
     checkSecureContext()
-    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = Strength.DefaultStrengthChecker, logger, autolockMinutes, requestCleartext, onBadNews = DefaultOnBadNews } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, requestCleartext, onBadNews = DefaultOnBadNews } } = Checks.deviceMakeArgs.parse({ record, opts })
     Object.assign(this, { userid, banklabel, device_tok })
     this.vaultDB = vaultDB
     this.keyDeriver = guardKeyDeriver(keyDeriver)
-    this.strengthChecker = Strength.guardStrengthChecker(strengthChecker)
+    this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews
