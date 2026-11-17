@@ -212,6 +212,7 @@ export class ThingMinder {
 
   /** Call `listener` with the answer `tryAt` would give for an entry, under this minder's own `staleTime`, each time a record lands in it, a get of it is refused, or it is invalidated or removed.
    * A record that lands is told even when it changes nothing. A record that ages past `staleTime` is not told, and listening keeps nothing cached: a TanStack observer does both.
+   * A box that `list` caches sparse may be told timely, then untimely, in one step.
    * Returns the function that stops it. What the listener throws goes to the device's `onBadNews`, and stops nothing.
    */
   listen(listener: (answer: TSQGotAnswer) => void): () => void {
@@ -268,22 +269,19 @@ export class ThingMinder {
     if (modelkindOf(notice.val.labelpath) === this.modelkind) { this.#doDeliverRecord(notice.val) }
   }
 
-  // Stale, not refetched: the next get, or a listener's next look, fetches it whole. Landed as of time 0, it is stale from
-  // the moment it lands, so that no listener is told it timely; invalidated too, for a staleTime longer than the epoch is old.
+  // Invalidated, not refetched: the next get, or a listener's next look, fetches it whole.
   /** Cache sparse `record`. Unless the cache already has the whole record, mark it stale: the next get will fetch it whole. */
   #doDeliverSeed(record: Sparse<Thing>): void {
-    if (this.#isWholeRecord(this.#betterRecordOf(this.#cachedAt(record), record))) {
-      this.#doDeliverRecord(record)
-      return
+    this.#doDeliverRecord(record)
+    if (! this.#isWholeRecord(this.#cachedAt(record))) {
+      void this.#tsq.invalidateQueries({ queryKey: this.queryKey(record), exact: true, refetchType: 'none' })
     }
-    this.#doDeliverRecord(record, { updatedAt: 0 })
-    void this.#tsq.invalidateQueries({ queryKey: this.queryKey(record), exact: true, refetchType: 'none' })
   }
 
   /** Send `record` to the cache, while this minder is minding. TSQ will use betterRecordOf to identify what, if anything, has changed. */
-  #doDeliverRecord(record: DeliverableThing, opts: TSQ.SetDataOptions = {}): void {
+  #doDeliverRecord(record: DeliverableThing): void {
     if (! this.#isReady) { return }
-    this.#tsq.setQueryData(this.queryKey(record), record, opts)
+    this.#tsq.setQueryData(this.queryKey(record), record)
   }
   // --
 
