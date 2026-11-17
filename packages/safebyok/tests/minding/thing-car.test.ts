@@ -17,11 +17,11 @@ function behindOf(newest: Thing, fullest: Thing): ThingCar<Thing> {
 
 describe("carOf", () => {
   const CarCases = [
-    [Box0,                      'full', Box0,      'a whole live record is full'],
-    [sparseOf(Box0),            'bare', undefined, 'a sparse live record is bare'],
-    [BoxGone,                   'gone', null,      'a whole tombstone is gone'],
-    [sparseOf(BoxGone),         'gone', null,      'a sparse tombstone is gone'],
-    [BoxShell,                  'void', null,      'the void sentinel is void'],
+    [Box0,               "full", Box0,      'a whole live record is full'],
+    [sparseOf(Box0),     "bare", undefined, 'a sparse live record is bare'],
+    [BoxGone,            "gone", null,      'a whole tombstone is gone'],
+    [sparseOf(BoxGone),  "gone", null,      'a sparse tombstone is gone'],
+    [BoxShell,           "void", null,      'the void sentinel is void'],
   ] as const
   for (const [record, liveness, fullest, blurb] of CarCases) {
     it(blurb, () => {
@@ -46,17 +46,17 @@ describe("mergedCarOf", () => {
 
   const MergeCases = [
     // the newest revision, and the newest whole record:
-    [carOf(Box0),               carOf(Box1),               carOf(Box1),                'a later whole record makes a full car of it'],
-    [carOf(Box0),               carOf(sparseOf(Box1)),     behindOf(Box1, Box0),       'a later sparse record leaves the whole one behind it'],
-    [carOf(sparseOf(Box1)),     carOf(Box0),               behindOf(Box1, Box0),       'an older whole record under a newer sparse one is kept behind it'],
-    [behindOf(Box2, Box0),      carOf(Box1),               behindOf(Box2, Box1),       'a newer whole record, still older than the newest, moves up behind it'],
-    [behindOf(Box1, Box0),      carOf(Box1),               carOf(Box1),                'the whole record of the newest revision makes the car full'],
-    [carOf(sparseOf(Box0)),     carOf(Box0),               carOf(Box0),                'the whole record of a bare revision makes the car full'],
+    [carOf(Box0),           carOf(Box1),                carOf(Box1),                 'a later whole record makes a full car of it'],
+    [carOf(Box0),           carOf(sparseOf(Box1)),      behindOf(Box1, Box0),        'a later sparse record leaves the whole one behind it'],
+    [carOf(sparseOf(Box1)), carOf(Box0),                behindOf(Box1, Box0),        'an older whole record under a newer sparse one is kept behind it'],
+    [behindOf(Box2, Box0),  carOf(Box1),                behindOf(Box2, Box1),        'a newer whole record, still older than the newest, moves up behind it'],
+    [behindOf(Box1, Box0),  carOf(Box1),                carOf(Box1),                 'the whole record of the newest revision makes the car full'],
+    [carOf(sparseOf(Box0)), carOf(Box0),                carOf(Box0),                 'the whole record of a bare revision makes the car full'],
     // tombstones and lives:
-    [behindOf(Box1, Box0),      carOf(BoxGone),            carOf(BoxGone),             'a whole tombstone replaces the older whole record'],
-    [behindOf(Box1, Box0),      carOf(sparseOf(BoxGone)),  carOf(sparseOf(BoxGone)),   'a sparse tombstone replaces the older whole record'],
-    [carOf(Box2),               carOf(sparseOf(BoxReborn)), carOf(sparseOf(BoxReborn)), 'a later life heard sparse keeps no whole record of the earlier life'],
-    [carOf(BoxShell),           carOf(sparseOf(Box0)),     carOf(sparseOf(Box0)),      'any record replaces the void sentinel'],
+    [behindOf(Box1, Box0),  carOf(BoxGone),             carOf(BoxGone),              'a whole tombstone replaces the older whole record'],
+    [behindOf(Box1, Box0),  carOf(sparseOf(BoxGone)),   carOf(sparseOf(BoxGone)),    'a sparse tombstone replaces the older whole record'],
+    [carOf(Box2),           carOf(sparseOf(BoxReborn)), carOf(sparseOf(BoxReborn)),  'a later life heard sparse keeps no whole record of the earlier life'],
+    [carOf(BoxShell),       carOf(sparseOf(Box0)),      carOf(sparseOf(Box0)),       'any record replaces the void sentinel'],
   ] as const
   for (const [prior, landed, expected, blurb] of MergeCases) {
     it(blurb, () => {
@@ -93,14 +93,14 @@ describe("mergedCarOf", () => {
   })
 
   const BrokenCars = [
-    [{ liveness: 'full',   newest: Box0,           fullest: { ...Box0 } },  'a full car of two records'],
-    [{ liveness: 'full',   newest: sparseOf(Box0), fullest: sparseOf(Box0) }, 'a full car of a sparse record'],
-    [{ liveness: 'bare',   newest: Box0,           fullest: undefined },    'a bare car of a whole record'],
-    [{ liveness: 'behind', newest: sparseOf(Box0), fullest: Box1 },         'a behind car whose fullest is newer'],
-    [{ liveness: 'behind', newest: sparseOf(BoxReborn), fullest: Box0 },    'a behind car whose fullest is of an earlier life'],
-    [{ liveness: 'gone',   newest: Box0,           fullest: null },         'a gone car of a live record'],
-    [{ liveness: 'void',   newest: sparseOf(BoxGone), fullest: null },      'a void car of a tombstone'],
-    [{ liveness: 'gone',   newest: BoxGone,        fullest: undefined },    'a gone car whose fullest is undefined'],
+    [{ liveness: 'full',   newest: Box0,                fullest: { ...Box0 } },    'a full car of two records'],
+    [{ liveness: 'full',   newest: sparseOf(Box0),      fullest: sparseOf(Box0) }, 'a full car of a sparse record'],
+    [{ liveness: 'bare',   newest: Box0,                fullest: undefined },      'a bare car of a whole record'],
+    [{ liveness: 'behind', newest: sparseOf(Box0),      fullest: Box1 },           'a behind car whose fullest is newer'],
+    [{ liveness: 'behind', newest: sparseOf(BoxReborn), fullest: Box0 },           'a behind car whose fullest is of an earlier life'],
+    [{ liveness: 'gone',   newest: Box0,                fullest: null },           'a gone car of a live record'],
+    [{ liveness: 'void',   newest: sparseOf(BoxGone),   fullest: null },           'a void car of a tombstone'],
+    [{ liveness: 'gone',   newest: BoxGone,             fullest: undefined },      'a gone car whose fullest is undefined'],
   ] as const
   for (const [car, blurb] of BrokenCars) {
     it(`refuses ${blurb} on the way out`, () => {
