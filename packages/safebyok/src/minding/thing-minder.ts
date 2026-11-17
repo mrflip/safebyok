@@ -211,7 +211,7 @@ export class ThingMinder {
     const answer = await this.#vaultDB.tryListThings(this.#bank.makeListAsk({ labelpath: this.modelkind, ifAbsent: 'nil' }))
     if (! answer.ok) { throw answer.err }
     TSQ.notifyManager.batch(() => {
-      for (const record of answer.val) { this.#doDeliverRecord(record) }
+      for (const record of answer.val) { this.#sendToTSQ(record) }
     })
     return answer.val.map((record) => record.labelpath)
   }
@@ -276,15 +276,15 @@ export class ThingMinder {
   }
   // --
 
-  // == [VaultDB->Minder Delivery]: #receive, #doDeliverRecord
+  // == [VaultDB->Minder Delivery]: #receive, #sendToTSQ
 
-  /** Cache `notice`'s Thing, if it is of this minder's kind. */
+  /** Send `notice`'s Thing to TanStack, if it is of this minder's kind. */
   #receive(notice: ThingNotice): void {
-    if (modelkindOf(notice.val.labelpath) === this.modelkind) { this.#doDeliverRecord(notice.val) }
+    if (modelkindOf(notice.val.labelpath) === this.modelkind) { this.#sendToTSQ(notice.val) }
   }
 
-  /** Merge `record` into its cached car, while minding. */
-  #doDeliverRecord(record: DeliverableThing): void {
+  /** Send `record`'s car to TanStack, to merge into its cached car, while minding. */
+  #sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
     this.#tsq.setQueryData(this.queryKey(record), carOf(record))
   }
