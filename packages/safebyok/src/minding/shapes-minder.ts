@@ -11,15 +11,15 @@ import type { TSQGotAnswer } from './thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
 
-/** The TanStack Query options a host may choose for a minder's cache entries. */
+/** The TanStack Query options a host may choose for the cars a minder caches. */
 export interface QueryCacheOpts {
-  /** How long a record stays timely, in milliseconds. */
+  /** How long a full car stays timely, in milliseconds. A `behind` or `bare` car is never timely. */
   staleTime: number
-  /** How long an entry stays in the cache once no TanStack observer uses it, in milliseconds. `Infinity` keeps it until `goodbye`. */
+  /** How long a car stays in the cache once no TanStack observer uses it, in milliseconds. `Infinity` keeps it until `goodbye`. */
   gcTime:    number
 }
 
-/** The default {@link QueryCacheOpts}: records stay timely an hour, and entries stay until `goodbye`. */
+/** The default {@link QueryCacheOpts}: a full car stays timely an hour, and every car stays until `goodbye`. */
 export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ staleTime: 60 * 60 * 1000, gcTime: Infinity })
 
 // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its

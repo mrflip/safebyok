@@ -36,7 +36,7 @@ Coach, 2026-11-15, box_ops thread 1.
 * current outcome: the ThingMinder keeps the newer record it holds, and TanStack Query marks the entry fresh as of the
   late answer. The record reads as timely for longer, by however long that answer was in flight.
 * alternatives:
-  - skip a delivery that `betterRecordOf` would refuse: a listing's could, but a get's queryFn must return its record,
+  - skip a delivery that `mergedCarOf` would refuse: a listing's could, but a get's queryFn must return its car,
     so a get would still move the staleness on.
   - deliver with the held record's `dataUpdatedAt` as `updatedAt`: which record wins is known only inside
     `structuralSharing`, after the time has been chosen.
@@ -50,11 +50,11 @@ would put a comparison outside `structuralSharing`. Ruled by the Coach, 2026-11-
 
 ### The ThingMinder detects no conflict among the records it holds
 
-* current outcome: `betterRecordOf` keeps the later record by lifepath and then revseq. Two records of one revision
+* current outcome: `mergedCarOf` keeps the later record by lifepath and then revseq. Two records of one revision
   with different revtoks keep whichever landed first. A get that storage answers older than the record cached when
   the get began refuses `stale_read`, and the cached record stays.
 * alternatives:
-  - refuse `record_conflict` in the cache: `betterRecordOf` must stay pure, since TanStack Query calls it for every
+  - refuse `record_conflict` in the cache: `mergedCarOf` must stay pure, since TanStack Query calls it for every
     observer's result, so a refusal would need a state of its own outside it.
 * workaround: none needed. A write citing what the cache holds is refused by storage where storage holds otherwise,
   and the refusal carries the stored record.
@@ -85,21 +85,3 @@ Reasoning for wontfix: the device was sent revisions of both rows, so either cas
 underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
 `tracked` type and at `notifyTrackedRecords` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
-
-### A listener hears a listed sparse box timely, then untimely
-
-* current outcome: `ThingMinder.list` caches each box it lists as a sparse record. That record lands timely, and the
-  minder invalidates it before `list` returns, so a `listen` listener is told `timely`, then `untimely`, for the same box
-  in one synchronous step. The next `get` fetches the box whole, as `list` promises.
-* alternatives:
-  - land the record as of time 0: stale only where `staleTime` is shorter than the epoch's age, so the invalidate stays,
-    and the listener hears `untimely` twice; a whole record the cache held would also turn stale.
-  - skip delivery where the cache holds the box whole: changes what `list` leaves timely when everything works.
-  - cap `staleTime`: a new constraint on a host's option, to hide one notice.
-* workaround: a listener that must not act on a sparse record checks the record it is handed for its body.
-
-Steps to reproduce: a box minder with a `listen` listener, and a box in the vaultDB the cache does not hold; call `list`.
-
-Reasoning for wontfix: silencing the first notice means landing the record untimely or not delivering it, and each
-changes what `list` or `get` answer when all works, or adds a state to the cache. The listener's last word is
-`untimely`, the record's true standing. Ruled by the Coach, 2026-11-17, lean_buttonup minder_grain.
