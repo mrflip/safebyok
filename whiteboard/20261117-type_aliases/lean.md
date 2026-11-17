@@ -1,6 +1,6 @@
 # Thread: type aliases in the lean core (2026-11-17)
 
-Branch `20261117-type_aliases_lean`, outside any sprint, stacked on nothing (cut from origin/main 193708df9). Proved: `pnpm --filter safebyok` lint, typecheck, test (15 files, 871 tests) green; `pnpm justify` below.
+Branch `20261117-type_aliases_lean`, outside any sprint, stacked on nothing (cut from origin/main 193708df9). Proved: `pnpm --filter safebyok` lint, typecheck, test (15 files, 871 tests) green; `pnpm justify` green.
 
 * **Built**: `packages/safebyok/src/storage/primitives.ts`, the one home for nine plain aliases, each with a one-line doc block: `Userid`, `Banklabel`, `Labelpath`, `Lifeseq`, `Lifepath`, `Lifenum`, `Revtok`, `DeviceTok` (all `string` or `number`) and `EpochMillis` (= big's `CX.EpochMillis`, a `number`). Exported from `src/index.ts`, `core.ts` and `storage.ts`. Used in the hand-written signatures, props, type literals and `Map` keys of `models/` (base-thing, lease, device, gating, wayin, bank, sealers), `minding/thing-minder.ts` and `storage/` (shapes-thing, thing-classifier, memory-vault-db), and in the test helpers' signatures. Types only: no runtime change, no renamed field or variable.
 * **Decisions made**:
