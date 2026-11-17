@@ -151,12 +151,10 @@ The Coach's answers, in close to the Coach's words, beside each question.
 5. **"Accepts a duck record" for put and del:** the ask builders (`putAskOf`, `makePutAsk`) are in the chain the
    classifier tidy reworks, so T3b leaves them as they are: an extra draft key still refuses. Raise it if something
    blocks.
-
-## Open
-
 * **The stamp pair's spelling,** as under item 4: `bankStamp` / `gateStamp` wherever a third party names the pair,
   `stamp` for a thing's own. The hunt's own text for item 14 was in a session transcript and is lost: confirm this is
   what it meant.
+
 
 ## Decided in the plan, no ruling needed
 
