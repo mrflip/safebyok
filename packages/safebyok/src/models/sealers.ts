@@ -58,16 +58,16 @@ export interface SealPurposes {
  * `RecordT` is the record as stored, its part sealed; `CleartextsT` is what that part seals. Each member checks what it is given.
  */
 export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
-  /** The Thing fields and body of `donor`, its other fields dropped. Refuses what is not a record of this kind or its shell. */
-  donorPropsOf(donor: unknown): Sealable<RecordT>
+  /** The Thing fields and body of `donorProps`, its other fields dropped. Refuses what is not a record of this kind or its shell. */
+  donorPropsOf(donorProps: unknown): Sealable<RecordT>
   /** The body, `am` and `written_at` of `publicProps`, its other fields dropped. */
   publicPropsOf(publicProps: unknown): PublicPropsOf<RecordT, CleartextsT>
   /** The cleartexts in `secretProps`, its other fields dropped. */
   secretPropsOf(secretProps: unknown): CleartextsT
-  /** The live revision next after `donor`, without its sealed part, with `publicProps` laid over it. */
-  nextRevisionOf(donor: unknown, publicProps: unknown): RevisionOf<LiveOf<RecordT>, CleartextsT>
-  /** The tombstone of the live `donor`, without its sealed part, written at `publicProps.written_at`. Refuses a tombstone or the shell. */
-  tombstoneOf(donor: unknown, publicProps: unknown): RevisionOf<TombstoneOf<RecordT>, CleartextsT>
+  /** The live revision next after `donorProps`, without its sealed part, with `publicProps` laid over it. */
+  nextRevisionOf(donorProps: unknown, publicProps: unknown): RevisionOf<LiveOf<RecordT>, CleartextsT>
+  /** The tombstone of the live `donorProps`, without its sealed part, written at `publicProps.written_at`. Refuses a tombstone or the shell. */
+  tombstoneOf(donorProps: unknown, publicProps: unknown): RevisionOf<TombstoneOf<RecordT>, CleartextsT>
   /** The empty cleartexts a tombstone seals, which sign it. */
   readonly tombstoneSecrets: CleartextsT
   /** The stamp the seal of `record` is bound to, after the bank's. A change to it refuses the unseal. */
