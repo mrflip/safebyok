@@ -1,6 +1,6 @@
 # Thread thing_car: the ThingMinder caches ThingCars (2026-11-17)
 
-Branch `20261117-thing_car`, PR (see below), stacked on [#716](https://github.com/mrflip/safebyok/pull/716). Proved: safebyok lint and typecheck clean, its tests 922 passed (884 before); `pnpm justify` at the tip (see the PR's **Tests:** line).
+Branch `20261117-thing_car`, [PR #718](https://github.com/mrflip/safebyok/pull/718), stacked on [#716](https://github.com/mrflip/safebyok/pull/716). Proved: safebyok lint and typecheck clean, its tests 922 passed (884 before); `pnpm justify` at the tip (see the PR's **Tests:** line).
 
 The design is complete.md's bullet "The ThingCar, the minder's cache value", agreed with the Coach; VOCABULARY.md's `car` and `am` rows are on the plan branch, not this one.
 
