@@ -23,14 +23,14 @@ The design is complete.md's bullet "The ThingCar, the minder's cache value", agr
   - **A car's check refuses `unexpected_error`**: a broken car is a bug in the minder.
 
 * **Deviations**:
-  - **The root box's seed**: a live root box is seeded `bare` (`carOf(sparseOf(rootBox))`), keeping "sparse and stale". Before the bank's birth, the root is the shell, and nothing is seeded: its car would be `void` and timely, and a `get` of the root box would answer the shell from the cache where today it asks the vaultDB and is refused. A one-line branch in `hello`; test "caches no root box before the bank's birth". (Before: the sparse shell was seeded and invalidated.)
+  - **A minder minds a born bank only** (the Coach, 2026-11-17: "go for it on the bank birth"). `ThingMinder.make` refuses `bad_option`, with `Phrases.BornBankExpected`, a bank whose `rootBox` is still the shell: `minderFriend` gains a refinement, and the checked bank is a `BornMinderFriend` (`rootBox: BoxRecord`). `hello` seeds the root box `bare` unconditionally. A minder made from an unborn Bank object would keep the shell as its `rootBox` and a `track` at the shell's revision, so it would go stale at the birth.
 
 * **Set aside**: `TSQ.replaceEqualDeep` on a car of another Thing (it would build an unfrozen copy); dispatching `structuralSharing` on `liveness` alone (the review round: a selected value may carry one, so `isThingCar` is the car's own check); seeding a `full` car from the bank's whole root (see *For the Coach*).
 
 * **For the Coach**:
   - **Root seed `full` or `bare`?** Kept `bare`. A `full` car would be timely for `staleTime`, so a `get` would answer the bank's copy of the root box, which may predate what storage holds; `bare` fetches it once.
-  - **Earlier-life rule** above, and **the shell's seed** above: each a reading, open to a ruling.
+  - **Earlier-life rule** above: a reading, open to a ruling.
 
 ## The review round (2026-11-17)
 
-Every directive is built but one: the bare car of the root box at birth, held for the orchestrator, because no seam is small (`Bank.birth` runs on a Bank object no minder holds). `isVaultDBNewer` narrows its parameter rather than checking it; a box's shell now comes from the bank's `rootBox`. Detail, with the birth-seam options: [thread-thing_car-review.md](thread-thing_car-review.md).
+The birth seam is settled as option (d), build nothing: the vaultDB's watch promises a notice for each Thing a birth writes (`onNotice` gets each changed Thing), so the stored root box lands `full` in every minder watching, one round trip after the send. In its place a minder is made from a born bank only (see *Deviations*). `isVaultDBNewer` narrows its parameter rather than checking it; a box's shell now comes from the bank's `rootBox`. Detail, with the birth-seam options: [thread-thing_car-review.md](thread-thing_car-review.md).

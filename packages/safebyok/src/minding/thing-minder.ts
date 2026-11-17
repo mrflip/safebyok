@@ -18,7 +18,7 @@ import {
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
-  type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
+  type BornMinderFriend, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, minderScope, minderTrack, queryCacheOpts, tsqClient,
 } from './shapes-minder'
 import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpRecords, isThingCar, isVaultDBNewer, mergedCarOf } from './thing-car'
@@ -72,14 +72,14 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
 // --
 
 /** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through a watch of the bank of its own.
- * The bank must be stored: before its birth, a get or a list refuses.
+ * `make` takes a born bank: one whose root box is no longer the shell.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
   readonly userid:    Userid
   readonly banklabel: Banklabel
   readonly modelkind: Thingkind
-  readonly #bank:           MinderFriend
+  readonly #bank:           BornMinderFriend
   readonly #vaultDB:        VaultDB
   readonly #tsq:            TSQ.QueryClient
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
@@ -96,7 +96,7 @@ export class ThingMinder {
     return new ThingMinder(checked.ties, checked.opts, checked.bank)
   }
 
-  private constructor(ties: Pick<ThingTies, 'modelkind'>, opts: Omit<MinderOpts, 'queryCacheOpts'> & { queryCacheOpts: QueryCacheOpts }, bank: MinderFriend) {
+  private constructor(ties: Pick<ThingTies, 'modelkind'>, opts: Omit<MinderOpts, 'queryCacheOpts'> & { queryCacheOpts: QueryCacheOpts }, bank: BornMinderFriend) {
     const { userid, banklabel } = bank.scope
     this.userid          = userid
     this.banklabel       = banklabel
@@ -129,7 +129,7 @@ export class ThingMinder {
     if (this.modelkind === 'box') {
       // Kept whatever the host's gcTime: its own key's defaults reach no box under it.
       this.#tsq.setQueryDefaults(this.queryKey(this.#bank.rootBox), { gcTime: Infinity })
-      if (this.#bank.rootBox.am === 'a') { this.#doDeliverRecord(sparseOf(this.#bank.rootBox)) }
+      this.#doDeliverRecord(sparseOf(this.#bank.rootBox))
     }
     this.#startVaultDBWatch()
   }

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type ThingCar, carOf } from '../../src/minding/thing-car'
 import { type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
+import * as Phrases from '../../src/phrases'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../src/storage/primitives'
 import { type GateThing, type GetAsk, type Thing, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, isVoidSentinel, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
@@ -218,12 +219,10 @@ describe("ThingMinder.hello", () => {
     expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
-  it("caches no root box before the bank's birth, when the root box is the shell", () => {
-    const tsq       = new TSQ.QueryClient()
-    const bank      = { ...fakeBankOf(), rootBox: shellOf({ ...TH.ThingBank, labelpath: 'box' }) }
-    const boxMinder = minderOf('box', new MemoryVaultDB(), tsq, {}, bank as MinderFriend)
-    boxMinder.hello()
-    expect(boxMinder.at(TH.RootScope)).to.be.undefined
+  it("refuses a bank whose root box is still the shell, saying the bank is not born", () => {
+    const unborn = { ...fakeBankOf(), rootBox: shellOf({ ...TH.ThingBank, labelpath: 'box' }) } as MinderFriend
+    TH.expectSyncRefusal(() => minderOf('box', new MemoryVaultDB(), new TSQ.QueryClient(), {}, unborn), 'bad_option')
+    expect(() => minderOf('gate', new MemoryVaultDB(), new TSQ.QueryClient(), {}, unborn)).to.throw(Phrases.BornBankExpected)
   })
 
   it("keeps the root box cached past the host's gcTime, which collects the boxes under it, until goodbye", async () => {
