@@ -860,30 +860,12 @@ describe("A host's QueryObserver on a minder's key", () => {
     unsubscribe()
   })
 
-  it("follows each new revision through its select", () => {
+  it("refuses a select whose value is not a car, as the observer's error", () => {
     const { tsq, minder, receive } = minderWorldOf(new MemoryVaultDB())
     const observer = new TSQ.QueryObserver<ThingCar<Thing>, Error, string>(tsq, { queryKey: minder.queryKey(TH.GateScope), enabled: false, select: (car) => car.newest.revtok })
     const unsubscribe = observer.subscribe(noop)
-    const gate0 = TH.gateThingOf()
-    receive(noticeOf(gate0))
-    expect(observer.getCurrentResult().data).to.eq(gate0.revtok)
-    const gate1 = TH.nextGateOf(gate0)
-    receive(noticeOf(gate1))
-    expect(observer.getCurrentResult().data).to.eq(gate1.revtok)
-    unsubscribe()
-  })
-
-  it("shows the placeholder of the box it moves to, not the box it showed", () => {
-    const { tsq, boxMinder, receive } = minderWorldOf(new MemoryVaultDB())
-    const box = TH.boxThingOf()
-    receive(noticeOf(box))
-    const observer = new TSQ.QueryObserver<ThingCar<Thing>>(tsq, { queryKey: boxMinder.queryKey(TH.BoxScope), enabled: false })
-    const unsubscribe = observer.subscribe(noop)
-    expect(observer.getCurrentResult().data).to.deep.equal(carOf(box))
-    const otherScope = { ...TH.ThingBank, labelpath: 'box/anthropic' }
-    const shellCar   = carOf(shellOf(otherScope, TH.rootBoxOf()))
-    observer.setOptions({ queryKey: boxMinder.queryKey(otherScope), enabled: false, placeholderData: shellCar })
-    expect(observer.getCurrentResult()).to.deep.include({ data: shellCar, isPlaceholderData: true })
+    receive(noticeOf(TH.gateThingOf()))
+    expect((observer.getCurrentResult().error as Errors.VaultError | null)?.refusalkind).to.eq('unexpected_error')
     unsubscribe()
   })
 
@@ -925,20 +907,18 @@ describe("ThingMinder's structural sharing", () => {
     expect(share(bare, full)).to.deep.equal(full)
   })
 
-  it("shares any value that is not a car as TanStack's default does", () => {
-    const share = shareOf()
-    const car   = carOf(TH.gateThingOf())
-    expect(share('a', 'b')).to.eq('b')
-    expect(share(car, 'b')).to.eq('b')
-    expect(share(undefined, car)).to.eq(car)
-    expect(share({ revtok: 'r1' }, { revtok: 'r1' })).to.deep.equal({ revtok: 'r1' })
+  it("returns a car delivered over nothing", () => {
+    const car = carOf(TH.gateThingOf())
+    expect(shareOf()(undefined, car)).to.eq(car)
   })
 
-  it("shares a selected value that carries a liveness as TanStack's default does, without refusing it", () => {
-    const share  = shareOf()
-    const prior  = { liveness: 'full', label: 'openai' }
-    expect(share(prior, { liveness: 'full', label: 'openai' })).to.eq(prior)
-    expect(share(prior, { liveness: 'bare', label: 'openai' })).to.deep.equal({ liveness: 'bare', label: 'openai' })
+  it("refuses any value that is not a car, unexpected_error", () => {
+    const share = shareOf()
+    const car   = carOf(TH.gateThingOf())
+    const cases: [unknown, unknown][] = [['a', 'b'], [car, 'b'], ['a', car], [null, car], [car, undefined], [car, { liveness: 'full', label: 'openai' }]]
+    for (const [prior, delivered] of cases) {
+      TH.expectSyncRefusal(() => share(prior, delivered), 'unexpected_error')
+    }
   })
 
   it("returns the car of the Thing at one labelpath of another user or bank, whatever its revision", () => {

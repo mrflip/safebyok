@@ -142,6 +142,9 @@ export const QueryClientExpected = 'A ThingMinder is made with a QueryClient fro
 /** A gcTime that is not Infinity or a whole number of milliseconds up to 2^31 - 1. */
 export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2147483647 (about 24.8 days): a longer timer fires at once.'
 
+/** A value in a minder's query that is not a car. */
+export const NotACar = "A ThingMinder's query was given a value that is not a ThingCar, by a select, a placeholder or a write under its query key: only cars belong there."
+
 /** A car whose newest is not a Thing's scope and revision. */
 export const CarRecordShape = "A ThingCar's newest record lacks a Thing's scope or revision: this is a bug in safebyok."
 

@@ -65,7 +65,9 @@ export type TSQAnswer = TSQGotAnswer | BadAnswer
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
-  /** The TanStack Query client whose cache has the cars. A host may share its own. */
+  /** The TanStack Query client whose cache has the cars. A host may share its own.
+   * An observer of a minder's query gives neither a `select` nor a `placeholderData`: a value that is not a car refuses `unexpected_error`.
+   */
   tsq:             TSQ.QueryClient
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
@@ -389,11 +391,16 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: minderNotStarted, staleRead, isCarEvent, gotAnswerOf, staleTimeFnOf, isStaleQuery, mergedValOf
+// == [Helpers]: minderNotStarted, notACar, staleRead, isCarEvent, gotAnswerOf, staleTimeFnOf, isStaleQuery, mergedValOf
 
 /** The refusal of a read on a minder that is not minding. */
 function minderNotStarted(): Errors.VaultError {
   return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
+}
+
+/** The refusal of a value in a minder's query that is not a car. */
+function notACar(): Errors.VaultError {
+  return new Errors.VaultError('unexpected_error', Phrases.NotACar)
 }
 
 /** The refusal of a get answered with a revision older than one cached when it began. */
@@ -433,10 +440,11 @@ function isStaleQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTim
   return carQuery?.isStaleByTime(staleTimeFnOf(staleTime)(carQuery)) ?? true
 }
 
-// TanStack also calls it on an observer's selected and placeholder values, which may be anything.
-/** The value TanStack caches when `delivered` arrives over `prior`: the merged car ({@link mergedCarOf}) for a car, else TanStack's default sharing. */
-function mergedValOf(prior: unknown, delivered: unknown): unknown {
-  if (! isThingCar(delivered)) { return TSQ.replaceEqualDeep(prior, delivered) }
-  return mergedCarOf(isThingCar(prior) ? prior : undefined, delivered)
+// TanStack also calls it on an observer's selected and placeholder values, which is why a minder's query refuses both.
+/** The car TanStack caches when `delivered` arrives over `prior` ({@link mergedCarOf}). Anything but a car refuses, `prior` also undefined. */
+function mergedValOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
+  if (! isThingCar(delivered))                        { throw notACar() }
+  if ((prior !== undefined) && (! isThingCar(prior))) { throw notACar() }
+  return mergedCarOf(prior, delivered)
 }
 // --
