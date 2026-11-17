@@ -32,7 +32,7 @@ times: in `#tryBirth`, `sealBox`, `tombstoneBox` and `unsealBox` (`(parsed.am ==
 parsed) : await lease.unseal('BoxTombstone', parsed)`).
 
 **After.**
-* `CoreBox`, a class of statics in a new `src/models/box.ts`: `nextRevisionOf` (today's `boxWhisperOf`), `tombstoneOf`
+* `CoreBox`, a class of statics in a new `src/models/core-box.ts`: `nextRevisionOf` (today's `boxWhisperOf`), `tombstoneOf`
   (`boxTombstoneOf`), and the Sealer's members `tags`, `purposes`, `stampsOf`, `encode`, `decode`, `sealedOf`,
   `recordOf`, moved verbatim. `CoreBox satisfies Sealer`.
 * `Sealer` loses `PriorT` and `nextRevisionOf`. `sealers.ts` keeps the Sealer and record types (`BoxRecord`, the
@@ -46,14 +46,14 @@ parsed) : await lease.unseal('BoxTombstone', parsed)`).
   `core.ts`, and `'sealerkindVals'` from `index.test.ts`'s exclusion list.
 
 **Contract.** No change in the working case, if the members move verbatim. A kind string handed to the lease no longer
-means anything (Q4).
+means anything, so the lease checks the sealer it is handed (ruling 2).
 
 **Guarantees** (`notes/guarantees-big.md`, *The guarantees*). This touches G5 (the boxKey a local in the lease), G6 (the
 whisper's bytes zeroed), G7 (the whisper's JSON text only in locals), G8 (`decode` refuses quoting nothing), G9 (only
 Proving and Lease touch keys) and G10 (purpose separation; the ctx binds the box's sparse fields). All are kept, in
 substance, so long as `#sealText` and `#openSealed` are unchanged and the members move verbatim. The proofs must pass
 with only identifiers changed: `ctx-bytes.test.ts`'s byte literals, lease.test's "zeroes the whisper's bytes", and
-sealers.test's "quoting none of it". One nuance for `notes/guarantees-drift.md` unless Q4 rules a check: today the
+sealers.test's "quoting none of it". One nuance, which ruling 2's check answers: today the
 lease runs only sealers its own module exports; after this, it runs whatever sealer it is handed, `decode` included.
 
 **Tests.** `sealers.test.ts` (its `sealerkindVals` and "share all but their next revision" describes go or become
@@ -68,7 +68,7 @@ CoreBox's), `lease.test.ts` (about 25 calls with kind strings; `SealerkindCases`
   `wayinCtxOf(bank, gate, header)`;
 * `bankstamp` and `cited`: `buildLease`'s locals.
 
-**After** (Q10): `bankStamp` / `gateStamp` wherever a third party names the pair; `stamp` stays for a thing's own stamp,
+**After** (open: confirm): `bankStamp` / `gateStamp` wherever a third party names the pair; `stamp` stays for a thing's own stamp,
 so `StampedGate` keeps `{ bankStamp, stamp, wayins }`. The lease stamp's flat fields (`gatelabelpath`, `gate_lifeseq`,
 `gate_revtok`) are not renamed.
 
@@ -91,11 +91,11 @@ casts and double-checks:
   `tryDelBox`.
 
 **After.**
-* `GetAnswer<RecordT extends Thing = Thing>` and `WriteAnswer<RecordT>` (Q1); the `VaultDB` verbs typed by kind, with one
-  `as` left in the adapter's `answerOf`, commented with the by-kind check (Q3).
+* `GetAnswer<RecordT extends Thing = Thing>` and `WriteAnswer<RecordT>`, with `GetAsk<RecordT>` and `ListAsk<RecordT>` (ruling 1); the `VaultDB` verbs typed by kind, with one
+  `as` left in the adapter's `answerOf`, commented with the by-kind check.
 * `otherThanBox`, `Phrases.GotOtherThanBox`, the `as BankThing` cast and `tryGetBox`'s `return { ...answer, val:
   answer.val }` go.
-* The ended check is one private helper, called first in each of the five (Q2). It keeps its answer exactly: the
+* The ended check is one private helper, called first in each of the five. It keeps its answer exactly: the
   device's `endCause`, `act: 'unclassified_storing'`, `world: null`, `dbhas: null`, and the vaultDB never called.
 
 **Contract.** No change in the working case. The broken case changes how it is reported, not what a working call
@@ -120,11 +120,11 @@ for the verb's strict check to refuse."
 
 **After.** `getBoxRecord`, `putBoxRecord`, `delBoxRecord` and `listBoxRecords` throw and give the record (`BoxThing |
 BoxShell | null`, the `BoxThing` written, the tombstone, `Sparse<BoxThing>[]`); their `try` twins replace the four `try*Box`
-verbs, with no aliases (Q8). Each throwing form is its twin and `if (! answer.ok) { throw answer.err }`, so the ended
-check lives in the twins alone. What "accepts a duck record" means for put and del is Q7.
+verbs, with no aliases. Each throwing form is its twin and `if (! answer.ok) { throw answer.err }`, so the ended
+check lives in the twins alone. Put and del keep today's strictness on extra draft keys: their builders are the
+classifier tidy's (ruling 5).
 
-**Tests.** bank-flows' four flows and seven refusals renamed; each throwing form gives `val` or throws `err`; the duck
-input, once Q7 is ruled.
+**Tests.** bank-flows' four flows and seven refusals renamed; each throwing form gives `val` or throws `err`.
 
 ## Collisions
 
