@@ -6,7 +6,7 @@ import { exactOptional } from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, boxRecordOrShell, thingWatchScope, trackShape } from '../storage/shapes-thing'
+import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, boxRecordOrShell, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
 import type { TSQGotAnswer } from './thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
@@ -15,7 +15,7 @@ import type { TSQGotAnswer } from './thing-minder'
 export interface QueryCacheOpts {
   /** How long a record stays timely, in milliseconds. */
   staleTime: number
-  /** How long an entry no one listens to stays in the cache, in milliseconds. `Infinity` keeps it until `goodbye`. */
+  /** How long an entry stays in the cache once no TanStack observer uses it, in milliseconds. `Infinity` keeps it until `goodbye`. */
   gcTime:    number
 }
 
@@ -32,10 +32,10 @@ export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry:
 const MaxGcTime = (2 ** 31) - 1
 // --
 
-// == [Checks]: queryCacheOpts, minderFriend, tsqClient, minderListener, minderTrack, minderAskOpts, minderGetAskOpts
+// == [Checks]: queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts
 
-/** The checks of a {@link QueryCacheOpts}, of the parts of `ThingMinder.make`'s arguments that name no minder, of a listener, of an ask's track, and of a read's options. */
-export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderTrack, minderAskOpts, minderGetAskOpts } = Validator.Checkers('bad_option', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
+/** The checks of a {@link QueryCacheOpts}, of the parts of `ThingMinder.make`'s arguments that name no minder, of a listener, of a scope, of an ask's track, and of a read's options. */
+export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts } = Validator.Checkers('bad_option', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
   const gcTime           = union([uint.max(MaxGcTime, Phrases.GcTimeShape), lit(Infinity)])
   const queryCacheOpts   = obj({
     staleTime: orDefault(uint, DefaultQueryCacheOpts.staleTime),
@@ -47,12 +47,14 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderTr
   const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn(), invalidateQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)
   const minderListener   = fn<(answer: TSQGotAnswer) => void>()
+  // Its fields alone: an ask or a record passes, and is read as its scope.
+  const minderScope      = obj(thingScope.shape)
   // The rest of the ask is the vaultDB's, which checks it.
   const minderTrack      = obj({ track: trackShape }).loose()
   // Each option may be left out, and never given as undefined.
   const minderGetAskOpts = obj({ staleTime: exactOptional(uint) }).strict()
   const minderAskOpts    = minderGetAskOpts.extend({ ifStale: exactOptional(oneof(['get', 'refresh'])) }).strict()
-  return { queryCacheOpts, minderFriend, tsqClient, minderListener, minderTrack, minderAskOpts, minderGetAskOpts }
+  return { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts }
 })
 
 /** A minder's get ask: the bank's get ask, `track` and `ifAbsent: 'nil'` included, which the minder sends to the vaultDB exactly as given. */

@@ -9,17 +9,17 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { Errors, Outcome, SX, Throwers, Validator } from 'safebyok-big/internals'
+import { Errors, Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Userid } from '../storage/primitives'
 import {
-  type GetAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  KindChecks, checkedGetAsk, loggableAskOf, modelkindOf, shellOf, sparseOf, thingkindVals,
+  type GetAsk, type LoggableAsk, type Sparse, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
+  KindChecks, checkedGetAsk, isVoidSentinel, loggableAskOf, modelkindOf, shellOf, sparseOf, thingCited, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
   type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
-  DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, minderTrack, queryCacheOpts, tsqClient,
+  DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, minderScope, minderTrack, queryCacheOpts, tsqClient,
 } from './shapes-minder'
 
 // == [Answers]: DeliverableThing, GotAnswer, TSQEntryState, TSQGotAnswer, TSQAnswer
@@ -53,7 +53,7 @@ export interface MinderOpts {
   vaultDB:         VaultDB
   /** The TanStack Query client whose cache holds the records. A host may share its own. */
   tsq:             TSQ.QueryClient
-  /** How long a record stays timely, and an entry no one listens to stays cached. A missing field defaults from {@link DefaultQueryCacheOpts}. */
+  /** How long a record stays timely, and an entry stays cached once no TanStack observer uses it. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
@@ -85,7 +85,7 @@ export class ThingMinder {
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   readonly #recordChecker:  typeof KindChecks[Thingkind]['record']
   #unwatch: (() => void) | null = null
-  /** True from `hello` until `goodbye`: the reads answer, and records are cached, only then. */
+  /** True from `hello` until `goodbye`: records are cached, and `tryAt`, `get` and `list` answer, only then. */
   #isReady = false
   // --
 
@@ -120,9 +120,8 @@ export class ThingMinder {
     this.#tsq.setQueryDefaults(this.keyPrefix, {
       ...this.#queryCacheOpts,
       ...FixedQueryCacheOpts,
-      structuralSharing: (prior: unknown, record: unknown) => (
-        betterRecordOf(prior, record, (cached) => this.#isWholeRecord(cached))
-      ),
+      queryFn:           ({ queryKey }) => this.#fetchRecord(this.#bank.makeGetAsk(this.#scopeOfKey(queryKey))),
+      structuralSharing: (prior: unknown, record: unknown) => this.#betterRecordOf(prior, record),
     })
     this.#isReady = true
     if (this.modelkind === 'box') {
@@ -159,7 +158,8 @@ export class ThingMinder {
 
   /** The cached record for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at(scoped: ThingScope): DeliverableThing | undefined {
-    return this.#tsq.getQueryData<DeliverableThing>(this.queryKey(scoped))
+    this.#demandOwnScope(scoped)
+    return this.#cachedAt(scoped)
   }
 
   /** The cache's answer for `ask`'s scope, and whether it is timely. Never waits on the vaultDB.
@@ -210,9 +210,9 @@ export class ThingMinder {
     return this.#tsqFind(ask)?.isStaleByTime(staleTime) ?? true
   }
 
-  /** Call `listener` with the answer `tryAt` would give for a scope, under this minder's own `staleTime`, each time its record or its standing changes.
-   * A record that lands is told even when it changes nothing. So is a get's refusal, or an invalidation, after which the answer is `untimely`, and the
-   * entry's removal, after which it is `vacant`. Returns the function that stops it. What the listener throws goes to the device's `onBadNews`, and stops nothing.
+  /** Call `listener` with the answer `tryAt` would give for an entry, under this minder's own `staleTime`, each time a record lands in it, a get of it is refused, or it is invalidated or removed.
+   * A record that lands is told even when it changes nothing. A record that ages past `staleTime` is not told, and listening keeps nothing cached: a TanStack observer does both.
+   * Returns the function that stops it. What the listener throws goes to the device's `onBadNews`, and stops nothing.
    */
   listen(listener: (answer: TSQGotAnswer) => void): () => void {
     const checked = minderListener.parse(listener)
@@ -228,7 +228,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #tsqFind
+  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #cachedAt, #tsqFind
 
   // Its refusal lands in the entry, where the next tryAt finds it as `lastErr`.
   /** Initiate fetch of `ask`'s record, if it is stale, without waiting for the result. If a fetch is under way, it will use its result (not starting a new one). */
@@ -247,7 +247,12 @@ export class ThingMinder {
     }
     // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
     // get may have left the cache a later record.
-    return this.at(ask) ?? fetched
+    return this.#cachedAt(ask) ?? fetched
+  }
+
+  /** The cached record for `scoped`, one of this minder's scopes, or undefined for none. */
+  #cachedAt(scoped: ThingScope): DeliverableThing | undefined {
+    return this.#tsq.getQueryData<DeliverableThing>(this.queryKey(scoped))
   }
 
   /** The cache's entry for `scoped`, or undefined for none. */
@@ -263,23 +268,26 @@ export class ThingMinder {
     if (modelkindOf(notice.val.labelpath) === this.modelkind) { this.#doDeliverRecord(notice.val) }
   }
 
-  // Invalidated, not refetched: the next get, or a listener's next look, fetches it whole.
+  // Stale, not refetched: the next get, or a listener's next look, fetches it whole. Landed as of time 0, it is stale from
+  // the moment it lands, so that no listener is told it timely; invalidated too, for a staleTime longer than the epoch is old.
   /** Cache sparse `record`. Unless the cache already has the whole record, mark it stale: the next get will fetch it whole. */
   #doDeliverSeed(record: Sparse<Thing>): void {
-    this.#doDeliverRecord(record)
-    if (! this.isWholeRecordAt(record)) {
-      void this.#tsq.invalidateQueries({ queryKey: this.queryKey(record), exact: true, refetchType: 'none' })
+    if (this.#isWholeRecord(this.#betterRecordOf(this.#cachedAt(record), record))) {
+      this.#doDeliverRecord(record)
+      return
     }
+    this.#doDeliverRecord(record, { updatedAt: 0 })
+    void this.#tsq.invalidateQueries({ queryKey: this.queryKey(record), exact: true, refetchType: 'none' })
   }
 
   /** Send `record` to the cache, while this minder is minding. TSQ will use betterRecordOf to identify what, if anything, has changed. */
-  #doDeliverRecord(record: DeliverableThing): void {
+  #doDeliverRecord(record: DeliverableThing, opts: TSQ.SetDataOptions = {}): void {
     if (! this.#isReady) { return }
-    this.#tsq.setQueryData(this.queryKey(record), record)
+    this.#tsq.setQueryData(this.queryKey(record), record, opts)
   }
   // --
 
-  // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #shellAt
+  // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #fetchRecord, #betterRecordOf, #shellAt
 
   /** The key every one of this minder's cache entries starts with: its root's, without the final '.', selecting the root and everything under it. */
   get keyPrefix(): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, this.modelkind] }
@@ -293,19 +301,24 @@ export class ThingMinder {
 
   /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. TanStack caches its record through `betterRecordOf`. */
   #tsqGetAskOf(ask: GetAsk) {
-    return {
-      queryKey: this.queryKey(ask),
-      queryFn:  async (): Promise<DeliverableThing> => {
-        // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
-        const prior  = this.at(ask)
-        const answer = await this.#vaultDB.tryGetThing(ask)
-        if (! answer.ok) { throw answer.err }
-        const record = answer.val ?? this.#shellAt(ask)
-        // TanStack keeps the entry's record and its time, marks it invalidated, and holds the refusal as the entry's error.
-        if ((prior !== undefined) && (cmpRecords(prior, record) < 0)) { throw staleRead(ask) }
-        return record
-      },
-    }
+    return { queryKey: this.queryKey(ask), queryFn: () => this.#fetchRecord(ask) }
+  }
+
+  /** The record for `ask`'s scope from the vaultDB, or its shell where storage holds nothing. Refuses `stale_read` where it is older than the record cached when it began. */
+  async #fetchRecord(ask: GetAsk): Promise<DeliverableThing> {
+    // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
+    const prior  = this.#cachedAt(ask)
+    const answer = await this.#vaultDB.tryGetThing(ask)
+    if (! answer.ok) { throw answer.err }
+    const record = answer.val ?? this.#shellAt(ask)
+    // TanStack keeps the entry's record and its time, marks it invalidated, and holds the refusal as the entry's error.
+    if ((prior !== undefined) && (cmpRecords(prior, record) < 0)) { throw staleRead(ask) }
+    return record
+  }
+
+  /** The record of `prior` and `record` the cache keeps: see {@link betterRecordOf}. */
+  #betterRecordOf(prior: unknown, record: unknown): unknown {
+    return betterRecordOf(prior, record, (cached) => this.#isWholeRecord(cached))
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box, which `hello` caches.
@@ -313,13 +326,13 @@ export class ThingMinder {
   #shellAt(scoped: ThingScope): VoidSentinel {
     const { labelpath } = scoped
     if (! labelpath.includes('/')) { return shellOf(scoped) }
-    const parent = this.at({ ...scoped, labelpath: modelkindOf(labelpath) })
+    const parent = this.#cachedAt({ ...scoped, labelpath: modelkindOf(labelpath) })
     // With no root cached, shellOf refuses: below a root, a shell needs a life.
     return (parent === undefined) ? shellOf(scoped) : shellOf(scoped, parent)
   }
   // --
 
-  // == [Checks]: scope, ties, #isWholeRecord, isWholeRecordAt, #demandOwnAsk, #demandReady, #scopeOfKey
+  // == [Checks]: scope, ties, #isWholeRecord, isWholeRecordAt, #demandOwnAsk, #demandOwnScope, #demandReady, #scopeOfKey
 
   /** The bank this minder minds Things of. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
@@ -328,19 +341,26 @@ export class ThingMinder {
   get ties(): ThingTies { return { userid: this.userid, banklabel: this.banklabel, modelkind: this.modelkind } }
 
   /** True when `record` passes its kind's record check, so it has its body. A sparse record does not. */
-  #isWholeRecord(record: DeliverableThing | undefined): boolean {
+  #isWholeRecord(record: unknown): boolean {
     return this.#recordChecker.safeParse(record).success
   }
 
   /** Internal. True when the record cached at `scoped` has its body: not sparse, not the void sentinel, and not missing. */
   isWholeRecordAt(scoped: ThingScope): boolean {
-    return this.#isWholeRecord(this.at(scoped))
+    this.#demandOwnScope(scoped)
+    return this.#isWholeRecord(this.#cachedAt(scoped))
   }
 
-  /** Demand that `rawAsk` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. Throws `bad_option`. */
-  #demandOwnAsk(rawAsk: unknown): void {
-    minderTrack.parse(rawAsk)
-    Validator.checkedConsistent(checkedGetAsk(rawAsk), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
+  /** Demand that `ask` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. Throws `bad_option`. */
+  #demandOwnAsk(ask: MinderGetAsk): void {
+    minderTrack.parse(ask)
+    Validator.checkedConsistent(checkedGetAsk(ask), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
+  }
+
+  /** Demand that `scoped` is a scope in this minder's bank, of its modelkind. Throws `bad_option`. */
+  #demandOwnScope(scoped: ThingScope): void {
+    const { labelpath, ...bankScope } = minderScope.parse(scoped)
+    Validator.checkedConsistent({ ...bankScope, modelkind: modelkindOf(labelpath) }, this.ties, { kind: 'bad_option' })
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
@@ -374,7 +394,7 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: minderNotStarted, staleRead, isRecordEvent, isVoidSentinel, gotAnswerOf, betterRecordOf, cmpRecords
+// == [Helpers]: minderNotStarted, staleRead, isRecordEvent, gotAnswerOf, betterRecordOf, isRevisionPair, cmpRecords
 
 /** The refusal of a read on a minder that is not minding. */
 function minderNotStarted(): Errors.VaultError {
@@ -394,11 +414,6 @@ function isRecordEvent(event: TSQ.QueryCacheNotifyEvent): boolean {
   return (event.type === 'updated') && ['success', 'error', 'invalidate'].includes(event.action.type)
 }
 
-/** True when `record` is a void sentinel: its revseq is the shell's -1. */
-function isVoidSentinel(record: DeliverableThing): record is VoidSentinel {
-  return record.revseq === SX.VoidRevisionSeq
-}
-
 /** A get's answer for `record`, the cached record at `ask`'s scope: act `vacant` for none, `untimely` unless `isTimely`, `gotvoid` for a void sentinel. */
 function gotAnswerOf(ask: GetAsk, record: DeliverableThing | undefined, isTimely: boolean): GotAnswer {
   if (record === undefined)   { return { ok: true, ask, act: 'vacant',   world: null, val: undefined } }
@@ -408,13 +423,22 @@ function gotAnswerOf(ask: GetAsk, record: DeliverableThing | undefined, isTimely
   return                               { ok: true, ask, act,             world: null, val: record }
 }
 
-// Kept pure: TanStack also calls it on observers' results, and marks the entry fresh whichever record it keeps.
-/** The later of `prior` and `record`, by lifepath, then revseq. For the same revision, `record` wins only if it is whole and `prior` is not. */
-function betterRecordOf(prior: unknown, record: unknown, isWholeRecord: (cached: DeliverableThing) => boolean): unknown {
-  if (prior === undefined) { return record }
-  const [ante, post] = [prior as DeliverableThing, record as DeliverableThing]
-  const cmp = cmpRecords(ante, post) || ((isWholeRecord(post) && ! isWholeRecord(ante)) ? 1 : 0)
+// Kept pure: TanStack also calls it on an observer's selected and placeholder values, where the pair may be anything,
+// even records of two Things, and marks the entry fresh whichever record it keeps.
+/** The later of `prior` and `record` where both are revisions of one Thing, by lifepath, then revseq. For the same revision, `record` wins only if it is whole and `prior` is not.
+ * Any other pair shares structure as TanStack's default does.
+ */
+function betterRecordOf(prior: unknown, record: unknown, isWholeRecord: (cached: unknown) => boolean): unknown {
+  if (! isRevisionPair(prior, record)) { return TSQ.replaceEqualDeep(prior, record) }
+  const cmp = cmpRecords(prior as ThingCited, record as ThingCited) || ((isWholeRecord(record) && ! isWholeRecord(prior)) ? 1 : 0)
   return (cmp > 0) ? TSQ.replaceEqualDeep(prior, record) : prior
+}
+
+/** True when `prior` and `record` are revisions of one Thing, each whole, sparse or a shell, at one labelpath. */
+function isRevisionPair(prior: unknown, record: unknown): boolean {
+  if (! (thingCited.safeParse(prior).success && thingCited.safeParse(record).success)) { return false }
+  const { labelpath } = prior as Partial<ThingScope>
+  return (labelpath !== undefined) && (labelpath === (record as Partial<ThingScope>).labelpath)
 }
 
 // The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0. Lifeseqs are
