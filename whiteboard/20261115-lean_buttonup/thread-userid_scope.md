@@ -1,6 +1,6 @@
 # Thread userid_scope: the new core names the user `userid` (2026-11-17)
 
-Branch `20261117-userid_scope`, PR #TBD, stacked on #715 (`20261117-core_box`). Proved: `pnpm --filter safebyok lint
+Branch `20261117-userid_scope`, PR #717, stacked on #715 (`20261117-core_box`). Proved: `pnpm --filter safebyok lint
 typecheck test`, 872 tests passing (871 before; one case added). `pnpm justify` not yet run: the thread is **blocked** on
 directive 4, below.
 
