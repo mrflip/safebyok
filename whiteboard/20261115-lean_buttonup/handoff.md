@@ -13,6 +13,7 @@ the Coach runs the work, and rulings recorded nowhere else.
   argument.
 * Rounds of building go to thread-workers; small edits are yours. A worker's report comes to the Coach whole.
 * Coach text is not sacred: fix it and report each fix.
+* Read VOCABULARY.md for 'fingerpainting'
 
 ## State
 
@@ -57,10 +58,3 @@ the Coach runs the work, and rulings recorded nowhere else.
 * The workshop skill and `notes/supervising.md`: the Coach's read.
 * For `notes/security.md`, once world_function.md decides it: a bank delete's leftover `gate/<label>` rows still wrap the
   dead bank's bankKey.
-
-## Gotchas learned
-
-* Before cherry-picking onto a PR branch, check the local ref against origin: `git worktree add` on an existing branch
-  takes the local ref, which can be behind.
-* base-sync stops when two sibling PRs change the same lines. Keep a PR's files disjoint from its siblings', or stack it.
-* The Coach merges mid-flight: `gh pr view N --json state` immediately before every push.
