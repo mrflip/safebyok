@@ -7,7 +7,7 @@ import type { CX } from 'safebyok-big/internals'
 export type Userid = string
 /** A bank's label, chosen by the host (`banklabel`). */
 export type Banklabel = string
-/** Where a Thing is stored in its bank: its modelkind, then up to one label, each after a `/` (`bank`, `gate`, `box/aa`). */
+/** Where a Thing is stored in its bank: its modelkind, then at most one label after a `/` (`bank`, `gate`, `box/aa`). */
 export type Labelpath = string
 // --
 
@@ -16,7 +16,7 @@ export type Labelpath = string
 export type Lifeseq = string
 /** The lifeseq of each life from a root's down to a Thing's own, joined by `/`. */
 export type Lifepath = string
-/** A life's number: -1 for the shell, 0 for a birth, odd for a tombstone. It is the number a {@link Lifeseq} spells. */
+/** A life's number: -1 for the shell, then 0, 1, 2 and up, each even one a live life and each odd one a tombstone's. It is the number a {@link Lifeseq} spells. */
 export type Lifenum = number
 /** A fresh token for each revision of a Thing (`revtok`). */
 export type Revtok = string
