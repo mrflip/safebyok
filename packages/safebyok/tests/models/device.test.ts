@@ -124,7 +124,7 @@ describe("Device.make(record, opts)", () => {
     [{ device_tok: undefined },    'no device_tok'],
     [{ device_tok: 'device_one' }, 'a device_tok that is a label'],
     [{ banklabel: '' },            'an empty banklabel'],
-    [{ user_id: 42 },              'a user_id that is not a string'],
+    [{ userid: 42 },               'a userid that is not a string'],
   ] as const
 
   for (const [moved, blurb] of RecordCases) {

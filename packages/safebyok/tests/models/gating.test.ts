@@ -70,7 +70,7 @@ describe("Gating.make(record, opts)", () => {
     const gating = makeGating({ device, bank })
     expect(gating.toJSON()).to.deep.equal({ gatingkind: 'birth_bank', gatingTok: gating.gatingTok, ...TH.WorldScope })
     expect(TH.jsonOf(gating)).to.deep.equal(gating.toJSON())
-    expect(Object.keys(gating)).to.have.members(['gatingkind', 'gatingTok', 'user_id', 'banklabel'])
+    expect(Object.keys(gating)).to.have.members(['gatingkind', 'gatingTok', 'userid', 'banklabel'])
     expect(Object.isFrozen(gating)).to.be.true
   })
 

@@ -3,7 +3,7 @@ import type { Consts, Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases, Throwers, Validator } from 'safebyok-big/internals'
 import { thingRecord } from '../storage/shapes-thing'
 import { Lease, type LeaseBank } from './lease'
-import type { BankStamp, GateStamp, StampedGate } from './stamps'
+import type { BankScope, BankStamp, GateStamp, StampedGate } from './stamps'
 import * as Stamps from './stamps'
 import { Wayin, wayinCtxOf } from './wayin'
 
@@ -25,7 +25,7 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps.
-/** The checks of a {@link GateRevisionedStamp}, of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' arguments. */
+/** The checks of a {@link GateRevisionedStamp}, of {@link Proving.buildWayin}'s `source`, of {@link Proving.buildLease}'s arguments, and of the static builders' and `judgeStrength`'s arguments. */
 const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => {
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
   const gateRevisionedStamp = Stamps.gateStamp.extend(thingRecord.pick({ revtok: true }).shape)
@@ -37,6 +37,7 @@ const Checks = Validator.Checkers('bad_option', ({ obj, fn, bool, custom }) => {
     passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp }),
     passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate }),
     passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.stampedGate }),
+    strengthArgs:         GX.strengthArgs.extend({ scope: Stamps.bankScope }),
   }
 })
 
@@ -105,9 +106,10 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
   /** The strength checker's verdict on `passphraseCleartext`.
    * A throw from the checker is replaced, so no error quotes the passphrase.
    */
-  static async judgeStrength(device: GX.ProvingDevice, scope: CX.BankScope, passphraseCleartext: string): Promise<GX.PassphraseVerdict> {
-    const checked = GX.strengthArgs.parse({ passphraseClear: passphraseCleartext, scope, device })
-    return checked.device.strengthChecker(checked.passphraseClear, checked.scope)
+  static async judgeStrength(device: GX.ProvingDevice, scope: BankScope, passphraseCleartext: string): Promise<GX.PassphraseVerdict> {
+    const { passphraseClear: typed, scope: { userid, banklabel }, device: checkedDevice } = Checks.strengthArgs.parse({ passphraseClear: passphraseCleartext, scope, device })
+    // The host's strength checker hears the user as `user_id`.
+    return checkedDevice.strengthChecker(typed, { user_id: userid, banklabel })
   }
 
   /** Wrap a bankKey into this proving's wayin: a new one for `NOVEL`, or the one `source` unwraps.
@@ -197,8 +199,7 @@ export class PassphraseProving extends Proving<GX.PassphraseWayinHeader> {
    */
   static async buildNovel(device: GX.ProvingDevice, bankStamp: BankStamp, gateStamp: GateStamp, passphraseCleartext: GX.PassphraseCleartext): Promise<PassphraseProving> {
     const { bankStamp: checkedBank, gateStamp: checkedGate, passphraseClear: typed } = Checks.passphraseNovelArgs.parse({ device, bankStamp, gateStamp, passphraseClear: passphraseCleartext })
-    // The host's strength checker hears the user as `user_id`.
-    const verdict = await super.judgeStrength(device, { user_id: checkedBank.userid, banklabel: checkedBank.banklabel }, typed)
+    const verdict = await super.judgeStrength(device, checkedBank, typed)
     if (! verdict.strong) { throw Throwers.weakPassphrase(verdict.reason) }
     const header = mintPassphraseHeader(device)
     const wayinKey = await passphraseKeyOf(device.keyDeriver, typed, Crypto.fromB64(header.salt_b64))

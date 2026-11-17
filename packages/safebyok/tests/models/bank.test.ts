@@ -54,7 +54,7 @@ describe("Bank.mintStamps(scope)", () => {
 
   const ScopeCases = [
     [null,                               'null'],
-    [{ user_id: 'u1' },                  'a scope with no banklabel'],
+    [{ userid: 'u1' },                   'a scope with no banklabel'],
     [{ ...TH.WorldScope, banklabel: '' }, 'an empty banklabel'],
   ] as const
 
@@ -156,15 +156,16 @@ describe("Bank.make(record, { device, vaultDB })", () => {
   }
 
   const OtherDeviceCases = [
-    [{ user_id: 'u2' },     "another user's device"],
-    [{ banklabel: 'work' }, "a device of the user's other bank"],
+    [{ userid: 'u2' },      "userid",    "another user's device"],
+    [{ banklabel: 'work' }, "banklabel", "a device of the user's other bank"],
   ] as const
 
-  for (const [moved, blurb] of OtherDeviceCases) {
+  for (const [moved, fieldname, blurb] of OtherDeviceCases) {
     it(`refuses ${blurb}`, async () => {
       const { record } = await TH.buildBornBank()
       const device = TH.makeDevice(moved)
-      TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: device.vaultDB }), 'record_conflict')
+      const err = TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: device.vaultDB }), 'record_conflict')
+      expect(err.meta).to.deep.equal({ fieldnames: [fieldname] })
     })
   }
 
