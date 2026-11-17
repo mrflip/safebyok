@@ -143,7 +143,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(Object.isFrozen(opened)).to.be.true
   })
 
-  it("unseals to the record as the sealer checks it, never the object given: a field beside the record refuses", async () => {
+  it("answers a copy of the record as the sealer checks it: a field beside the record refuses", async () => {
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(CoreBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const { whisper_sealed: _sealed, ...unsealed } = sealed
