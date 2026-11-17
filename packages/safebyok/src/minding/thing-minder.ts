@@ -27,7 +27,10 @@ import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpRecords
 
 // `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
 // A timely car is full, gone or void: a behind or bare car is never timely.
-/** The cache's record for a scope, shaped like a get's answer. Act `vacant` means nothing is cached, and `untimely` means the cached car is older than asked, or lacks the newest record whole. */
+/** A get's answer, read from the cache. Beside a get's own acts:
+ * * `vacant`   -- nothing is cached
+ * * `untimely` -- the car is older than `staleTime`, is `behind` or `bare`, or its last get was refused
+ */
 type GotAnswer = (
   | GoodAnswer<Thing, 'gotlive'>
   | GoodAnswer<Tombstone<Thing>, 'gotgone'>
@@ -35,25 +38,36 @@ type GotAnswer = (
   | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
 ) & { ask: GetAsk }
 
-/** The car cached for a scope, however old, and how recent it is, and how its last get went. */
-interface CarFreshness { car: ThingCar<Thing> | undefined, isTimely: boolean, refreshedAt: EpochMillis, isFetching: boolean, lastErr: Errors.VaultError | null }
+/** The car cached for a scope, however old, and the state of its gets. */
+interface CarFreshness {
+  /** The cached car, or undefined for none. */
+  car:         ThingCar<Thing> | undefined
+  /** False where the act is `vacant` or `untimely`. */
+  isTimely:    boolean
+  /** When a record last landed in the car, or 0 for none. */
+  refreshedAt: EpochMillis
+  /** True while a get of the car is under way. */
+  isFetching:  boolean
+  /** The refusal of the car's last get, or null. */
+  lastErr:     Errors.VaultError | null
+}
 
-/** The cache's record for a scope, shaped like a get's answer, with its car and the car's freshness (`car`, `isTimely`, `refreshedAt`, `isFetching`, `lastErr`). */
+/** A get's answer read from the cache, with the car and its {@link CarFreshness}. */
 export type TSQGotAnswer = GotAnswer & CarFreshness
 
-/** The cache's answer for a scope, read without waiting on the vaultDB: its {@link TSQGotAnswer}, or a refusal. */
+/** `tryAt`'s answer: a {@link TSQGotAnswer}, or a refusal. */
 export type TSQAnswer = TSQGotAnswer | BadAnswer
 // --
 
 // == [Arguments]: MinderOpts, Checks
 
-/** The options of {@link ThingMinder.make}, beside its ties and its bank. */
+/** Options for {@link ThingMinder.make}. */
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
   /** The TanStack Query client whose cache holds the cars. A host may share its own. */
   tsq:             TSQ.QueryClient
-  /** How long a full car stays timely, and a car stays cached once no TanStack observer uses it. A missing field defaults from {@link DefaultQueryCacheOpts}. */
+  /** The cache's timings ({@link QueryCacheOpts}). A field left out takes its value from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
@@ -71,8 +85,10 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
 }))
 // --
 
-/** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through a watch of the bank of its own.
- * A minder reads only its bank's scope and ask builders, so it may be made before the bank is born: a get or a list refuses until the bank is stored.
+/** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through its own watch of the bank.
+ * Internal: the layers above the core build on it, and a host does not call it.
+ * It reads only its bank's scope and ask builders, so it may be made before the bank's birth.
+ * It answers `get`, `tryAt` and `list` only between `hello` and `goodbye`, and refuses `disabled` outside them.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
@@ -84,13 +100,13 @@ export class ThingMinder {
   readonly #tsq:            TSQ.QueryClient
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   #unwatch: (() => void) | null = null
-  /** True from `hello` until `goodbye`: cars are cached, and `tryAt`, `get` and `list` answer, only then. */
+  /** True while minding: from `hello` until `goodbye`. */
   #isReady = false
   // --
 
   // == [Construction]: make, constructor
 
-  /** Make a minder of `ties.modelkind` in `bank`, asking `opts.vaultDB` and caching in `opts.tsq`. Call `hello` to start it. */
+  /** Make a minder of one kind of Thing in `bank`. It does nothing until `hello`. */
   static make(ties: Pick<ThingTies, 'modelkind'>, opts: MinderOpts, bank: MinderFriend): ThingMinder {
     const checked = Checks.minderMakeArgs.parse({ ties, opts, bank })
     return new ThingMinder(checked.ties, checked.opts, checked.bank)
@@ -111,7 +127,9 @@ export class ThingMinder {
 
   // == [Starting and ending]: hello, #startVaultDBWatch, goodbye
 
-  /** Start minding: set this minder's defaults on the cache, and watch the bank. A second call does nothing. */
+  /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB tells of. A second call does nothing.
+   * A TanStack observer of a minder's `queryKey` then fetches and merges cars too.
+   */
   hello(): void {
     if (this.#isReady) { return }
     const { staleTime } = this.#queryCacheOpts
@@ -128,7 +146,7 @@ export class ThingMinder {
     this.#startVaultDBWatch()
   }
 
-  /** Watch the bank: each notice goes to `#receive`, and the watch's trouble to the bank's `tellBadNews`. */
+  /** Start this minder's watch of the bank. */
   #startVaultDBWatch(): void {
     this.#unwatch = this.#vaultDB.watch(
       this.scope,
@@ -137,7 +155,7 @@ export class ThingMinder {
     )
   }
 
-  /** Stop minding, and remove this minder's cars and defaults from the cache. Reads refuse until `hello` is called again. */
+  /** Stop minding, and remove this minder's cars from the cache. A get still waiting refuses `disabled`. */
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
@@ -157,10 +175,9 @@ export class ThingMinder {
     return this.#cachedAt(scoped)
   }
 
-  /** The cache's answer for `ask`'s scope, and whether it is timely. Never waits on the vaultDB.
-   * - `staleTime`          -- a car older than this (milliseconds) is `untimely`, without its `val`; so is a `behind` or `bare` car
-   * - `ifStale: 'get'`     -- read the cache alone (default)
-   * - `ifStale: 'refresh'` -- also fetch a stale or vacant car in the background
+  /** The cache's answer for `ask`'s scope, without waiting on the vaultDB.
+   * A car that is not timely answers `untimely`, with no `val`.
+   * Under `ifStale: 'refresh'`, it also fetches a stale or missing car in the background ({@link MinderAskOpts}).
    */
   tryAt(ask: MinderGetAsk, opts: MinderAskOpts = {}): TSQAnswer {
     try {
@@ -174,9 +191,9 @@ export class ThingMinder {
     }
   }
 
-  /** Get the car of the Thing `ask` names: the cached one if timely, else from the vaultDB. A get already under way is shared.
-   * Refuses `stale_read` where storage answers older than the newest record cached when the get began. That car stays cached, and no longer counts as timely.
-   * Refuses `disabled` where `goodbye` is called while it waits.
+  /** Get `ask`'s car: the cached one if timely, else from the vaultDB. A get already under way is shared.
+   * Refuses `stale_read` when the vaultDB answers with a revision older than one cached when the get began. A later get asks again.
+   * With no root car cached, a get of a box the vaultDB holds nothing for refuses: get the root box first.
    */
   async get(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): Promise<ThingCar<Thing>> {
     const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
@@ -185,8 +202,9 @@ export class ThingMinder {
     return this.#doGet(ask, staleTime)
   }
 
-  /** List the Things one label under this minder's root, tombstones included, and resolve their labelpaths. A box minder lists the boxes under the root box.
-   * Each lands in its car as a sparse record. A car left `behind` or `bare` is stale, so that the next get fetches the record whole.
+  /** List the Things directly under this minder's root, in labelpath order, tombstones included.
+   * A box minder's root is the root box. Each record is cached sparse. Where that leaves a car `behind` or `bare`, the
+   * next get fetches it whole. A tombstone's car is `gone`, and answers from the cache.
    */
   async list(): Promise<Labelpath[]> {
     this.#demandReady()
@@ -198,16 +216,18 @@ export class ThingMinder {
     return answer.val.map((record) => record.labelpath)
   }
 
-  /** True when no cached car for `ask`'s scope is timely. `staleTime` overrides the minder's own. Never asks the vaultDB. */
+  /** True when `ask`'s car is missing or not timely. */
   isStaleAt(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): boolean {
     const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
     this.#demandOwnAsk(ask)
     return isStaleQuery(this.#tsqFind(ask), staleTime)
   }
 
-  /** Call `listener` with the answer `tryAt` would give for a scope, under this minder's own `staleTime`, each time a record lands in its car, a get of it is refused, or the car is invalidated or removed.
-   * A record that lands is told even when it changes nothing. A car that ages past `staleTime` is not told, and listening keeps nothing cached: a TanStack observer does both.
-   * Returns the function that stops it. What the listener throws goes to the device's `onBadNews`, and stops nothing.
+  /** Call `listener` each time a car changes, with the answer for its scope. Returns the function that stops it.
+   * A car changes when a record lands in it (even one that changes nothing), a get of it is refused, or it is invalidated
+   * or removed. The answer's `isTimely` uses the minder's own `staleTime`.
+   * Nothing is called when a car ages past `staleTime`, and listening keeps no car cached: use a TanStack observer for either.
+   * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
   listen(listener: (answer: TSQGotAnswer) => void): () => void {
     const checked = minderListener.parse(listener)
@@ -226,12 +246,12 @@ export class ThingMinder {
   // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #cachedAt, #tsqFind
 
   // Its refusal lands beside the car, where the next tryAt finds it as `lastErr`.
-  /** Initiate fetch of `ask`'s record, if its car is stale, without waiting for the result. If a fetch is under way, it will use its result (not starting a new one). */
+  /** Fetch `ask`'s car in the background, if it is stale. */
   #backgroundRefresh(ask: GetAsk, staleTime: number): void {
     void this.#doGet(ask, staleTime).catch(noop)
   }
 
-  /** The car for `ask`'s scope, from the cache if timely within `staleTime`, else from the vaultDB. */
+  /** `ask`'s car: the cached one if timely within `staleTime`, else from the vaultDB. */
   async #doGet(ask: GetAsk, staleTime: number): Promise<ThingCar<Thing>> {
     let fetched: ThingCar<Thing>
     try {
@@ -250,7 +270,7 @@ export class ThingMinder {
     return this.#tsq.getQueryData<ThingCar<Thing>>(this.queryKey(scoped))
   }
 
-  /** The cache's query for `scoped`, which holds its car, or undefined for none. */
+  /** The cache's query holding `scoped`'s car, or undefined for none. */
   #tsqFind(scoped: ThingScope): TSQ.Query<ThingCar<Thing>> | undefined {
     return this.#tsq.getQueryCache().find<ThingCar<Thing>>({ queryKey: this.queryKey(scoped), exact: true })
   }
@@ -258,12 +278,12 @@ export class ThingMinder {
 
   // == [VaultDB->Minder Delivery]: #receive, #doDeliverRecord
 
-  /** Cache the Thing a notice of the bank's watch carries, where it is of this minder's kind. */
+  /** Cache `notice`'s Thing, if it is of this minder's kind. */
   #receive(notice: ThingNotice): void {
     if (modelkindOf(notice.val.labelpath) === this.modelkind) { this.#doDeliverRecord(notice.val) }
   }
 
-  /** Land the car of `record` in the cache, while this minder is minding. */
+  /** Merge `record` into its cached car, while minding. */
   #doDeliverRecord(record: DeliverableThing): void {
     if (! this.#isReady) { return }
     this.#tsq.setQueryData(this.queryKey(record), carOf(record))
@@ -272,7 +292,7 @@ export class ThingMinder {
 
   // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #fetchCar, #shellAt
 
-  /** The key every one of this minder's cars is cached under starts with: its root's, without the final '.', selecting the root and everything under it. */
+  /** The start of the key every one of this minder's cars is cached under. */
   get keyPrefix(): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, this.modelkind] }
 
   // Each label is a segment of its own, so that the key without its final '.' selects a Thing and everything under it.
@@ -282,13 +302,15 @@ export class ThingMinder {
   /** The key `scoped`'s car is cached under. */
   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
 
-  /** TanStack's query options for a get of `ask`, the vaultDB's part of a minder's get ask. */
+  /** TanStack's query options for a get of `ask`. */
   #tsqGetAskOf(ask: GetAsk) {
     return { queryKey: this.queryKey(ask), queryFn: () => this.#fetchCar(ask) }
   }
 
   // A host's observer keeps the default queryFn past goodbye, and would cache what it fetches.
-  /** The car of `ask`'s record from the vaultDB, or of its shell where storage holds nothing. Refuses `stale_read` where it is older than the newest record cached when it began. */
+  /** Fetch `ask`'s car from the vaultDB, made of its shell where storage holds nothing.
+   * Refuses `stale_read` for an answer older than the revision cached when it began.
+   */
   async #fetchCar(ask: GetAsk): Promise<ThingCar<Thing>> {
     this.#demandReady()
     // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
@@ -302,7 +324,7 @@ export class ThingMinder {
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The shell at `scoped`: a root's, or that of a Thing under the newest of its root's cached car. Refuses `bad_option` where no root is cached. */
+  /** The shell at `scoped`. Below a root, it takes the life of its root's cached car, and refuses `bad_option` where none is cached. */
   #shellAt(scoped: ThingScope): VoidSentinel {
     const { labelpath } = scoped
     if (! labelpath.includes('/')) { return shellOf(scoped) }
@@ -314,7 +336,7 @@ export class ThingMinder {
 
   // == [Checks]: scope, ties, #demandOwnAsk, #demandOwnScope, #demandReady, #scopeOfKey
 
-  /** The bank this minder minds Things of. */
+  /** The scope of this minder's bank. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
 
   /** The scope of the bank's root box. */
@@ -323,13 +345,13 @@ export class ThingMinder {
   /** This minder's user, bank and modelkind. */
   get ties(): ThingTies { return { userid: this.userid, banklabel: this.banklabel, modelkind: this.modelkind } }
 
-  /** Demand that `ask` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. Throws `bad_option`. */
+  /** Demand that `ask` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. */
   #demandOwnAsk(ask: MinderGetAsk): void {
     minderTrack.parse(ask)
     Validator.checkedConsistent(checkedGetAsk(ask), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
   }
 
-  /** Demand that `scoped` is a scope in this minder's bank, of its modelkind. Throws `bad_option`. */
+  /** Demand that `scoped` is a scope in this minder's bank, of its modelkind. */
   #demandOwnScope(scoped: ThingScope): void {
     const { labelpath, ...bankScope } = minderScope.parse(scoped)
     Validator.checkedConsistent({ ...bankScope, modelkind: modelkindOf(labelpath) }, this.ties, { kind: 'bad_option' })
@@ -374,7 +396,7 @@ function minderNotStarted(): Errors.VaultError {
   return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
 }
 
-/** The refusal of a get that storage answered older than the newest record cached when it began. */
+/** The refusal of a get answered with a revision older than one cached when it began. */
 function staleRead(ask: GetAsk): Errors.VaultError {
   return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
 }
@@ -387,7 +409,7 @@ function isCarEvent(event: TSQ.QueryCacheNotifyEvent): boolean {
   return (event.type === 'updated') && ['success', 'error', 'invalidate'].includes(event.action.type)
 }
 
-/** A get's answer for `car`, the car cached at `ask`'s scope: act `vacant` for none, `untimely` unless `isTimely`, and otherwise its newest record. */
+/** The {@link GotAnswer} for `car`, the car cached at `ask`'s scope. */
 function gotAnswerOf(ask: GetAsk, car: ThingCar<Thing> | undefined, isTimely: boolean): GotAnswer {
   if (car === undefined)                         { return { ok: true, ask, act: 'vacant',   world: null, val: undefined } }
   if (isTimely && (car.liveness === 'full'))     { return { ok: true, ask, act: 'gotlive',  world: null, val: car.newest } }
@@ -398,7 +420,7 @@ function gotAnswerOf(ask: GetAsk, car: ThingCar<Thing> | undefined, isTimely: bo
 }
 
 // A query under this minder's prefix holds a car this minder cached.
-/** TanStack's staleTime for a car's query: `staleTime`, or 0 where the vaultDB holds a newer whole record, so that the next get fetches it. */
+/** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link isVaultDBNewer}. */
 function staleTimeFnOf(staleTime: number): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => number {
   return (carQuery) => {
     const car = carQuery.state.data as ThingCar<Thing> | undefined
@@ -412,7 +434,7 @@ function isStaleQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTim
 }
 
 // TanStack also calls it on an observer's selected and placeholder values, which may be anything.
-/** The value TanStack keeps when `landed` lands over `prior`: their merged car where `landed` is a car, else what TanStack's default sharing keeps. */
+/** The value TanStack keeps when `landed` lands over `prior`: the merged car ({@link mergedCarOf}) for a car, else TanStack's default sharing. */
 function keptValOf(prior: unknown, landed: unknown): unknown {
   if (! isThingCar(landed)) { return TSQ.replaceEqualDeep(prior, landed) }
   return mergedCarOf(isThingCar(prior) ? prior : undefined, landed)
