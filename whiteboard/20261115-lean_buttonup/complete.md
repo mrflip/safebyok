@@ -107,16 +107,18 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 * **DONE** `queryKey` names the modelkind once; `pins` becomes `ties`; `isLifeOff` becomes `isLifeMismatch`.
 * **DONE** `TableVersion` and `SqlRevision` name every Postgres function; old versions stay installed.
 
-### 3. The signature PR (`#pass-it-whole`)
+### 3. The signature PR (`#pass-it-whole`, #713)
 
-* The signature hunt's clear wins 1-8 and 12, and its cosmetic fixes (`notifyTrackedRecords` named `(ask, answer)`;
+* **DONE** The signature hunt's clear wins 1-8 and 12, and its cosmetic fixes (`notifyTrackedRecords` named `(ask, answer)`;
   `Bank`'s constructor takes `(record, opts)` and parses first).
-* `judgeStrength(device, scope, cleartext)`.
-* `clear` becomes `cleartext` in code (19 uses).
+* **DONE** `judgeStrength(device, scope, cleartext)`.
+* **DONE** `clear` becomes `cleartext` in code (19 uses).
+* **DONE** The provings' builders take the device first and the cleartext last; `#sealText(sealer, nextRevision,
+  cleartext)`; gallant.md gains the hunt's five `#pass-it-whole` pairs; keep and kept join VOCABULARY's avoid list.
 * Not done: 10, `doBirthBank(ask)` and `tryBirthBank` answering in the batch answer's shape, was reverted from #713.
   Its bank put went to `ifPresent: 'fail'`, which made the birth create-only. The birth is redone in
   `whiteboard/20261116-world_function/world_function.md`.
-* The asks' drafts and full forms renamed, in one commit, drafts first: `GetAsk`, `ListAsk`, `PutAsk`, `DelAsk`,
+* **DONE** The asks' drafts and full forms renamed, in one commit, drafts first: `GetAsk`, `ListAsk`, `PutAsk`, `DelAsk`,
   `BankAsk` and `GetBoxAsk` become `GetAskDraft`, `ListAskDraft`, `PutAskDraft`, `DelAskDraft`, `BankAskDraft` and
   `GetBoxAskDraft`; then `GetThingAsk`, `ListThingsAsk` and `WriteAskOf` / `WriteThingAsk` become `GetAsk`, `ListAsk`
   and `WriteAsk<RecordT>`. VOCABULARY.md gains **draft**.
