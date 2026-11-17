@@ -11,7 +11,7 @@ export type { Wayin } from './models/wayin'
 export type { BankScope, BankStamp } from './models/stamps'
 export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './storage/primitives'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'
-export type { BoxThing, DelAskDraft, PutAskDraft, VoidSentinel } from './storage/shapes-thing'
+export { type BoxThing, type DelAskDraft, type PutAskDraft, type VoidSentinel, isVoidSentinel } from './storage/shapes-thing'
 export { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies } from './minding/shapes-minder'
 export { type DeliverableThing, type MinderOpts, type TSQAnswer, type TSQGotAnswer, ThingMinder } from './minding/thing-minder'
 
