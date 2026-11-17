@@ -203,6 +203,10 @@ which reverses the usual rule for an internal function.
   (the checker audit's finding 2).
 * A checker that picks fields is a good use: it names intent (`bankScope.parse(stamp)` says "the scope"). The audit's
   findings 1 and 3 are withdrawn; the literal `{ userid, banklabel }` a line above `bankScope.parse` in `bank.ts` becomes the checker too.
+  As written this would drop the user check: `device.scope` is big's `{ user_id, banklabel }`, and `checkedConsistent`
+  compares only shared fields. The Coach (2026-11-17): "user_id is wrong, it should be userid there. We have control
+  over the interface: the exercise here is to simplify and untangle." So the new core speaks `userid` throughout
+  (Device, Gating, `Bank.mintStamps`, the strength checker's call), and then the line is `bankScope.parse(parsed)`.
 
 
 ## Decided in the plan, no ruling needed

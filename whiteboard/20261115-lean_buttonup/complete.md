@@ -65,7 +65,9 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
   * **The ThingCar, the minder's cache value (the Coach, 2026-11-17; under discussion).** A host shows the whole
     record, steady, and writes against the newest revision: the newest heard of and the newest whole record are kept
     apart, so a sparse revision heard by `list` never blinks a body out. Ruled:
-    * The name is `ThingCar`. `entry` is banned (VOCABULARY.md), and `state` names nothing public (STYLE.md).
+    * The name is `ThingCar`, by kind `BoxCar` and `GateCar`: a silly name for the carrier of two Things, since a
+      record is one Thing as stored and sent over a wire, a pojo. `entry` is banned (VOCABULARY.md), and `state` names
+      nothing public (STYLE.md). The cache holds cars, frozen.
     * The minder serves ThingCars only. It is internal: no `select`, no host-facing portal. Its callers are the
       ReactBridge and, later, a Listing class. The bridge handles the customer's side, so its contract is not ours here.
     * The type, as the Coach gave it (the field's name is open, below):
@@ -83,7 +85,7 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
       // dbNewer: liveness is 'behind' or 'bare'
       ```
       The doc's `null` and `undefined` describe `whole`: gone and void cache a definite "no body", bare a body not held.
-      Claude would name `whole` as the subject of that line.
+      Agreed: that line names `whole` as its subject ("`whole` is null when gone or void…"), since a car is never null.
     * Agreed: `staleTime` as a function makes a car stale when `behind` or `bare`, so query-core's own refetch fetches
       it whole. Deliver-then-invalidate and #716's wontfix row go.
     * Agreed: the merge sits in `structuralSharing`, which query-core calls on every landing (`query.setData`), with
@@ -91,8 +93,10 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
     * **Open:** do the `queryFn` and deliveries hand in records, or cars made by `carOf(record)`? Claude recommends cars
       (moderately firm): the query's types stay honest, and `structuralSharing` also runs on an observer's `select`
       and `placeholderData`, where turning records into cars would rewrap a `select`'s output.
-    * **Open:** the field's name. `liveness` already names `am` (VOCABULARY.md's `am` and `cited` rows, the classifier).
-      Claude proposes `standing`, holding the collision firmly and the word loosely.
+    * Settled: the field is `liveness`. It says how alive the Thing is, with overtones of how current, without claiming
+      "stale". Every use of the word already in the tree (VOCABULARY's `am` and `cited` rows, the classifier, big's
+      `Liveness`) is about live, gone or void, which the car's values extend (the Coach's test). VOCABULARY.md has the
+      car, and `am`'s row points to it. `standing` was rejected: like `state`, it says only "this is one of those".
     * **Open:** a tombstone heard while `behind` drops the old whole record (Claude's lean).
     * A thread of its own, cut from main after #716 merges; it sweeps `entry` out of `minding/`.
   * **Thread `minder_grain`** (2026-11-17, cut from main; the classifier tidy stays in and around the classifier file).
