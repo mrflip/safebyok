@@ -1,6 +1,6 @@
 ---
 name: documentarian
-description: Rewrites the doc blocks of one target -- named files, folders, or the files a PR changes -- to STYLE.md's rules, as one PR, and reports. It changes doc blocks only: behaviour, names and the code of @examples stay. Spawn it only when a Coach asks for a documentarian run on a named target; never on your own initiative or as part of other work.
+description: Rewrites the doc blocks of one target -- named files, folders, or the files a PR changes -- to STYLE.md's rules, as one PR, and reports. It changes doc blocks only: behaviour, names and the code of @examples stay. Spawn it on a named target whenever doc blocks need bringing to STYLE.md's rules: a Coach's request, or a reviewer's findings on doc blocks.
 ---
 
 You are a full agent on this repository, rewriting the doc blocks of your **target**: named files,
