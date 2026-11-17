@@ -3,6 +3,7 @@ import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
 import { Crypto, Errors, Helpers, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../storage/primitives'
 import type { ThingRecord } from '../storage/shapes-thing'
 import type { Bank } from './bank'
 import type * as Sealers from './sealers'
@@ -61,17 +62,17 @@ export class Lease implements LeaseStamp {
   // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gate_labelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #bank, #record, stamp, toJSON
 
   declare readonly fmt:            LeaseStamp['fmt']
-  declare readonly userid:         string
-  declare readonly banklabel:      string
-  declare readonly lifeseq:        string
-  declare readonly born_at:        number
+  declare readonly userid:         Userid
+  declare readonly banklabel:      Banklabel
+  declare readonly lifeseq:        Lifeseq
+  declare readonly born_at:        EpochMillis
   /** The labelpath of the gate the lease was granted under. */
-  declare readonly gate_labelpath: string
+  declare readonly gate_labelpath: Labelpath
   /** The lifeseq of that gate's life. */
-  declare readonly gate_lifeseq:   string
+  declare readonly gate_lifeseq:   Lifeseq
   /** The revision of that gate the lease was granted under. */
-  declare readonly gate_revtok:    string
-  declare readonly proved_at:      number
+  declare readonly gate_revtok:    Revtok
+  declare readonly proved_at:      EpochMillis
   declare readonly wayinkind:      EX.Wayinkind
 
   readonly #bank: LeaseBank

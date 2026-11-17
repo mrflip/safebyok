@@ -2,6 +2,7 @@
 
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
+import type { Labelpath } from './primitives'
 import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
   type WriteAsk, MainGateLabelpath, RootBoxLabelpath } from './shapes-thing'
 import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
@@ -15,22 +16,22 @@ export class MemoryVaultDB extends AdapterVaultDB {
   // == [Props]: #banks, #watchers
 
   // Each bank's Things, by labelpath, so that a listing reads one bank's. The modelkind at the base of each labelpath keeps the kinds apart.
-  readonly #banks = new Map<string, Map<string, unknown>>()
+  readonly #banks = new Map<string, Map<Labelpath, unknown>>()
   readonly #watchers = new Set<Watcher>()
   // --
 
   // == [Things]: _cheat_things, ckeyOf, #thingsOf, #write, #rootsOf, #worldFetchedOf, #worldAfter, #notify
 
   /** For tests: the Things stored in `scope`'s bank, by labelpath, to read or change in place. */
-  _cheat_things(scope: ThingWatchScope): Map<string, unknown> { return this.#thingsOf(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
+  _cheat_things(scope: ThingWatchScope): Map<Labelpath, unknown> { return this.#thingsOf(scope) } // eslint-disable-line unicorn/prefer-private-class-fields
 
   /** The ckey of the bank at `scope`, in `#banks`. */
   static ckeyOf({ userid, banklabel }: ThingWatchScope): string { return Helpers.ckeyOf(userid, banklabel) }
 
   /** The Things of `scope`'s bank, by labelpath. */
-  #thingsOf(scope: ThingWatchScope): Map<string, unknown> {
+  #thingsOf(scope: ThingWatchScope): Map<Labelpath, unknown> {
     const ckey = MemoryVaultDB.ckeyOf(scope)
-    const things = this.#banks.get(ckey) ?? new Map<string, unknown>()
+    const things = this.#banks.get(ckey) ?? new Map<Labelpath, unknown>()
     this.#banks.set(ckey, things)
     return things
   }

@@ -4,6 +4,7 @@ import { sortBy } from 'es-toolkit'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
 import { BankRootsMissing, BornAtNotStored } from '../phrases'
 import { PoliciedMeta, gateIssue, policyRefusalOf } from './policies'
+import type { Labelpath } from './primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
   type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
@@ -262,7 +263,7 @@ export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: Wo
 }
 
 /** The raw rows a store fetched for a listing: the parent (null for none), and each child one label under it, with its labelpath. */
-export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: string, raw: unknown }>[] }>
+export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Readonly<{ labelpath: Labelpath, raw: unknown }>[] }>
 
 /** Classify a listing against the {@link ThingsFetched} rows: the parent's get act, the parent, the children of its live life in labelpath order,
  * and the children that fail their checks.
@@ -291,7 +292,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
 }
 
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
-function isChildLabelpath(ask: ListAsk, labelpath: string): boolean {
+function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
   const label = labelpath.slice(ask.labelpath.length + 1)
   return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind(labelpath, ask.modelkind)
 }

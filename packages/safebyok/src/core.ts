@@ -17,4 +17,5 @@ export {
   LeaseFormat, bankScope, bankStamp, boxStamp, gateStamp, leaseRecord, leaseStamp, stampedGate,
 } from './models/stamps'
 export { Wayin } from './models/wayin'
+export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './storage/primitives'
 export { type VaultDB, isVaultDB } from './storage/vault-db'

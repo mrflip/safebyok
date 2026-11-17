@@ -5,6 +5,7 @@ import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
+import type { Lifeseq } from '../../src/storage/primitives'
 import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxThing, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -125,7 +126,7 @@ describe("Bank.make(record, { device, vaultDB })", () => {
     const { bank } = await TH.buildBornBank()
     expect(Object.keys(bank)).to.have.members(BankFields)
     expect(Object.isFrozen(bank)).to.be.true
-    expect(() => { (bank as { lifeseq: string }).lifeseq = Life2 }).to.throw(TypeError)
+    expect(() => { (bank as { lifeseq: Lifeseq }).lifeseq = Life2 }).to.throw(TypeError)
     expect(JSON.stringify(bank)).to.not.include('ciphertext_b64')
     expect(bank.modelkind).to.eq('bank')
   })

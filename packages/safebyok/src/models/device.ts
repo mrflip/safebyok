@@ -4,6 +4,7 @@ import type { Bank } from './bank'
 import { type AskUser, Gating, type RequestCleartext, birthBank } from './gating'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
 import * as Phrases from '../phrases'
+import type { Banklabel, DeviceTok, Userid } from '../storage/primitives'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
 
 // == [Given to a device]: DefaultLeaseMillis, DeviceRecord, BadNews, BadNewsHandler, DeviceOpts
@@ -70,10 +71,10 @@ const Checks = Validator.Checkers('bad_option', ({ obj, arr, fn, custom, user_id
 export class Device {
   // == [Props]: user_id, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #askUser, #openGating, #endCause, toJSON
 
-  declare readonly user_id:    string
-  declare readonly banklabel:  string
+  declare readonly user_id:    Userid
+  declare readonly banklabel:  Banklabel
   /** This device's token in its bank scope, recorded in each wayin it builds. */
-  declare readonly device_tok: string
+  declare readonly device_tok: DeviceTok
   /** Where this device's banks are stored. */
   readonly vaultDB:            VaultDB
   readonly keyDeriver:         GuardedKeyDeriver

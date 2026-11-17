@@ -1,6 +1,7 @@
 /** The battery's cases of tryListThings, over the root box's children. */
 import { describe, expect, it } from 'vitest'
 import { expectBad, expectGood } from 'safebyok-big/testing'
+import type { Labelpath } from '../../src/storage/primitives'
 import { sparseOf } from '../../src/storage/shapes-thing'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { Life0, ThingBank, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, listAskAt, rootBoxOf } from './vaultdb-world'
@@ -10,7 +11,7 @@ import type { VaultDBBatteryWorld } from './vaultdb-battery'
 const DamagedBox = Object.freeze({ ...boxThingOf('bad'), whisper_sealed: {} })
 
 /** The children `vaultDB` lists under the Thing at `labelpath`, or throw. */
-async function listedAt(vaultDB: VaultDB, labelpath: string): Promise<unknown> {
+async function listedAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<unknown> {
   const answer = await vaultDB.tryListThings(listAskAt(labelpath))
   return await expectGood(answer)
 }

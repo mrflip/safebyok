@@ -3,13 +3,15 @@ import { Crypto, GX } from 'safebyok-big/internals'
 import { CoreBox } from '../../src/models/core-box'
 import { Lease, withoutSecrets } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
+import type { BoxCleartexts, Sealer } from '../../src/models/sealers'
 import { LeaseFormat, type LeaseRecord } from '../../src/models/stamps'
-import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import type { EpochMillis } from '../../src/storage/primitives'
+import { type BoxThing, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
 
-const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind']
+const StampFieldnames = ['fmt', 'userid', 'banklabel', 'lifeseq', 'born_at', 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind'] as const satisfies readonly (keyof LeaseRecord)[]
 
 const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gate_labelpath: 'gate', gate_lifeseq: TH.WorldGate.lifeseq, gate_revtok: TH.WorldGate.revtok, proved_at: TH.T0, wayinkind: 'passphrase' }
 
@@ -20,7 +22,7 @@ const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 const SealerMembernames = [
   'donorPropsOf', 'publicPropsOf', 'secretPropsOf', 'nextRevisionOf', 'tombstoneOf', 'tombstoneSecrets', 'stampOf', 'tags', 'purposes', 'encode', 'decode', 'sealedOf', 'recordOf',
-] as const
+] as const satisfies readonly (keyof Sealer<BoxThing, BoxCleartexts>)[]
 
 /** CoreBox's members, as a plain object. */
 const BoxSealerBag = Object.freeze({
@@ -440,6 +442,6 @@ describe("what a lease shows", () => {
   it("is frozen: its stamp cannot be changed", async () => {
     const { lease } = await leaseWorld()
     expect(Object.isFrozen(lease)).to.be.true
-    expect(() => { (lease as { proved_at: number }).proved_at = TH.T0 + 1 }).to.throw(TypeError)
+    expect(() => { (lease as { proved_at: EpochMillis }).proved_at = TH.T0 + 1 }).to.throw(TypeError)
   })
 })

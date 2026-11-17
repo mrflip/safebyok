@@ -1,6 +1,7 @@
 // The storage of the lean core: the vaultDB, which keeps every kind as a Thing, and its memory store.
 export { type AdapterVaultDBOpts, type Received, AdapterVaultDB } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
+export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './storage/primitives'
 export {
   type AnyAsk, type BankRecord, type BankRoots, type BankThing, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxThing, type BoxWriteAsk, type CitedOf, type DelAskDraft,
   type GateThing, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type Sealed, type ShellParent, type ShellScoped, type VoidSentinel, type Wayins,
