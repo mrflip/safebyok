@@ -14,11 +14,11 @@ import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Userid } from '../storage/primitives'
 import {
   type GetAsk, type LoggableAsk, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  checkedGetAsk, loggableAskOf, modelkindOf, shellOf, sparseOf, thingkindVals,
+  RootBoxLabelpath, checkedGetAsk, loggableAskOf, modelkindOf, shellOf, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
-  type BornMinderFriend, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
+  type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, minderScope, minderTrack, queryCacheOpts, tsqClient,
 } from './shapes-minder'
 import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpRecords, isThingCar, isVaultDBNewer, mergedCarOf } from './thing-car'
@@ -72,14 +72,14 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
 // --
 
 /** Keeps one kind of Thing in one bank fresh in a TanStack Query cache, through a watch of the bank of its own.
- * `make` takes a born bank: one whose root box is no longer the shell.
+ * A minder reads only its bank's scope and ask builders, so it may be made before the bank is born: a get or a list refuses until the bank is stored.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
   readonly userid:    Userid
   readonly banklabel: Banklabel
   readonly modelkind: Thingkind
-  readonly #bank:           BornMinderFriend
+  readonly #bank:           MinderFriend
   readonly #vaultDB:        VaultDB
   readonly #tsq:            TSQ.QueryClient
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
@@ -96,7 +96,7 @@ export class ThingMinder {
     return new ThingMinder(checked.ties, checked.opts, checked.bank)
   }
 
-  private constructor(ties: Pick<ThingTies, 'modelkind'>, opts: Omit<MinderOpts, 'queryCacheOpts'> & { queryCacheOpts: QueryCacheOpts }, bank: BornMinderFriend) {
+  private constructor(ties: Pick<ThingTies, 'modelkind'>, opts: Omit<MinderOpts, 'queryCacheOpts'> & { queryCacheOpts: QueryCacheOpts }, bank: MinderFriend) {
     const { userid, banklabel } = bank.scope
     this.userid          = userid
     this.banklabel       = banklabel
@@ -111,10 +111,7 @@ export class ThingMinder {
 
   // == [Starting and ending]: hello, #startVaultDBWatch, goodbye
 
-  // The root box is cached here, not when the minder is made: only a minder minding keeps cars, under its defaults.
-  // Before the bank's birth its root box is the shell, which is not cached: a void car would be timely, and a get of the
-  // root box would answer the shell where the vaultDB refuses.
-  /** Start minding: set this minder's defaults on the cache, and watch the bank. A box minder caches its bank's live root box, `bare`, until `goodbye`. A second call does nothing. */
+  /** Start minding: set this minder's defaults on the cache, and watch the bank. A second call does nothing. */
   hello(): void {
     if (this.#isReady) { return }
     const { staleTime } = this.#queryCacheOpts
@@ -126,11 +123,8 @@ export class ThingMinder {
       structuralSharing: keptValOf,
     })
     this.#isReady = true
-    if (this.modelkind === 'box') {
-      // Kept whatever the host's gcTime: its own key's defaults reach no box under it.
-      this.#tsq.setQueryDefaults(this.queryKey(this.#bank.rootBox), { gcTime: Infinity })
-      this.#doDeliverRecord(sparseOf(this.#bank.rootBox))
-    }
+    // Kept whatever the host's gcTime: its own key's defaults reach no box under it.
+    if (this.modelkind === 'box') { this.#tsq.setQueryDefaults(this.queryKey(this.#rootBoxScope), { gcTime: Infinity }) }
     this.#startVaultDBWatch()
   }
 
@@ -151,7 +145,7 @@ export class ThingMinder {
     this.#tsq.removeQueries({ queryKey: this.keyPrefix })
     // TanStack Query cannot remove a key's defaults: empty ones in their place set nothing.
     this.#tsq.setQueryDefaults(this.keyPrefix, {})
-    if (this.modelkind === 'box') { this.#tsq.setQueryDefaults(this.queryKey(this.#bank.rootBox), {}) }
+    if (this.modelkind === 'box') { this.#tsq.setQueryDefaults(this.queryKey(this.#rootBoxScope), {}) }
   }
   // --
 
@@ -307,15 +301,14 @@ export class ThingMinder {
     return carOf(record)
   }
 
-  // A box's shell comes from the bank's root box, not the car cached for it, so that it is the same whether or not the
-  // root box's notice has landed.
-  /** The shell at `scoped`: a root's, a box's under the bank's root box, or that of another Thing under its root's car. */
+  // Boxes are the only Things under a root, for now: one label under the root box.
+  /** The shell at `scoped`: a root's, or that of a Thing under the newest of its root's cached car. Refuses `bad_option` where no root is cached. */
   #shellAt(scoped: ThingScope): VoidSentinel {
     const { labelpath } = scoped
     if (! labelpath.includes('/')) { return shellOf(scoped) }
-    const parent = (modelkindOf(labelpath) === 'box') ? this.#bank.rootBox : this.#cachedAt({ ...scoped, labelpath: modelkindOf(labelpath) })?.newest
-    // With no root cached, shellOf refuses: below a root, a shell needs a life.
-    return (parent === undefined) ? shellOf(scoped) : shellOf(scoped, parent)
+    const parent = this.#cachedAt({ ...scoped, labelpath: modelkindOf(labelpath) })?.newest
+    if (parent === undefined) { throw new Errors.VaultError('bad_option', Phrases.RootNotCached) }
+    return shellOf(scoped, parent)
   }
   // --
 
@@ -323,6 +316,9 @@ export class ThingMinder {
 
   /** The bank this minder minds Things of. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
+
+  /** The scope of the bank's root box. */
+  get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: RootBoxLabelpath } }
 
   /** This minder's user, bank and modelkind. */
   get ties(): ThingTies { return { userid: this.userid, banklabel: this.banklabel, modelkind: this.modelkind } }

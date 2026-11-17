@@ -5,9 +5,8 @@ import type * as Z from 'zod'
 import { exactOptional } from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
-import type { BoxRecord } from '../models/sealers'
 import * as Phrases from '../phrases'
-import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, boxRecordOrShell, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
+import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
 import type { TSQGotAnswer } from './thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
@@ -43,10 +42,8 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderSc
     gcTime:    orDefault(gcTime, DefaultQueryCacheOpts.gcTime),
   }).strict()
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
-  const friendFields     = obj({ scope: thingWatchScope, rootBox: boxRecordOrShell, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
-  // A bank made before its birth keeps the shell as its root box, and its track stays at the shell's revision, so it would go stale at the birth.
+  const friendFields     = obj({ scope: thingWatchScope, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
-    .refine((friend): friend is BornMinderFriend => friend.rootBox.am === 'a', Phrases.BornBankExpected)
   const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)
   const minderListener   = fn<(answer: TSQGotAnswer) => void>()
@@ -70,10 +67,8 @@ export type MinderGetAskOpts = Z.input<typeof minderGetAskOpts>
  * - `ifStale: 'refresh'` -- also fetch a stale or vacant record in the background
  */
 export type MinderAskOpts    = Z.input<typeof minderAskOpts>
-/** Internal. What a minder reads of its bank: its scope, its get and list asks, where trouble with no caller goes, and its root box, which a box minder caches when it starts. */
-export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
-/** Internal. A {@link MinderFriend} whose root box is the stored one, which `make` requires. */
-export type BornMinderFriend = MinderFriend & Readonly<{ rootBox: BoxRecord }>
+/** Internal. What a minder reads of its bank: its scope, its get and list asks, and where trouble with no caller goes. */
+export type MinderFriend     = Pick<Bank, 'scope' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
 /** The user, bank and modelkind a minder is tied to: every ask it takes must match them. */
 export type ThingTies        = ThingWatchScope & Readonly<{ modelkind: Thingkind }>
 // --

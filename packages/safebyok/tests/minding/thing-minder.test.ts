@@ -26,11 +26,10 @@ const BoxAsk  = askOf(TH.BoxScope)
 /** The ask that gets the root box, as a minder takes it. */
 const RootAsk = askOf(TH.RootScope)
 
-/** A bank as a minder reads it: its scope, its root box in life 0, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
+/** A bank as a minder reads it: its scope, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
 function fakeBankOf() {
   return {
     scope:       { ...TH.ThingBank },
-    rootBox:     TH.rootBoxOf(),
     makeGetAsk:  (args: { labelpath: Labelpath }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     makeListAsk: (args: { labelpath: Labelpath }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
@@ -80,8 +79,8 @@ interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   receive:    (notice: ThingNotice) => void
 }
 
-/** The minders of a bank over `vaultDB`, made, and started unless `isStarted` is false. `minder` is the gate's. */
-function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true } = {}): MinderWorld<VaultDBT> {
+/** The minders of a bank over `vaultDB`, made, and started unless `isStarted` is false, after which the box minder has heard the root box's notice unless `isRootHeard` is false. `minder` is the gate's. */
+function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true, isRootHeard = true } = {}): MinderWorld<VaultDBT> {
   const tsq        = new TSQ.QueryClient()
   const bank       = fakeBankOf()
   const watching   = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
@@ -92,6 +91,7 @@ function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isSt
   function receive(notice: ThingNotice): void {
     for (const watched of watching.mock.calls) { watched[1](notice) }
   }
+  if (isStarted && isRootHeard) { receive(noticeOf(TH.rootBoxOf())) }
   return { vaultDB, tsq, bank, minder, boxMinder, bankMinder, receive }
 }
 
@@ -143,7 +143,7 @@ describe("ThingMinder.make", () => {
   const { makeListAsk: _makeListAsk, ...noListAsks } = fakeBankOf()
   const MakeCases = [
     [{ modelkind: 'vault' }, {},                                                    null,                'refuses a modelkind that is no kind of Thing'],
-    [{},                     {},                                                    { ...TH.ThingBank }, 'refuses a bank without its scope and root box'],
+    [{},                     {},                                                    { ...TH.ThingBank }, 'refuses a bank without its scope'],
     [{},                     {},                                                    noAsks,              'refuses a bank that builds no get asks'],
     [{},                     {},                                                    noListAsks,          'refuses a bank that builds no list asks'],
     [{},                     { vaultDB: { tryGetThing: () => 1, watch: () => 1 } }, null,                'refuses a vaultDB without the brand'],
@@ -208,21 +208,24 @@ describe("ThingMinder.hello", () => {
     expect(watching.mock.calls).to.have.lengthOf(3)
   })
 
-  it("caches the bank's root box in the box minder, bare and stale, so that the next get of it fetches it whole", async () => {
+  it("caches nothing at hello, so the first get of the root box fetches it whole", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
-    const { boxMinder, minder } = minderWorldOf(vaultDB)
-    expect(boxMinder.at(TH.RootScope)).to.deep.equal({ liveness: 'bare', newest: sparseOf(TH.rootBoxOf()), fullest: undefined })
-    expect(boxMinder.isStaleAt(RootAsk)).to.be.true
+    const { boxMinder, minder } = minderWorldOf(vaultDB, { isRootHeard: false })
+    expect(boxMinder.at(TH.RootScope)).to.be.undefined
     expect(minder.at(TH.GateScope)).to.be.undefined
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     expect(await boxMinder.get(RootAsk)).to.deep.equal(carOf(TH.rootBoxOf()))
     expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
-  it("refuses a bank whose root box is still the shell, saying the bank is not born", () => {
-    const unborn = { ...fakeBankOf(), rootBox: shellOf({ ...TH.ThingBank, labelpath: 'box' }) } as MinderFriend
-    TH.expectSyncRefusal(() => minderOf('box', new MemoryVaultDB(), new TSQ.QueryClient(), {}, unborn), 'bad_option')
-    expect(() => minderOf('gate', new MemoryVaultDB(), new TSQ.QueryClient(), {}, unborn)).to.throw(Phrases.BornBankExpected)
+  it("is made before its bank is born, refuses until the bank is stored, then answers under the root box the birth's notice lands", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const { boxMinder, receive } = minderWorldOf(vaultDB, { isRootHeard: false })
+    await TH.expectRefusal(boxMinder.get(BoxAsk), 'storage_issue')
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    receive(noticeOf(TH.rootBoxOf()))
+    const shell = shellOf(TH.BoxScope, TH.rootBoxOf())
+    expect(await boxMinder.get(BoxAsk)).to.deep.equal(carOf(shell))
   })
 
   it("keeps the root box cached past the host's gcTime, which collects the boxes under it, until goodbye", async () => {
@@ -233,10 +236,11 @@ describe("ThingMinder.hello", () => {
       const tsq       = new TSQ.QueryClient()
       const boxMinder = minderOf('box', vaultDB, tsq, { gcTime: 10 })
       boxMinder.hello()
+      await boxMinder.get(RootAsk)
       await boxMinder.list()
       expect(tsq.getQueryCache().find({ queryKey: boxMinder.queryKey(BoxAsk), exact: true })).to.have.property('gcTime', 10)
       await vi.advanceTimersByTimeAsync(20)
-      expect(boxMinder.at(RootAsk)?.newest).to.deep.equal(sparseOf(TH.rootBoxOf()))
+      expect(boxMinder.at(RootAsk)?.newest).to.deep.equal(TH.rootBoxOf())
       expect(boxMinder.at(BoxAsk)).to.be.undefined
       await boxMinder.list()
       const bare = carOf(sparseOf(TH.boxThingOf()))
@@ -466,12 +470,11 @@ describe("ThingMinder.get", () => {
     await TH.expectGood(vaultDB.tryWriteThing(birth))
   })
 
-  it("returns the shell of a box under the bank's root box when no car of the root box is cached", async () => {
+  it("refuses a get of an empty box while no car of the root box is cached, saying so", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
-    const { tsq, boxMinder } = minderWorldOf(vaultDB)
-    tsq.removeQueries({ queryKey: boxMinder.queryKey(TH.RootScope), exact: true })
-    const shell = shellOf(TH.BoxScope, TH.rootBoxOf())
-    expect(await boxMinder.get(BoxAsk)).to.deep.equal(carOf(shell))
+    const { boxMinder } = minderWorldOf(vaultDB, { isRootHeard: false })
+    await TH.expectRefusal(boxMinder.get(BoxAsk), 'bad_option')
+    await expect(boxMinder.get(BoxAsk)).rejects.toThrow(Phrases.RootNotCached)
   })
 
   it("asks the vaultDB once for two gets under way together", async () => {
@@ -871,14 +874,14 @@ describe("A host's QueryObserver on a minder's key", () => {
   })
 
   it("shows the placeholder of the box it moves to, not the box it showed", () => {
-    const { tsq, bank, boxMinder, receive } = minderWorldOf(new MemoryVaultDB())
+    const { tsq, boxMinder, receive } = minderWorldOf(new MemoryVaultDB())
     const box = TH.boxThingOf()
     receive(noticeOf(box))
     const observer = new TSQ.QueryObserver<ThingCar<Thing>>(tsq, { queryKey: boxMinder.queryKey(TH.BoxScope), enabled: false })
     const unsubscribe = observer.subscribe(noop)
     expect(observer.getCurrentResult().data).to.deep.equal(carOf(box))
     const otherScope = { ...TH.ThingBank, labelpath: 'box/anthropic' }
-    const shellCar   = carOf(shellOf(otherScope, bank.rootBox))
+    const shellCar   = carOf(shellOf(otherScope, TH.rootBoxOf()))
     observer.setOptions({ queryKey: boxMinder.queryKey(otherScope), enabled: false, placeholderData: shellCar })
     expect(observer.getCurrentResult()).to.deep.include({ data: shellCar, isPlaceholderData: true })
     unsubscribe()
