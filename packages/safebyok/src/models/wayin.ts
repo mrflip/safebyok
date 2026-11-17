@@ -2,6 +2,7 @@ import type * as Z from 'zod'
 import type { Consts, CX, EX } from 'safebyok-big/internals'
 import { Crypto, GX, Helpers } from 'safebyok-big/internals'
 import * as Stamps from './stamps'
+import type { DeviceTok, EpochMillis } from '../storage/primitives'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
@@ -26,8 +27,8 @@ export class Wayin {
 
   declare readonly wayinkind:              EX.Wayinkind
   declare readonly wayinlabel:             'main' | 'passkey0'
-  declare readonly device_tok:             string
-  declare readonly registered_at:          number
+  declare readonly device_tok:             DeviceTok
+  declare readonly registered_at:          EpochMillis
   declare readonly bank_key_wayin_wrapped: GX.WayinRecord['bank_key_wayin_wrapped']
   /** Only on a passphrase wayin. */
   declare readonly key_deriver_label?:     string

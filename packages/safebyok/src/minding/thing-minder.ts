@@ -11,6 +11,7 @@ import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Errors, Outcome, SX, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import type { Banklabel, EpochMillis, Labelpath, Userid } from '../storage/primitives'
 import {
   type GetAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
   KindChecks, checkedGetAsk, loggableAskOf, modelkindOf, shellOf, sparseOf, thingkindVals,
@@ -35,7 +36,7 @@ type GotAnswer = (
 ) & { ask: GetAsk }
 
 /** How recent a cache entry is, and how its last get went. */
-interface TSQEntryState { isTimely: boolean, refreshedAt: number, isFetching: boolean, lastErr: Errors.VaultError | null }
+interface TSQEntryState { isTimely: boolean, refreshedAt: EpochMillis, isFetching: boolean, lastErr: Errors.VaultError | null }
 
 /** The cache's record for a scope, shaped like a get's answer, with the entry's freshness (`isTimely`, `refreshedAt`, `isFetching`, `lastErr`). */
 export type TSQGotAnswer = GotAnswer & TSQEntryState
@@ -75,8 +76,8 @@ const Checks = Validator.Checkers('bad_option', ({ obj, oneof, custom, orDefault
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #recordChecker, #unwatch, #isReady
-  readonly userid:    string
-  readonly banklabel: string
+  readonly userid:    Userid
+  readonly banklabel: Banklabel
   readonly modelkind: Thingkind
   readonly #bank:           MinderFriend
   readonly #vaultDB:        VaultDB
@@ -192,7 +193,7 @@ export class ThingMinder {
   /** List the Things one label under this minder's root, tombstones included, and resolve their labelpaths. A box minder lists the boxes under the root box.
    * Each enters the cache as a sparse record, stale unless the cache holds it whole, so that the next get fetches it whole.
    */
-  async list(): Promise<string[]> {
+  async list(): Promise<Labelpath[]> {
     this.#demandReady()
     const answer = await this.#vaultDB.tryListThings(this.#bank.makeListAsk({ labelpath: this.modelkind, ifAbsent: 'nil' }))
     if (! answer.ok) { throw answer.err }

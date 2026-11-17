@@ -1,4 +1,5 @@
 import { Helpers } from 'safebyok-big/internals'
+import type { Banklabel, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from '../storage/primitives'
 import { type Thing, type ThingRecord, sparseOf } from '../storage/shapes-thing'
 
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
@@ -10,23 +11,23 @@ export abstract class BaseThing<RecordT extends Thing, ScopeT, StampT> implement
   // == [Props]: userid, banklabel, labelpath, label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am, #record
 
   /** The user's id. With `banklabel` and `labelpath`, it says where this Thing is stored. */
-  declare readonly userid:     string
-  declare readonly banklabel:  string
-  declare readonly labelpath:  string
+  declare readonly userid:     Userid
+  declare readonly banklabel:  Banklabel
+  declare readonly labelpath:  Labelpath
   /** The last label of `labelpath`. */
   declare readonly label:      string
   declare readonly fmt:        number
   /** The lifeseqs of this Thing's life and of each life above it, root first. */
-  declare readonly lifepath:   string
+  declare readonly lifepath:   Lifepath
   /** This Thing's life, as a lifeseq. A Thing born again has the next. */
-  declare readonly lifeseq:    string
+  declare readonly lifeseq:    Lifeseq
   /** This revision's token. Every write makes a new one. */
-  declare readonly revtok:     string
+  declare readonly revtok:     Revtok
   /** This revision's sequence number, 0 at the Thing's birth. */
   declare readonly revseq:     number
-  declare readonly born_at:    number
+  declare readonly born_at:    EpochMillis
   /** When this revision was written, in epoch milliseconds. */
-  declare readonly written_at: number
+  declare readonly written_at: EpochMillis
   /** `'a'` while live, `'x'` for a tombstone. */
   declare readonly am:         ThingRecord['am']
 

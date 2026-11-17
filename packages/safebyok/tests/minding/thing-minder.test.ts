@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import type { Labelpath, Revtok } from '../../src/storage/primitives'
 import { type GateThing, type GetAsk, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -27,8 +28,8 @@ function fakeBankOf() {
   return {
     scope:       { ...TH.ThingBank },
     rootBox:     TH.rootBoxOf(),
-    makeGetAsk:  (args: { labelpath: string }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
-    makeListAsk: (args: { labelpath: string }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
+    makeGetAsk:  (args: { labelpath: Labelpath }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
+    makeListAsk: (args: { labelpath: Labelpath }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
   } satisfies MinderFriend
 }
@@ -124,7 +125,7 @@ function noticeOf(thing: ThingNotice['val'], world: ThingNotice['world'] = null)
 }
 
 /** The revtok of what the minder holds for the main gate, or undefined for nothing or the void sentinel. */
-function revtokAt(minder: ThingMinder): string | undefined {
+function revtokAt(minder: ThingMinder): Revtok | undefined {
   const record: DeliverableThing | undefined = minder.at(GateAsk)
   return ((record === undefined) || (record.revseq === -1)) ? undefined : record.revtok
 }

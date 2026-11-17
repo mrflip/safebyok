@@ -5,6 +5,7 @@ import type * as Z from 'zod'
 import { exactOptional } from 'zod'
 import { BX, type Consts, CX, EX, Errors, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
 // == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isGoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
 
@@ -17,19 +18,19 @@ export const ShellLifeseq = '-000000001'
 export const ShellLifepath = ShellLifeseq
 
 /** The lifeseq of life `lifenum`: its base-32 digits (`0-9a-v`) padded to 10, which sort in the order of the lives. Life -1's is the shell's. */
-export function lifeseqOfLifenum(lifenum: number): string { return (lifenum === -1) ? ShellLifeseq : lifenum.toString(32).padStart(LifeseqDigits, '0') }
+export function lifeseqOfLifenum(lifenum: Lifenum): Lifeseq { return (lifenum === -1) ? ShellLifeseq : lifenum.toString(32).padStart(LifeseqDigits, '0') }
 
 /** The lifenum of `lifeseq`, the number of the life it names: -1 for the shell's. */
-export function lifenumOfLifeseq(lifeseq: string): number { return Number.parseInt(lifeseq, 32) }
+export function lifenumOfLifeseq(lifeseq: Lifeseq): Lifenum { return Number.parseInt(lifeseq, 32) }
 
 /** True when `lifeseq` is a tombstone's: an odd life, the shell's among them. */
-export function isGoneLifeseq(lifeseq: string): boolean { return Math.abs(lifenumOfLifeseq(lifeseq) % 2) === 1 }
+export function isGoneLifeseq(lifeseq: Lifeseq): boolean { return Math.abs(lifenumOfLifeseq(lifeseq) % 2) === 1 }
 
 /** The Thing's own lifeseq: the last of its lifepath. */
-export function lifeseqOfLifepath(lifepath: string): string { return lifepath.slice(lifepath.lastIndexOf('/') + 1) }
+export function lifeseqOfLifepath(lifepath: Lifepath): Lifeseq { return lifepath.slice(lifepath.lastIndexOf('/') + 1) }
 
 /** The lifeseqs of a Thing's ancestors: its lifepath less its own lifeseq, `''` for a root. */
-function leadingLifeseqsOf(lifepath: string): string { return lifepath.slice(0, Math.max(0, lifepath.lastIndexOf('/'))) }
+function leadingLifeseqsOf(lifepath: Lifepath): string { return lifepath.slice(0, Math.max(0, lifepath.lastIndexOf('/'))) }
 // --
 
 // == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, ThingFormats, MainGateLabelpath, RootBoxLabelpath, modelkindOf, isLabelpathOfKind
@@ -58,16 +59,16 @@ export const RootBoxLabelpath = 'box'
 const MaxLabelsUnder = { bank: 0, gate: 1, box: 1 } as const satisfies Record<Thingkind, number>
 
 /** The modelkind a sound labelpath starts with. */
-export function modelkindOf(labelpath: string): Thingkind { return labelpath.split('/', 1)[0] as Thingkind }
+export function modelkindOf(labelpath: Labelpath): Thingkind { return labelpath.split('/', 1)[0] as Thingkind }
 
 /** True when `labelpath` is `modelkind` followed by at most as many valid labels as that kind nests, each after a `/`. */
-export function isLabelpathOfKind(labelpath: string, modelkind: Thingkind): boolean {
+export function isLabelpathOfKind(labelpath: Labelpath, modelkind: Thingkind): boolean {
   const [head, ...labels] = labelpath.split('/')
   return (head === modelkind) && (labels.length <= MaxLabelsUnder[modelkind]) && labels.every((label) => Validator.Kit.label.safeParse(label).success)
 }
 
 /** True when `labelpath` is one of some kind of Thing's. */
-function isLabelpath(labelpath: string): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
+function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
 // --
 
 // == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell, StoredCited, Sealed, Wayins, Sparse, sparseOf, ShellCited, childShellCited
@@ -76,14 +77,14 @@ const LifeseqPattern       = /^[0-9a-v]{10}$/
 const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/
 const ShellLifepathPattern = /^(?:[0-9a-v]{10}\/)*-000000001$/
 
-type Labelled = { labelpath: string, label: string }
-type Lived    = { lifepath: string, am: string }
-type Revised  = { revtok: string, revseq: number, lifepath: string }
+type Labelled = { labelpath: Labelpath, label: string }
+type Lived    = { lifepath: Lifepath, am: string }
+type Revised  = { revtok: Revtok, revseq: number, lifepath: Lifepath }
 
 /** True when a Thing's label is the last segment of its labelpath. A root's label is its modelkind. */
 function isLabelLast({ labelpath, label }: Labelled): boolean { return labelpath.slice(labelpath.lastIndexOf('/') + 1) === label }
 /** True when a Thing's lifeseq is the last of its lifepath. */
-function isLifeseqOwn({ lifepath, lifeseq }: Lived & { lifeseq: string }): boolean { return lifeseqOfLifepath(lifepath) === lifeseq }
+function isLifeseqOwn({ lifepath, lifeseq }: Lived & { lifeseq: Lifeseq }): boolean { return lifeseqOfLifepath(lifepath) === lifeseq }
 /** True when a Thing's lifepath has one lifeseq for each segment of its labelpath. */
 function isLifepathDeep({ lifepath, labelpath }: Lived & Labelled): boolean { return lifepath.split('/').length === labelpath.split('/').length }
 /** True when a Thing's own lifeseq is odd exactly when it is a tombstone. */
@@ -276,7 +277,7 @@ export const ShellCited: ThingCited = Object.freeze({
 })
 
 /** The citation for the birth of a child of the Thing at `parentLifepath`: the shell, at the parent's lifepath then the shell's lifeseq. */
-export function childShellCited(parentLifepath: string): ThingCited {
+export function childShellCited(parentLifepath: Lifepath): ThingCited {
   return Object.freeze({ ...ShellCited, lifepath: `${parentLifepath}/${ShellLifeseq}` })
 }
 // --
@@ -315,7 +316,7 @@ const ShellChecks = Validator.Checkers('bad_option', ({ obj, lit, uint, label, u
 })
 
 /** True when a Thing's fmt is its kind's. */
-function isFmtOwn({ labelpath, fmt }: { labelpath: string, fmt: number }): boolean { return fmt === ThingFormats[modelkindOf(labelpath)] }
+function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): boolean { return fmt === ThingFormats[modelkindOf(labelpath)] }
 
 /** The shell of a scope, as cached where storage holds nothing: a tombstone with every Thing field and no body.
  * Its revseq is -1. A write cites it as the Thing it expects to find, to make the Thing's first revision.
@@ -359,12 +360,12 @@ export const KindChecks = {
 } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, policies: readonly EX.StoragePolicy[] }>
 
 /** The checks for the kind of Thing at `labelpath`, which must be sound. */
-export function kindChecksOf(labelpath: string): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
+export function kindChecksOf(labelpath: Labelpath): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
 // == [Asks]: AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedGetAsk, checkedListAsk, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
-type Kinded   = { modelkind: Thingkind, labelpath: string }
+type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
 
 /** True when an ask's modelkind is its labelpath's. */

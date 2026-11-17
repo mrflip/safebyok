@@ -10,6 +10,7 @@ import { type GateRevisionedStamp, Proving } from './proving'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps, UnsealedOf } from './sealers'
 import { type BankScope, type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
 import * as Phrases from '../phrases'
+import type { DeviceTok, Labelpath } from '../storage/primitives'
 import {
   type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
   type Sparse, type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
@@ -36,12 +37,12 @@ export type BoxShell = Sparse<BoxTombstone>
 /** The draft of a box's get ask, for {@link Bank.tryGetBox}: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`).
  * The bank fills in the rest of the {@link GetAsk}.
  */
-export type GetBoxAskDraft = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent | 'shell' }>
+export type GetBoxAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent | 'shell' }>
 
 /** The draft of a get or list ask, for {@link Bank.makeGetAsk} or {@link Bank.makeListAsk}: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
  * The bank fills in the rest of the {@link GetAsk} or {@link ListAsk}.
  */
-export type BankAskDraft = Readonly<{ labelpath: string, ifAbsent?: EX.IfAbsent }>
+export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 
 /** The answer of {@link Bank.tryGetBox}: the box, what `ifAbsent` gives when none is stored, or a refusal. */
 export type GetBoxAnswer<ValT> = GoodAnswer<ValT, EX.GotAct> | BadAnswer
@@ -103,7 +104,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   get device(): Device { return this.#device }
 
   /** This device's token, recorded in each wayin the bank builds. */
-  get device_tok(): string { return this.#device.device_tok }
+  get device_tok(): DeviceTok { return this.#device.device_tok }
 
   /** This bank's scope: its user and its `banklabel`. */
   get scope(): BankScope { return bankScope.parse(this) }

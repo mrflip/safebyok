@@ -1,4 +1,5 @@
 import type { CX, Crypto } from 'safebyok-big/internals'
+import type { EpochMillis } from '../storage/primitives'
 import type { BoxThing, Sealed, Sparse, ThingRecord } from '../storage/shapes-thing'
 
 export type { Sealed } from '../storage/shapes-thing'
@@ -38,13 +39,13 @@ export type Sealable<RecordT extends ThingRecord> = Omit<Sparse<RecordT>, 'am'> 
  * - `am`              -- `'a'` for a live revision (default), or `'x'` for a tombstone
  * - `written_at`      -- the revision's time (default: now)
  */
-export type PublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a' | 'x', written_at?: number }>
+export type PublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a' | 'x', written_at?: EpochMillis }>
 
 /** {@link PublicPropsOf} for a live revision: `am` is `'a'` or left out. */
-export type LivePublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a', written_at?: number }>
+export type LivePublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a', written_at?: EpochMillis }>
 
 /** The public props of a tombstone's seal: `am: 'x'`, and `written_at` (default: now). */
-export type TombstonePublicProps = Readonly<{ am: 'x', written_at?: number }>
+export type TombstonePublicProps = Readonly<{ am: 'x', written_at?: EpochMillis }>
 // --
 
 // == [The Sealer]: SealTags, SealPurposes, Sealer

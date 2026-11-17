@@ -1,6 +1,7 @@
 /** The Things and asks a vaultDB's tests share: a bank's three roots and a box under its root, and the asks that get, list and write them. */
 
 import { BW } from 'safebyok-big/testing'
+import type { Labelpath, Lifepath } from '../../src/storage/primitives'
 import {
   type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetAsk, type ListAsk, type PutAskDraft, type Thing,
   type ThingCited, type Track, type WriteAsk,
@@ -78,7 +79,7 @@ export function nextOf<RecordT extends Thing>(prior: RecordT, overrides: Partial
 export function nextGateOf(prior: GateThing, overrides: Partial<GateThing> = {}): GateThing { return nextOf(prior, overrides) }
 
 /** `lifepath` with its own lifeseq moved on by `lives`. */
-export function lifepathPlus(lifepath: string, lives: number): string {
+export function lifepathPlus(lifepath: Lifepath, lives: number): Lifepath {
   const leading = lifepath.slice(0, lifepath.lastIndexOf('/') + 1)
   return `${leading}${lifeseqOfLifenum(lifenumOfLifeseq(lifeseqOfLifepath(lifepath)) + lives)}`
 }
@@ -114,10 +115,10 @@ export function delAskFor(cited: ThingCited, record: Thing): WriteAsk { return d
 export function getGateAskOf(ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskAt('gate', ifAbsent) }
 
 /** The ask that gets the Thing at `labelpath` in {@link ThingBank}. */
-export function getAskAt(labelpath: string, ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent }) }
+export function getAskAt(labelpath: Labelpath, ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskOf({ ...ThingBank, labelpath, ifAbsent }) }
 
 /** The ask that lists the children of the Thing at `labelpath` in {@link ThingBank}. */
-export function listAskAt(labelpath: string, ifAbsent: ListAsk['ifAbsent'] = 'fail'): ListAsk { return listAskOf({ ...ThingBank, labelpath, ifAbsent }) }
+export function listAskAt(labelpath: Labelpath, ifAbsent: ListAsk['ifAbsent'] = 'fail'): ListAsk { return listAskOf({ ...ThingBank, labelpath, ifAbsent }) }
 
 /** The ask that births {@link ThingBank} with its three roots, each at revision 0 of life 0, with `overrides` laid over it. */
 export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBankAsk {

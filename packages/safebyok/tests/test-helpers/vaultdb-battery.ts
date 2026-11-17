@@ -2,6 +2,7 @@
 import { describe } from 'vitest'
 import { type Helpers, Validator } from 'safebyok-big/internals'
 import { expectGood } from 'safebyok-big/testing'
+import type { Labelpath, Lifepath } from '../../src/storage/primitives'
 import type { BoxThing, GateThing, Thing, ThingScope } from '../../src/storage/shapes-thing'
 import { childShellCited } from '../../src/storage/shapes-thing'
 import type { VaultDB } from '../../src/storage/vault-db'
@@ -52,11 +53,11 @@ export type VaultDBBatteryWorld = {
   /** A fresh vaultDB with the main gate alone written in it, by a birth, and no bank. */
   withGate:  (stored?: GateThing) => Promise<VaultDB>
   /** Write `thing` into `vaultDB`, born under its parent's life at `parentLifepath`. */
-  bornUnder: (vaultDB: VaultDB, thing: Thing, parentLifepath: string) => Promise<void>
+  bornUnder: (vaultDB: VaultDB, thing: Thing, parentLifepath: Lifepath) => Promise<void>
   /** Write each of `boxes` into `vaultDB`, born under the root box's life 0, and return them. */
   boxesBorn: (vaultDB: VaultDB, ...boxes: BoxThing[]) => Promise<BoxThing[]>
   /** The Thing `vaultDB` stores at `labelpath`, or null for none; throws on a refusal. */
-  gotAt:     (vaultDB: VaultDB, labelpath: string) => Promise<Thing | null>
+  gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<Thing | null>
   /** The backdoor to what `vaultDB` stores. */
   rowsOf:    (vaultDB: VaultDB) => VaultDBRowCheats
   watches:   boolean
@@ -75,7 +76,7 @@ function worldOf<DBT extends VaultDB>({ makeVaultDB, _cheat_rowsOf, watches = tr
     await expectGood(vaultDB.tryWriteThing(birthAskOf(stored)))
     return vaultDB
   }
-  async function bornUnder(vaultDB: VaultDB, thing: Thing, parentLifepath: string): Promise<void> {
+  async function bornUnder(vaultDB: VaultDB, thing: Thing, parentLifepath: Lifepath): Promise<void> {
     const ask = birthAskOf(thing, childShellCited(parentLifepath))
     await expectGood(vaultDB.tryWriteThing(ask))
   }
@@ -83,7 +84,7 @@ function worldOf<DBT extends VaultDB>({ makeVaultDB, _cheat_rowsOf, watches = tr
     for (const box of boxes) { await bornUnder(vaultDB, box, Life0) }
     return boxes
   }
-  async function gotAt(vaultDB: VaultDB, labelpath: string): Promise<Thing | null> {
+  async function gotAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<Thing | null> {
     const answer = await vaultDB.tryGetThing(getAskAt(labelpath))
     return await expectGood(answer)
   }
