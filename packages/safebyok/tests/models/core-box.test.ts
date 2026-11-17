@@ -111,7 +111,7 @@ describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
     expect(next).to.deep.include({ am: 'a', revseq: 2, lifeseq: Life2, lifepath: `${Life0}/${Life2}`, born_at: TH.T0 + 7, sidecar: { account: 'home' } })
   })
 
-  it("leaves the prior it was handed as it was, and keeps none of a stored box's sealed whisper", () => {
+  it("leaves the donor it was handed as it was, and keeps none of a stored box's sealed whisper", () => {
     const shell = TH.boxShellOf()
     const copy = structuredClone(shell)
     CoreBox.nextRevisionOf(shell, PublicProps)
@@ -121,19 +121,19 @@ describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
     expect(next).to.not.have.property('whisper_sealed')
   })
 
-  const PriorCases = [
-    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a prior of a damaged row'],
+  const DonorCases = [
+    [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of a damaged row'],
     [() => ({ ...TH.boxShellOf(), revseq: 1.5 }),            'a revseq that is not an integer'],
     [() => ({ ...TH.boxShellOf(), revtok: 'rev-1' }),        'half the shell: its revtok moved, its revseq and lifeseq not'],
-    [() => ({ ...TH.boxShellOf(), fmt: 5000 }),              'a prior of another fmt'],
-    [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a prior of another kind'],
-    [() => TH.omitting(TH.boxShellOf(), 'lifepath'),         'a prior with no lifepath'],
+    [() => ({ ...TH.boxShellOf(), fmt: 5000 }),              'a donor of another fmt'],
+    [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a donor of another kind'],
+    [() => TH.omitting(TH.boxShellOf(), 'lifepath'),         'a donor with no lifepath'],
     [() => null,                                             'null'],
   ] as const
 
-  for (const [priorOf, blurb] of PriorCases) {
+  for (const [donorOf, blurb] of DonorCases) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(priorOf() as never, PublicProps), 'bad_option')
+      TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(donorOf() as never, PublicProps), 'bad_option')
     })
   }
 })
