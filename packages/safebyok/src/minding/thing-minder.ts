@@ -13,7 +13,7 @@ import { Errors, Outcome, SX, Throwers, Validator } from 'safebyok-big/internals
 import * as Phrases from '../phrases'
 import {
   type GetAsk, type LoggableAsk, type Sparse, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  KindChecks, checkedGetAsk, loggableAskOf, modelkindOf, shellOf, thingkindVals,
+  KindChecks, checkedGetAsk, loggableAskOf, modelkindOf, shellOf, sparseOf, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
@@ -127,7 +127,8 @@ export class ThingMinder {
     if (this.modelkind === 'box') {
       // Kept whatever the host's gcTime: its own key's defaults reach no box under it.
       this.#tsq.setQueryDefaults(this.queryKey(this.#bank.rootBox), { gcTime: Infinity })
-      this.#doDeliverSeed(this.#bank.rootBox)
+      // The Thing fields of a live box or of its shell: TypeScript cannot see that the shell's are a Thing's.
+      this.#doDeliverSeed(sparseOf(this.#bank.rootBox) as Sparse<Thing>)
     }
     this.#startVaultDBWatch()
   }

@@ -1,9 +1,17 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, BoxOfOtherRoot, GotOtherThanBox
+// == [Models]: VaultDBExpected, SealerExpected, TombstoneSecretsGiven, TombstoneSidecarGiven, BoxOfOtherRoot, GotOtherThanBox
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
+
+/** A sealer that lacks one of its methods, its tags or its purposes. */
+export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'
+
+/** A tombstone's seal given secret props. */
+export const TombstoneSecretsGiven = "A tombstone seals no secrets: give `{ am: 'x' }` with no secret props."
+/** A box tombstone's seal given a sidecar. */
+export const TombstoneSidecarGiven = "A tombstone has no sidecar: give `{ am: 'x' }` with no sidecar."
 
 /** A box whose lifepath is not under the bank's root box. */
 export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its bank's root box: this one is of another life of the root."
@@ -41,8 +49,8 @@ export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tomb
 /** A citation that is half the shell. */
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."
 
-/** A sparse record that is half the shell. */
-export const SparseHalfShell = "A sparse record is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
+/** A sealable box that matches the shell in some of its revseq, lifeseq and revtok, but not all three. */
+export const SealableHalfShell = "A box a revision is made from is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
 
 /** A shell asked for with neither a labelpath nor a label and its parent. */
 export const ShellUnscoped = "A shell is made from a labelpath, or from a label and its parent."
@@ -58,6 +66,9 @@ export const ShellOfOtherLife = "A lifepath given for a shell is its parent's li
 
 /** A shell asked for with the fmt of another kind of Thing. */
 export const ShellFmtOfOtherKind = "A shell's fmt is the fmt of its kind of Thing."
+
+/** A live box's revision made with no sidecar, given or kept. */
+export const SidecarMissing = "A live box has a sidecar: give one, or make the revision from a box that has one."
 
 /** A tombstone made of a tombstone or the shell. */
 export const TombstoneOfLiveOnly = "Only a live box has a tombstone: a tombstone or the shell has none."

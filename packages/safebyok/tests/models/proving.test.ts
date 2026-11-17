@@ -1,6 +1,7 @@
 import { describe, expect, it, type Mock, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
 import { CX, Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
+import { CoreBox } from '../../src/models/core-box'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, guardKeyDeriver } from '../../src/models/proving'
 import type { StampedGate } from '../../src/models/stamps'
@@ -70,8 +71,8 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   const bank = TH.fakeLeaseBankOf()
   const sealer = await one.buildLease(bank, TH.WorldGate)
   const opener = await other.buildLease(bank, TH.WorldGate)
-  const sealed = await sealer.seal('BoxWhisper', TH.boxShellOf(), { whisper: { apiKey: 'sk-test-5678' } })
-  expect(await opener.unseal('BoxWhisper', sealed)).to.deep.equal({ whisper: { apiKey: 'sk-test-5678' } })
+  const sealed = await sealer.seal(CoreBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: { apiKey: 'sk-test-5678' } })
+  expect(await opener.unseal(CoreBox, sealed)).to.deep.include({ whisper: { apiKey: 'sk-test-5678' } })
 }
 
 /** A checker whose answer throws the passphrase it heard, when its verdict is read. */
@@ -121,7 +122,7 @@ describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {
   })
 })
 
-describe("PassphraseProving.buildNovel(device, bank, gate, passphraseCleartext)", () => {
+describe("PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)", () => {
   const ArgsCases = [
     [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'keyDeriver') }),                       'a device with no keyDeriver'],
     [() => ({ device: TH.omitting(TH.provingDeviceOf(), 'device_tok') }),                       'a device with no device_tok'],
@@ -129,19 +130,19 @@ describe("PassphraseProving.buildNovel(device, bank, gate, passphraseCleartext)"
     [() => ({ device: TH.provingDeviceOf({ device_tok: '' }) }),                                'a device with an empty device_tok'],
     [() => ({ device: { ...TH.provingDeviceOf(), keyDeriver: TH.testDeriver } }),               "a device with the host's bare keyDeriver"],
     [() => ({ device: { ...TH.provingDeviceOf(), strengthChecker: TH.anyStrengthChecker } }),   "a device with the host's bare strengthChecker"],
-    [() => ({ bank: { ...TH.WorldBankStamp, lifeseq: undefined } }),                            'a bank stamp with no lifeseq'],
-    [() => ({ bank: { ...TH.WorldBankStamp, born_at: 'yesterday' } }),                          'a bank stamp whose born_at is not epoch millis'],
-    [() => ({ bank: null }),                                                                    'no bank stamp at all'],
-    [() => ({ gate: { ...TH.WorldGateStamp, lifeseq: undefined } }),                            'a gate stamp with no lifeseq'],
-    [() => ({ gate: TH.omitting(TH.WorldGateStamp, 'labelpath') }),                              'a gate stamp with no labelpath'],
-    [() => ({ gate: null }),                                                                    'no gate stamp at all'],
+    [() => ({ bankStamp: { ...TH.WorldBankStamp, lifeseq: undefined } }),                       'a bank stamp with no lifeseq'],
+    [() => ({ bankStamp: { ...TH.WorldBankStamp, born_at: 'yesterday' } }),                     'a bank stamp whose born_at is not epoch millis'],
+    [() => ({ bankStamp: null }),                                                               'no bank stamp at all'],
+    [() => ({ gateStamp: { ...TH.WorldGateStamp, lifeseq: undefined } }),                       'a gate stamp with no lifeseq'],
+    [() => ({ gateStamp: TH.omitting(TH.WorldGateStamp, 'labelpath') }),                         'a gate stamp with no labelpath'],
+    [() => ({ gateStamp: null }),                                                               'no gate stamp at all'],
     [() => ({ passphraseCleartext: 42 }),                                                       'a passphrase that is not a string'],
   ] as const
 
   for (const [argsOf, blurb] of ArgsCases) {
     it(`refuses ${blurb}`, async () => {
-      const { bank = TH.WorldBankStamp, gate = TH.WorldGateStamp, passphraseCleartext = TH.TestPassphrase, device = TH.provingDeviceOf() } = argsOf() as Record<string, unknown>
-      await TH.expectRefusal(PassphraseProving.buildNovel(device as GX.ProvingDevice, bank as never, gate as never, passphraseCleartext as never))
+      const { bankStamp = TH.WorldBankStamp, gateStamp = TH.WorldGateStamp, passphraseCleartext = TH.TestPassphrase, device = TH.provingDeviceOf() } = argsOf() as Record<string, unknown>
+      await TH.expectRefusal(PassphraseProving.buildNovel(device as GX.ProvingDevice, bankStamp as never, gateStamp as never, passphraseCleartext as never))
     })
   }
 
@@ -214,7 +215,7 @@ describe("PassphraseProving.buildNovel(device, bank, gate, passphraseCleartext)"
   })
 })
 
-describe("PasskeyProving.buildNovel(device, bank, gate, passkeyCleartext)", () => {
+describe("PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext)", () => {
   it("has the stamps given, and does not zero the answer", async () => {
     const answer = TH.passkeyAnswerOf()
     const proving = await novelPasskey(answer)
@@ -510,14 +511,14 @@ describe("proving.buildWayin(source)", () => {
   })
 
   const OtherSourceCases = [
-    [{ bank: { lifeseq: lifeseqOfLifenum(2) } },      'another life of the bank'],
-    [{ gate: { lifeseq: lifeseqOfLifenum(2) } },      'another life of the gate'],
+    [{ bankStamp: { lifeseq: lifeseqOfLifenum(2) } },      'another life of the bank'],
+    [{ gateStamp: { lifeseq: lifeseqOfLifenum(2) } },      'another life of the gate'],
   ] as const
 
   for (const [moves, blurb] of OtherSourceCases) {
     it(`refuses a source proving of ${blurb}`, async () => {
-      const { bank = {}, gate = {} } = moves as { bank?: object, gate?: object }
-      const theirs = await PassphraseProving.buildNovel(TH.provingDeviceOf(), { ...TH.WorldBankStamp, ...bank }, { ...TH.WorldGateStamp, ...gate }, TH.TestPassphrase)
+      const { bankStamp = {}, gateStamp = {} } = moves as { bankStamp?: object, gateStamp?: object }
+      const theirs = await PassphraseProving.buildNovel(TH.provingDeviceOf(), { ...TH.WorldBankStamp, ...bankStamp }, { ...TH.WorldGateStamp, ...gateStamp }, TH.TestPassphrase)
       await theirs.buildWayin(NOVEL)
       const mine = await novelPassphrase()
       const err = await TH.expectRefusal(mine.buildWayin(theirs))
@@ -616,7 +617,7 @@ describe("proving.buildLease(bank, gate)", () => {
     const bank = TH.fakeLeaseBankOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(bank, gate)
-    expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gatelabelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
+    expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gate_labelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
     expect(lease.isEvicted).to.be.false
     expect(bank.lock).not.toHaveBeenCalled()
   })

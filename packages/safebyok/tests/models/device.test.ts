@@ -300,7 +300,7 @@ describe("device.birthBankPrompt()", () => {
     expect(bank.maingate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: dialog.passkeyCleartexts[0]!.credential_id })
     expect(TH.isZeroed(dialog.passkeyCleartexts[0]!.prfBytes)).to.be.true
     expect(device.openGating).to.be.null
-    const box = await bank.sealBox(TH.boxShellOf(), { whisper: TH.Whisper })
+    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { whisper } = await bank.unsealBox(box)
     expect(whisper).to.deep.equal(TH.Whisper)
   })

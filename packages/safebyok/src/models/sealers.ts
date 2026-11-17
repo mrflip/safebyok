@@ -1,17 +1,55 @@
-import { CX, Clock, Crypto, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
-import * as Phrases from '../phrases'
-import { type BoxSparse, type BoxThing, type Sealed, boxSparse, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../storage/shapes-thing'
+import type { CX, Crypto } from 'safebyok-big/internals'
+import type { BoxThing, Sealed, Sparse, ThingRecord } from '../storage/shapes-thing'
 
-export type { BoxSparse, Sealed } from '../storage/shapes-thing'
+export type { Sealed } from '../storage/shapes-thing'
 
-// == [The Sealer]: sealerkindVals, Sealerkind, SealTags, SealPurposes, SealedOf, UnsealedOf, Sealer, SealerKinds
+// == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
 
-/** The kinds of sealer: the sealer of kind `K` is the export `K` below. */
-export const sealerkindVals = ['BoxWhisper', 'BoxTombstone'] as const satisfies readonly (keyof SealerKinds)[]
-/** A kind of sealer, one of {@link sealerkindVals}. */
-export type Sealerkind = typeof sealerkindVals[number]
+/** A {@link Sealed} field at `<part>_sealed` for each part that `CleartextsT` names. */
+export type SealedPartsOf<CleartextsT> = { readonly [PartT in keyof CleartextsT & string as `${PartT}_sealed`]: Sealed }
 
-/** The tags a sealed part carries in the clear, which its seal binds. */
+/** `RecordT` with each part that `CleartextsT` names replaced by its sealed form, at `<part>_sealed`. A union is mapped member by member. */
+export type SealedOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<RecordT, keyof CleartextsT> & SealedPartsOf<CleartextsT> : never
+
+/** `RecordT` with each `<part>_sealed` that `CleartextsT` names replaced by its cleartext, at `<part>`. A union is mapped member by member. */
+export type UnsealedOf<RecordT, CleartextsT> = RecordT extends unknown
+  ? Omit<RecordT, `${keyof CleartextsT & string}_sealed`> & CleartextsT
+  : never
+
+/** The live records of `RecordT`. */
+export type LiveOf<RecordT> = Exclude<RecordT, { am: 'x' }>
+
+/** The tombstones of `RecordT`. */
+export type TombstoneOf<RecordT> = Extract<RecordT, { am: 'x' }>
+
+/** A revision of `RecordT` before it is sealed, without the sealed parts that `CleartextsT` names. A union is mapped member by member. */
+export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<RecordT, keyof SealedPartsOf<CleartextsT>> : never
+
+/** The body of a live `RecordT`: its fields other than its Thing fields and its sealed parts, such as a box's sidecar. */
+export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof ThingRecord | keyof SealedPartsOf<CleartextsT>>
+
+/** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
+ * The seal keeps its Thing fields and its body, and never its secrets.
+ */
+export type Sealable<RecordT extends ThingRecord> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: ThingRecord['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof ThingRecord>>
+
+/** A seal's public props: the fields it is given that are not secret, each optional.
+ * - the body's fields -- replace those of the sealable
+ * - `am`              -- `'a'` for a live revision (default), or `'x'` for a tombstone
+ * - `written_at`      -- the revision's time (default: now)
+ */
+export type PublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a' | 'x', written_at?: number }>
+
+/** {@link PublicPropsOf} for a live revision: `am` is `'a'` or left out. */
+export type LivePublicPropsOf<RecordT, CleartextsT> = Partial<BodyOf<RecordT, CleartextsT>> & Readonly<{ am?: 'a', written_at?: number }>
+
+/** The public props of a tombstone's seal: `am: 'x'`, and `written_at` (default: now). */
+export type TombstonePublicProps = Readonly<{ am: 'x', written_at?: number }>
+// --
+
+// == [The Sealer]: SealTags, SealPurposes, Sealer
+
+/** The tags of a sealed part, stored unencrypted and bound into its seal. */
 export type SealTags = Pick<Sealed, 'codectag' | 'schematag'>
 
 /** The ctx purposes a sealed part's two ciphertexts are bound to. */
@@ -20,138 +58,55 @@ export interface SealPurposes {
   cipher: string
 }
 
-/** `RecordT` with each part `CleartextsT` names sealed, at `<part>_sealed`. A union is mapped member by member. */
-export type SealedOf<RecordT, CleartextsT> = RecordT extends unknown
-  ? Omit<RecordT, keyof CleartextsT> & { readonly [PartT in keyof CleartextsT & string as `${PartT}_sealed`]: Sealed }
-  : never
-
-/** `RecordT` with each `<part>_sealed` that `CleartextsT` names unsealed, at `<part>`. A union is mapped member by member. */
-export type UnsealedOf<RecordT, CleartextsT> = RecordT extends unknown
-  ? Omit<RecordT, `${keyof CleartextsT & string}_sealed`> & CleartextsT
-  : never
-
-/** The interface a lease seals one part of a record through, so the lease itself knows nothing of the record.
- * `PriorT` is the revision sealed after, `NextT` the next revision without its sealed part, `RecordT` the record with it.
+/** The interface through which a lease seals and unseals one part of a record.
+ * `RecordT` is the record as stored, with its part sealed. `CleartextsT` is the part's cleartexts.
+ * Each member must check what it is given: the lease passes its caller's arguments on unchecked.
  */
-export interface Sealer<PriorT, NextT, RecordT, CleartextsT> {
-  /** The next revision after `prior`, still without its sealed part. */
-  nextRevisionOf(prior: PriorT): NextT
-  /** The stamps the seal of `record` is bound to, after the bank's stamp. A change to any of them refuses the unseal. */
-  stampsOf(record: NextT | RecordT): readonly Crypto.CipherCtxRecord[]
+export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
+  /** The Thing fields and body of `donorProps`, with every other field dropped. Refuses anything but a record of this kind or its shell. */
+  donorPropsOf(donorProps: unknown): Sealable<RecordT>
+  /** The body, `am` and `written_at` of `publicProps`. Refuses any other field. */
+  publicPropsOf(publicProps: unknown): PublicPropsOf<RecordT, CleartextsT>
+  /** The cleartexts in `secretProps`. Refuses any other field. */
+  secretPropsOf(secretProps: unknown): CleartextsT
+  /** The next live revision after `donorProps`, updated by `publicProps`, without its sealed part. */
+  nextRevisionOf(donorProps: unknown, publicProps: unknown): RevisionOf<LiveOf<RecordT>, CleartextsT>
+  /** The tombstone of the live `donorProps`, without its sealed part. Refuses a tombstone or the shell.
+   * Its `written_at` is `publicProps.written_at`, or now.
+   */
+  tombstoneOf(donorProps: unknown, publicProps: unknown): RevisionOf<TombstoneOf<RecordT>, CleartextsT>
+  /** The empty cleartexts a tombstone seals. Their seal authenticates the tombstone. */
+  readonly tombstoneSecrets: CleartextsT
+  /** The stamp of `record` that its seal is bound to, after the bank's. Any change to it makes the unseal refuse. */
+  stampOf(record: unknown): Crypto.CipherCtxRecord
   /** The tags each seal carries. */
   readonly tags: SealTags
   /** The ctx purposes of the wrapped key and of the ciphertext. */
   readonly purposes: SealPurposes
   /** `cleartexts` as the text to cipher. */
   encode(cleartexts: CleartextsT): string
-  /** The cleartexts in `text`, refusing as damaged when it will not parse or check. */
+  /** The cleartexts in `text`. Refuses as damaged when the text does not parse or check. A refusal must not quote `text`, which holds cleartext. */
   decode(text: string): CleartextsT
-  /** The sealed part of `record`, refusing as damaged when its tags are not this sealer's. */
+  /** The sealed part of `record`. Refuses as damaged when its tags are not this sealer's. */
   sealedOf(record: RecordT): Sealed
-  /** `next` with `sealed` added, checked. */
-  recordOf(next: NextT, sealed: Sealed): RecordT
-}
-
-/** The types of the sealer of each kind. */
-export interface SealerKinds {
-  BoxWhisper:   Sealer<BoxSparse & Pick<BoxRecord, 'sidecar'>, Omit<BoxRecord, 'whisper_sealed'>, BoxRecord, BoxCleartexts>
-  BoxTombstone: Sealer<BoxSparse, Omit<BoxTombstone, 'whisper_sealed'>, BoxTombstone, BoxCleartexts>
+  /** `next` with `sealed` added, checked as a stored record. */
+  recordOf(next: unknown, sealed: Sealed): RecordT
 }
 // --
 
-// == [A box's whisper]: BoxRecord, BoxTombstone, BoxCleartexts, BoxWhisper
+// == [A box's records]: BoxRecord, BoxTombstone, BoxCleartexts, BoxPublicProps
 
 /** A live box: its Thing fields, its sidecar and its sealed whisper. */
-export type BoxRecord = Extract<BoxThing, { am: 'a' }>
+export type BoxRecord = LiveOf<BoxThing>
 
 /** A deleted box: its Thing fields and a sealed empty whisper, which signs it. */
-export type BoxTombstone = Extract<BoxThing, { am: 'x' }>
+export type BoxTombstone = TombstoneOf<BoxThing>
 
 /** The cleartexts of a box: its whisper. */
 export interface BoxCleartexts {
   whisper: CX.Whisper
 }
 
-/** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
-const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
-
-/** The checks of what a box's seal starts from, of a box sealed, and of what it seals. */
-const Checks = Validator.Checkers('bad_option', ({ obj }) => ({
-  boxPrior:      boxSparse.and(obj({ sidecar: CX.sidecar })),
-  liveBoxSparse: boxSparse.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
-  boxSparse,
-  boxThing,
-  boxCleartexts: obj({ whisper: CX.whisper }),
-}))
-
-/** Seals a box's whisper, bound to its Thing fields and its tags. Its sidecar stays in the clear.
- * Over a live box it makes the next revision. Over a tombstone or the shell, it makes the first revision of the next life.
- */
-export const BoxWhisper = Object.freeze({
-  nextRevisionOf: boxWhisperOf,
-
-  stampsOf(record: BoxSparse): readonly Crypto.CipherCtxRecord[] { return [Checks.boxSparse.parse(record)] },
-
-  tags: BoxTags,
-
-  purposes: Object.freeze({ key: 'whisper_sealed.key_wrapped', cipher: 'whisper_sealed.ciphered' }),
-
-  encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(Checks.boxCleartexts.parse(cleartexts).whisper) },
-
-  decode(text: string): BoxCleartexts { return { whisper: deserializeWhisper(text) } },
-
-  sealedOf(record: BoxThing): Sealed {
-    const { whisper_sealed } = Checks.boxThing.parse(record)
-    if (! Validator.isConsistent(whisper_sealed, BoxTags)) { throw Throwers.undecodedWhisper() }
-    return whisper_sealed
-  },
-
-  // The parse checks the record, and the spread is handed back: it keeps the type of the revision it was given.
-  recordOf<NextT extends BoxSparse>(next: NextT, whisper_sealed: Sealed): NextT & { readonly whisper_sealed: Sealed } {
-    const record = Object.freeze({ ...next, whisper_sealed })
-    Checks.boxThing.parse(record)
-    return record
-  },
-}) satisfies SealerKinds['BoxWhisper']
-
-/** Seals the empty whisper that signs a box's tombstone. It makes the tombstone of a live box, and refuses a tombstone or the shell. */
-export const BoxTombstone: SealerKinds['BoxTombstone'] = Object.freeze({ ...BoxWhisper, nextRevisionOf: boxTombstoneOf })
-// --
-
-// == [Helpers]: boxWhisperOf, boxTombstoneOf, nextLifeOf, deserializeWhisper
-
-/** The live box next after `prior`, without its sealed whisper */
-function boxWhisperOf(prior: BoxSparse & Pick<BoxRecord, 'sidecar'>): Omit<BoxRecord, 'whisper_sealed'> {
-  const parsed = Checks.boxPrior.parse(prior)
-  const written_at = Clock.nowMillis()
-  const revision = { revtok: Crypto.randomId(), revseq: parsed.revseq + 1, written_at }
-  if (parsed.am === 'a') { return { ...parsed, ...revision, am: 'a' } }
-  return { ...parsed, ...revision, ...nextLifeOf(parsed), am: 'a', born_at: written_at }
-}
-
-/** The tombstone of the live box `prior`, without its sealed whisper */
-function boxTombstoneOf(prior: BoxSparse): Omit<BoxTombstone, 'whisper_sealed'> {
-  const parsed = Checks.liveBoxSparse.parse(prior)
-  return { ...parsed, ...nextLifeOf(parsed), revtok: Crypto.randomId(), revseq: parsed.revseq + 1, am: 'x', written_at: Clock.nowMillis() }
-}
-
-/** The lifeseq and lifepath of the life after `box`'s */
-function nextLifeOf({ lifeseq, lifepath }: Pick<BoxSparse, 'lifeseq' | 'lifepath'>): Pick<BoxSparse, 'lifeseq' | 'lifepath'> {
-  const nextLifeseq = lifeseqOfLifenum(lifenumOfLifeseq(lifeseq) + 1)
-  return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
-}
-
-// What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
-/** The whisper in the JSON `text`, or throw `damaged_whisper` */
-function deserializeWhisper(text: string): CX.Whisper {
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(text)
-  } catch {
-    throw Throwers.undecodedWhisper()
-  }
-  const checked = CX.whisper.safeParse(parsed)
-  if (! checked.success) { throw Throwers.undecodedWhisper() }
-  return checked.data
-}
+/** The public props of a box's seal ({@link PublicPropsOf}): its sidecar, `am` and `written_at`, each optional. */
+export type BoxPublicProps = PublicPropsOf<BoxThing, BoxCleartexts>
 // --

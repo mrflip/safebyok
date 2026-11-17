@@ -11,12 +11,11 @@ import { type Mock, type MockInstance, afterEach, beforeEach, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
 import { Consts, Crypto, GX, SX, Strength } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
-import { Bank } from '../../src/models/bank'
+import { Bank, type BoxShell } from '../../src/models/bank'
 import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/device'
 import { Lease, type LeaseBank } from '../../src/models/lease'
-import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
-import type { BoxRecord, BoxSparse } from '../../src/models/sealers'
-import type { BankStamp, CitedGate, GateStamp, LeaseRecord } from '../../src/models/stamps'
+import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
+import type { BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
 import { BoxThingFormat, ShellLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
@@ -47,7 +46,7 @@ export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user
 export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
 
 /** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at a revision of its own. */
-export const WorldGate: CitedGate = Object.freeze({ ...WorldGateStamp, revtok: 'gate-revision-tok-1' })
+export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: 'gate-revision-tok-1' })
 // --
 
 // == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, makeDevice, passkeyAnswerOf
@@ -143,22 +142,22 @@ export function spyBirths(device: Device, answer?: (ask: BirthBankAsk) => Promis
 }
 // --
 
-// == [Boxes]: Whisper, BoxShell, boxShellOf
+// == [Boxes]: Whisper, Sidecar, boxShellOf
 
 /** An obvious fake whisper, never a real one. */
 export const Whisper = Object.freeze({ apiKey: 'sk-test-0000' })
 
-/** What a box's first seal starts from: the shell's Thing fields, with the sidecar to put. */
-export type BoxShell = BoxSparse & Pick<BoxRecord, 'sidecar'>
+/** A box's sidecar, for a seal's `publicProps`. */
+export const Sidecar = Object.freeze({ account: 'work' })
 
-/** The shell of the box `anthropic_api_key` in {@link WorldScope}'s bank, under life 0 of the root box, with a sidecar, as `overrides` changes it.
- * A shell has no record, so its `born_at` and `written_at` are {@link T0}.
+/** The shell of the box `anthropic_api_key` in {@link WorldScope}'s bank, under life 0 of the root box, as `overrides` changes it.
+ * A shell has no record, so its `born_at` and `written_at` are {@link T0}, and it has no sidecar.
  */
 export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
   return {
     userid: WorldScope.user_id, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
     revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${ShellLifeseq}`,
-    born_at: T0, written_at: T0, sidecar: { account: 'work' }, ...overrides,
+    born_at: T0, written_at: T0, ...overrides,
   }
 }
 // --
@@ -175,7 +174,7 @@ export function fakeLeaseBankOf(overrides: Partial<BankStamp> = {}): FakeLeaseBa
 }
 
 /** A test backdoor: a lease `proving` builds on `bank` citing `gate`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
-export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: CitedGate = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
+export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
   const lease = await proving.buildLease(bank, gate)
   const [record] = make.mock.calls.at(-1)!
@@ -199,9 +198,9 @@ export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
  * It exists only so a test can show two wayins have one bankKey, or read what a seal is bound to; no model hands out a bankKey.
  * Rejects with WebCrypto's error when the wayin will not unwrap.
  */
-export async function _cheat_bankKeyBytesOf(bank: BankStamp, gate: GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
+export async function _cheat_bankKeyBytesOf(bankStamp: BankStamp, gateStamp: GateStamp, wayin: Wayin, secret: WayinSecret): Promise<Uint8Array> {
   const header = wayin.toJSON()
-  const ctx = wayinCtxOf(bank, gate, header)
+  const ctx = wayinCtxOf(bankStamp, gateStamp, header)
   async function wayinKeyOf(): Promise<CryptoKey> {
     if ('prfBytes' in secret) { return Crypto.deriveWrappingKey(secret.prfBytes, ctx) }
     if (header.wayinkind !== 'passphrase') { throw new Error('A passphrase unwraps a passphrase wayin alone.') }
