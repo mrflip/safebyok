@@ -83,7 +83,7 @@
   },
   "dependencies": {
     "@tanstack/query-core": "^5.107.1",
-    "es-toolkit": "^1.53.1",
+    "es-toolkit": "^1.53.2",
     "safebyok-big": "workspace:*"
   },
   "peerDependencies": {
