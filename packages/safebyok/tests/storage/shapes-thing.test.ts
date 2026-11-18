@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
   type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, AskChecks, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf,
-  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isTombstone, isVoidSentinel,
+  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isGone, isTombstone, isVoidSentinel,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -349,14 +349,26 @@ describe("isVoidSentinel(record)", () => {
 })
 
 describe("isTombstone(record)", () => {
-  it("is true of a tombstone, whole or sparse", () => {
+  it("is true of a tombstone, whole or sparse, and of the void sentinel", () => {
     const tombstone = TH.boxTombOf(TH.boxThingOf())
-    for (const record of [tombstone, sparseOf(tombstone)]) { expect(isTombstone(record)).to.be.true }
+    for (const record of [tombstone, sparseOf(tombstone), shellOf(TH.BoxScope, TH.rootBoxOf()), shellOf(TH.GateScope)]) { expect(isTombstone(record)).to.be.true }
   })
 
-  it("is false of a live record, whole or sparse, the void sentinel, or what is not a record", () => {
+  it("is false of a live record, whole or sparse, or what is not a record", () => {
     const box = TH.boxThingOf()
-    for (const val of [box, sparseOf(box), shellOf(TH.BoxScope, TH.rootBoxOf()), shellOf(TH.GateScope), null, undefined, 'x']) { expect(isTombstone(val)).to.be.false }
+    for (const val of [box, sparseOf(box), null, undefined, 'x']) { expect(isTombstone(val)).to.be.false }
+  })
+})
+
+describe("isGone(record)", () => {
+  it("is true of a deleted Thing's tombstone, whole or sparse", () => {
+    const tombstone = TH.boxTombOf(TH.boxThingOf())
+    for (const record of [tombstone, sparseOf(tombstone)]) { expect(isGone(record)).to.be.true }
+  })
+
+  it("is false of the void sentinel, a live record, whole or sparse, or what is not a record", () => {
+    const box = TH.boxThingOf()
+    for (const val of [shellOf(TH.BoxScope, TH.rootBoxOf()), shellOf(TH.GateScope), box, sparseOf(box), null, undefined, 'x']) { expect(isGone(val)).to.be.false }
   })
 })
 

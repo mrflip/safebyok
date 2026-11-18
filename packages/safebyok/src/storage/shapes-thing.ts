@@ -4,6 +4,7 @@ import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
 import { exactOptional } from 'zod'
 import { BX, type Consts, CX, EX, Errors, SX, Validator } from 'safebyok-big/internals'
+import type { TombstoneOf } from '../models/sealers'
 import * as Phrases from '../phrases'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
@@ -350,7 +351,10 @@ export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel
 }
 // --
 
-// == [Reading records]: isVoidSentinel, isWholeRecord, isTombstone, isSparse, haveSameScope, cmpThings
+// == [Reading records]: Tombstone, isVoidSentinel, isWholeRecord, isTombstone, isGone, isSparse, haveSameScope, cmpThings
+
+/** A tombstone of a RecordT, sparse or whole. */
+export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
 
 /** True when `record` is a void sentinel: its revseq is the shell's -1. */
 export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
@@ -360,10 +364,15 @@ export function isWholeRecord(record: Sparse<Thing>): record is Thing {
   return kindChecksOf(record.labelpath).record.safeParse(record).success
 }
 
-// Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it. The void sentinel's `am` is 'x' too.
-/** True when `record` is a tombstone, sparse or whole. The void sentinel is not one. */
-export function isTombstone<RecordT extends Thing>(record: unknown): record is Sparse<RecordT> & Readonly<{ am: 'x' }> {
-  return ((record as Partial<ThingCited> | null | undefined)?.am === 'x') && (! isVoidSentinel(record as Sparse<Thing>))
+// Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
+/** True when `record` is a tombstone, sparse or whole, the void sentinel among them. */
+export function isTombstone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
+  return (record as Partial<ThingCited> | null | undefined)?.am === 'x'
+}
+
+/** True when `record` is the tombstone of a deleted Thing, sparse or whole: any tombstone but the void sentinel. */
+export function isGone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
+  return isTombstone(record) && (! isVoidSentinel(record))
 }
 
 /** True when `record` is live, and not whole. */

@@ -205,7 +205,7 @@ export class ThingMinder {
 
   /** List the Things directly under this minder's root, in labelpath order, tombstones included.
    * A box minder's root is the root box. Each record is cached sparse. Where that leaves a car `behind` or `bare`, the
-   * next get fetches it whole. A tombstone's car is `gone`, and answers from the cache.
+   * next get fetches it whole. A deleted Thing's car is `gone`, and answers from the cache.
    */
   async list(): Promise<Labelpath[]> {
     this.#demandReady()

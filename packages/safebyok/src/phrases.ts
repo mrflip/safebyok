@@ -122,7 +122,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, RootNotCached, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarGoneNotTombstone, CarVoidNotShell
+// == [Minding]: BankExpected, RootNotCached, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -163,8 +163,8 @@ export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is 
 /** A behind car whose fullest is not an earlier revision of its newest's life. */
 export const CarBehindOfOtherRevision = "A behind ThingCar's fullest record is an earlier revision of its newest's Thing and life, and this one's is not: this is a bug in safebyok."
 
-/** A gone car whose newest is not a tombstone. */
-export const CarGoneNotTombstone = "A gone ThingCar's newest record is a tombstone, and this one's is not: this is a bug in safebyok."
+/** A gone car whose newest is not gone: a live record, or the void sentinel. */
+export const CarNewestNotGone = "A gone ThingCar's newest record is the tombstone of a deleted Thing, and this one's is a live record or the void sentinel: this is a bug in safebyok."
 
 /** A void car whose newest is not the void sentinel. */
 export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel, and this one's is not: this is a bug in safebyok."

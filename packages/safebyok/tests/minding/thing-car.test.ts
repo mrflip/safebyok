@@ -135,6 +135,7 @@ describe("bestCarOf", () => {
     [{ liveness: 'behind', newest: sparseOf(Box0),      fullest: Box1 },           'a behind car whose fullest is newer'],
     [{ liveness: 'behind', newest: sparseOf(BoxReborn), fullest: Box0 },           'a behind car whose fullest is of an earlier life'],
     [{ liveness: 'gone',   newest: Box0,                fullest: null },           'a gone car of a live record'],
+    [{ liveness: 'gone',   newest: BoxShell,            fullest: null },           'a gone car of the void sentinel'],
     [{ liveness: 'void',   newest: sparseOf(BoxGone),   fullest: null },           'a void car of a tombstone'],
     [{ liveness: 'gone',   newest: BoxGone,             fullest: undefined },      'a gone car whose fullest is undefined'],
   ] as const

@@ -1,21 +1,19 @@
 /** `ThingCar`, what a ThingMinder caches for one scope, and how two cars of one Thing merge. */
 
 import { Validator } from 'safebyok-big/internals'
-import type { TombstoneOf } from '../models/sealers'
 import * as Phrases from '../phrases'
 import {
-  type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type VoidSentinel,
-  cmpThings, haveSameScope, isSparse, isTombstone, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
+  type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type Tombstone, type VoidSentinel,
+  cmpThings, haveSameScope, isGone, isSparse, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
 } from '../storage/shapes-thing'
 
 // == [The car]: Tombstone, ThingCar, BoxCar, GateCar, DeliverableThing, carLivenessVals
 
-/** A tombstone of a RecordT, sparse or whole. */
-export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
+export type { Tombstone } from '../storage/shapes-thing'
 
 // The vaultDB has a newer whole record when liveness is 'behind' or 'bare' (dbHasNewer).
 /** A ThingMinder's frozen cache value for a Thing: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
- * - `newest` is always a record: full, sparse, the void sentinel when void, or a tombstone when gone.
+ * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
  * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
  * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
  * - On `full`, the two are *identical* (`newest === fullest`): the same object, not just the same content.
@@ -25,7 +23,7 @@ export type ThingCar<RecordT extends ThingRecord> = Readonly<
   | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
   | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
   | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
-  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a tombstone: known to be gone. dbHasNewer: false
+  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a deleted Thing's tombstone: known to be gone. dbHasNewer: false
   | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
 >
 
@@ -44,12 +42,12 @@ export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as con
 // == [Making cars]: carOf, bestCarOf, tagBestNewestSL, tagBestFullestSL, tagBestNewestRecordSL
 
 /** The car of `newest`, with `fullest` the whole record of its life where `newest` is sparse.
- * A tombstone's car is `gone`, even when the tombstone is sparse. A sparse `newest` with no `fullest` makes a `bare` car.
+ * A deleted Thing's car is `gone`, even when its tombstone is sparse, and the void sentinel's is `void`. A sparse `newest` with no `fullest` makes a `bare` car.
  */
 export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing> {
   ArgChecks.deliverableThing.parse(newest)
   if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
-  if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
+  if (isGone(newest))         { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
   if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
   if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
   kindChecksOf(newest.labelpath).record.parse(fullest)
@@ -137,7 +135,7 @@ const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, c
   const bareCar   = obj({ liveness: lit('bare'), newest: cited, fullest: lit(undefined) })
     .refine(({ newest }) => isSparse(newest), Phrases.CarNewestNotSparse)
   const goneCar   = obj({ liveness: lit('gone'), newest: cited, fullest: lit(null) })
-    .refine(({ newest }) => isTombstone(newest), Phrases.CarGoneNotTombstone)
+    .refine(({ newest }) => isGone(newest), Phrases.CarNewestNotGone)
   const voidCar   = obj({ liveness: lit('void'), newest: cited, fullest: lit(null) })
     .refine(({ newest }) => isVoidSentinel(newest), Phrases.CarVoidNotShell)
   const thingCar  = discrim('liveness', [fullCar, behindCar, bareCar, goneCar, voidCar])
