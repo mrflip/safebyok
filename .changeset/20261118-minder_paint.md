@@ -1,0 +1,4 @@
+---
+---
+
+Empty: the new `safebyok` is private. What a caller of a `ThingMinder` will see: `isVaultDBNewer` is renamed `dbHasNewer`, and `carOf` takes a second argument, `fullest`, the whole record of the life where `newest` is sparse, making a `behind` car; a `fullest` that is not an earlier whole record of that life refuses `bad_record`. `bestCarOf(prior, delivered)`, the minder's structural sharing, merges two cars of a scope, and `cmpThings` orders two records of one scope. `isStaleAt(scoped, opts)` takes a scope (an ask or a record passes) and the get options, refusing `bad_record` for a scope of another modelkind. A get's `staleTime` accepts `Infinity` and `'static'` (`TsqStaleTime`, exported), under which a `behind` car counts timely and a `bare` one still does not; a get gives TanStack a `staleTime` only where its caller gave one. `checkedGetAsk` and `checkedListAsk` are replaced by `AskChecks`, whose `getAsk` and `listAsk` refuse `bad_record`.
