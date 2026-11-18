@@ -119,6 +119,18 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
       * `structuralSharing` sees only cars, and undefined before the first (the Coach): a minder's query refuses `select`
         and `placeholderData`, and `mergedValOf` throws `unexpected_error` on any value that is not a car. TanStack
         calls it from the cache and from observers alike, and cannot say which.
+        Amended 2026-11-18 (the Coach): nothing refuses `select` or `placeholderData`; the only rule is that the
+        structural sharing (now `bestCarOf`) throws unless it gets (a car or undefined, a car). Open: an observer's own
+        `structuralSharing` is not a way out, since TanStack keeps the last observer's options on the query, and the query
+        then stops merging the records that arrive (the worker reproduced an older gate replacing a newer car).
+      * 2026-11-18 rulings (the Coach): `isTombstone` is true of any tombstone, the void sentinel included, and `isGone`
+        of a tombstone that is not it, both guarding `is Tombstone`; the minder tests gone with `isGone`. `Infinity` and
+        `'static'` no longer force a car timely, and `behind` and `bare` are judged alike: a car is timely when the
+        vaultDB has nothing newer and TanStack's `isStaleByTime` says so. A finite staleTime is bounded by
+        `MaxTimerMillis` (588 hours). `staleTime: undefined` is "no opinion", and reaches TanStack as no key at all.
+        `#tsqQueryRunner` is `#tsqQueryOptions`. A del citing a tombstone or the shell refuses `dubdel` (docs fixed).
+        Left in TODO.md: `sparseOk`/`gotsparse`, `'static'`, whole tombstones from the vaultDB, void and gone in the
+        minder, a child box's cold get.
       * The root box: no seed at `hello` before birth; a `bare` car of the version-0 root box when `#tryBirth` sends
         it ("optimistically, it's the empty box we sent off"); `#shellAt` reads the bank's root box. The Coach: in the
         React case, the delay to fully populated data is a thousandth of the time to unlock or birth.
