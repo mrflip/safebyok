@@ -2,11 +2,11 @@
 
 import type { CX, Crypto } from 'safebyok-big/internals'
 import type { EpochMillis } from './primitives'
-import type { BoxThing, Sealed, Sparse, ThingRecord } from './shapes-thing'
+import type { BoxRecord, Sealed, Sparse, ThingRecord } from './shapes-thing'
 
 export type { Sealed } from './shapes-thing'
 
-// == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
+// == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, ShellOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
 
 /** A {@link Sealed} field at `<part>_sealed` for each part that `CleartextsT` names. */
 export type SealedPartsOf<CleartextsT> = { readonly [PartT in keyof CleartextsT & string as `${PartT}_sealed`]: Sealed }
@@ -20,21 +20,24 @@ export type UnsealedOf<RecordT, CleartextsT> = RecordT extends unknown
   : never
 
 /** The live records of `RecordT`. */
-export type LiveOf<RecordT> = Exclude<RecordT, { am: 'x' }>
+export type LiveOf<RecordT> = RecordT extends unknown ? RecordT & Readonly<{ am: 'a' }> : never
 
 /** The tombstones of `RecordT`. */
-export type TombstoneOf<RecordT> = Extract<RecordT, { am: 'x' }>
+export type TombstoneOf<RecordT> = RecordT extends unknown ? RecordT & Readonly<{ am: 'x' }> : never
+
+/** The shell of `RecordT`: its tombstone's Thing fields without its body. */
+export type ShellOf<RecordT extends Sparse<ThingRecord>> = Sparse<TombstoneOf<RecordT>>
 
 /** A revision of `RecordT` before it is sealed, without the sealed parts that `CleartextsT` names. A union is mapped member by member. */
 export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<RecordT, keyof SealedPartsOf<CleartextsT>> : never
 
 /** The body of a live `RecordT`: its fields other than its Thing fields and its sealed parts, such as a box's sidecar. */
-export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof ThingRecord | keyof SealedPartsOf<CleartextsT>>
+export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord> | keyof SealedPartsOf<CleartextsT>>
 
 /** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
  * The seal keeps its Thing fields and its body, and never its secrets.
  */
-export type Sealable<RecordT extends ThingRecord> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: ThingRecord['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof ThingRecord>>
+export type Sealable<RecordT extends Sparse<ThingRecord>> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord>>>
 
 /** A seal's public props: the fields it is given that are not secret, each optional.
  * - the body's fields -- replace those of the sealable
@@ -65,7 +68,7 @@ export interface SealPurposes {
  * `RecordT` is the record as stored, with its part sealed. `CleartextsT` is the part's cleartexts.
  * Each member must check what it is given: the lease passes its caller's arguments on unchecked.
  */
-export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
+export interface Sealer<RecordT extends Sparse<ThingRecord>, CleartextsT> {
   /** The Thing fields and body of `donorProps`, with every other field dropped. Refuses anything but a record of this kind or its shell. */
   donorPropsOf(donorProps: unknown): Sealable<RecordT>
   /** The body, `am` and `written_at` of `publicProps`. Refuses any other field. */
@@ -97,13 +100,7 @@ export interface Sealer<RecordT extends ThingRecord, CleartextsT> {
 }
 // --
 
-// == [A box's records]: BoxRecord, BoxTombstone, BoxCleartexts, BoxPublicProps
-
-/** A live box: its Thing fields, its sidecar and its sealed whisper. */
-export type BoxRecord = LiveOf<BoxThing>
-
-/** A deleted box: its Thing fields and a sealed empty whisper, which signs it. */
-export type BoxTombstone = TombstoneOf<BoxThing>
+// == [A box's records]: BoxCleartexts, BoxPublicProps
 
 /** The cleartexts of a box: its whisper. */
 export interface BoxCleartexts {
@@ -111,5 +108,5 @@ export interface BoxCleartexts {
 }
 
 /** The public props of a box's seal ({@link PublicPropsOf}): its sidecar, `am` and `written_at`, each optional. */
-export type BoxPublicProps = PublicPropsOf<BoxThing, BoxCleartexts>
+export type BoxPublicProps = PublicPropsOf<BoxRecord, BoxCleartexts>
 // --

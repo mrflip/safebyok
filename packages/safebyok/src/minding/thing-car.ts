@@ -3,7 +3,7 @@ import * as TSQ from '@tanstack/query-core'
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
-  type Sparse, type Thing, ThingChecks,
+  type Sparse, type ThingRecord, ThingChecks,
   cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord,
 } from '../shapes/shapes-thing'
 import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
@@ -13,7 +13,7 @@ import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
 /** The car of `newest`, with `fullest` the whole record of its life where `newest` is sparse.
  * A deleted Thing's car is `gone`, even when its tombstone is sparse, and the void sentinel's is `void`. A sparse `newest` with no `fullest` makes a `bare` car.
  */
-export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing> {
+export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar<ThingRecord> {
   ThingChecks.scopedCited.parse(newest)
   if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
   if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
@@ -28,7 +28,7 @@ export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing
  * It serves as a minder query's structural sharing: it is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined or of another scope.
  * Anything but a car refuses `unexpected_error`; `prior` may also be undefined.
  */
-export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
+export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<ThingRecord> {
   demandCar(delivered, Phrases.NotACar)
   if (prior === undefined) { return delivered }
   demandCar(prior, Phrases.NotACar)
@@ -38,12 +38,12 @@ export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
   const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)
   if ((newestTag === 'prior') && (fullestTag === 'prior')) { return prior }
   // Only a whole record has parts worth sharing, and a newer one can come only from `delivered`. A full car's newest is its fullest, so it takes the shared record too.
-  const shared = (((fullestTag === 'delivered') && prior.fullest) ? TSQ.replaceEqualDeep(prior.fullest, fullest) : fullest) as Thing | undefined
+  const shared = (((fullestTag === 'delivered') && prior.fullest) ? TSQ.replaceEqualDeep(prior.fullest, fullest) : fullest) as ThingRecord | undefined
   return carOf((newest === fullest) ? shared! : newest, shared)
 }
 
 /** The newer of the two cars' newest records, tagged with its car. On a tie, `delivered`'s where it alone is full, else `prior`'s. */
-function tagBestNewestSL(prior: ThingCar<Thing>, delivered: ThingCar<Thing>): ['prior' | 'delivered', DeliverableThing] {
+function tagBestNewestSL(prior: ThingCar<ThingRecord>, delivered: ThingCar<ThingRecord>): ['prior' | 'delivered', DeliverableThing] {
   const cmp = cmpThings(prior.newest, delivered.newest)
   if (cmp < 0) { return ['prior',     prior.newest] }
   if (cmp > 0) { return ['delivered', delivered.newest] }
@@ -53,7 +53,7 @@ function tagBestNewestSL(prior: ThingCar<Thing>, delivered: ThingCar<Thing>): ['
 }
 
 /** The newer of the two cars' fullest records, tagged with its car: a bare car offers none, any other its `fullest ?? newest`. On a tie, `prior`'s. */
-function tagBestFullestSL(prior: ThingCar<Thing>, delivered: ThingCar<Thing>): ['prior' | 'delivered', DeliverableThing | null | undefined] {
+function tagBestFullestSL(prior: ThingCar<ThingRecord>, delivered: ThingCar<ThingRecord>): ['prior' | 'delivered', DeliverableThing | null | undefined] {
   if (delivered.liveness === 'bare') { return ['prior',     prior.fullest] }
   if (prior.liveness     === 'bare') { return ['delivered', delivered.fullest] }
   return tagBestNewestRecordSL(prior.fullest ?? prior.newest, delivered.fullest ?? delivered.newest)
@@ -68,17 +68,17 @@ function tagBestNewestRecordSL(prior: DeliverableThing, delivered: DeliverableTh
 // == [Reading cars]: isThingCar, dbHasNewer, demandCar
 
 /** True when `val` is a sound car. */
-export function isThingCar(val: unknown): val is ThingCar<Thing> {
+export function isThingCar(val: unknown): val is ThingCar<ThingRecord> {
   return CarChecks.thingCar.safeParse(val).success
 }
 
 /** True when the vaultDB has a whole record newer than `car`'s fullest. */
-export function dbHasNewer(car: Pick<ThingCar<Thing>, 'liveness'>): boolean {
+export function dbHasNewer(car: Pick<ThingCar<ThingRecord>, 'liveness'>): boolean {
   return (car.liveness === 'behind') || (car.liveness === 'bare')
 }
 
 /** Demand that `val` is a sound car, refusing `unexpected_error` with `advice`. */
-function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing> {
+function demandCar(val: unknown, advice?: string): asserts val is ThingCar<ThingRecord> {
   CarChecks.thingCar.parse(val, { advice })
 }
 // --
@@ -88,8 +88,8 @@ function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing
 /** The checks of a car's invariants, as {@link ThingCar} states them, each liveness by name. A car that fails one is a bug in safebyok. */
 const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
   // Its records pass through as they are, so that a refinement can compare them by reference.
-  const cited = custom<Sparse<Thing>>((val) => ThingChecks.scopedCited.safeParse(val).success, Phrases.CarRecordShape)
-  const whole = custom<Thing>((val) => ThingChecks.scopedCited.safeParse(val).success && isWholeRecord(val as Sparse<Thing>), Phrases.CarFullestShape)
+  const cited = custom<Sparse<ThingRecord>>((val) => ThingChecks.scopedCited.safeParse(val).success, Phrases.CarRecordShape)
+  const whole = custom<ThingRecord>((val) => ThingChecks.scopedCited.safeParse(val).success && isWholeRecord(val as Sparse<ThingRecord>), Phrases.CarFullestShape)
   const fullCar   = obj({ liveness: lit('full'), newest: cited, fullest: whole })
     .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit)
   const behindCar = obj({ liveness: lit('behind'), newest: cited, fullest: whole })

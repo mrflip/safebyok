@@ -1,10 +1,12 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BoxThing, type GateThing, BoxChecks, BoxThingFormat, GateThingFormat, Shell, isGone, isTombstone, isVoidSentinel, isWholeRecord, sparseOf,
+  type BankRecord, type BoxRecord, type GateRecord,
+  BoxChecks, BoxThingFormat, GateThingFormat, Shell, isGone, isTombstone, isVoidSentinel, isWholeRecord, sparseOf,
 } from '../../src/shapes/shapes-thing'
-import { type BankRecord, type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
+import { type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
+import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 
@@ -522,7 +524,21 @@ describe("loggableAskOf(ask)", () => {
 describe("Tracked", () => {
   it("is, for each of the bank, main gate and root box, its record or 'same'", () => {
     expectTypeOf<Tracked['bank']>().toEqualTypeOf<BankRecord | 'same'>()
-    expectTypeOf<Tracked[typeof Labelpath.MainGate]>().toEqualTypeOf<GateThing | 'same'>()
-    expectTypeOf<Tracked[typeof Labelpath.RootBox]>().toEqualTypeOf<BoxThing | 'same'>()
+    expectTypeOf<Tracked[typeof Labelpath.MainGate]>().toEqualTypeOf<GateRecord | 'same'>()
+    expectTypeOf<Tracked[typeof Labelpath.RootBox]>().toEqualTypeOf<BoxRecord | 'same'>()
+  })
+})
+
+describe("LiveOf, TombstoneOf and ShellOf", () => {
+  it("mark a gate, whose am is one field, as they mark a box", () => {
+    expectTypeOf<LiveOf<GateRecord>['am']>().toEqualTypeOf<'a'>()
+    expectTypeOf<TombstoneOf<GateRecord>['am']>().toEqualTypeOf<'x'>()
+    expectTypeOf<ShellOf<GateRecord>['am']>().toEqualTypeOf<'x'>()
+  })
+
+  it("keep a box tombstone from having a sidecar, and a live box having one", () => {
+    expectTypeOf<LiveOf<BoxRecord>>().toHaveProperty('sidecar')
+    expectTypeOf<TombstoneOf<BoxRecord>>().not.toHaveProperty('sidecar')
+    expectTypeOf<ShellOf<BoxRecord>>().not.toHaveProperty('whisper_sealed')
   })
 })

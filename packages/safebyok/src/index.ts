@@ -5,11 +5,11 @@
 // safebyok-big defines is re-exported from it, so that `VaultError` stays one class across both packages.
 export { Bank } from './models/bank'
 export { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from './models/device'
-export { type BadNews, type BadNewsHandler, type BankAskDraft, type BankMakeRecord, type BoxShell, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type GetBoxAnswer, type GetBoxAskDraft, BankishChecks } from './shapes/shapes-bankish'
+export { type BadNews, type BadNewsHandler, type BankAskDraft, type BankMakeRecord, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type GetBoxAnswer, type GetBoxAskDraft, BankishChecks } from './shapes/shapes-bankish'
 export type { Gate } from './models/gate'
 export type { Gating } from './models/gating'
 export { type AskUser, type CleartextsForGatingkind, type GatingSnapshot, type Gatingkind, type GuardedStrengthChecker, type RequestCleartext, type StrengthChecker, GateishChecks, gatingkindVals } from './shapes/shapes-gateish'
-export type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, Sealable } from './shapes/shapes-sealers'
+export type { BoxCleartexts, BoxPublicProps, LiveOf, Sealable, ShellOf, TombstoneOf } from './shapes/shapes-sealers'
 export type { Wayin } from './models/wayin'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
 export { type Banklabel, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
@@ -17,11 +17,11 @@ export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphra
 export { type BadAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from './storage/vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export {
-  type BankThing, type BoxThing, type GateThing, type Sparse, type Thing, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel,
+  type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel,
   BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, sparseOf, thingkindVals,
 } from './shapes/shapes-thing'
 export {
-  type BankRecord, type DelAskDraft, type PutAskDraft, type WorldRecord, AskChecks,
+  type DelAskDraft, type PutAskDraft, type WorldRecord, AskChecks,
 } from './shapes/shapes-asks'
 export {
   type BankCar, type BoxCar, type CarAt, type CarFreshness, type DeliverableThing, type GateCar, type GotAnswer, type MinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, carLivenessVals,

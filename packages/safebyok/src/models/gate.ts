@@ -5,13 +5,13 @@ import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
 import { type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
-import { type GateThing, type ThingScope, type Wayins, GateThingFormat, GateChecks, ThingChecks } from '../shapes/shapes-thing'
+import { type GateRecord, type ThingScope, type Wayins, GateChecks, GateThingFormat, ThingChecks } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
 /** One revision of a bank's gate: its passphrase wayin, and its passkey wayin if it has one.
  * A gate verb makes the next revision as a new Gate; this one never changes.
  */
-export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements GateStamp {
+export class Gate extends BaseThing<GateRecord, ThingScope, GateStamp> implements GateStamp {
   // == [Props]: #bank, #main, #passkey0
 
   readonly #bank:     GateBank
@@ -43,14 +43,14 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
   // == [Construction]: make, constructor, makeRecord
 
   /** Make the gate of `record`, which must be of `opts.bank`'s scope. */
-  static make(record: GateThing, opts: GateOpts): Gate {
+  static make(record: GateRecord, opts: GateOpts): Gate {
     const { record: gateRecord, opts: { bank } } = Checks.gateMakeArgs.parse({ record, opts })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
     Validator.checkedConsistent(gateRecord, StampChecks.bankScope.parse(bank.stamp), { kind: 'record_conflict' })
     return new Gate(gateRecord, opts)
   }
 
-  private constructor(gateRecord: GateThing, opts: GateOpts) {
+  private constructor(gateRecord: GateRecord, opts: GateOpts) {
     const main = Wayin.make(gateRecord.wayins.main)
     const passkey0 = (gateRecord.wayins.passkey0 === null) ? null : Wayin.make(gateRecord.wayins.passkey0)
     super({ ...gateRecord, wayins: wayinsOf({ main, passkey0 }) })
@@ -61,7 +61,7 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
   }
 
   /** The first record of a new main gate, made from `dna`, born at its stamp's `born_at`. */
-  static makeRecord(dna: GateDna): GateThing {
+  static makeRecord(dna: GateDna): GateRecord {
     const { wayins, ...stamp } = Checks.makeRecordArgs.parse(dna)
     return GateChecks.record.parse({
       ...stamp, label: stamp.labelpath, fmt: GateThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a',

@@ -8,15 +8,15 @@ import { BoxChecks, BoxThingFormat, GateChecks, ThingChecks } from './shapes-thi
 
 /** The checks of the bank's and gate's stamps and a box's stamp. */
 const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit }) => {
-  const bankStamp = ThingChecks.thingRecord.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
-  const gateStamp = ThingChecks.thingRecord.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
+  const bankStamp = ThingChecks.sparse.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
+  const gateStamp = ThingChecks.sparse.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
   return {
     bankScope:   ThingChecks.bankScope,
     bankStamp,
     gateStamp,
     stampedGate: obj({ bankStamp, stamp: gateStamp, wayins: GateChecks.wayins }),
     // Every Thing field, so a box's revision and its record have the same stamp. The shell has no revision, and refuses.
-    boxStamp:    ThingChecks.thingRecord.extend({
+    boxStamp:    ThingChecks.sparse.extend({
       labelpath: BoxChecks.labelpath,
       fmt:       lit(BoxThingFormat),
     }),
@@ -46,7 +46,7 @@ export const LeaseFormat = 7102
 const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, custom, epochMillis, bank_key_lease_wrapped }) => {
   const leaseStamp  = obj({
     fmt: lit(LeaseFormat), ...PlainChecks.bankStamp.shape,
-    gate_labelpath: PlainChecks.gateStamp.shape.labelpath, gate_lifeseq: PlainChecks.gateStamp.shape.lifeseq, gate_revtok: ThingChecks.thingRecord.shape.revtok,
+    gate_labelpath: PlainChecks.gateStamp.shape.labelpath, gate_lifeseq: PlainChecks.gateStamp.shape.lifeseq, gate_revtok: ThingChecks.sparse.shape.revtok,
     proved_at: epochMillis, wayinkind: GX.wayinkind,
   })
   const leaseRecord = leaseStamp.extend({

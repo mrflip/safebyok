@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
-import { type GateThing, GateThingFormat } from '../../src/shapes/shapes-thing'
+import { type GateRecord, GateThingFormat } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
 
@@ -26,7 +26,7 @@ async function wayinsOf(isPasskeyed = false): Promise<DnaWayins> {
 }
 
 /** The record of a new gate of {@link TH.WorldGateStamp}, with a passkey's wayin if `isPasskeyed`. */
-async function gateRecordOf(isPasskeyed = false): Promise<GateThing> {
+async function gateRecordOf(isPasskeyed = false): Promise<GateRecord> {
   return Gate.makeRecord({ ...TH.WorldGateStamp, wayins: await wayinsOf(isPasskeyed) })
 }
 
@@ -81,14 +81,14 @@ describe("Gate.make(record, { bank })", () => {
   })
 
   const RecordCases = [
-    [(record: GateThing) => ({ ...record, wayins: { main: record.wayins.passkey0, passkey0: record.wayins.main } }), "its two wayins in each other's field"],
-    [(record: GateThing) => ({ ...record, wayins: { ...record.wayins, passkey0: record.wayins.main } }),             'a passphrase wayin in the passkey field'],
-    [(record: GateThing) => ({ ...record, wayins: { passkey0: record.wayins.passkey0 } }),                           'no passphrase wayin'],
-    [(record: GateThing) => ({ ...record, wayins: { main: record.wayins.main } }),                                   'no passkey0, where a gate with no passkey has null'],
-    [(record: GateThing) => TH.omitting(record, 'revtok'),                                                           'no revtok'],
-    [(record: GateThing) => ({ ...record, lifeseq: Lifeseq.ofLifenum(2) }),                                                  'a lifeseq its lifepath does not end with'],
-    [(record: GateThing) => ({ ...record, am: 'x', lifeseq: Lifeseq.ofLifenum(1), lifepath: Lifeseq.ofLifenum(1) }),                 'am x, where the main gate is never deleted'],
-    [(record: GateThing) => ({ ...record, maingate: record }),                                                       'a field no gate Thing has'],
+    [(record: GateRecord) => ({ ...record, wayins: { main: record.wayins.passkey0, passkey0: record.wayins.main } }), "its two wayins in each other's field"],
+    [(record: GateRecord) => ({ ...record, wayins: { ...record.wayins, passkey0: record.wayins.main } }),             'a passphrase wayin in the passkey field'],
+    [(record: GateRecord) => ({ ...record, wayins: { passkey0: record.wayins.passkey0 } }),                           'no passphrase wayin'],
+    [(record: GateRecord) => ({ ...record, wayins: { main: record.wayins.main } }),                                   'no passkey0, where a gate with no passkey has null'],
+    [(record: GateRecord) => TH.omitting(record, 'revtok'),                                                           'no revtok'],
+    [(record: GateRecord) => ({ ...record, lifeseq: Lifeseq.ofLifenum(2) }),                                                  'a lifeseq its lifepath does not end with'],
+    [(record: GateRecord) => ({ ...record, am: 'x', lifeseq: Lifeseq.ofLifenum(1), lifepath: Lifeseq.ofLifenum(1) }),                 'am x, where the main gate is never deleted'],
+    [(record: GateRecord) => ({ ...record, maingate: record }),                                                       'a field no gate Thing has'],
     [() => null,                                                                                                     'null'],
   ] as const
 

@@ -1,6 +1,6 @@
 /** The battery's cases of the world each answer carries: its bank and main gate. */
 import { describe, expect, it } from 'vitest'
-import type { GateThing } from '../../src/shapes/shapes-thing'
+import type { GateRecord } from '../../src/shapes/shapes-thing'
 import type { WorldRecord } from '../../src/shapes/shapes-asks'
 import {
   GateScope, RootScope, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
@@ -9,7 +9,7 @@ import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
 
 /** The world of the bank {@link birthBankAskOf} births, with its main gate as given. */
-function worldWith(maingate: GateThing = gateThingOf()): WorldRecord { return { ...bankThingOf(), maingate } }
+function worldWith(maingate: GateRecord = gateThingOf()): WorldRecord { return { ...bankThingOf(), maingate } }
 
 /** Register the battery's cases of an answer's world. */
 export function describeVaultDBWorld({ fresh, bornBank, withGate, boxesBorn, rowsOf }: VaultDBBatteryWorld): void {

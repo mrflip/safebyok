@@ -5,7 +5,7 @@ import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/inter
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
-import { type StoredCited, type Thing, type ThingCited, type ThingScope, BankChecks, BoxChecks, GateChecks, ThingChecks, sparseOf } from '../shapes/shapes-thing'
+import { type StoredCited, type ThingCited, type ThingRecord, type ThingScope, BankChecks, BoxChecks, GateChecks, ThingChecks, sparseOf } from '../shapes/shapes-thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
@@ -142,10 +142,10 @@ export function storedCitedOf(scope: ThingScope, raw: unknown): StoredCited | nu
 const storedCitedChecker = ThingChecks.storedCited.refusingAs('damaged_row')
 
 /** The Thing stored at `scope`, checked, or null for none. */
-export function storedThingOf(scope: ThingScope, raw: unknown): Thing | null { return storedOf<Thing>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
+export function storedThingOf(scope: ThingScope, raw: unknown): ThingRecord | null { return storedOf<ThingRecord>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
 /** The Thing the store reports writing at `scope`, checked. */
-export function writtenThingOf(scope: ThingScope, raw: unknown): Thing { return writtenOf<Thing>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
+export function writtenThingOf(scope: ThingScope, raw: unknown): ThingRecord { return writtenOf<ThingRecord>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
 /** The three roots the store reports writing for a birth's `puts`, checked. */
 export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
@@ -157,14 +157,14 @@ export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: 
 }
 
 /** The Thing listed at `scope`, checked, or null when it fails its checks: a damaged child is set aside, not thrown. */
-function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
+function listedThingOf(scope: ThingScope, raw: unknown): ThingRecord | null {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   const thingReport = ThingChecks.ofLabelpath(scope.labelpath).stored.safeParse(raw)
   return thingReport.success ? Validator.checkedConsistent(thingReport.data, scope, RowOfOtherScope) : null
 }
 
 /** The Thing in a notice from a watch on `bankScope`, checked. */
-export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing {
+export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): ThingRecord {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   // The labelpath is the record's own; the bank is the watch's, so that a Thing of another bank refuses.
   const scopeReport = ThingChecks.thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
@@ -225,7 +225,7 @@ export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: 
 }
 
 /** `'same'`, or the Thing at `scope` checked by `check`. */
-function trackedEntryOf<RecordT extends Thing>(check: StoredCheck<RecordT>, scope: ThingScope, raw: unknown): RecordT | 'same' {
+function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>, scope: ThingScope, raw: unknown): RecordT | 'same' {
   return (raw === 'same') ? 'same' : writtenOf(check, scope, raw)
 }
 // --
@@ -276,7 +276,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
   const { userid, banklabel } = ask
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${stored.lifepath}/`
-  const living: Thing[] = []
+  const living: ThingRecord[] = []
   const damaged_rows: DamagedThing[] = []
   for (const { labelpath, raw } of children) {
     if (! isChildLabelpath(ask, labelpath)) { throw Throwers.rowOfOtherAddress(['labelpath']) }

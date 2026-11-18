@@ -5,9 +5,9 @@ import type { BankMakeRecord } from '../../src/shapes/shapes-bankish'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
-import type { BoxRecord, BoxTombstone } from '../../src/shapes/shapes-sealers'
+import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { Lifeseq } from '../../src/shapes/primitives'
-import { BankThingFormat, BoxChecks, BoxThingFormat, GateThingFormat, Shell, sparseOf } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, BankThingFormat, BoxChecks, BoxThingFormat, GateThingFormat, Shell, sparseOf } from '../../src/shapes/shapes-thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -343,14 +343,14 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   // Each alteration still passes the box's check, so only the seal can catch it. The box's userid and banklabel are bound
   // too, but a box claiming another bank is refused before the unseal, below.
   const AlteredCases = [
-    [(box: BoxRecord) => ({ ...box, revtok: TH.OtherRevtok }),                          'its revtok'],
-    [(box: BoxRecord) => ({ ...box, revseq: box.revseq + 1 }),                                             'its revseq'],
-    [(box: BoxRecord) => ({ ...box, born_at: box.born_at + 1 }),                                           'its born_at'],
-    [(box: BoxRecord) => ({ ...box, written_at: box.written_at + 1 }),                                     'its written_at'],
-    [(box: BoxRecord) => ({ ...box, labelpath: 'box/openai_api_key', label: 'openai_api_key' }),           'its labelpath and label'],
-    [(box: BoxRecord) => ({ ...box, lifeseq: Life2, lifepath: `${Life0}/${Life2}` }),                       'its lifeseq'],
-    [(box: BoxRecord) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'json_v2' } }),     'its codectag'],
-    [(box: BoxRecord) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, schematag: 'whisper_v2' } }), 'its schematag'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, revtok: TH.OtherRevtok }),                          'its revtok'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, revseq: box.revseq + 1 }),                                             'its revseq'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, born_at: box.born_at + 1 }),                                           'its born_at'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, written_at: box.written_at + 1 }),                                     'its written_at'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, labelpath: 'box/openai_api_key', label: 'openai_api_key' }),           'its labelpath and label'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, lifeseq: Life2, lifepath: `${Life0}/${Life2}` }),                       'its lifeseq'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'json_v2' } }),     'its codectag'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, schematag: 'whisper_v2' } }), 'its schematag'],
   ] as const
 
   for (const [alter, blurb] of AlteredCases) {
@@ -362,12 +362,12 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   }
 
   const UncheckedCases = [
-    [(box: BoxRecord) => ({ ...box, fmt: BoxThingFormat + 1 }),                                        'its fmt not its one value'],
-    [(box: BoxRecord) => ({ ...box, am: 'd' }),                                                        'am d'],
-    [(box: BoxRecord) => ({ ...box, label: 'openai_api_key' }),                                        'a label not the last of its labelpath'],
-    [(box: BoxRecord) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'JSON v1' } }), 'a codectag that is not a label'],
-    [(box: BoxRecord) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, extra: 'field' } }),      'a field no sealed part has'],
-    [(box: BoxRecord) => TH.omitting(box, 'whisper_sealed'),                                           'no sealed whisper'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, fmt: BoxThingFormat + 1 }),                                        'its fmt not its one value'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, am: 'd' }),                                                        'am d'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, label: 'openai_api_key' }),                                        'a label not the last of its labelpath'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'JSON v1' } }), 'a codectag that is not a label'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, extra: 'field' } }),      'a field no sealed part has'],
+    [(box: LiveOf<BoxRecord>) => TH.omitting(box, 'whisper_sealed'),                                           'no sealed whisper'],
     [() => null,                                                                                       'null'],
   ] as const
 
@@ -562,9 +562,9 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
   })
 
   const AlteredCases = [
-    [(tombstone: BoxTombstone) => ({ ...tombstone, revtok: TH.OtherRevtok }),          'its revtok'],
-    [(tombstone: BoxTombstone) => ({ ...tombstone, written_at: tombstone.written_at + 1 }),            'its written_at'],
-    [(tombstone: BoxTombstone) => ({ ...tombstone, lifeseq: Life3, lifepath: `${Life0}/${Life3}` }),   'its lifeseq'],
+    [(tombstone: TombstoneOf<BoxRecord>) => ({ ...tombstone, revtok: TH.OtherRevtok }),          'its revtok'],
+    [(tombstone: TombstoneOf<BoxRecord>) => ({ ...tombstone, written_at: tombstone.written_at + 1 }),            'its written_at'],
+    [(tombstone: TombstoneOf<BoxRecord>) => ({ ...tombstone, lifeseq: Life3, lifepath: `${Life0}/${Life3}` }),   'its lifeseq'],
   ] as const
 
   for (const [alter, blurb] of AlteredCases) {

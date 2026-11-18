@@ -3,7 +3,7 @@
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
 import { Labelpath } from '../shapes/primitives'
-import { type Thing } from '../shapes/shapes-thing'
+import { type ThingRecord } from '../shapes/shapes-thing'
 import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import type { BankRootsFetched, WorldFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
@@ -38,7 +38,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   }
 
   /** Write `record` at its scope, and return it as read back, checked. */
-  #write(record: Thing): Thing {
+  #write(record: ThingRecord): ThingRecord {
     const things = this.#thingsOf(record)
     things.set(record.labelpath, structuredClone(record))
     return Classifier.writtenThingOf(record, structuredClone(things.get(record.labelpath)))
@@ -66,7 +66,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
   /** Notify each watcher of `thing`'s bank of it, and of the bank as `world`. */
-  #notify(thing: Thing, world: WorldRecord | null): void {
+  #notify(thing: ThingRecord, world: WorldRecord | null): void {
     for (const { scope, receive, onBadNews } of this.#watchers) {
       if ((scope.userid === thing.userid) && (scope.banklabel === thing.banklabel)) {
         queueMicrotask(() => {

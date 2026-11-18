@@ -11,7 +11,7 @@ import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
-import { type Thing, type ThingScope, type VoidSentinel, Shell, ThingChecks, cmpThings } from '../shapes/shapes-thing'
+import { type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks, cmpThings } from '../shapes/shapes-thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../storage/vault-db'
 import {
@@ -185,8 +185,8 @@ export class ThingMinder {
   }
 
   /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
-  async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<Thing>> {
-    let fetched: ThingCar<Thing>
+  async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
+    let fetched: ThingCar<ThingRecord>
     try {
       fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
     } catch (err) {
@@ -201,7 +201,7 @@ export class ThingMinder {
   /** Fetch `ask`'s car from the vaultDB, made of its shell where storage has nothing.
    * Refuses `stale_read` for an answer older than the revision cached when it began.
    */
-  async #fetchCar(ask: GetAsk): Promise<ThingCar<Thing>> {
+  async #fetchCar(ask: GetAsk): Promise<ThingCar<ThingRecord>> {
     // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
     const prior  = this.#cachedAt(ask)
     const answer = await this.#vaultDB.tryGetThing(ask)
@@ -213,13 +213,13 @@ export class ThingMinder {
   }
 
   /** The cached car for `scoped`, a scope in this minder's bank, or undefined for none. */
-  #cachedAt(scoped: ThingScope): ThingCar<Thing> | undefined {
-    return this.#tsq.getQueryData<ThingCar<Thing>>(this.queryKey(scoped))
+  #cachedAt(scoped: ThingScope): ThingCar<ThingRecord> | undefined {
+    return this.#tsq.getQueryData<ThingCar<ThingRecord>>(this.queryKey(scoped))
   }
 
   /** The cache's query of `scoped`'s car, or undefined for none. */
-  #tsqFind(scoped: ThingScope): TSQ.Query<ThingCar<Thing>> | undefined {
-    return this.#tsq.getQueryCache().find<ThingCar<Thing>>({ queryKey: this.queryKey(scoped), exact: true })
+  #tsqFind(scoped: ThingScope): TSQ.Query<ThingCar<ThingRecord>> | undefined {
+    return this.#tsq.getQueryCache().find<ThingCar<ThingRecord>>({ queryKey: this.queryKey(scoped), exact: true })
   }
 
   /** Send `record`'s car to TanStack, to merge into its cached car, while minding. */
@@ -240,7 +240,7 @@ export class ThingMinder {
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
   /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
-  #tsqQueryOptions(scoped: ThingScope, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<Thing>> {
+  #tsqQueryOptions(scoped: ThingScope, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
     const queryOpts = { queryKey: this.queryKey(scoped) }
     if (opts.staleTime === undefined) { return queryOpts }
     return { ...queryOpts, staleTime: staleTimeFnOf(opts.staleTime) }
@@ -316,7 +316,7 @@ function isUsefulTSQEvent(event: unknown): event is Readonly<{ type: 'removed' |
 }
 
 /** The {@link GotAnswer} for `carQuery`, the query of `ask`'s car, with the car and whether it is timely within `staleTime`. */
-function gotAnswerOf(ask: GetAsk, carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTime: TsqStaleTime): GotAnswer & Pick<CarFreshness, 'car' | 'isTimely'> {
+function gotAnswerOf(ask: GetAsk, carQuery: TSQ.Query<ThingCar<ThingRecord>> | undefined, staleTime: TsqStaleTime): GotAnswer & Pick<CarFreshness, 'car' | 'isTimely'> {
   const car      = carQuery?.state.data
   const isTimely = isTimelyQuery(carQuery, staleTime)
   const base     = { ok: true, car, ask, world: null, isTimely } as const
@@ -331,7 +331,7 @@ function gotAnswerOf(ask: GetAsk, carQuery: TSQ.Query<ThingCar<Thing>> | undefin
 }
 
 /** True when `carQuery` has a car the vaultDB has nothing newer for, and which TanStack Query counts fresh under `staleTime`. */
-function isTimelyQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTime: TsqStaleTime): boolean {
+function isTimelyQuery(carQuery: TSQ.Query<ThingCar<ThingRecord>> | undefined, staleTime: TsqStaleTime): boolean {
   const car = carQuery?.state.data
   if ((carQuery === undefined) || (car === undefined)) { return false }
   if (dbHasNewer(car))                                 { return false }
@@ -342,7 +342,7 @@ function isTimelyQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTi
 /** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link dbHasNewer}. */
 function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => TSQ.StaleTime {
   return (carQuery) => {
-    const car = carQuery.state.data as ThingCar<Thing> | undefined
+    const car = carQuery.state.data as ThingCar<ThingRecord> | undefined
     return ((car !== undefined) && dbHasNewer(car)) ? 0 : staleTime
   }
 }

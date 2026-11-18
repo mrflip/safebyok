@@ -7,13 +7,13 @@ import { Device } from './device'
 import { Gate } from './gate'
 import type { Lease } from './lease'
 import { Proving } from './proving'
-import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxShell, BoxUnsealed, GetBoxAnswer, GetBoxAskDraft } from '../shapes/shapes-bankish'
+import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxUnsealed, GetBoxAnswer, GetBoxAskDraft } from '../shapes/shapes-bankish'
 import type { GateRevisionedStamp } from '../shapes/shapes-gateish'
-import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps } from '../shapes/shapes-sealers'
+import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf, TombstonePublicProps } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankThing, type BoxThing, type Thing, BankChecks, BankThingFormat, BoxChecks, BoxThingFormat, GateChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type ThingRecord, BankChecks, BankThingFormat, BoxChecks, BoxThingFormat, GateChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
 import * as Throwers from '../refusals/throwers'
@@ -21,7 +21,7 @@ import * as Throwers from '../refusals/throwers'
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
-export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements BankStamp {
+export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements BankStamp {
   // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease
 
   readonly #device:   Device
@@ -31,7 +31,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   // Set once more, where the bank's birth lands: from the shell to the root box stored.
   /** The root box: its shell until the bank is born, then its stored record. */
-  #rootBox: BoxRecord | BoxShell
+  #rootBox: LiveOf<BoxRecord> | ShellOf<BoxRecord>
 
   /** The attached lease, null while locked. */
   #lease: Lease | null = null
@@ -55,7 +55,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   get maingate(): Gate { return this.#maingate }
 
   /** The root box: its shell until the bank is born, then its stored record. Every box of this bank is under it. */
-  get rootBox(): BoxRecord | BoxShell { return this.#rootBox }
+  get rootBox(): LiveOf<BoxRecord> | ShellOf<BoxRecord> { return this.#rootBox }
 
   /** The revseq and lifepath this object holds of the bank, its main gate and its root box, which every ask it makes tracks. */
   get track(): Track {
@@ -130,12 +130,12 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   makeListAsk(ask: BankAskDraft): ListAsk { return listAskOf({ ...ask, ...this.scope, track: this.track }) }
 
   /** The put ask writing `ask.record` over `ask.cited`, in this bank. */
-  makePutAsk<RecordT extends Thing>(ask: Omit<PutAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
+  makePutAsk<RecordT extends ThingRecord>(ask: Omit<PutAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
     return { ...putAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
   }
 
   /** The del ask writing the tombstone `ask.record` over `ask.cited`, in this bank. */
-  makeDelAsk<RecordT extends Thing>(ask: Omit<DelAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
+  makeDelAsk<RecordT extends ThingRecord>(ask: Omit<DelAskDraft<RecordT>, 'track'>): WriteAsk<RecordT> {
     return { ...delAskOf<RecordT>({ ...ask, track: this.track }), ...this.scope }
   }
 
@@ -146,12 +146,12 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // == [Methods]: put
 
   /** Write `ask.record`, this bank's next revision, over `ask.cited`. Resolves the bank's Thing the store reports writing. This Bank object is not updated. */
-  async put(ask: PutAskDraft<BankThing>): Promise<BankThing> {
+  async put(ask: PutAskDraft<BankRecord>): Promise<BankRecord> {
     this.demandEnabled()
     const answer = await this.#vaultDB.tryWriteThing({ ...this.makePutAsk(ask), labelpath: 'bank', modelkind: 'bank' })
     if (! answer.ok) { throw answer.err }
     // The ask's modelkind is the bank's, which the vaultDB checks what it answers against.
-    return answer.val as BankThing
+    return answer.val as BankRecord
   }
   // --
 
@@ -214,10 +214,10 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
    * @example
    *   await bank.sealBox(box, { sidecar: { account: 'work' } }, { whisper })
    */
-  sealBox(donorProps: Sealable<BoxRecord>, publicProps: TombstonePublicProps): Promise<BoxTombstone>
-  sealBox(donorProps: Sealable<BoxRecord>, publicProps: LivePublicPropsOf<BoxThing, BoxCleartexts>, secretProps: BoxCleartexts): Promise<BoxRecord>
-  sealBox(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxThing>
-  async sealBox(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxThing> {
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: TombstonePublicProps): Promise<TombstoneOf<BoxRecord>>
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<LiveOf<BoxRecord>>
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord>
+  async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
     const lease = this.#demandLease()
     this.#demandOwnBox(donorProps)
     return lease.seal(CoreBox, donorProps, publicProps, secretProps)
@@ -226,14 +226,14 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** Seal the tombstone of the live box `donorProps`. Needs the bank unlocked.
    * Its sealed empty whisper authenticates it. Its `written_at` is `publicProps.written_at`, or now.
    */
-  tombstoneBox(donorProps: Sealable<BoxRecord>, publicProps: Partial<TombstonePublicProps> = {}): Promise<BoxTombstone> {
+  tombstoneBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: Partial<TombstonePublicProps> = {}): Promise<TombstoneOf<BoxRecord>> {
     return this.sealBox(donorProps, { ...publicProps, am: 'x' })
   }
 
   /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
    * It authenticates the box, all but its sidecar. For a tombstone, that checks its signature.
    */
-  async unsealBox(box: BoxThing): Promise<BoxUnsealed> {
+  async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
     const lease = this.#demandLease()
     this.#demandOwnBox(box)
     return lease.unseal(CoreBox, box)
@@ -256,9 +256,9 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
    * If none is stored:
    * - `ifAbsent: 'shell'` answers with a shell tombstone: "updating" it is a create operation.
    */
-  tryGetBox(ask: GetBoxAskDraft & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxShell>>
+  tryGetBox(ask: GetBoxAskDraft & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<ShellOf<BoxRecord>>>
   tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer>
-  async tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer<BoxShell | null>> {
+  async tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer<ShellOf<BoxRecord> | null>> {
     // Spread, so that an ask that is not a bag reaches the vaultDB's check and refuses in the answer.
     const { labelpath, ifAbsent } = { ...ask }
     const thingAsk = { ...this.makeGetAsk({ labelpath, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
@@ -269,7 +269,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     if (answer.act === 'gotvoid') {
       if (ifAbsent !== 'shell') { return answer }
       // A box's labelpath, so its shell is a box's.
-      return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) as BoxShell }
+      return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) as ShellOf<BoxRecord> }
     }
     const { val } = answer
     if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) } }
@@ -277,7 +277,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   /** Write the live box `ask.record` over the box `ask.cited` cites: the one stored at its scope, or its shell. */
-  tryPutBox(ask: PutAskDraft<BoxThing>): Promise<WriteThingAnswer> {
+  tryPutBox(ask: PutAskDraft<BoxRecord>): Promise<WriteThingAnswer> {
     const thingAsk = { ...this.makePutAsk(ask), modelkind: 'box' } as const
     const { endCause } = this.#device
     if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
@@ -285,7 +285,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   /** Write the tombstone `ask.record` over the live box `ask.cited` cites. */
-  tryDelBox(ask: DelAskDraft<BoxThing>): Promise<WriteThingAnswer> {
+  tryDelBox(ask: DelAskDraft<BoxRecord>): Promise<WriteThingAnswer> {
     const thingAsk = { ...this.makeDelAsk(ask), modelkind: 'box' } as const
     const { endCause } = this.#device
     if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
@@ -331,7 +331,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 // == [Helpers]: trackPairOf, disabledAnswerOf
 
 /** The revseq and lifepath of a Thing, as a `track` holds them. */
-function trackPairOf({ revseq, lifepath }: Pick<Thing, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
+function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
 
 /** The refused answer to `ask` while the bank's device is disabled: its `err` is the device's `endCause`. */
 function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<null> {

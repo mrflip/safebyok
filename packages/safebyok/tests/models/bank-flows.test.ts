@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
 import type { Bank } from '../../src/models/bank'
-import type { BoxShell, BoxUnsealed } from '../../src/shapes/shapes-bankish'
-import type { BoxRecord } from '../../src/shapes/shapes-sealers'
-import { type BoxThing, Shell, sparseOf } from '../../src/shapes/shapes-thing'
+import type { BoxUnsealed } from '../../src/shapes/shapes-bankish'
+import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
+import { type BoxRecord, Shell, sparseOf } from '../../src/shapes/shapes-thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
@@ -20,7 +20,7 @@ async function storedBank(): Promise<Bank> {
 }
 
 /** The box at {@link Openai} in `bank`'s vaultDB, or its shell where none is stored. */
-async function priorOf(bank: Bank): Promise<BoxThing | BoxShell> {
+async function priorOf(bank: Bank): Promise<BoxRecord | ShellOf<BoxRecord>> {
   const got = await bank.tryGetBox({ labelpath: Openai, ifAbsent: 'shell' })
   if (! got.ok) { throw got.err }
   return got.val
@@ -34,7 +34,7 @@ async function unsealedAt(bank: Bank): Promise<BoxUnsealed> {
 }
 
 /** The design's put flow: get the box or its shell, add one to its count of apicalls, seal and put it. */
-async function bumpApicalls(bank: Bank): Promise<BoxRecord> {
+async function bumpApicalls(bank: Bank): Promise<LiveOf<BoxRecord>> {
   const prior    = await priorOf(bank)
   const old      = (prior.am === 'a') ? await bank.unsealBox(prior) : null
   const apicalls = Number(old?.whisper['apicalls'] ?? 0) + 1

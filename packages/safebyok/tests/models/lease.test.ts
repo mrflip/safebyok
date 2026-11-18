@@ -6,7 +6,7 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import type { BoxCleartexts, Sealer } from '../../src/shapes/shapes-sealers'
 import { LeaseFormat, type LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type EpochMillis, Lifeseq } from '../../src/shapes/primitives'
-import { type BoxThing } from '../../src/shapes/shapes-thing'
+import { type BoxRecord } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -22,7 +22,7 @@ const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 const SealerMembernames = [
   'donorPropsOf', 'publicPropsOf', 'secretPropsOf', 'nextRevisionOf', 'tombstoneOf', 'tombstoneSecrets', 'stampOf', 'tags', 'purposes', 'encode', 'decode', 'sealedOf', 'recordOf',
-] as const satisfies readonly (keyof Sealer<BoxThing, BoxCleartexts>)[]
+] as const satisfies readonly (keyof Sealer<BoxRecord, BoxCleartexts>)[]
 
 /** CoreBox's members, as a plain object. */
 const BoxSealerBag = Object.freeze({

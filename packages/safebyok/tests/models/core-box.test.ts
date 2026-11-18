@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CoreBox } from '../../src/models/core-box'
 import * as Phrases from '../../src/phrases'
-import type { BoxCleartexts, BoxRecord, RevisionOf } from '../../src/shapes/shapes-sealers'
+import type { BoxCleartexts, LiveOf, RevisionOf } from '../../src/shapes/shapes-sealers'
+import type { BoxRecord } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
@@ -20,7 +21,7 @@ const Life2 = Lifeseq.ofLifenum(2)
 const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 /** A live box at its first revision, without its sealed whisper: the first revision over {@link TH.boxShellOf}'s shell. */
-function liveRevisionOf(): RevisionOf<BoxRecord, BoxCleartexts> {
+function liveRevisionOf(): RevisionOf<LiveOf<BoxRecord>, BoxCleartexts> {
   return { ...TH.boxShellOf(), revtok: TH.revtokOf('box1'), revseq: 0, am: 'a', lifeseq: Life0, lifepath: `${Life0}/${Life0}`, sidecar: TH.Sidecar }
 }
 

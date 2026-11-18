@@ -3,10 +3,11 @@ export { type AdapterVaultDBOpts, type Received, AdapterVaultDB } from './storag
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export { type Banklabel, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
 export {
-  type BankThing, type BoxThing, type GateThing, type Sealed, type VoidSentinel, type Wayins, type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, BankThingFormat, BoxThingFormat, GateThingFormat, BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, sparseOf, thingkindVals,
+  type BankRecord, type BoxRecord, type GateRecord, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type VoidSentinel, type Wayins,
+  BankChecks, BankThingFormat, BoxChecks, BoxThingFormat, GateChecks, GateThingFormat, Shell, ThingChecks, cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, sparseOf, thingkindVals,
 } from './shapes/shapes-thing'
 export {
-  type AnyAsk, type BankRecord, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, AskChecks, delAskOf, getAskOf, listAskOf, putAskOf,
+  type AnyAsk, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, AskChecks, delAskOf, getAskOf, listAskOf, putAskOf,
 } from './shapes/shapes-asks'
 export * as Classifier from './storage/thing-classifier'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'

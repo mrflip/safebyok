@@ -7,7 +7,7 @@ import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
 import type { EpochMillis, Labelpath } from './primitives'
-import { type BankThing, type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, ThingChecks } from './shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, ThingChecks } from './shapes-thing'
 import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
@@ -96,7 +96,7 @@ export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | '
  * - On `full`, the two are *identical* (`newest === fullest`): the same object, not just the same content.
  * - When `behind`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
  */
-export type ThingCar<RecordT extends ThingRecord> = Readonly<
+export type ThingCar<RecordT extends Sparse<ThingRecord>> = Readonly<
   | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
   | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
   | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
@@ -105,24 +105,24 @@ export type ThingCar<RecordT extends ThingRecord> = Readonly<
 >
 
 /** The car of the bank's Thing. */
-export type BankCar = ThingCar<BankThing>
+export type BankCar = ThingCar<BankRecord>
 /** The car of a box. */
-export type BoxCar  = ThingCar<BoxThing>
+export type BoxCar  = ThingCar<BoxRecord>
 /** The car of a gate. */
-export type GateCar = ThingCar<GateThing>
+export type GateCar = ThingCar<GateRecord>
 
 /** The kind of Thing stored at `LabelpathT`, read from its modelkind, or any Thing for a labelpath not known when compiled. */
 export type ThingAt<LabelpathT extends Labelpath> =
-  LabelpathT extends 'gate' | `gate/${string}` ? GateThing
-    : LabelpathT extends 'box' | `box/${string}` ? BoxThing
-      : LabelpathT extends 'bank' ? BankThing
-        : Thing
+  LabelpathT extends 'gate' | `gate/${string}` ? GateRecord
+    : LabelpathT extends 'box' | `box/${string}` ? BoxRecord
+      : LabelpathT extends 'bank' ? BankRecord
+        : ThingRecord
 
 /** The car of the Thing stored at `LabelpathT` ({@link ThingAt}). */
 export type CarAt<LabelpathT extends Labelpath> = ThingCar<ThingAt<LabelpathT>>
 
 /** A record a car is made from: a Thing, whole or sparse, or the void sentinel. */
-export type DeliverableThing = Thing | Sparse<Thing> | VoidSentinel
+export type DeliverableThing = ThingRecord | Sparse<ThingRecord> | VoidSentinel
 
 /** Each `liveness` a car may have. */
 export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as const
@@ -136,7 +136,7 @@ export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as con
  * - `vacant`   -- nothing is cached
  * - `untimely` -- the car is `behind` or `bare`, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
  */
-export type GotAnswer<RecordT extends Thing = Thing> = (
+export type GotAnswer<RecordT extends ThingRecord = ThingRecord> = (
   | GoodAnswer<RecordT, 'gotlive'>
   | GoodAnswer<Tombstone<RecordT>, 'gotgone'>
   | GoodAnswer<null, 'gotvoid'>
@@ -144,7 +144,7 @@ export type GotAnswer<RecordT extends Thing = Thing> = (
 ) & { ask: GetAsk }
 
 /** The car cached for a scope, however old, and the state of its gets. */
-export interface CarFreshness<RecordT extends Thing = Thing> {
+export interface CarFreshness<RecordT extends ThingRecord = ThingRecord> {
   /** The cached car, or undefined for none. */
   car:         ThingCar<RecordT> | undefined
   /** False where the act is `vacant` or `untimely`. */
@@ -158,10 +158,10 @@ export interface CarFreshness<RecordT extends Thing = Thing> {
 }
 
 /** A get's answer read from the cache, with the car and its {@link CarFreshness}. */
-export type TSQGotAnswer<RecordT extends Thing = Thing> = GotAnswer<RecordT> & CarFreshness<RecordT>
+export type TSQGotAnswer<RecordT extends ThingRecord = ThingRecord> = GotAnswer<RecordT> & CarFreshness<RecordT>
 
 /** `tryAt`'s answer: a {@link TSQGotAnswer}, or a refusal. */
-export type TSQAnswer<RecordT extends Thing = Thing> = TSQGotAnswer<RecordT> | BadAnswer
+export type TSQAnswer<RecordT extends ThingRecord = ThingRecord> = TSQGotAnswer<RecordT> | BadAnswer
 
 /** A scope whose labelpath is `LabelpathT`, which types the car a minder answers for it ({@link ThingAt}). */
 export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labelpath: LabelpathT }>

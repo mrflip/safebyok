@@ -16,7 +16,9 @@ import { Device } from '../../src/models/device'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
-import type { BoxShell, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
+import type { DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
+import type { ShellOf } from '../../src/shapes/shapes-sealers'
+import type { BoxRecord } from '../../src/shapes/shapes-thing'
 import type { GateRevisionedStamp, LeaseBank, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { BoxThingFormat, Shell } from '../../src/shapes/shapes-thing'
@@ -170,7 +172,7 @@ export const Sidecar = Object.freeze({ account: 'work' })
 /** The shell of the box `anthropic_api_key` in {@link WorldScope}'s bank, under life 0 of the root box, as `overrides` changes it.
  * A shell has no record, so its `born_at` and `written_at` are {@link T0}, and it has no sidecar.
  */
-export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
+export function boxShellOf(overrides: Partial<ShellOf<BoxRecord>> = {}): ShellOf<BoxRecord> {
   return {
     userid: WorldScope.userid, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
     revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: `${Lifeseq.ofLifenum(0)}/${Shell.VoidLifeseq}`,

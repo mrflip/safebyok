@@ -3,7 +3,8 @@
 import { describe, expect, it } from 'vitest'
 import { Crypto } from 'safebyok-big/internals'
 import { CoreBox } from '../../src/models/core-box'
-import type { BoxRecord } from '../../src/shapes/shapes-sealers'
+import type { LiveOf } from '../../src/shapes/shapes-sealers'
+import type { BoxRecord } from '../../src/shapes/shapes-thing'
 import { LeaseFormat, type LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Lifeseq } from '../../src/shapes/primitives'
 
@@ -48,7 +49,7 @@ async function sealedWorld() {
 }
 
 /** The whisper text of `box`, unsealed by hand under `bankKey` with the ctx of `bankStamp`, `boxStamp` and `tags` (the box's own by default); rejects with WebCrypto's error when it will not unseal. */
-async function unsealByHand(bankKey: CryptoKey, box: BoxRecord, bankStamp: Crypto.CipherCtxRecord, boxStamp: Crypto.CipherCtxRecord, tags: Crypto.CipherCtxRecord = CoreBox.tags): Promise<string> {
+async function unsealByHand(bankKey: CryptoKey, box: LiveOf<BoxRecord>, bankStamp: Crypto.CipherCtxRecord, boxStamp: Crypto.CipherCtxRecord, tags: Crypto.CipherCtxRecord = CoreBox.tags): Promise<string> {
   const { key_wrapped, ciphered } = box.whisper_sealed
   const partKey = await Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([bankStamp, boxStamp], 'whisper_sealed.key_wrapped', tags), { extractable: false, usage: ['decrypt'] })
   return new TextDecoder().decode(await Crypto.decipherBytes(partKey, ciphered, Crypto.cipherCtx([bankStamp, boxStamp], 'whisper_sealed.ciphered', tags)))

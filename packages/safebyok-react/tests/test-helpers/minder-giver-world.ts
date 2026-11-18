@@ -1,7 +1,7 @@
 /** A Device for the giver's tests over the new core's minder: one bank, born in a memory vaultDB, already started. */
 
 import { type BoxCar, type MinderFriend, ThingMinder } from 'safebyok'
-import { type BoxThing, type GetAsk, type Thing, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
+import { type BoxRecord, type GetAsk, type ThingRecord, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { giverBankOfMinder } from '../../src/giver/minder-bank'
 import type { DeviceSnapshot, GiverBank, GiverDevice } from '../../src/giver/react-giver'
@@ -26,9 +26,9 @@ export interface MinderGiverWorld {
   /** Hold every get the vaultDB is asked from now on, until the function returned is called. */
   holdGets(): () => void
   /** Store `box` under the root box, as its first revision. */
-  _cheat_birthBox(box: BoxThing): Promise<void>
+  _cheat_birthBox(box: BoxRecord): Promise<void>
   /** Store `next` over `prior`. */
-  _cheat_replace(prior: Thing, next: Thing): Promise<void>
+  _cheat_replace(prior: ThingRecord, next: ThingRecord): Promise<void>
 }
 
 /** A Device signed in as the user of the core's test bank ({@link LeanTH.ThingBank}), that bank born with no box under its root, and the bank object started.

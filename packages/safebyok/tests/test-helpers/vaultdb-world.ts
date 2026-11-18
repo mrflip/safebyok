@@ -3,7 +3,8 @@
 import { BW } from 'safebyok-big/testing'
 import { type Labelpath, type Lifepath, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, BankThingFormat, BoxThingFormat, GateThingFormat, Shell,
+  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord,
+  BankThingFormat, BoxThingFormat, GateThingFormat, Shell,
 } from '../../src/shapes/shapes-thing'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstRevtok, T0, revtokOf } from './models-world'
@@ -35,7 +36,7 @@ export const Life0 = Lifeseq.ofLifenum(0)
 const FirstRevision = { am: 'a', revtok: FirstRevtok, revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
 
 /** The track of the bank, main gate and root box `bank`, `gate` and `box`: their revseq and lifepath. */
-export function trackOf(bank: Thing = bankThingOf(), gate: Thing = gateThingOf(), box: Thing = rootBoxOf()): Track {
+export function trackOf(bank: ThingRecord = bankThingOf(), gate: ThingRecord = gateThingOf(), box: ThingRecord = rootBoxOf()): Track {
   return {
     bank: { revseq: bank.revseq, lifepath: bank.lifepath },
     gate: { revseq: gate.revseq, lifepath: gate.lifepath },
@@ -44,12 +45,12 @@ export function trackOf(bank: Thing = bankThingOf(), gate: Thing = gateThingOf()
 }
 
 /** The bank Thing at revision 0 of life 0, with `overrides` laid over it. */
-export function bankThingOf(overrides: Partial<BankThing> = {}): BankThing {
+export function bankThingOf(overrides: Partial<BankRecord> = {}): BankRecord {
   return { ...BankScope, label: 'bank', fmt: BankThingFormat, ...FirstRevision, lifepath: Life0, ...overrides }
 }
 
 /** The main gate at revision 0 of life 0, with `overrides` laid over it. */
-export function gateThingOf(overrides: Partial<GateThing> = {}): GateThing {
+export function gateThingOf(overrides: Partial<GateRecord> = {}): GateRecord {
   return {
     ...GateScope, label: 'gate', fmt: GateThingFormat, ...FirstRevision, lifepath: Life0,
     wayins: MainOnly, auth: {}, sigs: {}, meta: {}, ...overrides,
@@ -57,12 +58,12 @@ export function gateThingOf(overrides: Partial<GateThing> = {}): GateThing {
 }
 
 /** The root box at revision 0 of life 0, with `overrides` laid over it. */
-export function rootBoxOf(overrides: Partial<BoxThing> = {}): BoxThing {
+export function rootBoxOf(overrides: Partial<BoxRecord> = {}): BoxRecord {
   return { ...RootScope, label: 'box', fmt: BoxThingFormat, ...FirstRevision, lifepath: Life0, sidecar: {}, whisper_sealed: FakeSealed, ...overrides }
 }
 
 /** A live box at revision 0 of life 0, one `label` under the root box's life 0, with `overrides` laid over it. */
-export function boxThingOf(label = 'openai', overrides: Partial<BoxThing> = {}): BoxThing {
+export function boxThingOf(label = 'openai', overrides: Partial<BoxRecord> = {}): BoxRecord {
   return {
     ...ThingBank, labelpath: `box/${label}`, label, fmt: BoxThingFormat, ...FirstRevision, lifepath: `${Life0}/${Life0}`,
     sidecar: {}, whisper_sealed: FakeSealed, ...overrides,
@@ -70,12 +71,12 @@ export function boxThingOf(label = 'openai', overrides: Partial<BoxThing> = {}):
 }
 
 /** The revision after `prior`, written a millisecond later, with `overrides` laid over it. */
-export function nextOf<RecordT extends Thing>(prior: RecordT, overrides: Partial<RecordT> = {}): RecordT {
+export function nextOf<RecordT extends ThingRecord>(prior: RecordT, overrides: Partial<RecordT> = {}): RecordT {
   return { ...prior, revtok: revtokOf(String(prior.revseq + 1)), revseq: prior.revseq + 1, written_at: prior.written_at + 1, ...overrides }
 }
 
 /** The revision of the main gate after `prior`: see {@link nextOf}. */
-export function nextGateOf(prior: GateThing, overrides: Partial<GateThing> = {}): GateThing { return nextOf(prior, overrides) }
+export function nextGateOf(prior: GateRecord, overrides: Partial<GateRecord> = {}): GateRecord { return nextOf(prior, overrides) }
 
 /** `lifepath` with its own lifeseq moved on by `lives`. */
 export function lifepathPlus(lifepath: Lifepath, lives: number): Lifepath {
@@ -84,31 +85,31 @@ export function lifepathPlus(lifepath: Lifepath, lives: number): Lifepath {
 }
 
 /** The tombstone of the live box `prior`: its next revision, in its next life, sealing an empty whisper, with no sidecar. */
-export function boxTombOf(prior: BoxThing, overrides: Partial<BoxThing> = {}): BoxThing {
-  const { sidecar: _sidecar, ...next } = nextOf(prior) as BoxThing & { sidecar?: unknown }
+export function boxTombOf(prior: BoxRecord, overrides: Partial<BoxRecord> = {}): BoxRecord {
+  const { sidecar: _sidecar, ...next } = nextOf(prior) as BoxRecord & { sidecar?: unknown }
   const lifepath = lifepathPlus(prior.lifepath, 1)
-  return { ...next, am: 'x', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), ...overrides } as BoxThing
+  return { ...next, am: 'x', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), ...overrides } as BoxRecord
 }
 
 /** The box reborn over the tombstone `prior`: its next revision, in its next life, born when it is written. */
-export function boxRebornOf(prior: BoxThing, overrides: Partial<BoxThing> = {}): BoxThing {
+export function boxRebornOf(prior: BoxRecord, overrides: Partial<BoxRecord> = {}): BoxRecord {
   const next     = nextOf(prior)
   const lifepath = lifepathPlus(prior.lifepath, 1)
   return { ...next, am: 'a', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), born_at: next.written_at, sidecar: {}, ...overrides }
 }
 
 /** The ask that births `record` (the main gate by default) over the shell it `cited` (a root's by default). */
-export function birthAskOf(record: Thing = gateThingOf(), cited: ThingCited = Shell.Cited): WriteAsk {
+export function birthAskOf(record: ThingRecord = gateThingOf(), cited: ThingCited = Shell.Cited): WriteAsk {
   return putAskOf({ cited, record, ifPresent: 'fail' })
 }
 
 /** The ask that puts `record` over the live Thing it `cited`, under the storage policies of `options`. */
-export function replaceAskOf<RecordT extends Thing>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAskDraft['options']): WriteAsk<RecordT> {
+export function replaceAskOf<RecordT extends ThingRecord>(cited: CitedOf<RecordT>, record: RecordT, options?: PutAskDraft['options']): WriteAsk<RecordT> {
   return putAskOf({ cited, record, ifAbsent: 'fail', ...(options && { options }) })
 }
 
 /** The ask that deletes the Thing it `cited` with the tombstone `record`. */
-export function delAskFor(cited: ThingCited, record: Thing): WriteAsk { return delAskOf({ cited, record }) }
+export function delAskFor(cited: ThingCited, record: ThingRecord): WriteAsk { return delAskOf({ cited, record }) }
 
 /** The ask that gets the main gate, answering null for none under `'nil'`. */
 export function getGateAskOf(ifAbsent: GetAsk['ifAbsent'] = 'nil'): GetAsk { return getAskAt('gate', ifAbsent) }

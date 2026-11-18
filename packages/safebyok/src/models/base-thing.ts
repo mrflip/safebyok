@@ -1,13 +1,13 @@
 import { Helpers } from 'safebyok-big/internals'
 import type { Banklabel, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
-import { type Thing, type ThingRecord, sparseOf } from '../shapes/shapes-thing'
+import { type Sparse, type ThingRecord, sparseOf } from '../shapes/shapes-thing'
 
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
 // subclass declares its own: `make(record, opts[, friend])`, which parses what it is given.
 /** A model of one revision of a stored Thing: its Thing fields are read-only props, and its record is private.
  * A subclass parses its record before calling `super`, and freezes itself last.
  */
-export abstract class BaseThing<RecordT extends Thing, ScopeT, StampT> implements ThingRecord {
+export abstract class BaseThing<RecordT extends ThingRecord, ScopeT, StampT> implements Sparse<ThingRecord> {
   // == [Props]: userid, banklabel, labelpath, label, fmt, lifepath, lifeseq, revtok, revseq, born_at, written_at, am, #record
 
   /** The user's id. With `banklabel` and `labelpath`, it says where this Thing is stored. */
@@ -16,7 +16,7 @@ export abstract class BaseThing<RecordT extends Thing, ScopeT, StampT> implement
   declare readonly labelpath:  Labelpath
   /** The last label of `labelpath`. */
   declare readonly label:      string
-  declare readonly fmt:        number
+  declare readonly fmt:        Sparse<ThingRecord>['fmt']
   /** The lifeseqs of this Thing's life and of each life above it, root first. */
   declare readonly lifepath:   Lifepath
   /** This Thing's life, as a lifeseq. A Thing born again has the next. */
@@ -29,7 +29,7 @@ export abstract class BaseThing<RecordT extends Thing, ScopeT, StampT> implement
   /** When this revision was written, in epoch milliseconds. */
   declare readonly written_at: EpochMillis
   /** `'a'` while live, `'x'` for a tombstone. */
-  declare readonly am:         ThingRecord['am']
+  declare readonly am:         Sparse<ThingRecord>['am']
 
   readonly #record: RecordT
   // --
