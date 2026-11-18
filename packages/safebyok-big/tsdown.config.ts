@@ -13,12 +13,13 @@ export default defineConfig({
   // `safebyok-big/browser` is its own entry, so the Argon2id derivers (and the hashing code under them) reach only a host that imports them.
   // `safebyok-big/utils` is its own entry, so a host that wants only `mash` pulls in none of the vault.
   // `safebyok-big/internals` is its own entry: the transitional seam the new `safebyok` core imports through.
+  // `safebyok-big/refusals/throwers` is its own entry too, so the new core's throwers module can re-export big's whole.
   // `safebyok-big/storage` is its own entry, so the contract a storage adapter is written against stays off the host's front door.
   // `safebyok-big/testing` is its own entry, so only a test that asks for it loads vitest. The entries
   // are a list so that `root` is honoured: given an object, tsdown takes the package's own directory
   // as the root and writes the modules under dist/src/. The testing entry builds from tests/, outside
   // `src`, so it is named in an object beside the list.
-  entry:      ['src/index.ts', 'src/browser.ts', 'src/utils.ts', 'src/dom/index.ts', 'src/internals.ts', 'src/storage/index.ts', { testing: 'tests/test-helpers.ts' }],
+  entry:      ['src/index.ts', 'src/browser.ts', 'src/utils.ts', 'src/dom/index.ts', 'src/internals.ts', 'src/refusals/throwers.ts', 'src/storage/index.ts', { testing: 'tests/test-helpers.ts' }],
   format:     ['esm', 'cjs'],
   // Browser first, but nothing here is browser-only: WebCrypto is the same global under Node.
   platform:   'neutral',

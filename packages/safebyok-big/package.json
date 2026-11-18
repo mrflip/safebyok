@@ -90,6 +90,11 @@
       "import": "./dist/internals.js",
       "require": "./dist/internals.cjs"
     },
+    "./refusals/throwers": {
+      "@safebyok/source": "./src/refusals/throwers.ts",
+      "import": "./dist/refusals/throwers.js",
+      "require": "./dist/refusals/throwers.cjs"
+    },
     "./storage": {
       "@safebyok/source": "./src/storage/index.ts",
       "import": "./dist/storage/index.js",
@@ -131,6 +136,9 @@
       "internals": [
         "./dist/internals.d.cts"
       ],
+      "refusals/throwers": [
+        "./dist/refusals/throwers.d.cts"
+      ],
       "storage": [
         "./dist/storage/index.d.cts"
       ],
@@ -159,6 +167,10 @@
       "./internals": {
         "import": "./dist/internals.js",
         "require": "./dist/internals.cjs"
+      },
+      "./refusals/throwers": {
+        "import": "./dist/refusals/throwers.js",
+        "require": "./dist/refusals/throwers.cjs"
       },
       "./storage": {
         "import": "./dist/storage/index.js",
