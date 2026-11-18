@@ -6,7 +6,7 @@ import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok
 import { AnswerNotMade } from '../phrases'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
-  type WriteAsk, birthPutsOf, checkedBirthBankAsk, checkedGetAsk, checkedListAsk, checkedWriteAsk, loggableAskOf, watchArgs,
+  type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf, watchArgs,
 } from './shapes-thing'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
@@ -92,7 +92,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** The Thing at `ask`'s scope ({@link VaultDB.tryGetThing}). */
   async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
     try {
-      const checked     = checkedGetAsk(ask)
+      const checked     = AskChecks.getAsk.parse(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doGetThing(checked) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'getThing', loggableAsk)
@@ -116,7 +116,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** The children of the Thing at `ask`'s scope ({@link VaultDB.tryListThings}). */
   async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
     try {
-      const checked     = checkedListAsk(ask)
+      const checked     = AskChecks.listAsk.parse(ask)
       const loggableAsk = loggableAskOf(checked)
       const actual      = await this.doListThings(checked)
       const beside      = { world: actual.world, ...trackedFieldOf(actual), parent: actual.parent, damaged_rows: actual.damaged_rows }

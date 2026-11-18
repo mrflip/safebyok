@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetAsk, checkedListAsk, checkedWriteAsk, delAskOf, getAskOf,
+  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, AskChecks, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf,
   isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isVoidSentinel,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
@@ -141,11 +141,11 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
   })
 })
 
-describe("checkedGetAsk(ask) and checkedListAsk(ask)", () => {
+describe("AskChecks.getAsk and AskChecks.listAsk", () => {
   it("accepts an ask of each kind", () => {
     for (const labelpath of ['bank', 'gate', 'gate/second', 'box', 'box/openai']) {
-      expect(checkedGetAsk(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
-      expect(checkedListAsk(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
+      expect(AskChecks.getAsk.parse(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
+      expect(AskChecks.listAsk.parse(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
     }
   })
 
@@ -161,11 +161,11 @@ describe("checkedGetAsk(ask) and checkedListAsk(ask)", () => {
   ] as const
 
   for (const [ask, blurb] of BadGetCases) {
-    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => checkedGetAsk(ask), 'bad_record') })
+    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => AskChecks.getAsk.parse(ask), 'bad_record') })
   }
 
   it("refuses a list ask that is a get", () => {
-    TH.expectSyncRefusal(() => checkedListAsk(TH.getAskAt('box')), 'bad_record')
+    TH.expectSyncRefusal(() => AskChecks.listAsk.parse(TH.getAskAt('box')), 'bad_record')
   })
 })
 
@@ -329,7 +329,7 @@ describe("the ask builders", () => {
     const tomb = TH.boxTombOf(box)
     TH.expectSyncRefusal(() => checkedWriteAsk(delAskOf({ cited: box, record: tomb, options: { policies: [] } } as never)), 'bad_record')
     TH.expectSyncRefusal(() => checkedWriteAsk(putAskOf({ cited: box, record: box, extra: 1 } as never)), 'bad_record')
-    TH.expectSyncRefusal(() => checkedGetAsk(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_record')
+    TH.expectSyncRefusal(() => AskChecks.getAsk.parse(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_record')
   })
 
   it("never throw: a record with no scope, or args that are not a bag, go to the verb as given", () => {

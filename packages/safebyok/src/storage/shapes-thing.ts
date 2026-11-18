@@ -366,7 +366,7 @@ export const KindChecks = {
 export function kindChecksOf(labelpath: Labelpath): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
-// == [Asks]: AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedGetAsk, checkedListAsk, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -383,8 +383,10 @@ function isPolicyOwn({ modelkind, options }: Flagged): boolean {
   return (options?.policies ?? []).every((policy) => owned.includes(policy))
 }
 
-/** The checks of a vaultDB ask, its records aside, and of a watch's scope and handlers. */
-const AskChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
+/** The checks of a vaultDB ask, its records aside, and of a watch's scope and handlers.
+ * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
+ */
+export const AskChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
   const modelkind       = oneof(thingkindVals)
   const thingWatchScope = thingScope.pick({ userid: true, banklabel: true })
   const thingOptions    = obj({
@@ -453,12 +455,6 @@ export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
 // Unspecified for a missing or damaged row: notes/wontfix.md.
 /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same', [RootBoxLabelpath]: BoxThing | 'same' }>
-
-/** Check a get `ask`, throwing `bad_record`, and return it typed. */
-export function checkedGetAsk(ask: unknown): GetAsk { return AskChecks.getAsk.parse(ask) }
-
-/** Check a list `ask`, throwing `bad_record`, and return it typed. */
-export function checkedListAsk(ask: unknown): ListAsk { return AskChecks.listAsk.parse(ask) }
 
 /** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {

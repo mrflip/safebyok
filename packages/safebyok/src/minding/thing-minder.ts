@@ -14,7 +14,7 @@ import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Userid } from '../storage/primitives'
 import {
   type GetAsk, type LoggableAsk, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  RootBoxLabelpath, checkedGetAsk, loggableAskOf, modelkindOf, shellOf, thingkindVals,
+  AskChecks, RootBoxLabelpath, loggableAskOf, modelkindOf, shellOf, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
@@ -350,7 +350,7 @@ export class ThingMinder {
   /** Demand that `ask` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. */
   #demandOwnAsk(ask: MinderGetAsk): void {
     minderTrack.parse(ask)
-    Validator.checkedConsistent(checkedGetAsk(ask), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_record' })
+    Validator.checkedConsistent(AskChecks.getAsk.parse(ask), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_record' })
   }
 
   /** Demand that `scoped` is a scope in this minder's bank, of its modelkind. */
