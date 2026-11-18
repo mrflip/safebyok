@@ -11,7 +11,7 @@ export { type AskUser, type CleartextsForGatingkind, type GatingSnapshot, type G
 export type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, Sealable } from './shapes/shapes-sealers'
 export type { Wayin } from './models/wayin'
 export type { BankScope, BankStamp } from './shapes/shapes-stamps'
-export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './shapes/primitives'
+export { type Banklabel, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'
 export {

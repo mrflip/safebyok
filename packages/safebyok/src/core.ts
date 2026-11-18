@@ -17,7 +17,7 @@ export {
   StampChecks,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
-export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './shapes/primitives'
+export { type Banklabel, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { BadNews, BadNewsHandler, BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxShell, BoxUnsealed, DeviceOpts, DeviceRecord, GetBoxAnswer, GetBoxAskDraft } from './shapes/shapes-bankish'
 export {
