@@ -313,10 +313,10 @@ export abstract class AdapterBankDB implements BankDB {
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void = noBadNews): () => void {
     return this.doWatch(SX.watchScope.parse(scope), ({ row, parent }) => {
-      const noticedRow = BX.noticedRow.safeParse(row)
-      const above      = (parent === undefined) ? null : BX.noticedParent.safeParse(parent)
-      if ((! noticedRow.success) || ((above !== null) && (! above.success))) { return }
-      onNotice({ act: (noticedRow.data.am === 'x') ? 'gotgone' : 'gotlive', val: noticedRow.data, parent: BX.noticeParentOf(noticedRow.data, above?.data ?? null) })
+      const noticedReport = BX.noticedRow.safeParse(row)
+      const parentReport  = (parent === undefined) ? null : BX.noticedParent.safeParse(parent)
+      if ((! noticedReport.success) || ((parentReport !== null) && (! parentReport.success))) { return }
+      onNotice({ act: (noticedReport.data.am === 'x') ? 'gotgone' : 'gotlive', val: noticedReport.data, parent: BX.noticeParentOf(noticedReport.data, parentReport?.data ?? null) })
     }, onBadNews)
   }
   // --
@@ -372,8 +372,8 @@ function goodOrThrow<ValT, ActT extends string, ParentT>(answer: Answer<ValT, Ac
 function refusalOf(thrown: unknown, oplabel: string, ask: unknown): VaultError {
   const refusal = storageRefusalOf(thrown)
   // An ask that failed its check has no metadata to trust: its refusal carries none.
-  const loggableAsk = BX.loggableAsk.safeParse(ask)
-  return Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableAsk.success ? loggableAsk.data : {} } })
+  const loggableReport = BX.loggableAsk.safeParse(ask)
+  return Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableReport.success ? loggableReport.data : {} } })
 }
 
 /** The size of `val`'s JSON text, in UTF-8 bytes. */

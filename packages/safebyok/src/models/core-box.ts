@@ -10,8 +10,8 @@ import { type BoxStamp, boxStamp } from '../shapes/shapes-stamps'
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
 
 // A sealer is handed to a lease as the class itself, so the class has statics alone.
-/** The {@link Sealer} for a box's whisper. Pass the class itself to a lease's `seal` or `unseal`.
- * The whisper unseals only within the revision it was sealed in. The sidecar is unencrypted and outside the seal: storage can change it, and the box still unseals.
+/** The record-level operations for the Box model.
+ *  Acts as the {@link Sealer} for a box's whisper. Pass the class itself to a lease's `seal` or `unseal`.
  */
 export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-class
   // == [What a seal takes]: donorPropsOf, publicPropsOf, secretPropsOf, tombstoneSecrets
@@ -39,11 +39,13 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
    * Its `written_at` is `publicProps.written_at`, or now.
    */
   static nextRevisionOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
-    const { sidecar: donorSidecar, ...thing } = boxSealable.parse(donorProps)
+    const { sidecar: donorSidecar, ...thing                        } = boxSealable.parse(donorProps)
     const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar === undefined) { throw sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
-    if (thing.am === 'a') { return { ...thing, ...revision } }
+    if (thing.am === 'a') {
+      return { ...thing, ...revision }
+    }
     return { ...thing, ...nextLifeOf(thing), ...revision, born_at: written_at }
   }
 
@@ -52,10 +54,11 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
    * A tombstone has no sidecar: the sidecar of `donorProps` is dropped, and a sidecar given in `publicProps` refuses.
    */
   static tombstoneOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxTombstone, BoxCleartexts> {
-    const { sidecar: _sidecar, ...thing } = Checks.liveBoxSealable.parse(donorProps)
+    const { sidecar: _sidecar, ...thing             } = Checks.liveBoxSealable.parse(donorProps)
     const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar !== undefined) { throw tombstoneSidecarGiven() }
-    return { ...thing, ...nextLifeOf(thing), revtok: Crypto.randomId(), revseq: thing.revseq + 1, am: 'x', written_at }
+    const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x' } as const
+    return { ...thing, ...nextLifeOf(thing), ...revision }
   }
   // --
 
@@ -108,9 +111,9 @@ function deserializeWhisper(text: string): CX.Whisper {
   } catch {
     throw Throwers.undecodedWhisper()
   }
-  const whisper = CX.whisper.safeParse(jsonVal)
-  if (! whisper.success) { throw Throwers.undecodedWhisper() }
-  return whisper.data
+  const whisperReport = CX.whisper.safeParse(jsonVal)
+  if (! whisperReport.success) { throw Throwers.undecodedWhisper() }
+  return whisperReport.data
 }
 // --
 

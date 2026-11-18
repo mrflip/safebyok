@@ -149,9 +149,9 @@ describe("Checkers", () => {
   })
 
   it("leaves safeParse and parseAsync Zod's own", async () => {
-    const checked = vaultScope.safeParse({ ...scope, vaultlabel: 'Main' })
-    expect(checked.success).to.be.false
-    expect(checked.error).to.be.instanceOf(Zod.ZodError)
+    const scopeReport = vaultScope.safeParse({ ...scope, vaultlabel: 'Main' })
+    expect(scopeReport.success).to.be.false
+    expect(scopeReport.error).to.be.instanceOf(Zod.ZodError)
     await expect(vaultScope.parseAsync({ ...scope, vaultlabel: 'Main' })).rejects.toThrow(Zod.ZodError)
   })
 

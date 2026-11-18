@@ -42,8 +42,8 @@ export class MemoryDeviceDB extends DeviceDB {
 
   protected doForget(asked: LeaseQuery): void {
     const ckey = leaseCkeyOf(leaseScopepathOf(asked))
-    const leaseRow = SX.leaseRow.safeParse(this.#leaserows.get(ckey)?.row)
-    if (leaseRow.success && (leaseRow.data.bank_tok === asked.bank_tok)) { this.#leaserows.delete(ckey) }
+    const storedReport = SX.leaseRow.safeParse(this.#leaserows.get(ckey)?.row)
+    if (storedReport.success && (storedReport.data.bank_tok === asked.bank_tok)) { this.#leaserows.delete(ckey) }
   }
 
   protected doListLeases(): RawLease[] {
@@ -55,9 +55,9 @@ export class MemoryDeviceDB extends DeviceDB {
   }
 
   protected doEnsureCachedDevice(made: DeviceRow): unknown {
-    const stored = this.#devicerows.get(deviceRowCkeyOf(made))
-    const deviceRow = SX.deviceRow.safeParse(stored)
-    const row = deviceRow.success ? { ...deviceRow.data, package_version: made.package_version } : made
+    const raw = this.#devicerows.get(deviceRowCkeyOf(made))
+    const storedReport = SX.deviceRow.safeParse(raw)
+    const row = storedReport.success ? { ...storedReport.data, package_version: made.package_version } : made
     this.#devicerows.set(deviceRowCkeyOf(made), structuredClone(row))
     return structuredClone(row)
   }

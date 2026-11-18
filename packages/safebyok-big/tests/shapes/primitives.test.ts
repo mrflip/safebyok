@@ -42,13 +42,13 @@ describe("label", () => {
   // label @example
   it("passes lowercase words, and refuses a label breaking three rules with one sentence", () => {
     expect(PX.label.safeParse('anthropic_api_key').success).to.be.true
-    const checked = PX.label.safeParse('0__b_')
-    expect(checked.success).to.be.false
-    expect(checked.error?.issues.map((issue) => issue.message)).to.deep.equal([Phrases.LabelShape])
+    const labelReport = PX.label.safeParse('0__b_')
+    expect(labelReport.success).to.be.false
+    expect(labelReport.error?.issues.map((issue) => issue.message)).to.deep.equal([Phrases.LabelShape])
   })
 
   it("says what is wrong and never quotes the label", () => {
-    const said = JSON.stringify([PX.label.safeParse('Secret_Label'), PX.label.safeParse(`secret${'x'.repeat(MaxLabelChars)}`)].map((checked) => checked.error?.issues.map((issue) => issue.message)))
+    const said = JSON.stringify([PX.label.safeParse('Secret_Label'), PX.label.safeParse(`secret${'x'.repeat(MaxLabelChars)}`)].map((report) => report.error?.issues.map((issue) => issue.message)))
     expect(said).to.include('starting with a letter and ending on a letter or digit')
     expect(said).to.include('<=40')
     expect(said.toLowerCase()).to.not.include('secret')
@@ -131,7 +131,7 @@ describe("user_id", () => {
 
   it("names its bound when it refuses, and never quotes the id", () => {
     const overlong = `alice@example.com${'u'.repeat(MaxUserIdChars)}`
-    const refusals = [PX.user_id.safeParse(overlong), PX.user_id.safeParse(''), PX.user_id.safeParse('alice smith')].map((checked) => JSON.stringify(checked.error?.issues.map((issue) => issue.message)))
+    const refusals = [PX.user_id.safeParse(overlong), PX.user_id.safeParse(''), PX.user_id.safeParse('alice smith')].map((report) => JSON.stringify(report.error?.issues.map((issue) => issue.message)))
     expect(refusals[0]).to.include('<=100')
     expect(refusals[1]).to.include("can't be empty")
     expect(refusals[2]).to.include('percent-encode')

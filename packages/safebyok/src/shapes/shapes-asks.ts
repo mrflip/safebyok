@@ -254,7 +254,7 @@ export type LoggableAsk = Readonly<Z.infer<typeof loggableAsk>>
 
 /** The loggable part of `ask`, or `{}` for an ask that does not parse. */
 export function loggableAskOf(ask: unknown): LoggableAsk {
-  const loggable = loggableAsk.safeParse(ask)
-  return loggable.success ? loggable.data : {}
+  const loggableReport = loggableAsk.safeParse(ask)
+  return loggableReport.success ? loggableReport.data : {}
 }
 // --

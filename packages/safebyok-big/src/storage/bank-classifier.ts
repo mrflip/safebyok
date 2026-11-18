@@ -212,8 +212,8 @@ function boxVaultActOf(ask: Pick<BoxQuery, 'bank_tok' | 'vault_tok'>, parent: Va
 /** The listed row `raw`, checked, or null when it fails its checks: a damaged listed row is set aside, not thrown. */
 function listedRowOf<RowT extends object>(rowCheck: Z.ZodType<RowT>, raw: unknown, address: object): RowT | null {
   if (! CX.isPlainBag(raw)) { throw Refuse.storageIssue() }
-  const row = rowCheck.safeParse(raw)
-  return row.success ? checkedConsistent(row.data, address, RowOfOtherAddress) : null
+  const rowReport = rowCheck.safeParse(raw)
+  return rowReport.success ? checkedConsistent(rowReport.data, address, RowOfOtherAddress) : null
 }
 // --
 

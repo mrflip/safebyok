@@ -161,17 +161,17 @@ export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: 
 /** The Thing listed at `scope`, checked, or null when it fails its checks: a damaged child is set aside, not thrown. */
 function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
-  const thing = kindChecksOf(scope.labelpath).stored.safeParse(raw)
-  return thing.success ? Validator.checkedConsistent(thing.data, scope, RowOfOtherScope) : null
+  const thingReport = kindChecksOf(scope.labelpath).stored.safeParse(raw)
+  return thingReport.success ? Validator.checkedConsistent(thingReport.data, scope, RowOfOtherScope) : null
 }
 
 /** The Thing in a notice from a watch on `bankScope`, checked. */
 export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   // The labelpath is the record's own; the bank is the watch's, so that a Thing of another bank refuses.
-  const scope = thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
-  if (! scope.success) { throw Throwers.storageIssue() }
-  return writtenThingOf(scope.data, raw)
+  const scopeReport = thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
+  if (! scopeReport.success) { throw Throwers.storageIssue() }
+  return writtenThingOf(scopeReport.data, raw)
 }
 
 /** The raw bank, main gate and root box a store fetched for a bank's birth, each null for none, and its {@link TrackedFetched}. */

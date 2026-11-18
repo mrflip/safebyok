@@ -57,10 +57,10 @@ export class Lease implements LeaseStamp {
   static make(record: Z.input<typeof leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
   private constructor(record: Z.input<typeof leaseRecord>, opts: LeaseOpts) {
-    const { record: recordC, opts: { bank } } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(bankStamp.parse(recordC), bank.stamp, { kind: 'damaged_lease' })
-    this.#record = recordC
-    Helpers.tattoo(this, leaseStamp.parse(recordC), { configurable: false })
+    const { record: recordChecked, opts: { bank } } = Checks.leaseMakeArgs.parse({ record, opts })
+    Validator.checkedConsistent(bankStamp.parse(recordChecked), bank.stamp, { kind: 'damaged_lease' })
+    this.#record = recordChecked
+    Helpers.tattoo(this, leaseStamp.parse(recordChecked), { configurable: false })
     this.#bank = opts.bank
     Object.freeze(this)
   }
@@ -112,10 +112,10 @@ export class Lease implements LeaseStamp {
   async unseal<RecordT extends ThingRecord, CleartextsT>(sealer: Sealers.Sealer<RecordT, CleartextsT>, record: RecordT): Promise<Sealers.UnsealedOf<RecordT, CleartextsT>> {
     Checks.sealer.parse(sealer)
     // The answer is built from the record as the sealer checks a stored one, never from the caller's object.
-    const recordC = sealer.recordOf(record, sealer.sealedOf(record))
-    const cleartexts = sealer.decode(await this.#openSealed(sealer, recordC))
+    const recordChecked = sealer.recordOf(record, sealer.sealedOf(record))
+    const cleartexts = sealer.decode(await this.#openSealed(sealer, recordChecked))
     // The spread's type is UnsealedOf's, which TypeScript cannot see through for a record of any kind.
-    return Object.freeze({ ...withoutSecrets(recordC), ...cleartexts }) as Sealers.UnsealedOf<RecordT, CleartextsT>
+    return Object.freeze({ ...withoutSecrets(recordChecked), ...cleartexts }) as Sealers.UnsealedOf<RecordT, CleartextsT>
   }
 
   /** Encrypt `cleartext` for `revision` under a fresh key wrapped under the bankKey, as a {@link Sealers.Sealed} with the sealer's tags. */

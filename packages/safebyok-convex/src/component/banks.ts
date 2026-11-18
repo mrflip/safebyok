@@ -232,13 +232,13 @@ export const tidyGone = mutation({
     const damagedlabels: Vaultlabel[] = []
     for (const vaultDoc of vaultDocs) {
       const { vaultlabel } = vaultDoc
-      const vault = BX.vaultRow.safeParse(vaultDoc.vault)
-      if (! vault.success) {
+      const vaultReport = BX.vaultRow.safeParse(vaultDoc.vault)
+      if (! vaultReport.success) {
         damagedlabels.push(vaultlabel)
-      } else if (vault.data.bank_tok !== bank_tok) {
+      } else if (vaultReport.data.bank_tok !== bank_tok) {
         await ctx.db.delete('safebyok_vaults', vaultDoc._id)
-      } else if (vault.data.am === 'a') {
-        lives.push(lifeOf({ ...ask, vaultlabel, bank_tok: vault.data.bank_tok, vault_tok: vault.data.vault_tok }))
+      } else if (vaultReport.data.am === 'a') {
+        lives.push(lifeOf({ ...ask, vaultlabel, bank_tok: vaultReport.data.bank_tok, vault_tok: vaultReport.data.vault_tok }))
       }
     }
     const liveCkeys = new Set(lives.map((life) => ckeyOfLife(life)))
@@ -267,9 +267,9 @@ export const watchRows = query({
     const vaultDocs = await listVaultDocs(ctx.db, scope)
     const boxes: { vaultlabel: Vaultlabel, boxlabel: Boxlabel, box: unknown }[] = []
     for (const { vaultlabel, vault } of vaultDocs) {
-      const vaultRecord = BX.vaultRecord.safeParse(vault)
-      if ((! vaultRecord.success) || (vaultRecord.data.bank_tok !== bank_tok)) { continue }
-      const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, lifeOf({ ...scope, vaultlabel, bank_tok: vaultRecord.data.bank_tok, vault_tok: vaultRecord.data.vault_tok })).collect()
+      const vaultReport = BX.vaultRecord.safeParse(vault)
+      if ((! vaultReport.success) || (vaultReport.data.bank_tok !== bank_tok)) { continue }
+      const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, lifeOf({ ...scope, vaultlabel, bank_tok: vaultReport.data.bank_tok, vault_tok: vaultReport.data.vault_tok })).collect()
       boxes.push(...boxDocs.map(({ boxlabel, box }) => ({ vaultlabel, boxlabel, box })))
     }
     return {
@@ -389,8 +389,8 @@ function ckeyOfLife({ vaultlabel, bank_tok, vault_tok }: Life): string { return 
 
 /** The `bank_tok` of `bankRaw` when it is a live bank row, else null. */
 function liveBankTokOf(bankRaw: unknown): BankTok | null {
-  const bank = BX.bankRecord.safeParse(bankRaw)
-  return bank.success ? bank.data.bank_tok : null
+  const bankReport = BX.bankRecord.safeParse(bankRaw)
+  return bankReport.success ? bankReport.data.bank_tok : null
 }
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in

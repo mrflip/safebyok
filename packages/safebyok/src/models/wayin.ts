@@ -16,8 +16,8 @@ export const PurposeForWayinkind = Object.freeze({
  * The bankKey unwraps only given the same context: any change, such as another `userid` or a forged `born_at`, prevents it.
  */
 export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateStamp, header: GX.WayinHeader): Uint8Array {
-  const wayinHeader = GX.wayinHeader.parse(header)
-  return Crypto.cipherCtx([Stamps.bankStamp.parse(bankStamp), Stamps.gateStamp.parse(gateStamp)], PurposeForWayinkind[wayinHeader.wayinkind], wayinHeader)
+  const headerChecked = GX.wayinHeader.parse(header)
+  return Crypto.cipherCtx([Stamps.bankStamp.parse(bankStamp), Stamps.gateStamp.parse(gateStamp)], PurposeForWayinkind[headerChecked.wayinkind], headerChecked)
 }
 // --
 

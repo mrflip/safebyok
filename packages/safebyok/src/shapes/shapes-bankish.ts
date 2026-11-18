@@ -43,8 +43,8 @@ export type GetBoxAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAb
  */
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 
-/** The answer of {@link Bank.tryGetBox}: the box, what `ifAbsent` gives when none is stored, or a refusal. */
-export type GetBoxAnswer<ValT> = GoodAnswer<ValT, EX.GotAct> | BadAnswer
+/** The answer of {@link Bank.tryGetBox}: the box, live or a tombstone; `VoidT` under `gotvoid`, when none is stored; or a refusal. */
+export type GetBoxAnswer<VoidT = null> = GoodAnswer<BoxThing, 'gotlive' | 'gotgone'> | GoodAnswer<VoidT, 'gotvoid'> | BadAnswer
 // --
 
 // == [The bank's making]: BankOpts, BirthOpts
