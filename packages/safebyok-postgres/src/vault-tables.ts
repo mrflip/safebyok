@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS safebyok_box_things (${ThingColumns}
   sidecar        jsonb NOT NULL,
   whisper_sealed jsonb NOT NULL,${ThingChecks}
   CHECK (labelpath IN ('box', 'box/' || label)),
+  CHECK (am = 'a' OR sidecar = '{}'::jsonb),
   CHECK (jsonb_typeof(sidecar) = 'object' AND jsonb_typeof(whisper_sealed) = 'object')
 );
 
