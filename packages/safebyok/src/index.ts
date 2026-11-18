@@ -4,6 +4,8 @@
 // `safebyok/storage` the vaultDB. What a host needs that
 // safebyok-big defines is re-exported from it, so that `VaultError` stays one class across both packages.
 export { Bank } from './models/bank'
+export { type Kinded, type LiveOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
+export { Thing } from './models/thing'
 export { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from './models/device'
 export { type BadNews, type BadNewsHandler, type BankAskDraft, type BankMakeRecord, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type GetBoxAnswer, type GetBoxAskDraft, BankishChecks } from './shapes/shapes-bankish'
 export type { Gate } from './models/gate'
@@ -17,8 +19,8 @@ export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphra
 export { type BadAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from './storage/vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
 export {
-  type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel,
-  BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, sparseOf, thingkindVals,
+  type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel,
+  BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export {
   type DelAskDraft, type PutAskDraft, type WorldRecord, AskChecks,

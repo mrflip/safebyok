@@ -1,9 +1,10 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BankRecord, type BoxRecord, type GateRecord, type ThingRecord, type VoidSentinel,
-  BoxChecks, Shell, ThingFormat, isGone, isTombstone, isVoidSentinel, isWholeRecord, sparseOf,
+  type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type ThingRecord, type VoidSentinel,
+  BoxChecks, Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import { type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
 import type { LiveOf, ShellOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
@@ -414,57 +415,6 @@ describe("the ask builders", () => {
   })
 })
 
-describe("isVoidSentinel(record)", () => {
-  it("is true of a shell, and false of a live record, a tombstone or a sparse record", () => {
-    const box = TH.boxThingOf()
-    for (const shell of [Shell.of(TH.GateScope), Shell.of(TH.BoxScope, TH.rootBoxOf())]) { expect(isVoidSentinel(shell)).to.be.true }
-    for (const record of [box, TH.boxTombOf(box), sparseOf(box)]) { expect(isVoidSentinel(record)).to.be.false }
-  })
-})
-
-describe("isWholeRecord(record)", () => {
-  it("is true of a whole record, live or tombstone, and of the void sentinel", () => {
-    const box = TH.boxThingOf()
-    for (const record of [box, TH.boxTombOf(box), Shell.of(TH.BoxScope, TH.rootBoxOf()), Shell.of(TH.GateScope)]) { expect(isWholeRecord(record)).to.be.true }
-  })
-
-  it("is false of a sparse record, live or tombstone", () => {
-    const box = TH.boxThingOf()
-    for (const record of [sparseOf(box), sparseOf(TH.boxTombOf(box))]) { expect(isWholeRecord(record)).to.be.false }
-  })
-})
-
-describe("isTombstone(record)", () => {
-  it("is true of a tombstone, whole or sparse, and of the void sentinel", () => {
-    const tombstone = TH.boxTombOf(TH.boxThingOf())
-    for (const record of [tombstone, sparseOf(tombstone), Shell.of(TH.BoxScope, TH.rootBoxOf()), Shell.of(TH.GateScope)]) { expect(isTombstone(record)).to.be.true }
-  })
-
-  it("is false of a live record, whole or sparse, or what is not a record", () => {
-    const box = TH.boxThingOf()
-    for (const val of [box, sparseOf(box), null, undefined, 'x']) { expect(isTombstone(val)).to.be.false }
-  })
-})
-
-describe("isGone(record)", () => {
-  it("is true of a deleted Thing's tombstone, whole or sparse", () => {
-    const tombstone = TH.boxTombOf(TH.boxThingOf())
-    for (const record of [tombstone, sparseOf(tombstone)]) { expect(isGone(record)).to.be.true }
-  })
-
-  it("is false of the void sentinel, a live record, whole or sparse, or what is not a record", () => {
-    const box = TH.boxThingOf()
-    for (const val of [Shell.of(TH.BoxScope, TH.rootBoxOf()), Shell.of(TH.GateScope), box, sparseOf(box), null, undefined, 'x']) { expect(isGone(val)).to.be.false }
-  })
-})
-
-describe("sparseOf(record)", () => {
-  it("keeps a Thing's fields and drops its body", () => {
-    const { sidecar: _sidecar, whisper_sealed: _sealed, ...thingFields } = TH.boxThingOf() as ReturnType<typeof TH.boxThingOf> & { sidecar: unknown }
-    expect(sparseOf(TH.boxThingOf())).to.deep.equal(thingFields)
-  })
-})
-
 describe("BoxChecks.sealable", () => {
   const shell = Object.freeze({
     ...TH.ThingBank, labelpath: 'box/openai', label: 'openai', fmt: ThingFormat, revtok: Shell.Cited.revtok, revseq: Shell.Cited.revseq, am: 'x',
@@ -473,9 +423,9 @@ describe("BoxChecks.sealable", () => {
 
   it("accepts a live box's, a tombstone's and the shell's Thing fields and sidecar, stripping the rest", () => {
     const box = TH.boxThingOf()
-    expect(BoxChecks.sealable.parse(box)).to.deep.equal({ ...sparseOf(box), sidecar: {} })
+    expect(BoxChecks.sealable.parse(box)).to.deep.equal({ ...Thing.sparseOf(box), sidecar: {} })
     const tomb = TH.boxTombOf(box)
-    expect(BoxChecks.sealable.parse(tomb)).to.deep.equal({ ...sparseOf(tomb), sidecar: {} })
+    expect(BoxChecks.sealable.parse(tomb)).to.deep.equal({ ...Thing.sparseOf(tomb), sidecar: {} })
     expect(BoxChecks.sealable.parse(shell)).to.deep.equal(shell)
   })
 
@@ -555,5 +505,15 @@ describe("LiveOf, TombstoneOf and ShellOf", () => {
     expectTypeOf<ShellOf<BoxRecord>['revtok']>().toEqualTypeOf<typeof SX.VoidRevisionTok>()
     expectTypeOf<ShellOf<GateRecord>['lifeseq']>().toEqualTypeOf<typeof Shell.VoidLifeseq>()
     expectTypeOf<VoidSentinel>().toEqualTypeOf<ShellOf<ThingRecord>>()
+  })
+})
+
+describe("AnyThingRecord", () => {
+  it("has the fields every kind has as they are, and each kind's own fields optional", () => {
+    expectTypeOf<AnyThingRecord['revseq']>().toEqualTypeOf<number>()
+    expectTypeOf<AnyThingRecord['fmt']>().toEqualTypeOf<typeof ThingFormat>()
+    expectTypeOf<AnyThingRecord['sidecar']>().toEqualTypeOf<BoxRecord['sidecar'] | undefined>()
+    expectTypeOf<AnyThingRecord['wayins']>().toEqualTypeOf<GateRecord['wayins'] | undefined>()
+    expectTypeOf<AnyThingRecord['label']>().toEqualTypeOf<string>()
   })
 })

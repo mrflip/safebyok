@@ -1,6 +1,7 @@
 /** The shapes of a Thing, the record every kind is stored as in a vaultDB, and the checks of each. */
 
-import { isEmptyObject, pick } from 'es-toolkit'
+import { isEmptyObject } from 'es-toolkit'
+import type { AllUnionFields } from 'type-fest'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
 import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
@@ -23,7 +24,7 @@ export const ThingFormat = 100_501
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: GenericChecks, vaultDBShape, PerKindChecks, BankChecks, GateChecks, BoxChecks, ThingChecks, ThingScope, ThingCited, StoredCited, Sealed, Wayins, Sparse, sparseOf
+// == [Thing]: GenericChecks, vaultDBShape, PerKindChecks, BankChecks, GateChecks, BoxChecks, ThingChecks, ThingScope, ThingCited, StoredCited, Sealed, Wayins, Sparse, AnyThingRecord
 
 // A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
 // and only its last may be void: a void lifepath is the void lifeseq under its parent's lifepath, or alone at a root.
@@ -274,6 +275,8 @@ export type GateRecord   = Readonly<Z.infer<typeof GateChecks.record>>
 export type BoxRecord    = Readonly<Z.infer<typeof BoxChecks.record>>
 /** Any Thing stored in a vaultDB. */
 export type ThingRecord  = BankRecord | GateRecord | BoxRecord
+/** Every field of every kind of Thing: those every kind has as they are, the rest optional, and each a union of its kinds' types. */
+export type AnyThingRecord = AllUnionFields<ThingRecord>
 /** One sealed part of a record, at `<part>_sealed`: a fresh key wrapped under the bankKey, the cleartext ciphered under that key, and the tags its unseal reads. */
 export type Sealed       = Readonly<Z.infer<typeof ThingChecks.sealed>>
 /** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin or null for none. */
@@ -281,11 +284,6 @@ export type Wayins       = Readonly<Z.infer<typeof GateChecks.wayins>>
 
 /** A record's Thing fields, without its body: what a listing returns for each Thing. */
 export type Sparse<RecordT extends Sparse<ThingRecord>> = Pick<RecordT, ThingFieldname>
-
-const ThingFieldnames = Object.keys(ThingChecks.sparse.shape) as ThingFieldname[]
-
-/** The Thing fields of `record`, without its body. */
-export function sparseOf<RecordT extends Sparse<ThingRecord>>(record: RecordT): Sparse<RecordT> { return pick(record, ThingFieldnames) }
 // --
 
 // == [Shells]: ShellChecks, VoidSentinel, Shell
@@ -399,54 +397,8 @@ export const Shell = Object.freeze({
 })
 // --
 
-// == [Reading records]: Tombstone, isVoidSentinel, isWholeRecord, isTombstone, isGone, isSparse, haveSameScope, cmpThings
+// == [Reading records]: Tombstone
 
 /** A tombstone of a RecordT, sparse or whole. */
 export type Tombstone<RecordT extends Sparse<ThingRecord>> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
-
-/** True when `record` is a void sentinel: its revseq is the shell's -1. */
-export function isVoidSentinel(record: Sparse<ThingRecord>): record is VoidSentinel {
-  if (! isTombstone(record)) { return false }
-  return record.revseq === SX.VoidRevisionSeq
-}
-
-// The void sentinel is a whole tombstone, though no record check accepts it: a store must never take a shell as a record.
-/** True when `record` is whole, with its body, and not sparse. The void sentinel is whole. */
-export function isWholeRecord(record: Sparse<ThingRecord>): record is ThingRecord {
-  return isVoidSentinel(record) || ThingChecks.ofLabelpath(record.labelpath).record.safeParse(record).success
-}
-
-// Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
-/** True when `record` is a tombstone, sparse or whole, the void sentinel among them. */
-export function isTombstone<RecordT extends ThingRecord>(record: unknown): record is Tombstone<RecordT> {
-  return tombstoneChecker.safeParse(record).success
-}
-/** What every tombstone has, sparse or whole: a Thing's scope and citation, marked deleted. */
-const tombstoneChecker = Validator.Checker(({ lit }) => ThingChecks.scopedCited.extend({ am: lit('x') }))
-
-/** True when `record` is the tombstone of a deleted Thing, sparse or whole: any tombstone but the void sentinel. */
-export function isGone<RecordT extends ThingRecord>(record: unknown): record is Tombstone<RecordT> {
-  return isTombstone(record) && (! isVoidSentinel(record))
-}
-
-/** True when `record` is live, and not whole. */
-export function isSparse(record: Sparse<ThingRecord>): boolean {
-  return (record.am === 'a') && (! isWholeRecord(record))
-}
-
-/** True when `ante` and `post` are at one labelpath of one bank. */
-export function haveSameScope(ante: ThingScope, post: ThingScope): boolean {
-  return (ante.labelpath === post.labelpath) && (ante.userid === post.userid) && (ante.banklabel === post.banklabel)
-}
-
-// The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0, and the parent's later
-// lifeseq orders it after. Lifeseqs are fixed-width base-32 digits, 0-9 then a-v, so lifepaths compare as strings, and
-// the shell's '-' sorts below them all.
-/** Compare two revisions: by life, then revision. Returns: positive (`post` newer), negative (`ante` newer), zero (the same).
- * The output is **not** restricted to -1, 0, 1: it may be any integer.
- */
-export function cmpThings(ante: Pick<ThingCited, 'lifepath' | 'revseq'>, post: Pick<ThingCited, 'lifepath' | 'revseq'>): number {
-  if (ante.lifepath !== post.lifepath) { return (post.lifepath > ante.lifepath) ? 1 : -1 }
-  return post.revseq - ante.revseq
-}
 // --

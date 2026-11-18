@@ -1,20 +1,27 @@
 import { exactOptional } from 'zod'
 import { CX, Clock, Crypto, StableJsonify, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type BoxRecord, type Sealed, BoxChecks } from '../shapes/shapes-thing'
+import { type BoxRecord, type Sealed, type ThingScope, BoxChecks } from '../shapes/shapes-thing'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, RevisionOf, SealTags, Sealable, Sealer, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BoxStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Lifeseq } from '../shapes/primitives'
 import * as Throwers from '../refusals/throwers'
+import { Thing } from './thing'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
 
-// A sealer is handed to a lease as the class itself, so the class has statics alone.
+// A sealer is handed to a lease as the class itself, so what a seal and an unseal call is static.
 /** The record-level operations for the Box model.
  *  Acts as the {@link Sealer} for a box's whisper. Pass the class itself to a lease's `seal` or `unseal`.
  */
-export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-class
+export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp> {
+  // == [Kind]: modelkind
+
+  /** A box's modelkind: the guards this class inherits answer for boxes alone. */
+  static override readonly modelkind = 'box'
+  // --
+
   // == [What a seal takes]: donorPropsOf, publicPropsOf, secretPropsOf, tombstoneSecrets
 
   /** The Thing fields and sidecar of `donorProps`, which may be a live box, a tombstone or the shell.
@@ -95,7 +102,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   }
   // --
 }
-Object.freeze(CoreBox satisfies Sealer<BoxRecord, BoxCleartexts>)
+Object.freeze(BaseBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
 // == [Helpers]: nextLifeOf, deserializeWhisper
 

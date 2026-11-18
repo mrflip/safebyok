@@ -11,7 +11,8 @@ import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
-import { type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks, cmpThings } from '../shapes/shapes-thing'
+import { type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { Thing } from '../models/thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../storage/vault-db'
 import {
@@ -208,7 +209,7 @@ export class ThingMinder {
     if (! answer.ok) { throw answer.err }
     const record = answer.val ?? this.#shellAt(ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
-    if ((prior !== undefined) && (cmpThings(prior.newest, record) < 0)) { throw Throwers.staleRead(ask) }
+    if ((prior !== undefined) && (Thing.cmp(prior.newest, record) < 0)) { throw Throwers.staleRead(ask) }
     return carOf(record)
   }
 

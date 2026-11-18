@@ -1,6 +1,6 @@
 import type { Consts } from 'safebyok-big/internals'
 import { Crypto, Validator } from 'safebyok-big/internals'
-import { BaseThing } from './base-thing'
+import { Thing } from './thing'
 import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
 import { type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -11,7 +11,7 @@ import * as Throwers from '../refusals/throwers'
 /** One revision of a bank's gate: its passphrase wayin, and its passkey wayin if it has one.
  * A gate verb makes the next revision as a new Gate; this one never changes.
  */
-export class Gate extends BaseThing<GateRecord, ThingScope, GateStamp> implements GateStamp {
+export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements GateStamp {
   // == [Props]: #bank, #main, #passkey0
 
   readonly #bank:     GateBank
@@ -80,6 +80,9 @@ export class Gate extends BaseThing<GateRecord, ThingScope, GateStamp> implement
 
   /** Always `'gate'`: marks this model for a {@link Consts.Modelkind} check. */
   get modelkind(): 'gate' { return 'gate' satisfies Consts.Modelkind }
+
+  /** A gate's modelkind: the guards this class inherits answer for gates alone. */
+  static override readonly modelkind = 'gate'
 }
 
 // == [Helpers]: wayinsOf

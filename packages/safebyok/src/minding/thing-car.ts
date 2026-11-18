@@ -2,10 +2,8 @@
 import * as TSQ from '@tanstack/query-core'
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import {
-  type Sparse, type ThingRecord, ThingChecks,
-  cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord,
-} from '../shapes/shapes-thing'
+import { type Sparse, type ThingRecord, ThingChecks } from '../shapes/shapes-thing'
+import { Thing } from '../models/thing'
 import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
 
 // == [Making cars]: carOf, bestCarOf, tagBestNewestSL, tagBestFullestSL, tagBestNewestRecordSL
@@ -15,9 +13,9 @@ import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
  */
 export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar<ThingRecord> {
   ThingChecks.scopedCited.parse(newest)
-  if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
-  if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
-  if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
+  if (Thing.isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
+  if (Thing.isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
+  if (Thing.isWhole(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
   if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
   ThingChecks.ofLabelpath(newest.labelpath).record.parse(fullest)
   return      Object.freeze(CarOfChecks.behindCar.parse({ liveness: 'behind', newest, fullest } as const))
@@ -32,8 +30,8 @@ export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<ThingRec
   demandCar(delivered, Phrases.NotACar)
   if (prior === undefined) { return delivered }
   demandCar(prior, Phrases.NotACar)
-  if (! haveSameScope(prior.newest, delivered.newest))     { return delivered }
-  if (prior.newest.lifepath !== delivered.newest.lifepath) { return (cmpThings(prior.newest, delivered.newest) > 0) ? delivered : prior }
+  if (! Thing.haveSameScope(prior.newest, delivered.newest))     { return delivered }
+  if (prior.newest.lifepath !== delivered.newest.lifepath) { return (Thing.cmp(prior.newest, delivered.newest) > 0) ? delivered : prior }
   const [newestTag,  newest]  = tagBestNewestSL(prior,  delivered)
   const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)
   if ((newestTag === 'prior') && (fullestTag === 'prior')) { return prior }
@@ -44,7 +42,7 @@ export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<ThingRec
 
 /** The newer of the two cars' newest records, tagged with its car. On a tie, `delivered`'s where it alone is full, else `prior`'s. */
 function tagBestNewestSL(prior: ThingCar<ThingRecord>, delivered: ThingCar<ThingRecord>): ['prior' | 'delivered', DeliverableThing] {
-  const cmp = cmpThings(prior.newest, delivered.newest)
+  const cmp = Thing.cmp(prior.newest, delivered.newest)
   if (cmp < 0) { return ['prior',     prior.newest] }
   if (cmp > 0) { return ['delivered', delivered.newest] }
   if (delivered.liveness !== 'full') { return ['prior',     prior.newest] }
@@ -61,7 +59,7 @@ function tagBestFullestSL(prior: ThingCar<ThingRecord>, delivered: ThingCar<Thin
 
 /** The newer of two records, tagged with its car. On a tie, `prior`'s. */
 function tagBestNewestRecordSL(prior: DeliverableThing, delivered: DeliverableThing): ['prior' | 'delivered', DeliverableThing] {
-  return (cmpThings(prior, delivered) <= 0) ? ['prior', prior] : ['delivered', delivered]
+  return (Thing.cmp(prior, delivered) <= 0) ? ['prior', prior] : ['delivered', delivered]
 }
 // --
 
@@ -89,18 +87,18 @@ function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing
 const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
   // Its records pass through as they are, so that a refinement can compare them by reference.
   const cited = custom<Sparse<ThingRecord>>((val) => ThingChecks.scopedCited.safeParse(val).success, Phrases.CarRecordShape)
-  const whole = custom<ThingRecord>((val) => ThingChecks.scopedCited.safeParse(val).success && isWholeRecord(val as Sparse<ThingRecord>), Phrases.CarFullestShape)
+  const whole = custom<ThingRecord>((val) => ThingChecks.scopedCited.safeParse(val).success && Thing.isWhole(val as Sparse<ThingRecord>), Phrases.CarFullestShape)
   const fullCar   = obj({ liveness: lit('full'), newest: cited, fullest: whole })
     .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit)
   const behindCar = obj({ liveness: lit('behind'), newest: cited, fullest: whole })
-    .refine(({ newest }) => isSparse(newest), Phrases.CarNewestNotSparse)
-    .refine(({ newest, fullest }) => haveSameScope(newest, fullest) && (newest.lifepath === fullest.lifepath) && (fullest.revseq < newest.revseq), Phrases.CarBehindOfOtherRevision)
+    .refine(({ newest }) => Thing.isSparse(newest), Phrases.CarNewestNotSparse)
+    .refine(({ newest, fullest }) => Thing.haveSameScope(newest, fullest) && (newest.lifepath === fullest.lifepath) && (fullest.revseq < newest.revseq), Phrases.CarBehindOfOtherRevision)
   const bareCar   = obj({ liveness: lit('bare'), newest: cited, fullest: lit(undefined) })
-    .refine(({ newest }) => isSparse(newest), Phrases.CarNewestNotSparse)
+    .refine(({ newest }) => Thing.isSparse(newest), Phrases.CarNewestNotSparse)
   const goneCar   = obj({ liveness: lit('gone'), newest: cited, fullest: lit(null) })
-    .refine(({ newest }) => isGone(newest), Phrases.CarNewestNotGone)
+    .refine(({ newest }) => Thing.isGone(newest), Phrases.CarNewestNotGone)
   const voidCar   = obj({ liveness: lit('void'), newest: cited, fullest: lit(null) })
-    .refine(({ newest }) => isVoidSentinel(newest), Phrases.CarVoidNotShell)
+    .refine(({ newest }) => Thing.isVoidSentinel(newest), Phrases.CarVoidNotShell)
   const thingCar  = discrim('liveness', [fullCar, behindCar, bareCar, goneCar, voidCar])
   return { thingCar, fullCar, behindCar, bareCar, goneCar, voidCar }
 })
