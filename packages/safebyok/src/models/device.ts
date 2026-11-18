@@ -3,12 +3,12 @@ import type { Bank } from './bank'
 import { Gating, birthBank } from './gating'
 import { guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, deviceRecord } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, BankishChecks } from '../shapes/shapes-bankish'
 import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
-import { type BankScope, bankScope } from '../shapes/shapes-stamps'
+import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
-import { vaultDBShape } from '../shapes/shapes-thing'
+import { ThingChecks } from '../shapes/shapes-thing'
 
 // == [Defaults]: DefaultLeaseMillis
 
@@ -51,7 +51,7 @@ export class Device {
   // == [Getters]: scope, openGating, autolockMinutes
 
   /** The bank scope this device serves. */
-  get scope(): BankScope { return bankScope.parse(this) }
+  get scope(): BankScope { return StampChecks.bankScope.parse(this) }
 
   /** The gating open on this device, or null. */
   get openGating(): Gating | null { return this.#openGating }
@@ -207,9 +207,9 @@ function checkSecureContext(): void {
 const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   requestCleartext: fn<RequestCleartext>(),
   deviceMakeArgs: obj({
-    record: deviceRecord,
+    record: BankishChecks.deviceRecord,
     opts:   Validator.objCheck(() => ({
-      vaultDB:         vaultDBShape,
+      vaultDB:         ThingChecks.vaultDBShape,
       keyDeriver:      custom<Deriver.KeyDeriver>(),
       strengthChecker: custom<StrengthChecker>().optional(),
       logger:          custom<Logger.VaultLogger>().optional(),

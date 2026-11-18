@@ -12,13 +12,13 @@ import { noop } from 'es-toolkit'
 import { Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import { minderNotStarted, staleRead } from '../refusals/throwers'
 import type { Banklabel, Labelpath, Userid } from '../shapes/primitives'
-import { type Thing, type ThingScope, type VoidSentinel, RootBoxLabelpath, cmpThings, shellOf, thingScope, vaultDBShape } from '../shapes/shapes-thing'
+import { type Thing, type ThingScope, type VoidSentinel, RootBoxLabelpath, ThingChecks, cmpThings, shellOf } from '../shapes/shapes-thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../storage/vault-db'
 import {
   type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts, type QueryCacheOpts,
   type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type TsqStaleTime,
-  FixedQueryCacheOpts, minderFriend, minderGetOpts, minderLabelpath, minderListener, minderTryAtOpts, queryCacheOptsOrDefault,
+  FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
 
@@ -114,7 +114,7 @@ export class ThingMinder {
    */
   tryAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderTryAtOpts = {}): TSQAnswer<ThingAt<LabelpathT>> {
     try {
-      minderTryAtOpts.parse(opts)
+      MinderChecks.minderTryAtOpts.parse(opts)
       this.#demandReady()
       const scope = this.#demandOwnScope(scoped)
       if (opts.ifStale === 'refresh') { this.#backgroundRefresh(scope, opts) }
@@ -129,7 +129,7 @@ export class ThingMinder {
    * With no root car cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
    */
   async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<CarAt<LabelpathT>> {
-    minderGetOpts.parse(opts)
+    MinderChecks.minderGetOpts.parse(opts)
     this.#demandReady()
     return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
   }
@@ -139,7 +139,7 @@ export class ThingMinder {
    * Thing's car is `gone`, and answers from the cache.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
-    minderLabelpath.parse(labelpath)
+    MinderChecks.minderLabelpath.parse(labelpath)
     this.#demandReady()
     const answer = await this.#vaultDB.tryListThings(this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' }))
     if (! answer.ok) { throw answer.err }
@@ -151,7 +151,7 @@ export class ThingMinder {
 
   /** True when `scoped`'s car is missing or not timely. */
   isStaleAt(scoped: ThingScope, opts: MinderGetOpts = {}): boolean {
-    minderGetOpts.parse(opts)
+    MinderChecks.minderGetOpts.parse(opts)
     const carQuery = this.#tsqFind(this.#demandOwnScope(scoped))
     return (! isTimelyQuery(carQuery, opts.staleTime ?? this.#queryCacheOpts.staleTime))
   }
@@ -163,7 +163,7 @@ export class ThingMinder {
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
   listen(listener: (answer: TSQGotAnswer) => void): () => void {
-    minderListener.parse(listener)
+    MinderChecks.minderListener.parse(listener)
     return this.#tsq.getQueryCache().subscribe((event: unknown) => {
       if (! isUsefulTSQEvent(event)) { return }
       const answer = this.#answerOfTSQ(this.#askAt(this.#scopeOfQueryKey(event.query.queryKey)), {})
@@ -272,7 +272,7 @@ export class ThingMinder {
   /** The scope of `scoped`, demanding that it is in this minder's bank. */
   #demandOwnScope(scoped: ThingScope): ThingScope {
     // Its fields alone: an ask or a record passes, and is read as its scope.
-    return thingScope.parseConsistent(scoped, this.scope)
+    return ThingChecks.thingScope.parseConsistent(scoped, this.scope)
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
@@ -354,10 +354,10 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
 const Checks = Validator.Checkers('bad_record', ({ obj }) => ({
   minderMakeArgs: obj({
     opts: obj({
-      vaultDB:        vaultDBShape,
-      queryCacheOpts: queryCacheOptsOrDefault,
+      vaultDB:        ThingChecks.vaultDBShape,
+      queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
     }),
-    bank: minderFriend,
+    bank: MinderChecks.minderFriend,
   }),
 }))
 // --

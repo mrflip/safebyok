@@ -8,7 +8,7 @@ import { carOf } from '../../src/minding/thing-car'
 import { ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../src/shapes/primitives'
-import { type GateThing, type Thing, VoidLifeseq, boxSealable, isVoidSentinel, shellOf, sparseOf } from '../../src/shapes/shapes-thing'
+import { type GateThing, type Thing, VoidLifeseq, BoxChecks, isVoidSentinel, shellOf, sparseOf } from '../../src/shapes/shapes-thing'
 import { type GetAsk, getAskOf, listAskOf } from '../../src/shapes/shapes-asks'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -519,7 +519,7 @@ describe("ThingMinder.get", () => {
     expect(liveness).to.eq('void')
     expect(shell).to.deep.equal(shellOf(TH.BoxScope, TH.rootBoxOf()))
     expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/${VoidLifeseq}` })
-    expect(boxSealable.safeParse(shell).success).to.be.true
+    expect(BoxChecks.sealable.safeParse(shell).success).to.be.true
     const birth = TH.birthAskOf(TH.boxThingOf(), shell)
     await TH.expectGood(vaultDB.tryWriteThing(birth))
   })

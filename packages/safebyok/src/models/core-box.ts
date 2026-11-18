@@ -2,9 +2,9 @@ import { exactOptional } from 'zod'
 import { CX, Clock, Crypto, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { sidecarMissing, tombstoneSidecarGiven } from '../refusals/throwers'
-import { type BoxThing, type Sealed, boxSealable, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../shapes/shapes-thing'
+import { type BoxThing, type Sealed, BoxChecks, lifeseqOfLifenum, lifenumOfLifeseq } from '../shapes/shapes-thing'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from '../shapes/shapes-sealers'
-import { type BoxStamp, boxStamp } from '../shapes/shapes-stamps'
+import { type BoxStamp, StampChecks } from '../shapes/shapes-stamps'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
@@ -19,7 +19,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   /** The Thing fields and sidecar of `donorProps`, which may be a live box, a tombstone or the shell.
    * Every other field is dropped, including a whisper, sealed or not.
    */
-  static donorPropsOf(donorProps: Sealable<BoxRecord>): Sealable<BoxRecord> { return boxSealable.parse(donorProps) }
+  static donorPropsOf(donorProps: Sealable<BoxRecord>): Sealable<BoxRecord> { return BoxChecks.sealable.parse(donorProps) }
 
   /** The sidecar, `am` and `written_at` of `publicProps`. Refuses any other field. */
   static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps { return Checks.boxPublicProps.parse(publicProps) }
@@ -39,7 +39,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
    * Its `written_at` is `publicProps.written_at`, or now.
    */
   static nextRevisionOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
-    const { sidecar: donorSidecar, ...thing                        } = boxSealable.parse(donorProps)
+    const { sidecar: donorSidecar, ...thing                        } = BoxChecks.sealable.parse(donorProps)
     const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar === undefined) { throw sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
@@ -71,7 +71,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static readonly purposes = Object.freeze({ key: 'whisper_sealed.key_wrapped', cipher: 'whisper_sealed.ciphered' })
 
   /** The {@link BoxStamp} of `record`. Refuses the shell, which has no revision to seal. */
-  static stampOf(record: RevisionOf<BoxThing, BoxCleartexts>): BoxStamp { return boxStamp.parse(record) }
+  static stampOf(record: RevisionOf<BoxThing, BoxCleartexts>): BoxStamp { return StampChecks.boxStamp.parse(record) }
 
   /** The whisper of `cleartexts` as stable JSON, with its keys sorted. */
   static encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(Checks.boxCleartexts.parse(cleartexts).whisper) }
@@ -81,14 +81,14 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
 
   /** The sealed whisper of `record`, which must carry a box's tags. */
   static sealedOf(record: BoxThing): Sealed {
-    const { whisper_sealed } = boxThing.parse(record)
+    const { whisper_sealed } = BoxChecks.record.parse(record)
     if (! Validator.isConsistent(whisper_sealed, BoxTags)) { throw Throwers.undecodedWhisper() }
     return whisper_sealed
   }
 
   /** `next` with `whisper_sealed` added, checked as a stored box, and frozen. */
   static recordOf(next: RevisionOf<BoxThing, BoxCleartexts>, whisper_sealed: Sealed): BoxThing {
-    return Object.freeze(boxThing.parse({ ...next, whisper_sealed }))
+    return Object.freeze(BoxChecks.record.parse({ ...next, whisper_sealed }))
   }
   // --
 }
@@ -121,7 +121,7 @@ function deserializeWhisper(text: string): CX.Whisper {
 
 /** Checks for what a box's seal takes: a live sealable for a tombstone, and the public and secret props. */
 const Checks = Validator.Checkers('bad_record', ({ obj, oneof, epochMillis }) => ({
-  liveBoxSealable: boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
+  liveBoxSealable: BoxChecks.sealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
   // Strict, since a misspelt key in either bag would otherwise be dropped without a word.
   boxPublicProps:  obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
   boxCleartexts:   obj({ whisper: CX.whisper }).strict(),

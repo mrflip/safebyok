@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CoreBox } from '../../src/models/core-box'
 import * as Phrases from '../../src/phrases'
 import type { BoxCleartexts, BoxRecord, RevisionOf } from '../../src/shapes/shapes-sealers'
-import { boxThing, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
+import { BoxChecks, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -246,7 +246,7 @@ describe("CoreBox.sealedOf(record) and recordOf(next, sealed)", () => {
     const record = CoreBox.recordOf(liveRevisionOf(), Sealed)
     expect(record.whisper_sealed).to.deep.equal(Sealed)
     expect(Object.isFrozen(record)).to.be.true
-    expect(boxThing.parse(record)).to.deep.equal(record)
+    expect(BoxChecks.record.parse(record)).to.deep.equal(record)
     expect(CoreBox.sealedOf(record)).to.deep.equal(Sealed)
   })
 

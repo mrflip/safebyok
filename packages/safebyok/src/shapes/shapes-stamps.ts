@@ -2,57 +2,51 @@
 
 import type * as Z from 'zod'
 import { CX, GX, Phrases, Validator } from 'safebyok-big/internals'
-import { LabelpathOfOtherKind } from '../phrases'
-import { BoxThingFormat, ThingChecks, isLabelpathOfKind, thingRecord, wayins } from './shapes-thing'
+import { BoxChecks, BoxThingFormat, GateChecks, ThingChecks } from './shapes-thing'
 
-// == [The stamps]: bankScope, bankStamp, gateStamp, stampedGate, boxStamp, BankScope, BankStamp, GateStamp, StampedGate, BoxStamp
+// == [The stamps]: PlainChecks, BankScope, BankStamp, GateStamp, StampedGate, BoxStamp
 
-/** The checks of a bank's scope and stamp, a gate's stamp, a {@link StampedGate}, and a box's stamp.
- * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
- */
-export const { bankScope, bankStamp, gateStamp, stampedGate, boxStamp } = Validator.Checkers('bad_record', ({ obj, lit }) => {
-  const bankStamp = thingRecord.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
-  const gateStamp = thingRecord.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
+/** The checks of the bank's and gate's stamps and a box's stamp. */
+const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit }) => {
+  const bankStamp = ThingChecks.thingRecord.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
+  const gateStamp = ThingChecks.thingRecord.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
   return {
     bankScope:   ThingChecks.bankScope,
     bankStamp,
     gateStamp,
-    stampedGate: obj({ bankStamp, stamp: gateStamp, wayins }),
+    stampedGate: obj({ bankStamp, stamp: gateStamp, wayins: GateChecks.wayins }),
     // Every Thing field, so a box's revision and its record have the same stamp. The shell has no revision, and refuses.
-    boxStamp:    thingRecord.extend({
-      labelpath: thingRecord.shape.labelpath.refine((given) => isLabelpathOfKind(given, 'box'), LabelpathOfOtherKind),
+    boxStamp:    ThingChecks.thingRecord.extend({
+      labelpath: BoxChecks.labelpath,
       fmt:       lit(BoxThingFormat),
     }),
   }
 })
 
 /** A bank's scope: its user and its `banklabel`. */
-export type BankScope   = Z.infer<typeof bankScope>
+export type BankScope   = Z.infer<typeof StampChecks.bankScope>
 /** A bank's stamp: its scope, and the lifeseq and `born_at` of its life. Every ctx under the bank binds it first. */
-export type BankStamp   = Z.infer<typeof bankStamp>
+export type BankStamp   = Z.infer<typeof StampChecks.bankStamp>
 /** A gate's stamp: its scope, and the lifeseq and `born_at` of its life. A wayin's wrapped bankKey is bound to it. */
-export type GateStamp   = Z.infer<typeof gateStamp>
+export type GateStamp   = Z.infer<typeof StampChecks.gateStamp>
 /** A gate's stamp, its bank's stamp, and its wayins: what a proving of a stored wayin takes. */
-export type StampedGate = Z.infer<typeof stampedGate>
+export type StampedGate = Z.infer<typeof StampChecks.stampedGate>
 /** A box's stamp: its Thing fields, not its sidecar or its sealed whisper.
  * Its whisper's seal is bound to it: the whisper unseals only within the revision it was sealed in.
  */
-export type BoxStamp    = Z.infer<typeof boxStamp>
+export type BoxStamp    = Z.infer<typeof StampChecks.boxStamp>
 // --
 
-// == [The lease's forms]: LeaseFormat, leaseStamp, leaseRecord, LeaseStamp, LeaseSparse, LeaseRecord
+// == [The lease's forms]: LeaseFormat, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord
 
 /** The `fmt` a lease carries. */
 export const LeaseFormat = 7102
 
-/** The checks of a lease's stamp and its record.
- * The stamp cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
- * The record adds the leaseKey and the bankKey wrapped under it.
- */
-export const { leaseStamp, leaseRecord } = Validator.Checkers('bad_record', ({ obj, lit, custom, epochMillis, bank_key_lease_wrapped }) => {
+/** The checks of a lease's stamp and record. */
+const LeaseChecks = Validator.Checkers('bad_record', ({ obj, lit, custom, epochMillis, bank_key_lease_wrapped }) => {
   const leaseStamp  = obj({
-    fmt: lit(LeaseFormat), ...bankStamp.shape,
-    gate_labelpath: gateStamp.shape.labelpath, gate_lifeseq: gateStamp.shape.lifeseq, gate_revtok: thingRecord.shape.revtok,
+    fmt: lit(LeaseFormat), ...PlainChecks.bankStamp.shape,
+    gate_labelpath: PlainChecks.gateStamp.shape.labelpath, gate_lifeseq: PlainChecks.gateStamp.shape.lifeseq, gate_revtok: ThingChecks.thingRecord.shape.revtok,
     proved_at: epochMillis, wayinkind: GX.wayinkind,
   })
   const leaseRecord = leaseStamp.extend({
@@ -62,10 +56,18 @@ export const { leaseStamp, leaseRecord } = Validator.Checkers('bad_record', ({ o
   return { leaseStamp, leaseRecord }
 }, [CX])
 
-/** A lease's stamp: see {@link leaseStamp}. */
-export type LeaseStamp  = Z.infer<typeof leaseStamp>
+/** The checks of a bank's scope and stamp, a gate's stamp, a {@link StampedGate}, a box's stamp, and a lease's stamp and record.
+ * Anything carrying a stamp's fields passes, such as a Bank, a Gate or its Thing, and its other fields are dropped.
+ * The lease's stamp cites the gate the lease was granted under, and is bound into the wrap of its bankKey.
+ * The record adds the leaseKey and the bankKey wrapped under it.
+ * Also `LeaseFormat`, the `fmt` a lease carries.
+ */
+export const StampChecks = Object.freeze({ ...PlainChecks, ...LeaseChecks, LeaseFormat })
+
+/** A lease's stamp: see {@link StampChecks}. */
+export type LeaseStamp  = Z.infer<typeof StampChecks.leaseStamp>
 /** The parts of a lease that are safe to show: its {@link LeaseStamp}. */
 export type LeaseSparse = LeaseStamp
 /** A lease's record: its stamp, its leaseKey handle, and the bankKey wrapped under it. */
-export type LeaseRecord = Z.infer<typeof leaseRecord>
+export type LeaseRecord = Z.infer<typeof StampChecks.leaseRecord>
 // --

@@ -1,7 +1,7 @@
 import { HostErrorSanitizer } from 'safebyok-big'
 import { Consts, Errors, GX, Helpers, Phrases, Strength, Throwers } from 'safebyok-big/internals'
-import { type GuardedStrengthChecker, type StrengthChecker, strengthChecker } from '../shapes/shapes-gateish'
-import { type BankScope, bankScope } from '../shapes/shapes-stamps'
+import { type GuardedStrengthChecker, type StrengthChecker, GateishChecks } from '../shapes/shapes-gateish'
+import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 
 // == [The default]: DefaultStrengthChecker
 
@@ -28,10 +28,10 @@ const BlankVerdict: GX.PassphraseVerdict = Object.freeze({ strong: false, reason
  * Anything the checker throws is replaced by a refusal that keeps nothing of the throw.
  */
 export function guardStrengthChecker(hostChecker: StrengthChecker): GuardedStrengthChecker {
-  const host = strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
+  const host = GateishChecks.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })
   const check = async (passphrase: string, scope: BankScope): Promise<GX.PassphraseVerdict> => {
     // Frozen, so the host's checker can change nothing of what it is told.
-    const told = Object.freeze(bankScope.parse(scope))
+    const told = Object.freeze(StampChecks.bankScope.parse(scope))
     const typed = GX.passphraseCleartext.parse(passphrase)
     if (! typed.trim()) { return BlankVerdict }
     let answered: unknown

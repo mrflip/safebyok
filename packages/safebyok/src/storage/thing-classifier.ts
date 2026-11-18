@@ -7,7 +7,7 @@ import { policyRefusalOf } from './policies'
 import type { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type StoredCited, type Thing, type ThingCited, type ThingScope, KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
+  type StoredCited, type Thing, type ThingCited, type ThingScope, BankChecks, BoxChecks, GateChecks, MainGateLabelpath, RootBoxLabelpath, ThingChecks, isLabelpathOfKind, sparseOf,
 } from '../shapes/shapes-thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 
@@ -125,7 +125,7 @@ export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeAc
 
 const RowOfOtherScope = { kind: 'storage_issue', message: BigPhrases.rowOfOtherAddress } as const
 
-/** A check of a Thing stored: a kind's, from {@link KindChecks}, or a write's of its preconditions. */
+/** A check of a Thing stored: a kind's, from {@link ThingChecks}, or a write's of its preconditions. */
 type StoredCheck<RecordT extends object> = Readonly<{ parseConsistent: (raw: unknown, other: object, refusal: typeof RowOfOtherScope) => RecordT }>
 
 /** The Thing stored at `scope`, checked by `check`, or null for none. */
@@ -141,27 +141,27 @@ function writtenOf<RecordT extends object>(check: StoredCheck<RecordT>, { userid
 
 /** The part of the Thing stored at `scope` that a write's preconditions compare, checked, or null for none. The rest of the Thing is not read. */
 export function storedCitedOf(scope: ThingScope, raw: unknown): StoredCited | null { return storedOf(storedCitedChecker, scope, raw) }
-const storedCitedChecker = storedCited.refusingAs('damaged_row')
+const storedCitedChecker = ThingChecks.storedCited.refusingAs('damaged_row')
 
 /** The Thing stored at `scope`, checked, or null for none. */
-export function storedThingOf(scope: ThingScope, raw: unknown): Thing | null { return storedOf<Thing>(kindChecksOf(scope.labelpath).stored, scope, raw) }
+export function storedThingOf(scope: ThingScope, raw: unknown): Thing | null { return storedOf<Thing>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
 /** The Thing the store reports writing at `scope`, checked. */
-export function writtenThingOf(scope: ThingScope, raw: unknown): Thing { return writtenOf<Thing>(kindChecksOf(scope.labelpath).stored, scope, raw) }
+export function writtenThingOf(scope: ThingScope, raw: unknown): Thing { return writtenOf<Thing>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
 /** The three roots the store reports writing for a birth's `puts`, checked. */
 export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
   return {
-    bank: writtenOf(KindChecks.bank.stored, bankPut, written.bank),
-    gate: writtenOf(KindChecks.gate.stored, gatePut, written.gate),
-    root: writtenOf(KindChecks.box.stored,  rootPut, written.root),
+    bank: writtenOf(BankChecks.stored, bankPut, written.bank),
+    gate: writtenOf(GateChecks.stored, gatePut, written.gate),
+    root: writtenOf(BoxChecks.stored,  rootPut, written.root),
   }
 }
 
 /** The Thing listed at `scope`, checked, or null when it fails its checks: a damaged child is set aside, not thrown. */
 function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
-  const thingReport = kindChecksOf(scope.labelpath).stored.safeParse(raw)
+  const thingReport = ThingChecks.ofLabelpath(scope.labelpath).stored.safeParse(raw)
   return thingReport.success ? Validator.checkedConsistent(thingReport.data, scope, RowOfOtherScope) : null
 }
 
@@ -169,7 +169,7 @@ function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
 export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): Thing {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   // The labelpath is the record's own; the bank is the watch's, so that a Thing of another bank refuses.
-  const scopeReport = thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
+  const scopeReport = ThingChecks.thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
   if (! scopeReport.success) { throw Throwers.storageIssue() }
   return writtenThingOf(scopeReport.data, raw)
 }
@@ -184,8 +184,8 @@ export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?
 /** The world of the bank at `bankScope`, from its raw `fetched` bank and main gate; null where either is missing or fails its checks. */
 export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFetched): WorldRecord | null {
   try {
-    const bank     = storedOf(KindChecks.bank.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank)
-    const maingate = storedOf(KindChecks.gate.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched.maingate)
+    const bank     = storedOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank)
+    const maingate = storedOf(GateChecks.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched.maingate)
     return ((bank === null) || (maingate === null)) ? null : { ...bank, maingate }
   } catch { return null }
 }
@@ -220,9 +220,9 @@ function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
 export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched | undefined): { tracked?: Tracked } {
   if ((fetched === null) || (fetched === undefined)) { return {} }
   return { tracked: {
-    bank:                 trackedEntryOf(KindChecks.bank.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
-    [MainGateLabelpath]:  trackedEntryOf(KindChecks.gate.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched[MainGateLabelpath]),
-    [RootBoxLabelpath]:   trackedEntryOf(KindChecks.box.stored, { userid, banklabel, labelpath: RootBoxLabelpath }, fetched[RootBoxLabelpath]),
+    bank:                 trackedEntryOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
+    [MainGateLabelpath]:  trackedEntryOf(GateChecks.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched[MainGateLabelpath]),
+    [RootBoxLabelpath]:   trackedEntryOf(BoxChecks.stored, { userid, banklabel, labelpath: RootBoxLabelpath }, fetched[RootBoxLabelpath]),
   } }
 }
 
@@ -336,7 +336,7 @@ export function demandPolicies(ask: WriteAsk, raw: unknown): void {
   const why = policyRefusalOf(ask, storedWayinsChecker.parse(raw).wayins)
   if (why !== null) { throw gateIssue(storedThingOf(ask, raw), why) }
 }
-const storedWayinsChecker = storedWayins.refusingAs('damaged_row')
+const storedWayinsChecker = GateChecks.storedWayins.refusingAs('damaged_row')
 
 /** The answer to a birth the fetched roots pass or refuse, or null if the act tables let it write.
  * Over a live bank the answer is `passed`, with the three roots stored. Otherwise it is the first root's refusal.
@@ -345,9 +345,9 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
   const [bankPut, gatePut, rootPut] = puts
   // The bank's put passes over a live bank, whose gate and root must be stored with it.
   if (putActOf(bankPut, storedCitedOf(bankPut, fetched.bank)) === 'passed') {
-    const bank = storedOf(KindChecks.bank.stored, bankPut, fetched.bank)
-    const gate = storedOf(KindChecks.gate.stored, gatePut, fetched.gate)
-    const root = storedOf(KindChecks.box.stored,  rootPut, fetched.root)
+    const bank = storedOf(BankChecks.stored, bankPut, fetched.bank)
+    const gate = storedOf(GateChecks.stored, gatePut, fetched.gate)
+    const root = storedOf(BoxChecks.stored,  rootPut, fetched.root)
     if ((bank === null) || (gate === null) || (root === null)) { throw bankRootsMissing() }
     return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, things: { bank, gate, root }, ...trackedFieldOf(bankPut, fetched.tracked) }
   }

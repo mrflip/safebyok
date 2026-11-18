@@ -17,7 +17,7 @@ export const PurposeForWayinkind = Object.freeze({
  */
 export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateStamp, header: GX.WayinHeader): Uint8Array {
   const headerChecked = GX.wayinHeader.parse(header)
-  return Crypto.cipherCtx([Stamps.bankStamp.parse(bankStamp), Stamps.gateStamp.parse(gateStamp)], PurposeForWayinkind[headerChecked.wayinkind], headerChecked)
+  return Crypto.cipherCtx([Stamps.StampChecks.bankStamp.parse(bankStamp), Stamps.StampChecks.gateStamp.parse(gateStamp)], PurposeForWayinkind[headerChecked.wayinkind], headerChecked)
 }
 // --
 

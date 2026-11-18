@@ -7,11 +7,10 @@ import { bornAtNotNow, lifepathNotKept, lifeseqNotNext, opNotOfRecord, recordOfO
 import type { Labelpath } from './primitives'
 import {
   type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, type ThingScope, type Thingkind,
-  KindChecks, MainGateLabelpath, RootBoxLabelpath, ShellCited, bankCited, bankThing, boxCited, boxThing, gateCited, gateThing, leadingLifeseqsOf, lifenumOfLifeseq, lifeseqOfLifepath,
-  modelkindOf, thingCited, thingRecord, thingScope, thingkindVals,
+  BankChecks, BoxChecks, GateChecks, MainGateLabelpath, RootBoxLabelpath, ShellCited, ThingChecks, leadingLifeseqsOf, lifenumOfLifeseq, lifeseqOfLifepath, modelkindOf,
 } from './shapes-thing'
 
-// == [Asks]: AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -24,31 +23,29 @@ function isDelFixed({ op, ifAbsent, ifPresent, options }: Flagged): boolean {
 }
 /** True when each storage policy an ask names is one its kind has. */
 function isPolicyOwn({ modelkind, options }: Flagged): boolean {
-  const owned: readonly string[] = KindChecks[modelkind].policies
+  const owned: readonly string[] = ThingChecks.byKind[modelkind].policies
   return (options?.policies ?? []).every((policy) => owned.includes(policy))
 }
 
-/** The checks of a vaultDB ask, its records aside, and of a watch's scope and handlers.
- * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
- */
-export const AskChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
-  const modelkind       = oneof(thingkindVals)
-  const thingWatchScope = thingScope.pick({ userid: true, banklabel: true })
+/** The checks of an ask, a watch's scope and its arguments. */
+const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
+  const modelkind       = oneof(ThingChecks.thingkindVals)
+  const thingWatchScope = ThingChecks.thingScope.pick({ userid: true, banklabel: true })
   const thingOptions    = obj({
     /** The storage policies the write must keep, each over the Thing stored. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
-  const trackPair       = obj({ revseq: thingRecord.shape.revseq, lifepath: thingRecord.shape.lifepath }).strict()
+  const trackPair       = obj({ revseq: ThingChecks.thingRecord.shape.revseq, lifepath: ThingChecks.thingRecord.shape.lifepath }).strict()
   const trackShape      = obj({ bank: trackPair, [MainGateLabelpath]: trackPair, [RootBoxLabelpath]: trackPair }).strict()
   const track           = trackShape.optional()
   return {
     thingOptions,
     trackShape,
-    getAsk:          thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
+    getAsk:          ThingChecks.thingScope.extend({ op: lit('get'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
-    listAsk:         thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
+    listAsk:         ThingChecks.thingScope.extend({ op: lit('list'), modelkind, ifAbsent: SX.ifAbsent, track }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn),
-    writeAsk:        thingScope.extend({
+    writeAsk:        ThingChecks.thingScope.extend({
       op: oneof(['put', 'del']), modelkind, cited: unk, record: unk, ifAbsent: SX.putIfAbsent, ifPresent: SX.ifPresent, options: thingOptions.optional(), track,
     }).strict()
       .refine(isModelkindOwn, Phrases.ModelkindNotOwn)
@@ -59,8 +56,35 @@ export const AskChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk,
     watchArgs:       obj({ scope: thingWatchScope, onNotice: fn(), onBadNews: fn() }),
   }
 })
-/** The checks of a watch's scope (a bank) and of its arguments. */
-export const { thingWatchScope, watchArgs, trackShape } = AskChecks
+
+/** The part of an ask that is safe to log: its scope, its flags, and what each record cites, never a gate's wayins.
+ * Each field is optional, so a refusal of a malformed ask still carries the sound part of it.
+ */
+const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => {
+  const citedFields = ThingChecks.thingCited.partial()
+  const trackFields = obj({ revseq: ThingChecks.thingRecord.shape.revseq, lifepath: ThingChecks.thingRecord.shape.lifepath }).partial()
+  return {
+    op:        oneof(['get', 'list', 'put', 'del', 'birth']).optional(),
+    modelkind: oneof(ThingChecks.thingkindVals).optional(),
+    userid:    user_id.optional(),
+    banklabel: label.optional(),
+    labelpath: ThingChecks.thingScope.shape.labelpath.optional(),
+    ifAbsent:  SX.anyIfAbsent.optional(),
+    ifPresent: SX.ifPresent.optional(),
+    options:   obj({ policies: arr(oneof(EX.storagePolicyVals)) }).optional(),
+    cited:     citedFields.optional(),
+    record:    citedFields.optional(),
+    bank:      citedFields.optional(),
+    gate:      citedFields.optional(),
+    root:      citedFields.optional(),
+    track:     obj({ bank: trackFields, [MainGateLabelpath]: trackFields, [RootBoxLabelpath]: trackFields }).partial().optional(),
+  }
+}, 'bad_record')
+
+/** The checks of a vaultDB ask, its records aside, of a watch's scope and handlers, and of the part of an ask that is safe to log.
+ * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
+ */
+export const AskChecks = Object.freeze({ ...RawChecks, loggableAsk })
 
 /** The revseq and lifepath the ask's sender has of its bank, its main gate and its root box. The answer's `tracked` says, for each, whether it is still the one stored. */
 export type Track           = Readonly<Z.infer<typeof AskChecks.trackShape>>
@@ -92,7 +116,7 @@ export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk
 /** The three puts of a bank's birth, one for each root. */
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */
-export type ThingWatchScope = Readonly<Z.infer<typeof thingWatchScope>>
+export type ThingWatchScope = Readonly<Z.infer<typeof AskChecks.thingWatchScope>>
 /** A bank's record: its Thing. */
 export type BankRecord      = BankThing
 /** The `world` of a vaultDB answer: the bank's record, with its main gate's Thing as `maingate`. */
@@ -111,15 +135,15 @@ export function checkedWriteAsk(ask: unknown): WriteAsk {
 
 /** Check the records of `ask` by the kind its modelkind names. Its flags are already checked. */
 function withRecordsChecked({ cited, record, ...flags }: Z.infer<typeof AskChecks.writeAsk>): WriteAsk {
-  if (flags.modelkind === 'bank') { return { ...flags, modelkind: 'bank', cited: bankCited.parse(cited), record: bankThing.parse(record) } }
-  if (flags.modelkind === 'gate') { return { ...flags, modelkind: 'gate', cited: gateCited.parse(cited), record: gateThing.parse(record) } }
-  return { ...flags, modelkind: 'box', cited: boxCited.parse(cited), record: boxThing.parse(record) }
+  if (flags.modelkind === 'bank') { return { ...flags, modelkind: 'bank', cited: BankChecks.cited.parse(cited), record: BankChecks.record.parse(record) } }
+  if (flags.modelkind === 'gate') { return { ...flags, modelkind: 'gate', cited: GateChecks.cited.parse(cited), record: GateChecks.record.parse(record) } }
+  return { ...flags, modelkind: 'box', cited: BoxChecks.cited.parse(cited), record: BoxChecks.record.parse(record) }
 }
 
 /** Check a birth `ask`: each of its three records, as the put {@link birthPutsOf} makes of it. Throws `bad_record`, and returns it typed. */
 export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
   const { bank, gate, root, ...flags } = AskChecks.birthBankAsk.parse(ask)
-  const birthBankAsk = { ...flags, bank: bankThing.parse(bank), gate: gateThing.parse(gate), root: boxThing.parse(root) }
+  const birthBankAsk = { ...flags, bank: BankChecks.record.parse(bank), gate: GateChecks.record.parse(gate), root: BoxChecks.record.parse(root) }
   for (const put of birthPutsOf(birthBankAsk)) { checkedWriteAsk(put) }
   return birthBankAsk
 }
@@ -223,38 +247,14 @@ function trackGiven(track: unknown): { track?: unknown } { return (track === und
 function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typeof labelpath === 'string') ? modelkindOf(labelpath) : undefined }
 // --
 
-// == [Loggable asks]: loggableAsk, LoggableAsk, loggableAskOf
-
-/** The part of an ask that is safe to log: its scope, its flags, and what each record cites, never a gate's wayins.
- * Each field is optional, so a refusal of a malformed ask still carries the sound part of it.
- */
-export const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => {
-  const citedFields = thingCited.partial()
-  const trackFields = obj({ revseq: thingRecord.shape.revseq, lifepath: thingRecord.shape.lifepath }).partial()
-  return {
-    op:        oneof(['get', 'list', 'put', 'del', 'birth']).optional(),
-    modelkind: oneof(thingkindVals).optional(),
-    userid:    user_id.optional(),
-    banklabel: label.optional(),
-    labelpath: thingScope.shape.labelpath.optional(),
-    ifAbsent:  SX.anyIfAbsent.optional(),
-    ifPresent: SX.ifPresent.optional(),
-    options:   obj({ policies: arr(oneof(EX.storagePolicyVals)) }).optional(),
-    cited:     citedFields.optional(),
-    record:    citedFields.optional(),
-    bank:      citedFields.optional(),
-    gate:      citedFields.optional(),
-    root:      citedFields.optional(),
-    track:     obj({ bank: trackFields, [MainGateLabelpath]: trackFields, [RootBoxLabelpath]: trackFields }).partial().optional(),
-  }
-}, 'bad_record')
+// == [Loggable asks]: LoggableAsk, loggableAskOf
 
 /** The part of a vaultDB ask that is safe to log. */
-export type LoggableAsk = Readonly<Z.infer<typeof loggableAsk>>
+export type LoggableAsk = Readonly<Z.infer<typeof AskChecks.loggableAsk>>
 
 /** The loggable part of `ask`, or `{}` for an ask that does not parse. */
 export function loggableAskOf(ask: unknown): LoggableAsk {
-  const loggableReport = loggableAsk.safeParse(ask)
+  const loggableReport = AskChecks.loggableAsk.safeParse(ask)
   return loggableReport.success ? loggableReport.data : {}
 }
 // --

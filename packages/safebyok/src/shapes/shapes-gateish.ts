@@ -10,8 +10,8 @@ import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
 import type { guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
-import { type BankScope, type BankStamp, type GateStamp, bankStamp, gateStamp } from './shapes-stamps'
-import { thingRecord } from './shapes-thing'
+import { type BankScope, type BankStamp, type GateStamp, StampChecks } from './shapes-stamps'
+import { ThingChecks } from './shapes-thing'
 
 // == [The gating's forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
 
@@ -73,20 +73,21 @@ export interface GateOpts {
 }
 // --
 
-// == [What a proving is handed]: gateRevisionedStamp, provingDevice, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
+// == [What a proving is handed]: RawChecks, leaseBank, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
 
-/** The checks of a {@link GateRevisionedStamp} and a {@link ProvingDevice}. */
-export const { gateRevisionedStamp, provingDevice } = Validator.Checkers('bad_record', ({ custom }) => ({
+/** The checks of what a lease and a proving are handed. */
+const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => ({
+  leaseBank:           obj({ stamp: StampChecks.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
-  gateRevisionedStamp: gateStamp.extend(thingRecord.pick({ revtok: true }).shape),
+  gateRevisionedStamp: StampChecks.gateStamp.extend(ThingChecks.thingRecord.pick({ revtok: true }).shape),
   provingDevice:       GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected) }),
 }))
 
 /** A {@link GateStamp} with the `revtok` of one revision of the gate: the revision a lease is granted under. */
-export type GateRevisionedStamp = Z.infer<typeof gateRevisionedStamp>
+export type GateRevisionedStamp = Z.infer<typeof GateishChecks.gateRevisionedStamp>
 
 /** What a proving is given of its device: the wrapped key deriver and strength checker, and the device's token. */
-export type ProvingDevice = Z.infer<typeof provingDevice>
+export type ProvingDevice = Z.infer<typeof GateishChecks.provingDevice>
 
 /** The host's key deriver, wrapped by {@link guardKeyDeriver}. */
 export type GuardedKeyDeriver = ProvingDevice['keyDeriver']
@@ -107,12 +108,7 @@ export interface ProvingOpts {
 }
 // --
 
-// == [What a lease is handed]: leaseBank, LeaseBank, SecretFieldname, LeaseOpts
-
-/** The check of a {@link LeaseBank}. */
-export const { leaseBank } = Validator.Checkers('bad_record', ({ obj, fn, bool }) => ({
-  leaseBank: obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
-}))
+// == [What a lease is handed]: LeaseBank, SecretFieldname, LeaseOpts
 
 /** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
@@ -127,7 +123,7 @@ export interface LeaseOpts {
 }
 // --
 
-// == [Strength]: StrengthChecker, GuardedStrengthChecker, strengthChecker
+// == [Strength]: StrengthChecker, GuardedStrengthChecker, StrengthChecks, GateishChecks
 
 /** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link GX.PassphraseVerdict}.
  * It is given the passphrase as typed, and the bank's scope, `{ userid, banklabel }`: words a guesser who knows the user tries first.
@@ -164,7 +160,12 @@ export type GuardedStrengthChecker = {
 }
 
 /** The check of a host's {@link StrengthChecker}. */
-export const { strengthChecker } = Validator.Checkers('bad_record', ({ custom }) => ({
+const StrengthChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, BigPhrases.StrengthCheckerShape),
 }))
+
+/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice} and a host's {@link StrengthChecker}.
+ * Also `gatingkindVals`, the kinds of gating.
+ */
+export const GateishChecks = Object.freeze({ ...RawChecks, ...StrengthChecks, gatingkindVals })
 // --

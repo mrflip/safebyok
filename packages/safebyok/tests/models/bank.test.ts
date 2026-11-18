@@ -7,7 +7,7 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/shapes/shapes-sealers'
 import type { Lifeseq } from '../../src/shapes/primitives'
-import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, VoidLifeseq, boxThing, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
+import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, VoidLifeseq, BoxChecks, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -292,7 +292,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     expect(box.sidecar).to.deep.equal(TH.Sidecar)
     expect(box.whisper_sealed).to.include({ codectag: 'json_v1', schematag: 'whisper_v1' })
     expect(JSON.stringify(box)).to.not.include('sk-test-0000')
-    expect(boxThing.parse(box)).to.deep.equal(box)
+    expect(BoxChecks.record.parse(box)).to.deep.equal(box)
   })
 
   it("unseals the box's whisper in place of its sealed one", async () => {
@@ -502,7 +502,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     expect(tombstone.revtok).to.not.eq(box.revtok)
     expect(tombstone).to.not.have.property('sidecar')
     expect(tombstone.whisper_sealed).to.include({ codectag: 'json_v1', schematag: 'whisper_v1' })
-    expect(boxThing.parse(tombstone)).to.deep.equal(tombstone)
+    expect(BoxChecks.record.parse(tombstone)).to.deep.equal(tombstone)
   })
 
   it("writes the tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {

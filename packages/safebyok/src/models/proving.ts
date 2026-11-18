@@ -2,7 +2,7 @@ import type { Consts, Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { Lease } from './lease'
-import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, gateRevisionedStamp, leaseBank, provingDevice } from '../shapes/shapes-gateish'
+import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, StampedGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
 import { Wayin, wayinCtxOf } from './wayin'
@@ -95,7 +95,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
     Validator.checkedConsistent(bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     Validator.checkedConsistent(cited, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     const granted = {
-      fmt: Stamps.LeaseFormat, ...bankStamp, gate_labelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
+      fmt: Stamps.StampChecks.LeaseFormat, ...bankStamp, gate_labelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
     } as const
     const bankKey = await this.#unwrapBankKey()
     const leaseKey = await Crypto.makeLeaseKey()
@@ -315,12 +315,12 @@ async function passphraseKeyOf(keyDeriver: GuardedKeyDeriver, passphrase: GX.Pas
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   return {
     wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), Phrases.NovelOrProvingExpected),
-    provingLeaseArgs:     obj({ bank: leaseBank, gate: gateRevisionedStamp }),
-    passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
-    passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
-    passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate, device: provingDevice }),
-    passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.stampedGate }),
-    strengthArgs:         GX.strengthArgs.extend({ scope: Stamps.bankScope, device: provingDevice }),
+    provingLeaseArgs:     obj({ bank: GateishChecks.leaseBank, gate: GateishChecks.gateRevisionedStamp }),
+    passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.StampChecks.bankStamp, gateStamp: Stamps.StampChecks.gateStamp, device: GateishChecks.provingDevice }),
+    passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.StampChecks.bankStamp, gateStamp: Stamps.StampChecks.gateStamp, device: GateishChecks.provingDevice }),
+    passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.StampChecks.stampedGate, device: GateishChecks.provingDevice }),
+    passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.StampChecks.stampedGate }),
+    strengthArgs:         GX.strengthArgs.extend({ scope: Stamps.StampChecks.bankScope, device: GateishChecks.provingDevice }),
   }
 })
 // --

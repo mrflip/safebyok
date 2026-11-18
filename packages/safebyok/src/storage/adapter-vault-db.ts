@@ -1,11 +1,12 @@
 /** The `AdapterVaultDB` base class: a store extends it by writing the `do*` calls. */
 
 import { noop } from 'es-toolkit'
-import { EX, Errors, Outcome, Throwers, type Helpers } from 'safebyok-big/internals'
+import type * as Z from 'zod'
+import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
 import { answerNotMade } from '../refusals/throwers'
-import { type Thing, type AdapterVaultDBOpts, adapterVaultDBOpts, isGone } from '../shapes/shapes-thing'
+import { type Thing, isGone } from '../shapes/shapes-thing'
 import {
-  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf, watchArgs,
+  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
@@ -53,7 +54,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Throws `bad_record` for opts it does not know. */
   constructor(opts: AdapterVaultDBOpts = {}) {
-    const { doNotifyTracked = true } = adapterVaultDBOpts.parse(opts)
+    const { doNotifyTracked = true } = Checks.adapterVaultDBOpts.parse(opts)
     this.#doNotifyTracked = doNotifyTracked
   }
   // --
@@ -137,7 +138,7 @@ export abstract class AdapterVaultDB implements VaultDB {
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
-    const { scope: bankScope } = watchArgs.parse({ scope, onNotice, onBadNews })
+    const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
     const feed: Feed = { scope: bankScope, receive: ({ record, world }) => {
       let val: Thing
       try { val = watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
@@ -227,3 +228,17 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
   // --
 }
+
+// == [Checks]: Checks
+
+/** The checks of the options of a vaultDB that extends {@link AdapterVaultDB}. */
+const Checks = Validator.Checkers('bad_record', ({ obj, bool }) => ({
+  adapterVaultDBOpts: obj({
+    /** False to notify no watch of the Things in an answer's `tracked` ({@link AdapterVaultDB.notifyTrackedRecords}). Default true. */
+    doNotifyTracked: bool.optional(),
+  }).strict(),
+}))
+
+/** The options of a vaultDB that extends {@link AdapterVaultDB}. */
+export type AdapterVaultDBOpts = Readonly<Z.infer<typeof Checks.adapterVaultDBOpts>>
+// --

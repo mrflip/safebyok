@@ -14,7 +14,7 @@ export type {
 } from './shapes/shapes-sealers'
 export {
   type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseRecord, type LeaseSparse, type LeaseStamp, type StampedGate,
-  LeaseFormat, bankScope, bankStamp, boxStamp, gateStamp, leaseRecord, leaseStamp, stampedGate,
+  StampChecks,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
 export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './shapes/primitives'
@@ -22,6 +22,6 @@ export { type VaultDB, isVaultDB } from './storage/vault-db'
 export type { BadNews, BadNewsHandler, BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxShell, BoxUnsealed, DeviceOpts, DeviceRecord, GetBoxAnswer, GetBoxAskDraft } from './shapes/shapes-bankish'
 export {
   type AskUser, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,
-  type Gatingkind, type LeaseBank, type LeaseOpts, type ProvingDevice, type RequestCleartext, type SecretFieldname, gatingkindVals,
+  type Gatingkind, type LeaseBank, type LeaseOpts, type ProvingDevice, type RequestCleartext, type SecretFieldname, GateishChecks, gatingkindVals,
 } from './shapes/shapes-gateish'
 export type { BankRecord } from './shapes/shapes-asks'

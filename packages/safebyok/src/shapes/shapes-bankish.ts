@@ -65,15 +65,15 @@ export interface BirthOpts extends BankOpts {
 }
 // --
 
-// == [The device]: deviceRecord, DeviceRecord, BadNews, BadNewsHandler, DeviceOpts
+// == [The device]: BankishChecks, DeviceRecord, BadNews, BadNewsHandler, DeviceOpts
 
 /** The check of a {@link DeviceRecord}. */
-export const { deviceRecord } = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, device_tok }) => ({
+export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, device_tok }) => ({
   deviceRecord: obj({ userid: user_id, banklabel, device_tok }).strict(),
 }), [CX])
 
 /** A device's record: the bank scope it serves, and its token there. */
-export type DeviceRecord = Z.infer<typeof deviceRecord>
+export type DeviceRecord = Z.infer<typeof BankishChecks.deviceRecord>
 
 /** What `onBadNews` hears: a refusal no caller waits on, and the device it reached. */
 export interface BadNews {

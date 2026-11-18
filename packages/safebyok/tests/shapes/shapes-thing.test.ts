@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BoxThing, type GateThing, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, VoidLifeseq, isTombstoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, modelkindOf, lifenumOfLifeseq, childShellCited, shellOf, labelpathWithParentage, lifepathWithParentage, sparseOf, boxSealable, isGone, isTombstone, isWholeRecord, isVoidSentinel,
+  type BoxThing, type GateThing, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, VoidLifeseq, isTombstoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, modelkindOf, lifenumOfLifeseq, childShellCited, shellOf, labelpathWithParentage, lifepathWithParentage, sparseOf, BoxChecks, isGone, isTombstone, isWholeRecord, isVoidSentinel,
 } from '../../src/shapes/shapes-thing'
 import { type BankRecord, type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import * as Phrases from '../../src/phrases'
@@ -461,7 +461,7 @@ describe("sparseOf(record)", () => {
   })
 })
 
-describe("boxSealable", () => {
+describe("BoxChecks.sealable", () => {
   const shell = Object.freeze({
     ...TH.ThingBank, labelpath: 'box/openai', label: 'openai', fmt: 5103, revtok: ShellCited.revtok, revseq: ShellCited.revseq, am: 'x',
     lifeseq: VoidLifeseq, lifepath: `${Life0}/${VoidLifeseq}`, born_at: TH.T0, written_at: TH.T0,
@@ -469,14 +469,14 @@ describe("boxSealable", () => {
 
   it("accepts a live box's, a tombstone's and the shell's Thing fields and sidecar, stripping the rest", () => {
     const box = TH.boxThingOf()
-    expect(boxSealable.parse(box)).to.deep.equal({ ...sparseOf(box), sidecar: {} })
+    expect(BoxChecks.sealable.parse(box)).to.deep.equal({ ...sparseOf(box), sidecar: {} })
     const tomb = TH.boxTombOf(box)
-    expect(boxSealable.parse(tomb)).to.deep.equal(sparseOf(tomb))
-    expect(boxSealable.parse(shell)).to.deep.equal(shell)
+    expect(BoxChecks.sealable.parse(tomb)).to.deep.equal(sparseOf(tomb))
+    expect(BoxChecks.sealable.parse(shell)).to.deep.equal(shell)
   })
 
   it("keeps a sidecar on the shell, and strips a whisper in the clear", () => {
-    expect(boxSealable.parse({ ...shell, sidecar: { account: 'work' }, whisper: { apiKey: 'sk-test' } })).to.deep.equal({ ...shell, sidecar: { account: 'work' } })
+    expect(BoxChecks.sealable.parse({ ...shell, sidecar: { account: 'work' }, whisper: { apiKey: 'sk-test' } })).to.deep.equal({ ...shell, sidecar: { account: 'work' } })
   })
 
   const BadSparseCases = [
@@ -490,7 +490,7 @@ describe("boxSealable", () => {
 
   for (const [sparse, said, blurb] of BadSparseCases) {
     it(`refuses ${blurb}`, () => {
-      const err = TH.expectSyncRefusal(() => boxSealable.parse(sparse), 'bad_record')
+      const err = TH.expectSyncRefusal(() => BoxChecks.sealable.parse(sparse), 'bad_record')
       expect(err.message).to.include(said)
     })
   }
