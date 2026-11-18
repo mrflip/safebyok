@@ -1,5 +1,25 @@
 # Crossings: events and their timescales
 
+## User Experience Timings
+
+What a person waits through between signing in and an API call that needs a whisper, in milliseconds. Everything the
+network does finishes long before a person can finish a dialog, so a dialog never waits on the network to appear, and
+none appears just because data is loading. All are estimates, except the derive, measured below.
+
+| Event                                                     | ms                        | Source          | What it covers                                                                                           |
+| --------------------------------------------------------- | ------------------------- | --------------- | -------------------------------------------------------------------------------------------------------- |
+| A cached lease attached                                   | 10 to 50                  | Estimate        | IndexedDB read and WebCrypto unwrap, once the gate fetch it waits on is in                               |
+| vaultDB round trip, connection warm                       | 50 to 300                 | Estimate        | As the Convex and GraphQL rows below                                                                     |
+| vaultDB round trip, cold connection or poor mobile signal | 500 to 2,000              | Estimate        | A first connection, a cold serverless start, a phone on a weak signal                                    |
+| Refresh a user                                            | 200 to 800                | Estimate        | Gate, bank row and listing in parallel, then the whole records of the boxes on screen: one or two round trips |
+| Derive a key                                              | 650; a phone 1,300 to 3,250 | Measured, below | Argon2id at 64 MiB, t=3; a phone likely 2 to 5 times slower                                            |
+| Unlock with a passkey                                     | 1,000 to 5,000            | Estimate        | Prompt shown to finger read, as *Execute PRF with Touch ID* below                                        |
+| Fill a passphrase from a password manager                 | 1,000 to 3,000            | Estimate        | Autofill offered, accepted and submitted                                                                 |
+| Unlock 1Password, for comparison                          | 1,000 to 10,000           | Estimate        | Touch ID, or typing the account password                                                                 |
+| Type in a passphrase                                      | 5,000 to 30,000           | Estimate        | As the row below: about 20 characters at 2 to 5 per second, plus a retry                                 |
+
+## Library Event Timings
+
 How long each event takes, in milliseconds, so that we can judge which crossings can happen in practice. A
 crossing is one operation called while another is still in flight.
 

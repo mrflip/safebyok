@@ -66,9 +66,10 @@ export const device = Device.make({
   banks: {
     acme: { vaultDB: new ConvexVaultDB(convex) },   // each bank may have its own backend
   },
-  // What this browser keeps for a user: nothing, past_userids, offline_signins or unlocked. The host's
-  // decision (internals.md, F13); whether it is one level or a set is open (internals.md, open matter 4).
-  keepOnDevice: ['past_userids', 'unlocked'],
+  // What this browser keeps for a user ('none', 'userids' or 'offline_signins'), and how long an unlock
+  // lasts: the host's decisions (internals.md, F13).
+  keepOnDevice: 'offline_signins',
+  autolock:     { hours: 24 * 14, on: 'since_last_proof' },
 })
 ```
 

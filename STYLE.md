@@ -534,8 +534,8 @@ rows with it.
 
 **WRITE PLAIN ENGLISH** `#plain-english`. Sometimes a sentence fragment is enough. Usually a doc block is one line of readable prose describing the essentials, and when warranted, important details follow on the next lines.
 
-`/** */` for doc blocks, `//` for a running clarification or commented-out code. Bulleted lists use `*` at the top level and
-`-` below, indented two spaces per level.
+`/** */` for doc blocks, `//` for a running clarification or commented-out code. A bulleted list in a doc block uses `-`,
+indented two spaces per level.
 
 **A doc block is as short as its purpose, and together with its signature says what the contract delivers.** Its first
 line rests on the `/**`: a few words to a full line, so the essentials may be read with the code folded. Gauge its length and register against the doc of a method with similar complexity and flexibility from your memory or training: usually one line, rarely more than a few (library entrypoints excepted).

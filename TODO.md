@@ -19,3 +19,18 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
 
 * If a request has any kind of `world` error it must not return anything in `val` or `dbhas`
 
+* **Hash the userid that keys what a browser keeps before sign-in.** Under `keepOnDevice: 'userids'`, each user's
+  stamp and wayin headers are kept on the device, keyed by userid, so whoever uses the browser next can read who used it
+  before. Key them instead on HMAC-SHA-256 of the userid under one random salt per browser, made at the first `hello()`,
+  and keep no userid in the value, since the bank's stamp carries one. `@noble/hashes` keeps it synchronous, which the
+  first read needs; WebCrypto's HMAC is async. It hides the list from a look through storage, not from a test of a
+  guessed userid, since the salt is on the device; and it gives up a list of past users to pick from. An entry in
+  `notes/security.md` once built (`whiteboard/20261116-react_backwards/internals.md`, open matter 13).
+* **Confirm a bankKey against the gate.** Nothing proves that the bankKey a kept lease or a wayin yields is this bank's:
+  a lease records the gate revision it was granted under, and nothing compares it with the gate fetched; a wayin is
+  checked only by unwrapping it. Give each gate row one part sealed under the bankKey, through the lease's `seal` with a
+  sealer of its own, its ctx binding the bank's stamp and the gate's, wayin headers included, rewritten by each gate verb
+  as it writes the gate. A kept lease that unseals it is the bank's, and the gate revision was written by someone holding
+  the bankKey; an unlock checked the same way refuses a wayin storage swapped in, before anything is sealed under the
+  wrong key. Agreed in principle (the Coach, 2026-11-17); an entry in `notes/security.md` once built
+  (`whiteboard/20261116-react_backwards/internals.md`, F15).
