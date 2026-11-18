@@ -11,8 +11,8 @@ import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import { minderNotStarted, staleRead } from '../refusals/throwers'
-import type { Banklabel, Labelpath, Userid } from '../shapes/primitives'
-import { type Thing, type ThingScope, type VoidSentinel, RootBoxLabelpath, ThingChecks, cmpThings, shellOf } from '../shapes/shapes-thing'
+import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
+import { type Thing, type ThingScope, type VoidSentinel, Shell, ThingChecks, cmpThings } from '../shapes/shapes-thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../storage/vault-db'
 import {
@@ -254,7 +254,7 @@ export class ThingMinder {
   // Boxes are the only Things under a root, for now: one label under the root box.
   /** The shell at `scoped`. Below a root, it lives in the life of the bank's root box. */
   #shellAt(scoped: ThingScope): VoidSentinel {
-    return scoped.labelpath.includes('/') ? shellOf(scoped, this.rootBox) : shellOf(scoped)
+    return scoped.labelpath.includes('/') ? Shell.of(scoped, this.rootBox) : Shell.of(scoped)
   }
   // --
 
@@ -267,7 +267,7 @@ export class ThingMinder {
   get rootBox(): MinderFriend['rootBox'] { return this.#bank.rootBox }
 
   /** The scope of the bank's root box. */
-  get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: RootBoxLabelpath } }
+  get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: Labelpath.RootBox } }
 
   /** The scope of `scoped`, demanding that it is in this minder's bank. */
   #demandOwnScope(scoped: ThingScope): ThingScope {

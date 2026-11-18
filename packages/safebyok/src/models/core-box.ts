@@ -2,9 +2,10 @@ import { exactOptional } from 'zod'
 import { CX, Clock, Crypto, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { sidecarMissing, tombstoneSidecarGiven } from '../refusals/throwers'
-import { type BoxThing, type Sealed, BoxChecks, lifeseqOfLifenum, lifenumOfLifeseq } from '../shapes/shapes-thing'
+import { type BoxThing, type Sealed, BoxChecks } from '../shapes/shapes-thing'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from '../shapes/shapes-sealers'
 import { type BoxStamp, StampChecks } from '../shapes/shapes-stamps'
+import { Lifeseq } from '../shapes/primitives'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
@@ -98,7 +99,7 @@ Object.freeze(CoreBox satisfies Sealer<BoxThing, BoxCleartexts>)
 
 /** The lifeseq and lifepath of the life after the given box's */
 function nextLifeOf({ lifeseq, lifepath }: Pick<BoxThing, 'lifeseq' | 'lifepath'>): Pick<BoxThing, 'lifeseq' | 'lifepath'> {
-  const nextLifeseq = lifeseqOfLifenum(lifenumOfLifeseq(lifeseq) + 1)
+  const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
   return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
 }
 

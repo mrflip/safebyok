@@ -19,11 +19,12 @@ import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BoxShell, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
 import type { GateRevisionedStamp, LeaseBank, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
-import { BoxThingFormat, VoidLifeseq, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
+import { BoxThingFormat, Shell } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAsk } from '../../src/shapes/shapes-asks'
 import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
+import { Lifeseq } from '../../src/shapes/primitives'
 
 // == [Time]: T0, useFakeClock
 
@@ -56,7 +57,7 @@ export function useFakeClock(): void {
 export const WorldScope: BankScope = Object.freeze({ userid: 'u1', banklabel: 'acme' })
 
 /** The stamp of the bank every builder here makes things in: its first life, born at {@link T0}. */
-export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.userid, banklabel: WorldScope.banklabel, lifeseq: lifeseqOfLifenum(0), born_at: T0 })
+export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.userid, banklabel: WorldScope.banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at: T0 })
 
 /** The stamp of {@link WorldBankStamp}'s main gate: its first life, born at {@link T0}. */
 export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
@@ -172,7 +173,7 @@ export const Sidecar = Object.freeze({ account: 'work' })
 export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
   return {
     userid: WorldScope.userid, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
-    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: VoidLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${VoidLifeseq}`,
+    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: `${Lifeseq.ofLifenum(0)}/${Shell.VoidLifeseq}`,
     born_at: T0, written_at: T0, ...overrides,
   }
 }

@@ -4,10 +4,9 @@ import type * as Z from 'zod'
 import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { bornAtNotNow, lifepathNotKept, lifeseqNotNext, opNotOfRecord, recordOfOtherScope, revseqNotNext, revtokNotNew, testimonyMissing, tombstoneOverTombstone } from '../refusals/throwers'
-import type { Labelpath } from './primitives'
+import { Labelpath, Lifeseq } from './primitives'
 import {
-  type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, type ThingScope, type Thingkind,
-  BankChecks, BoxChecks, GateChecks, MainGateLabelpath, RootBoxLabelpath, ShellCited, ThingChecks, leadingLifeseqsOf, lifenumOfLifeseq, lifeseqOfLifepath, modelkindOf,
+  type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, type ThingScope, type Thingkind, BankChecks, BoxChecks, GateChecks, Shell, ThingChecks,
 } from './shapes-thing'
 
 // == [Asks]: RawChecks, loggableAsk, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
@@ -16,7 +15,7 @@ type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
 
 /** True when an ask's modelkind is its labelpath's. */
-function isModelkindOwn({ modelkind, labelpath }: Kinded): boolean { return modelkindOf(labelpath) === modelkind }
+function isModelkindOwn({ modelkind, labelpath }: Kinded): boolean { return Labelpath.kindOf(labelpath) === modelkind }
 /** True unless a del changes its fixed flags, or names a storage policy. */
 function isDelFixed({ op, ifAbsent, ifPresent, options }: Flagged): boolean {
   return (op !== 'del') || ((ifAbsent === 'fail') && (ifPresent === 'repl') && (options === undefined))
@@ -36,7 +35,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
   const trackPair       = obj({ revseq: ThingChecks.thingRecord.shape.revseq, lifepath: ThingChecks.thingRecord.shape.lifepath }).strict()
-  const trackShape      = obj({ bank: trackPair, [MainGateLabelpath]: trackPair, [RootBoxLabelpath]: trackPair }).strict()
+  const trackShape      = obj({ bank: trackPair, [Labelpath.MainGate]: trackPair, [Labelpath.RootBox]: trackPair }).strict()
   const track           = trackShape.optional()
   return {
     thingOptions,
@@ -77,7 +76,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
     bank:      citedFields.optional(),
     gate:      citedFields.optional(),
     root:      citedFields.optional(),
-    track:     obj({ bank: trackFields, [MainGateLabelpath]: trackFields, [RootBoxLabelpath]: trackFields }).partial().optional(),
+    track:     obj({ bank: trackFields, [Labelpath.MainGate]: trackFields, [Labelpath.RootBox]: trackFields }).partial().optional(),
   }
 }, 'bad_record')
 
@@ -123,7 +122,7 @@ export type BankRecord      = BankThing
 export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
 // Unspecified for a missing or damaged row: notes/wontfix.md.
 /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
-export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same', [RootBoxLabelpath]: BoxThing | 'same' }>
+export type Tracked         = Readonly<{ bank: BankRecord | 'same', [Labelpath.MainGate]: GateThing | 'same', [Labelpath.RootBox]: BoxThing | 'same' }>
 
 /** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {
@@ -154,9 +153,9 @@ export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
 export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAsk): BirthPuts {
   const flags = { userid, banklabel, op: 'put', ifAbsent: 'add', ifPresent: 'fail' } as const
   return [
-    { ...flags, labelpath: 'bank', modelkind: 'bank', cited: ShellCited, record: bank, ifPresent: 'get' },
-    { ...flags, labelpath: 'gate', modelkind: 'gate', cited: ShellCited, record: gate },
-    { ...flags, labelpath: 'box',  modelkind: 'box',  cited: ShellCited, record: root },
+    { ...flags, labelpath: 'bank', modelkind: 'bank', cited: Shell.Cited, record: bank, ifPresent: 'get' },
+    { ...flags, labelpath: 'gate', modelkind: 'gate', cited: Shell.Cited, record: gate },
+    { ...flags, labelpath: 'box',  modelkind: 'box',  cited: Shell.Cited, record: root },
   ]
 }
 
@@ -167,9 +166,9 @@ function checkWriteInvariants(ask: WriteAsk): void {
   if ((record.revtok === cited.revtok) || (record.revtok === SX.VoidRevisionTok))                   { throw revtokNotNew(ask) }
   if (! Validator.isConsistent(record, { userid, banklabel, labelpath }))                           { throw recordOfOtherScope(ask) }
   if ((record.am === 'x') && (cited.am === 'x'))                                                    { throw tombstoneOverTombstone(ask) }
-  if (leadingLifeseqsOf(record.lifepath) !== leadingLifeseqsOf(cited.lifepath))                     { throw lifepathNotKept(ask) }
+  if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw lifepathNotKept(ask) }
   const isLifeFlipped = (record.am !== cited.am)
-  if (lifenumOfLifeseq(record.lifeseq) !== lifenumOfLifeseq(lifeseqOfLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw lifeseqNotNext(ask) }
+  if (Lifeseq.lifenumOf(record.lifeseq) !== Lifeseq.lifenumOf(Lifeseq.ofLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw lifeseqNotNext(ask) }
   // A live record over a live one keeps the stored born_at: the store checks that, against the Thing it has.
   if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw bornAtNotNow(ask) }
   if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw testimonyMissing(ask) }
@@ -244,7 +243,7 @@ function scopeGiven(record: unknown): Partial<Record<keyof ThingScope, unknown>>
 function trackGiven(track: unknown): { track?: unknown } { return (track === undefined) ? {} : { track } }
 
 /** The modelkind `labelpath` starts with, or undefined when it is not a string. */
-function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typeof labelpath === 'string') ? modelkindOf(labelpath) : undefined }
+function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typeof labelpath === 'string') ? Labelpath.kindOf(labelpath) : undefined }
 // --
 
 // == [Loggable asks]: LoggableAsk, loggableAskOf

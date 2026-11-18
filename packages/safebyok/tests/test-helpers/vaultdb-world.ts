@@ -1,9 +1,9 @@
 /** The Things and asks a vaultDB's tests share: a bank's three roots and a box under its root, and the asks that get, list and write them. */
 
 import { BW } from 'safebyok-big/testing'
-import type { Labelpath, Lifepath } from '../../src/shapes/primitives'
+import { type Labelpath, type Lifepath, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, lifeseqOfLifenum, lifeseqOfLifepath, lifenumOfLifeseq,
+  type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, BankThingFormat, BoxThingFormat, GateThingFormat, Shell,
 } from '../../src/shapes/shapes-thing'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstRevtok, T0, revtokOf } from './models-world'
@@ -29,7 +29,7 @@ const FakeCiphered = Object.freeze({ cipher_iv_b64: 'aXY', ciphertext_b64: 'Y3Q'
 export const FakeSealed = Object.freeze({ key_wrapped: FakeCiphered, ciphered: FakeCiphered, codectag: 'json_v1', schematag: 'test_v1' })
 
 /** Life 0's lifeseq, which is also a root's lifepath in its first life. */
-export const Life0 = lifeseqOfLifenum(0)
+export const Life0 = Lifeseq.ofLifenum(0)
 
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
 const FirstRevision = { am: 'a', revtok: FirstRevtok, revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
@@ -80,25 +80,25 @@ export function nextGateOf(prior: GateThing, overrides: Partial<GateThing> = {})
 /** `lifepath` with its own lifeseq moved on by `lives`. */
 export function lifepathPlus(lifepath: Lifepath, lives: number): Lifepath {
   const leading = lifepath.slice(0, lifepath.lastIndexOf('/') + 1)
-  return `${leading}${lifeseqOfLifenum(lifenumOfLifeseq(lifeseqOfLifepath(lifepath)) + lives)}`
+  return `${leading}${Lifeseq.ofLifenum(Lifeseq.lifenumOf(Lifeseq.ofLifepath(lifepath)) + lives)}`
 }
 
 /** The tombstone of the live box `prior`: its next revision, in its next life, sealing an empty whisper, with no sidecar. */
 export function boxTombOf(prior: BoxThing, overrides: Partial<BoxThing> = {}): BoxThing {
   const { sidecar: _sidecar, ...next } = nextOf(prior) as BoxThing & { sidecar?: unknown }
   const lifepath = lifepathPlus(prior.lifepath, 1)
-  return { ...next, am: 'x', lifepath, lifeseq: lifeseqOfLifepath(lifepath), ...overrides } as BoxThing
+  return { ...next, am: 'x', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), ...overrides } as BoxThing
 }
 
 /** The box reborn over the tombstone `prior`: its next revision, in its next life, born when it is written. */
 export function boxRebornOf(prior: BoxThing, overrides: Partial<BoxThing> = {}): BoxThing {
   const next     = nextOf(prior)
   const lifepath = lifepathPlus(prior.lifepath, 1)
-  return { ...next, am: 'a', lifepath, lifeseq: lifeseqOfLifepath(lifepath), born_at: next.written_at, sidecar: {}, ...overrides }
+  return { ...next, am: 'a', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), born_at: next.written_at, sidecar: {}, ...overrides }
 }
 
 /** The ask that births `record` (the main gate by default) over the shell it `cited` (a root's by default). */
-export function birthAskOf(record: Thing = gateThingOf(), cited: ThingCited = ShellCited): WriteAsk {
+export function birthAskOf(record: Thing = gateThingOf(), cited: ThingCited = Shell.Cited): WriteAsk {
   return putAskOf({ cited, record, ifPresent: 'fail' })
 }
 
@@ -125,7 +125,7 @@ export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBank
 }
 
 /** The track of a sender that holds the main gate of another life. */
-export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: lifeseqOfLifenum(2) }))
+export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: Lifeseq.ofLifenum(2) }))
 /** The track of a sender that holds the bank at another revision. */
 export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
 /** The track of a sender that holds the root box at another revision. */

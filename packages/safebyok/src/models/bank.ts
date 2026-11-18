@@ -13,10 +13,8 @@ import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublic
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
 import { boxOfOtherRoot, otherThanBox } from '../refusals/throwers'
-import type { DeviceTok } from '../shapes/primitives'
-import {
-  type BankThing, type BoxThing, type Thing, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, BankChecks, BoxChecks, GateChecks, ThingChecks, lifeseqOfLifenum, shellOf,
-} from '../shapes/shapes-thing'
+import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
+import { type BankThing, type BoxThing, type Thing, BankChecks, BankThingFormat, BoxChecks, BoxThingFormat, GateChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
 
@@ -61,7 +59,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** The revseq and lifepath this object holds of the bank, its main gate and its root box, which every ask it makes tracks. */
   get track(): Track {
-    return { bank: trackPairOf(this), [MainGateLabelpath]: trackPairOf(this.#maingate), [RootBoxLabelpath]: trackPairOf(this.#rootBox) }
+    return { bank: trackPairOf(this), [Labelpath.MainGate]: trackPairOf(this.#maingate), [Labelpath.RootBox]: trackPairOf(this.#rootBox) }
   }
 
   /** The defaults this bank's minders set on their TanStack Query cache entries. */
@@ -105,8 +103,8 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const { userid, banklabel } = StampChecks.bankScope.parse(scope)
     const born_at = Clock.nowMillis()
     return {
-      bankStamp: StampChecks.bankStamp.parse({ userid, banklabel, lifeseq: lifeseqOfLifenum(0), born_at }),
-      gateStamp: StampChecks.gateStamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: lifeseqOfLifenum(0), born_at }),
+      bankStamp: StampChecks.bankStamp.parse({ userid, banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at }),
+      gateStamp: StampChecks.gateStamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: Lifeseq.ofLifenum(0), born_at }),
     }
   }
 
@@ -116,7 +114,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const bank = BankChecks.record.parse({
       userid, banklabel, labelpath: 'bank', label: 'bank', fmt: BankThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
     })
-    const rootBox = BoxChecks.liveOrShell.parse(shellOf({ userid, banklabel, labelpath: RootBoxLabelpath }))
+    const rootBox = BoxChecks.liveOrShell.parse(Shell.of({ userid, banklabel, labelpath: Labelpath.RootBox }))
     return { ...bank, maingate: Gate.makeRecord(dna.maingate), rootBox }
   }
   // --
@@ -248,7 +246,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** The boxes directly under the root box, tombstones included, with the root box as `parent`. */
   tryListBoxes(): Promise<ListThingsAnswer> {
-    const ask = this.makeListAsk({ labelpath: RootBoxLabelpath })
+    const ask = this.makeListAsk({ labelpath: Labelpath.RootBox })
     const { endCause } = this.#device
     if (endCause !== null) { return Promise.resolve({ ...disabledAnswerOf(ask, endCause), parent: null, damaged_rows: [] }) }
     return this.#vaultDB.tryListThings(ask)
@@ -271,7 +269,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     if (answer.act === 'gotvoid') {
       if (ifAbsent !== 'shell') { return answer }
       // A box's labelpath, so its shell is a box's.
-      return { ...answer, val: shellOf({ ...this.scope, labelpath }, this.#rootBox) as BoxShell }
+      return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) as BoxShell }
     }
     const { val } = answer
     if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer) } }

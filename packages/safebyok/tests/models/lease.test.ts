@@ -5,8 +5,8 @@ import { Lease, withoutSecrets } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import type { BoxCleartexts, Sealer } from '../../src/shapes/shapes-sealers'
 import { LeaseFormat, type LeaseRecord } from '../../src/shapes/shapes-stamps'
-import type { EpochMillis } from '../../src/shapes/primitives'
-import { type BoxThing, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
+import { type EpochMillis, Lifeseq } from '../../src/shapes/primitives'
+import { type BoxThing } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -104,7 +104,7 @@ describe("Lease.make(record, { bank })", () => {
   })
 
   const OtherBankCases = [
-    [{ lifeseq: lifeseqOfLifenum(2) },   'another life of the bank, by its lifeseq'],
+    [{ lifeseq: Lifeseq.ofLifenum(2) },   'another life of the bank, by its lifeseq'],
     [{ born_at: TH.T0 + 1 },         'another life of the bank, by its born_at'],
     [{ userid: 'u2' },               "another user's bank"],
     [{ banklabel: 'work' },          'another bank of the same user'],
@@ -396,7 +396,7 @@ describe("a tampered lease record", () => {
     [(record: LeaseRecord) => ({ ...record, proved_at: record.proved_at + 1 }),                            'its proved_at moved'],
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'passkey' }),                                       'its wayinkind changed'],
     [(record: LeaseRecord) => ({ ...record, gate_revtok: TH.revtokOf('gate2') }),                         'its gate_revtok changed'],
-    [(record: LeaseRecord) => ({ ...record, gate_lifeseq: lifeseqOfLifenum(1) }),                                 'its gate_lifeseq changed'],
+    [(record: LeaseRecord) => ({ ...record, gate_lifeseq: Lifeseq.ofLifenum(1) }),                                 'its gate_lifeseq changed'],
     [(record: LeaseRecord) => ({ ...record, gate_labelpath: 'gate/passkeys' }),                            'its gate_labelpath changed'],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, lease_key: other.lease_key }),          "another lease's leaseKey"],
     [(record: LeaseRecord, other: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: other.bank_key_lease_wrapped }), "another lease's wrapped bankKey"],

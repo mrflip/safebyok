@@ -1,9 +1,9 @@
 // The storage of the lean core: the vaultDB, which keeps every kind as a Thing, and its memory store.
 export { type AdapterVaultDBOpts, type Received, AdapterVaultDB } from './storage/adapter-vault-db'
 export { MemoryVaultDB } from './storage/memory-vault-db'
-export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './shapes/primitives'
+export { type Banklabel, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
 export {
-  type BankThing, type BoxThing, type GateThing, type Sealed, type VoidSentinel, type Wayins, type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, BankThingFormat, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, RootVoidLifepath, VoidLifeseq, BankChecks, BoxChecks, GateChecks, ThingChecks, childShellCited, isGone, isTombstoneLifeseq, isLabelpathOfKind, isTombstone, isVoidSentinel, lifenumOfLifeseq, lifeseqOfLifenum, lifeseqOfLifepath, modelkindOf, shellOf, sparseOf, thingkindVals,
+  type BankThing, type BoxThing, type GateThing, type Sealed, type VoidSentinel, type Wayins, type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, BankThingFormat, BoxThingFormat, GateThingFormat, BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, isGone, isTombstone, isVoidSentinel, sparseOf, thingkindVals,
 } from './shapes/shapes-thing'
 export {
   type AnyAsk, type BankRecord, type BankRoots, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxWriteAsk, type CitedOf, type DelAskDraft, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf,

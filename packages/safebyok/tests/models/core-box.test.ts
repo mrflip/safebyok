@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { CoreBox } from '../../src/models/core-box'
 import * as Phrases from '../../src/phrases'
 import type { BoxCleartexts, BoxRecord, RevisionOf } from '../../src/shapes/shapes-sealers'
-import { BoxChecks, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
+import { BoxChecks } from '../../src/shapes/shapes-thing'
+import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -11,9 +12,9 @@ TH.useFakeClock()
 const Sealed = Object.freeze({ ...TH.FakeSealed, ...CoreBox.tags })
 const OtherSealed = Object.freeze({ ...Sealed, key_wrapped: TH.fakeCiphered('k2') })
 
-const Life0 = lifeseqOfLifenum(0)
-const Life1 = lifeseqOfLifenum(1)
-const Life2 = lifeseqOfLifenum(2)
+const Life0 = Lifeseq.ofLifenum(0)
+const Life1 = Lifeseq.ofLifenum(1)
+const Life2 = Lifeseq.ofLifenum(2)
 
 /** What a box's first seal takes in the clear: its sidecar. */
 const PublicProps = Object.freeze({ sidecar: TH.Sidecar })

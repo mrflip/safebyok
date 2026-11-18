@@ -3,8 +3,9 @@ import { Errors } from 'safebyok-big/internals'
 import type { Bank } from '../../src/models/bank'
 import type { BoxShell, BoxUnsealed } from '../../src/shapes/shapes-bankish'
 import type { BoxRecord } from '../../src/shapes/shapes-sealers'
-import { type BoxThing, VoidLifeseq, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
+import { type BoxThing, Shell, sparseOf } from '../../src/shapes/shapes-thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
+import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -55,13 +56,13 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
   it("gives the shell of a box not stored, under the root box's life, for its first revision to cite", async () => {
     const bank = await storedBank()
     const shell = await priorOf(bank)
-    expect(shell).to.include({ ...bank.scope, labelpath: Openai, label: 'openai', am: 'x', lifeseq: VoidLifeseq, lifepath: `${bank.rootBox.lifeseq}/${VoidLifeseq}` })
+    expect(shell).to.include({ ...bank.scope, labelpath: Openai, label: 'openai', am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: `${bank.rootBox.lifeseq}/${Shell.VoidLifeseq}` })
   })
 
   it("puts a box over its shell, and again over itself, each put unsealing what the one before sealed", async () => {
     const bank = await storedBank()
     const first = await bumpApicalls(bank)
-    expect(first).to.include({ revseq: 0, am: 'a', lifepath: `${bank.rootBox.lifeseq}/${lifeseqOfLifenum(0)}` })
+    expect(first).to.include({ revseq: 0, am: 'a', lifepath: `${bank.rootBox.lifeseq}/${Lifeseq.ofLifenum(0)}` })
     await bumpApicalls(bank)
     const unsealed = await unsealedAt(bank)
     expect(unsealed).to.include({ revseq: 1, am: 'a' })
@@ -78,13 +79,13 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
     const deleted = await bank.tryDelBox({ cited: prior, record: tombstone })
     expect(deleted).to.include({ ok: true, act: 'deleted' })
     const unsealed = await unsealedAt(bank)
-    expect(unsealed).to.include({ am: 'x', lifeseq: lifeseqOfLifenum(1) })
+    expect(unsealed).to.include({ am: 'x', lifeseq: Lifeseq.ofLifenum(1) })
     expect(unsealed.whisper).to.deep.equal({})
     const listed = await bank.tryListBoxes()
     expect(listed.ok && listed.val.map((box) => box.am)).to.deep.equal(['x'])
 
     const reborn = await bumpApicalls(bank)
-    expect(reborn).to.include({ am: 'a', lifeseq: lifeseqOfLifenum(2) })
+    expect(reborn).to.include({ am: 'a', lifeseq: Lifeseq.ofLifenum(2) })
     const unsealedAgain = await unsealedAt(bank)
     expect(unsealedAgain.whisper).to.deep.equal({ ...TH.Whisper, apicalls: 1 })
   })

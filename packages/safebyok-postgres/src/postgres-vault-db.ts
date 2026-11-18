@@ -5,7 +5,7 @@ import { type EX, type Errors, Throwers, Validator } from 'safebyok-big/internal
 import {
   type Actual, type AnyAsk, type AdapterVaultDBOpts, type BankRootsFetched, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type ListThingsActual,
   type ListAsk, type Received, type ThingWatchScope, type ThingsFetched, type TrackedFetched, type WorldFetched,
-  type WriteAsk, AdapterVaultDB, ShellCited, demandBornAtKept, demandPolicies, isWriteAct, getAskOf, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
+  type WriteAsk, AdapterVaultDB, Shell, demandBornAtKept, demandPolicies, getAskOf, isWriteAct, storedCitedOf, trackedFieldOf, unwrittenBirthOf,
   unwrittenWriteOf, worldOf, writeActOf, writtenRootsOf, writtenThingOf,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, unlistenOnceListening } from './postgres-bank-db'
@@ -77,7 +77,7 @@ function mayWrite({ op, cited, ifAbsent, ifPresent }: WriteAsk): boolean {
 /** The act of a write the store made, over the Thing the ask cites. */
 function writtenActOf({ op, cited }: WriteAsk): EX.WriteAct {
   if (op === 'del')                        { return 'deleted' }
-  if (cited.revseq === ShellCited.revseq)  { return 'born' }
+  if (cited.revseq === Shell.Cited.revseq)  { return 'born' }
   return (cited.am === 'a') ? 'replaced' : 'reborn'
 }
 // --

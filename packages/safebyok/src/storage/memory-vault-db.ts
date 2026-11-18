@@ -2,8 +2,8 @@
 
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
-import type { Labelpath } from '../shapes/primitives'
-import { type Thing, MainGateLabelpath, RootBoxLabelpath } from '../shapes/shapes-thing'
+import { Labelpath } from '../shapes/primitives'
+import { type Thing } from '../shapes/shapes-thing'
 import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
@@ -46,14 +46,14 @@ export class MemoryVaultDB extends AdapterVaultDB {
   /** The raw roots of `ask`'s bank, each a copy, or null for none, and how its bank, main gate and root box compare with what `ask` tracks. */
   #rootsOf(ask: AnyAsk): BankRootsFetched {
     const { maingate: gate, ...fetched } = this.#worldFetchedOf(ask)
-    return { ...fetched, gate, root: structuredClone(this.#thingsOf(ask).get(RootBoxLabelpath) ?? null) }
+    return { ...fetched, gate, root: structuredClone(this.#thingsOf(ask).get(Labelpath.RootBox) ?? null) }
   }
 
   /** The raw bank and main gate of `ask`'s bank, each a copy, or null for none, and how they and its root box compare with what `ask` tracks. */
   #worldFetchedOf(ask: AnyAsk): WorldFetched {
     const things  = this.#thingsOf(ask)
-    const fetched = structuredClone({ bank: things.get('bank') ?? null, maingate: things.get(MainGateLabelpath) ?? null })
-    const rows    = { bank: fetched.bank, [MainGateLabelpath]: fetched.maingate, [RootBoxLabelpath]: structuredClone(things.get(RootBoxLabelpath) ?? null) }
+    const fetched = structuredClone({ bank: things.get('bank') ?? null, maingate: things.get(Labelpath.MainGate) ?? null })
+    const rows    = { bank: fetched.bank, [Labelpath.MainGate]: fetched.maingate, [Labelpath.RootBox]: structuredClone(things.get(Labelpath.RootBox) ?? null) }
     return { ...fetched, tracked: trackedFetchedOf(ask, rows) }
   }
 

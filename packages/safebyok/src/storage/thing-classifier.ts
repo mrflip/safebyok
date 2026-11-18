@@ -4,11 +4,9 @@ import { sortBy } from 'es-toolkit'
 import { CX, EX, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
 import { bankRootsMissing, bornAtNotStored, gateIssue, rowOfOtherAddress } from '../refusals/throwers'
 import { policyRefusalOf } from './policies'
-import type { Labelpath } from '../shapes/primitives'
+import { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
-import {
-  type StoredCited, type Thing, type ThingCited, type ThingScope, BankChecks, BoxChecks, GateChecks, MainGateLabelpath, RootBoxLabelpath, ThingChecks, isLabelpathOfKind, sparseOf,
-} from '../shapes/shapes-thing'
+import { type StoredCited, type Thing, type ThingCited, type ThingScope, BankChecks, BoxChecks, GateChecks, ThingChecks, sparseOf } from '../shapes/shapes-thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
@@ -185,7 +183,7 @@ export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?
 export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFetched): WorldRecord | null {
   try {
     const bank     = storedOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank)
-    const maingate = storedOf(GateChecks.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched.maingate)
+    const maingate = storedOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched.maingate)
     return ((bank === null) || (maingate === null)) ? null : { ...bank, maingate }
   } catch { return null }
 }
@@ -196,18 +194,18 @@ export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFe
 // The adapter checks each row the store reports in place of 'same'.
 
 /** A store's report on the bank, main gate and root box an ask tracks: for each, `'same'` or the raw Thing. Null or left out for an ask that tracks nothing. */
-export type TrackedFetched = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown, [RootBoxLabelpath]: unknown }> | null
+export type TrackedFetched = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }> | null
 
 /** The raw bank, main gate and root box a store fetched, each null for none, under its key in a `track`. */
-export type TrackedRows = Readonly<{ bank: unknown, [MainGateLabelpath]: unknown, [RootBoxLabelpath]: unknown }>
+export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknown, [Labelpath.RootBox]: unknown }>
 
 /** The {@link TrackedFetched} report of what `ask` tracks against the raw rows a store fetched, for a store that compares in TypeScript. */
 export function trackedFetchedOf({ track }: AnyAsk, rows: TrackedRows): TrackedFetched {
   if (track === undefined) { return null }
   return {
     bank:               trackedRawOf(track.bank, rows.bank),
-    [MainGateLabelpath]: trackedRawOf(track[MainGateLabelpath], rows[MainGateLabelpath]),
-    [RootBoxLabelpath]:  trackedRawOf(track[RootBoxLabelpath], rows[RootBoxLabelpath]),
+    [Labelpath.MainGate]: trackedRawOf(track[Labelpath.MainGate], rows[Labelpath.MainGate]),
+    [Labelpath.RootBox]:  trackedRawOf(track[Labelpath.RootBox], rows[Labelpath.RootBox]),
   }
 }
 
@@ -221,8 +219,8 @@ export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: 
   if ((fetched === null) || (fetched === undefined)) { return {} }
   return { tracked: {
     bank:                 trackedEntryOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
-    [MainGateLabelpath]:  trackedEntryOf(GateChecks.stored, { userid, banklabel, labelpath: MainGateLabelpath }, fetched[MainGateLabelpath]),
-    [RootBoxLabelpath]:   trackedEntryOf(BoxChecks.stored, { userid, banklabel, labelpath: RootBoxLabelpath }, fetched[RootBoxLabelpath]),
+    [Labelpath.MainGate]:  trackedEntryOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched[Labelpath.MainGate]),
+    [Labelpath.RootBox]:   trackedEntryOf(BoxChecks.stored, { userid, banklabel, labelpath: Labelpath.RootBox }, fetched[Labelpath.RootBox]),
   } }
 }
 
@@ -292,7 +290,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
 function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
   const label = labelpath.slice(ask.labelpath.length + 1)
-  return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && isLabelpathOfKind(labelpath, ask.modelkind)
+  return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && Labelpath.isOfKind(labelpath, ask.modelkind)
 }
 
 /** Classify a bank's birth, by its three `puts`, against the raw roots a store fetched.
