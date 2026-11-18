@@ -58,6 +58,9 @@ export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segmen
 /** A Thing whose am and lifeseq disagree. */
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
+/** A box tombstone whose sidecar is not empty. */
+export const TombstoneSidecarNotEmpty = "A box tombstone's sidecar is always `{}`."
+
 /** A citation that is half the shell. */
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."
 

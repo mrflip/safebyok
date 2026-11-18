@@ -1,6 +1,6 @@
 /** The shapes of a Thing, the record every kind is stored as in a vaultDB, and the checks of each. */
 
-import { pick } from 'es-toolkit'
+import { isEmptyObject, pick } from 'es-toolkit'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
 import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
@@ -47,6 +47,8 @@ function isLifepathDeep({ lifepath, labelpath }: Lived & Labelled): boolean { re
 function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === Lifeseq.isTombstone(Lifeseq.ofLifepath(lifepath)) }
 /** True unless the Thing is a deleted main gate. */
 function isMainGateLive({ labelpath, am }: Lived & Labelled): boolean { return (labelpath !== Labelpath.MainGate) || (am === 'a') }
+/** True unless the box is a tombstone whose sidecar is not empty. */
+function isGoneSidecarEmpty({ am, sidecar }: { am: string, sidecar: object }): boolean { return (am === 'a') || isEmptyObject(sidecar) }
 /** The fields of `shape`, each optional: it may be omitted, but not undefined. */
 function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> } {
   // Object.fromEntries loses the fieldnames' types: the cast restores them.
@@ -161,6 +163,7 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union }) => 
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
+    .refine(isGoneSidecarEmpty, Phrases.TombstoneSidecarNotEmpty)
 
   // A citation must carry what ThingCited names; any other field of its kind it carries must check.
   const bankCited    = obj({ ...exactPartialOf(bankBase.shape), ...thingCited.shape }).strict()

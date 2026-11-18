@@ -328,6 +328,7 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     [TH.birthAskOf(TH.boxThingOf('openai', { label: 'other' }), under),              Phrases.LabelNotLast,       'a box whose label is not its last'],
     [TH.birthAskOf({ ...box, sidecar: undefined } as never, under),                  'sidecar',                  'a live box with no sidecar'],
     [TH.delAskFor(box, { ...tomb, sidecar: undefined } as never),                    'sidecar',                  'a tombstone with no sidecar'],
+    [TH.delAskFor(box, { ...tomb, sidecar: { account: 'home' } }),                   Phrases.TombstoneSidecarNotEmpty, 'a tombstone whose sidecar is not empty'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, codectag: 1 } } as never, under), 'codectag', 'a box whose sealed whisper is misshapen'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, schematag: 'Whisper v1' } }, under), 'schematag', 'a box whose schematag is not a label'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, nonce: 'n' } } as never, under), Unaccepted, 'a box whose sealed whisper has a field no sealed part has'],
