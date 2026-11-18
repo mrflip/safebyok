@@ -1,3 +1,8 @@
 {
-  "js/ts.tsdk.path": "node_modules/typescript/lib"
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+  "js/ts.preferences.autoImportSpecifierExcludeRegexes": [
+    "^es-toolkit/",
+    "^zod/",
+    "^(assert|async_hooks|buffer|child_process|cluster|console|crypto|dgram|diagnostics_channel|dns|events|fs|http|http2|https|inspector|module|net|os|path|perf_hooks|process|punycode|querystring|readline|repl|stream|string_decoder|timers|tls|trace_events|tty|url|util|v8|vm|wasi|worker_threads|zlib)(/.*)?$"
+  ]
 }
