@@ -77,32 +77,32 @@ describe("WX's answer checks", () => {
   it("parses a serialized refusal to a VaultError of its kind, with its parent", async () => {
     const answer = await new MemoryBankDB().tryPutVault(vaultPutAskOf(vaultAt()))
     expect(answer.ok).to.be.false
-    const parsed = WX.putVaultAnswer.parse(crossed(answer))
-    if (parsed.ok || answer.ok) { throw new Error('expected a refusal') }
-    expect(parsed.act).to.eq('bank_void')
-    expect(parsed.parent).to.deep.equal(answer.parent)
-    expect(parsed.err).to.be.instanceOf(VaultError)
-    expect(parsed.err.refusalkind).to.equal(answer.err.refusalkind)
-    expect(parsed.err.meta).to.deep.include({ act: answer.act, ask: answer.ask })
+    const putVaultAnswer = WX.putVaultAnswer.parse(crossed(answer))
+    if (putVaultAnswer.ok || answer.ok) { throw new Error('expected a refusal') }
+    expect(putVaultAnswer.act).to.eq('bank_void')
+    expect(putVaultAnswer.parent).to.deep.equal(answer.parent)
+    expect(putVaultAnswer.err).to.be.instanceOf(VaultError)
+    expect(putVaultAnswer.err.refusalkind).to.equal(answer.err.refusalkind)
+    expect(putVaultAnswer.err.meta).to.deep.include({ act: answer.act, ask: answer.ask })
   })
 
   it("parses a serialized gate_issue refusal back with its ask's policy and the gate row stored", async () => {
     const bankDB = await bankDBWithBox()
     const answer = await bankDB.tryPutGate(gatePutAskOf('revoke_passkey', gateAt(), { main: mainWayin }))
-    const parsed = WX.putGateAnswer.parse(crossed(answer))
-    if (parsed.ok || answer.ok) { throw new Error('expected a refusal') }
-    expect(parsed.err.refusalkind).to.eq('gate_issue')
-    expect(parsed.ask).to.deep.equal(answer.ask)
-    expect(parsed.ask.options).to.deep.equal({ policies: ['revoke_passkey'] })
-    expect(parsed.dbhas).to.deep.equal(gateAt())
+    const putGateAnswer = WX.putGateAnswer.parse(crossed(answer))
+    if (putGateAnswer.ok || answer.ok) { throw new Error('expected a refusal') }
+    expect(putGateAnswer.err.refusalkind).to.eq('gate_issue')
+    expect(putGateAnswer.ask).to.deep.equal(answer.ask)
+    expect(putGateAnswer.ask.options).to.deep.equal({ policies: ['revoke_passkey'] })
+    expect(putGateAnswer.dbhas).to.deep.equal(gateAt())
   })
 
   it("accepts a damaged box row only under damaged_rows", async () => {
     const bankDB = await bankDBWithBox()
     const listed = crossed(await bankDB.tryListBoxes(boxListAsk)) as { val: { boxes: unknown[], damaged_rows: unknown[] } }
     const damaged = { ...boxQuery, boxlabel: 'Not A Label', am: 'd' }
-    const parsed = WX.listBoxesAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [damaged] } })
-    expect(parsed.ok && parsed.val.damaged_rows).to.deep.eq([damaged])
+    const listBoxesAnswer = WX.listBoxesAnswer.parse({ ...listed, val: { ...listed.val, damaged_rows: [damaged] } })
+    expect(listBoxesAnswer.ok && listBoxesAnswer.val.damaged_rows).to.deep.eq([damaged])
     expect(() => WX.listBoxesAnswer.parse({ ...listed, val: { ...listed.val, boxes: [...listed.val.boxes, damaged] } })).to.throw(VaultError)
   })
 

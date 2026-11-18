@@ -43,16 +43,16 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
 
   /** Make the gate of `record`, which must be of `opts.bank`'s scope. */
   static make(record: GateThing, opts: GateOpts): Gate {
-    const { record: parsed, opts: checked } = Checks.gateMakeArgs.parse({ record, opts })
+    const { record: gateRecord, opts: { bank } } = Checks.gateMakeArgs.parse({ record, opts })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
-    Validator.checkedConsistent(parsed, bankScope.parse(checked.bank.stamp), { kind: 'record_conflict' })
-    return new Gate(parsed, opts)
+    Validator.checkedConsistent(gateRecord, bankScope.parse(bank.stamp), { kind: 'record_conflict' })
+    return new Gate(gateRecord, opts)
   }
 
-  private constructor(parsed: GateThing, opts: GateOpts) {
-    const main = Wayin.make(parsed.wayins.main)
-    const passkey0 = (parsed.wayins.passkey0 === null) ? null : Wayin.make(parsed.wayins.passkey0)
-    super({ ...parsed, wayins: wayinsOf({ main, passkey0 }) })
+  private constructor(gateRecord: GateThing, opts: GateOpts) {
+    const main = Wayin.make(gateRecord.wayins.main)
+    const passkey0 = (gateRecord.wayins.passkey0 === null) ? null : Wayin.make(gateRecord.wayins.passkey0)
+    super({ ...gateRecord, wayins: wayinsOf({ main, passkey0 }) })
     this.#bank = opts.bank
     this.#main = main
     this.#passkey0 = passkey0

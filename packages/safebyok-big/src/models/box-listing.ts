@@ -42,12 +42,12 @@ export class BoxListing extends Listing<Boxscope, BoxRecord, BoxSparse, BoxSnaps
   // A vault of a new life makes a new box listing: this one answers only while the vault is of the life it was made under.
   /** The listing of `vault`'s boxes, under the life the vault has now. */
   constructor(vault: Vault, opts: ListingOpts) {
-    const checked = VX.listedUnder.vault.parse(vault)
-    super(checked.bank.device, opts)
-    this.bank  = checked.bank
-    this.vault = checked
-    this.scope = Object.freeze(checked.scope)
-    tattoo(this, { ...this.scope, bank_tok: checked.bank_tok, vault_tok: checked.vault_tok })
+    const vaultC = VX.listedUnder.vault.parse(vault)
+    super(vaultC.bank.device, opts)
+    this.bank  = vaultC.bank
+    this.vault = vaultC
+    this.scope = Object.freeze(vaultC.scope)
+    tattoo(this, { ...this.scope, bank_tok: vaultC.bank_tok, vault_tok: vaultC.vault_tok })
     Object.freeze(this)
   }
 

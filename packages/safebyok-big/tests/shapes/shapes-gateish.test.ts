@@ -90,9 +90,9 @@ function misshapenAnswers(answer: PasskeyAnswer) {
 describe("passkeyAnswer", () => {
   it("accepts a passkey's answer without copying its bytes", async () => {
     const answer = await TH.passkeyOf('laptop')
-    const checked = GX.passkeyAnswer.parse(answer)
-    expect(checked).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
-    expect(checked.prfBytes).to.eq(answer.prfBytes)
+    const passkeyAnswer = GX.passkeyAnswer.parse(answer)
+    expect(passkeyAnswer).to.include({ credential_id: answer.credential_id, prf_salt_b64: answer.prf_salt_b64 })
+    expect(passkeyAnswer.prfBytes).to.eq(answer.prfBytes)
   })
 
   it("accepts bytes made in another realm, an iframe's or a test's jsdom, judging them by their tag", async () => {

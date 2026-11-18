@@ -161,8 +161,8 @@ export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: 
 /** The Thing listed at `scope`, checked, or null when it fails its checks: a damaged child is set aside, not thrown. */
 function listedThingOf(scope: ThingScope, raw: unknown): Thing | null {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
-  const parsed = kindChecksOf(scope.labelpath).stored.safeParse(raw)
-  return parsed.success ? Validator.checkedConsistent(parsed.data, scope, RowOfOtherScope) : null
+  const thing = kindChecksOf(scope.labelpath).stored.safeParse(raw)
+  return thing.success ? Validator.checkedConsistent(thing.data, scope, RowOfOtherScope) : null
 }
 
 /** The Thing in a notice from a watch on `bankScope`, checked. */
@@ -316,9 +316,9 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
  */
 export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWrite): Actual<EX.PutAct | EX.DelAct> {
   const record  = storedThingOf(ask, raw)
-  const checked = worldOf(ask, world)
+  const worldRecord = worldOf(ask, world)
   const beside  = trackedFieldOf(ask, world.tracked)
-  return isRefusedAct(act) ? { ok: false, act, world: checked, record, ...beside } : { ok: true, act, world: checked, record, ...beside }
+  return isRefusedAct(act) ? { ok: false, act, world: worldRecord, record, ...beside } : { ok: true, act, world: worldRecord, record, ...beside }
 }
 
 /** What {@link unwrittenWriteOf} answers for: the write, the act the act tables found, and the raw world the store fetched. */

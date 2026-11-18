@@ -102,15 +102,15 @@ function nextLifeOf({ lifeseq, lifepath }: Pick<BoxThing, 'lifeseq' | 'lifepath'
 // What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
 /** The whisper in the JSON `text`, or throw `damaged_whisper` */
 function deserializeWhisper(text: string): CX.Whisper {
-  let parsed: unknown
+  let jsonVal: unknown
   try {
-    parsed = JSON.parse(text)
+    jsonVal = JSON.parse(text)
   } catch {
     throw Throwers.undecodedWhisper()
   }
-  const checked = CX.whisper.safeParse(parsed)
-  if (! checked.success) { throw Throwers.undecodedWhisper() }
-  return checked.data
+  const whisper = CX.whisper.safeParse(jsonVal)
+  if (! whisper.success) { throw Throwers.undecodedWhisper() }
+  return whisper.data
 }
 // --
 

@@ -87,14 +87,14 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   }
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
-    const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
-    const parsed = bankThing.parse(rest)
-    Validator.checkedConsistent(bankScope.parse(parsed), checked.device.scope, { kind: 'record_conflict' })
-    Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
-    super(parsed)
-    this.#device = checked.device
-    this.#vaultDB = checked.vaultDB
-    this.#queryCacheOpts = Object.freeze(checked.queryCacheOpts)
+    const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB, queryCacheOpts } } = Checks.bankMakeArgs.parse({ record, opts })
+    const bankRecord = bankThing.parse(rest)
+    Validator.checkedConsistent(bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
+    Validator.checkedConsistent(rootBox, { ...bankScope.parse(bankRecord), labelpath: 'box' }, { kind: 'record_conflict' })
+    super(bankRecord)
+    this.#device = device
+    this.#vaultDB = vaultDB
+    this.#queryCacheOpts = Object.freeze(queryCacheOpts)
     this.#rootBox = Object.freeze(rootBox)
     this.#maingate = Gate.make(maingate, { bank: this })
     Object.freeze(this)

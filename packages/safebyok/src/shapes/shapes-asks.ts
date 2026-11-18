@@ -103,10 +103,10 @@ export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLab
 
 /** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {
-  const checked = withRecordsChecked(AskChecks.writeAsk.parse(ask))
-  if ((checked.op === 'put') !== (checked.record.am === 'a')) { throw opNotOfRecord(checked) }
-  checkWriteInvariants(checked)
-  return checked
+  const writeAsk = withRecordsChecked(AskChecks.writeAsk.parse(ask))
+  if ((writeAsk.op === 'put') !== (writeAsk.record.am === 'a')) { throw opNotOfRecord(writeAsk) }
+  checkWriteInvariants(writeAsk)
+  return writeAsk
 }
 
 /** Check the records of `ask` by the kind its modelkind names. Its flags are already checked. */
@@ -118,10 +118,10 @@ function withRecordsChecked({ cited, record, ...flags }: Z.infer<typeof AskCheck
 
 /** Check a birth `ask`: each of its three records, as the put {@link birthPutsOf} makes of it. Throws `bad_record`, and returns it typed. */
 export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
-  const parsed  = AskChecks.birthBankAsk.parse(ask)
-  const checked = { ...parsed, bank: bankThing.parse(parsed.bank), gate: gateThing.parse(parsed.gate), root: boxThing.parse(parsed.root) }
-  for (const put of birthPutsOf(checked)) { checkedWriteAsk(put) }
-  return checked
+  const { bank, gate, root, ...flags } = AskChecks.birthBankAsk.parse(ask)
+  const birthBankAsk = { ...flags, bank: bankThing.parse(bank), gate: gateThing.parse(gate), root: boxThing.parse(root) }
+  for (const put of birthPutsOf(birthBankAsk)) { checkedWriteAsk(put) }
+  return birthBankAsk
 }
 
 /** The three puts of a bank's birth, each writing a root over the shell.
@@ -254,7 +254,7 @@ export type LoggableAsk = Readonly<Z.infer<typeof loggableAsk>>
 
 /** The loggable part of `ask`, or `{}` for an ask that does not parse. */
 export function loggableAskOf(ask: unknown): LoggableAsk {
-  const parsed = loggableAsk.safeParse(ask)
-  return parsed.success ? parsed.data : {}
+  const loggable = loggableAsk.safeParse(ask)
+  return loggable.success ? loggable.data : {}
 }
 // --
