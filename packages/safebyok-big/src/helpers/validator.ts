@@ -269,15 +269,15 @@ export function isConsistent(bag: object, other: object): boolean { return disag
 /** The names of the fields `bag` and `other` both define, at different values. */
 export function disagreeingFieldnames(bag: object, other: object): readonly string[] { return disagreeing(bag, other) }
 
-/** Demand that `bag` is {@link isConsistent} with `other`, else throw a VaultError of `refusal.kind`.
+/** Demand that `bag` is {@link isConsistent} with `other`, else throw a VaultError of `refusal.kind`, `'bad_record'` when no refusal is given.
  * The refusal names the fields that disagree in `meta.fieldnames`, and in its message unless
  * `refusal.message` gives its own. Choose the kind for what a disagreement means at the call: a scope
  * of another user, a record of another vault.
  *
  * @example demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` })   // throws 'bad_scope', naming user_id
  */
-export function demandConsistent(bag: object, other: object, refusal: ConsistencyRefusal): true {
-  const { kind, message } = Checks.consistencyRefusal.parse(refusal)
+export function demandConsistent(bag: object, other: object, refusal?: ConsistencyRefusal): true {
+  const { kind, message } = Checks.consistencyRefusal.parse(refusal ?? { kind: 'bad_record' })
   const fieldnames = disagreeing(bag, other)
   if (fieldnames.length === 0) { return true }
   const said = typeof message === 'function' ? message(fieldnames) : message
