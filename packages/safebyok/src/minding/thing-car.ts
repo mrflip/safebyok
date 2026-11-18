@@ -48,7 +48,8 @@ export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing
   ArgChecks.deliverableThing.parse(newest)
   if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
   if (isGone(newest))         { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
-  if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
+  // The void sentinel, the one whole record that is not a Thing, was answered above.
+  if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest: newest as Thing, fullest: newest as Thing }) }
   if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
   kindChecksOf(newest.labelpath).record.parse(fullest)
   const behind = Object.freeze({ liveness: 'behind', newest, fullest } as const)

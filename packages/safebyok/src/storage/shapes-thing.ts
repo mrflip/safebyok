@@ -8,7 +8,7 @@ import type { TombstoneOf } from '../models/sealers'
 import * as Phrases from '../phrases'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
-// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isGoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
+// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isTombstoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
 
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10
@@ -25,7 +25,7 @@ export function lifeseqOfLifenum(lifenum: Lifenum): Lifeseq { return (lifenum ==
 export function lifenumOfLifeseq(lifeseq: Lifeseq): Lifenum { return Number.parseInt(lifeseq, 32) }
 
 /** True when `lifeseq` is a tombstone's: an odd life, the shell's among them. */
-export function isGoneLifeseq(lifeseq: Lifeseq): boolean { return Math.abs(lifenumOfLifeseq(lifeseq) % 2) === 1 }
+export function isTombstoneLifeseq(lifeseq: Lifeseq): boolean { return Math.abs(lifenumOfLifeseq(lifeseq) % 2) === 1 }
 
 /** The Thing's own lifeseq: the last of its lifepath. */
 export function lifeseqOfLifepath(lifepath: Lifepath): Lifeseq { return lifepath.slice(lifepath.lastIndexOf('/') + 1) }
@@ -89,7 +89,7 @@ function isLifeseqOwn({ lifepath, lifeseq }: Lived & { lifeseq: Lifeseq }): bool
 /** True when a Thing's lifepath has one lifeseq for each segment of its labelpath. */
 function isLifepathDeep({ lifepath, labelpath }: Lived & Labelled): boolean { return lifepath.split('/').length === labelpath.split('/').length }
 /** True when a Thing's own lifeseq is odd exactly when it is a tombstone. */
-function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === isGoneLifeseq(lifeseqOfLifepath(lifepath)) }
+function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === isTombstoneLifeseq(lifeseqOfLifepath(lifepath)) }
 /** True unless the Thing is a deleted main gate. */
 function isMainGateLive({ labelpath, am }: Lived & Labelled): boolean { return (labelpath !== MainGateLabelpath) || (am === 'a') }
 /** The fields of `shape`, each optional: it may be omitted, but not undefined. */
@@ -359,9 +359,10 @@ export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Spa
 /** True when `record` is a void sentinel: its revseq is the shell's -1. */
 export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
 
-/** True when `record` is whole, with its body, and not sparse. */
-export function isWholeRecord(record: Sparse<Thing>): record is Thing {
-  return kindChecksOf(record.labelpath).record.safeParse(record).success
+// The void sentinel is a whole tombstone, though no record check accepts it: a store must never take a shell as a record.
+/** True when `record` is whole, with its body, and not sparse. The void sentinel is whole. */
+export function isWholeRecord(record: Sparse<Thing>): record is Thing | VoidSentinel {
+  return isVoidSentinel(record) || kindChecksOf(record.labelpath).record.safeParse(record).success
 }
 
 // Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
