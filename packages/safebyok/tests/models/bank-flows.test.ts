@@ -116,6 +116,12 @@ describe("the bank's box methods refuse, never throwing", () => {
     expect(got.ok).to.equal(false)
   })
 
+  it("tryGetBox answers a refusal, and does not throw, for an ask that is not a bag", async () => {
+    const bank = await storedBank()
+    await TH.expectBad(await bank.tryGetBox(null as never), 'bad_record')
+    await TH.expectBad(await bank.tryGetBox(undefined as never), 'bad_record')
+  })
+
   it("tryGetBox answers each of its refusals on a disabled device with the device's one refusal", async () => {
     const bank = await storedBank()
     bank.device.sweep()
