@@ -21,8 +21,8 @@ export {
   type BankRecord, type DelAskDraft, type PutAskDraft,
 } from './shapes/shapes-asks'
 export {
-  type BoxCar, type CarFreshness, type DeliverableThing, type GateCar, type GotAnswer, type MinderOpts, type TSQAnswer, type TSQGotAnswer, type ThingCar, carLivenessVals,
-  DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies, type TsqStaleTime,
+  type BankCar, type BoxCar, type CarAt, type CarFreshness, type DeliverableThing, type GateCar, type GotAnswer, type MinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, carLivenessVals,
+  DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, type MinderFriend, type MinderGetOpts, type MinderTryAtOpts, type QueryCacheOpts, type TsqStaleTime,
 } from './shapes/shapes-minder'
 export { ThingMinder } from './minding/thing-minder'
 export { carOf, dbHasNewer } from './minding/thing-car'

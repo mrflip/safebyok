@@ -91,10 +91,7 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: modelkindMismatch, minderNotStarted, staleRead
-
-/** A `bad_record` refusal: a scope of another modelkind than the minder's. */
-export function modelkindMismatch(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.ModelkindMismatch) }
+// == [Minding Throwers]: minderNotStarted, staleRead
 
 /** The refusal of a read on a minder that is not minding. */
 export function minderNotStarted(): Errors.VaultError {

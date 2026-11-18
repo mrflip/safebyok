@@ -16,6 +16,15 @@ function behindOf(newest: Thing, fullest: Thing): ThingCar<Thing> {
   return { liveness: 'behind', newest: sparseOf(newest), fullest }
 }
 
+/** `car`'s liveness, and the life and revision of each of its records. */
+function revisionsOf(car: ThingCar<Thing>) {
+  return {
+    liveness: car.liveness,
+    newest:   [car.newest.lifepath, car.newest.revseq],
+    fullest:  car.fullest && [car.fullest.lifepath, car.fullest.revseq],
+  }
+}
+
 describe("carOf", () => {
   const CarCases = [
     [Box0,               "full", Box0,      'a whole live record is full'],
@@ -115,6 +124,16 @@ describe("bestCarOf", () => {
       expect(bestCarOf(prior, delivered)).to.eq(prior)
     })
   }
+
+  // Of equal revisions, the merge keeps the first heard, so a tombstone heard sparse then whole stays sparse: only the revisions are order-free.
+  it("makes a car of the same liveness and revisions whichever of two cars arrives first", () => {
+    const cars = [...MergeCases, ...PriorWinsCases].flatMap(([prior, delivered]) => [prior, delivered])
+    for (const one of cars) {
+      for (const other of cars) {
+        expect(revisionsOf(bestCarOf(one, other))).to.deep.equal(revisionsOf(bestCarOf(other, one)))
+      }
+    }
+  })
 
   it("makes a frozen full car of the later record itself, where the prior car has no whole record", () => {
     const later  = structuredClone(Box1)

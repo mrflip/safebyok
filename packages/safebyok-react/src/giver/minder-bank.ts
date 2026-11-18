@@ -1,35 +1,43 @@
-/** A giver's bank over a box minder of the new core, for a Device to hand the giver. */
+/** A giver's bank over a bank's minder in the new core, for a Device to hand the giver. */
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
-import { type BoxCar, type MinderFriend, type MinderGetAsk, ThingMinder } from 'safebyok'
+import { type BoxCar, ThingMinder } from 'safebyok'
+// eslint-disable-next-line import-x/no-extraneous-dependencies -- as above
+import { isLabelpathOfKind } from 'safebyok/storage'
 import { Checkers } from 'safebyok-big/storage'
 import type { GiverBank } from './react-giver'
 
-// == [Checks]: Checks
+// == [Checks]: Checks, BoxLabelpath, isBoxLabelpath
 
 const Checks = Checkers('bad_record', ({ custom }) => ({
-  boxMinder: custom<ThingMinder>((val) => (val instanceof ThingMinder) && (val.modelkind === 'box'), 'Expected a ThingMinder of boxes'),
-  bank:      custom<Pick<MinderFriend, 'makeGetAsk'>>((val) => (val instanceof Object) && (typeof (val as Partial<MinderFriend>).makeGetAsk === 'function'), 'Expected a bank'),
+  minder:       custom<ThingMinder>((val) => val instanceof ThingMinder, 'Expected a ThingMinder'),
+  boxLabelpath: custom<BoxLabelpath>((val) => (typeof val === 'string') && isBoxLabelpath(val), 'Expected the labelpath of a box'),
 }))
+
+/** The labelpath of a box: the root box's, or one under it. */
+type BoxLabelpath = 'box' | `box/${string}`
+
+/** True when `labelpath` is a box's. */
+function isBoxLabelpath(labelpath: string): labelpath is BoxLabelpath { return isLabelpathOfKind(labelpath, 'box') }
 // --
 
 // == [The bank]: giverBankOfMinder
 
-// The minder is of boxes, so each car it answers or tells of is a box's. A bank's get ask has `ifAbsent` as given and its
-// own `track`, as the minder takes it.
-/** The giver's bank over `boxMinder`, a box minder from `hello` until `goodbye`, getting each box by `bank`'s get ask for it.
- * A get waits for nothing the minder holds timely; anything else it asks of the vaultDB.
+/** The giver's bank over the boxes `minder` minds, from its `hello` until its `goodbye`.
+ * A get answers at once from a car the minder holds timely, and asks the vaultDB for any other. It gets only a box's labelpath.
  */
-export function giverBankOfMinder(boxMinder: ThingMinder, bank: Pick<MinderFriend, 'makeGetAsk'>): GiverBank<BoxCar> {
-  Checks.boxMinder.parse(boxMinder)
-  Checks.bank.parse(bank)
+export function giverBankOfMinder(minder: ThingMinder): GiverBank<BoxCar> {
+  Checks.minder.parse(minder)
   return Object.freeze({
-    userid:        boxMinder.userid,
-    banklabel:     boxMinder.banklabel,
-    getBoxCar:     async (labelpath: string) => (await boxMinder.get(bank.makeGetAsk({ labelpath, ifAbsent: 'nil' }) as MinderGetAsk)) as BoxCar,
-    listenBoxCars: (listener: (labelpath: string, car: BoxCar) => void) => boxMinder.listen((answer) => {
+    userid:        minder.userid,
+    banklabel:     minder.banklabel,
+    getBoxCar:     async (labelpath: string) => minder.get({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
+    listenBoxCars: (listener: (labelpath: string, car: BoxCar) => void) => minder.listen((answer) => {
+      const { labelpath } = answer.ask
       // A removed car has none: the bank object that removed it is ending, and the bridge resets its entries.
-      if (answer.car !== undefined) { listener(answer.ask.labelpath, answer.car as BoxCar) }
+      if ((answer.car === undefined) || (! isBoxLabelpath(labelpath))) { return }
+      // The minder's listen is not typed by kind: a car at a box's labelpath is a box's.
+      listener(labelpath, answer.car as BoxCar)
     }),
   })
 }

@@ -125,9 +125,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   // Each fills in this bank's scope and its `track`, and the modelkind and default flags of `getAskOf` and the rest. The
   // track is this object's, which may be stale: the answer's `tracked` says so. Nothing is checked here: the verb does that.
 
-  /** The get ask for the Thing at `ask.labelpath` in this bank.
-   * A ThingMinder sends it to the vaultDB exactly as given, in the get ask it is handed.
-   */
+  /** The get ask for the Thing at `ask.labelpath` in this bank. */
   makeGetAsk(ask: BankAskDraft): GetAsk { return getAskOf({ ...ask, ...this.scope, track: this.track }) }
 
   /** The list ask for the children of the Thing at `ask.labelpath` in this bank. */

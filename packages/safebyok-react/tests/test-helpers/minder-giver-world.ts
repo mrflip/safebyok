@@ -1,27 +1,26 @@
-/** A Device for the giver's tests over the new core's box minder: one bank, born in a memory vaultDB, already started. */
+/** A Device for the giver's tests over the new core's minder: one bank, born in a memory vaultDB, already started. */
 
-import { QueryClient } from '@tanstack/react-query'
-import { type BoxCar, type MinderFriend, type MinderGetAsk, ThingMinder } from 'safebyok'
-import { type BoxThing, type Thing, MemoryVaultDB, getAskOf, listAskOf, shellOf } from 'safebyok/storage'
+import { type BoxCar, type MinderFriend, ThingMinder } from 'safebyok'
+import { type BoxThing, type GetAsk, type Thing, MemoryVaultDB, getAskOf, listAskOf, shellOf } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { giverBankOfMinder } from '../../src/giver/minder-bank'
 import type { DeviceSnapshot, GiverBank, GiverDevice } from '../../src/giver/react-giver'
 
 // == [Asks]: minderGetAskOf
 
-/** The get ask for the Thing at `labelpath` in the core's test bank, tracking its roots at revision 0, as the minder takes it. */
-function minderGetAskOf({ labelpath }: Readonly<{ labelpath: string }>): MinderGetAsk {
-  return getAskOf({ ...LeanTH.ThingBank, labelpath, ifAbsent: 'nil', track: LeanTH.trackOf() }) as MinderGetAsk
+/** The get ask for the Thing at `labelpath` in the core's test bank, tracking its roots at revision 0. */
+function minderGetAskOf({ labelpath, ifAbsent }: Readonly<{ labelpath: string, ifAbsent?: GetAsk['ifAbsent'] }>): GetAsk {
+  return getAskOf({ ...LeanTH.ThingBank, labelpath, ...(ifAbsent && { ifAbsent }), track: LeanTH.trackOf() })
 }
 // --
 
 // == [The world]: MinderGiverWorld, makeMinderGiverWorld, minderDeviceOf, unsubscribeNothing
 
-/** A Device over one started bank's box minder, and the test's ways past it. */
+/** A Device over one started bank's minder, and the test's ways past it. */
 export interface MinderGiverWorld {
   device:    GiverDevice<BoxCar>
   vaultDB:   MemoryVaultDB
-  boxMinder: ThingMinder
+  minder:    ThingMinder
   /** How many gets the vaultDB has answered. */
   counts:    { gets: number }
   /** Store `box` under the root box, as its first revision. */
@@ -51,13 +50,13 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
     makeListAsk: ({ labelpath }) => listAskOf({ ...LeanTH.ThingBank, labelpath, track: LeanTH.trackOf() }),
     tellBadNews: (badnews) => { throw new AggregateError(badnews, 'The minder told of bad news') },
   })
-  const boxMinder = ThingMinder.make({ modelkind: 'box' }, { vaultDB, tsq: new QueryClient(), queryCacheOpts: {} }, friend)
-  boxMinder.hello()
+  const minder = ThingMinder.make({ vaultDB }, friend)
+  minder.hello()
 
   return {
-    device:          minderDeviceOf(giverBankOfMinder(boxMinder, friend)),
+    device:          minderDeviceOf(giverBankOfMinder(minder)),
     vaultDB,
-    boxMinder,
+    minder,
     counts,
     _cheat_birthBox: async (box) => {
       const shell = shellOf({ ...LeanTH.ThingBank, labelpath: box.labelpath }, LeanTH.rootBoxOf())
