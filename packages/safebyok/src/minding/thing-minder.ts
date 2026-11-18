@@ -259,7 +259,7 @@ export class ThingMinder {
   async #doGet(ask: GetAsk, opts: MinderGetAskOpts): Promise<ThingCar<Thing>> {
     let fetched: ThingCar<Thing>
     try {
-      fetched = await this.#tsq.query(this.#tsqQueryRunner(ask, opts))
+      fetched = await this.#tsq.query(this.#tsqQueryOptions(ask, opts))
     } catch (err) {
       // TanStack cancels a get under way when goodbye removes its car.
       throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
@@ -310,7 +310,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: keyPrefix, queryKey, #tsqQueryRunner, #shellAt
+  // == [TSQ Asks]: keyPrefix, queryKey, #tsqQueryOptions, #shellAt
 
   /** The start of the query key every one of this minder's cars is cached under. */
   get keyPrefix(): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, this.modelkind] }
@@ -324,10 +324,10 @@ export class ThingMinder {
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
   /** TanStack's query options for a get of `ask`, with `opts.staleTime` where given, else the minder's query defaults' own. */
-  #tsqQueryRunner(ask: GetAsk, opts: MinderGetAskOpts): TSQ.QueryExecuteOptions<ThingCar<Thing>> {
-    const runner = { queryKey: this.queryKey(ask), queryFn: () => this.#fetchCar(ask) }
-    if (opts.staleTime === undefined) { return runner }
-    return { ...runner, staleTime: staleTimeFnOf(opts.staleTime) }
+  #tsqQueryOptions(ask: GetAsk, opts: MinderGetAskOpts): TSQ.QueryExecuteOptions<ThingCar<Thing>> {
+    const queryOpts = { queryKey: this.queryKey(ask), queryFn: () => this.#fetchCar(ask) }
+    if (opts.staleTime === undefined) { return queryOpts }
+    return { ...queryOpts, staleTime: staleTimeFnOf(opts.staleTime) }
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
