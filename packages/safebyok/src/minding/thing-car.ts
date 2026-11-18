@@ -4,7 +4,7 @@ import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
   type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type Tombstone, type VoidSentinel,
-  cmpThings, haveSameScope, isGone, isSparse, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
+  cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
 } from '../storage/shapes-thing'
 
 // == [The car]: Tombstone, ThingCar, BoxCar, GateCar, DeliverableThing, carLivenessVals
@@ -45,16 +45,13 @@ export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as con
  * A deleted Thing's car is `gone`, even when its tombstone is sparse, and the void sentinel's is `void`. A sparse `newest` with no `fullest` makes a `bare` car.
  */
 export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing> {
-  ArgChecks.deliverableThing.parse(newest)
+  CarChecks.deliverableThing.parse(newest)
   if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
-  if (isGone(newest))         { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
-  // The void sentinel, the one whole record that is not a Thing, was answered above.
-  if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest: newest as Thing, fullest: newest as Thing }) }
+  if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
+  if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
   if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
   kindChecksOf(newest.labelpath).record.parse(fullest)
-  const behind = Object.freeze({ liveness: 'behind', newest, fullest } as const)
-  ArgChecks.thingCar.parse(behind)
-  return behind
+  return      Object.freeze(CarChecks.behindCar.parse({ liveness: 'behind', newest, fullest } as const))
 }
 
 // TanStack also calls it on an observer's selected and placeholder values, so it throws for one that is not a car.
@@ -71,11 +68,7 @@ export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
   const [newestTag,  newest]  = tagBestNewestSL(prior, delivered)
   const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)
   if ((newestTag === 'prior') && (fullestTag === 'prior')) { return prior }
-  // A tombstone has a life of its own, so two cars of one life are both live, or both gone, or both void: where `newest`
-  // is live and sparse, the one case carOf reads `fullest`, it is whole or undefined.
-  const best = carOf(newest, fullest as Thing | undefined)
-  demandCar(best)
-  return best
+  return carOf(newest, fullest as Thing | undefined)
 }
 
 /** The newer of the two cars' newest records, tagged with its car. On a tie, `delivered`'s where it alone is full, else `prior`'s. */
@@ -120,10 +113,10 @@ function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing
 }
 // --
 
-// == [Checks]: CarChecks, ArgChecks
+// == [Checks]: UnexpectedCarChecks, CarChecks
 
 /** The checks of a car's invariants, as {@link ThingCar} states them, each liveness by name. A car that fails one is a bug in safebyok. */
-const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
+const UnexpectedCarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
   const citedShape = obj({ ...thingScope.shape, ...thingCited.shape })
   // Its records pass through as they are, so that a refinement can compare them by reference.
   const cited = custom<Sparse<Thing>>((val) => citedShape.safeParse(val).success, Phrases.CarRecordShape)
@@ -144,10 +137,11 @@ const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, c
 })
 
 /** The checks of {@link carOf}'s arguments, refusing `bad_record`: a Thing's scope and revision, and the car a pair of records makes. */
-const ArgChecks = {
+const CarChecks = {
+  ...UnexpectedCarChecks,
   ...Validator.Checkers('bad_record', ({ obj }) => ({
     deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
   })),
-  thingCar: CarChecks.thingCar.refusingAs('bad_record'),
+  thingCar: UnexpectedCarChecks.thingCar.refusingAs('bad_record'),
 }
 // --
