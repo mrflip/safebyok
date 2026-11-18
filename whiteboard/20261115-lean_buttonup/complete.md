@@ -32,7 +32,7 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
 ### safebyok/cached
 
 * **DONE** *One way into the cache.* Every record enters through `structuralSharing` (`betterRecordOf`): a get's
-  answer as its `queryFn` returns it, and a notice or a listing through `#doDeliverRecord`.
+  answer as its `queryFn` returns it, and a notice or a listing through `#sendToTSQ`.
 * **DONE** *Each minder holds its own watch, and the minders know nothing of each other.* A change to the bank, the
   main gate or the root box comes back as that Thing's own notice, through `tracked`.
 * **DONE** *The ThingMinder is a strict public primitive.* `get(ask, opts)` and `tryAt(ask, opts)` take the bank's
@@ -59,7 +59,7 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
   API: firmly typed records in our vocabulary, discipline inside the boundaries, and generous DWIM-but-safe portals and
   helpers. Not yet scoped as a thread: first a review of `minding/` against both ends (running, 2026-11-17).
   * Known, agreed: `betterRecordOf` freezes an observer's `select` result that is not a record (TanStack passes it
-    through `structuralSharing`; `cmpRecords` gives NaN, so `prior` is kept). Compare as records only when both are
+    through `structuralSharing`; `cmpThings` gives NaN, so `prior` is kept). Compare as records only when both are
     records, else `TSQ.replaceEqualDeep`; a test red first. Rides with the minder round.
   * Agreed: `#demandOwnAsk(ask: MinderGetAsk)`, losing the `unknown`, keeping the check and the name.
   * **The ThingCar, the minder's cache value (the Coach, 2026-11-17; agreed).** A host shows the whole
@@ -104,7 +104,33 @@ PR #707 built (the vaultDB's verbs on bank, gate and box, the battery, `Postgres
       pasted type's shapes: `null` when `gone` or `void`, `undefined` when `bare`. A sparse record seems full to us, but
       for the user it is bereft, so `null` and `undefined` are the fullest records we can provide. The doc line names
       `fullest` as its subject: "`fullest` is null when gone or void, and undefined when bare"
-    * A thread of its own, cut from main after #716 merges; it sweeps `entry` out of `minding/`.
+    * Built as #718 (`thing_car`, stacked on #716). The review round (the Coach, 2026-11-17):
+      * A tombstone heard sparse by `list` lands `gone` and answers `get` from the cache: accepted, with a changeset line.
+      * `isThingCar` uses the car's zod check, not `liveness` alone ("we don't have to worry about slow until someone
+        complains"). A `modelkind` field on the car was offered; Claude holds it for T3b's typing by kind.
+      * `carOf` stays exported and checks its input. `isVaultDBNewer` stays a function, not a field on the car (the
+        Coach, settled). It takes `Pick<ThingCar, 'liveness'>` and checks nothing, since an
+        `isFoo` never throws (the Coach: yes).
+      * `Tombstone<RecordT>` keeps its bare name, like `Sparse<RecordT>`. STYLE.md does not say so: the Coach wants
+        STYLE.md to rely more on context.
+      * `#doDeliverRecord` is `#sendToTSQ` (the Coach): it names whom the record goes to, and the record may not enter
+        the cache.
+      * A bulleted list in a doc block uses `-` (the Coach); STYLE.md now says so.
+      * `structuralSharing` sees only cars, and undefined before the first (the Coach): a minder's query refuses `select`
+        and `placeholderData`, and `mergedValOf` throws `unexpected_error` on any value that is not a car. TanStack
+        calls it from the cache and from observers alike, and cannot say which.
+      * The root box: no seed at `hello` before birth; a `bare` car of the version-0 root box when `#tryBirth` sends
+        it ("optimistically, it's the empty box we sent off"); `#shellAt` reads the bank's root box. The Coach: in the
+        React case, the delay to fully populated data is a thousandth of the time to unlock or birth.
+      * The reviewer's cleanup items, as listed in its report.
+      * `get` returns a car (the Coach). A whole record of an earlier life is dropped by the merge, leaving the car
+        `bare` (the Coach: correct).
+      * The birth: "thing minder should just leave the bank alone" (the Coach). The minder reads none of the bank's state,
+        only its scope and its functions (`makeGetAsk`, `makeListAsk`, `tellBadNews`); `MinderFriend` drops `rootBox`.
+        No seed at `hello`: with nothing cached, the first get fetches the root box anyway. `#shellAt` takes an empty
+        box's parent from the cached root car, and with none cached, the get refuses. No orchestration in the minder:
+        "other things will handle this: device has a whole hello dying to help" (the Coach). A minder may be made before birth. The seam is option (d), building nothing:
+        the vaultDB's watch notices the birth's root box.
   * **Thread `minder_grain`** (2026-11-17, cut from main; the classifier tidy stays in and around the classifier file).
     From the review: the `select`/`placeholderData` sharing fix (both values revisions of one Thing, by `thingCited` and
     labelpath, else `replaceEqualDeep`); a default `queryFn` in the key defaults, its ask from `makeGetAsk`, `track`

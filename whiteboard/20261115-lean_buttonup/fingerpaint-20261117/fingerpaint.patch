@@ -1,0 +1,724 @@
+diff --git a/packages/safebyok/src/index.ts b/packages/safebyok/src/index.ts
+index 5dded6559..62c24997f 100644
+--- a/packages/safebyok/src/index.ts
++++ b/packages/safebyok/src/index.ts
+@@ -15,7 +15,7 @@ export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer
+ export { type BoxThing, type DelAskDraft, type PutAskDraft, type VoidSentinel, isVoidSentinel } from './storage/shapes-thing'
+ export { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies } from './minding/shapes-minder'
+ export { type CarFreshness, type GotAnswer, type MinderOpts, type TSQAnswer, type TSQGotAnswer, ThingMinder } from './minding/thing-minder'
+-export { type BoxCar, type DeliverableThing, type GateCar, type ThingCar, type Tombstone, carLivenessVals, carOf, isVaultDBNewer } from './minding/thing-car'
++export { type BoxCar, type DeliverableThing, type GateCar, type ThingCar, type Tombstone, carLivenessVals, carOf, dbHasNewer } from './minding/thing-car'
+ 
+ // From safebyok-big: its refusals, what a device is handed, and what a gating's dialog and a box carry.
+ export { IsVaultError, VaultError, isVaultError, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
+diff --git a/packages/safebyok/src/minding/shapes-minder.ts b/packages/safebyok/src/minding/shapes-minder.ts
+index ee16a18a9..43db5dbfa 100644
+--- a/packages/safebyok/src/minding/shapes-minder.ts
++++ b/packages/safebyok/src/minding/shapes-minder.ts
+@@ -35,7 +35,10 @@ const MaxGcTime = (2 ** 31) - 1
+ // == [Checks]: queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts
+ 
+ /** The checks of a ThingMinder's arguments and options. */
+-export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts } = Validator.Checkers('bad_option', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
++export const {
++  queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener,
++  minderScope, minderTrack, minderAskOpts, minderGetAskOpts
++} = Validator.Checkers('bad_option', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
+   const gcTime           = union([uint.max(MaxGcTime, Phrases.GcTimeShape), lit(Infinity)])
+   const queryCacheOpts   = obj({
+     staleTime: orDefault(uint, DefaultQueryCacheOpts.staleTime),
+@@ -51,12 +54,15 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderSc
+   const minderScope      = obj(thingScope.shape)
+   // The rest of the ask is the vaultDB's, which checks it.
+   const minderTrack      = obj({ track: trackShape }).loose()
++  const tsqStaleTime     = uint.optional().or(lit(Infinity)).or(lit('static'))
+   // Each option may be left out, and never given as undefined.
+-  const minderGetAskOpts = obj({ staleTime: exactOptional(uint) }).strict()
++  const minderGetAskOpts = obj({ staleTime: tsqStaleTime }).strict()
+   const minderAskOpts    = minderGetAskOpts.extend({ ifStale: exactOptional(oneof(['get', 'refresh'])) }).strict()
+-  return { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts }
++  return { queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts }
+ })
+ 
++export type TsqStaleTime = Z.input<typeof tsqStaleTime>
++
+ /** A get ask with `ifAbsent: 'nil'` and a `track`, which the minder sends to the vaultDB exactly as given. */
+ export type MinderGetAsk     = GetAsk & Readonly<{ ifAbsent: 'nil', track: Track }>
+ /** A get's options: `staleTime` overrides the minder's own. */
+diff --git a/packages/safebyok/src/minding/thing-car.ts b/packages/safebyok/src/minding/thing-car.ts
+index 7402da30f..811ba0821 100644
+--- a/packages/safebyok/src/minding/thing-car.ts
++++ b/packages/safebyok/src/minding/thing-car.ts
+@@ -1,6 +1,5 @@
+ /** `ThingCar`, what a ThingMinder caches for one scope, and how two cars of one Thing merge. */
+ 
+-import * as TSQ from '@tanstack/query-core'
+ import { Validator } from 'safebyok-big/internals'
+ import type { TombstoneOf } from '../models/sealers'
+ import * as Phrases from '../phrases'
+@@ -14,21 +13,20 @@ import {
+ /** A tombstone of a RecordT, sparse or whole. */
+ export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
+ 
+-// The vaultDB holds a newer whole record when liveness is 'behind' or 'bare' (isVaultDBNewer).
+-/** A ThingMinder's frozen cache value for one scope: the newest revision heard of, perhaps sparse, and the fullest record seen.
+- * Show `fullest ?? newest`, the fullest record the car holds, and write against `newest`.
+- * - `newest` is always a record: the void sentinel when none is stored.
+- * - `fullest` is null when gone or void, and undefined when bare.
+- * - Both records are of one scope and one life: they share a lifepath.
+- * - When `full`, they are one record: `newest === fullest`.
+- * - When `behind`, `fullest` is of an earlier revision: `newest.revseq > fullest.revseq`, never equal.
++// The vaultDB holds a newer whole record when liveness is 'behind' or 'bare' (dbHasNewer).
++/** A ThingMinder's frozen cache value for a thing: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
++ * - `newest` is always a record: full, sparse, the void sentinel when void, or a tombstone when gone.
++ * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
++ * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
++ * - On `full`, the two are *identical* (`newest === fullest`): the same object not just the same content.
++ * - When `behind`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
+  */
+ export type ThingCar<RecordT extends ThingRecord> = Readonly<
+-  | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both
+-  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is older
+-  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched whole
+-  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a tombstone, sparse or whole
+-  | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // none stored
++  | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
++  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
++  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
++  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a tombstone: known to be gone. dbHasNewer: false
++  | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
+ >
+ 
+ /** The car of a box. */
+@@ -45,125 +43,147 @@ export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as con
+ 
+ // == [Making cars]: carOf, mergedCarOf, carOfPair, carOfParts, sharedCarOf, newerWholeOf
+ 
+-/** The car of `record` alone. A tombstone's car is `gone`, even when the tombstone is sparse. */
+-export function carOf(record: DeliverableThing): ThingCar<Thing> {
+-  ArgChecks.deliverableThing.parse(record)
+-  if (isVoidSentinel(record)) { return Object.freeze({ liveness: 'void', newest: record, fullest: null }) }
+-  if (isTombstone(record))    { return Object.freeze({ liveness: 'gone', newest: record, fullest: null }) }
+-  if (isWholeRecord(record))  { return Object.freeze({ liveness: 'full', newest: record, fullest: record }) }
+-  return                               Object.freeze({ liveness: 'bare', newest: record, fullest: undefined })
+-}
+-
+-/** The merge of `landed` over `prior`: the newer newest, with the newer fullest of the same life.
+- * It is `prior` itself where `landed` adds nothing, and `landed` where `prior` is undefined or of another Thing.
++/** The merge of two cars of one Thing: see {@link mergedCarOf}. On a tie, `prior`'s record is kept.
++ * 1. For different lives, return the newer (records in a car share a lifepath; newest is always a record.)
++ * 2. identify which is fuller.
+  */
+-export function mergedCarOf(prior: ThingCar<Thing> | undefined, landed: ThingCar<Thing>): ThingCar<Thing> {
+-  const merged = ((prior === undefined) || (! isSameScope(prior.newest, landed.newest))) ? landed : carOfPair(prior, landed)
+-  Checks.thingCar.parse(merged)
+-  return merged
++export function bestCarOf(prior: ThingCar<Thing>, landed: ThingCar<Thing>): ThingCar<Thing> {
++  if (prior === undefined) { return landed } // cold cache: no prior
++  CarChecks.thingCar.parse(prior); CarChecks.thingCar.parse(landed)
++  if (prior.newest.lifepath !== landed.newest.lifepath) { return (prior.newest.lifepath > landed.newest.lifepath) ? prior : landed }
++  const [bestNewest,  newest]  = tagBestNewestSL(prior, landed)
++  const [bestFullest, fullest] = tagBestFullestSL(prior, landed)
++  if ((bestFullest === 'prior') && (bestNewest === 'prior')) { return prior }
++  return carOf(newest, fullest as Thing | null | undefined) // at least one is not from prior
+ }
+ 
+-/** The merge of two cars of one Thing: see {@link mergedCarOf}. On a tie, `prior`'s record is kept. */
+-function carOfPair(prior: ThingCar<Thing>, landed: ThingCar<Thing>): ThingCar<Thing> {
+-  const newer = (cmpRecords(prior.newest, landed.newest) > 0) ? landed : prior
+-  if (newer.fullest === null) { return newer }
+-  const fullest = newerWholeOf(prior.fullest, landed.fullest)
+-  const ofLife  = (fullest?.lifepath === newer.newest.lifepath) ? fullest : undefined
+-  return sharedCarOf(prior, carOfParts(newer.newest, ofLife))
++// make this handle the sparse case. don't use undefined as a sentinel
++/** Which car has the newer `newest` record? On a tie, the fuller; on a tie for fullest, `prior`. */
++function tagBestNewestSL(prior: ThingCar<Thing>, landed: ThingCar<Thing>): ['prior' | 'landed', DeliverableThing] {
++  const cmp = cmpThings(prior.newest, landed.newest)
++  if (cmp < 0) { return ['prior',  prior.newest] }
++  if (cmp > 0) { return ['landed', landed.newest] }
++  if (landed.liveness !== 'full') { return ['prior', prior.newest] }
++  if (prior.liveness  !== 'full') { return ['landed', landed.newest] }
++  return ['prior', prior.newest]
+ }
+ 
+-/** The car of live `newest`, with `fullest` the newest whole record of its life, or undefined for none. */
+-function carOfParts(newest: Sparse<Thing>, fullest: Thing | undefined): ThingCar<Thing> {
+-  if (fullest === undefined)               { return Object.freeze({ liveness: 'bare',   newest, fullest }) }
+-  if (cmpRecords(fullest, newest) === 0)   { return Object.freeze({ liveness: 'full',   newest: fullest, fullest }) }
+-  return                                            Object.freeze({ liveness: 'behind', newest, fullest })
++/** The fullest record of two cars, or undefined where both are absent. On a tie, `prior`. */
++function tagBestFullestSL(prior: ThingCar<Thing>, landed: ThingCar<Thing>): ['prior' | 'landed', Sparse<Thing> | Thing | null | undefined] {
++  if (landed.liveness === 'bare')   { return ['prior',  prior.fullest] }
++  if (prior.liveness  === 'bare')   { return ['landed', landed.fullest] }
++  return tagBestNewestRecordSL(prior.fullest ?? prior.newest, landed.fullest ?? landed.newest)
+ }
+ 
+-// TanStack's own default sharing, applied to the car: `prior` itself where nothing differs.
+-/** `car`, keeping each part that is unchanged from `prior` as it was. */
+-function sharedCarOf(prior: ThingCar<Thing>, car: ThingCar<Thing>): ThingCar<Thing> {
+-  const shared = TSQ.replaceEqualDeep(prior, car)
+-  if (shared === prior)            { return prior }
+-  // A full car has one record in both fields: the one shared with prior's fullest keeps the most of its body.
+-  if (shared.liveness === 'full')  { return Object.freeze({ ...shared, newest: shared.fullest }) }
+-  return Object.freeze(shared)
++/** The newer record of two deliverables. On a tie, `prior`. */
++function tagBestNewestRecordSL(prior: DeliverableThing, landed: DeliverableThing): ['prior' | 'landed', DeliverableThing] {
++  return (cmpThings(prior, landed) <= 0) ? ['prior', prior] : ['landed', landed]
+ }
+ 
+-/** The newer of two whole records, or undefined where both are absent. On a tie, `ante`. */
+-function newerWholeOf(ante: Thing | null | undefined, post: Thing | null | undefined): Thing | undefined {
+-  if (! ante) { return post ?? undefined }
+-  if (! post) { return ante }
+-  return (cmpRecords(ante, post) > 0) ? post : ante
++// if future need arises to type-refine this, overload it.
++/** The car of `record` alone. A tombstone's car is `gone`, even when the tombstone is sparse. */
++export function carOf(newest: DeliverableThing, fullest: Thing | null | undefined = undefined): ThingCar<Thing> {
++  CarChecks.deliverableThing.parse(newest)
++  if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
++  if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
++  if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
++  if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
++  // replace the check with the correct sparse checker, strict if possible.
++  const sparse = ThingChecks.sparseThing.parse(fullest)
++  return                               Object.freeze({ liveness: 'behind', newest, fullest: sparse })
+ }
++
+ // --
+ 
+-// == [Reading cars and records]: isThingCar, isVaultDBNewer, isWholeRecord, isTombstone, cmpRecords, isSameScope
++// == [Reading cars and records]: isThingCar, dbHasNewer, isWholeRecord, isTombstone, cmpThings, haveSameScope
+ 
+ // TanStack also shares an observer's selected and placeholder values, which may be anything, a `liveness` field included.
+ /** True when `val` is a sound car. */
+ export function isThingCar(val: unknown): val is ThingCar<Thing> {
+-  return Checks.thingCar.safeParse(val).success
++  return CarChecks.thingCar.safeParse(val).success
+ }
+ 
++
+ /** True when the vaultDB holds a whole record newer than `car`'s fullest. */
+-export function isVaultDBNewer(car: Pick<ThingCar<Thing>, 'liveness'>): boolean {
++export function dbHasNewer(car: Pick<ThingCar<Thing>, 'liveness'>): boolean {
+   return (car.liveness === 'behind') || (car.liveness === 'bare')
+ }
+ 
++// move these to Thing; find where they're not being used, and use them.
++
+ /** True when `record` is whole, with its body, and not sparse. */
+ export function isWholeRecord(record: Sparse<Thing>): record is Thing {
+   return kindChecksOf(record.labelpath).record.safeParse(record).success
+ }
+ 
+ // Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
+-/** True when `record` is a tombstone, sparse or whole. The void sentinel is not one. */
+-export function isTombstone<RecordT extends Thing>(record: Sparse<RecordT>): record is Tombstone<RecordT> {
+-  return (record.am === 'x') && (! isVoidSentinel(record))
++/** True when `record` is a tombstone. */
++export function isTombstone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
++  return ((record as Sparse<RecordT>)?.am === 'x')
+ }
+ 
+-// The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0. Lifeseqs are
+-// fixed-width base-32 digits, 0-9 then a-v, so lifepaths compare as strings; the shell's '-' sorts below them all.
+-/** Compare two revisions, life first: positive when `post` is later than `ante`, negative when earlier, zero when the same. */
+-export function cmpRecords(ante: Pick<DeliverableThing, 'lifepath' | 'revseq'>, post: Pick<DeliverableThing, 'lifepath' | 'revseq'>): number {
++// export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel {
++// }
++
++// The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0.
++// Lifeseq strings are lexicographically ordered, since a reset implies a parent with a later lifepath.
++/** Compare two revisions: by life, then revision. Returns: positive (`post` newer), negative (`ante` newer), zero (`same`).
++ * The output is **not** restricted to -1, 0, 1: it may be any integer.
++*/
++export function cmpThings(ante: Pick<DeliverableThing, 'lifepath' | 'revseq'>, post: Pick<DeliverableThing, 'lifepath' | 'revseq'>): number {
+   if (ante.lifepath !== post.lifepath) { return (post.lifepath > ante.lifepath) ? 1 : -1 }
+   return post.revseq - ante.revseq
+ }
+ 
++// Thing.haveSameScope
+ /** True when `ante` and `post` are at one labelpath of one bank. */
+-function isSameScope(ante: ThingScope, post: ThingScope): boolean {
++function haveSameScope(ante: ThingScope, post: ThingScope): boolean {
+   return (ante.labelpath === post.labelpath) && (ante.userid === post.userid) && (ante.banklabel === post.banklabel)
+ }
+ // --
+ 
+-// == [Checks]: isLiveSparse, ArgChecks, Checks
+-
++// == [Checks]: isSparse, CarChecks, Checks
++// Thing.isSparse
+ /** True when `record` is live, and not whole. */
+-function isLiveSparse(record: Sparse<Thing>): boolean { return (record.am === 'a') && (! isWholeRecord(record)) }
+-
+-/** The check of {@link carOf}'s record: a Thing's scope and revision. */
+-const ArgChecks = Validator.Checkers('bad_option', ({ obj }) => ({
+-  deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
+-}))
++function isSparse(record: Sparse<Thing>): boolean {
++  return (record.am === 'a') && (! isWholeRecord(record))
++}
+ 
+-/** The check of a car's invariants, as {@link ThingCar} states them. A car that fails it is a bug in the minder. */
+-const Checks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
++/** ThingCar's type-safe checks. */
++// is checkers requiring everyone to use the same refusal code? does it redecorate an
++// already-decorated checker? TODO reforming that.
++const CarChecks = Validator.Checkers('bad_option', ({ obj, lit, discrim, custom }) => {
++  const deliverableThing = obj({ ...thingScope.shape, ...thingCited.shape })
+   const citedShape = obj({ ...thingScope.shape, ...thingCited.shape })
+   // Its records pass through as they are, so that a refinement can compare them by reference.
+   const cited = custom<Sparse<Thing>>((val) => citedShape.safeParse(val).success, Phrases.CarRecordShape)
+   const whole = custom<Thing>((val) => citedShape.safeParse(val).success && isWholeRecord(val as Sparse<Thing>), Phrases.CarFullestShape)
++
++  const fullCar =    obj({ liveness: lit('full'), newest: cited, fullest: whole })
++    .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit),
++
+   const thingCar = discrim('liveness', [
+-    obj({ liveness: lit('full'), newest: cited, fullest: whole })
+-      .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit),
++    fullCar,
++    // ...
+     obj({ liveness: lit('behind'), newest: cited, fullest: whole })
+-      .refine(({ newest }) => isLiveSparse(newest), Phrases.CarNewestNotSparse)
+-      .refine(({ newest, fullest }) => isSameScope(newest, fullest) && (newest.lifepath === fullest.lifepath) && (fullest.revseq < newest.revseq), Phrases.CarBehindOfOtherRevision),
++      .refine(({ newest }) => isSparse(newest), Phrases.CarNewestNotSparse)
++      .refine(({ newest, fullest }) => haveSameScope(newest, fullest) && (newest.lifepath === fullest.lifepath) && (fullest.revseq < newest.revseq), Phrases.CarBehindOfOtherRevision),
+     obj({ liveness: lit('bare'), newest: cited, fullest: lit(undefined) })
+-      .refine(({ newest }) => isLiveSparse(newest), Phrases.CarNewestNotSparse),
++      .refine(({ newest }) => isSparse(newest), Phrases.CarNewestNotSparse),
+     obj({ liveness: lit('gone'), newest: cited, fullest: lit(null) })
+       .refine(({ newest }) => isTombstone(newest), Phrases.CarGoneNotTombstone),
+     obj({ liveness: lit('void'), newest: cited, fullest: lit(null) })
+       .refine(({ newest }) => isVoidSentinel(newest), Phrases.CarVoidNotShell),
+   ])
+-  return { thingCar }
++  return {
++    thingCar,
++    deliverableThing,
++    fullCar,
++    behindCar,
++    bareCar,
++    goneCar,
++    voidCar,
++
++  }
+ })
+ // --
+diff --git a/packages/safebyok/src/minding/thing-minder.ts b/packages/safebyok/src/minding/thing-minder.ts
+index 5a543efae..c4668e494 100644
+--- a/packages/safebyok/src/minding/thing-minder.ts
++++ b/packages/safebyok/src/minding/thing-minder.ts
+@@ -19,9 +19,12 @@ import {
+ import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
+ import {
+   type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
++  type TsqStaleTime,
+   DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, minderScope, minderTrack, queryCacheOpts, tsqClient,
++  tsqStaleTime,
+ } from './shapes-minder'
+-import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpRecords, isThingCar, isVaultDBNewer, mergedCarOf } from './thing-car'
++import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpThings, isThingCar, dbHasNewer, bestCarOf } from './thing-car'
++import { FarFuture } from '../../../safebyok-big/src/helpers/consts.js'
+ 
+ // == [Answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer
+ 
+@@ -137,8 +140,8 @@ export class ThingMinder {
+       ...this.#queryCacheOpts,
+       ...FixedQueryCacheOpts,
+       staleTime:         staleTimeFnOf(staleTime),
+-      queryFn:           ({ queryKey }) => this.#fetchCar(this.#bank.makeGetAsk(this.#scopeOfKey(queryKey))),
+-      structuralSharing: keptValOf,
++      queryFn:           ({ queryKey }) => this.#fetchCar(this.#bank.makeGetAsk(this.#scopeOfQueryKey(queryKey))),
++      structuralSharing: bestCarOf,
+     })
+     this.#isReady = true
+     // Kept whatever the host's gcTime: its own key's defaults reach no box under it.
+@@ -171,8 +174,7 @@ export class ThingMinder {
+ 
+   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
+   at(scoped: ThingScope): ThingCar<Thing> | undefined {
+-    this.#demandOwnScope(scoped)
+-    return this.#cachedAt(scoped)
++    return this.#cachedAt(this.#demandOwnScope(scoped))
+   }
+ 
+   /** The cache's answer for `ask`'s scope, without waiting on the vaultDB.
+@@ -196,10 +198,9 @@ export class ThingMinder {
+    * With no root car cached, a get of a box the vaultDB holds nothing for refuses: get the root box first.
+    */
+   async get(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): Promise<ThingCar<Thing>> {
+-    const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
+     this.#demandReady()
+     this.#demandOwnAsk(ask)
+-    return this.#doGet(ask, staleTime)
++    return this.#doGet(ask, opts)
+   }
+ 
+   /** List the Things directly under this minder's root, in labelpath order, tombstones included.
+@@ -217,10 +218,9 @@ export class ThingMinder {
+   }
+ 
+   /** True when `ask`'s car is missing or not timely. */
+-  isStaleAt(ask: MinderGetAsk, opts: MinderGetAskOpts = {}): boolean {
+-    const { staleTime = this.#queryCacheOpts.staleTime } = minderGetAskOpts.parse(opts)
+-    this.#demandOwnAsk(ask)
+-    return isStaleQuery(this.#tsqFind(ask), staleTime)
++  isStaleAt(scoped: ThingScope, staleTime: TsqStaleTime): boolean {
++    const carQuery = this.#tsqFind(this.#demandOwnScope(scoped))
++    return (! isTimelyQuery(carQuery, staleTime))
+   }
+ 
+   /** Call `listener` each time a car changes, with the answer for its scope. Returns the function that stops it.
+@@ -230,15 +230,20 @@ export class ThingMinder {
+    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
+    */
+   listen(listener: (answer: TSQGotAnswer) => void): () => void {
+-    const checked = minderListener.parse(listener)
++    minderListener.parse(listener)
+     const { keyPrefix } = this
+-    return this.#tsq.getQueryCache().subscribe((event) => {
+-      if (! (isCarEvent(event) && TSQ.matchQuery({ queryKey: keyPrefix }, event.query))) { return }
++    return this.#tsq.getQueryCache().subscribe((event: unknown) => {
++      if (! isCarEvent(event)) { return }
++      if (! TSQ.matchQuery({ queryKey: keyPrefix }, event.query)) { return }
+       // The cache's events are typed loosely; a query under this minder's prefix holds a car of its own.
+-      const carQuery = event.query as TSQ.Query<ThingCar<Thing>>
+-      const ask      = this.#bank.makeGetAsk(this.#scopeOfKey(carQuery.queryKey))
++      // const carQuery = event.query as TSQ.Query<ThingCar<Thing>>
++      const ask      = this.#bank.makeGetAsk(this.#scopeOfQueryKey(event.query.queryKey))
+       const answer   = this.#answerOfTSQ(ask, this.#queryCacheOpts)
+-      try { checked(answer) } catch (err) { this.#bank.tellBadNews([Throwers.unexpectedError(err)]) }
++      try {
++        listener(answer)
++      } catch (err) {
++        this.#bank.tellBadNews([Throwers.unexpectedError(err)])
++      }
+     })
+   }
+   // --
+@@ -252,10 +257,10 @@ export class ThingMinder {
+   }
+ 
+   /** `ask`'s car: the cached one if timely within `staleTime`, else from the vaultDB. */
+-  async #doGet(ask: GetAsk, staleTime: number): Promise<ThingCar<Thing>> {
++  async #doGet(ask: GetAsk, staleTime: TsqStaleTime): Promise<ThingCar<Thing>> {
+     let fetched: ThingCar<Thing>
+     try {
+-      fetched = await this.#tsq.query({ ...this.#tsqGetAskOf(ask), staleTime: staleTimeFnOf(staleTime) })
++      fetched = await this.#tsq.query(this.#tsqQueryRunner(ask, opts))
+     } catch (err) {
+       // TanStack cancels a get under way when goodbye removes its car.
+       throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
+@@ -265,6 +270,22 @@ export class ThingMinder {
+     return this.#cachedAt(ask) ?? fetched
+   }
+ 
++  // A host's observer keeps the default queryFn past goodbye, and would cache what it fetches.
++  /** Fetch `ask`'s car from the vaultDB, made of its shell where storage holds nothing.
++   * Refuses `stale_read` for an answer older than the revision cached when it began.
++   */
++  async #fetchCar(ask: GetAsk): Promise<ThingCar<Thing>> {
++    this.#demandReady()
++    // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
++    const prior  = this.#cachedAt(ask)
++    const answer = await this.#vaultDB.tryGetThing(ask)
++    if (! answer.ok) { throw answer.err }
++    const record = answer.val ?? this.#shellAt(ask)
++    // TanStack keeps the car and its time, marks it invalidated, and holds the refusal beside it as its error.
++    if ((prior !== undefined) && (cmpThings(prior.newest, record) < 0)) { throw staleRead(ask) }
++    return carOf(record)
++  }
++
+   /** The cached car for `scoped`, one of this minder's scopes, or undefined for none. */
+   #cachedAt(scoped: ThingScope): ThingCar<Thing> | undefined {
+     return this.#tsq.getQueryData<ThingCar<Thing>>(this.queryKey(scoped))
+@@ -290,7 +311,7 @@ export class ThingMinder {
+   }
+   // --
+ 
+-  // == [TSQ Asks]: keyPrefix, queryKey, #tsqGetAskOf, #fetchCar, #shellAt
++  // == [TSQ Asks]: keyPrefix, queryKey, #tsqQueryRunner, #fetchCar, #shellAt
+ 
+   /** The start of the key every one of this minder's cars is cached under. */
+   get keyPrefix(): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, this.modelkind] }
+@@ -303,25 +324,15 @@ export class ThingMinder {
+   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
+ 
+   /** TanStack's query options for a get of `ask`. */
+-  #tsqGetAskOf(ask: GetAsk) {
+-    return { queryKey: this.queryKey(ask), queryFn: () => this.#fetchCar(ask) }
++  #tsqQueryRunner(ask: GetAsk, opts: MinderGetAskOpts): TSQ.QueryOptions<ThingCar<Thing>> {
++    return {
++      queryKey: this.queryKey(ask),
++      queryFn: () => this.#fetchCar(ask)
++      staleTime: staleTimeFnOf(opts)
++    }
+   }
+ 
+-  // A host's observer keeps the default queryFn past goodbye, and would cache what it fetches.
+-  /** Fetch `ask`'s car from the vaultDB, made of its shell where storage holds nothing.
+-   * Refuses `stale_read` for an answer older than the revision cached when it began.
+-   */
+-  async #fetchCar(ask: GetAsk): Promise<ThingCar<Thing>> {
+-    this.#demandReady()
+-    // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
+-    const prior  = this.#cachedAt(ask)
+-    const answer = await this.#vaultDB.tryGetThing(ask)
+-    if (! answer.ok) { throw answer.err }
+-    const record = answer.val ?? this.#shellAt(ask)
+-    // TanStack keeps the car and its time, marks it invalidated, and holds the refusal beside it as its error.
+-    if ((prior !== undefined) && (cmpRecords(prior.newest, record) < 0)) { throw staleRead(ask) }
+-    return carOf(record)
+-  }
++  // why does this exist -- where is it important to reject a record because its parent is not cached?
+ 
+   // Boxes are the only Things under a root, for now: one label under the root box.
+   /** The shell at `scoped`. Below a root, it takes the life of its root's cached car, and refuses `bad_option` where none is cached. */
+@@ -334,7 +345,7 @@ export class ThingMinder {
+   }
+   // --
+ 
+-  // == [Checks]: scope, ties, #demandOwnAsk, #demandOwnScope, #demandReady, #scopeOfKey
++  // == [Checks]: scope, ties, #demandOwnAsk, #demandOwnScope, #demandReady, #scopeOfQueryKey
+ 
+   /** The scope of this minder's bank. */
+   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
+@@ -342,19 +353,24 @@ export class ThingMinder {
+   /** The scope of the bank's root box. */
+   get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: RootBoxLabelpath } }
+ 
+-  /** This minder's user, bank and modelkind. */
+-  get ties(): ThingTies { return { userid: this.userid, banklabel: this.banklabel, modelkind: this.modelkind } }
++  /** Properties we demand consistency of: this minder's user, bank and modelkind. */
++  get ties(): ThingTies { return { ...this.scope, modelkind: this.modelkind } }
+ 
+   /** Demand that `ask` is a get ask with `ifAbsent: 'nil'` and a `track`, for this minder's bank and modelkind. */
+-  #demandOwnAsk(ask: MinderGetAsk): void {
+-    minderTrack.parse(ask)
+-    Validator.checkedConsistent(checkedGetAsk(ask), { ...this.ties, ifAbsent: 'nil' }, { kind: 'bad_option' })
++  #demandOwnAsk(ask: MinderGetAsk): MinderGetAsk {
++    return AskChecks.getAsk.parseConsistent(ask, { ...this.ties, ifAbsent: 'nil' })
+   }
+ 
+   /** Demand that `scoped` is a scope in this minder's bank, of its modelkind. */
+-  #demandOwnScope(scoped: ThingScope): void {
+-    const { labelpath, ...bankScope } = minderScope.parse(scoped)
+-    Validator.checkedConsistent({ ...bankScope, modelkind: modelkindOf(labelpath) }, this.ties, { kind: 'bad_option' })
++  #demandOwnScope(scoped: ThingScope): ThingScope {
++    const slicedToScope = minderScope.parseConsistent(scoped, this.ties)
++    if (modelkindOf(slicedToScope.labelpath) !== this.modelkind) { throw new Errors.VaultError('bad_option', Phrases.ModelkindMismatch) }
++    return slicedToScope
++  }
++
++  /** The scope whose car is cached under `queryKey`, one of this minder's keys. */
++  #scopeOfQueryKey(queryKey: TSQ.QueryKey): ThingScope {
++    return { ...this.scope, labelpath: queryKey.slice(3, -1).join('/') }
+   }
+ 
+   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
+@@ -362,25 +378,17 @@ export class ThingMinder {
+     if (! this.#isReady) { throw minderNotStarted() }
+   }
+ 
+-  /** The scope whose car is cached under `queryKey`, one of this minder's keys. */
+-  #scopeOfKey(queryKey: TSQ.QueryKey): ThingScope {
+-    return { userid: this.userid, banklabel: this.banklabel, labelpath: queryKey.slice(3, -1).join('/') }
+-  }
+-
+   // --
+ 
+   // == [TSQ Helpers]: #answerOfTSQ
+ 
+   // Its caller starts any refresh first, so that a vacant answer is isFetching. A removed car is vacant.
+   /** The {@link TSQGotAnswer} the cache gives for `ask`'s scope, timely within `opts.staleTime`. */
+-  #answerOfTSQ(ask: GetAsk, opts: Readonly<{ staleTime: number }>): TSQGotAnswer {
++  #answerOfTSQ(ask: GetAsk, opts: Readonly<{ staleTime?: number | undefined }>): TSQGotAnswer {
+     const carQuery = this.#tsqFind(ask)
+-    const isTimely = (! isStaleQuery(carQuery, opts.staleTime))
+     const lastErr  = carQuery?.state.error ?? null
+     return {
+-      ...gotAnswerOf(ask, carQuery?.state.data, isTimely),
+-      car:         carQuery?.state.data,
+-      isTimely,
++      ...gotAnswerOf(ask, carQuery, opts),
+       refreshedAt: carQuery?.state.dataUpdatedAt ?? 0,
+       isFetching:  (carQuery?.state.fetchStatus === 'fetching'),
+       lastErr:     (lastErr === null) ? null : Outcome.storageRefusalOf(lastErr),
+@@ -401,42 +409,49 @@ function staleRead(ask: GetAsk): Errors.VaultError {
+   return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
+ }
+ 
++// This doesn't do what its doc block says; we don't need it to. Fix the method to be isUsefulTSQEvent
++
+ // A record lands (success), a get is refused or the car invalidated (both leave the car untimely), or the car is
+ // removed. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.
+-/** True for a cache event that changes a car, or whether it is timely. */
+-function isCarEvent(event: TSQ.QueryCacheNotifyEvent): boolean {
+-  if (event.type === 'removed') { return true }
+-  return (event.type === 'updated') && ['success', 'error', 'invalidate'].includes(event.action.type)
++/** True for a cache event that changes a car, removes a car, or adjusts its invalidation. */
++function isCarEvent(event: unknown): event is TSQ.QueryCacheNotifyEvent {
++  if (! (event instanceof Object)) { return false }
++  const qcne = event as TSQ.QueryCacheNotifyEvent
++  if     (qcne.type === 'removed') { return true }
++  return (qcne.type === 'updated') && ['success', 'error', 'invalidate'].includes(qcne.action?.type)
+ }
+ 
+ /** The {@link GotAnswer} for `car`, the car cached at `ask`'s scope. */
+-function gotAnswerOf(ask: GetAsk, car: ThingCar<Thing> | undefined, isTimely: boolean): GotAnswer {
+-  if (car === undefined)                         { return { ok: true, ask, act: 'vacant',   world: null, val: undefined } }
+-  if (isTimely && (car.liveness === 'full'))     { return { ok: true, ask, act: 'gotlive',  world: null, val: car.newest } }
+-  if (isTimely && (car.liveness === 'gone'))     { return { ok: true, ask, act: 'gotgone',  world: null, val: car.newest } }
+-  if (isTimely && (car.liveness === 'void'))     { return { ok: true, ask, act: 'gotvoid',  world: null, val: null } }
+-  // A behind or bare car is never timely.
+-  return                                                  { ok: true, ask, act: 'untimely', world: null, val: undefined }
++function gotAnswerOf(ask: GetAsk, carQuery: TSQ.Query<ThingCar<Thing>> | undefined, opts: Readonly<{ staleTime?: number | undefined }>): GotAnswer & { isTimely: boolean, car: ThingCar<Thing> | undefined } {
++  const car      = carQuery?.state.data as ThingCar<Thing> | undefined
++  const isTimely = isTimelyQuery(carQuery, opts.staleTime)
++  const base     = { ok: true, car, ask, world: null, isTimely } as const
++  if (car === undefined)           { return { ...base, act: 'vacant',   val: undefined } }
++  if (! isTimely) {
++    if ((car.liveness === 'full')) { return { ...base, act: 'gotlive',  val: car.newest } }
++    if ((car.liveness === 'gone')) { return { ...base, act: 'gotgone',  val: car.newest } }
++    if ((car.liveness === 'void')) { return { ...base, act: 'gotvoid',  val: null } }
++  } // bare and behind were declared stale; they roll into the untimely answer.
++  return                                    { ...base, act: 'untimely', val: undefined }
++}
++
++/** True when `carQuery` or its car is vacant; the car is bare or behind; or the car is not timely within `staleTime`. */
++function isTimelyQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTime: TsqStaleTime): boolean {
++  const car = carQuery?.state.data as ThingCar<Thing> | undefined
++  tsqStaleTime.parse(staleTime)
++  if ((carQuery === undefined) || (car === undefined)) { return false } // vacant; never timely.
++  if (car.liveness === 'bare')                         { return false } // bare; never timely.
++  if (staleTime === 'static')                          { return true  } // forced timely.
++  if (staleTime && (staleTime >= FarFuture))           { return true  } // forced timely.
++  if (dbHasNewer(car))                                 { return false } // bare or behind; never timely.
++  return (! carQuery.isStaleByTime(staleTime))
+ }
+ 
+ // A query under this minder's prefix holds a car this minder cached.
+-/** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link isVaultDBNewer}. */
+-function staleTimeFnOf(staleTime: number): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => number {
++/** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link dbHasNewer}. */
++function staleTimeFnOf({ staleTime }: MinderGetAskOpts): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => TSQ.StaleTime | undefined {
+   return (carQuery) => {
+-    const car = carQuery.state.data as ThingCar<Thing> | undefined
+-    return ((car !== undefined) && isVaultDBNewer(car)) ? 0 : staleTime
++    const car = carQuery?.state.data as ThingCar<Thing> | undefined
++    return ((car !== undefined) && dbHasNewer(car)) ? 0 : staleTime
+   }
+ }
+-
+-/** True when `carQuery` is absent, or its car is not timely within `staleTime`. */
+-function isStaleQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTime: number): boolean {
+-  return carQuery?.isStaleByTime(staleTimeFnOf(staleTime)(carQuery)) ?? true
+-}
+-
+-// TanStack also calls it on an observer's selected and placeholder values, which may be anything.
+-/** The value TanStack keeps when `landed` lands over `prior`: the merged car ({@link mergedCarOf}) for a car, else TanStack's default sharing. */
+-function keptValOf(prior: unknown, landed: unknown): unknown {
+-  if (! isThingCar(landed)) { return TSQ.replaceEqualDeep(prior, landed) }
+-  return mergedCarOf(isThingCar(prior) ? prior : undefined, landed)
+-}
+-// --
+diff --git a/packages/safebyok/src/models/lease.ts b/packages/safebyok/src/models/lease.ts
+index ab79c0766..c3631a438 100644
+--- a/packages/safebyok/src/models/lease.ts
++++ b/packages/safebyok/src/models/lease.ts
+@@ -133,14 +133,16 @@ export class Lease implements LeaseStamp {
+     Checks.sealer.parse(sealer)
+     const kept = withoutSecrets(sealer.donorPropsOf(donorProps))
+     const given = sealer.publicPropsOf(publicProps)
++    // have this use the isTombstone helper
+     const isTombstone = (given.am === 'x')
+     if (isTombstone && (secretProps !== undefined)) { throw new Errors.VaultError('bad_option', Phrases.TombstoneSecretsGiven) }
+-    const revision = isTombstone ? sealer.tombstoneOf(kept, given) : sealer.nextRevisionOf(kept, given)
+-    const cleartexts = isTombstone ? sealer.tombstoneSecrets : sealer.secretPropsOf(secretProps)
++    const revision   = isTombstone ? sealer.tombstoneOf(kept, given) : sealer.nextRevisionOf(kept, given)
++    const cleartexts = isTombstone ? sealer.tombstoneSecrets         : sealer.secretPropsOf(secretProps)
+     const sealed = await this.#sealText(sealer, revision, sealer.encode(cleartexts))
+     return sealer.recordOf(revision, sealed)
+   }
+ 
++
+   /** Unseal `record`, returning it with the part `sealer` seals in cleartext, in place of its sealed form.
+    * The answer is a new, frozen record built from `record` as checked, not `record` itself.
+    * Unsealing authenticates the ciphertexts, the stamp and the tags together: a change to any of them refuses as damaged.
+diff --git a/packages/safebyok/src/storage/shapes-thing.ts b/packages/safebyok/src/storage/shapes-thing.ts
+index e4b7d8dcf..ee6774a97 100644
+--- a/packages/safebyok/src/storage/shapes-thing.ts
++++ b/packages/safebyok/src/storage/shapes-thing.ts
+@@ -332,7 +332,8 @@ export type ShellScoped = Pick<ThingScope, 'userid' | 'banklabel'> & Partial<Thi
+ /** What {@link shellOf} reads of a parent: its labelpath and lifepath, from a record, a sparse record, an instance or a literal. */
+ export type ShellParent = Pick<ThingRecord, 'labelpath' | 'lifepath'>
+ 
+-/** The shell of the Thing at `scoped`'s scope, the record its first revision cites.
++// this is unreadable. What does parent == undefined mean?
++/** Construct a shell from its scope. Provide either full labelpath/lifepath, or label/lifeseq and the parent's paths
+  * A root's shell needs no life. Below a root, the life comes from `parent`, or from `scoped.lifepath`, the shell's own.
+  * With `parent`, `scoped` may give its `label` in place of its `labelpath`. Each field of `scoped` that the shell has is proposed for it,
+  * and must hold the shell's value; the rest are not read.
+@@ -351,6 +352,20 @@ export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel
+   const shell = { fmt: ThingFormats[modelkindOf(labelpath)], ...proposed, labelpath, label: label ?? labelpath.slice(labelpath.lastIndexOf('/') + 1), lifepath }
+   return Object.freeze(ShellChecks.shell.parse(shell)) as VoidSentinel
+ }
++
++function scopedWithParentage(raw: Partial<Pick<Thing, 'labelpath' | 'label'>>, parent?: Partial<Pick<Thing, 'labelpath'>>): string {
++  if (! parent) { return thingScope.parse(raw) }
++  const scoped = ShellChecks.shellScoped.parse(raw)
++  const labelpath = parent.labelpath + '/' + scoped.label
++  if (scoped.labelpath && (labelpath !== scoped.labelpath)) { throw new Errors.VaultError('bad_option', Phrases.ShellNotChild) }
++  return { ...scoped, labelpath }
++}
++function lifepathWithParentage(raw: Partial<Pick<Thing, 'labelpath' | 'label' | 'lifepath' | 'lifeseq'>>, parent?: Partial<Pick<Thing, 'labelpath' | 'lifepath'>>): Pick<Thing, 'labelpath' | 'label' | 'lifepath' | 'lifeseq'> {
++  if (! parent) { return raw }
++  const lifepath = parent.lifepath + '/' + raw.lifeseq // fix this
++  if (raw.lifepath && (lifepath !== raw.lifepath)) { throw new Errors.VaultError('bad_option', Phrases.ShellOfOtherLife) }
++  return { ...raw, lifepath }
++}
+ // --
+ 
+ // == [Each kind's checks]: KindChecks, kindChecksOf
+@@ -454,9 +469,11 @@ export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
+ /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
+ export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same', [RootBoxLabelpath]: BoxThing | 'same' }>
+ 
++// remove this everywhere and use AskChecks.getAsk.parse directly.
+ /** Check a get `ask`, throwing `bad_option`, and return it typed. */
+-export function checkedGetAsk(ask: unknown): GetAsk { return AskChecks.getAsk.parse(ask) }
++export function checkedGetAsk(ask: unknown): GetAsk { return  }
+ 
++// remove this everywhere and use AskChecks.getAsk.parse directly.
+ /** Check a list `ask`, throwing `bad_option`, and return it typed. */
+ export function checkedListAsk(ask: unknown): ListAsk { return AskChecks.listAsk.parse(ask) }
+ 
+diff --git a/packages/safebyok/tests/minding/thing-car.test.ts b/packages/safebyok/tests/minding/thing-car.test.ts
+index 94eaffdc2..ca88ce8bd 100644
+--- a/packages/safebyok/tests/minding/thing-car.test.ts
++++ b/packages/safebyok/tests/minding/thing-car.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from 'vitest'
+-import { type ThingCar, carOf, isThingCar, isVaultDBNewer, mergedCarOf } from '../../src/minding/thing-car'
++import { type ThingCar, carOf, isThingCar, dbHasNewer, mergedCarOf } from '../../src/minding/thing-car'
+ import { type Thing, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+ import * as TH from '../test-helpers'
+ 
+@@ -141,13 +141,13 @@ describe("isThingCar", () => {
+   }
+ })
+ 
+-describe("isVaultDBNewer", () => {
++describe("dbHasNewer", () => {
+   it("is true of a behind or bare car, and false of the rest", () => {
+     const cars = [carOf(Box0), behindOf(Box1, Box0), carOf(sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]
+-    expect(cars.map((car) => [car.liveness, isVaultDBNewer(car)])).to.deep.equal([['full', false], ['behind', true], ['bare', true], ['gone', false], ['void', false]])
++    expect(cars.map((car) => [car.liveness, dbHasNewer(car)])).to.deep.equal([['full', false], ['behind', true], ['bare', true], ['gone', false], ['void', false]])
+   })
+ 
+   it("reads the liveness alone", () => {
+-    expect([isVaultDBNewer({ liveness: 'bare' }), isVaultDBNewer({ liveness: 'full' })]).to.deep.equal([true, false])
++    expect([dbHasNewer({ liveness: 'bare' }), dbHasNewer({ liveness: 'full' })]).to.deep.equal([true, false])
+   })
+ })

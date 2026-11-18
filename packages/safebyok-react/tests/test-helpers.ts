@@ -12,6 +12,7 @@ import type { BankProviderProps, PassphraseGating } from '../src/shapes'
 
 export * from 'safebyok-big/testing'
 export * from './test-helpers-react'
+export * from './test-helpers/fake-giver-world'
 
 /** Sweep every bank a test made, once the test ends. This is `useBankWorlds`, under a name that React's hook lint does not mistake for a hook. */
 export const sweepBankWorlds = useBankWorlds

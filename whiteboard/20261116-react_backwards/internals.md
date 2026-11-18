@@ -3,7 +3,8 @@
 What has to exist under `app-side.md`'s hooks, parts and kit, layer by layer, and what each layer
 owes the one above. Status: a proposal for discussion, 2026-11-16, rewritten the same day around
 one Device per process, and on 2026-11-17 around two layers of query cache: a private client per
-bank, which the minders keep, and the host's own React Query, which the hooks read. The core's interface serves this layer: where a facility asks the core
+bank, which the minders keep, and the host's own React Query, which the giver's hooks read. The
+first version of the giver and the bridge is in `packages/safebyok-react/src/giver/`. The core's interface serves this layer: where a facility asks the core
 for something, the ask is the point, not the spelling.
 
 ## The layers
@@ -14,18 +15,18 @@ safebyok-react      the giver: hooks · parts · kit · the bridge
       │               records: the host's React Query, fed by the bridge from the minders
 Device              one per process (per tab): host functions · deviceDB · the open gating ·
       │             the user · each bank's snapshot, then its bank object
-bank object         one per (user, banklabel), arriving whole after its start: its vaultDB · its own
-      │             QueryClient · minders · drafts · the lease · where a whisper may be
-safebyok/cached     ThingMinder (query-core)               stored Things, as minded records
+bank object         one per life of (user, banklabel), arriving whole after its start: its vaultDB ·
+      │             its own QueryClient · minders · drafts · the lease · where a whisper may be
+safebyok/cached     ThingMinder (query-core)               stored Things, as cars
 safebyok/core       Bank (one life) · Gate · Gating · Lease · sealers
 safebyok/storage    VaultDB                                 one per bank, the host's choice
 ```
 
 Two kinds of state, each with its own tool:
 
-* **Stored Things** (records, listings) come through the ThingMinder, which keeps them in its
-  bank's private TanStack cache. That is server state, the job TanStack was built for. The host's
-  React Query shows them, in entries of its own that the bridge keeps current (F5).
+* **Stored Things** (records, listings) come through the ThingMinder, which keeps them as cars in
+  its bank's private TanStack cache. That is server state, the job TanStack was built for. The
+  host's React Query shows them, in entries of its own that the bridge keeps current (F5).
 * **This tab's state** (who is signed in, each bank's stage, locked or unlocked, the lease's end,
   the open gating) is never stored, so no cache can know it. The Device and each bank object say
   when it changes, and build their snapshots.
@@ -49,9 +50,9 @@ is made by an async start and arrives whole; until then, the Device's snapshot g
 | `probe()` on each host function: it starts loading, and reports a failure rather than throwing | the packet's hydration, where there is no packet |
 
 Each bank's snapshot is a slice of the Device's, before its bank object arrives and after, so a
-tab-state hook never changes what it subscribes to. A record hook holds its fetch until the bank
-object arrives, and shows any entry already in hand. A button whose act needs the bank object is
-disabled until then.
+tab-state hook never changes what it subscribes to. A record hook's fetch waits on `ensureBank`, and
+shows any entry already in hand meanwhile. A button whose act needs the bank object is disabled
+until it arrives.
 
 ### A user this browser has never seen
 
@@ -62,7 +63,7 @@ one is (a returning user on a new browser, with no lease here).
 | Facility | While the bank is starting | New user (no bank) | Returning user (bank stored) |
 |---|---|---|---|
 | `useBank` | Device: `starting`, no bank object | `unborn`, a bank object | `ready`, locked, a bank object |
-| `useBox`, `useBoxList` | `isPending`, nothing fetched | `data: null`, empty: real answers (open matter 7) | `isPending`, then the records |
+| `useBoxRecord`, `useBoxList` | `isPending`, the fetch waiting on the bank object | `data: null`, empty: real answers (open matter 7) | `isPending`, then the records |
 | `useWhisperDraft` | `isReady: false` | ready | ready |
 | `GatingDialogs` | no gating | `build_bank` once a put needs a bank | `unlock_bank` once an act needs the bankKey |
 | `bank.putBox`, `draft.put` | (disabled) | `build_bank`, birth, put | `unlock_bank`, put |
@@ -79,7 +80,59 @@ nothing) and written at the first birth or unlock (`device_tok`, then the lease)
 of the bank, its watch of the bank's row from the start on, **even while unborn**, or a bank born
 in another tab goes unseen, and its puts; the key deriver, and the strength checker for
 `build_bank`; the bank's QueryClient; and the box minders, started only once the bank is known
-born. While it is unborn, the bank object answers none stored, and empty, itself.
+born. While it is unborn, the bank object answers the void car, and an empty listing, itself.
+
+## From userid to first dialog
+
+**No dialog at sign-in, ever.** safebyok is enabling technology, there for the moment an API call is
+made. The first dialog appears when a call needs a whisper (unlock), or when the first save needs a
+bank (create). Everything a round trip can learn arrives long before a person could finish a dialog
+(`notes/reference-timings.md`, *User Experience Timings*): a round trip is 50 to 300 ms, typing a
+passphrase 5,000 to 30,000. So a dialog never waits on the network to appear, and none appears
+because data is loading. After an unlock, the call that asked for it goes on by itself.
+
+Two changes from safebyok-big:
+
+* **Starting a bank never births it.** Big's `Device.ensureBank` launches `build_bank` when no bank
+  is stored (`Bank.launchBirth`), and its provider calls it at mount, so a new user is asked to
+  invent a passphrase before doing anything. Here birth waits for the first save, where making the
+  passphrase is a step of saving ("Protect your keys with a passphrase"). A read with no box stored
+  never births: it answers "Add your OpenAI key first".
+* **The unlock dialog shows from the cache, and the gate is fetched beside it.** Big's
+  `Bank.ensureUnlocked` waits on `maingate.ensureTimely` before the cached lease and before the
+  dialog: 200 ms online, a failure offline. Here the dialog shows at once from the kept wayin
+  headers, and by the time the user submits, the fresh gate is almost always in hand. With it, the
+  unlock is against the fresh gate, so a passphrase replaced elsewhere is honoured; without it,
+  offline, against the kept wayin, the risk `offline_signins` declares. A kept lease still attaches
+  only against the fetched gate (F13, rule 1).
+
+When a userid arrives, with `keepOnDevice: 'offline_signins'`:
+
+| State | First dialog | What waits for a round trip | What shows meanwhile |
+|---|---|---|---|
+| This bank kept, its lease good | None | Attaching the lease, once the gate fetch confirms it | The app, locked for about 200 ms; a call made then waits that long |
+| This bank kept, no lease | Unlock, when a call needs a whisper, at once from the kept headers: the passkey button or the passphrase field already known | The fresh gate, fetched while the user types; submit uses it if it has arrived, else the kept wayin | The app, locked; the lock indicator says so from the first frame |
+| Nothing on the machine for this user | None until the round trip says which: unlock on demand if stored, create at the first save if not | Whether any bank is stored: no entry means unknown, never unborn | The app; the lock indicator neutral, never "Create" or "Unlock" until known; a click in that window shows a pending button, then the right dialog |
+| Another bank kept for this user, not this one | As for nothing on the machine | As for nothing on the machine | As for nothing on the machine. The other bank says only that the user has been here (the account list `userids` keeps) |
+
+With or without a kept listing of five sparse boxes (a sparse record has its labelpath, revision
+and `written_at`, and no sidecar):
+
+| | Listing kept | No listing kept |
+|---|---|---|
+| First frame | Five rows with their labels and "updated 3 days ago"; the masks are placeholders | The app's shell; the box area a placeholder |
+| "Is there an OpenAI key?" | Answered at once: Ask is ready | Unknown for one round trip; Ask stays clickable, and a click waits on the record |
+| After one round trip | The listing confirmed; the whole records of the rows on screen arrive in parallel, and the masks fill in | The listing arrives and the rows appear; the masks after a second round trip, or with the first if the list returns whole records |
+| The unlock dialog, if a call needs it | From the kept wayins either way | From the kept wayins either way |
+
+**`offline_signins` is hollow without the boxes' whole records.** An unlock offline yields the
+bankKey, but with no box ciphertext on the device there is nothing to unseal. So `offline_signins`
+keeps the cars whole, ciphertext and sidecars, which the server holds anyway; its listing is not
+sparse, and the first frame has the masks too. A sparse listing suits `userids` (open matter 12).
+
+At sign-in, in parallel and in about one round trip, none of it a dialog: the gate fetch, the bank
+row's watch, the listing, the whole records of the boxes the page's hooks show, and the deviceDB's
+read of the lease. None of it needs a passphrase.
 
 ## Facilities
 
@@ -87,11 +140,14 @@ Each one names what in `app-side.md` needs it, the layer it lives in, and a size
 
 ### F1. The Device, once per process (core, M)
 
-`Device.make({ keyDeriver, strengthChecker, logger, onBadNews, autolockMinutes, banks, keepOnDevice })`.
-`banks` maps each banklabel to its options, its `vaultDB` first. The Device has the host functions,
-the deviceDB handle, the open gating, the signed-in `userid`, each of the user's banks' snapshots,
-and each bank object once it arrives. It has no QueryClient: each bank object has its own (F7). Its
-snapshot carries each bank's whole snapshot (open matter 6):
+`Device.make({ keyDeriver, strengthChecker, logger, onBadNews, banks, keepOnDevice, autolock })`.
+`banks` maps each banklabel to its options, its `vaultDB` first. The Device's options are the
+defaults for its banks, and `Bank.make` may override them; once made, neither the Device's copy nor
+a bank's own changes, so a bank on another vaultDB is a bank made anew (open matter 3). The Device
+has the host functions, the deviceDB handle, the open gating, the signed-in `userid`, each of the
+user's banks' snapshots, and each bank object while it runs. It has no QueryClient: each bank
+object has its own (F7). Its snapshot carries each bank's whole snapshot, a handful of small fields,
+no records (open matter 6):
 
 ```ts
 interface DeviceSnapshot { userid: string | null, banks: Readonly<Record<string, BankSnapshot>>, openGating: Gating | null, probeErr: VaultError | null }
@@ -99,8 +155,12 @@ interface BankSnapshot   { stage: BankStage, isLocked: boolean, leaseEndsAt: num
 type BankStage = 'signed_out' | 'starting' | 'unborn' | 'ready' | 'failed'
 ```
 
-A bank the Device has not heard of reads as a fixed `PendingBank`, with `isLocked: true` spelled
-out: `isLocked` is true in the safe state, so a slice left out would read as unlocked.
+Its parts come from two places. What is stored (born, unborn or gone, and the stamp) the Device
+learns by observing the bank's record through a minder. What is this tab's alone (`isLocked` and
+`leaseEndsAt`, since a lease is never in the bank's record; `starting`, `failed` and `lastErr`, from
+the start) the bank object tells it (F4). A bank the Device has not heard of reads as a fixed
+`PendingBank`, with `isLocked: true` spelled out: `isLocked` is true in the safe state, so a slice
+left out would read as unlocked.
 
 * **Construction touches no browser API**, so module scope is safe during a server render.
   `checkSecureContext()` already passes on the server (it refuses only where `isSecureContext` is
@@ -133,16 +193,16 @@ say so before the user types. The passphrase field never waits on it: the meter 
 it reads the deviceDB (`device_tok`, any cached lease), gets the bank's record from the bank's
 vaultDB (or learns that none is stored), starts the watch of the bank's row, attaches a cached lease
 that is still good, makes its own QueryClient, and, if the bank is born, starts its minders. Only
-then does the object exist.
-It stands for (user, banklabel), adopting each life's core `Bank`: a bank born, or born again after
-a deletion elsewhere, is adopted, and the stage moves between `unborn` and `ready`. It ends at a
-user switch or a vacate, for good: its minders say goodbye, and its QueryClient is cleared and let
-go, everything it cached with it.
+then does the object exist. **It ends with its life** (open matter 2): a bank deleted elsewhere, or
+born where it was unborn, ends this bank object, and the next `ensureBank` makes the one for the new
+life. It ends too at a user switch or a vacate. Ending, its minders say goodbye and its QueryClient
+is cleared and let go, everything it cached with it; the bridge resets the host's entries of the
+bank, so a hook still showing one fetches again from the next bank object (F5). The bank's slice of
+the Device's snapshot outlives it, so `useBankSnapshot` never unmounts anything.
 
 It carries the bank's acts (`withWhisper`, `withWhispers`, `putBox`, `putBoxOnce`, `delBox`,
 `lock`, `ensureUnlocked`, the gate verbs), its minders (F5, F6) and its drafts (F10). Its state
-reaches React as its slice of the Device's snapshot (F1), which the Device rebuilds when the bank
-object tells it something changed.
+reaches React as its slice of the Device's snapshot (F1).
 
 A start that fails leaves the Device's stage `failed`, with the error. `ensureBank` may be called
 again; whether to retry is the host's decision, outside the core.
@@ -154,90 +214,84 @@ past autolock), when a gating opens or concludes, and when a life ends. **Ask:**
 `subscribe(listener)` with no payload on the core's `Bank`, and a readable `leaseEndsAt` (epoch
 milliseconds, not secret) for "locks in 4 minutes".
 
-### F5. Records reach React: the minded record, and the bridge (cached and react, L)
+### F5. Records reach React: the car, and the bridge (cached and react, L)
 
-**Two layers.** The minder keeps the ground truth in its bank's private client: each record as it
-was last heard of, merged in a fixed order, kept current by the watch. The host's React Query
-holds entries of its own, which the giver's hooks read and the bridge keeps current. Every option
-a host gives (`structuralSharing`, `retry`, `select`, `staleTime`) applies in full, to the host's
-entries alone. One shared client cannot do this: TanStack sets an observer's options on the entry
-it observes (`queryObserver.ts:216`, `this.#currentQuery.setOptions(this.options)`), so a host's
-`useQuery` on the minder's key would replace the minder's sharing function, its `retry` and its
-`networkMode` for every reader.
+**Two layers.** The minder keeps the ground truth in its bank's private client: each Thing's car,
+merged in a fixed order, kept current by the watch. The host's React Query holds entries of its
+own, which the giver's hooks read and the bridge keeps current. Every option a host gives
+(`structuralSharing`, `retry`, `select`, `staleTime`) applies in full, to the host's entries alone.
+One shared client could not do this: TanStack sets an observer's options on the entry it observes
+(`queryObserver.ts:216`, `this.#currentQuery.setOptions(this.options)`), so a host's `useQuery` on
+the minder's key would replace the minder's sharing function, its `retry` and its `networkMode` for
+every reader.
 
-**The minded record**, the minder's cache value, holds both the newest revision heard of and the
-newest whole record of that revision's life. It is being built in a neighbouring session; this is
-the shape this layer reads:
+**The car** is the minder's cache value (VOCABULARY.md, *car*; built in the minder's own thread,
+`whiteboard/20261115-lean_buttonup/complete.md`):
 
 ```ts
-/** Cache value for a ThingRecord: the newest revision heard of (which might be sparse), and the newest whole record seen.
- * `null` when gone/void, `undefined` for "known to exist but nothing useable cached"
- */
 type ThingCar<RecordT extends ThingRecord> = Readonly<
-  | { liveness: 'full',   newest: RecordT,            whole: RecordT   } // the same record in both
-  | { liveness: 'behind', newest: Sparse<RecordT>,    whole: RecordT   } // whole is older
-  | { liveness: 'bare',   newest: Sparse<RecordT>,    whole: undefined } // never fetched whole
-  | { liveness: 'gone',   newest: Tombstone<RecordT>, whole: null      } // a tombstone, sparse or whole
-  | { liveness: 'void',   newest: VoidSentinel,       whole: null      } // none stored
+  | { liveness: 'full',   newest: RecordT,            fullest: RecordT }
+  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT }
+  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined }
+  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null }
+  | { liveness: 'void',   newest: VoidSentinel,       fullest: null }
 >
-// dbNewer: liveness is 'behind' or 'bare'
+// isDBNewer: liveness is 'behind' or 'bare'
 ```
 
-`newest` is the later of what is held and what arrives; `whole` is the later whole record of
-`newest`'s life, so a box born again elsewhere is `bare`, never `behind`, and never shows its last
-life's sidecar. Records arriving in any order come to the same value. `undefined` for never
-fetched and `null` for no body follow the minder's present convention for `val`. A put needs no
-`whole`: one that replaces whisper and sidecar both cites `newest`.
+A host shows the fullest and writes against the newest. A put that replaces whisper and sidecar
+both cites `newest`, needing no whole record; a merge goes through the revisor (F12).
 
-**The hooks' `data` is `whole`**, by a default `select: (minded) => minded.whole`: `undefined`
-while pending, `null` for gone or none stored, else the record to show, its whisper sealed. A
-`behind` record shows while the newer one is fetched. `select` is TanStack's own way to reshape
+**`useBoxRecord`'s `data` is the car's `fullest`**, picked by a default `select`: undefined while
+pending, null for gone or none stored, else the record to show, its whisper sealed. A `behind`
+car's older record shows while the newer one is fetched. `select` is TanStack's own way to reshape
 `data`, so React Query's tracking of which fields a component reads still holds; a result copied
-with an added field would read every field, and re-render on every `isFetching` flip. A host's own
-`select` receives the whole `Minded`, `newest` with it. `newest` is not on the result: the puts
-(F12) read it from the minder.
+with an added field would read every field, and re-render on every `isFetching` flip. A host that
+wants the whole car, `newest` with it, uses `boxCarQueryOptions` with a `useQuery` of its own. The
+puts read `newest` from the minder, never from a hook's answer.
 
-**The bridge** runs while the provider is mounted, one listener per bank object, writing into the
-host's client (`useQueryClient()`), only into entries a hook has made:
+**The bridge** (`react-bridge.ts`, mounted by the giver's `useBridge`, inside the host's
+`QueryClientProvider`) listens to each bank object's feed of the cars its minders cache, and writes
+into the host's client, only into entries a hook has made:
 
-* `full`, `behind`, `gone`, `void`: the host's entry takes the `Minded`. On `behind`, the entry is
-  also invalidated, so an active hook fetches the newer whole, and an idle one does not.
-* `bare`, or nothing cached: the entry is invalidated, never given a value whose `data` is
-  undefined after it has loaded.
-* At the bank object's end: the host's entries under `['safebyok-react', userid, banklabel]` are
-  removed. The host's client is not ours to clear, so only our prefix goes.
+* `full`, `gone`, `void`: the host's entry takes the car.
+* `behind`: the entry takes the car, and is invalidated, so an active hook fetches the newer whole
+  record and an idle one does not.
+* `bare`: the entry is invalidated, never given a car whose `data` is undefined once loaded.
+* At a bank object's end: the host's entries under `['safebyok', userid, banklabel]` are reset, not
+  removed, so a mounted hook stays attached and fetches again from the next bank object. The host's
+  client is not ours to clear: only our prefix is touched. Unmounting the bridge only stops copying.
 
-The hook's `queryFn` asks the minder, never the vaultDB: `await minder.get(ask, { staleTime: 0 })`,
-then `minder.at(ask)`, the `Minded`. TanStack calls it only when the host's entry is stale by the
-host's own `staleTime` (`Infinity` by default, since the bridge keeps the entry current), so the
-minder reads afresh. A host's `retry` reaches `minder.get`, never a primitive.
+The hook's `queryFn` asks the bank object, never the vaultDB: `ensureBank`, then `getBoxCar`, which
+asks the vaultDB afresh. TanStack calls it only when the host's entry is stale by the host's own
+`staleTime` (`Infinity` by default, since the bridge keeps the entry current). A host's `retry`
+reaches `getBoxCar`, never a primitive. The minder's feed suits the bridge as it stands: it carries
+each car after the merge, as the cache holds it, with its labelpath; a landing that changes nothing
+keeps its identity under structural sharing, and re-renders nothing.
 
-**What this asks of the minder:** `at` and `listen` answer the `Minded`. Its sharing function, run
-by its private client alone, merges by the rule above. The minder's keys may drop `userid` and
-`banklabel`, which its client already stands for.
+**What this asks of the bank object** (`GiverBank` and `GiverDevice` in `react-giver.ts`):
+`getBoxCar(labelpath)`, answering the void car on an unborn bank; `listenBoxCars(listener)`;
+`ensureBank({ userid, banklabel })`, refusing once that user is no longer signed in; and
+`onBankStart(starter)`, calling the function `starter` returns at that bank object's end.
 
-**One race**, a row for `notes/wontfix.md`, not a fix: a newer notice landing between the moment
-the host's fetch resolves and the moment TanStack stores its result would leave the older
-`Minded` in the host's entry. `minder.at` answers what the minder holds when it is called, and
-TanStack stores the result in the same chain of microtasks, which a watch notice, a task of its
-own, cannot interrupt; so the window is closed in practice.
+**One race**, a row for `notes/wontfix.md` when the bridge lands, not a fix (open matter 8): a newer
+car landing between the moment the host's fetch resolves and the moment TanStack stores its result
+would leave the older car in the host's entry. TanStack stores the result in the same chain of
+microtasks, which a watch notice, a task of its own, cannot interrupt.
 
-**A customer's own view** (sidecar and whisper merged, say) is the customer's choice to make. It is
-a query of its own, under the box's key, `[...boxKey, 'view', viewlabel]`, whose `queryFn` runs the
-host's async `viewOf(minded, bank)`. The bridge invalidates everything under the box's key, so the
-view refetches, and TanStack's refetch cancels the one it replaces: the latest wins without a
-guard of ours. A view that unseals throws while the bank is locked, and the host decides how that
-looks (open matter 10).
+**A customer's own view** (sidecar and whisper merged, say) is the customer's to make: a `useQuery`
+of its own, under `[...boxKey, 'view', viewlabel]`, whose `queryFn` runs its async view of the car.
+Offering it as a `useBoxRecord` option waits until after 1.0 (open matter 10).
 
 ### F6. A listing by listpath, structurally shared (cached, M)
 
 `useBoxList(listpath)` needs the labelpaths under a listpath, in tree order, as an array that keeps
 its identity until an entry comes or goes. **Ask:** the listing becomes a cache entry of its own
 (its key: the listpath's, plus a final `'list'`), whose value is the array of labelpaths, kept
-stable by `replaceEqualDeep`. A notice of a box born or tombstoned under it updates it. The bridge
-carries it to the host's entry as it does a box (F5). Each row is then its own `useBox`, so a
-memoized row redraws only for its own box. What a row shows before its box is fetched whole is
-open: a sparse record has no sidecar.
+stable by `replaceEqualDeep`. A notice of a box born or tombstoned under it updates it, and the
+bridge carries it to the host's entry as it does a box (F5). Each row is then its own
+`useBoxRecord`, so a memoized row redraws only for its own box. A row known only from a sparse
+listing has no sidecar until its whole record arrives.
 
 ### F7. A QueryClient per bank, and React Query the host's (cached and react, S)
 
@@ -247,11 +301,11 @@ remove a key's defaults). No host sees the minder's client, so `@tanstack/query-
 dependency of the core: its version never has to match the host's React Query, and no error crosses
 from one copy to another (the minder turns its `CancelledError` into a refusal of its own).
 
-`safebyok-react` builds on `@tanstack/react-query`, a peer dependency, through the host's own
-`QueryClientProvider`: its Suspense, error-boundary and render-time handling is the hard part of a
-record hook, and it is done (PROCESS.md, *Dependencies*; open matter 9). Devtools, `dehydrate`, a
-persister and `invalidateQueries()` all reach the host's entries, which hold sealed records: no
-cleartext, unless the host's own view puts it there.
+`safebyok-react` builds on `@tanstack/react-query`, a peer dependency (open matter 9), through the
+host's own `QueryClientProvider`: its Suspense, error-boundary and render-time handling is the hard
+part of a record hook, and it is done. Until the giver is exported, the peer is optional. Devtools,
+`dehydrate`, a persister and `invalidateQueries()` all reach the host's entries, which hold sealed
+records: no cleartext, unless the host's own view puts it there.
 
 ### F8. Snapshots, sliced and frozen (instance layer, M)
 
@@ -264,7 +318,7 @@ interface DraftSnapshot   { isReady: boolean, isEditing: boolean, isPutting: boo
 Frozen, the same object until something changes, nothing a host has no use for (STYLE.md,
 *Stateful objects and snapshots*). Every tab-state hook has a `getServerSnapshot`, answering
 `signed_out`, for server rendering. A record hook's answer is React Query's result (F5), not a
-snapshot of ours; a `Minded` and its records are frozen plain objects, never instances, since
+snapshot of ours. A car and its records are frozen plain objects, never instances:
 `replaceEqualDeep` shares only plain objects and arrays (`utils.ts:398`), and `dehydrate` and
 Server Component props want them plain too.
 
@@ -273,7 +327,7 @@ Server Component props want them plain too.
 ```text
 bank.withWhisper(labelpath, fn)
   ensureUnlocked()          may open an unlock_bank gating; GatingDialogs answers it
-  minder.get(ask)           the whole record, cached if timely
+  minder.get(ask)           the car, cached if timely; its fullest record
   bank.unsealBox(record)    the whisper, under the lease
   fn(whisper)               the bank object lets go of the whisper once fn settles
 ```
@@ -281,8 +335,8 @@ bank.withWhisper(labelpath, fn)
 **Ask of the core:** a second `ensureUnlocked` while an `unlock_bank` gating is open waits on that
 gating (`whenConcluded`), instead of refusing. In React, several components fire calls at once (two
 queries on mount, a mutation and a refetch), and refusing each but the first is a refusal only the
-timing caused. A gating of another kind open at that moment still refuses. This changes a present
-guarantee, narrowly, and wants a Coach's yes. `withWhispers(listpath, fn)` is the same over a
+timing caused: it is arbitration among dialogs, and the second call joins the first (open matter
+1, settled). A gating of another kind open at that moment still refuses. `withWhispers(listpath, fn)` is the same over a
 listing: one unlock, then every box unsealed.
 
 ### F10. Drafts (instance layer, L)
@@ -330,8 +384,8 @@ each attempt, so a revisor that writes into it (as `merge` does) harms nothing. 
 is the empty shell, `{ whisper: {}, sidecar: {}, revtok: null }`, never null. The retry lives here,
 outside the primitive's path. `putBoxRecord` is the same over a record the caller has sealed.
 The puts read what they cite from the minder, never from a hook's answer: a put replacing whisper
-and sidecar cites the `Minded`'s `newest`, which needs no whole record, and the revisor gets the
-stored whole.
+and sidecar cites the car's `newest`, which needs no whole record, and the revisor gets the stored
+whole record.
 
 ### F13. The packet: per-user cache, read synchronously (instance layer, M)
 
@@ -354,33 +408,38 @@ Two rules (proposed):
 2. **No entry means unknown, never unborn.** A browser that has never seen the user fetches before
    it shows Create.
 
-**What is kept is the host's choice**, through `Device.make({ keepOnDevice })`, named in the
-customer's words for what the browser keeps, not the pieces. Knowing what it may keep, the Device
-also knows what to fetch ahead: under `offline_signins`, the wayins at each start. The docs say what
-each gives away:
+**What is kept is the host's choice, on two axes** (open matter 4). `keepOnDevice` says what this
+browser keeps for a user, in the customer's words for what it buys; knowing it, the Device also
+knows what to fetch ahead, as the wayins and the whole records at each start under
+`offline_signins`. The docs say what each gives away:
 
-| `keepOnDevice` | What it keeps | What it gives away | What it buys |
-|---|---|---|---|
-| `nothing` | nothing | nothing | nothing: each load fetches before its first screen |
-| `past_userids` | each user's stamp (so far the gate's), and each wayin but its wrapped bankKey | who has used this browser, to whoever uses it next; nothing the server lacks | the first screen and the passkey button at once, the parallel starts above, a list of past users to pick from |
-| `offline_signins` | the wayins whole | the bankKey wrapped under the passphrase: this device becomes a second place to steal it for offline guessing | unlocking offline |
-| `unlocked` | the lease | the bank, to whoever uses this browser before autolock | skipping the passphrase until autolock |
+| `keepOnDevice`      | What it keeps                                                                                   | What it gives away                                                                                            | What it buys                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `'none'`            | nothing                                                                                         | nothing                                                                                                       | nothing: each load fetches before its first screen                                                            |
+| `'userids'`         | each user's stamp (so far the gate's), each wayin but its wrapped bankKey, and a sparse listing | who has used this browser, to whoever uses it next; nothing the server lacks                                  | the first screen and the passkey button at once, the parallel starts above, a list of past users to pick from |
+| `'offline_signins'` | as `userids`, and the wayins whole and the boxes' whole records                                 | the bankKey wrapped under the passphrase: this device becomes a second place to steal it for offline guessing | unlocking offline, with something to unseal once unlocked                                                     |
 
-Whether these are one level or a set, and the default, are open (open matter 4). Where the lease is cached, its leaseKey is stored in
+`autolock: { hours, on }` says how long an unlock lasts, and so whether and how long the lease is
+kept: `on: 'since_last_proof'` locks `hours` after the last proving; `'close'` keeps the lease in the
+tab's memory alone, so closing locks; `'never'` keeps it until `lock()`; `'signout'` until a vacate.
+(That reading of the four values is mine.) Where the lease is kept, its leaseKey is stored in
 IndexedDB as a non-extractable `CryptoKey`, which script on the page can use while it runs but never
 carry off as bytes; localStorage cannot hold one.
 
 **Tabs.** IndexedDB is one database per origin, shared by every tab: a committed write is seen by
-the next transaction in any tab, but no tab is told of it. After each write that another tab should
-act on (a lease cached or forgotten, a vacate), the writer posts a notice on a `BroadcastChannel`,
-and the other tabs read again. No worker is needed: a SharedWorker is missing on Chrome for
-Android, and Web Locks would elect one tab only if one tab should ever hold the watch for all.
+the next transaction in any tab, but no tab is told of it. Locking or unlocking across tabs is not
+yet (open matter 5): each tab locks and unlocks alone, and a lease one tab keeps is there for the
+next start in any tab, as today. When it comes, a `BroadcastChannel` carries the notices; no worker
+is needed, and a SharedWorker is missing on Chrome for Android.
 
 **Later, the rest:** so that a returning user's first render shows its boxes' sidecars at once.
 After each change, the bank object dehydrates its entries with TanStack's
 `dehydrate`, and writes them, with `device_tok`, the bank's stamp, the main gate's wayin headers
 and a lease hint ("a cached lease exists, good until T"), to localStorage under the user and the
-banklabel. `hello()` and `ensureBank` read it back with `hydrate`, synchronously.
+banklabel. `hello()` and `ensureBank` read it back with `hydrate`, synchronously. Under
+`offline_signins` the records are whole, ciphertext included, and go to IndexedDB, which suits them
+better than localStorage's 5 MB of text; the stamp stays in localStorage for the synchronous first
+read.
 
 * **Never in it:** a lease, a key, a whisper. Unlocking stays async whatever it says, as the
   bankKey's unwrap is an async WebCrypto call; the lease hint is what lets the UI say "Unlocking…"
@@ -394,118 +453,66 @@ banklabel. `hello()` and `ensureBank` read it back with `hydrate`, synchronously
 ### F14. Stable promises for Suspense (instance layer, M, after 1.0)
 
 `useSuspenseBank` suspends on `device.ensureBank(banklabel)`, which must hand out the same
-promise per (user, banklabel) until it settles. `useSuspenseBox` suspends on that first, then is
-React Query's `useSuspenseQuery` over the same options as `useBox`, which keeps its own promises
-stable. On the server, a suspending hook throws, so the nearest Suspense boundary streams its
-fallback and the client takes over.
+promise per (user, banklabel) until it settles. `useSuspenseBoxRecord` is React Query's
+`useSuspenseQuery` over the same options as `useBoxRecord`, which keeps its own promises stable. On
+the server, a suspending hook throws, so the nearest Suspense boundary streams its fallback and the
+client takes over.
+
+### F15. Confirming a bankKey: a sealed check on the gate (core, M; proposal)
+
+A lease is bound to the bank's stamp and records the gate revision it was granted under
+(`gatelabelpath`, `gate_lifeseq`, `gate_revtok`), all in the ctx its bankKey is wrapped under. Nothing
+in the new core yet compares that revision with the gate fetched; big compares `gate_tok` and the
+revision for equality and forgets a row that differs. Neither proves anything about the wayins: a
+wayin is checked only by unwrapping it, and nothing says the bankKey a lease or a wayin yields is
+this bank's.
+
+**Proposal:** each gate row carries one part sealed under the bankKey, through the lease's `seal`
+with a sealer of its own, its ctx binding the bank's stamp and the gate's stamp, wayin headers
+included. A gate verb writes it with the gate, holding the bankKey already. Then:
+
+* **A kept lease is confirmed against the fetched gate** by unsealing that part: its bankKey is the
+  bank's, and the gate revision was written by someone holding the bankKey, not made up by storage.
+* **An unlock is confirmed** the same way: a wayin served by storage that wraps some other bankKey
+  fails here, before anything is sealed under the wrong key. Without the check, a substituted wayin
+  would leave existing boxes unsealable but quietly seal new ones under storage's key.
+* **The root box** could carry such a part instead, sealed at birth and bound to the bank's stamp
+  alone. That confirms the bankKey, but not the gate's revision.
+
+It composes constructions already in `src/` (the lease's `seal`, a sealer); it is still a new use,
+for a Coach's yes and an entry in `notes/security.md` (open matter 11).
 
 ## How a hook is built
 
-The giver is bound to a Device, not read from context: bank labels typecheck against
-`Device.make`'s `banks`, several standalone Devices need no nested providers, and a test binds a
-fake Device. A host names its bank givers in PascalCase (`Acme`), since eslint-plugin-react-hooks
-checks `Acme.useBox()` as a hook only on a PascalCase object.
+The giver and the bridge are built: `packages/safebyok-react/src/giver/react-giver.ts` and
+`react-bridge.ts`, tested against a fake Device (`tests/giver/`). The giver is bound to a Device,
+not read from context, so several standalone Devices need no nested providers, and a test binds a
+fake Device:
 
 ```ts
-'use client'
-import { skipToken, useQuery, useQueryClient, type QueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query'
-import { useEffect, useSyncExternalStore } from 'react'
+export const Giver = makeReactGiver(device)        // once, beside the Device
+export const Acme  = Giver.forBank('acme')         // PascalCase, so the hooks lint checks Acme.useX()
 
-/** TanStack's own options for a box hook, less the key and the fetch, which are the giver's. */
-export type BoxHookOpts<SelT> = Omit<UseQueryOptions<Minded<BoxThing>, VaultError, SelT>, 'queryKey' | 'queryFn' | 'enabled'>
+Giver.useBridge()                                  // once, near the root, inside the QueryClientProvider
 
-/** What a bank's hooks report before the Device has heard of the bank. */
-const PendingBank: BankSnapshot = Object.freeze({ stage: 'signed_out', isLocked: true, leaseEndsAt: null, lastErr: null, lastSeen: null })
-
-/** Hooks bound to `device`: bank labels typecheck against those it was made with. Make it once, at module scope. */
-export function reactGiver<BanklabelT extends string>(device: Device<BanklabelT>) {
-  return Object.freeze({ bank: (banklabel: BanklabelT) => bankGiverOf(device, banklabel) })
-}
-
-function stageOf(snap: BankSnapshot): BankStage { return snap.stage }
-function wholeOf(minded: Minded<BoxThing>): BoxThing | null | undefined { return minded.whole }
-
-function bankGiverOf<BanklabelT extends string>(device: Device<BanklabelT>, banklabel: BanklabelT) {
-  function snapshotOf(): BankSnapshot       { return device.getSnapshot().banks[banklabel] ?? PendingBank }
-  function serverSnapshotOf(): BankSnapshot { return device.getServerSnapshot().banks[banklabel] ?? PendingBank }
-
-  /** This tab's state of the bank: its stage, whether it is locked, when its lease ends. Synchronous, and never suspends.
-   * With `select`, re-renders only when the selected value changes; it must return a field of the snapshot or a primitive, never a new object.
-   */
-  function useBank(): BankSnapshot
-  function useBank<SelT>(select: (snap: BankSnapshot) => SelT): SelT
-  function useBank<SelT>(select?: (snap: BankSnapshot) => SelT): BankSnapshot | SelT {
-    const pick = select ?? ((snap: BankSnapshot) => snap)
-    return useSyncExternalStore(device.subscribe, () => pick(snapshotOf()), () => pick(serverSnapshotOf()))
-  }
-
-  /** The box at `labelpath`, through React Query: `data` is the record to show, its whisper sealed; null for none stored; undefined while pending.
-   * A `select` of the host's receives the whole `Minded`, the newest revision heard of with it.
-   */
-  function useBox<SelT = BoxThing | null | undefined>(labelpath: string, opts: BoxHookOpts<SelT> = {}): UseQueryResult<SelT, VaultError> {
-    const userid = useSyncExternalStore(device.subscribe, () => device.getSnapshot().userid, () => null)
-    // Read so that the hook re-renders when the bank arrives or starts a new life: that render hands
-    // TanStack the new queryFn.
-    const stage  = useBank(stageOf)
-    const bank   = (stage === 'ready') ? device.bankAt(banklabel) : null
-    const ask    = { labelpath }
-    return useQuery({
-      staleTime: Infinity,
-      select:    wholeOf as (minded: Minded<BoxThing>) => SelT,
-      ...opts,
-      queryKey:  ['safebyok-react', userid, banklabel, labelpath],
-      queryFn:   bank ? async () => { await bank.boxes.get(ask, { staleTime: 0 }); return bank.boxes.at(ask) } : skipToken,
-    })
-  }
-
-  return Object.freeze({ useBank, useBox })
-}
-
-/** Keep the host's entries current with each bank's minders, while mounted. The provider calls it. */
-export function useBridge(device: Device): void {
-  const client = useQueryClient()
-  useEffect(() => device.onBankObject((bank) => bridgeBank(client, bank)), [client, device])
-}
-
-function bridgeBank(client: QueryClient, bank: BankObject): () => void {
-  const prefix = ['safebyok-react', bank.userid, bank.banklabel]
-  const unlisten = bank.boxes.listen((answer) => {
-    const queryKey = [...prefix, answer.ask.labelpath]
-    if (! client.getQueryCache().find({ queryKey, exact: true })) { return }
-    const minded = bank.boxes.at(answer.ask)
-    if ((minded === undefined) || (minded.mindedkind === 'bare')) {
-      void client.invalidateQueries({ queryKey })
-      return
-    }
-    client.setQueryData(queryKey, minded)
-    // A newer whole, and any view of the host's, refetch only where a hook watches them.
-    if (minded.mindedkind === 'behind') { void client.invalidateQueries({ queryKey, exact: true }) }
-    void client.invalidateQueries({ queryKey: [...queryKey, 'view'] })
-  })
-  return () => { unlisten(); client.removeQueries({ queryKey: prefix }) }
-}
+const { isLocked } = Acme.useBankSnapshot()                     // this tab's state, synchronous
+const ends         = Acme.useBankSnapshot((b) => b.leaseEndsAt) // re-renders only when it changes
+const { data: box, isPending } = Acme.useBoxRecord('box/openai')  // the fullest record, sealed
+const { data: car } = useQuery(Acme.boxCarQueryOptions('box/openai'))  // the whole car, newest with it
 ```
 
-Before the bank object arrives, `skipToken` holds the fetch, and any entry already in hand shows;
-when it arrives, the same observer takes the new `queryFn`. A host uses it as:
-
-```ts
-export const Sb   = reactGiver(device)
-export const Acme = Sb.bank('acme')
-
-const { isLocked } = Acme.useBank()
-const ends         = Acme.useBank((b) => b.leaseEndsAt)
-const { data: box, isFetching } = Acme.useBox('openai')
-const { data: mask } = Acme.useBox('openai', { select: (minded) => minded.whole?.sidecar.mask })
-```
+`useBankSnapshot` is a `useSyncExternalStore` on the Device, picking its bank's slice.
+`useBoxRecord` is React Query's `useQuery`: its key is `['safebyok', userid, banklabel, labelpath]`,
+its fetch is skipped while nobody is signed in and otherwise waits on `ensureBank`, its `staleTime`
+is `Infinity`, and its `select` picks the fullest record. Every other record hook has this shape.
 
 ## The order to build in
 
 1. **F1, F2, F3, F4:** the Device, `probe`, the bank object, and `useBank`, `GatingDialogs` and
    `LockButton` on them. The gating dialogs move over almost as they are.
-2. **F5, F7, F8, F9:** the minded record (in the neighbouring session), the bank's QueryClient,
-   the bridge, `useBox` and `withWhisper`. The API-key use case then works end to end, with
-   `ApiKeyField` on `putBoxOnce`.
+2. **F5, F7, F8, F9:** the car (in the minder's thread), the bank's QueryClient, the bridge,
+   `useBoxRecord` and `withWhisper`. The API-key use case then works end to end, with `ApiKeyField`
+   on `putBoxOnce`. The giver and the bridge are built against a fake Device.
 3. **F12:** `putBox` with `retry` and a revisor; `ApiKeyField` moves onto it.
 4. **F10, F11:** drafts, `WhisperInput`, `WhisperText`.
 5. **F6:** `useBoxList`, `BoxTree`, `WhisperForm`: the doppler-lite. Waits on nesting.
@@ -517,15 +524,22 @@ adapters and the demo move off `safebyok-big` as their pieces land.
 
 ## Open matters
 
-| # | Matter | My recommendation |
-|---|---|---|
-| 1 | F9: may a second `ensureUnlocked` wait on the open unlock gating instead of refusing? | Yes, for `unlock_bank` alone |
-| 2 | F3: does one bank object stand for (user, banklabel) through the bank's lives, adopting each, or end with a life? | Through its lives, so a bank deleted and born again elsewhere does not unmount the host's UI |
-| 3 | F1: are a bank's options given only at `Device.make`, or may `ensureBank` take a banklabel it has not seen, with its options? | Both: `banks` at make, for `hello()` to warm, and `ensureBank(banklabel, opts)` for a bank found later |
-| 4 | F13: is `keepOnDevice` one level, each keeping what the ones before it keep, or a set? And its default? | A set: `offline_signins` and `unlocked` each imply `past_userids`, but not each other. Their risks differ in kind (a passphrase open to offline guessing for good, against the bank open until autolock), and each without the other is a product people ship: today's leases without cached wayins, and a manager that unlocks offline but locks on close. Default `['past_userids', 'unlocked']`, today's behaviour |
-| 5 | F13: does locking or unlocking one tab reach every tab? | Both, by `BroadcastChannel`: unlock once and every tab unlocks (each attaching only against the fetched gate); lock once and every tab locks. **Settled**: *I'd like it to* |
-| 6 | F1: does each bank's snapshot live inside the Device's, as one store? | Yes: `useBank` is then one `useSyncExternalStore`, before the bank object arrives and after. With two stores it would switch its `subscribe` mid-life |
-| 7 | F5: what does `useBox` answer on an unborn bank? | `data: null`, none stored, at once, not pending until a birth: the bank object knows no box can exist |
-| 8 | F5: the race between the host's fetch and a newer notice | A row in `notes/wontfix.md`, not a fix, when the bridge is built. **Settled**: *wontfix* |
-| 9 | F7: `@tanstack/react-query` as a peer dependency of `safebyok-react` | Yes: its Suspense and error-boundary handling is the hard part of a record hook (PROCESS.md, *Dependencies*). **Settled**: *yes!* |
-| 10 | F5: a customer's own view, under `[...boxKey, 'view', viewlabel]` | Offer it as an option of `useBox` (`view: { viewlabel, viewOf }`) after 1.0; until then a host writes the `useQuery` itself over `Acme.boxQuery(labelpath)`. **Settled**: deferred past 1.0 |
+The Coach's answers stand as given, in the Ruling column.
+
+| # | Matter | My recommendation | Ruling |
+|---|---|---|---|
+| 1 | F9: may a second `ensureUnlocked` wait on the open unlock gating instead of refusing? | Yes, for `unlock_bank` alone | *this just has to do with arbitrating among dialog boxes? Shouldn't it join?* Settled: it joins |
+| 2 | F3: does one bank object stand for (user, banklabel) through the bank's lives, or end with a life? | Through its lives | *firm end with the life if I get to choose.* Settled: it ends with its life (F3) |
+| 3 | F1: are a bank's options given only at `Device.make`, or may `ensureBank` take a banklabel it has not seen, with its options? | Both | *a bank's options should be overrideable at Bank.make. Once made, the device' copy of the options don't change; once made, a bank's own options don't change. If you want ot make a per-bank vaultDB, you have to make a new one.* Settled (F1) |
+| 4 | F13: is `keepOnDevice` one level or a set? And its default? | A set | *if there are two axes, two options. keepOnDevice: 'userids', 'offline_signins', 'none'; autolock: { hours, on: 'since_last_proof' \| 'close' \| 'never' \| 'signout' }.* Settled (F13). Defaults open |
+| 5 | F13: does locking or unlocking one tab reach every tab? | Both, by `BroadcastChannel` | *that would be very nice, but I don't want to hear about the race conditions so not yet.* Deferred |
+| 6 | F1: does each bank's snapshot live inside the Device's, as one store? | Yes: `useBankSnapshot` is one `useSyncExternalStore`, before the bank object arrives and after; with two stores it would switch its `subscribe` mid-life. The giver is built this way | Open |
+| 7 | F5: what does a record hook answer on an unborn bank? | `data: null` at once, not pending until a birth: the bank object's `getBoxCar` answers the void car | Open |
+| 8 | F5: the race between the host's fetch and a newer car | A row in `notes/wontfix.md` when the bridge lands | *wontfix.* Settled |
+| 9 | F7: `@tanstack/react-query` as a peer dependency of `safebyok-react` | Yes | *yes!* Settled; installed, optional until the giver is exported |
+| 10 | F5: a customer's own view under `[...boxKey, 'view', viewlabel]` | Offer it as a `useBoxRecord` option after 1.0 | *defer please.* Settled: after 1.0 |
+| 11 | F15: a sealed check on the gate, confirming a kept lease and each unlock | Yes, on the gate row, written by each gate verb | *I vote yes for authenticating, but a TODO for the moment.* Settled: in TODO.md |
+| 12 | From userid to first dialog: does `offline_signins` keep the boxes' whole records? | Yes: an offline unlock has nothing to unseal without them | Open |
+| 13 | F13: key the `userids` entries on a salted hash of the userid (the Coach's proposal) | Yes: HMAC-SHA-256 under one random salt per browser, made at the first `hello()`, by `@noble/hashes` so that the first read stays synchronous; no userid in the kept value either, since the stamp carries one. It hides who has used this browser from a look through storage, not from a test of a guessed userid, as the salt is on the device. It gives up the list of past users to pick from | Open |
+| 14 | F6: a small pouch of unauthenticated display data in each box's sparse record, so every listing carries it (the Coach's proposal) | Yes, told apart from the sidecar by purpose: what a row shows against what a detail view shows. No size check of its own: the box's own size check counts it, and its storage is the host's to pay for; the docs say it rides in every listing. The kit's keys are checked where present (`title`, `mask`, `placeholder`, `hint`, `min`, `max`) and every other key passes through as given (the Coach): a loose shape, the one exception to the strict validators, so `CX.pouch.parse(pouch)` returns both. A host that dislikes our check of a recognized key keeps its own bag under a key of its own (`{ fu: { … } }`). A recognized key of the wrong type refuses a put `bad_option`; read back, it fails the record's check, and the row reads as damaged. A misspelt recognized key is stored and ignored. The mask moves into it, so a listing of 1,002 shows every mask without 1.1 MB of whole records. The sidecar's trust class: unencrypted, unauthenticated, editable while locked; the kit renders it as text only, and `min` and `max` advise, never enforce. An entry in `notes/security.md` and VOCABULARY.md | Open |
+| 15 | Kit: recipes for the standard kinds of secret (API key with its account id, login, OAuth client, connection string, SSH or PGP key pair, certificate, TOTP, webhook secret, secure note) | Yes: a recipe says, for each field, whether it lives in the whisper, the sidecar or the pouch, its input (line, password, text area, file) and its placeholder and hint, and may `summarize(whisper)` into pouch fields at save: a mask, a fingerprint, an expiry. `WhisperForm` takes a recipe; `ApiKeyField` is the `api_key` recipe; a host writes its own the same way. `mask` is useless on key material, whose first line is a PEM header: its row shows a fingerprint, or a certificate's subject and expiry. The light recipes ship in the kit; certificate and PGP parsing (`@peculiar/x509`, `openpgp.js`) in optional packages or a host's `summarize`. `summarize` is a fifth place a whisper may be (F11), inside a draft's put alone | Open |
