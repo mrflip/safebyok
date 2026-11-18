@@ -19,9 +19,16 @@ export {
 export { Wayin } from './models/wayin'
 export { type Banklabel, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
-export type { BadNews, BadNewsHandler, BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxShell, BoxUnsealed, DeviceOpts, DeviceRecord, GetBoxAnswer, GetBoxAskDraft } from './shapes/shapes-bankish'
+export {
+  type BadNews, type BadNewsHandler, type BankAskDraft, type BankDna, type BankMakeRecord, type BankOpts, type BirthOpts, type BoxShell, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type GetBoxAnswer,
+  type GetBoxAskDraft, BankishChecks,
+} from './shapes/shapes-bankish'
 export {
   type AskUser, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,
   type Gatingkind, type LeaseBank, type LeaseOpts, type ProvingDevice, type RequestCleartext, type SecretFieldname, GateishChecks, gatingkindVals,
 } from './shapes/shapes-gateish'
-export type { BankRecord } from './shapes/shapes-asks'
+export { type BankRecord, type WorldRecord, AskChecks } from './shapes/shapes-asks'
+export {
+  type BankThing, type BoxThing, type GateThing, type Sparse, type Thing, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel,
+  BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, sparseOf, thingkindVals,
+} from './shapes/shapes-thing'
