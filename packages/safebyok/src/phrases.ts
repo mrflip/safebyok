@@ -122,7 +122,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, StaleTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -134,20 +134,14 @@ export const MinderNotStarted = 'This ThingMinder is not minding: call hello bef
 /** A get that storage answered older than the record the minder held when it began. */
 export const StaleRead = 'Storage answered with a revision older than one this device already held. The newer record stays cached, and a later get asks again.'
 
-/** A minder handed something that is not a TanStack Query client. */
-export const QueryClientExpected = 'A ThingMinder is made with a QueryClient from @tanstack/query-core.'
-
 /** A gcTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
-/** A scope of another modelkind than the minder's. */
-export const ModelkindMismatch = "A ThingMinder minds one modelkind: the scope's labelpath must start with it."
-
 /** A value in a minder's query that is not a car. */
-export const NotACar = "A ThingMinder's structural sharing was given a value that is not a ThingCar, by a select, a placeholder or a write under its query key: only cars belong there."
+export const NotACar = "A ThingMinder's structural sharing was given a value that is not a ThingCar: only cars belong in its cache."
 
 /** A car whose newest is not a Thing's scope and revision. */
 export const CarRecordShape = "A ThingCar's newest record lacks a Thing's scope or revision: this is a bug in safebyok."

@@ -23,7 +23,7 @@ export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing
   return      Object.freeze(CarOfChecks.behindCar.parse({ liveness: 'behind', newest, fullest } as const))
 }
 
-// TanStack also calls it on an observer's selected and placeholder values, so it throws for one that is not a car.
+// TanStack Query types the values it hands structural sharing as unknown, so both are checked as cars.
 /** The car of the newest record of `prior` and `delivered`, and the fullest of its life, from either car, with `prior`'s on a tie.
  * It serves as a minder query's structural sharing: it is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined or of another scope.
  * Anything but a car refuses `unexpected_error`; `prior` may also be undefined.
@@ -67,7 +67,6 @@ function tagBestNewestRecordSL(prior: DeliverableThing, delivered: DeliverableTh
 
 // == [Reading cars]: isThingCar, dbHasNewer, demandCar
 
-// TanStack also shares an observer's selected and placeholder values, which may be anything, a `liveness` field included.
 /** True when `val` is a sound car. */
 export function isThingCar(val: unknown): val is ThingCar<Thing> {
   return CarChecks.thingCar.safeParse(val).success
