@@ -91,7 +91,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   })
   // A Thing's scope and citation: what every record and tombstone has, sparse or whole.
   const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape })
-  const sparse  = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
+  const sparse       = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
   // The store checks only the shape of a sealed part: what is inside is the sealer's.
@@ -271,6 +271,7 @@ export type ThingCited   = Readonly<Z.infer<typeof ThingChecks.thingCited>>
 export type StoredCited  = Readonly<Z.infer<typeof ThingChecks.storedCited>>
 /** The fields every kind of Thing has, which the store reads. The rest of a record is its body. */
 type ThingSparse    = Readonly<Z.infer<typeof ThingChecks.sparse>>
+/** The name of a Thing field. */
 type ThingFieldname = keyof ThingSparse
 /** The bank, as a Thing. */
 export type BankRecord   = Readonly<Z.infer<typeof BankChecks.record>>
