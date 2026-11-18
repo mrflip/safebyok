@@ -4,8 +4,8 @@ import { Crypto, EX, Errors, GX, Helpers, Outcome, Throwers, Validator } from 's
 import { Bank } from './bank'
 import { Device } from './device'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
-import type { Banklabel, Userid } from '../storage/primitives'
-import { type BankScope, bankScope } from './stamps'
+import type { Banklabel, Userid } from '../shapes/primitives'
+import { type BankScope, bankScope } from '../shapes/shapes-stamps'
 
 // == [Kinds and forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
 

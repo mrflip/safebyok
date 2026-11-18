@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CoreBox } from '../../src/models/core-box'
 import * as Phrases from '../../src/phrases'
-import type { BoxCleartexts, BoxRecord, RevisionOf } from '../../src/models/sealers'
-import { boxThing, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import type { BoxCleartexts, BoxRecord, RevisionOf } from '../../src/shapes/shapes-sealers'
+import { boxThing, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()

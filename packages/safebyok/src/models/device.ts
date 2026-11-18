@@ -4,9 +4,9 @@ import type { Bank } from './bank'
 import { type AskUser, Gating, type RequestCleartext, birthBank } from './gating'
 import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { type BankScope, bankScope } from './stamps'
+import { type BankScope, bankScope } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
-import type { Banklabel, DeviceTok, Userid } from '../storage/primitives'
+import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
 
 // == [Given to a device]: DefaultLeaseMillis, DeviceRecord, BadNews, BadNewsHandler, DeviceOpts

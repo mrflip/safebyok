@@ -1,9 +1,9 @@
 import { exactOptional } from 'zod'
 import { CX, Clock, Crypto, Errors, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type BoxThing, type Sealed, boxSealable, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../storage/shapes-thing'
-import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from './sealers'
-import { type BoxStamp, boxStamp } from './stamps'
+import { type BoxThing, type Sealed, boxSealable, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../shapes/shapes-thing'
+import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from '../shapes/shapes-sealers'
+import { type BoxStamp, boxStamp } from '../shapes/shapes-stamps'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })

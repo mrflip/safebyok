@@ -5,11 +5,11 @@ import * as Phrases from '../phrases'
 import {
   type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type Tombstone, type VoidSentinel,
   cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
-} from '../storage/shapes-thing'
+} from '../shapes/shapes-thing'
 
 // == [The car]: Tombstone, ThingCar, BoxCar, GateCar, DeliverableThing, carLivenessVals
 
-export type { Tombstone } from '../storage/shapes-thing'
+export type { Tombstone } from '../shapes/shapes-thing'
 
 // The vaultDB has a newer whole record when liveness is 'behind' or 'bare' (dbHasNewer).
 /** A ThingMinder's frozen cache value for a Thing: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").

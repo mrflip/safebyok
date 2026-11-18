@@ -1,6 +1,6 @@
 import { HostErrorSanitizer } from 'safebyok-big'
 import { Consts, Errors, GX, Helpers, Phrases, Strength, Throwers, Validator } from 'safebyok-big/internals'
-import { type BankScope, bankScope } from '../models/stamps'
+import { type BankScope, bankScope } from '../shapes/shapes-stamps'
 
 // == [The checker]: StrengthChecker, GuardedStrengthChecker, strengthChecker
 

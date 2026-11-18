@@ -5,8 +5,8 @@ import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, AskChecks, thingCited, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
-import type { TSQGotAnswer } from './thing-minder'
+import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, AskChecks, thingCited, thingScope, thingWatchScope, trackShape } from './shapes-thing'
+import type { TSQGotAnswer } from '../minding/thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 

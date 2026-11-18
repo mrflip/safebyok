@@ -2,7 +2,7 @@
 
 import { isEqual, omit } from 'es-toolkit'
 import { type EX, Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
-import type { GateWriteAsk, Thing, Wayins } from './shapes-thing'
+import type { GateWriteAsk, Thing, Wayins } from '../shapes/shapes-thing'
 
 // == [Policies]: GatePolicies, policyRefusalOf, PoliciedMeta, gateIssue
 // Each runs once the put table has found the write would replace the live gate. Each line is one row of its policy's table

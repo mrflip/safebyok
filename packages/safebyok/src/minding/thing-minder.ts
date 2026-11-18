@@ -11,16 +11,16 @@ import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Errors, Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import type { Banklabel, EpochMillis, Labelpath, Userid } from '../storage/primitives'
+import type { Banklabel, EpochMillis, Labelpath, Userid } from '../shapes/primitives'
 import {
   type GetAsk, type LoggableAsk, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
   RootBoxLabelpath, cmpThings, loggableAskOf, modelkindOf, shellOf, thingkindVals,
-} from '../storage/shapes-thing'
+} from '../shapes/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
   type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies, type TsqStaleTime,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAsk, minderGetAskOpts, minderListener, minderScope, queryCacheOpts, tsqClient,
-} from './shapes-minder'
+} from '../shapes/shapes-minder'
 import { type DeliverableThing, type ThingCar, type Tombstone, bestCarOf, carOf, dbHasNewer } from './thing-car'
 
 // == [Answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer

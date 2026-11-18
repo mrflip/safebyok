@@ -2,9 +2,9 @@
 import { describe, expect, it } from 'vitest'
 import type { Errors } from 'safebyok-big/internals'
 import { aWhile, eventually, expectSyncRefusal } from 'safebyok-big/testing'
-import type { ThingWatchScope, WorldRecord } from '../../src/storage/shapes-thing'
+import type { ThingWatchScope, WorldRecord } from '../../src/shapes/shapes-thing'
 import type { ThingNotice, VaultDB } from '../../src/storage/vault-db'
-import { childShellCited } from '../../src/storage/shapes-thing'
+import { childShellCited } from '../../src/shapes/shapes-thing'
 import {
   BankStaleTrack, GateStaleTrack, Life0, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'

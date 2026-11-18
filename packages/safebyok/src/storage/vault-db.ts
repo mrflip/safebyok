@@ -3,7 +3,7 @@
 import type { EX, Errors } from 'safebyok-big/internals'
 import type {
   BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, Sparse, Thing, ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAsk,
-} from './shapes-thing'
+} from '../shapes/shapes-thing'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
 

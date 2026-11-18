@@ -3,7 +3,7 @@ import { SX } from 'safebyok-big/internals'
 import {
   type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, AskChecks, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, VoidLifeseq, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf,
   isTombstoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, labelpathWithParentage, lifepathWithParentage, sparseOf, boxSealable, isGone, isTombstone, isWholeRecord, isVoidSentinel,
-} from '../../src/storage/shapes-thing'
+} from '../../src/shapes/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 

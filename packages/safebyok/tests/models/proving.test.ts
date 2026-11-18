@@ -4,9 +4,9 @@ import { Consts, Crypto, Errors, GX, Phrases } from 'safebyok-big/internals'
 import { CoreBox } from '../../src/models/core-box'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving, type ProvingDevice, guardKeyDeriver } from '../../src/models/proving'
-import type { StampedGate } from '../../src/models/stamps'
+import type { StampedGate } from '../../src/shapes/shapes-stamps'
 import { Wayin } from '../../src/models/wayin'
-import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()

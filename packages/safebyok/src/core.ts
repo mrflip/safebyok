@@ -11,11 +11,11 @@ export type { GateRevisionedStamp, PasskeyProving, PassphraseProving, Proving, P
 export type {
   BodyOf, BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LiveOf, LivePublicPropsOf, PublicPropsOf, RevisionOf, SealPurposes, SealTags, Sealable, Sealed,
   SealedOf, SealedPartsOf, Sealer, TombstoneOf, TombstonePublicProps, UnsealedOf,
-} from './models/sealers'
+} from './shapes/shapes-sealers'
 export {
   type BankScope, type BankStamp, type BoxStamp, type GateStamp, type LeaseRecord, type LeaseSparse, type LeaseStamp, type StampedGate,
   LeaseFormat, bankScope, bankStamp, boxStamp, gateStamp, leaseRecord, leaseStamp, stampedGate,
-} from './models/stamps'
+} from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
-export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './storage/primitives'
+export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './shapes/primitives'
 export { type VaultDB, isVaultDB } from './storage/vault-db'

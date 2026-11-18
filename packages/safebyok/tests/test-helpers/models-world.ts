@@ -16,11 +16,11 @@ import { Device, type DeviceOpts, type DeviceRecord } from '../../src/models/dev
 import { Lease, type LeaseBank } from '../../src/models/lease'
 import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, type ProvingDevice, guardKeyDeriver } from '../../src/models/proving'
 import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
-import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
-import { BoxThingFormat, VoidLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
+import { BoxThingFormat, VoidLifeseq, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { BirthBankAsk } from '../../src/storage/shapes-thing'
+import type { BirthBankAsk } from '../../src/shapes/shapes-thing'
 import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
 
 // == [Time]: T0, useFakeClock

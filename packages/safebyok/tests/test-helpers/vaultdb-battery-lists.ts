@@ -1,8 +1,8 @@
 /** The battery's cases of tryListThings, over the root box's children. */
 import { describe, expect, it } from 'vitest'
 import { expectBad, expectGood } from 'safebyok-big/testing'
-import type { Labelpath } from '../../src/storage/primitives'
-import { sparseOf } from '../../src/storage/shapes-thing'
+import type { Labelpath } from '../../src/shapes/primitives'
+import { sparseOf } from '../../src/shapes/shapes-thing'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { Life0, ThingBank, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, listAskAt, rootBoxOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'

@@ -3,11 +3,11 @@ import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
 import { Crypto, Errors, Helpers, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../storage/primitives'
-import type { ThingRecord } from '../storage/shapes-thing'
+import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
+import type { ThingRecord } from '../shapes/shapes-thing'
 import type { Bank } from './bank'
-import type * as Sealers from './sealers'
-import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from './stamps'
+import type * as Sealers from '../shapes/shapes-sealers'
+import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from '../shapes/shapes-stamps'
 
 /** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>

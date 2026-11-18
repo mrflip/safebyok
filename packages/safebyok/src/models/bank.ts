@@ -1,24 +1,24 @@
 import type { Consts, EX } from 'safebyok-big/internals'
 import { Clock, Crypto, Errors, Throwers, Validator } from 'safebyok-big/internals'
-import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../minding/shapes-minder'
+import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../shapes/shapes-minder'
 import { BaseThing } from './base-thing'
 import { CoreBox } from './core-box'
 import { Device } from './device'
 import { Gate, type GateDna } from './gate'
 import type { Lease } from './lease'
 import { type GateRevisionedStamp, Proving } from './proving'
-import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps, UnsealedOf } from './sealers'
-import { type BankScope, type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
+import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps, UnsealedOf } from '../shapes/shapes-sealers'
+import { type BankScope, type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
-import type { DeviceTok, Labelpath } from '../storage/primitives'
+import type { DeviceTok, Labelpath } from '../shapes/primitives'
 import {
   type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
   type Sparse, type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
   listAskOf, loggableAskOf, putAskOf, shellOf,
-} from '../storage/shapes-thing'
+} from '../shapes/shapes-thing'
 import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
-export type { BankRecord, WorldRecord } from '../storage/shapes-thing'
+export type { BankRecord, WorldRecord } from '../shapes/shapes-thing'
 
 /** The record {@link Bank.make} and {@link Bank.birth} take: the bank's Thing, with its main gate's Thing at `maingate` and its root box at `rootBox`.
  * The root box is whole, or its shell before the bank is born.

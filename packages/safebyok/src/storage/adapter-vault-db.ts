@@ -7,7 +7,7 @@ import { AnswerNotMade } from '../phrases'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
   type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, isGone, loggableAskOf, watchArgs,
-} from './shapes-thing'
+} from '../shapes/shapes-thing'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,

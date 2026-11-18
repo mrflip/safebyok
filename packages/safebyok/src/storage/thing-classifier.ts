@@ -4,13 +4,13 @@ import { sortBy } from 'es-toolkit'
 import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
 import { BankRootsMissing, BornAtNotStored } from '../phrases'
 import { PoliciedMeta, gateIssue, policyRefusalOf } from './policies'
-import type { Labelpath } from './primitives'
+import type { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
   type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
   type Tracked, type WorldRecord, type WriteAsk,
   KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
-} from './shapes-thing'
+} from '../shapes/shapes-thing'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,

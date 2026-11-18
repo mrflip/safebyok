@@ -4,7 +4,7 @@ import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
 import { BX, type Consts, CX, EX, Errors, SX, Validator } from 'safebyok-big/internals'
-import type { TombstoneOf } from '../models/sealers'
+import type { TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 

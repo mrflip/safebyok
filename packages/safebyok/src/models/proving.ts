@@ -1,10 +1,10 @@
 import type * as Z from 'zod'
 import type { Consts, Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases, Throwers, Validator } from 'safebyok-big/internals'
-import { thingRecord } from '../storage/shapes-thing'
+import { thingRecord } from '../shapes/shapes-thing'
 import { Lease, type LeaseBank } from './lease'
-import type { BankScope, BankStamp, GateStamp, StampedGate } from './stamps'
-import * as Stamps from './stamps'
+import type { BankScope, BankStamp, GateStamp, StampedGate } from '../shapes/shapes-stamps'
+import * as Stamps from '../shapes/shapes-stamps'
 import type { GuardedStrengthChecker } from '../helpers/passphrase-strength'
 import { Wayin, wayinCtxOf } from './wayin'
 

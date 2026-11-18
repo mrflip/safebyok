@@ -2,9 +2,9 @@ import type { Consts } from 'safebyok-big/internals'
 import { Crypto, Throwers, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import { BaseThing } from './base-thing'
-import { type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
+import { type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
-import { type GateThing, type ThingScope, type Wayins, GateThingFormat, gateThing, thingScope } from '../storage/shapes-thing'
+import { type GateThing, type ThingScope, type Wayins, GateThingFormat, gateThing, thingScope } from '../shapes/shapes-thing'
 
 /** The dna of a new main gate: its stamp, and its wayins. */
 export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
