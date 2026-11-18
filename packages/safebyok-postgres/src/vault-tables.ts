@@ -60,13 +60,12 @@ CREATE TABLE IF NOT EXISTS safebyok_gate_things (${ThingColumns}
     AND jsonb_typeof(auth) = 'object' AND jsonb_typeof(sigs) = 'object' AND jsonb_typeof(meta) = 'object', false))
 );
 
--- A box. A live box has its sidecar; a tombstone keeps its sealed whisper, and has none.
+-- A box. A tombstone keeps its sealed whisper and its sidecar, which is always {}.
 CREATE TABLE IF NOT EXISTS safebyok_box_things (${ThingColumns}
-  sidecar        jsonb,
+  sidecar        jsonb NOT NULL,
   whisper_sealed jsonb NOT NULL,${ThingChecks}
   CHECK (labelpath IN ('box', 'box/' || label)),
-  CHECK ((am = 'a') = (sidecar IS NOT NULL)),
-  CHECK (COALESCE(jsonb_typeof(sidecar), 'object') = 'object' AND jsonb_typeof(whisper_sealed) = 'object')
+  CHECK (jsonb_typeof(sidecar) = 'object' AND jsonb_typeof(whisper_sealed) = 'object')
 );
 
 -- Row-level security is on, with no policy. The role that owns the tables, which your server
