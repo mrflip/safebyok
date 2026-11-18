@@ -9,13 +9,13 @@ import * as Phrases from '../phrases'
 import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, AskChecks, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
 import type { TSQGotAnswer } from './thing-minder'
 
-// == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
+// == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 
 /** The TanStack Query options a host may choose for the cars a minder caches. */
 export interface QueryCacheOpts {
-  /** How long a car stays timely, in milliseconds. A `behind` or `bare` car is never timely. */
+  /** How long a car stays timely, in milliseconds up to {@link MaxTimerMillis}, or `Infinity` for one that never ages. A `behind` or `bare` car is never timely. */
   staleTime: number
-  /** How long a car stays in the cache once no TanStack observer uses it, in milliseconds. `Infinity` means until `goodbye`. */
+  /** How long a car stays in the cache once no TanStack observer uses it, in milliseconds up to {@link MaxTimerMillis}. `Infinity` means until `goodbye`. */
   gcTime:    number
 }
 
@@ -27,9 +27,13 @@ export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ s
 /** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, and is never retried. */
 export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry: false } as const)
 
-// A timer longer than this fires at once, in every JavaScript runtime, and TanStack Query passes gcTime to one as it is.
-/** The longest finite gcTime: 2^31 - 1 milliseconds, about 24.8 days. */
-const MaxGcTime = (2 ** 31) - 1
+// TanStack Query passes a finite gcTime or staleTime to a timer as it is, and a timer longer than 2^31 - 1 milliseconds
+// fires at once, in every JavaScript runtime. The bound is a whole number of hours, below that limit.
+/** The longest finite gcTime or staleTime, in hours: 24.5 days. Give `Infinity` for a longer one. */
+export const MaxTimerHours = 588
+
+/** The longest finite gcTime or staleTime, in milliseconds: 24.5 days. Give `Infinity` for a longer one. */
+export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 // --
 
 // == [Checks]: queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts
@@ -38,9 +42,11 @@ const MaxGcTime = (2 ** 31) - 1
 export const {
   queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts,
 } = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
-  const gcTime           = union([uint.max(MaxGcTime, Phrases.GcTimeShape), lit(Infinity)])
+  const gcTime           = union([uint.max(MaxTimerMillis, Phrases.GcTimeShape), lit(Infinity)])
+  const staleMillis      = uint.max(MaxTimerMillis, Phrases.StaleTimeShape)
+  const staleTime        = union([staleMillis, lit(Infinity)])
   const queryCacheOpts   = obj({
-    staleTime: orDefault(uint, DefaultQueryCacheOpts.staleTime),
+    staleTime: orDefault(staleTime, DefaultQueryCacheOpts.staleTime),
     gcTime:    orDefault(gcTime, DefaultQueryCacheOpts.gcTime),
   }).strict()
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
@@ -53,15 +59,15 @@ export const {
   const minderScope      = obj(thingScope.shape)
   // Zod refuses to `extend` a refined object over keys it has; `safeExtend` narrows them, and keeps the refinement.
   const minderGetAsk     = AskChecks.getAsk.safeExtend({ ifAbsent: lit('nil'), track: trackShape })
-  const tsqStaleTime     = union([uint, lit(Infinity), lit('static')])
+  const tsqStaleTime     = union([staleMillis, lit(Infinity), lit('static')])
   // Each option may be left out, and never given as undefined.
   const minderGetAskOpts = obj({ staleTime: exactOptional(tsqStaleTime) }).strict()
   const minderAskOpts    = minderGetAskOpts.extend({ ifStale: exactOptional(oneof(['get', 'refresh'])) }).strict()
   return { queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts }
 })
 
-/** How long a minder's get or read counts a car timely: milliseconds, or `Infinity` or `'static'` for a car that is never stale by age.
- * A `bare` car is never timely, whatever the staleTime. Under `Infinity` or `'static'`, a `behind` car is timely.
+/** How long a minder's get or read counts a car timely: milliseconds up to {@link MaxTimerMillis}, or `Infinity` or `'static'` for a car that never ages.
+ * A `behind` or `bare` car is never timely, whatever the staleTime. An invalidated car, or one whose last get was refused, is not timely under `Infinity`, and is under `'static'`, as TanStack Query counts them.
  */
 export type TsqStaleTime = Z.input<typeof tsqStaleTime>
 

@@ -29,7 +29,7 @@ import { type DeliverableThing, type ThingCar, type Tombstone, bestCarOf, carOf,
 // A timely car is full, gone or void: a behind or bare car is never timely.
 /** A get's answer, read from the cache. Beside a get's own acts:
  * - `vacant`   -- nothing is cached
- * - `untimely` -- the car is older than `staleTime`, is `behind` or `bare`, or its last get was refused
+ * - `untimely` -- the car is `behind` or `bare`, or TanStack Query counts it stale under `staleTime`: older than it, invalidated, or its last get refused
  */
 export type GotAnswer = (
   | GoodAnswer<Thing, 'gotlive'>
@@ -429,16 +429,11 @@ function gotAnswerOf(ask: GetAsk, carQuery: TSQ.Query<ThingCar<Thing>> | undefin
   return                                   { ...base, act: 'untimely', val: undefined }
 }
 
-/** True when `carQuery` has a car that is timely within `staleTime`.
- * Never for a vacant query or a `bare` car; always for any other car under `Infinity` or `'static'`;
- * otherwise, for a car the vaultDB has nothing newer for, cached more recently than `staleTime` ago and not invalidated.
- */
+/** True when `carQuery` has a car the vaultDB has nothing newer for, and which TanStack Query counts fresh under `staleTime`. */
 function isTimelyQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTime: TsqStaleTime): boolean {
   const car = carQuery?.state.data
-  if ((carQuery === undefined) || (car === undefined))       { return false }
-  if (car.liveness === 'bare')                               { return false }
-  if ((staleTime === Infinity) || (staleTime === 'static'))  { return true  }
-  if (dbHasNewer(car))                                       { return false }
+  if ((carQuery === undefined) || (car === undefined)) { return false }
+  if (dbHasNewer(car))                                 { return false }
   return (! carQuery.isStaleByTime(staleTime))
 }
 

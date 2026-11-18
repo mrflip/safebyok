@@ -122,7 +122,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, RootNotCached, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
+// == [Minding]: BankExpected, RootNotCached, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, StaleTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -139,8 +139,11 @@ export const StaleRead = 'Storage answered with a revision older than one this d
 /** A minder handed something that is not a TanStack Query client. */
 export const QueryClientExpected = 'A ThingMinder is made with a QueryClient from @tanstack/query-core.'
 
-/** A gcTime that is not Infinity or a whole number of milliseconds up to 2^31 - 1. */
-export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2147483647 (about 24.8 days): a longer timer fires at once.'
+/** A gcTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
+export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
+
+/** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
+export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
 /** A scope of another modelkind than the minder's. */
 export const ModelkindMismatch = "A ThingMinder minds one modelkind: the scope's labelpath must start with it."

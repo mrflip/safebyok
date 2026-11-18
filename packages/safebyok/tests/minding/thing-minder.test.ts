@@ -2,7 +2,7 @@ import * as TSQ from '@tanstack/query-core'
 import { Errors } from 'safebyok-big/internals'
 import { noop } from 'es-toolkit'
 import { describe, expect, it, vi } from 'vitest'
-import { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
+import { DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerMillis, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type ThingCar, carOf } from '../../src/minding/thing-car'
 import { type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import * as Phrases from '../../src/phrases'
@@ -151,6 +151,9 @@ describe("ThingMinder.make", () => {
     [{},                     { queryCacheOpts: { networkMode: 'online' } },         null,                'refuses a networkMode, which no host sets'],
     [{},                     { queryCacheOpts: { retry: 3 } },                      null,                'refuses a retry, which no host sets'],
     [{},                     { queryCacheOpts: { staleTime: -1 } },                 null,                'refuses a negative staleTime'],
+    [{},                     { queryCacheOpts: { staleTime: MaxTimerMillis + 1 } }, null,                'refuses a staleTime past MaxTimerMillis'],
+    [{},                     { queryCacheOpts: { gcTime: MaxTimerMillis + 1 } },    null,                'refuses a gcTime past MaxTimerMillis'],
+    [{},                     { queryCacheOpts: { staleTime: 'static' } },           null,                "refuses a staleTime of 'static' for the minder's own"],
   ] as const
   for (const [tiesOver, optsOver, bank, blurb] of MakeCases) {
     it(blurb, () => {
@@ -191,6 +194,16 @@ describe("ThingMinder.hello", () => {
     for (const [car, expected, blurb] of StaleTimeCases) {
       expect(staleTimeAt(tsq, minder, car as ThingCar<Thing> | undefined), blurb).to.eq(expected)
     }
+  })
+
+  it("takes a staleTime of Infinity for the minder's own", () => {
+    const tsq    = new TSQ.QueryClient()
+    const minder = minderOf('gate', new MemoryVaultDB(), tsq, { staleTime: Infinity })
+    minder.hello()
+    const gate   = TH.gateThingOf()
+    const bare   = carOf(sparseOf(gate))
+    expect(staleTimeAt(tsq, minder, carOf(gate))).to.eq(Infinity)
+    expect(staleTimeAt(tsq, minder, bare)).to.eq(0)
   })
 
   it("watches the bank from each minder", () => {
@@ -360,7 +373,7 @@ describe("ThingMinder.tryAt", () => {
     }
   })
 
-  it("counts a behind car timely under a staleTime of Infinity, and a bare car never", async () => {
+  it("answers untimely for a bare or behind car, even under a staleTime of Infinity", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { boxMinder } = minderWorldOf(vaultDB)
@@ -369,8 +382,7 @@ describe("ThingMinder.tryAt", () => {
     await boxMinder.get(BoxAsk)
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.nextOf(box0))
     await boxMinder.list()
-    expect(boxMinder.tryAt(BoxAsk, { staleTime: Infinity })).to.have.property('isTimely', true)
-    expect(boxMinder.tryAt(BoxAsk)).to.have.property('isTimely', false)
+    expect(boxMinder.tryAt(BoxAsk, { staleTime: Infinity })).to.deep.include({ ok: true, act: 'untimely', isTimely: false })
   })
 
   it("answers untimely, without the record but with its car, where it is older than staleTime", async () => {
@@ -444,6 +456,7 @@ describe("ThingMinder.tryAt", () => {
     [{ ...GateAsk, staleTime: 0 },            {},                       'refuses bad_record for an ask that carries an option'],
     [GateAsk,                                 { staleTime: undefined }, 'refuses bad_record for a staleTime given as undefined'],
     [GateAsk,                                 { ifStale: 'keep' },      'refuses bad_record for an ifStale it does not know'],
+    [GateAsk,                                 { staleTime: MaxTimerMillis + 1 }, 'refuses bad_record for a staleTime past MaxTimerMillis'],
   ] as const
   for (const [ask, opts, blurb] of RefusedAsks) {
     it(blurb, async () => {
@@ -803,7 +816,7 @@ describe("ThingMinder.isStaleAt", () => {
     expect([minder.isStaleAt(GateAsk), minder.isStaleAt(gate)]).to.deep.equal([false, false])
   })
 
-  it("counts a behind car timely under a staleTime of Infinity or 'static', and a bare car under neither", async () => {
+  it("counts a bare or behind car stale under a staleTime of Infinity or 'static', and a get under Infinity fetches it", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { boxMinder } = minderWorldOf(vaultDB)
@@ -811,11 +824,49 @@ describe("ThingMinder.isStaleAt", () => {
     expect(boxMinder.at(TH.BoxScope)).to.have.property('liveness', 'bare')
     for (const staleTime of [Infinity, 'static'] as const) { expect(boxMinder.isStaleAt(TH.BoxScope, { staleTime })).to.be.true }
     await boxMinder.get(BoxAsk)
-    vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.nextOf(box0))
+    const box1 = TH.nextOf(box0)
+    vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box1)
     await boxMinder.list()
     expect(boxMinder.at(TH.BoxScope)).to.have.property('liveness', 'behind')
-    for (const staleTime of [Infinity, 'static'] as const) { expect(boxMinder.isStaleAt(TH.BoxScope, { staleTime })).to.be.false }
-    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.true
+    for (const staleTime of [Infinity, 'static'] as const) { expect(boxMinder.isStaleAt(TH.BoxScope, { staleTime })).to.be.true }
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    expect(await boxMinder.get(BoxAsk, { staleTime: Infinity })).to.deep.equal(carOf(box1))
+    expect(asked.mock.calls).to.have.lengthOf(1)
+    expect(boxMinder.isStaleAt(TH.BoxScope, { staleTime: Infinity })).to.be.false
+  })
+
+  it("counts an invalidated full car stale under a staleTime of Infinity, and timely under 'static', as a get does", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedGateOf(vaultDB, 0)
+    const { tsq, minder } = minderWorldOf(vaultDB)
+    await minder.get(GateAsk)
+    await tsq.invalidateQueries({ queryKey: minder.queryKey(TH.GateScope) })
+    expect(minder.at(TH.GateScope)).to.have.property('liveness', 'full')
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: 'static' })).to.be.false
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: Infinity })).to.be.true
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    await minder.get(GateAsk, { staleTime: 'static' })
+    expect(asked.mock.calls).to.have.lengthOf(0)
+    await minder.get(GateAsk, { staleTime: Infinity })
+    expect(asked.mock.calls).to.have.lengthOf(1)
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: Infinity })).to.be.false
+  })
+
+  it("counts a full car whose last get was refused stale under a staleTime of Infinity", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedGateOf(vaultDB, 1)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(GateAsk)
+    vaultDB._cheat_things(TH.ThingBank).set(TH.GateScope.labelpath, TH.gateThingOf())
+    await TH.expectRefusal(minder.get(GateAsk, { staleTime: 0 }), 'stale_read')
+    expect(minder.at(TH.GateScope)).to.have.property('liveness', 'full')
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: Infinity })).to.be.true
+  })
+
+  it("takes a staleTime up to MaxTimerMillis", async () => {
+    const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
+    await minder.get(GateAsk)
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: MaxTimerMillis })).to.be.false
   })
 
   const BadArgs = [
@@ -824,6 +875,7 @@ describe("ThingMinder.isStaleAt", () => {
     [TH.GateScope,                         { staleTime: undefined }, 'a staleTime given as undefined'],
     [TH.GateScope,                         { staleTime: -1 },        'a negative staleTime'],
     [TH.GateScope,                         { staleTime: 'never' },   'a staleTime of another word'],
+    [TH.GateScope,                         { staleTime: MaxTimerMillis + 1 }, 'a staleTime past MaxTimerMillis'],
   ] as const
   for (const [scoped, opts, blurb] of BadArgs) {
     it(`refuses bad_record for ${blurb}`, () => {
