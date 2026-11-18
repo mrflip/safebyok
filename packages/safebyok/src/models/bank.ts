@@ -273,7 +273,7 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
     }
     const { val } = answer
     if (! Labelpath.isOfModelkind(val.labelpath, 'box')) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) } }
-    // The labelpath says it is a box's; a later thread's kind-checking guards replace this cast.
+    // The labelpath says it is a box's, and the cast relies on it.
     return { ...answer, val: val as BoxRecord }
   }
 
