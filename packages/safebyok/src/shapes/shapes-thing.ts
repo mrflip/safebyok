@@ -432,10 +432,10 @@ export function isWholeRecord(record: Sparse<Thing>): record is Thing {
 // Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
 /** True when `record` is a tombstone, sparse or whole, the void sentinel among them. */
 export function isTombstone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
-  return TombstoneCheck.safeParse(record).success
+  return tombstoneChecker.safeParse(record).success
 }
 /** What every tombstone has, sparse or whole: a Thing's scope and citation, marked deleted. */
-const TombstoneCheck = Validator.Checker(({ obj, lit }) => obj({ ...thingScope.shape, ...thingCited.shape, am: lit('x') }))
+const tombstoneChecker = Validator.Checker(({ obj, lit }) => obj({ ...thingScope.shape, ...thingCited.shape, am: lit('x') }))
 
 /** True when `record` is the tombstone of a deleted Thing, sparse or whole: any tombstone but the void sentinel. */
 export function isGone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
