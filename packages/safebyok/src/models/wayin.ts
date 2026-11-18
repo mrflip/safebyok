@@ -16,8 +16,8 @@ export const PurposeForWayinkind = Object.freeze({
  * The bankKey unwraps only given the same context: any change, such as another `userid` or a forged `born_at`, prevents it.
  */
 export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateStamp, header: GX.WayinHeader): Uint8Array {
-  const checked = GX.wayinHeader.parse(header)
-  return Crypto.cipherCtx([Stamps.bankStamp.parse(bankStamp), Stamps.gateStamp.parse(gateStamp)], PurposeForWayinkind[checked.wayinkind], checked)
+  const wayinHeader = GX.wayinHeader.parse(header)
+  return Crypto.cipherCtx([Stamps.bankStamp.parse(bankStamp), Stamps.gateStamp.parse(gateStamp)], PurposeForWayinkind[wayinHeader.wayinkind], wayinHeader)
 }
 // --
 
@@ -48,9 +48,9 @@ export class Wayin {
   static make(record: Z.input<typeof GX.wayinRecord>): Wayin { return new Wayin(record) }
 
   private constructor(record: Z.input<typeof GX.wayinRecord>) {
-    const parsed = GX.wayinRecord.parse(record)
-    Object.freeze(parsed.bank_key_wayin_wrapped)
-    this.#pickle = Object.freeze(parsed)
+    const wayinRecord = GX.wayinRecord.parse(record)
+    Object.freeze(wayinRecord.bank_key_wayin_wrapped)
+    this.#pickle = Object.freeze(wayinRecord)
     Helpers.tattoo(this, this.#pickle)
     Object.freeze(this)
   }

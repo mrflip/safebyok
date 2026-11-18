@@ -234,10 +234,10 @@ export abstract class Listing<ScopeT extends object, RecordT extends SparseT, Sp
     let answer: ListingPutAnswer<RecordT, SparseT> | typeof UNANSWERED = UNANSWERED
     try {
       const { expected, ifAbsent, ifPresent } = SX.putOpts.parse(opts)
-      const checked = this.recordOf(record)
+      const recordC = this.recordOf(record)
       this.demandEnabled()
-      answer = putAnswerOf(await this.doTryPut(checked, { expected: this.sparseOf(expected), ifAbsent, ifPresent }))
-      return answerWithVal(answer, this.deliverAnswer(answer, checked))
+      answer = putAnswerOf(await this.doTryPut(recordC, { expected: this.sparseOf(expected), ifAbsent, ifPresent }))
+      return answerWithVal(answer, this.deliverAnswer(answer, recordC))
     } catch (err) { return refusedAnswerOf(err, answer) }
   }
 

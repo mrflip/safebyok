@@ -82,11 +82,11 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** The Thing at `ask`'s scope ({@link VaultDB.tryGetThing}). */
   async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
     try {
-      const checked     = AskChecks.getAsk.parse(ask)
-      const loggableAsk = loggableAskOf(checked)
-      const actual      = await this.doGetThing(checked) // has act and ok, but no err yet
+      const thingGetAsk = AskChecks.getAsk.parse(ask)
+      const loggableAsk = loggableAskOf(thingGetAsk)
+      const actual      = await this.doGetThing(thingGetAsk) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'getThing', loggableAsk)
-      this.notifyTrackedRecords(checked, answer)
+      this.notifyTrackedRecords(thingGetAsk, answer)
       return answer
     } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
   }
@@ -94,11 +94,11 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Write `ask.record` over the Thing `ask.cited` ({@link VaultDB.tryWriteThing}). */
   async tryWriteThing(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
-      const checked     = checkedWriteAsk(ask)
-      const loggableAsk = loggableAskOf(checked)
-      const actual      = await this.doWriteThing(checked) // has act and ok, but no err yet
+      const writeAsk    = checkedWriteAsk(ask)
+      const loggableAsk = loggableAskOf(writeAsk)
+      const actual      = await this.doWriteThing(writeAsk) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'writeThing', loggableAsk)
-      this.notifyTrackedRecords(checked, answer)
+      this.notifyTrackedRecords(writeAsk, answer)
       return answer
     } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
   }
@@ -106,14 +106,14 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** The children of the Thing at `ask`'s scope ({@link VaultDB.tryListThings}). */
   async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
     try {
-      const checked     = AskChecks.listAsk.parse(ask)
-      const loggableAsk = loggableAskOf(checked)
-      const actual      = await this.doListThings(checked)
+      const listAsk     = AskChecks.listAsk.parse(ask)
+      const loggableAsk = loggableAskOf(listAsk)
+      const actual      = await this.doListThings(listAsk)
       const beside      = { world: actual.world, ...trackedFieldOf(actual), parent: actual.parent, damaged_rows: actual.damaged_rows }
       const answer: ListThingsAnswer = actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.listed }
         : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.listed, err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
-      this.notifyTrackedRecords(checked, answer)
+      this.notifyTrackedRecords(listAsk, answer)
       return answer
     } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parent: null, damaged_rows: [] } }
   }
@@ -121,14 +121,14 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored ({@link VaultDB.tryBirthBank}). */
   async tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer> {
     try {
-      const checked     = checkedBirthBankAsk(ask)
-      const loggableAsk = loggableAskOf(checked)
-      const actual      = await this.doBirthBank(checked, birthPutsOf(checked))
-      const beside      = { world: actual.world, ...trackedFieldOf(actual) }
+      const birthBankAsk = checkedBirthBankAsk(ask)
+      const loggableAsk  = loggableAskOf(birthBankAsk)
+      const actual       = await this.doBirthBank(birthBankAsk, birthPutsOf(birthBankAsk))
+      const beside       = { world: actual.world, ...trackedFieldOf(actual) }
       const answer: BirthBankAnswer = actual.ok
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.things }
         : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk }) }
-      this.notifyTrackedRecords(checked, answer)
+      this.notifyTrackedRecords(birthBankAsk, answer)
       return answer
     } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
   }

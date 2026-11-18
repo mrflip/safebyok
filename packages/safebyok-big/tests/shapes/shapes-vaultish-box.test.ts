@@ -35,16 +35,16 @@ describe("BX.boxRecord and BX.boxSparse", () => {
     ])
 
     it("hands back a plain copy of a full record", () => {
-      const parsed = BX.boxRecord.parse(full)
-      expect(parsed).to.deep.equal(full)
-      expect(parsed).to.not.eq(full)
+      const boxRecord = BX.boxRecord.parse(full)
+      expect(boxRecord).to.deep.equal(full)
+      expect(boxRecord).to.not.eq(full)
     })
 
     it("passes a Box instance, and returns a plain object of its fields", () => {
       const box = boxListingOf(mw).deliverRecord(full)
-      const parsed = BX.boxRecord.parse(box)
-      expect(parsed).to.deep.equal(full)
-      expect(parsed).to.not.be.instanceOf(Box)
+      const boxRecord = BX.boxRecord.parse(box)
+      expect(boxRecord).to.deep.equal(full)
+      expect(boxRecord).to.not.be.instanceOf(Box)
     })
 
     it("refuses a plain object with a field a Box does not have", () => {
@@ -76,15 +76,15 @@ describe("BX.boxRecord and BX.boxSparse", () => {
     ])
 
     it("strips the sidecar and the sealed parts, which only the full record carries", () => {
-      const parsed = BX.boxSparse.parse(full)
-      expect(parsed).to.not.have.any.keys('sidecar', 'box_key_wrapped', 'whisper_ciphered')
-      expect(parsed).to.deep.equal(sparse)
+      const boxSparse = BX.boxSparse.parse(full)
+      expect(boxSparse).to.not.have.any.keys('sidecar', 'box_key_wrapped', 'whisper_ciphered')
+      expect(boxSparse).to.deep.equal(sparse)
     })
 
     it("keeps the whisper's codec and schema version, so a sparse record can be sealed over as it is", () => {
-      const parsed = BX.boxSparse.parse(full)
-      expect(parsed.whisper_codec).to.eq('json_v1')
-      expect(parsed.whisper_schema_version).to.eq(1)
+      const boxSparse = BX.boxSparse.parse(full)
+      expect(boxSparse.whisper_codec).to.eq('json_v1')
+      expect(boxSparse.whisper_schema_version).to.eq(1)
     })
 
     it("strips a field it does not accept, where boxRecord refuses it", () => {
@@ -155,9 +155,9 @@ describe("VX.boxDna", () => {
   })
 
   it("strips the props the factory controls", () => {
-    const parsed = VX.boxDna.parse({ ...dna, ...factoryProps, fmt: BX.BoxFormat })
-    expect(parsed).to.deep.equal(filled)
-    expect(parsed).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'registered_at', 'written_at')
+    const boxDna = VX.boxDna.parse({ ...dna, ...factoryProps, fmt: BX.BoxFormat })
+    expect(boxDna).to.deep.equal(filled)
+    expect(boxDna).to.not.have.any.keys('fmt', 'am', 'vault_tok', 'revision_tok', 'registered_at', 'written_at')
   })
 
   it("fills a default for a prop given as undefined", () => {

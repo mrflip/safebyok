@@ -267,9 +267,9 @@ export const watchRows = query({
     const vaultDocs = await listVaultDocs(ctx.db, scope)
     const boxes: { vaultlabel: Vaultlabel, boxlabel: Boxlabel, box: unknown }[] = []
     for (const { vaultlabel, vault } of vaultDocs) {
-      const live = BX.vaultRecord.safeParse(vault)
-      if ((! live.success) || (live.data.bank_tok !== bank_tok)) { continue }
-      const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, lifeOf({ ...scope, vaultlabel, bank_tok: live.data.bank_tok, vault_tok: live.data.vault_tok })).collect()
+      const vaultC = BX.vaultRecord.safeParse(vault)
+      if ((! vaultC.success) || (vaultC.data.bank_tok !== bank_tok)) { continue }
+      const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, lifeOf({ ...scope, vaultlabel, bank_tok: vaultC.data.bank_tok, vault_tok: vaultC.data.vault_tok })).collect()
       boxes.push(...boxDocs.map(({ boxlabel, box }) => ({ vaultlabel, boxlabel, box })))
     }
     return {

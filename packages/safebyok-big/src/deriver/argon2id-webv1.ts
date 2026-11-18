@@ -6,10 +6,10 @@ import { Argon2idWebV1, type KeyDeriverSpec } from './shapes'
 
 /** Make a key deriver that runs Argon2id under `spec`. */
 export function makeArgon2idDeriver(spec: KeyDeriverSpec): Argon2idKeyDeriver {
-  const checked = parseKeyDeriverSpec(spec)
-  const argonOpts = { m: checked.memory_kib, t: checked.iterations, p: checked.parallelism, dkLen: checked.output_size } // eslint-disable-line id-length -- noble's option names
+  const keyDeriverSpec = parseKeyDeriverSpec(spec)
+  const argonOpts = { m: keyDeriverSpec.memory_kib, t: keyDeriverSpec.iterations, p: keyDeriverSpec.parallelism, dkLen: keyDeriverSpec.output_size } // eslint-disable-line id-length -- noble's option names
   return Object.freeze({
-    ...checked,
+    ...keyDeriverSpec,
     deriveKeyBytes: (passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array> => argon2idAsync(passphrase, saltBytes, argonOpts),
   })
 }

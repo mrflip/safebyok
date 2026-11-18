@@ -72,16 +72,16 @@ describe("parseLogger", () => {
   it("guards a logger whose prototype is a guarded logger", () => {
     const child = Object.create(parseLogger(TH.spyLogger().logger)) as VaultLogger
     child.error = () => { throw new Error('a child logger that throws') }
-    const parsed = parseLogger(child)
-    expect(parsed).to.not.eq(child)
-    expect(() => { parsed.error('x') }).to.not.throw()
+    const guarded = parseLogger(child)
+    expect(guarded).to.not.eq(child)
+    expect(() => { guarded.error('x') }).to.not.throw()
   })
 
   it("guards a logger that claims to be guarded already, by any property it carries", () => {
     const claiming = { log: () => undefined, warn: () => undefined, error: () => { throw new Error('a logger that throws') }, _safebyok_modded: true }
-    const parsed = parseLogger(claiming)
-    expect(parsed).to.not.eq(claiming)
-    expect(() => { parsed.error('x') }).to.not.throw()
+    const guarded = parseLogger(claiming)
+    expect(guarded).to.not.eq(claiming)
+    expect(() => { guarded.error('x') }).to.not.throw()
   })
 
   // VaultLogger @example 2

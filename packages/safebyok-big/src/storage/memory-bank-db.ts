@@ -238,7 +238,7 @@ export class MemoryBankDB extends AdapterBankDB {
 /** True when `raw`, a vault row, is missing, a tombstone, or of a life other than `life`; false when it fails its checks. */
 function isLifeOver(raw: unknown, life: string): boolean {
   if (raw === null) { return true }
-  const parsed = BX.vaultRow.safeParse(raw)
-  return parsed.success && ((parsed.data.am === 'x') || (BX.vaultLifeOf(parsed.data) !== life))
+  const vaultRow = BX.vaultRow.safeParse(raw)
+  return vaultRow.success && ((vaultRow.data.am === 'x') || (BX.vaultLifeOf(vaultRow.data) !== life))
 }
 // --

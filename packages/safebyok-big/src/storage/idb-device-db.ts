@@ -103,9 +103,9 @@ export class IdbDeviceDB extends DeviceDB {
 
   protected async doEnsureCachedDevice(made: DeviceRow): Promise<unknown> {
     return await inOneStep(this.#deviceRowShelf, 'readwrite', async (store) => {
-      const stored = await rowAt(store, deviceRowScopepathOf(made))
-      const kept = SX.deviceRow.safeParse(stored)
-      const row = kept.success ? { ...kept.data, package_version: made.package_version } : made
+      const raw = await rowAt(store, deviceRowScopepathOf(made))
+      const stored = SX.deviceRow.safeParse(raw)
+      const row = stored.success ? { ...stored.data, package_version: made.package_version } : made
       store.put(row, deviceRowScopepathOf(made))
       return row
     })

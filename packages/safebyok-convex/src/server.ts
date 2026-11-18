@@ -63,8 +63,8 @@ export class SafebyokBankComponent {
     /** Throw `identity_revoked` unless the caller is signed in as the `user_id` of `scope`. */
     async function demandCaller(ctx: GenericQueryCtx<DataModel>, scope: unknown): Promise<void> {
       const callerId = await opts.getUserId(ctx)
-      const asked = scopeUser.safeParse(scope)
-      if ((! callerId) || (! asked.success) || (callerId !== asked.data.user_id)) { throw new ConvexError<SafebyokRefusal>({ kind: 'identity_revoked' }) }
+      const userReport = scopeUser.safeParse(scope)
+      if ((! callerId) || (! userReport.success) || (callerId !== userReport.data.user_id)) { throw new ConvexError<SafebyokRefusal>({ kind: 'identity_revoked' }) }
     }
 
     return {

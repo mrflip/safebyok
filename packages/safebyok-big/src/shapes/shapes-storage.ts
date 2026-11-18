@@ -190,8 +190,8 @@ export function nextRevisionOf({ revision_seq }: Revision, written_at: EpochMill
 
 /** The revision, `am` and `vault_tok` of `raw`, or null where it has none. */
 function metaOf(raw: unknown) {
-  const parsed = rowMeta.safeParse(raw)
-  return parsed.success ? parsed.data : null
+  const meta = rowMeta.safeParse(raw)
+  return meta.success ? meta.data : null
 }
 
 /** True when `raw`, a stored row or null for a void one, is at revision `prior`.

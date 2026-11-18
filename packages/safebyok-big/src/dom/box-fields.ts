@@ -52,9 +52,9 @@ export class BoxFields {
 
   /** The fields of `box`, the same instance at every call. */
   static of(box: Box): BoxFields {
-    const checked = fieldsBox.parse(box)
-    const fields = fieldsOfBox.get(checked) ?? new BoxFields(checked)
-    fieldsOfBox.set(checked, fields)
+    const boxC = fieldsBox.parse(box)
+    const fields = fieldsOfBox.get(boxC) ?? new BoxFields(boxC)
+    fieldsOfBox.set(boxC, fields)
     return fields
   }
 
