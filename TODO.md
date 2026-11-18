@@ -2,6 +2,11 @@
 
 The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog of `safebyok-big`.
 
+* **Share a record's unchanged parts across revisions in `bestCarOf`.** A car now holds each record exactly as the
+  vaultDB sent it, so a consumer memoized on a nested part (a box's sidecar, a gate's wayins) recomputes on every new
+  revision. Should one need it: only the fullest has parts worth sharing, so where the fullest came from `delivered` and
+  `prior` has one, `shared = TSQ.replaceEqualDeep(prior.fullest, fullest)`; a full car's newest is that same record and
+  takes `shared` too; a sparse newest takes nothing. One call, no fix-up after (the Coach, 2026-11-18: left simple).
 * **Reevaluate keeping void and gone separate in the minder.** For a host they differ only in act names, and the
   cache decides nothing differently between them; only a birth's cited record differs, and the writer builds that from
   the parent it holds. The minder makes up a shell for a void answer (`#shellAt`, `RootNotCached`, the `void` car) so
