@@ -1,6 +1,6 @@
 # Thread 3: classes (2026-11-18)
 
-Branch `20261118-classes`, PR (see below), stacked on #744. Proved: `pnpm --filter safebyok test` 1051 passed, typecheck and eslint clean for safebyok; `pnpm justify` at the tip: see the PR's Tests line.
+Branch `20261118-classes`, PR #747, stacked on #744. Proved: `pnpm --filter safebyok test` 1051 passed, typecheck and eslint clean for safebyok; `pnpm justify` at the tip: see the PR's Tests line.
 
 * **Built**:
   - `models/base-thing.ts`: `BaseThing`, abstract and not generic, declares the Thing fields (with their doc blocks) and carries the record guards as statics: `isLive` (new), `isTombstone`, `isGone`, `isVoidSentinel`, `isWhole` (was `isWholeRecord`), `isSparse`, and `cmp` (was `cmpThings`), `haveSameScope`, `sparseOf`. `static readonly modelkind: Thingkind | null = null`. Each guard is `this: Kinded<KindT>` and reads `this.modelkind`; the narrowed types are named for hovers: `LiveOfKind`, `TombstoneOfKind`, `VoidSentinelOfKind`, `WholeOfKind`, over `RecordOfKind<KindT>`. The kind is checked with `Labelpath.modelkindOf` after the scope-and-citation check (`ThingChecks.scopedCited` with `am`).
