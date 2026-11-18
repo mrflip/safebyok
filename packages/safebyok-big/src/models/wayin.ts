@@ -20,8 +20,8 @@ export const PurposeForWayinkind = Object.freeze({
  * key. With any change to them, such as another `user_id` or a forged `registered_at`, it will not unwrap.
  */
 export function wayinCtxOf(bank: BankStamp, gate: GateStamp, header: WayinHeader): Uint8Array {
-  const headerC = wayinHeader.parse(header)
-  return cipherCtx([bankStamp.parse(bank), gateStamp.parse(gate)], PurposeForWayinkind[headerC.wayinkind], headerC)
+  const headerChecked = wayinHeader.parse(header)
+  return cipherCtx([bankStamp.parse(bank), gateStamp.parse(gate)], PurposeForWayinkind[headerChecked.wayinkind], headerChecked)
 }
 // --
 
@@ -50,9 +50,9 @@ export class Wayin {
 
   /** A Wayin of `record`, checked as a {@link WayinRecord}. */
   constructor(record: unknown) {
-    const recordC = wayinRecord.parse(record)
-    Object.freeze(recordC.bank_key_wayin_wrapped)
-    this.#pickle = Object.freeze(recordC)
+    const recordChecked = wayinRecord.parse(record)
+    Object.freeze(recordChecked.bank_key_wayin_wrapped)
+    this.#pickle = Object.freeze(recordChecked)
     tattoo(this, this.#pickle)
     Object.freeze(this)
   }

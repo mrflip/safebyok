@@ -84,8 +84,8 @@ export class IdbDeviceDB extends DeviceDB {
 
   protected async doForget(asked: LeaseQuery): Promise<void> {
     await inOneStep(this.#leaseShelf, 'readwrite', async (store) => {
-      const leaseRow = SX.leaseRow.safeParse(await rowAt(store, leaseScopepathOf(asked)))
-      if (leaseRow.success && (leaseRow.data.bank_tok === asked.bank_tok)) { store.delete(leaseScopepathOf(asked)) }
+      const storedReport = SX.leaseRow.safeParse(await rowAt(store, leaseScopepathOf(asked)))
+      if (storedReport.success && (storedReport.data.bank_tok === asked.bank_tok)) { store.delete(leaseScopepathOf(asked)) }
     })
   }
 
@@ -103,9 +103,9 @@ export class IdbDeviceDB extends DeviceDB {
 
   protected async doEnsureCachedDevice(made: DeviceRow): Promise<unknown> {
     return await inOneStep(this.#deviceRowShelf, 'readwrite', async (store) => {
-      const stored = await rowAt(store, deviceRowScopepathOf(made))
-      const deviceRow = SX.deviceRow.safeParse(stored)
-      const row = deviceRow.success ? { ...deviceRow.data, package_version: made.package_version } : made
+      const raw = await rowAt(store, deviceRowScopepathOf(made))
+      const storedReport = SX.deviceRow.safeParse(raw)
+      const row = storedReport.success ? { ...storedReport.data, package_version: made.package_version } : made
       store.put(row, deviceRowScopepathOf(made))
       return row
     })

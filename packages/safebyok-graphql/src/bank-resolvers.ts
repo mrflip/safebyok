@@ -237,12 +237,12 @@ function crossingOf(answer: BX.Answer<unknown, DB.GoodAct, unknown>): CrossingAn
 /** Convert a refusal to wire form. Its `cause` is never sent. */
 function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): BX.CrossedErr {
   // Parse the capacity before sending it: JSON cannot carry Infinity, so the check turns an infinite limit into the largest safe integer.
-  const capacity = DB.capacity.safeParse(meta?.capacity)
+  const capacityReport = DB.capacity.safeParse(meta?.capacity)
   return {
     refusalkind,
     message,
     meta: {
-      capacity:   capacity.success ? capacity.data : null,
+      capacity:   capacityReport.success ? capacityReport.data : null,
       fieldnames: (meta?.fieldnames === undefined) ? null : [...meta.fieldnames],
       oplabel:    meta?.oplabel ?? null,
     },

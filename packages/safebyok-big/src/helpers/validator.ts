@@ -199,9 +199,9 @@ export type Refusing<SchemaT extends Z.ZodType> = SchemaT & {
 function refusing<SchemaT extends Z.ZodType>(kind: Refusalkind, schema: SchemaT): Refusing<SchemaT> {
   const parse = (val: unknown, story?: Story): Z.output<SchemaT> => {
     const framing = story === undefined ? {} : Checks.story.parse(story)
-    const result = schema.safeParse(val, InEnglish)
-    if (result.success) { return result.data }
-    throw refusalOf(kind, result.error, framing)
+    const report = schema.safeParse(val, InEnglish)
+    if (report.success) { return report.data }
+    throw refusalOf(kind, report.error, framing)
   }
   const parseConsistent = (val: unknown, other: object, { where, advice, ...refusal }: Partial<ConsistencyRefusal> & Story = {}): Z.output<SchemaT> => (
     checkedConsistent(parse(val, { where, advice }) as Z.output<SchemaT> & object, other, { kind, ...refusal })

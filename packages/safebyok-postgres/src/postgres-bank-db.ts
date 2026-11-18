@@ -74,11 +74,11 @@ const toldWhere = DB.objCheck(({ user_id, banklabel, str }) => ({
 /** Parse a notification's text into a {@link Told}, or return null if it is not one of our notices. */
 function toldOf(text: string): Told | null {
   const told = jsonOrNull(text) as { at?: unknown, row?: unknown, parent?: unknown } | null
-  const where = toldWhere.safeParse(told?.at)
-  if ((told === null) || (! where.success)) { return null }
+  const whereReport = toldWhere.safeParse(told?.at)
+  if ((told === null) || (! whereReport.success)) { return null }
   const { row, parent } = told
-  if (row === undefined) { return where.data }
-  return { ...where.data, heard: (parent === undefined) ? { row } : { row, parent } }
+  if (row === undefined) { return whereReport.data }
+  return { ...whereReport.data, heard: (parent === undefined) ? { row } : { row, parent } }
 }
 
 /** The JSON value in `text`, or null where it is not JSON. */

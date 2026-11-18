@@ -276,8 +276,8 @@ export class GraphQLBankDB implements BX.BankDB {
 function answerForRefusal(thrown: unknown, oplabel: string, ask: unknown): BX.BadAnswer {
   const refusal = DB.isVaultError(thrown) ? thrown : DB.unexpectedError(thrown)
   // An ask that failed its check has no metadata to trust: its refusal carries none.
-  const loggableAsk = BX.loggableAsk.safeParse(ask)
-  return BX.badAnswerOf(Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableAsk.success ? loggableAsk.data : {} } }))
+  const loggableReport = BX.loggableAsk.safeParse(ask)
+  return BX.badAnswerOf(Object.assign(refusal, { meta: { ...refusal.meta, oplabel, ask: loggableReport.success ? loggableReport.data : {} } }))
 }
 
 /** Return a good answer, or throw a bad answer's refusal. */
@@ -329,13 +329,13 @@ function codeOf(thrown: unknown): string | null {
 function hearNotice({ data }: OperationResult<unknown>, onNotice: (notice: BX.Notice) => void): DB.VaultError | null {
   // A notice is only a hint to fetch again, so a malformed notice is ignored.
   if ((typeof data !== 'object') || (data === null)) { return null }
-  const crossed = BX.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
-  if (! crossed.success) { return null }
-  if (crossed.data.ok) {
-    onNotice(crossed.data.val)
+  const crossedReport = BX.crossedNotice.safeParse(rowAnswerOf((data as Record<string, unknown>)['safebyokWatch']))
+  if (! crossedReport.success) { return null }
+  if (crossedReport.data.ok) {
+    onNotice(crossedReport.data.val)
     return null
   }
-  return crossed.data.err
+  return crossedReport.data.err
 }
 // --
 

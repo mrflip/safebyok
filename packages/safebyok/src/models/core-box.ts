@@ -108,9 +108,9 @@ function deserializeWhisper(text: string): CX.Whisper {
   } catch {
     throw Throwers.undecodedWhisper()
   }
-  const whisper = CX.whisper.safeParse(jsonVal)
-  if (! whisper.success) { throw Throwers.undecodedWhisper() }
-  return whisper.data
+  const whisperReport = CX.whisper.safeParse(jsonVal)
+  if (! whisperReport.success) { throw Throwers.undecodedWhisper() }
+  return whisperReport.data
 }
 // --
 

@@ -211,11 +211,11 @@ export class MemoryBankDB extends AdapterBankDB {
   // A row that fails its checks is left alone: it is neither of this life nor provably of an ended one.
   protected doTidyGone(ask: BoxTidyAsk): Tidied {
     const { bank, vaultrows } = this._cheat_shelfOf(ask)
-    const liveBank = BX.bankRow.safeParse(bank)
-    const bank_tok = (liveBank.success && (liveBank.data.am === 'a')) ? liveBank.data.bank_tok : null
+    const bankReport = BX.bankRow.safeParse(bank)
+    const bank_tok = (bankReport.success && (bankReport.data.am === 'a')) ? bankReport.data.bank_tok : null
     for (const [vaultlabel, raw] of vaultrows) {
-      const vault = BX.vaultRow.safeParse(raw)
-      if (vault.success && (vault.data.bank_tok !== bank_tok)) { vaultrows.delete(vaultlabel) }
+      const vaultReport = BX.vaultRow.safeParse(raw)
+      if (vaultReport.success && (vaultReport.data.bank_tok !== bank_tok)) { vaultrows.delete(vaultlabel) }
     }
     let totalCount = 0
     for (const [ckey, { scope, life, boxrows }] of this.#boxLives) {
@@ -238,7 +238,7 @@ export class MemoryBankDB extends AdapterBankDB {
 /** True when `raw`, a vault row, is missing, a tombstone, or of a life other than `life`; false when it fails its checks. */
 function isLifeOver(raw: unknown, life: string): boolean {
   if (raw === null) { return true }
-  const vaultRow = BX.vaultRow.safeParse(raw)
-  return vaultRow.success && ((vaultRow.data.am === 'x') || (BX.vaultLifeOf(vaultRow.data) !== life))
+  const vaultReport = BX.vaultRow.safeParse(raw)
+  return vaultReport.success && ((vaultReport.data.am === 'x') || (BX.vaultLifeOf(vaultReport.data) !== life))
 }
 // --

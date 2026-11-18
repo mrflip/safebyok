@@ -52,9 +52,9 @@ const toldCheck = Validator.objCheck(({ obj, str, unk }) => ({
 
 /** The notice in `text` of a Thing in `scope`'s bank, or null for anything else. */
 function toldOf({ userid, banklabel }: ThingWatchScope, text: string): Told | null {
-  const told = toldCheck.safeParse(jsonOrNull(text))
-  if ((! told.success) || (told.data.at.userid !== userid) || (told.data.at.banklabel !== banklabel)) { return null }
-  const { at: { labelpath }, thing, world } = told.data
+  const toldReport = toldCheck.safeParse(jsonOrNull(text))
+  if ((! toldReport.success) || (toldReport.data.at.userid !== userid) || (toldReport.data.at.banklabel !== banklabel)) { return null }
+  const { at: { labelpath }, thing, world } = toldReport.data
   return { labelpath, thing, world }
 }
 // --
