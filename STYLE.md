@@ -34,6 +34,8 @@ Use plain words, and write in clear, understandable full sentences. (In a doc bl
 * **The core's `src/shapes/` has the validators a module exports**, and no other module exports
   one. A validator a module keeps to itself stays beside its only user, made in a `Checkers` call
   at module level (`helpers/validator.ts`'s and `gate.ts`'s `Checks`, `device.ts`'s `HostChecks`).
+  A collection of validators is UpperCamelCase (`Checks`, `ThingChecks`); a single validator is
+  lowercase (`lifepathWithParentageChecker`, `bankScope`).
 * **Pick fields by destructuring the parsed output.** Where a pick by a list of names is truly
   needed, write `fieldnames.map((fieldname) => scope[fieldname])`: a pick helper returns an
   object, whose key order *Order comes from an explicit list* rules out.
