@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
-import type { Bank, BoxShell, BoxUnsealed } from '../../src/models/bank'
+import type { Bank } from '../../src/models/bank'
+import type { BoxShell, BoxUnsealed } from '../../src/shapes/shapes-bankish'
 import type { BoxRecord } from '../../src/shapes/shapes-sealers'
 import { type BoxThing, VoidLifeseq, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'

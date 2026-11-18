@@ -1,12 +1,17 @@
-/** The shapes of a ThingMinder's arguments and options, and their checks. */
+/** The shapes of a ThingMinder's arguments, options and answers, and of the cars it caches, with their checks. */
 
 import type * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
-import { Validator } from 'safebyok-big/internals'
+import { type Errors, Validator } from 'safebyok-big/internals'
+import type { ThingMinder } from '../minding/thing-minder'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, AskChecks, thingCited, thingScope, thingWatchScope, trackShape } from './shapes-thing'
-import type { TSQGotAnswer } from '../minding/thing-minder'
+import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
+import type { EpochMillis } from './primitives'
+import {
+  type BoxThing, type GateThing, type GetAsk, type LoggableAsk, type Sparse, type Thing, type ThingRecord, type ThingWatchScope, type Thingkind, type Tombstone, type Track, type VoidSentinel,
+  AskChecks, thingCited, thingScope, thingWatchScope, trackShape,
+} from './shapes-thing'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 
@@ -84,4 +89,85 @@ export type MinderAskOpts    = Z.input<typeof minderAskOpts>
 export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
 /** The user, bank and modelkind a minder is tied to: every ask it takes must match them. */
 export type ThingTies        = ThingWatchScope & Readonly<{ modelkind: Thingkind }>
+// --
+
+// == [The car]: ThingCar, BoxCar, GateCar, DeliverableThing, carLivenessVals
+
+// The vaultDB has a newer whole record when liveness is 'behind' or 'bare' (dbHasNewer).
+/** A ThingMinder's frozen cache value for a Thing: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
+ * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
+ * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
+ * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
+ * - On `full`, the two are *identical* (`newest === fullest`): the same object, not just the same content.
+ * - When `behind`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
+ */
+export type ThingCar<RecordT extends ThingRecord> = Readonly<
+  | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
+  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
+  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
+  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a deleted Thing's tombstone: known to be gone. dbHasNewer: false
+  | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
+>
+
+/** The car of a box. */
+export type BoxCar  = ThingCar<BoxThing>
+/** The car of a gate. */
+export type GateCar = ThingCar<GateThing>
+
+/** A record a car is made from: a Thing, whole or sparse, or the void sentinel. */
+export type DeliverableThing = Thing | Sparse<Thing> | VoidSentinel
+
+/** Each `liveness` a car may have. */
+export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as const
+// --
+
+// == [A minder's answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer
+
+// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
+// A timely car is full, gone or void: a behind or bare car is never timely.
+/** A get's answer, read from the cache. Beside a get's own acts:
+ * - `vacant`   -- nothing is cached
+ * - `untimely` -- the car is `behind` or `bare`, or TanStack Query counts it stale under `staleTime`: older than it, invalidated, or its last get refused
+ */
+export type GotAnswer = (
+  | GoodAnswer<Thing, 'gotlive'>
+  | GoodAnswer<Tombstone<Thing>, 'gotgone'>
+  | GoodAnswer<null, 'gotvoid'>
+  | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
+) & { ask: GetAsk }
+
+/** The car cached for a scope, however old, and the state of its gets. */
+export interface CarFreshness {
+  /** The cached car, or undefined for none. */
+  car:         ThingCar<Thing> | undefined
+  /** False where the act is `vacant` or `untimely`. */
+  isTimely:    boolean
+  /** When a record last arrived in the car, or 0 for none. */
+  refreshedAt: EpochMillis
+  /** True while a get of the car is under way. */
+  isFetching:  boolean
+  /** The refusal of the car's last get, or null. */
+  lastErr:     Errors.VaultError | null
+}
+
+/** A get's answer read from the cache, with the car and its {@link CarFreshness}. */
+export type TSQGotAnswer = GotAnswer & CarFreshness
+
+/** `tryAt`'s answer: a {@link TSQGotAnswer}, or a refusal. */
+export type TSQAnswer = TSQGotAnswer | BadAnswer
+// --
+
+// == [A minder's making]: MinderOpts
+
+/** Options for {@link ThingMinder.make}. */
+export interface MinderOpts {
+  /** Where the bank's Things are stored. */
+  vaultDB:         VaultDB
+  /** The TanStack Query client whose cache has the cars. A host may share its own.
+   * TanStack passes an observer's selected and placeholder values through the minder's structural sharing, which throws `unexpected_error` on anything but a car.
+   */
+  tsq:             TSQ.QueryClient
+  /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
+  queryCacheOpts?: Partial<QueryCacheOpts>
+}
 // --

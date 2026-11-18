@@ -1,3 +1,5 @@
+/** The forms of a sealed record, the `Sealer` a lease seals and unseals with, and a box's records. */
+
 import type { CX, Crypto } from 'safebyok-big/internals'
 import type { EpochMillis } from './primitives'
 import type { BoxThing, Sealed, Sparse, ThingRecord } from './shapes-thing'

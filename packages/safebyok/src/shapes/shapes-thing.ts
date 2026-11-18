@@ -1,4 +1,4 @@
-/** The shapes of a Thing, the record every kind is stored as in a vaultDB, and of the asks a vaultDB is given. */
+/** The shapes of a Thing, the record every kind is stored as in a vaultDB, of the asks a vaultDB is given, and of an adapter's options. */
 
 import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
@@ -7,6 +7,7 @@ import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
 import type { TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
 import { bornAtNotNow, lifepathNotKept, lifeseqNotNext, opNotOfRecord, recordOfOtherScope, revseqNotNext, revtokNotNew, testimonyMissing, tombstoneOverTombstone } from '../refusals/throwers'
+import type { AdapterVaultDB } from '../storage/adapter-vault-db'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
 // == [Lifeseqs]: VoidLifeseq, RootVoidLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isTombstoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
@@ -303,35 +304,6 @@ export function childShellCited(parentLifepath: Lifepath): ThingCited {
 // == [Shells]: ShellChecks, VoidSentinel, shellOf, scopedWithParentage, lifepathWithParentage
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
-const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label }) => {
-  const fixed = {
-    revtok:     lit(SX.VoidRevisionTok).default(SX.VoidRevisionTok),
-    revseq:     lit(SX.VoidRevisionSeq).default(SX.VoidRevisionSeq),
-    am:         lit('x').default('x'), //
-    lifeseq:    ThingChecks.voidLifeseq.default(VoidLifeseq),
-    born_at:    lit(SX.VoidTime).default(SX.VoidTime),
-    written_at: lit(SX.VoidTime).default(SX.VoidTime),
-  }
-  const shellLifepath = ThingChecks.voidLifepath
-  return {
-    shellScoped: obj({
-      userid:    thingScope.shape.userid,
-      banklabel: thingScope.shape.banklabel,
-      labelpath: exactOptional(thingScope.shape.labelpath),
-      label:     exactOptional(label),
-      lifepath:  exactOptional(shellLifepath),
-      fmt:       exactOptional(uint),
-      ...fixed,
-    }),
-    // What a shell proposed must meet, of a record's rules.
-    shell: obj({ ...thingScope.shape, label, fmt: uint, lifepath: shellLifepath, ...fixed })
-      .refine(isLabelLast,    Phrases.LabelNotLast)
-      .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
-      .refine(isLifepathDeep, Phrases.LifepathDepth)
-      .refine(isFmtOwn,       Phrases.ShellFmtOfOtherKind),
-  }
-})
-
 /** True when a Thing's fmt is its kind's. */
 function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): boolean { return fmt === ThingFormats[modelkindOf(labelpath)] }
 
@@ -361,6 +333,34 @@ function rootShellOf(proposed: Partial<ThingRecord>): VoidSentinel {
     fmt: ThingFormats[modelkind], label: modelkind, lifepath: RootVoidLifepath, ...proposed,
   })) as VoidSentinel
 }
+const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label }) => {
+  const fixed = {
+    revtok:     lit(SX.VoidRevisionTok).default(SX.VoidRevisionTok),
+    revseq:     lit(SX.VoidRevisionSeq).default(SX.VoidRevisionSeq),
+    am:         lit('x').default('x'), //
+    lifeseq:    ThingChecks.voidLifeseq.default(VoidLifeseq),
+    born_at:    lit(SX.VoidTime).default(SX.VoidTime),
+    written_at: lit(SX.VoidTime).default(SX.VoidTime),
+  }
+  const shellLifepath = ThingChecks.voidLifepath
+  return {
+    shellScoped: obj({
+      userid:    thingScope.shape.userid,
+      banklabel: thingScope.shape.banklabel,
+      labelpath: exactOptional(thingScope.shape.labelpath),
+      label:     exactOptional(label),
+      lifepath:  exactOptional(shellLifepath),
+      fmt:       exactOptional(uint),
+      ...fixed,
+    }),
+    // What a shell proposed must meet, of a record's rules.
+    shell: obj({ ...thingScope.shape, label, fmt: uint, lifepath: shellLifepath, ...fixed })
+      .refine(isLabelLast,    Phrases.LabelNotLast)
+      .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
+      .refine(isLifepathDeep, Phrases.LifepathDepth)
+      .refine(isFmtOwn,       Phrases.ShellFmtOfOtherKind),
+  }
+})
 
 function demandConsistentParent(partialThing: Pick<ThingRecord, 'userid' | 'banklabel' | 'labelpath' | 'lifepath'>, parent?: Partial<ThingRecord>): void {
   if (! parent) { return }
@@ -411,7 +411,6 @@ function labelOfLabelpath(labelpath: Labelpath): string {
 function parentpathOf(labelpath: Labelpath): Labelpath {
   return labelpath.slice(0, Math.max(0, labelpath.lastIndexOf('/')))
 }
-
 // --
 
 // == [Reading records]: Tombstone, isVoidSentinel, isWholeRecord, isTombstone, isGone, isSparse, haveSameScope, cmpThings
@@ -725,4 +724,16 @@ export function loggableAskOf(ask: unknown): LoggableAsk {
   const parsed = loggableAsk.safeParse(ask)
   return parsed.success ? parsed.data : {}
 }
+// --
+
+// == [Adapters]: adapterVaultDBOpts, AdapterVaultDBOpts
+
+/** The check of the options of a vaultDB that extends {@link AdapterVaultDB}. */
+export const adapterVaultDBOpts = Validator.Checker(({ obj, bool }) => obj({
+  /** False to notify no watch of the Things in an answer's `tracked` ({@link AdapterVaultDB.notifyTrackedRecords}). Default true. */
+  doNotifyTracked: bool.optional(),
+}).strict(), 'bad_record')
+
+/** The options of a vaultDB that extends {@link AdapterVaultDB}. */
+export type AdapterVaultDBOpts = Readonly<Z.infer<typeof adapterVaultDBOpts>>
 // --

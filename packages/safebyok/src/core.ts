@@ -1,13 +1,13 @@
 // safebyok/core: the device, bank, gate, gating, wayin, proving and lease, and the bank's methods that put its boxes
 // through its vaultDB; no caching. Private while it is built.
-export { Bank, type BankAskDraft, type BankDna, type BankOpts, type BankMakeRecord, type BankRecord, type BirthOpts, type BoxShell, type BoxUnsealed, type GetBoxAnswer, type GetBoxAskDraft } from './models/bank'
-export { type BadNews, type BadNewsHandler, DefaultLeaseMillis, DefaultOnBadNews, Device, type DeviceOpts, type DeviceRecord, guardRequestCleartext, tellBadNewsTo } from './models/device'
+export { Bank } from './models/bank'
+export { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from './models/device'
 export { BaseThing } from './models/base-thing'
 export { CoreBox } from './models/core-box'
-export { Gate, type GateBank, type GateDna, type GateOpts } from './models/gate'
-export { type AskUser, type CleartextsForGatingkind, Gating, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, type RequestCleartext, gatingkindVals } from './models/gating'
-export { type Lease, type LeaseBank, type LeaseOpts, type SecretFieldname, withoutSecrets } from './models/lease'
-export type { GateRevisionedStamp, PasskeyProving, PassphraseProving, Proving, ProvingDevice } from './models/proving'
+export { Gate } from './models/gate'
+export { Gating } from './models/gating'
+export { type Lease, withoutSecrets } from './models/lease'
+export type { PasskeyProving, PassphraseProving, Proving } from './models/proving'
 export type {
   BodyOf, BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LiveOf, LivePublicPropsOf, PublicPropsOf, RevisionOf, SealPurposes, SealTags, Sealable, Sealed,
   SealedOf, SealedPartsOf, Sealer, TombstoneOf, TombstonePublicProps, UnsealedOf,
@@ -19,3 +19,9 @@ export {
 export { Wayin } from './models/wayin'
 export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './shapes/primitives'
 export { type VaultDB, isVaultDB } from './storage/vault-db'
+export type { BadNews, BadNewsHandler, BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxShell, BoxUnsealed, DeviceOpts, DeviceRecord, GetBoxAnswer, GetBoxAskDraft } from './shapes/shapes-bankish'
+export {
+  type AskUser, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,
+  type Gatingkind, type LeaseBank, type LeaseOpts, type ProvingDevice, type RequestCleartext, type SecretFieldname, gatingkindVals,
+} from './shapes/shapes-gateish'
+export type { BankRecord } from './shapes/shapes-thing'

@@ -140,10 +140,9 @@ function writtenOf<RecordT extends object>(check: StoredCheck<RecordT>, { userid
   return check.parseConsistent(raw, { userid, banklabel, labelpath }, RowOfOtherScope)
 }
 
-const StoredCitedCheck = storedCited.refusingAs('damaged_row')
-
 /** The part of the Thing stored at `scope` that a write's preconditions compare, checked, or null for none. The rest of the Thing is not read. */
 export function storedCitedOf(scope: ThingScope, raw: unknown): StoredCited | null { return storedOf(StoredCitedCheck, scope, raw) }
+const StoredCitedCheck = storedCited.refusingAs('damaged_row')
 
 /** The Thing stored at `scope`, checked, or null for none. */
 export function storedThingOf(scope: ThingScope, raw: unknown): Thing | null { return storedOf<Thing>(kindChecksOf(scope.labelpath).stored, scope, raw) }
@@ -332,14 +331,13 @@ export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
   throw bornAtNotStored(storedThingOf(ask, raw))
 }
 
-const StoredWayinsCheck = storedWayins.refusingAs('damaged_row')
-
 /** Throw `gate_issue` if a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only a gate's writes name storage policies. */
 export function demandPolicies(ask: WriteAsk, raw: unknown): void {
   if ((ask.modelkind !== 'gate') || ((ask.options?.policies.length ?? 0) === 0)) { return }
   const why = policyRefusalOf(ask, StoredWayinsCheck.parse(raw).wayins)
   if (why !== null) { throw gateIssue(storedThingOf(ask, raw), why) }
 }
+const StoredWayinsCheck = storedWayins.refusingAs('damaged_row')
 
 /** The answer to a birth the fetched roots pass or refuse, or null if the act tables let it write.
  * Over a live bank the answer is `passed`, with the three roots stored. Otherwise it is the first root's refusal.

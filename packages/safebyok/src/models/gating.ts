@@ -1,64 +1,11 @@
-import type * as Z from 'zod'
 import type { Consts } from 'safebyok-big/internals'
 import { Crypto, EX, Errors, GX, Helpers, Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Device } from './device'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Banklabel, Userid } from '../shapes/primitives'
+import { type AskUser, type CleartextsForGatingkind, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, gatingkindVals } from '../shapes/shapes-gateish'
 import { type BankScope, bankScope } from '../shapes/shapes-stamps'
-
-// == [Kinds and forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
-
-/** The kinds of gating: what each asks the user to prove, and for what. */
-export const gatingkindVals = ['birth_bank'] as const
-/** A kind of gating, one of {@link gatingkindVals}. */
-export type Gatingkind = typeof gatingkindVals[number]
-
-/** A gating as a host's dialog renders it: its kind, its token and its bank scope. */
-export type GatingSnapshot = BankScope & { readonly gatingkind: Gatingkind, readonly gatingTok: string }
-
-/** The cleartexts a dialog hands `attempt`, by kind of gating. */
-export interface CleartextsForGatingkind {
-  birth_bank: Z.input<typeof GX.bankBuildCleartexts>
-}
-// --
-
-// == [Given to a gating]: GatingAttempt, RequestCleartext, AskUser
-
-/** An attempt's work: prove the user's cleartexts, then make the change its gating is for. */
-export type GatingAttempt = (cleartexts: unknown) => Promise<Bank>
-
-/** The host's dialog: show `gating`, and hand what the user types to `gating.attempt`. */
-export type RequestCleartext = (gating: Gating) => unknown
-
-/** The host's `requestCleartext`, guarded: it resolves true when the host's dialog returns, and false when it throws. */
-export type AskUser = (gating: Gating) => Promise<boolean>
-
-/** The options of {@link Gating.make}, beside its record. */
-export interface GatingOpts {
-  /** The device the gating opens on. */
-  device: Device
-  /** The bank the gating is for; null for a `birth_bank` gating, whose bank does not exist yet. */
-  bank:    Bank | null
-  /** The work each attempt does on the cleartexts it is handed. */
-  attempt: GatingAttempt
-  /** The host's dialog, guarded, or null to wait for the host's own `attempt` or `dismiss`. */
-  askUser: AskUser | null
-}
-
-/** A gating's record: its kind. */
-export interface GatingRecord<KindT extends Gatingkind = Gatingkind> {
-  gatingkind: KindT
-}
-
-// Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Gating.make}'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, fn, custom, oneof }) => ({
-  gatingMakeArgs: obj({
-    record: obj({ gatingkind: oneof(gatingkindVals) }),
-    opts:   obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device'), bank: custom<Bank | null>(), attempt: fn<GatingAttempt>(), askUser: fn<AskUser>().nullable() }),
-  }),
-}))
 
 /** A request to the user for their passphrase or passkey, for the change `gatingkind` names.
  * A device has one open at a time. The dialog hands what the user typed to `attempt`, and closes when `whenConcluded` resolves.
@@ -267,4 +214,16 @@ function spendCleartexts(cleartexts: unknown): void {
     if (Object.prototype.toString.call(prfBytes) === '[object ArrayBuffer]') { new Uint8Array(prfBytes as ArrayBuffer).fill(0) }
   } catch { /* nothing left to spend */ }
 }
+// --
+
+// == [Checks]: Checks
+
+// Defined here, not with the shapes: they name a model class.
+/** The checks of {@link Gating.make}'s arguments. */
+const Checks = Validator.Checkers('bad_record', ({ obj, fn, custom, oneof }) => ({
+  gatingMakeArgs: obj({
+    record: obj({ gatingkind: oneof(gatingkindVals) }),
+    opts:   obj({ device: custom<Device>((val) => val instanceof Device, 'Expected a Device'), bank: custom<Bank | null>(), attempt: fn<GatingAttempt>(), askUser: fn<AskUser>().nullable() }),
+  }),
+}))
 // --

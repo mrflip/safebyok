@@ -41,5 +41,4 @@ export function policyRefusalOf(ask: GateWriteAsk, stored: Wayins): string | nul
   }
   return null
 }
-
 // --

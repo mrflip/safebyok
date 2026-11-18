@@ -1,76 +1,20 @@
-import type * as Z from 'zod'
-import { CX, Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, Throwers, VX, Validator } from 'safebyok-big/internals'
+import { Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, Throwers, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
-import { type AskUser, Gating, type RequestCleartext, birthBank } from './gating'
-import { type GuardedKeyDeriver, guardKeyDeriver } from './proving'
-import { DefaultStrengthChecker, type GuardedStrengthChecker, type StrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
+import { Gating, birthBank } from './gating'
+import { guardKeyDeriver } from './proving'
+import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
+import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, deviceRecord } from '../shapes/shapes-bankish'
+import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, bankScope } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
 
-// == [Given to a device]: DefaultLeaseMillis, DeviceRecord, BadNews, BadNewsHandler, DeviceOpts
+// == [Defaults]: DefaultLeaseMillis
 
 /** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
-
-/** A device's record: the bank scope it serves, and its token there. */
-export type DeviceRecord = Z.infer<typeof Checks.deviceRecord>
-
-/** What `onBadNews` hears: a refusal no caller waits on, and the device it reached. */
-export interface BadNews {
-  readonly news:   Errors.VaultError
-  readonly device: Device
-}
-
-/** `Device.make`'s `onBadNews`: hears each refusal no caller waits on. */
-export type BadNewsHandler = (badnews: BadNews) => unknown
-
-/** The options of {@link Device.make}, beside the device's record. */
-export interface DeviceOpts {
-  /** Where this device's banks are stored: each bank made on it is given this vaultDB. */
-  vaultDB:          VaultDB
-  /** Makes a key from a passphrase: `argon2idWebV1Deriver` from `safebyok-big/browser`, or your own. */
-  keyDeriver:       Deriver.KeyDeriver
-  /** Judges each new passphrase before the bank accepts it. Without one, every new passphrase is too weak. */
-  strengthChecker?: StrengthChecker | undefined
-  /** Where the device reports what it has no caller to throw to. Default: the console. */
-  logger?:          Logger.VaultLogger | undefined
-  /** How long a lease lasts on this device, in minutes. `Infinity` lasts until locked. Default: 14 days. */
-  autolockMinutes?: number | undefined
-  /** Shows the host's dialog for each gating. Without one, the host renders the device's `openGating` itself. */
-  requestCleartext?: RequestCleartext | undefined
-  /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
-  onBadNews?:       BadNewsHandler | undefined
-}
-
-/** The checks of a {@link DeviceRecord} and of {@link Device.make}'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom, user_id, banklabel, device_tok }) => {
-  const deviceRecord = obj({ userid: user_id, banklabel, device_tok }).strict()
-  return {
-    deviceRecord,
-    requestCleartext: fn<RequestCleartext>(),
-    deviceMakeArgs: obj({
-      record: deviceRecord,
-      opts:   Validator.objCheck(() => ({
-        vaultDB:         custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
-        keyDeriver:      custom<Deriver.KeyDeriver>(),
-        strengthChecker: custom<StrengthChecker>().optional(),
-        logger:          custom<Logger.VaultLogger>().optional(),
-        autolockMinutes: VX.positiveMinutes.optional(),
-        requestCleartext: custom<RequestCleartext>().optional(),
-        onBadNews:       fn<BadNewsHandler>().optional(),
-      }), { refusalkind: 'bad_record' }),
-    }),
-    tellBadNewsToArgs: obj({
-      onBadNews: fn<BadNewsHandler>(),
-      device:    custom<Device>((val) => val instanceof Device, PhrasesX.DeviceExpected),
-      badnews:   arr(custom<Errors.VaultError>(Errors.isVaultError, PhrasesX.VaultErrorExpected)),
-    }),
-  }
-}, [CX])
 // --
-
 /** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and at most one open gating.
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
@@ -255,4 +199,29 @@ function millisOf(minutes: number | undefined, fallback: number): number { retur
 function checkSecureContext(): void {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw Throwers.insecureContext() }
 }
+// --
+
+// == [Checks]: Checks
+
+/** The checks of {@link Device.make}'s arguments. */
+const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
+  requestCleartext: fn<RequestCleartext>(),
+  deviceMakeArgs: obj({
+    record: deviceRecord,
+    opts:   Validator.objCheck(() => ({
+      vaultDB:         custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+      keyDeriver:      custom<Deriver.KeyDeriver>(),
+      strengthChecker: custom<StrengthChecker>().optional(),
+      logger:          custom<Logger.VaultLogger>().optional(),
+      autolockMinutes: VX.positiveMinutes.optional(),
+      requestCleartext: custom<RequestCleartext>().optional(),
+      onBadNews:       fn<BadNewsHandler>().optional(),
+    }), { refusalkind: 'bad_record' }),
+  }),
+  tellBadNewsToArgs: obj({
+    onBadNews: fn<BadNewsHandler>(),
+    device:    custom<Device>((val) => val instanceof Device, PhrasesX.DeviceExpected),
+    badnews:   arr(custom<Errors.VaultError>(Errors.isVaultError, PhrasesX.VaultErrorExpected)),
+  }),
+}))
 // --

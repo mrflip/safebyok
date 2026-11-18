@@ -1,48 +1,7 @@
 import { HostErrorSanitizer } from 'safebyok-big'
-import { Consts, Errors, GX, Helpers, Phrases, Strength, Throwers, Validator } from 'safebyok-big/internals'
+import { Consts, Errors, GX, Helpers, Phrases, Strength, Throwers } from 'safebyok-big/internals'
+import { type GuardedStrengthChecker, type StrengthChecker, strengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, bankScope } from '../shapes/shapes-stamps'
-
-// == [The checker]: StrengthChecker, GuardedStrengthChecker, strengthChecker
-
-/** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link GX.PassphraseVerdict}.
- * It is given the passphrase as typed, and the bank's scope, `{ userid, banklabel }`: words a guesser who knows the user tries first.
- * It runs on each new passphrase before any key is derived: the one a `birth_bank` gating births the bank
- * with. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
- * throws, or returns no verdict, refuses its call.
- *
- * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never quote
- * it, not even in its `reason`, which becomes the refusal's message.
- *
- * A checker that needs something fetched or built first, such as a dictionary, carries it as `load`.
- * Make the checker once, before any device, and pass the same one to each. Make `load` cost nothing once
- * it has succeeded, and forget a failure.
- *
- * `safebyok-big/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To judge as
- * the user types, call `gating.judgeStrength(typed)`. With no checker, every new passphrase is judged weak
- * ({@link DefaultStrengthChecker}).
- *
- * @example
- *   const strengthChecker = (typed: string) => (typed.length < 20 ? { strong: false, reason: 'Twenty characters or more, please.' } : { strong: true })
- * @example
- *   const strengthChecker = Object.assign((typed: string) => judge(typed), { load: () => loadWordList() })
- */
-export type StrengthChecker = {
-  (passphrase: string, scope: BankScope): GX.PassphraseVerdict | Promise<GX.PassphraseVerdict>
-  /** Fetch or build what the checker needs before it can judge. */
-  load?: (() => void | Promise<void>) | undefined
-}
-
-/** The host's strength checker as a device keeps it, wrapped by {@link guardStrengthChecker}. */
-export type GuardedStrengthChecker = {
-  (passphrase: string, scope: BankScope): Promise<GX.PassphraseVerdict>
-  readonly load: () => Promise<void>
-}
-
-/** The check of a host's {@link StrengthChecker}. */
-export const { strengthChecker } = Validator.Checkers('bad_record', ({ custom }) => ({
-  strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, Phrases.StrengthCheckerShape),
-}))
-// --
 
 // == [The default]: DefaultStrengthChecker
 

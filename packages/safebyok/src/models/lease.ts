@@ -6,52 +6,15 @@ import * as Phrases from '../phrases'
 import { tombstoneSecretsGiven } from '../refusals/throwers'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
 import type { ThingRecord } from '../shapes/shapes-thing'
-import type { Bank } from './bank'
+import type { LeaseBank, LeaseOpts, SecretFieldname } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from '../shapes/shapes-stamps'
-
-/** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
-export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
 /** Any sealer, whatever it seals. */
 type AnySealer = Sealers.Sealer<never, never>
 
-/** A field that holds a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
-export type SecretFieldname = 'whisper' | `${string}_sealed`
-
 /** The fieldnames that hold a cleartext. */
 const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
-
-/** The options of {@link Lease.make}, beside its record. */
-export interface LeaseOpts {
-  /** The bank the lease is granted to. */
-  bank: LeaseBank
-}
-
-// Defined here, not with the shapes: it names a model class.
-/** The checks of {@link Lease.make}'s arguments, and of the sealer a seal or unseal is given. */
-const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, bool, custom }) => {
-  const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() })
-  const sealerMembers = obj({
-    donorPropsOf:     fn(),
-    publicPropsOf:    fn(),
-    secretPropsOf:    fn(),
-    nextRevisionOf:   fn(),
-    tombstoneOf:      fn(),
-    tombstoneSecrets: obj({}),
-    stampOf:          fn(),
-    tags:             obj({ codectag: str, schematag: str }),
-    purposes:         obj({ key: str, cipher: str }),
-    encode:           fn(),
-    decode:           fn(),
-    sealedOf:         fn(),
-    recordOf:         fn(),
-  })
-  return {
-    leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank }) }),
-    sealer:        custom<AnySealer>((val) => sealerMembers.safeParse(sealerMembersOf(val)).success, Phrases.SealerExpected),
-  }
-})
 
 /** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
@@ -259,4 +222,32 @@ function sealerMembersOf(val: unknown): Partial<Record<keyof AnySealer, unknown>
   } = val as Partial<Record<keyof AnySealer, unknown>>
   return { donorPropsOf, publicPropsOf, secretPropsOf, nextRevisionOf, tombstoneOf, tombstoneSecrets, stampOf, tags, purposes, encode, decode, sealedOf, recordOf }
 }
+// --
+
+// == [Checks]: Checks
+
+// Defined here, not with the shapes: it names a model class.
+/** The checks of {@link Lease.make}'s arguments, and of the sealer a seal or unseal is given. */
+const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, bool, custom }) => {
+  const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() })
+  const sealerMembers = obj({
+    donorPropsOf:     fn(),
+    publicPropsOf:    fn(),
+    secretPropsOf:    fn(),
+    nextRevisionOf:   fn(),
+    tombstoneOf:      fn(),
+    tombstoneSecrets: obj({}),
+    stampOf:          fn(),
+    tags:             obj({ codectag: str, schematag: str }),
+    purposes:         obj({ key: str, cipher: str }),
+    encode:           fn(),
+    decode:           fn(),
+    sealedOf:         fn(),
+    recordOf:         fn(),
+  })
+  return {
+    leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank }) }),
+    sealer:        custom<AnySealer>((val) => sealerMembers.safeParse(sealerMembersOf(val)).success, Phrases.SealerExpected),
+  }
+})
 // --

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors, SX } from 'safebyok-big/internals'
-import { Bank, type BankMakeRecord } from '../../src/models/bank'
+import { Bank } from '../../src/models/bank'
+import type { BankMakeRecord } from '../../src/shapes/shapes-bankish'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
