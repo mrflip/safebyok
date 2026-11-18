@@ -1,4 +1,4 @@
-/** The shapes of a Thing, the record every kind is stored as in a vaultDB, and of an adapter's options. */
+/** The shapes of a Thing, the record every kind is stored as in a vaultDB, and the checks of each. */
 
 import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
