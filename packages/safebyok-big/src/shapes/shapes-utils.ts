@@ -5,24 +5,26 @@
 import type * as Z from 'zod'
 import { objCheck } from '../helpers/validator'
 
-/** The most characters `head`, `tail` or `minStars` may ask for: a whiff, not a copy. */
+/** The most characters `head`, `tail` or `minLen` may ask for: a whiff, not a copy. */
 const MaxShown = 1000
 
-/** The check of `mask`'s options, each defaulted, a field it does not accept refused. Its `parse` refuses 'bad_record'. */
+/** The check of `mask`'s options, a field it does not accept refused. Its `parse` refuses 'bad_record'. */
 export const maskOpts = objCheck(({ union, lit, uint }) => {
   const shownCount = uint.lte(MaxShown)
-  const resultLen  = union([lit(Infinity), uint])
   return {
-    /** Characters kept from the start of the text. Default 2. */
-    head:     shownCount.default(2),
-    /** Characters kept from the end of the text. Default 4. */
-    tail:     shownCount.default(4),
-    /** Fewest stars the result may carry, however short the text. Default 6. */
-    minStars: shownCount.default(6),
-    /** Longest result, in code points. Default 15. `Infinity` never collapses. */
-    maxLen:   resultLen.default(15),
+    /** Characters shown from the start of the text. */
+    head:   shownCount.optional(),
+    /** Characters shown from the end of the text, fewer where they would overlap the head. */
+    tail:   shownCount.optional(),
+    /** Shortest result: a shorter one is padded with stars. */
+    minLen: shownCount.optional(),
+    /** Longest result: a longer one loses stars from its middle, then its tail, then its head. Wins over `minLen`. `Infinity` never cuts. */
+    maxLen: union([lit(Infinity), uint]).optional(),
   }
 }, 'bad_record')
 
-/** How `mask` shows a text: how many characters to reveal, and how many stars to hide it behind. */
+/** How `mask` shows a text: how many characters to show, and how long a result to make. Each field left out comes from the text's row of `MaskSchedule`. */
 export type MaskOpts = Z.input<typeof maskOpts>
+
+/** A row of `MaskSchedule`. Without `minLen` nothing is padded, and without `maxLen` nothing is cut. */
+export type MaskRow = Readonly<{ head: number, tail: number, minLen?: number, maxLen?: number }>
