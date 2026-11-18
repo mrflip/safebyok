@@ -161,12 +161,14 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** Write the bank's three roots, sealing the root box under a lease built from `proved`. Unlocks the bank under that lease when its own roots were written. */
   async #tryBirth(proved: Proving): Promise<BirthBankAnswer> {
-    const ask = { ...this.scope, op: 'birth' } as const
+    const baseAsk = { ...this.scope, op: 'birth' } as const
     const { endCause } = this.#device
-    if (endCause !== null) { return disabledAnswerOf(ask, endCause) }
-    const lease = await Checks.proving.parse(proved).buildLease(this, this.#maingate)
-    const root = await lease.seal(CoreBox, this.#rootBox, { sidecar: {} }, { whisper: {} })
-    const answer = await this.#vaultDB.tryBirthBank({ ...ask, bank: this.pickle(), gate: this.#maingate.pickle(), root })
+    if (endCause !== null) { return disabledAnswerOf(baseAsk, endCause) }
+    const lease  = await Checks.proving.parse(proved).buildLease(this, this.#maingate)
+    const root   = await lease.seal(CoreBox, this.#rootBox, { sidecar: {} }, { whisper: {} })
+    //
+    const ask    = { ...baseAsk, bank: this.pickle(), gate: this.#maingate.pickle(), root }
+    const answer = await this.#vaultDB.tryBirthBank(ask)
     if (answer.ok && (answer.val.bank.revtok === this.revtok) && lease.isEnabled) {
       this.#rootBox = Object.freeze(boxRecord.parse(answer.val.root))
       this.#attachLease(lease)
@@ -184,7 +186,8 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
    */
   async unlockByProving(proved: Proving, cited: GateRevisionedStamp = this.maingate): Promise<this> {
     this.demandEnabled()
-    const lease = await Checks.proving.parse(proved).buildLease(this, cited)
+    Checks.proving.parse(proved)
+    const lease = await proved.buildLease(this, cited)
     this.#attachLease(lease)
     return this
   }
@@ -251,20 +254,28 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     return this.#vaultDB.tryListThings(ask)
   }
 
-  /** The box at `ask.labelpath`. If none is stored, `ifAbsent: 'shell'` answers its shell, which a first revision is sealed over and cites. */
-  tryGetBox(ask: GetBoxAskDraft & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxThing | BoxShell>>
-  tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer<BoxThing | null>>
-  async tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer<BoxThing | BoxShell | null>> {
-    const { ifAbsent, ...given } = { ...ask }
-    const thingAsk = { ...this.makeGetAsk({ ...given, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
+  /** Fetch the box at `ask.labelpath` from VaultDB.
+   * If none is stored:
+   * - `ifAbsent: 'shell'` answers with a shell tombstone: "updating" it is a create operation.
+   */
+  tryGetBox(ask: GetBoxAskDraft & Readonly<{ ifAbsent: 'shell' }>): Promise<GetBoxAnswer<BoxShell>>
+  tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer>
+  async tryGetBox(ask: GetBoxAskDraft): Promise<GetBoxAnswer<BoxShell | null>> {
+    // Spread, so that an ask that is not a bag reaches the vaultDB's check and refuses in the answer.
+    const { labelpath, ifAbsent } = { ...ask }
+    const thingAsk = { ...this.makeGetAsk({ labelpath, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
     const { endCause } = this.#device
     if (endCause !== null) { return disabledAnswerOf(thingAsk, endCause) }
     const answer = await this.#vaultDB.tryGetThing(thingAsk)
     if (! answer.ok) { return answer }
-    // A box's labelpath, so its shell is a box's.
-    if (answer.val === null) { return { ...answer, val: (ifAbsent === 'shell') ? shellOf({ ...this.scope, labelpath: given.labelpath }, this.#rootBox) as BoxShell : null } }
-    if (answer.val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer) } }
-    return { ...answer, val: answer.val }
+    if (answer.act === 'gotvoid') {
+      if (ifAbsent !== 'shell') { return answer }
+      // A box's labelpath, so its shell is a box's.
+      return { ...answer, val: shellOf({ ...this.scope, labelpath }, this.#rootBox) as BoxShell }
+    }
+    const { val } = answer
+    if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer) } }
+    return { ...answer, val }
   }
 
   /** Write the live box `ask.record` over the box `ask.cited` cites: the one stored at its scope, or its shell. */
