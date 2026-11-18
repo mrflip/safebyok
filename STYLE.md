@@ -24,14 +24,14 @@ Use plain words, and write in clear, understandable full sentences. (In a doc bl
   `vault`, not `vaultScopepath`.
 * **A module with one primary noun** is imported by name, along with its companions:
   `import { Box, BoxKinds } from './box'`.
-* **Validators are reached through a namespace**, tests included (the new core's shapes modules
-  export a bundle instead: *Validation*): a `src/shapes/` module is
+* **Validators are reached through a namespace**, tests included: a `src/shapes/` module is
   star-imported under the short name its header gives (`import * as CX from
   '../shapes/shapes-core'`, then `CX.bankScope.parse(opts)`), and its types are imported by name.
   A file that imports many validators by name grows a list that churns, and uses up names its locals
   want (`vaultRecord`, `whisper`); one that needs one or two may name them. Outside the core, a
   file that reaches many star-imports `safebyok` as `Safebyok`, and an adapter star-imports
-  `safebyok/storage` as `DB` (`DB.vaultRow`).
+  `safebyok/storage` as `DB` (`DB.vaultRow`). The new core's shapes modules export a bundle instead
+  (*Validation*).
 * **The core's `src/shapes/` has the validators a module exports**, and no other module exports
   one. A validator a module keeps to itself stays beside its only user, made in a `Checkers` call
   at module level (`helpers/validator.ts`'s and `gate.ts`'s `Checks`, `device.ts`'s `HostChecks`).
@@ -117,7 +117,7 @@ VOCABULARY.md *Shapes*: `VaultRecord`, `VaultSparse`, `VaultStamp`; never a bare
 
 **A plain string type's helpers ride on a companion object of the same name**, beside the type:
 `Lifeseq.ofLifenum(lifenum)`, `Labelpath.modelkindOf(labelpath)`. **A module of related functions
-is imported whole**: `import * as Classifier from './thing-classifier'`, `import * as Throwers`.
+is imported whole**: `import * as Classifier from './thing-classifier'`, `import * as Throwers from '../refusals/throwers'`.
 
 **A name is the doc block's first line, compressed.** Write that line (*Comments and doc
 blocks*), then read the name against it: the verb promises what the line says, in the vocabulary
@@ -369,12 +369,11 @@ has.
 * **Frame a refusal of a host's options in the parse**, `parse(opts, { where, advice })`, not in a
   catch that rethrows. Never `Z.config`: it is the host's Zod too.
 
-**A shapes module exports its checks through one frozen bundle**, `FooChecks`, and a caller never
-destructures it: each check keeps one public name, and a caller writes
-`const labelpath = ThingChecks.labelpath.parse(raw?.labelpath)`, so the local keeps the plain name.
+**A shapes module exports its checks through one frozen bundle**, `FooChecks`, never destructured,
+with one public name for each check. A caller writes
+`const labelpath = ThingChecks.labelpath.parse(raw?.labelpath)`, and the local keeps the plain name.
 A bundle also carries the few constants and helpers a caller reaches for beside its checks
-(`ThingChecks.ThingFormat`), and a kind's checks are read through its kind's bundle
-(`BoxChecks.sealable`).
+(`ThingChecks.ThingFormat`). A kind's checks are read through its kind's bundle (`BoxChecks.sealable`).
 
 **Strict for a whole type, duckish for a pick.** A checker for a whole type (an ask, an answer, a
 record, a field, a bag of options) is strict: a key it does not know is a mistake or damage, and it
