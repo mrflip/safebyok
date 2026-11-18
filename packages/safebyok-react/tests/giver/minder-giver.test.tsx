@@ -76,8 +76,11 @@ describe("the giver over a minder", () => {
     const next = LeanTH.nextOf(box, { sidecar: { account: 'home' } })
     await act(() => world._cheat_replace(box, next))
     const { gets } = world.counts
+    // The get of the newer revision waits until released, so the older record is still what shows.
+    const releaseGets = world.holdGets()
     await act(() => world.minder.list('box'))
     expect(result.current.data).to.deep.equal(box)
+    releaseGets()
     await waitFor(() => { expect(result.current.data).to.deep.equal(next) })
     expect(world.counts.gets).to.eq(gets + 1)
   })

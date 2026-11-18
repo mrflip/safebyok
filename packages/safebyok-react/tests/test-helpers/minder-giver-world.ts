@@ -23,6 +23,8 @@ export interface MinderGiverWorld {
   minder:    ThingMinder
   /** How many gets the vaultDB has answered. */
   counts:    { gets: number }
+  /** Hold every get the vaultDB is asked from now on, until the function returned is called. */
+  holdGets(): () => void
   /** Store `box` under the root box, as its first revision. */
   _cheat_birthBox(box: BoxThing): Promise<void>
   /** Store `next` over `prior`. */
@@ -36,10 +38,17 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
   const vaultDB = new MemoryVaultDB()
   if (! isWatching) { vaultDB.watch = () => unsubscribeNothing }
   const counts  = { gets: 0 }
+  let held: Promise<void> | null = null
   const tryGetThing = vaultDB.tryGetThing.bind(vaultDB)
-  vaultDB.tryGetThing = (ask) => {
+  vaultDB.tryGetThing = async (ask) => {
     counts.gets += 1
+    if (held !== null) { await held }
     return tryGetThing(ask)
+  }
+  function holdGets(): () => void {
+    let release!: () => void
+    held = new Promise<void>((resolve) => { release = resolve })
+    return () => { held = null; release() }
   }
   await LeanTH.expectGood(vaultDB.tryBirthBank(LeanTH.birthBankAskOf()))
 
@@ -58,6 +67,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
     vaultDB,
     minder,
     counts,
+    holdGets,
     _cheat_birthBox: async (box) => {
       const shell = shellOf({ ...LeanTH.ThingBank, labelpath: box.labelpath }, LeanTH.rootBoxOf())
       await LeanTH.expectGood(vaultDB.tryWriteThing(LeanTH.birthAskOf(box, shell)))
