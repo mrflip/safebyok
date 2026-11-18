@@ -1,7 +1,7 @@
 /** The forms of a sealed record, the `Sealer` a lease seals and unseals with, and a box's records. */
 
-import type { CX, Crypto } from 'safebyok-big/internals'
-import type { EpochMillis } from './primitives'
+import type { CX, Crypto, SX } from 'safebyok-big/internals'
+import type { EpochMillis, VoidLifeseq } from './primitives'
 import type { BoxRecord, Sealed, Sparse, ThingRecord } from './shapes-thing'
 
 export type { Sealed } from './shapes-thing'
@@ -25,8 +25,14 @@ export type LiveOf<RecordT> = RecordT & Readonly<{ am: 'a' }>
 /** The tombstones of `RecordT`. */
 export type TombstoneOf<RecordT> = RecordT & Readonly<{ am: 'x' }>
 
-/** The shell of `RecordT`: the void record, without a body, that its first revision is sealed over and cites. */
-export type ShellOf<RecordT extends Sparse<ThingRecord>> = Sparse<TombstoneOf<RecordT>>
+/** The shell of `RecordT`: the void record, without a body, that its first revision is sealed over and cites.
+ * Its revision is the void one: revseq -1, and the void revtok and lifeseq.
+ */
+export type ShellOf<RecordT extends Sparse<ThingRecord>> = Sparse<TombstoneOf<RecordT>> & Readonly<{
+  revtok:  typeof SX.VoidRevisionTok
+  revseq:  typeof SX.VoidRevisionSeq
+  lifeseq: typeof VoidLifeseq
+}>
 
 /** A revision of `RecordT` before it is sealed, without the sealed parts that `CleartextsT` names. A union is mapped member by member. */
 export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<RecordT, keyof SealedPartsOf<CleartextsT>> : never

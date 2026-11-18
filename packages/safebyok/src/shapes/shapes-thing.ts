@@ -4,7 +4,7 @@ import { isEmptyObject, pick } from 'es-toolkit'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
 import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
-import type { TombstoneOf } from './shapes-sealers'
+import type { ShellOf, TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
 import { type Lifepath, type Revtok, Labelpath, Lifeseq, VoidLifeseq } from './primitives'
@@ -294,7 +294,7 @@ export function sparseOf<RecordT extends Sparse<ThingRecord>>(record: RecordT): 
 /** A shell, whole: every Thing field of a tombstone and no body, its revseq -1.
  * What a ThingMinder's cache holds for a scope that stores nothing.
  */
-export type VoidSentinel = Sparse<ThingRecord> & Readonly<{ am: 'x' }>
+export type VoidSentinel = ShellOf<ThingRecord>
 
 const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, label }) => {
   const fixed = {

@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BankRecord, type BoxRecord, type GateRecord,
+  type BankRecord, type BoxRecord, type GateRecord, type ThingRecord, type VoidSentinel,
   BoxChecks, Shell, ThingFormat, isGone, isTombstone, isVoidSentinel, isWholeRecord, sparseOf,
 } from '../../src/shapes/shapes-thing'
 import { type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
@@ -548,5 +548,12 @@ describe("LiveOf, TombstoneOf and ShellOf", () => {
     expectTypeOf<TombstoneOf<BoxRecord>>().toHaveProperty('whisper_sealed')
     expectTypeOf<ShellOf<BoxRecord>>().not.toHaveProperty('sidecar')
     expectTypeOf<ShellOf<BoxRecord>>().not.toHaveProperty('whisper_sealed')
+  })
+
+  it("pin the shell to the void revision", () => {
+    expectTypeOf<ShellOf<BoxRecord>['revseq']>().toEqualTypeOf<typeof SX.VoidRevisionSeq>()
+    expectTypeOf<ShellOf<BoxRecord>['revtok']>().toEqualTypeOf<typeof SX.VoidRevisionTok>()
+    expectTypeOf<ShellOf<GateRecord>['lifeseq']>().toEqualTypeOf<typeof Shell.VoidLifeseq>()
+    expectTypeOf<VoidSentinel>().toEqualTypeOf<ShellOf<ThingRecord>>()
   })
 })

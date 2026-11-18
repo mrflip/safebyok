@@ -197,7 +197,7 @@ describe("Bank.make(record, { device, vaultDB })", () => {
 
   it("refuses a box other than the root box as its root box", async () => {
     const { record, device } = await TH.buildBornBank()
-    const box = TH.boxThingOf('openai')
+    const box: LiveOf<BoxRecord> = { ...TH.boxThingOf('openai'), am: 'a' }
     TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: box }, { device, vaultDB: device.vaultDB }), 'record_conflict')
   })
 

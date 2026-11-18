@@ -20,7 +20,7 @@ const GateGetAsk: GetAsk = getAskOf({ ...TH.GateScope, ifAbsent: 'nil', track: T
 function fakeBankOf() {
   return {
     scope:       { ...TH.ThingBank },
-    rootBox:     TH.rootBoxOf(),
+    rootBox:     { ...TH.rootBoxOf(), am: 'a' },
     makeGetAsk:  (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     makeListAsk: (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
