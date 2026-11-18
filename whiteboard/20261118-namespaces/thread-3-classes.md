@@ -1,6 +1,6 @@
 # Thread 3: classes (2026-11-18)
 
-Branch `20261118-classes`, PR #747, stacked on #744. Proved: `pnpm --filter safebyok test` 1051 passed, typecheck and eslint clean for safebyok; `pnpm justify` at the tip: see the PR's Tests line.
+Branch `20261118-classes`, PR #747, stacked on #744. Proved: `pnpm justify` green at 6eaca161c (safebyok 1051, safebyok-big 2941, safebyok-react 287, postgres 331, convex 329, indexeddb 213, fastkey 43, graphql 445, demo 99, e2e 576, scripts 287).
 
 * **Built**:
   - `models/base-thing.ts`: `BaseThing`, abstract and not generic, declares the Thing fields (with their doc blocks) and carries the record guards as statics: `isLive` (new), `isTombstone`, `isGone`, `isVoidSentinel`, `isWhole` (was `isWholeRecord`), `isSparse`, and `cmp` (was `cmpThings`), `haveSameScope`, `sparseOf`. `static readonly modelkind: Thingkind | null = null`. Each guard is `this: Kinded<KindT>` and reads `this.modelkind`; the narrowed types are named for hovers: `LiveOfKind`, `TombstoneOfKind`, `VoidSentinelOfKind`, `WholeOfKind`, over `RecordOfKind<KindT>`. The kind is checked with `Labelpath.modelkindOf` after the scope-and-citation check (`ThingChecks.scopedCited` with `am`).
@@ -19,7 +19,7 @@ Branch `20261118-classes`, PR #747, stacked on #744. Proved: `pnpm --filter safe
   - **`isWhole` and `isSparse` take a `Sparse<ThingRecord>`**, as today, since they read the labelpath before checking; the other guards take anything.
   - **`ShellOf` pins revtok, revseq and lifeseq only**, as the handoff lists. `born_at`/`written_at` are left as `EpochMillis`: `TH.boxShellOf()` builds a sealable shell at `T0`, which the sealer accepts, and pinning the times would have retyped that fixture.
   - **Kind-generic callers go through `Thing`**, including storage (`adapter-vault-db.ts`, `thing-classifier.ts`); `models/thing.ts` imports only big's Helpers and base-thing, so no cycle.
-  - **The tests that gave the bank a box record as its root box** now give a live one (`{ ...TH.rootBoxOf(), am: 'a' }`), since a `BoxRecord` of either liveness no longer passes for `ShellOf<BoxRecord>`. Changing `TH.rootBoxOf()` to return `LiveOf<BoxRecord>` was tried and set aside: `replaceAskOf`'s `WriteAsk<LiveOf<BoxRecord>>` stops being an object type.
+  - **The tests that gave the bank or a minder a box record as its root box** (safebyok's bank.test and thing-minder.test, safebyok-react's minder-giver world) now give a live one (`{ ...TH.rootBoxOf(), am: 'a' }`), since a `BoxRecord` of either liveness no longer passes for `ShellOf<BoxRecord>`. Changing `TH.rootBoxOf()` to return `LiveOf<BoxRecord>` was tried and set aside: `replaceAskOf`'s `WriteAsk<LiveOf<BoxRecord>>` stops being an object type.
 * **Deviations**:
   - `BaseThing` is not generic (the handoff allowed "as needed"): its only use of `RecordT` was `fmt`, now one value for every kind, and the linter refuses a type parameter used once.
   - The static field `modelkind` on `BaseThing` carries `// eslint-disable-line @typescript-eslint/class-literal-property-style`: the house config wants literal readonly fields as getters, and a subclass's `static override readonly` field could not override a getter. The subclasses' fields are `override`, which the rule skips.
