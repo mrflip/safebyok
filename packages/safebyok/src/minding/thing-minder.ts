@@ -13,10 +13,8 @@ import { Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { minderNotStarted, modelkindMismatch, staleRead } from '../refusals/throwers'
 import type { Banklabel, Labelpath, Userid } from '../shapes/primitives'
-import {
-  type GetAsk, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  RootBoxLabelpath, cmpThings, loggableAskOf, modelkindOf, shellOf, thingkindVals,
-} from '../shapes/shapes-thing'
+import { type Thing, type ThingScope, type Thingkind, type VoidSentinel, RootBoxLabelpath, cmpThings, modelkindOf, shellOf, thingkindVals } from '../shapes/shapes-thing'
+import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
 import { type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
   type CarFreshness, type DeliverableThing, type GotAnswer, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type MinderOpts, type QueryCacheOpts,

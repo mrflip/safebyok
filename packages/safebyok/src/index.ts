@@ -14,7 +14,12 @@ export type { BankScope, BankStamp } from './shapes/shapes-stamps'
 export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './shapes/primitives'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
 export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer } from './storage/vault-db'
-export { type BankRecord, type BoxThing, type DelAskDraft, type PutAskDraft, type Tombstone, type VoidSentinel, isVoidSentinel } from './shapes/shapes-thing'
+export {
+  type BoxThing, type Tombstone, type VoidSentinel, isVoidSentinel,
+} from './shapes/shapes-thing'
+export {
+  type BankRecord, type DelAskDraft, type PutAskDraft,
+} from './shapes/shapes-asks'
 export {
   type BoxCar, type CarFreshness, type DeliverableThing, type GateCar, type GotAnswer, type MinderOpts, type TSQAnswer, type TSQGotAnswer, type ThingCar, carLivenessVals,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies, type TsqStaleTime,

@@ -5,7 +5,8 @@
 import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import type { EX } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type GetAsk, type Thing, type WriteAsk, loggableAskOf } from '../shapes/shapes-thing'
+import { type Thing } from '../shapes/shapes-thing'
+import { type GetAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { GoodAnswer } from '../storage/vault-db'
 
 // == [Model Throwers]: tombstoneSecretsGiven, sidecarMissing, tombstoneSidecarGiven, boxOfOtherRoot, otherThanBox

@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { BW, expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { ShellCited, childShellCited, delAskOf, getAskOf, lifeseqOfLifenum, listAskOf, putAskOf, sparseOf } from '../../src/shapes/shapes-thing'
+import { ShellCited, childShellCited, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
+import { delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
   GateScope, Life0, RootScope, ThingBank, WithPasskey, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, getGateAskOf,
   nextGateOf, nextOf, replaceAskOf, rootBoxOf,

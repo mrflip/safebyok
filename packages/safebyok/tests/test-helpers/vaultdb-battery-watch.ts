@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Errors } from 'safebyok-big/internals'
 import { aWhile, eventually, expectSyncRefusal } from 'safebyok-big/testing'
-import type { ThingWatchScope, WorldRecord } from '../../src/shapes/shapes-thing'
+import type { ThingWatchScope, WorldRecord } from '../../src/shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../../src/storage/vault-db'
 import { childShellCited } from '../../src/shapes/shapes-thing'
 import {

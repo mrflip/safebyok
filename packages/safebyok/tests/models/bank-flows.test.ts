@@ -3,7 +3,8 @@ import { Errors } from 'safebyok-big/internals'
 import type { Bank } from '../../src/models/bank'
 import type { BoxShell, BoxUnsealed } from '../../src/shapes/shapes-bankish'
 import type { BoxRecord } from '../../src/shapes/shapes-sealers'
-import { type BoxThing, VoidLifeseq, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
+import { type BoxThing, VoidLifeseq, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
+import { getAskOf } from '../../src/shapes/shapes-asks'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()

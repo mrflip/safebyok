@@ -8,10 +8,8 @@ import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
 import type { EpochMillis } from './primitives'
-import {
-  type BoxThing, type GateThing, type GetAsk, type LoggableAsk, type Sparse, type Thing, type ThingRecord, type ThingWatchScope, type Thingkind, type Tombstone, type Track, type VoidSentinel,
-  AskChecks, thingCited, thingScope, thingWatchScope, trackShape,
-} from './shapes-thing'
+import { type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type Thingkind, type Tombstone, type VoidSentinel, thingCited, thingScope } from './shapes-thing'
+import { type GetAsk, type LoggableAsk, type ThingWatchScope, type Track, AskChecks, thingWatchScope, trackShape } from './shapes-asks'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 

@@ -24,4 +24,4 @@ export {
   type AskUser, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,
   type Gatingkind, type LeaseBank, type LeaseOpts, type ProvingDevice, type RequestCleartext, type SecretFieldname, gatingkindVals,
 } from './shapes/shapes-gateish'
-export type { BankRecord } from './shapes/shapes-thing'
+export type { BankRecord } from './shapes/shapes-asks'

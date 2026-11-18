@@ -1,9 +1,9 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, AskChecks, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, VoidLifeseq, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf,
-  isTombstoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, labelpathWithParentage, lifepathWithParentage, sparseOf, boxSealable, isGone, isTombstone, isWholeRecord, isVoidSentinel,
+  type BoxThing, type GateThing, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, VoidLifeseq, isTombstoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, modelkindOf, lifenumOfLifeseq, childShellCited, shellOf, labelpathWithParentage, lifepathWithParentage, sparseOf, boxSealable, isGone, isTombstone, isWholeRecord, isVoidSentinel,
 } from '../../src/shapes/shapes-thing'
+import { type BankRecord, type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 

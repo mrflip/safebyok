@@ -7,10 +7,9 @@ import { policyRefusalOf } from './policies'
 import type { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
-  type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
-  type Tracked, type WorldRecord, type WriteAsk,
-  KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
+  type StoredCited, type Thing, type ThingCited, type ThingScope, KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
 } from '../shapes/shapes-thing'
+import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,

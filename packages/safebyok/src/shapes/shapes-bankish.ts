@@ -10,7 +10,8 @@ import type { GateDna, RequestCleartext, StrengthChecker } from './shapes-gateis
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, BoxRecord, BoxTombstone, UnsealedOf } from './shapes-sealers'
 import type { BankStamp } from './shapes-stamps'
-import type { BoxThing, GetAsk, ListAsk, Sparse, WorldRecord } from './shapes-thing'
+import type { BoxThing, Sparse } from './shapes-thing'
+import type { GetAsk, ListAsk, WorldRecord } from './shapes-asks'
 import type { Labelpath } from './primitives'
 
 // == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed, BoxShell

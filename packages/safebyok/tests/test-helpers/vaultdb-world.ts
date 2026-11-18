@@ -3,10 +3,9 @@
 import { BW } from 'safebyok-big/testing'
 import type { Labelpath, Lifepath } from '../../src/shapes/primitives'
 import {
-  type BankThing, type BirthBankAsk, type BoxThing, type CitedOf, type GateThing, type GetAsk, type ListAsk, type PutAskDraft, type Thing,
-  type ThingCited, type Track, type WriteAsk,
-  BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, putAskOf, lifenumOfLifeseq,
+  type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, lifeseqOfLifenum, lifeseqOfLifepath, lifenumOfLifeseq,
 } from '../../src/shapes/shapes-thing'
+import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstRevtok, T0, revtokOf } from './models-world'
 
 /** The bank the Things stand in. */

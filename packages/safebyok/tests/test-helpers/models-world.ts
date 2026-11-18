@@ -22,7 +22,7 @@ import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/sha
 import { BoxThingFormat, VoidLifeseq, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { BirthBankAsk } from '../../src/shapes/shapes-thing'
+import type { BirthBankAsk } from '../../src/shapes/shapes-asks'
 import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
 
 // == [Time]: T0, useFakeClock

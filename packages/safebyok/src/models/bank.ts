@@ -15,10 +15,9 @@ import * as Phrases from '../phrases'
 import { boxOfOtherRoot, otherThanBox } from '../refusals/throwers'
 import type { DeviceTok } from '../shapes/primitives'
 import {
-  type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track,
-  type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
-  listAskOf, loggableAskOf, putAskOf, shellOf,
+  type BankThing, type BoxThing, type Thing, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, gateThing, lifeseqOfLifenum, shellOf,
 } from '../shapes/shapes-thing'
+import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
