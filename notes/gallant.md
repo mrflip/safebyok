@@ -1077,8 +1077,8 @@ parent's two strings, which any parent record also carries.
 
 ```ts
 listen(listener: (answer: TSQAnswer) => void): () => void
-shellOf({ ...scope, labelpath, lifepath })
-shellOf({ ...scope, label }, { labelpath, lifepath })
+Shell.of({ ...scope, labelpath, lifepath })
+Shell.of({ ...scope, label }, { labelpath, lifepath })
 ```
 
 **Goofus, from the signature hunt:** the parts of one cast member, passed one by one.
