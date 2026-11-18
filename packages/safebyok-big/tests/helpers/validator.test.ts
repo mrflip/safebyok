@@ -436,6 +436,12 @@ describe("demandConsistent", () => {
     const err = TH.expectSyncRefusal(() => demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }, { kind: 'bad_scope', message: (fieldnames) => `This names another ${fieldnames.join(' and ')}` }), 'bad_scope')
     expect(err.message).to.eq('This names another user_id')
   })
+
+  it("refuses as a bad record, naming the fields that disagree, when given no refusal", () => {
+    expect(demandConsistent(sparse, scope)).to.be.true
+    const err = TH.expectSyncRefusal(() => demandConsistent({ user_id: 'u2' }, { user_id: 'u1' }), 'bad_record')
+    expect(err.meta).to.deep.equal({ fieldnames: ['user_id'] })
+  })
 })
 
 describe("checkedConsistent", () => {

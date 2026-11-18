@@ -9,6 +9,7 @@ import {
   BankStaleTrack, GateStaleTrack, Life0, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
+import { OtherRevtok } from './models-world'
 
 /** What a watch on `scope` hears: its notices, and its bad news. */
 function heardOf(vaultDB: VaultDB, scope: ThingWatchScope = ThingBank): { notices: ThingNotice[], badNews: Errors.VaultError[], stop: () => void } {
@@ -55,7 +56,7 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
       const vaultDB = await withGate()
       const other = heardOf(vaultDB, { ...ThingBank, banklabel: 'other' })
       const own = heardOf(vaultDB)
-      await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: 'rev-other' })))
+      await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: OtherRevtok })))
       await aWhile()
       expect([...other.notices, ...own.notices]).to.have.lengthOf(0)
       expect([...other.badNews, ...own.badNews]).to.deep.equal([])
@@ -102,7 +103,7 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
         await vaultDB.tryListThings({ ...listAskAt('box'), track: BankStaleTrack })
         await eventually(() => notices.length === 1)
         expect(notices[0]).to.deep.equal({ ok: true, act: 'gotlive', val: bankThingOf(), world })
-        await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: 'rev-other' })), track: BankStaleTrack })
+        await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: OtherRevtok })), track: BankStaleTrack })
         await eventually(() => notices.length === 2)
         expect(notices[1]).to.deep.equal({ ok: true, act: 'gotlive', val: bankThingOf(), world })
         const next = nextGateOf(gateThingOf())

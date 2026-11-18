@@ -6,7 +6,7 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
 import type { Lifeseq } from '../../src/storage/primitives'
-import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxThing, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
+import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, VoidLifeseq, boxThing, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -76,7 +76,7 @@ describe("Bank.makeRecord(dna)", () => {
 
   it("makes the root box its shell, which the birth seals as the first revision of its first life", async () => {
     const { record, bank } = await TH.buildBornBank()
-    expect(record.rootBox).to.deep.equal({ ...TH.RootScope, label: 'box', fmt: BoxThingFormat, ...ShellCited, lifeseq: ShellLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime })
+    expect(record.rootBox).to.deep.equal({ ...TH.RootScope, label: 'box', fmt: BoxThingFormat, ...ShellCited, lifeseq: VoidLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime })
     expect(bank.rootBox).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0, written_at: TH.T0 })
     expect(bank.rootBox).to.include.keys('sidecar', 'whisper_sealed')
   })
@@ -221,8 +221,8 @@ describe("bank.unlockByProving(proved, cited) and bank.lock()", () => {
   it("cites the gate revision it is given", async () => {
     const { bank } = await TH.buildBornBank()
     const make = vi.spyOn(Lease, 'make')
-    await bank.unlockByProving(await storedProvingOf(bank), { ...TH.WorldGate, revtok: 'gate-revision-tok-9' })
-    expect(make.mock.calls[0]![0]).to.include({ gate_revtok: 'gate-revision-tok-9' })
+    await bank.unlockByProving(await storedProvingOf(bank), { ...TH.WorldGate, revtok: TH.revtokOf('gate9') })
+    expect(make.mock.calls[0]![0]).to.include({ gate_revtok: TH.revtokOf('gate9') })
   })
 
   it("evicts the lease an unlock replaces", async () => {
@@ -341,7 +341,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   // Each alteration still passes the box's check, so only the seal can catch it. The box's userid and banklabel are bound
   // too, but a box claiming another bank is refused before the unseal, below.
   const AlteredCases = [
-    [(box: BoxRecord) => ({ ...box, revtok: `${box.revtok}x` }),                                   'its revtok'],
+    [(box: BoxRecord) => ({ ...box, revtok: TH.OtherRevtok }),                          'its revtok'],
     [(box: BoxRecord) => ({ ...box, revseq: box.revseq + 1 }),                                             'its revseq'],
     [(box: BoxRecord) => ({ ...box, born_at: box.born_at + 1 }),                                           'its born_at'],
     [(box: BoxRecord) => ({ ...box, written_at: box.written_at + 1 }),                                     'its written_at'],
@@ -423,7 +423,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   // lifeseq is bound; the bank refuses it before any seal.
   it("refuses at the seal, the tombstone and the unseal a box under another life of the root box", async () => {
     const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf({ lifepath: `${Life2}/${ShellLifeseq}` }), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'record_conflict')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf({ lifepath: `${Life2}/${VoidLifeseq}` }), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'record_conflict')
     const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const moved = { lifepath: `${Life2}/${box.lifeseq}` }
     await TH.expectRefusal(bank.tombstoneBox({ ...box, ...moved }), 'record_conflict')
@@ -546,7 +546,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     const { bank } = await TH.buildBornBank()
     const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { sidecar: _sidecar, ...sparse } = box
-    const madeUp = { ...sparse, revtok: 'rev-made-up', revseq: box.revseq + 1, am: 'x', lifeseq: Life1, lifepath: `${Life0}/${Life1}`, whisper_sealed: TH.FakeSealed } as const
+    const madeUp = { ...sparse, revtok: TH.revtokOf('madeup'), revseq: box.revseq + 1, am: 'x', lifeseq: Life1, lifepath: `${Life0}/${Life1}`, whisper_sealed: TH.FakeSealed } as const
     await TH.expectRefusal(bank.unsealBox(madeUp), 'damaged_whisper')
     await TH.expectRefusal(bank.unsealBox({ ...madeUp, whisper_sealed: box.whisper_sealed }), 'damaged_whisper')
   })
@@ -560,7 +560,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
   })
 
   const AlteredCases = [
-    [(tombstone: BoxTombstone) => ({ ...tombstone, revtok: `${tombstone.revtok}x` }),              'its revtok'],
+    [(tombstone: BoxTombstone) => ({ ...tombstone, revtok: TH.OtherRevtok }),          'its revtok'],
     [(tombstone: BoxTombstone) => ({ ...tombstone, written_at: tombstone.written_at + 1 }),            'its written_at'],
     [(tombstone: BoxTombstone) => ({ ...tombstone, lifeseq: Life3, lifepath: `${Life0}/${Life3}` }),   'its lifeseq'],
   ] as const
@@ -627,7 +627,7 @@ describe("bank.put(args)", () => {
 
   it("throws the vaultDB's refusal, as for a revision it does not cite", async () => {
     const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), revtok: 'rev-stale' }, record: nextBankThingOf(bank) }))
+    await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), revtok: TH.revtokOf('stale') }, record: nextBankThingOf(bank) }))
     expect(await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })).to.include({ revseq: 1 })
   })
 

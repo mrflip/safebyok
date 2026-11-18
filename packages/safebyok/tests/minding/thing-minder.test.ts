@@ -7,7 +7,7 @@ import { type DeliverableThing, type ThingCar, carOf } from '../../src/minding/t
 import { type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../src/storage/primitives'
-import { type GateThing, type GetAsk, type Thing, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, isVoidSentinel, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { type GateThing, type GetAsk, type Thing, type ThingScope, type Thingkind, VoidLifeseq, boxSealable, getAskOf, isVoidSentinel, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -515,7 +515,7 @@ describe("ThingMinder.get", () => {
     const { liveness, newest: shell } = await boxMinder.get(BoxAsk)
     expect(liveness).to.eq('void')
     expect(shell).to.deep.equal(shellOf(TH.BoxScope, TH.rootBoxOf()))
-    expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/${ShellLifeseq}` })
+    expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/${VoidLifeseq}` })
     expect(boxSealable.safeParse(shell).success).to.be.true
     const birth = TH.birthAskOf(TH.boxThingOf(), shell)
     await TH.expectGood(vaultDB.tryWriteThing(birth))
@@ -941,13 +941,13 @@ describe("Each minder's watch", () => {
 
   it("puts a record of a later life after one of a higher revseq", () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
-    const oldLife = TH.gateThingOf({ lifeseq: '0000000000', lifepath: '0000000000', revtok: 'old-life', revseq: 3 })
-    const newLife = TH.gateThingOf({ lifeseq: '0000000002', lifepath: '0000000002', revtok: 'new-life', revseq: 0 })
+    const oldLife = TH.gateThingOf({ lifeseq: '0000000000', lifepath: '0000000000', revtok: TH.revtokOf('old'), revseq: 3 })
+    const newLife = TH.gateThingOf({ lifeseq: '0000000002', lifepath: '0000000002', revtok: TH.revtokOf('new'), revseq: 0 })
     receive(noticeOf(oldLife))
     receive(noticeOf(newLife))
-    expect(revtokAt(minder)).to.eq('new-life')
+    expect(revtokAt(minder)).to.eq(TH.revtokOf('new'))
     receive(noticeOf(oldLife))
-    expect(revtokAt(minder)).to.eq('new-life')
+    expect(revtokAt(minder)).to.eq(TH.revtokOf('new'))
   })
 
   it("puts any record after the shell", async () => {

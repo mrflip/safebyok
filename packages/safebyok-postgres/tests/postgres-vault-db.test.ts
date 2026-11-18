@@ -117,7 +117,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const box = VT.boxThingOf()
     await plant({ ...VT.ThingBank, labelpath: box.labelpath }, box)
     const write = `SELECT ok, thing FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`
-    const stale = { ...box, revtok: 'rev-other' }
+    const stale = { ...box, revtok: VT.OtherRevtok }
     const skips = VT.nextOf(box, { lifeseq: lifeseqOfLifenum(2), lifepath: lifeseqOfLifenum(2) })
     for (const [record, cited] of [[VT.nextOf(box), stale], [skips, box]]) {
       const { rows } = await db.query(write, [JSON.stringify(record), JSON.stringify(cited)])

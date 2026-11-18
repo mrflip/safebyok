@@ -31,6 +31,9 @@ export const LabelpathOfOtherKind = "A Thing's labelpath starts with its own mod
 /** A lifeseq that is not 10 base-32 digits. */
 export const LifeseqShape = "A lifeseq is 10 base-32 digits, 0-9 and a-v."
 
+/** A revtok not of a UUID's shape. */
+export const RevtokShape = "A revtok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
+
 /** A lifepath that is not lifeseqs, each after a '/'. */
 export const LifepathShape = "A lifepath is one or more lifeseqs, joined by '/'."
 
@@ -51,18 +54,6 @@ export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a 
 
 /** A sealable box that matches the shell in some of its revseq, lifeseq and revtok, but not all three. */
 export const SealableHalfShell = "A box a revision is made from is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
-
-/** A shell asked for with neither a labelpath nor a label and its parent. */
-export const ShellUnscoped = "A shell is made from a labelpath, or from a label and its parent."
-
-/** A shell asked for below a root with no life to put it under. */
-export const ShellLifeless = "The shell of a Thing below a root is made from its parent's lifepath, or from its own lifepath."
-
-/** A shell asked for under a parent whose labelpath is not its own less its label. */
-export const ShellNotChild = "A shell's labelpath is its parent's labelpath, a '/', and its label."
-
-/** A shell asked for with a lifepath that is not its own under the parent given beside it. */
-export const ShellOfOtherLife = "A lifepath given for a shell is its parent's lifepath, then the shell's lifeseq."
 
 /** A shell asked for with the fmt of another kind of Thing. */
 export const ShellFmtOfOtherKind = "A shell's fmt is the fmt of its kind of Thing."

@@ -17,7 +17,7 @@ import { Lease, type LeaseBank } from '../../src/models/lease'
 import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, type ProvingDevice, guardKeyDeriver } from '../../src/models/proving'
 import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
-import { BoxThingFormat, ShellLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { BoxThingFormat, VoidLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAsk } from '../../src/storage/shapes-thing'
@@ -27,6 +27,19 @@ import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
 
 /** The clock's first reading, in epoch milliseconds: 14 November 2023. The epoch check refuses small numbers. */
 export const T0 = 1_700_000_000_000
+
+/** A revtok for a test: a UUID whose last group spells `word` in hex, six bytes at most. */
+export function revtokOf(word: string): string {
+  const hex = Array.from(new TextEncoder().encode(word), (byte) => byte.toString(16).padStart(2, '0')).join('')
+  if (hex.length > 12) { throw new Error('revtokOf spells six bytes at most') }
+  return `00000000-0000-4000-8000-${hex.padStart(12, '0')}`
+}
+
+/** The revtok of a fixture's first revision. */
+export const FirstRevtok = revtokOf('0')
+
+/** A revtok no fixture is born with: another writer's revision. */
+export const OtherRevtok = revtokOf('other')
 
 /** Vitest's fake timers from {@link T0} before each test, real ones back after it. */
 export function useFakeClock(): void {
@@ -47,7 +60,7 @@ export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.user
 export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
 
 /** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at a revision of its own. */
-export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: 'gate-revision-tok-1' })
+export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: revtokOf('gate1') })
 // --
 
 // == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, makeDevice, passkeyAnswerOf
@@ -157,7 +170,7 @@ export const Sidecar = Object.freeze({ account: 'work' })
 export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
   return {
     userid: WorldScope.userid, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
-    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${ShellLifeseq}`,
+    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: VoidLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${VoidLifeseq}`,
     born_at: T0, written_at: T0, ...overrides,
   }
 }

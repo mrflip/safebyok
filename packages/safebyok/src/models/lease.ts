@@ -4,7 +4,7 @@ import type { Consts, EX } from 'safebyok-big/internals'
 import { Crypto, Errors, Helpers, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../storage/primitives'
-import { type ThingRecord, isTombstone } from '../storage/shapes-thing'
+import type { ThingRecord } from '../storage/shapes-thing'
 import type { Bank } from './bank'
 import type * as Sealers from './sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from './stamps'
@@ -133,7 +133,7 @@ export class Lease implements LeaseStamp {
     Checks.sealer.parse(sealer)
     const kept = withoutSecrets(sealer.donorPropsOf(donorProps))
     const given = sealer.publicPropsOf(publicProps)
-    const isGone = isTombstone(given)
+    const isGone = (given.am === 'x')
     if (isGone && (secretProps !== undefined)) { throw new Errors.VaultError('bad_record', Phrases.TombstoneSecretsGiven) }
     const revision   = isGone ? sealer.tombstoneOf(kept, given) : sealer.nextRevisionOf(kept, given)
     const cleartexts = isGone ? sealer.tombstoneSecrets         : sealer.secretPropsOf(secretProps)

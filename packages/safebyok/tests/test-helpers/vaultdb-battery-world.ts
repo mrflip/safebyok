@@ -5,6 +5,7 @@ import {
   GateScope, RootScope, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
+import { OtherRevtok } from './models-world'
 
 /** The world of the bank {@link birthBankAskOf} births, with its main gate as given. */
 function worldWith(maingate: GateThing = gateThingOf()): WorldRecord { return { ...bankThingOf(), maingate } }
@@ -40,16 +41,16 @@ export function describeVaultDBWorld({ fresh, bornBank, withGate, boxesBorn, row
       const [box] = await boxesBorn(vaultDB, boxThingOf())
       const boxAnswer = await vaultDB.tryWriteThing(replaceAskOf(box!, nextOf(box!)))
       expect(boxAnswer).to.deep.include({ ok: true, world: worldWith() })
-      const refusal = await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: 'rev-other' })))
+      const refusal = await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: OtherRevtok })))
       expect(refusal).to.deep.include({ ok: false, act: 'stale', world: worldWith() })
     })
 
     it("is the bank and main gate written or found, to a birth, and null to one refused over no bank", async () => {
       const vaultDB = await fresh()
       expect(await vaultDB.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: true, act: 'born', world: worldWith() })
-      const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }) })
+      const other = birthBankAskOf({ bank: bankThingOf({ revtok: OtherRevtok }) })
       expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', world: worldWith() })
-      const lone = await withGate(gateThingOf({ revtok: 'rev-other' }))
+      const lone = await withGate(gateThingOf({ revtok: OtherRevtok }))
       expect(await lone.tryBirthBank(birthBankAskOf())).to.deep.include({ ok: false, act: 'stale', world: null })
     })
 
