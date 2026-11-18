@@ -99,7 +99,7 @@ describe("Shell.of(scoped, parent?)", () => {
   const BadShellCases: [() => unknown, string, string][] = [
     [() => Shell.of(TH.boxThingOf()),                                                    'revseq',                   'a live record, on its revseq'],
     [() => Shell.of(TH.boxTombOf(TH.boxThingOf())),                                      'revseq',                   'a tombstone, on its revseq'],
-    [() => Shell.of({ ...boxShell, fmt: 5103 as never }),                            'expected 100501',          'a fmt that is not the Thing format'],
+    [() => Shell.of({ ...boxShell, fmt: 5103 as never }),                                'expected 100501',          'a fmt that is not the Thing format'],
     [() => Shell.of(TH.BoxScope),                                                        "expected string",          'a Thing below a root given no life'],
     [() => Shell.of({ ...TH.ThingBank, label: 'openai' }),                               "expected string",      'a label with no parent'],
     [() => Shell.of({ ...TH.ThingBank, labelpath: 'gate/openai' }, TH.rootBoxOf()),      "another labelpath than",      'a labelpath not one label under its parent'],
