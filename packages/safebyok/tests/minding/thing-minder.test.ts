@@ -992,19 +992,6 @@ describe("A host's QueryObserver on a minder's key", () => {
     unsubscribe()
   })
 
-  it("selects anything for an observer that gives its own structuralSharing, which then replaces the minder's merge for the query", () => {
-    const { tsq, minder, receive } = minderWorldOf(new MemoryVaultDB())
-    const gate0    = TH.gateThingOf()
-    const gate1    = TH.nextGateOf(gate0)
-    const observer = new TSQ.QueryObserver<ThingCar<Thing>, Error, string>(tsq, { queryKey: minder.queryKey(TH.GateScope), enabled: false, select: (car) => car.newest.revtok, structuralSharing: false })
-    const unsubscribe = observer.subscribe(noop)
-    receive(noticeOf(gate1))
-    expect(observer.getCurrentResult()).to.deep.include({ data: gate1.revtok, error: null })
-    receive(noticeOf(gate0))
-    expect(minder.at(TH.GateScope)?.newest).to.eq(gate0)
-    unsubscribe()
-  })
-
   it("refuses its refetch disabled after goodbye, asking the vaultDB nothing and caching nothing", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)

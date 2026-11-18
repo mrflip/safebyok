@@ -67,7 +67,6 @@ export interface MinderOpts {
   vaultDB:         VaultDB
   /** The TanStack Query client whose cache has the cars. A host may share its own.
    * TanStack passes an observer's selected and placeholder values through the minder's structural sharing, which throws `unexpected_error` on anything but a car.
-   * An observer that gives its own `structuralSharing` replaces the minder's for its query, which then stops merging the records that arrive.
    */
   tsq:             TSQ.QueryClient
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
@@ -92,6 +91,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, oneof, custom, orDefault
  * Internal: the layers above the core build on it, and a host does not call it.
  * It reads only its bank's scope and ask builders, so it may be made before the bank's birth.
  * It answers `get`, `tryAt` and `list` only between `hello` and `goodbye`, and refuses `disabled` outside them.
+ * Supplying a `structuralSharing`, or `placeholderData` that is not a car, is unspecified behaviour.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, modelkind, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
