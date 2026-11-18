@@ -11,10 +11,6 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   today. Let it say a sparse record is acceptable (`sparseOk`) apart from how old a record may be, and let invalidation
   and a refused get count as stale, as TanStack counts them; and decide whether `'static'` has any use for a car, whose
   newest the vaultDB can always replace (whiteboard/20261115-lean_buttonup, the staleTime table, 2026-11-18).
-* **A get of a child box before the root box is cached can throw.** Where the vaultDB answers void, the minder makes a
-  shell for the car, and below a root it takes the shell's life from the root's cached car: with none cached, the get
-  refuses `bad_record` (`RootNotCached`), though the vaultDB answered it soundly. The ask's track carries the root box's
-  lifepath; or the void car may hold no record at all (see the void and gone entry).
 * **The vaultDB should not return sparse tombstones.** A list sends each tombstone, and a gone parent, sparse
   (`classifyListThings`' `sparseOf`), and its types and docs promise them (`vault-db.ts`); a get's tombstone is always
   whole. Send every tombstone whole, so that "sparse" means live and not whole, and the minder's `gotgone` answers a

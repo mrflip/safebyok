@@ -99,7 +99,7 @@ function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT 
 }
 
 /** True when a citation is the shell in all three of its marks, or in none. */
-function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
+function isShellCitable({ revtok, revseq, lifepath }: Revised): boolean {
   const isShell = (revseq === SX.VoidRevisionSeq)
   return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifeseqOfLifepath(lifepath) === ShellLifeseq))
 }
@@ -187,15 +187,15 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
 
   // A citation must carry what ThingCited names; any other field of its kind it carries must check.
   const bankCited    = obj({ ...exactPartialOf(bankBase.shape), ...thingCited.shape }).strict()
-    .refine(isShellWhole,   Phrases.CitedHalfShell)
+    .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   const gateCited    = obj({ ...exactPartialOf(gateBase.shape), ...thingCited.shape }).strict()
-    .refine(isShellWhole,   Phrases.CitedHalfShell)
+    .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   // A box's shell, as a bank gives it, carries the shell's lifeseq.
   const lifeseqOrShell = union([lifeseq, lit(ShellLifeseq)])
   const boxCited     = obj({ ...exactPartialOf(boxLive.shape), lifeseq: exactOptional(lifeseqOrShell), ...thingCited.shape }).strict()
-    .refine(isShellWhole,   Phrases.CitedHalfShell)
+    .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
   // A box's sealable keeps only its Thing fields and sidecar, so a whisper given with it, sealed or not, is dropped. The
@@ -213,7 +213,7 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
-    .refine(isShellWhole,   Phrases.SealableHalfShell)
+    .refine(isShellCitable,   Phrases.SealableHalfShell)
 
   // A bank keeps its root box whole: live once the bank is born, and its shell before.
   const boxRecord    = boxLive

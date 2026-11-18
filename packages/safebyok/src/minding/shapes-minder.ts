@@ -5,7 +5,7 @@ import type * as Z from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, AskChecks, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
+import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, AskChecks, thingCited, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
 import type { TSQGotAnswer } from './thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
@@ -49,7 +49,7 @@ export const {
     gcTime:    orDefault(gcTime, DefaultQueryCacheOpts.gcTime),
   }).strict()
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
-  const friendFields     = obj({ scope: thingWatchScope, makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
+  const friendFields     = obj({ scope: thingWatchScope, rootBox: obj({ ...thingScope.shape, lifepath: thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)
@@ -81,7 +81,7 @@ export type MinderGetAskOpts = Z.input<typeof minderGetAskOpts>
  */
 export type MinderAskOpts    = Z.input<typeof minderAskOpts>
 /** The parts of a {@link Bank} a minder uses: its scope, its ask builders, and where trouble no caller waits on goes. */
-export type MinderFriend     = Pick<Bank, 'scope' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
+export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
 /** The user, bank and modelkind a minder is tied to: every ask it takes must match them. */
 export type ThingTies        = ThingWatchScope & Readonly<{ modelkind: Thingkind }>
 // --

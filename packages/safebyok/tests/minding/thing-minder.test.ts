@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerMillis, type MinderFriend, type MinderGetAsk, type QueryCacheOpts } from '../../src/minding/shapes-minder'
 import { type DeliverableThing, type ThingCar, carOf } from '../../src/minding/thing-car'
 import { type TSQAnswer, type TSQGotAnswer, ThingMinder } from '../../src/minding/thing-minder'
-import * as Phrases from '../../src/phrases'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../src/storage/primitives'
 import { type GateThing, type GetAsk, type Thing, type ThingScope, type Thingkind, ShellLifeseq, boxSealable, getAskOf, isVoidSentinel, listAskOf, modelkindOf, shellOf, sparseOf } from '../../src/storage/shapes-thing'
@@ -30,6 +29,7 @@ const RootAsk = askOf(TH.RootScope)
 function fakeBankOf() {
   return {
     scope:       { ...TH.ThingBank },
+    rootBox:     TH.rootBoxOf(),
     makeGetAsk:  (args: { labelpath: Labelpath }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     makeListAsk: (args: { labelpath: Labelpath }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
@@ -521,11 +521,12 @@ describe("ThingMinder.get", () => {
     await TH.expectGood(vaultDB.tryWriteThing(birth))
   })
 
-  it("refuses a get of an empty box while no car of the root box is cached, saying so", async () => {
+  it("answers a get of an empty box with a void car in the bank's root box's life, though no car of the root box is cached", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { boxMinder } = minderWorldOf(vaultDB, { isRootHeard: false })
-    await TH.expectRefusal(boxMinder.get(BoxAsk), 'bad_record')
-    await expect(boxMinder.get(BoxAsk)).rejects.toThrow(Phrases.RootNotCached)
+    const { liveness, newest } = await boxMinder.get(BoxAsk)
+    expect(liveness).to.eq('void')
+    expect(newest).to.deep.equal(shellOf(TH.BoxScope, TH.rootBoxOf()))
   })
 
   it("asks the vaultDB once for two gets under way together", async () => {

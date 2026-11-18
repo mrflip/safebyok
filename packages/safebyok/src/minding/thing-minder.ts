@@ -332,13 +332,9 @@ export class ThingMinder {
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The shell at `scoped`. Below a root, it has the life of its root's cached car, and refuses `bad_record` where none is cached. */
+  /** The shell at `scoped`. Below a root, it lives in the life of the bank's root box. */
   #shellAt(scoped: ThingScope): VoidSentinel {
-    const { labelpath } = scoped
-    if (! labelpath.includes('/')) { return shellOf(scoped) }
-    const parent = this.#cachedAt({ ...scoped, labelpath: modelkindOf(labelpath) })?.newest
-    if (parent === undefined) { throw new Errors.VaultError('bad_record', Phrases.RootNotCached) }
-    return shellOf(scoped, parent)
+    return scoped.labelpath.includes('/') ? shellOf(scoped, this.rootBox) : shellOf(scoped)
   }
   // --
 
@@ -349,6 +345,9 @@ export class ThingMinder {
 
   /** The scope of the bank's root box. */
   get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: RootBoxLabelpath } }
+
+  /** The bank's root box, the parent of every box: before the bank's birth, its shell. */
+  get rootBox(): MinderFriend['rootBox'] { return this.#bank.rootBox }
 
   /** This minder's user, bank and modelkind. */
   get ties(): ThingTies { return { ...this.scope, modelkind: this.modelkind } }

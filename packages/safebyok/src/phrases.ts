@@ -122,13 +122,11 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, RootNotCached, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, StaleTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, StaleTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
 
-/** A get of an empty Thing below a root, before the minder has that root. */
-export const RootNotCached = "This ThingMinder has not cached the root box yet, so it cannot make the shell of a Thing below it: its notice or a get of the root box comes first."
 
 /** A minder read before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it.'
