@@ -203,7 +203,7 @@ export type TrackedRows = Readonly<{ bank: unknown, [Labelpath.MainGate]: unknow
 export function trackedFetchedOf({ track }: AnyAsk, rows: TrackedRows): TrackedFetched {
   if (track === undefined) { return null }
   return {
-    bank:               trackedRawOf(track.bank, rows.bank),
+    bank:                 trackedRawOf(track.bank, rows.bank),
     [Labelpath.MainGate]: trackedRawOf(track[Labelpath.MainGate], rows[Labelpath.MainGate]),
     [Labelpath.RootBox]:  trackedRawOf(track[Labelpath.RootBox], rows[Labelpath.RootBox]),
   }
@@ -218,7 +218,7 @@ function trackedRawOf(pair: Track['bank'], raw: unknown): unknown {
 export function trackedFieldOf({ userid, banklabel }: ThingWatchScope, fetched: TrackedFetched | undefined): { tracked?: Tracked } {
   if ((fetched === null) || (fetched === undefined)) { return {} }
   return { tracked: {
-    bank:                 trackedEntryOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
+    bank:                  trackedEntryOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank),
     [Labelpath.MainGate]:  trackedEntryOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched[Labelpath.MainGate]),
     [Labelpath.RootBox]:   trackedEntryOf(BoxChecks.stored, { userid, banklabel, labelpath: Labelpath.RootBox }, fetched[Labelpath.RootBox]),
   } }

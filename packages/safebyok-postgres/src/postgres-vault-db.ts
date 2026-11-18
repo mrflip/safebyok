@@ -142,7 +142,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     // The store wrote nothing. The act tables say why, of the revision cited; where they find a write, a verdict names the check it failed.
     const stored = Classifier.storedCitedOf(ask, written.thing)
     const act    = Classifier.writeActOf(ask, stored)
-    if (! Classifier.isWriteAct(act))             { return Classifier.unwrittenWriteOf(written.thing, { ask, act, world: { ...written.world, tracked: written.tracked } }) }
+    if (! Classifier.isWriteAct(act))  { return Classifier.unwrittenWriteOf(written.thing, { ask, act, world: { ...written.world, tracked: written.tracked } }) }
     if (! written.born_at_ok)          { Classifier.demandBornAtKept(ask, written.thing) }
     if (written.policies_ok === false) { Classifier.demandPolicies(ask, written.thing) }
     // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.

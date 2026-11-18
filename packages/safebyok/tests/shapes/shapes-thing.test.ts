@@ -104,7 +104,7 @@ describe("Shell.of(scoped, parent?)", () => {
     [() => Shell.of({ ...TH.BoxScope, lifepath: `${Lifeseq.ofLifenum(2)}/${Shell.VoidLifeseq}` }, TH.rootBoxOf()), "another lifepath than", 'a lifepath under another life than its parent'],
     [() => Shell.of(TH.BoxScope, TH.rootBoxOf({ userid: 'u2' })),                        'userid',                   'a parent of another user'],
     [() => Shell.of({ ...TH.BoxScope, lifepath: `${Life0}/${Life0}` }),                  Phrases.LifepathShape,      'a lifepath not a shell\'s'],
-    [() => Shell.of({ ...TH.BoxScope, lifepath: Shell.VoidLifeseq }),                         Phrases.LifepathDepth,      'a lifepath shallower than its labelpath'],
+    [() => Shell.of({ ...TH.BoxScope, lifepath: Shell.VoidLifeseq }),                    Phrases.LifepathDepth,      'a lifepath shallower than its labelpath'],
     [() => Shell.of({ ...TH.BoxScope, label: 'other', lifepath: `${Life0}/${Shell.VoidLifeseq}` }), Phrases.LabelNotLast, 'a label not the last of its labelpath'],
   ]
 
@@ -258,7 +258,7 @@ describe("checkedWriteAsk(ask), of the main gate", () => {
     // the record does not follow the one cited:
     [{ ...good, record: { ...next, revseq: 2 } },                                    Phrases.RevseqNotNext,      'a revseq that skips one'],
     [{ ...good, record: { ...next, revtok: stored.revtok } },                        Phrases.RevtokNotNew,       'a revtok that is not new'],
-    [TH.birthAskOf(TH.gateThingOf({ revtok: Shell.Cited.revtok })),                    Phrases.RevtokNotNew,       'the void revtok'],
+    [TH.birthAskOf(TH.gateThingOf({ revtok: Shell.Cited.revtok })),                  Phrases.RevtokNotNew,       'the void revtok'],
     [{ ...good, record: { ...next, lifeseq: lifeseq2, lifepath: lifeseq2 } },        Phrases.LifeseqNotNext,     'a new life where am stays'],
     [TH.birthAskOf(TH.gateThingOf({ born_at: TH.T0 - 1 })),                          Phrases.BornAtNotNow,       'a birth born before it is written'],
     [{ ...good, record: { ...next, banklabel: 'other' } },                           Phrases.RecordOfOtherScope, 'a record at another scope'],
@@ -273,7 +273,7 @@ describe("checkedWriteAsk(ask), of the main gate", () => {
     [{ ...good, record: { ...next, label: 'main' } },                                Phrases.LabelNotLast,       'a label not the last of its labelpath'],
     [{ ...good, record: { ...next, wayins: {} } } as never,                         'wayins.main',              'a gate with no passphrase wayin'],
     // the citation is not a sound one:
-    [{ ...good, cited: { ...Shell.Cited, revtok: TH.revtokOf('0') } },                          Phrases.CitedHalfShell,     'a citation half the shell'],
+    [{ ...good, cited: { ...Shell.Cited, revtok: TH.revtokOf('0') } },               Phrases.CitedHalfShell,     'a citation half the shell'],
     [{ ...good, cited: { revtok: TH.revtokOf('0'), revseq: 0 } } as never,                   'lifepath',                 'a citation of too little'],
     [{ ...good, cited: { ...noTestimony, am: 'x' } },                                Phrases.LifeseqParity,      'a citation whose am its lifepath belies'],
     [{ ...good, cited: { ...noTestimony, lifepath: `${Life0}/${Life0}` } },          Phrases.LifepathNotKept,    'a citation of another lifepath'],
