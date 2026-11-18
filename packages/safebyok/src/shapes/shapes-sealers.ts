@@ -25,7 +25,7 @@ export type LiveOf<RecordT> = RecordT extends unknown ? RecordT & Readonly<{ am:
 /** The tombstones of `RecordT`. */
 export type TombstoneOf<RecordT> = RecordT extends unknown ? RecordT & Readonly<{ am: 'x' }> : never
 
-/** The shell of `RecordT`: its tombstone's Thing fields without its body. */
+/** The shell of `RecordT`: the void record, without a body, that its first revision is sealed over and cites. */
 export type ShellOf<RecordT extends Sparse<ThingRecord>> = Sparse<TombstoneOf<RecordT>>
 
 /** A revision of `RecordT` before it is sealed, without the sealed parts that `CleartextsT` names. A union is mapped member by member. */
