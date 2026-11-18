@@ -5,8 +5,8 @@
 import { toB64 } from './helpers/crypto'
 import { Checker } from './helpers/validator'
 
-export { mask } from './helpers/mask'
-export type { MaskOpts } from './shapes/shapes-utils'
+export { MaskSchedule, mask } from './helpers/mask'
+export type { MaskOpts, MaskRow } from './shapes/shapes-utils'
 export { fromB64, toB64 } from './helpers/crypto'
 export { WhisperFieldAttributes } from './helpers/whisper-field'
 

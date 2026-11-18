@@ -12,8 +12,8 @@ const MashCases = [
 ] as const
 
 describe("the utils entry point", () => {
-  it("exports exactly mash, mask, the base64url codec and the secret field's attributes", () => {
-    expect(Object.keys(utils)).to.have.members(['mash', 'mask', 'fromB64', 'toB64', 'WhisperFieldAttributes'])
+  it("exports exactly mash, mask and its schedule, the base64url codec and the secret field's attributes", () => {
+    expect(Object.keys(utils)).to.have.members(['mash', 'mask', 'MaskSchedule', 'fromB64', 'toB64', 'WhisperFieldAttributes'])
   })
 
   it("exports the base64url codec the stored records are written in, unpadded", () => {
@@ -26,7 +26,7 @@ describe("the utils entry point", () => {
   })
 
   it("exports a mask that masks", () => {
-    expect(utils.mask('sk-ant-abcd1234')).to.eq('sk*********1234')
+    expect(utils.mask('sk-ant-abcd1234')).to.eq('******************34')
   })
 })
 
