@@ -27,7 +27,7 @@ export const BoxThingFormat = 5103
 export const ThingFormats = { bank: BankThingFormat, gate: GateThingFormat, box: BoxThingFormat } as const satisfies Record<Thingkind, number>
 
 /** True when `labelpath` is one of some kind of Thing's. */
-function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfKind(labelpath, modelkind)) }
+function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
 // --
 
 // == [Thing]: GenericChecks, vaultDBShape, PerKindChecks, BankChecks, GateChecks, BoxChecks, ThingChecks, ThingScope, ThingCited, StoredCited, Sealed, Wayins, Sparse, sparseOf
@@ -121,8 +121,8 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union, discr
   const storedWayins = obj({ wayins })
 
   const bankLabelpath = lit('bank')
-  const gateLabelpath = labelpath.refine((given) => Labelpath.isOfKind(given, 'gate'), Phrases.LabelpathOfOtherKind)
-  const boxLabelpath  = labelpath.refine((given) => Labelpath.isOfKind(given, 'box'), Phrases.LabelpathOfOtherKind)
+  const gateLabelpath = labelpath.refine((given) => Labelpath.isOfModelkind(given, 'gate'), Phrases.LabelpathOfOtherKind)
+  const boxLabelpath  = labelpath.refine((given) => Labelpath.isOfModelkind(given, 'box'), Phrases.LabelpathOfOtherKind)
 
   // A stored record is strict: a field this version does not know is damage, or a newer format.
   const bankBase     = obj({
@@ -249,19 +249,19 @@ export const BoxChecks = Object.freeze({
 } as const)
 
 /** The bundle of each kind of Thing, by its modelkind. */
-const byKind = { bank: BankChecks, gate: GateChecks, box: BoxChecks } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, policies: readonly EX.StoragePolicy[] }>
+const byModelkind = { bank: BankChecks, gate: GateChecks, box: BoxChecks } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, policies: readonly EX.StoragePolicy[] }>
 
 /** The checks for the kind of Thing at `labelpath`, which must be sound. */
-function ofLabelpath(labelpath: Labelpath): typeof byKind[Thingkind] { return byKind[Labelpath.kindOf(labelpath)] }
+function ofLabelpath(labelpath: Labelpath): typeof byModelkind[Thingkind] { return byModelkind[Labelpath.modelkindOf(labelpath)] }
 
 /** The check of a host's {@link VaultDB}, by {@link isVaultDB}. */
 const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_record')
 
 /** The checks of a Thing's fields, of its citation, of what a write reads of the Thing stored, and of a host's vaultDB.
- * `byKind` holds the bundle of each kind of Thing: {@link BankChecks}, {@link GateChecks} and {@link BoxChecks}; `ofLabelpath` gives the one for a labelpath.
+ * `byModelkind` holds the bundle of each kind of Thing: {@link BankChecks}, {@link GateChecks} and {@link BoxChecks}; `ofLabelpath` gives the one for a labelpath.
  * Also `ThingFormats`, the `fmt` of each kind, and `thingkindVals`, the kinds.
  */
-export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, byKind, ofLabelpath, ThingFormats, thingkindVals })
+export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, byModelkind, ofLabelpath, ThingFormats, thingkindVals })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
@@ -297,10 +297,10 @@ export function sparseOf<RecordT extends ThingRecord>(record: RecordT): Sparse<R
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
 /** True when a Thing's fmt is its kind's. */
-function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): boolean { return fmt === ThingFormats[Labelpath.kindOf(labelpath)] }
+function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): boolean { return fmt === ThingFormats[Labelpath.modelkindOf(labelpath)] }
 
-/** A shell tombstone with every Thing field (and no body).
- * Its revseq is -1. Cite this when creating a new Thing (revseq 0)
+/** A shell, whole: every Thing field of a tombstone and no body, its revseq -1.
+ * What a ThingMinder's cache holds for a scope that stores nothing.
  */
 export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
 
@@ -363,23 +363,22 @@ export const Shell = Object.freeze({
   childCited(parentLifepath: Lifepath): ThingCited {
     return Object.freeze({ ...Shell.Cited, lifepath: `${parentLifepath}/${VoidLifeseq}` })
   },
-  /** Builds a shell tombstone (stands in for a void row: never been created)
-   *  It will have magic values for revseq (-1), lifeseq ('-000000001'), and am ('x').
-   *  In the root case, supply a labelpath equal to the modelkind
-   *  Otherwise: either an explicit labelpath/lifepath, or a label and a parent's labelpath/lifepath.
+  /** The shell of the Thing `raw` names: the tombstone that stands for it while none is stored.
+   * Name a root by its labelpath alone; any other Thing by its labelpath and lifepath, or by its label under `parent`.
+   * Refuses a `raw` that disagrees with `parent`.
    */
   of(raw: Partial<ThingRecord>, parent?: Partial<ThingRecord>): VoidSentinel {
     const proposed = ShellChecks.shellScoped.parse(raw)
     if (ThingChecks.modelkind.safeParse(proposed.labelpath).success) { return rootShellOf(proposed) }
     const labels    = Shell.labelpathWithParentage(proposed, parent)
     const lives    = Shell.lifepathWithParentage(proposed, parent)
-    const fmt      = ThingFormats[Labelpath.kindOf(labels.labelpath)]
+    const fmt      = ThingFormats[Labelpath.modelkindOf(labels.labelpath)]
     const shell    = ShellChecks.shell.parse({ fmt, ...proposed, ...labels, ...lives })
     demandConsistentParent(shell, parent)
     return Object.freeze(shell) as VoidSentinel
   },
-  /** Extract labelpath and label from a record: an explicit labelpath on the record, or a label and a parent's labelpath.
-   *  Caller must check that nothing in the record, or its parent, disagrees.
+  /** The labelpath and label of `raw`: its own labelpath, or its label under `parent`'s.
+   * It does not check `raw` against `parent`: the caller does.
    */
   labelpathWithParentage(
     raw: Partial<Pick<ThingRecord, 'labelpath' | 'label'>>, parent?: Partial<Pick<ThingRecord, 'labelpath'>>,
@@ -393,8 +392,8 @@ export const Shell = Object.freeze({
     const labelpath  = ThingChecks.labelpath.parse(parent?.labelpath) + '/' + label
     return labelpathWithParentageChecker.parse({ labelpath, label })
   },
-  /** Extract lifeseq and lifepath from a record: an explicit lifepath on the record, or a lifeseq and a parent's lifepath.
-   *  Caller must check that nothing in the record, or its parent, disagrees.
+  /** The lifepath and lifeseq of `raw`: its own lifepath, or its lifeseq under `parent`'s.
+   * It does not check `raw` against `parent`: the caller does.
    */
   lifepathWithParentage(raw: Partial<Pick<ThingRecord, 'lifepath' | 'lifeseq'>>, parent?: Partial<Pick<ThingRecord, 'lifepath'>>): Pick<ThingRecord, 'lifepath' | 'lifeseq'> {
     // if raw has a lifepath, find the lifeseq. Consistency check is done by the caller.

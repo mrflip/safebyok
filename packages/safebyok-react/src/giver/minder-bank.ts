@@ -18,7 +18,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 type BoxLabelpath = 'box' | `box/${string}`
 
 /** True when `labelpath` is a box's. */
-function isBoxLabelpath(labelpath: string): labelpath is BoxLabelpath { return Labelpath.isOfKind(labelpath, 'box') }
+function isBoxLabelpath(labelpath: string): labelpath is BoxLabelpath { return Labelpath.isOfModelkind(labelpath, 'box') }
 // --
 
 // == [The bank]: giverBankOfMinder

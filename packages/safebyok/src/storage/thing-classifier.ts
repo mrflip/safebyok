@@ -290,7 +290,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
 /** True when `labelpath` is one label under the listing's parent, of the parent's kind. */
 function isChildLabelpath(ask: ListAsk, labelpath: Labelpath): boolean {
   const label = labelpath.slice(ask.labelpath.length + 1)
-  return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && Labelpath.isOfKind(labelpath, ask.modelkind)
+  return labelpath.startsWith(`${ask.labelpath}/`) && (! label.includes('/')) && Labelpath.isOfModelkind(labelpath, ask.modelkind)
 }
 
 /** Classify a bank's birth, by its three `puts`, against the raw roots a store fetched.

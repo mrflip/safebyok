@@ -15,14 +15,14 @@ type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
 
 /** True when an ask's modelkind is its labelpath's. */
-function isModelkindOwn({ modelkind, labelpath }: Kinded): boolean { return Labelpath.kindOf(labelpath) === modelkind }
+function isModelkindOwn({ modelkind, labelpath }: Kinded): boolean { return Labelpath.modelkindOf(labelpath) === modelkind }
 /** True unless a del changes its fixed flags, or names a storage policy. */
 function isDelFixed({ op, ifAbsent, ifPresent, options }: Flagged): boolean {
   return (op !== 'del') || ((ifAbsent === 'fail') && (ifPresent === 'repl') && (options === undefined))
 }
 /** True when each storage policy an ask names is one its kind has. */
 function isPolicyOwn({ modelkind, options }: Flagged): boolean {
-  const owned: readonly string[] = ThingChecks.byKind[modelkind].policies
+  const owned: readonly string[] = ThingChecks.byModelkind[modelkind].policies
   return (options?.policies ?? []).every((policy) => owned.includes(policy))
 }
 
@@ -243,7 +243,7 @@ function scopeGiven(record: unknown): Partial<Record<keyof ThingScope, unknown>>
 function trackGiven(track: unknown): { track?: unknown } { return (track === undefined) ? {} : { track } }
 
 /** The modelkind `labelpath` starts with, or undefined when it is not a string. */
-function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typeof labelpath === 'string') ? Labelpath.kindOf(labelpath) : undefined }
+function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typeof labelpath === 'string') ? Labelpath.modelkindOf(labelpath) : undefined }
 // --
 
 // == [Loggable asks]: LoggableAsk, loggableAskOf

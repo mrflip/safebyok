@@ -54,7 +54,7 @@ async function makeVaultDB(): Promise<PostgresVaultDB> {
 }
 
 /** The table that keeps the Thing at `labelpath`. */
-function tableOf(labelpath: string): string { return ThingTables[Labelpath.kindOf(labelpath)] }
+function tableOf(labelpath: string): string { return ThingTables[Labelpath.modelkindOf(labelpath)] }
 
 /** Take away the Thing at a scope. */
 async function remove({ userid, banklabel, labelpath }: ThingScope): Promise<void> {

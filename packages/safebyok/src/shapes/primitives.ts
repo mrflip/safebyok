@@ -23,9 +23,9 @@ export const Labelpath = Object.freeze({
   /** Where the root box is stored in its bank, and its key in a `track`. */
   RootBox:  'box',
   /** The modelkind a sound labelpath starts with. */
-  kindOf(labelpath: Labelpath): Thingkind { return labelpath.split('/', 1)[0] as Thingkind },
+  modelkindOf(labelpath: Labelpath): Thingkind { return labelpath.split('/', 1)[0] as Thingkind },
   /** True when `labelpath` is `modelkind` followed by at most as many valid labels as that kind nests, each after a `/`. */
-  isOfKind(labelpath: Labelpath, modelkind: Thingkind): boolean {
+  isOfModelkind(labelpath: Labelpath, modelkind: Thingkind): boolean {
     const [head, ...labels] = labelpath.split('/')
     return (head === modelkind) && (labels.length <= MaxLabelsUnder[modelkind]) && labels.every((label) => Validator.Kit.label.safeParse(label).success)
   },
