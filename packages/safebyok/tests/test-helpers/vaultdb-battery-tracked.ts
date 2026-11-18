@@ -1,7 +1,7 @@
 /** The battery's cases of `tracked`: what an answer says of the bank, main gate and root box its ask tracks. */
 import { describe, expect, it } from 'vitest'
 import { expectBad } from 'safebyok-big/testing'
-import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import {
   BankStaleTrack, GateStaleTrack, RootStaleTrack, bankThingOf, birthAskOf, birthBankAskOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'

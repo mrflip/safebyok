@@ -1,83 +1,24 @@
-import type { Consts, EX } from 'safebyok-big/internals'
+import type { Consts } from 'safebyok-big/internals'
 import { Clock, Crypto, Errors, Throwers, Validator } from 'safebyok-big/internals'
-import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../minding/shapes-minder'
+import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../shapes/shapes-minder'
 import { BaseThing } from './base-thing'
 import { CoreBox } from './core-box'
 import { Device } from './device'
-import { Gate, type GateDna } from './gate'
+import { Gate } from './gate'
 import type { Lease } from './lease'
-import { type GateRevisionedStamp, Proving } from './proving'
-import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps, UnsealedOf } from './sealers'
-import { type BankScope, type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
+import { Proving } from './proving'
+import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxShell, BoxUnsealed, GetBoxAnswer, GetBoxAskDraft } from '../shapes/shapes-bankish'
+import type { GateRevisionedStamp } from '../shapes/shapes-gateish'
+import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps } from '../shapes/shapes-sealers'
+import { type BankScope, type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
-import type { DeviceTok, Labelpath } from '../storage/primitives'
+import { boxOfOtherRoot, otherThanBox } from '../refusals/throwers'
+import type { DeviceTok } from '../shapes/primitives'
 import {
-  type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
-  type Sparse, type WriteAsk, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, delAskOf, gateThing, getAskOf, lifeseqOfLifenum,
-  listAskOf, loggableAskOf, putAskOf, shellOf,
-} from '../storage/shapes-thing'
-import { type BadAnswer, type BirthBankAnswer, type GoodAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
-
-export type { BankRecord, WorldRecord } from '../storage/shapes-thing'
-
-/** The record {@link Bank.make} and {@link Bank.birth} take: the bank's Thing, with its main gate's Thing at `maingate` and its root box at `rootBox`.
- * The root box is whole, or its shell before the bank is born.
- */
-export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: BoxRecord | BoxShell }>
-
-/** The dna of a new bank: its stamp, and its main gate's dna. */
-export type BankDna = BankStamp & { maingate: GateDna }
-
-/** A box unsealed: its record with its whisper in place of the sealed one. A tombstone's whisper is empty. */
-export type BoxUnsealed = UnsealedOf<BoxThing, BoxCleartexts>
-
-/** A box's shell: the void sparse record a box's first revision is sealed over and cites. */
-export type BoxShell = Sparse<BoxTombstone>
-
-/** The draft of a box's get ask, for {@link Bank.tryGetBox}: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`).
- * The bank fills in the rest of the {@link GetAsk}.
- */
-export type GetBoxAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent | 'shell' }>
-
-/** The draft of a get or list ask, for {@link Bank.makeGetAsk} or {@link Bank.makeListAsk}: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
- * The bank fills in the rest of the {@link GetAsk} or {@link ListAsk}.
- */
-export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
-
-/** The answer of {@link Bank.tryGetBox}: the box, what `ifAbsent` gives when none is stored, or a refusal. */
-export type GetBoxAnswer<ValT> = GoodAnswer<ValT, EX.GotAct> | BadAnswer
-
-/** The options of {@link Bank.make}, beside its record. */
-export interface BankOpts {
-  /** The device the bank is on. Its scope must be the bank's. */
-  device:  Device
-  /** Where the bank's boxes are stored. */
-  vaultDB: VaultDB
-  /** The defaults this bank's minders set on their TanStack Query cache entries. A missing field defaults from {@link DefaultQueryCacheOpts}. */
-  queryCacheOpts?: Partial<QueryCacheOpts>
-}
-
-/** The options of {@link Bank.birth}, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the gating attempt underway. */
-export interface BirthOpts extends BankOpts {
-  proving: Proving
-}
-
-// Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, of the proving `unlockByProving` is given, and of the box a box method is given. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom, orDefault }) => ({
-  // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
-  bankMakeArgs: obj({
-    record: obj({ maingate: gateThing, rootBox: boxRecordOrShell }).loose(),
-    opts:   obj({
-      device:         custom<Device>((val) => val instanceof Device, 'Expected a Device'),
-      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
-      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
-    }),
-  }),
-  bankThing,
-  proving: custom<Proving>((val) => val instanceof Proving, 'Expected a Proving'),
-  boxSealable,
-}))
+  type BankThing, type BoxThing, type Thing, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, gateThing, lifeseqOfLifenum, shellOf,
+} from '../shapes/shapes-thing'
+import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
+import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
@@ -147,7 +88,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
     const { record: { maingate, rootBox, ...rest }, opts: checked } = Checks.bankMakeArgs.parse({ record, opts })
-    const parsed = Checks.bankThing.parse(rest)
+    const parsed = bankThing.parse(rest)
     Validator.checkedConsistent(bankScope.parse(parsed), checked.device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(rootBox, { ...bankScope.parse(parsed), labelpath: 'box' }, { kind: 'record_conflict' })
     super(parsed)
@@ -364,8 +305,8 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** Demand that `box` is a box of this bank, under its current root box. */
   #demandOwnBox(box: unknown): void {
-    const { lifepath } = Checks.boxSealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
-    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
+    const { lifepath } = boxSealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
+    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw boxOfOtherRoot() }
   }
 
   /** The attached lease. Demands that the bank is enabled and unlocked. */
@@ -380,7 +321,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   get modelkind(): 'bank' { return 'bank' satisfies Consts.Modelkind }
 }
 
-// == [Helpers]: trackPairOf, disabledAnswerOf, otherThanBox
+// == [Helpers]: trackPairOf, disabledAnswerOf
 
 /** The revseq and lifepath of a Thing, as a `track` holds them. */
 function trackPairOf({ revseq, lifepath }: Pick<Thing, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
@@ -389,10 +330,22 @@ function trackPairOf({ revseq, lifepath }: Pick<Thing, 'revseq' | 'lifepath'>): 
 function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<null> {
   return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: endCause }
 }
+// --
 
-// The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.
-/** A `storage_issue` refusal of `answer`, the vaultDB's to a box's get, whose Thing is not a box. */
-function otherThanBox({ ask, val }: GoodAnswer<Thing, EX.GotAct>): Errors.VaultError {
-  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
-}
+// == [Checks]: Checks
+
+// Defined here, not with the shapes: they name a model class.
+/** The checks of {@link Bank.make}'s arguments, and of the proving `unlockByProving` is given. */
+const Checks = Validator.Checkers('bad_record', ({ obj, custom, orDefault }) => ({
+  // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
+  bankMakeArgs: obj({
+    record: obj({ maingate: gateThing, rootBox: boxRecordOrShell }).loose(),
+    opts:   obj({
+      device:         custom<Device>((val) => val instanceof Device, 'Expected a Device'),
+      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
+    }),
+  }),
+  proving: custom<Proving>((val) => val instanceof Proving, 'Expected a Proving'),
+}))
 // --

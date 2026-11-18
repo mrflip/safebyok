@@ -1,8 +1,10 @@
-import type { CX, Crypto } from 'safebyok-big/internals'
-import type { EpochMillis } from '../storage/primitives'
-import type { BoxThing, Sealed, Sparse, ThingRecord } from '../storage/shapes-thing'
+/** The forms of a sealed record, the `Sealer` a lease seals and unseals with, and a box's records. */
 
-export type { Sealed } from '../storage/shapes-thing'
+import type { CX, Crypto } from 'safebyok-big/internals'
+import type { EpochMillis } from './primitives'
+import type { BoxThing, Sealed, Sparse, ThingRecord } from './shapes-thing'
+
+export type { Sealed } from './shapes-thing'
 
 // == [A record's forms]: SealedPartsOf, SealedOf, UnsealedOf, LiveOf, TombstoneOf, RevisionOf, BodyOf, Sealable, PublicPropsOf, LivePublicPropsOf, TombstonePublicProps
 

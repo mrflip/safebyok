@@ -1,31 +1,21 @@
 /** The `AdapterVaultDB` base class: a store extends it by writing the `do*` calls. */
 
 import { noop } from 'es-toolkit'
-import type * as Z from 'zod'
-import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
-import { AnswerNotMade } from '../phrases'
+import { EX, Errors, Outcome, Throwers, type Helpers } from 'safebyok-big/internals'
+import { answerNotMade } from '../refusals/throwers'
+import { type Thing, type AdapterVaultDBOpts, adapterVaultDBOpts, isGone } from '../shapes/shapes-thing'
 import {
-  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
-  type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, isGone, loggableAskOf, watchArgs,
-} from './shapes-thing'
+  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf, watchArgs,
+} from '../shapes/shapes-asks'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
 } from './vault-db'
 
-// == [Answers]: Received, AdapterVaultDBOpts, answerOf
+// == [Answers]: Received, answerOf
 
 /** A change a store's watch passes to `receive`: the changed Thing, raw, and its bank's world as the store last read it. */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
-
-/** The check of the options of a vaultDB that extends {@link AdapterVaultDB}. */
-const adapterVaultDBOpts = Validator.Checker(({ obj, bool }) => obj({
-  /** False to notify no watch of the Things in an answer's `tracked` ({@link AdapterVaultDB.notifyTrackedRecords}). Default true. */
-  doNotifyTracked: bool.optional(),
-}).strict(), 'bad_record')
-
-/** The options of a vaultDB that extends {@link AdapterVaultDB}. */
-export type AdapterVaultDBOpts = Readonly<Z.infer<typeof adapterVaultDBOpts>>
 
 /** A watch the adapter keeps: its bank, and the function called with each Thing received. */
 type Feed = { scope: ThingWatchScope, receive: (received: Received) => void }
@@ -196,7 +186,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as Thing | null
       return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: new Errors.VaultError('unexpected_error', AnswerNotMade) }
+      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: answerNotMade() }
     }
   }
   // --

@@ -3,9 +3,9 @@
 import { describe, expect, it } from 'vitest'
 import { Crypto } from 'safebyok-big/internals'
 import { CoreBox } from '../../src/models/core-box'
-import type { BoxRecord } from '../../src/models/sealers'
-import { LeaseFormat, type LeaseRecord } from '../../src/models/stamps'
-import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import type { BoxRecord } from '../../src/shapes/shapes-sealers'
+import { LeaseFormat, type LeaseRecord } from '../../src/shapes/shapes-stamps'
+import { lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()

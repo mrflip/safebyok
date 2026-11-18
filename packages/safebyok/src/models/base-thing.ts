@@ -1,6 +1,6 @@
 import { Helpers } from 'safebyok-big/internals'
-import type { Banklabel, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from '../storage/primitives'
-import { type Thing, type ThingRecord, sparseOf } from '../storage/shapes-thing'
+import type { Banklabel, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
+import { type Thing, type ThingRecord, sparseOf } from '../shapes/shapes-thing'
 
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
 // subclass declares its own: `make(record, opts[, friend])`, which parses what it is given.

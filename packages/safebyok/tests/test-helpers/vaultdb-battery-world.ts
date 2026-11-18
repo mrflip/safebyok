@@ -1,6 +1,7 @@
 /** The battery's cases of the world each answer carries: its bank and main gate. */
 import { describe, expect, it } from 'vitest'
-import type { GateThing, WorldRecord } from '../../src/storage/shapes-thing'
+import type { GateThing } from '../../src/shapes/shapes-thing'
+import type { WorldRecord } from '../../src/shapes/shapes-asks'
 import {
   GateScope, RootScope, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'

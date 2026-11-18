@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { type ThingCar, bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
-import { type BoxThing, type Thing, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
+import type { ThingCar } from '../../src/shapes/shapes-minder'
+import { type BoxThing, type Thing, shellOf, sparseOf } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 const Box0      = TH.boxThingOf()

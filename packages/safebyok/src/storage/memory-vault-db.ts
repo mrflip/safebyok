@@ -2,9 +2,9 @@
 
 import { type EX, type Errors, Helpers, Outcome } from 'safebyok-big/internals'
 import { AdapterVaultDB, type Received } from './adapter-vault-db'
-import type { Labelpath } from './primitives'
-import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
-  type WriteAsk, MainGateLabelpath, RootBoxLabelpath } from './shapes-thing'
+import type { Labelpath } from '../shapes/primitives'
+import { type Thing, MainGateLabelpath, RootBoxLabelpath } from '../shapes/shapes-thing'
+import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 

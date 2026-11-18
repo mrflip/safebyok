@@ -3,41 +3,10 @@ import * as TSQ from '@tanstack/query-core'
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
-  type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type Tombstone, type VoidSentinel,
+  type Sparse, type Thing,
   cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
-} from '../storage/shapes-thing'
-
-// == [The car]: Tombstone, ThingCar, BoxCar, GateCar, DeliverableThing, carLivenessVals
-
-export type { Tombstone } from '../storage/shapes-thing'
-
-// The vaultDB has a newer whole record when liveness is 'behind' or 'bare' (dbHasNewer).
-/** A ThingMinder's frozen cache value for a Thing: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
- * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
- * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
- * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
- * - On `full`, the two are *identical* (`newest === fullest`): the same object, not just the same content.
- * - When `behind`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
- */
-export type ThingCar<RecordT extends ThingRecord> = Readonly<
-  | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
-  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
-  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
-  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a deleted Thing's tombstone: known to be gone. dbHasNewer: false
-  | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
->
-
-/** The car of a box. */
-export type BoxCar  = ThingCar<BoxThing>
-/** The car of a gate. */
-export type GateCar = ThingCar<GateThing>
-
-/** A record a car is made from: a Thing, whole or sparse, or the void sentinel. */
-export type DeliverableThing = Thing | Sparse<Thing> | VoidSentinel
-
-/** Each `liveness` a car may have. */
-export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as const
-// --
+} from '../shapes/shapes-thing'
+import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
 
 // == [Making cars]: carOf, bestCarOf, tagBestNewestSL, tagBestFullestSL, tagBestNewestRecordSL
 

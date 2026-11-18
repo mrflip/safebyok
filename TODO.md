@@ -20,7 +20,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   `isTombstone` are written for sparse tombstones and for a tombstone that excludes the void sentinel; rename them for
   what they test, and drop what a sparse tombstone needed.
 * **`cleartext` names two things.** VOCABULARY.md's cleartext is the passphrase or passkey answer a gating accepts.
-  `BoxCleartexts`, in `models/sealers.ts`, uses it for what a seal ciphers: a box's whisper. One of them needs
+  `BoxCleartexts`, in `shapes/shapes-sealers.ts`, uses it for what a seal ciphers: a box's whisper. One of them needs
   another name. Every other name tried so far has been worse.
 * **A bank's lives can share a lifeseq.** The bank's stamp binds its lifeseq, and every ctx binds the stamp. Where
   storage loses the bank row and a bank is born again at the same lifeseq, a wrap of the earlier life unwraps in the new

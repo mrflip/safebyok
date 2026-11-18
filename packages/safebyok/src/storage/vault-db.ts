@@ -1,9 +1,8 @@
 /** The `VaultDB` interface the models call, the answers its verbs resolve, and what a store reports to its adapter. */
 
 import type { EX, Errors } from 'safebyok-big/internals'
-import type {
-  BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, Sparse, Thing, ThingScope, ThingWatchScope, Tracked, WorldRecord, WriteAsk,
-} from './shapes-thing'
+import type { Sparse, Thing, ThingScope } from '../shapes/shapes-thing'
+import type { BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, ThingWatchScope, Tracked, WorldRecord, WriteAsk } from '../shapes/shapes-asks'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
 

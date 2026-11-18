@@ -1,32 +1,10 @@
 import type { Consts } from 'safebyok-big/internals'
 import { Crypto, Throwers, Validator } from 'safebyok-big/internals'
-import type { Bank } from './bank'
 import { BaseThing } from './base-thing'
-import { type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from './stamps'
+import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
+import { type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
-import { type GateThing, type ThingScope, type Wayins, GateThingFormat, gateThing, thingScope } from '../storage/shapes-thing'
-
-/** The dna of a new main gate: its stamp, and its wayins. */
-export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
-
-/** The part of its bank a gate uses: its stamp. */
-export type GateBank = Pick<Bank, 'stamp'>
-
-/** The options of {@link Gate.make}, beside its record. */
-export interface GateOpts {
-  /** The bank the gate belongs to. */
-  bank: GateBank
-}
-
-// Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Gate.make}'s and {@link Gate.makeRecord}'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
-  const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
-  return {
-    gateMakeArgs:   obj({ record: gateThing, opts: obj({ bank: obj({ stamp: bankStamp }) }) }),
-    makeRecordArgs: gateStamp.extend({ wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),
-  }
-})
+import { type GateThing, type ThingScope, type Wayins, GateThingFormat, gateThing, thingScope } from '../shapes/shapes-thing'
 
 /** One revision of a bank's gate: its passphrase wayin, and its passkey wayin if it has one.
  * A gate verb makes the next revision as a new Gate; this one never changes.
@@ -109,4 +87,17 @@ export class Gate extends BaseThing<GateThing, ThingScope, GateStamp> implements
 function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
   return Object.freeze({ main: main.pickle(), passkey0: passkey0?.pickle() ?? null }) as Wayins
 }
+// --
+
+// == [Checks]: Checks
+
+// Defined here, not with the shapes: they name a model class.
+/** The checks of {@link Gate.make}'s and {@link Gate.makeRecord}'s arguments. */
+const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
+  const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
+  return {
+    gateMakeArgs:   obj({ record: gateThing, opts: obj({ bank: obj({ stamp: bankStamp }) }) }),
+    makeRecordArgs: gateStamp.extend({ wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),
+  }
+})
 // --

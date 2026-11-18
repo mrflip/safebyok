@@ -3,8 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { VaultError } from 'safebyok-big'
 import { zxcvbnStrengthChecker } from 'safebyok-big/browser'
 import { Consts, type GX, Strength } from 'safebyok-big/internals'
-import { DefaultStrengthChecker, guardStrengthChecker, type StrengthChecker } from '../../src/helpers/passphrase-strength'
-import type { BankScope } from '../../src/models/stamps'
+import { DefaultStrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
+import type { StrengthChecker } from '../../src/shapes/shapes-gateish'
+import type { BankScope } from '../../src/shapes/shapes-stamps'
 import * as TH from '../test-helpers'
 
 const { StrongVerdict } = Strength

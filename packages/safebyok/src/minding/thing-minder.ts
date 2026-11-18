@@ -9,83 +9,18 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { Errors, Outcome, Throwers, Validator } from 'safebyok-big/internals'
+import { Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import type { Banklabel, EpochMillis, Labelpath, Userid } from '../storage/primitives'
+import { minderNotStarted, modelkindMismatch, staleRead } from '../refusals/throwers'
+import type { Banklabel, Labelpath, Userid } from '../shapes/primitives'
+import { type Thing, type ThingScope, type Thingkind, type VoidSentinel, RootBoxLabelpath, cmpThings, modelkindOf, shellOf, thingkindVals } from '../shapes/shapes-thing'
+import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
+import { type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
-  type GetAsk, type LoggableAsk, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  RootBoxLabelpath, cmpThings, loggableAskOf, modelkindOf, shellOf, thingkindVals,
-} from '../storage/shapes-thing'
-import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
-import {
-  type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies, type TsqStaleTime,
-  DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAsk, minderGetAskOpts, minderListener, minderScope, queryCacheOpts, tsqClient,
-} from './shapes-minder'
-import { type DeliverableThing, type ThingCar, type Tombstone, bestCarOf, carOf, dbHasNewer } from './thing-car'
-
-// == [Answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer
-
-// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
-// A timely car is full, gone or void: a behind or bare car is never timely.
-/** A get's answer, read from the cache. Beside a get's own acts:
- * - `vacant`   -- nothing is cached
- * - `untimely` -- the car is `behind` or `bare`, or TanStack Query counts it stale under `staleTime`: older than it, invalidated, or its last get refused
- */
-export type GotAnswer = (
-  | GoodAnswer<Thing, 'gotlive'>
-  | GoodAnswer<Tombstone<Thing>, 'gotgone'>
-  | GoodAnswer<null, 'gotvoid'>
-  | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
-) & { ask: GetAsk }
-
-/** The car cached for a scope, however old, and the state of its gets. */
-export interface CarFreshness {
-  /** The cached car, or undefined for none. */
-  car:         ThingCar<Thing> | undefined
-  /** False where the act is `vacant` or `untimely`. */
-  isTimely:    boolean
-  /** When a record last arrived in the car, or 0 for none. */
-  refreshedAt: EpochMillis
-  /** True while a get of the car is under way. */
-  isFetching:  boolean
-  /** The refusal of the car's last get, or null. */
-  lastErr:     Errors.VaultError | null
-}
-
-/** A get's answer read from the cache, with the car and its {@link CarFreshness}. */
-export type TSQGotAnswer = GotAnswer & CarFreshness
-
-/** `tryAt`'s answer: a {@link TSQGotAnswer}, or a refusal. */
-export type TSQAnswer = TSQGotAnswer | BadAnswer
-// --
-
-// == [Arguments]: MinderOpts, Checks
-
-/** Options for {@link ThingMinder.make}. */
-export interface MinderOpts {
-  /** Where the bank's Things are stored. */
-  vaultDB:         VaultDB
-  /** The TanStack Query client whose cache has the cars. A host may share its own.
-   * TanStack passes an observer's selected and placeholder values through the minder's structural sharing, which throws `unexpected_error` on anything but a car.
-   */
-  tsq:             TSQ.QueryClient
-  /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */
-  queryCacheOpts?: Partial<QueryCacheOpts>
-}
-
-/** The checks of {@link ThingMinder.make}'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, oneof, custom, orDefault }) => ({
-  minderMakeArgs: obj({
-    ties: obj({ modelkind: oneof(thingkindVals) }),
-    opts: obj({
-      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
-      tsq:            tsqClient,
-      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
-    }),
-    bank: minderFriend,
-  }),
-}))
-// --
+  type CarFreshness, type DeliverableThing, type GotAnswer, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type MinderOpts, type QueryCacheOpts,
+  type TSQAnswer, type TSQGotAnswer, type ThingCar, type ThingTies, type TsqStaleTime, DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAsk, minderGetAskOpts, minderListener, minderScope, queryCacheOpts, tsqClient,
+} from '../shapes/shapes-minder'
+import { bestCarOf, carOf, dbHasNewer } from './thing-car'
 
 /** Minds one kind of Thing in one bank in a TanStack Query cache, through its own watch of the bank.
  * Internal: the layers above the core build on it, and a host does not call it.
@@ -360,7 +295,7 @@ export class ThingMinder {
   /** The scope of `scoped`, demanding that it is in this minder's bank, of its modelkind. */
   #demandOwnScope(scoped: ThingScope): ThingScope {
     const scope = minderScope.parseConsistent(scoped, this.ties)
-    if (modelkindOf(scope.labelpath) !== this.modelkind) { throw new Errors.VaultError('bad_record', Phrases.ModelkindMismatch) }
+    if (modelkindOf(scope.labelpath) !== this.modelkind) { throw modelkindMismatch() }
     return scope
   }
 
@@ -393,17 +328,7 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: minderNotStarted, staleRead, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf
-
-/** The refusal of a read on a minder that is not minding. */
-function minderNotStarted(): Errors.VaultError {
-  return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
-}
-
-/** The refusal of a get answered with a revision older than one cached when it began. */
-function staleRead(ask: GetAsk): Errors.VaultError {
-  return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
-}
+// == [Helpers]: isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf
 
 // A record arrives (success), a get is refused or the car invalidated (both leave the car untimely), or the car is
 // removed. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.
@@ -446,4 +371,20 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
     return ((car !== undefined) && dbHasNewer(car)) ? 0 : staleTime
   }
 }
+// --
+
+// == [Checks]: Checks
+
+/** The checks of {@link ThingMinder.make}'s arguments. */
+const Checks = Validator.Checkers('bad_record', ({ obj, oneof, custom, orDefault }) => ({
+  minderMakeArgs: obj({
+    ties: obj({ modelkind: oneof(thingkindVals) }),
+    opts: obj({
+      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+      tsq:            tsqClient,
+      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
+    }),
+    bank: minderFriend,
+  }),
+}))
 // --

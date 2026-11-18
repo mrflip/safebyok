@@ -2,9 +2,10 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
-import { type BadNews, DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
+import { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
+import type { BadNews } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
 
 /** A host's dialog that types `passphrases` into the gating it is shown, one attempt each, until one lands, keeping each outcome. */

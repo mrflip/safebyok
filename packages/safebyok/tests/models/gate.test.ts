@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
-import { type GateThing, GateThingFormat, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { type GateThing, GateThingFormat, lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()

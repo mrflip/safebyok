@@ -1,22 +1,13 @@
 import { exactOptional } from 'zod'
-import { CX, Clock, Crypto, Errors, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
+import { CX, Clock, Crypto, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type BoxThing, type Sealed, boxSealable, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../storage/shapes-thing'
-import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from './sealers'
-import { type BoxStamp, boxStamp } from './stamps'
+import { sidecarMissing, tombstoneSidecarGiven } from '../refusals/throwers'
+import { type BoxThing, type Sealed, boxSealable, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../shapes/shapes-thing'
+import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from '../shapes/shapes-sealers'
+import { type BoxStamp, boxStamp } from '../shapes/shapes-stamps'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
-
-/** Checks for what a box's seal takes and makes: the sealable, a live sealable for a tombstone, the public and secret props, and the stored record. */
-const Checks = Validator.Checkers('bad_record', ({ obj, oneof, epochMillis }) => ({
-  boxSealable,
-  liveBoxSealable: boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
-  // Strict, since a misspelt key in either bag would otherwise be dropped without a word.
-  boxPublicProps:  obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
-  boxThing,
-  boxCleartexts:   obj({ whisper: CX.whisper }).strict(),
-}))
 
 // A sealer is handed to a lease as the class itself, so the class has statics alone.
 /** The {@link Sealer} for a box's whisper. Pass the class itself to a lease's `seal` or `unseal`.
@@ -28,7 +19,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   /** The Thing fields and sidecar of `donorProps`, which may be a live box, a tombstone or the shell.
    * Every other field is dropped, including a whisper, sealed or not.
    */
-  static donorPropsOf(donorProps: Sealable<BoxRecord>): Sealable<BoxRecord> { return Checks.boxSealable.parse(donorProps) }
+  static donorPropsOf(donorProps: Sealable<BoxRecord>): Sealable<BoxRecord> { return boxSealable.parse(donorProps) }
 
   /** The sidecar, `am` and `written_at` of `publicProps`. Refuses any other field. */
   static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps { return Checks.boxPublicProps.parse(publicProps) }
@@ -48,9 +39,9 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
    * Its `written_at` is `publicProps.written_at`, or now.
    */
   static nextRevisionOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
-    const { sidecar: donorSidecar, ...thing } = Checks.boxSealable.parse(donorProps)
+    const { sidecar: donorSidecar, ...thing } = boxSealable.parse(donorProps)
     const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar === undefined) { throw new Errors.VaultError('bad_record', Phrases.SidecarMissing) }
+    if (sidecar === undefined) { throw sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
     if (thing.am === 'a') { return { ...thing, ...revision } }
     return { ...thing, ...nextLifeOf(thing), ...revision, born_at: written_at }
@@ -63,7 +54,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static tombstoneOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxTombstone, BoxCleartexts> {
     const { sidecar: _sidecar, ...thing } = Checks.liveBoxSealable.parse(donorProps)
     const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar !== undefined) { throw new Errors.VaultError('bad_record', Phrases.TombstoneSidecarGiven) }
+    if (sidecar !== undefined) { throw tombstoneSidecarGiven() }
     return { ...thing, ...nextLifeOf(thing), revtok: Crypto.randomId(), revseq: thing.revseq + 1, am: 'x', written_at }
   }
   // --
@@ -87,14 +78,14 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
 
   /** The sealed whisper of `record`, which must carry a box's tags. */
   static sealedOf(record: BoxThing): Sealed {
-    const { whisper_sealed } = Checks.boxThing.parse(record)
+    const { whisper_sealed } = boxThing.parse(record)
     if (! Validator.isConsistent(whisper_sealed, BoxTags)) { throw Throwers.undecodedWhisper() }
     return whisper_sealed
   }
 
   /** `next` with `whisper_sealed` added, checked as a stored box, and frozen. */
   static recordOf(next: RevisionOf<BoxThing, BoxCleartexts>, whisper_sealed: Sealed): BoxThing {
-    return Object.freeze(Checks.boxThing.parse({ ...next, whisper_sealed }))
+    return Object.freeze(boxThing.parse({ ...next, whisper_sealed }))
   }
   // --
 }
@@ -121,4 +112,15 @@ function deserializeWhisper(text: string): CX.Whisper {
   if (! checked.success) { throw Throwers.undecodedWhisper() }
   return checked.data
 }
+// --
+
+// == [Checks]: Checks
+
+/** Checks for what a box's seal takes: a live sealable for a tombstone, and the public and secret props. */
+const Checks = Validator.Checkers('bad_record', ({ obj, oneof, epochMillis }) => ({
+  liveBoxSealable: boxSealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
+  // Strict, since a misspelt key in either bag would otherwise be dropped without a word.
+  boxPublicProps:  obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
+  boxCleartexts:   obj({ whisper: CX.whisper }).strict(),
+}))
 // --

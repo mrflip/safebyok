@@ -1,14 +1,12 @@
-import type * as Z from 'zod'
 import type { Consts, Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases, Throwers, Validator } from 'safebyok-big/internals'
-import { thingRecord } from '../storage/shapes-thing'
-import { Lease, type LeaseBank } from './lease'
-import type { BankScope, BankStamp, GateStamp, StampedGate } from './stamps'
-import * as Stamps from './stamps'
-import type { GuardedStrengthChecker } from '../helpers/passphrase-strength'
+import { Lease } from './lease'
+import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, gateRevisionedStamp, provingDevice } from '../shapes/shapes-gateish'
+import type { BankScope, BankStamp, GateStamp, StampedGate } from '../shapes/shapes-stamps'
+import * as Stamps from '../shapes/shapes-stamps'
 import { Wayin, wayinCtxOf } from './wayin'
 
-// == [NOVEL and the checks]: NOVEL, Novel, RewrapUsage, CheckUsage, Checks, GateRevisionedStamp, ProvingDevice
+// == [NOVEL and the usages]: NOVEL, Novel, RewrapUsage, CheckUsage
 
 /** Pass to {@link Proving.buildWayin} to wrap a newly made bankKey. */
 export const NOVEL: unique symbol = Symbol.for('@safebyok/novel')
@@ -23,48 +21,6 @@ const RewrapUsage = Object.freeze({ extractable: true, usage: ['wrapKey'] as con
 // A bankKey unwrapped with it is dropped at once.
 /** How a proving unwraps the bankKey only to learn that it unwraps: non-extractable. */
 const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as const })
-
-// Defined here, not with the shapes: they name a model class.
-// The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
-/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, {@link Proving.buildWayin}'s `source`, {@link Proving.buildLease}'s arguments, and the static builders' and `judgeStrength`'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => {
-  // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
-  const gateRevisionedStamp = Stamps.gateStamp.extend(thingRecord.pick({ revtok: true }).shape)
-  const provingDevice = GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(ConstsX.isGuarded, Phrases.GuardedExpected) })
-  return {
-    gateRevisionedStamp,
-    provingDevice,
-    wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), 'Expected NOVEL or a proving'),
-    provingLeaseArgs:     obj({ bank: obj({ stamp: Stamps.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: gateRevisionedStamp }),
-    passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
-    passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
-    passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate, device: provingDevice }),
-    passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.stampedGate }),
-    strengthArgs:         GX.strengthArgs.extend({ scope: Stamps.bankScope, device: provingDevice }),
-  }
-})
-
-/** A {@link GateStamp} with the `revtok` of one revision of the gate: the revision a lease is granted under. */
-export type GateRevisionedStamp = Z.infer<typeof Checks.gateRevisionedStamp>
-
-/** What a proving is given of its device: the wrapped key deriver and strength checker, and the device's token. */
-export type ProvingDevice = Z.infer<typeof Checks.provingDevice>
-// --
-
-/** The parts of a proving: the stamps its wayin is bound to, the wayin's header, and the stored wayin it proves, if any. */
-export interface ProvingParts<HeaderT extends GX.WayinHeader> {
-  bankStamp: BankStamp
-  gateStamp: GateStamp
-  header:    HeaderT
-  /** The stored wayin this proving proves, or null for a new wayin, which `buildWayin` makes. */
-  stored:    Wayin | null
-}
-
-/** The options of a proving's `make`, beside its parts. */
-export interface ProvingOpts {
-  /** The key the proving wraps and unwraps the bankKey under: non-extractable. */
-  wayinKey: CryptoKey
-}
 
 /** A passphrase or a passkey answer, made into the wayinKey of one wayin.
  * Build one with a subclass's `buildStored`, to prove the wayin a gate has, or `buildNovel`, for a new wayin.
@@ -287,10 +243,7 @@ function mintPasskeyHeader({ device_tok }: ProvingDevice, { credential_id, prf_s
 }
 // --
 
-// == [The key deriver]: GuardedKeyDeriver, guardKeyDeriver, deriveKeyBytes
-
-/** The host's key deriver, wrapped by {@link guardKeyDeriver}. */
-export type GuardedKeyDeriver = ProvingDevice['keyDeriver']
+// == [The key deriver]: guardKeyDeriver, deriveKeyBytes
 
 // Its interface and its salt length are checked, never its other choices (#the-host-is-not-our-threat-model): what its key bytes must be is
 // checked where they are received, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
@@ -351,4 +304,22 @@ async function passphraseKeyOf(keyDeriver: GuardedKeyDeriver, passphrase: GX.Pas
     keyBytes.fill(0)
   }
 }
+// --
+
+// == [Checks]: Checks
+
+// Defined here, not with the shapes: they name a model class.
+// The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
+/** The checks of {@link Proving.buildWayin}'s `source`, {@link Proving.buildLease}'s arguments, and the static builders' and `judgeStrength`'s arguments. */
+const Checks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => {
+  return {
+    wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), 'Expected NOVEL or a proving'),
+    provingLeaseArgs:     obj({ bank: obj({ stamp: Stamps.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: gateRevisionedStamp }),
+    passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
+    passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
+    passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate, device: provingDevice }),
+    passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.stampedGate }),
+    strengthArgs:         GX.strengthArgs.extend({ scope: Stamps.bankScope, device: provingDevice }),
+  }
+})
 // --

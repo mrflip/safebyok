@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { type EX, Errors } from 'safebyok-big/internals'
 import { AnswerNotMade } from '../../src/phrases'
 import { AdapterVaultDB, type Received } from '../../src/storage/adapter-vault-db'
-import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/storage/shapes-thing'
+import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
 import type { Actual, BirthBankActual, ListThingsActual, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 

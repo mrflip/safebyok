@@ -1,7 +1,7 @@
 /** The battery's cases of tryBirthBank. */
 import { describe, expect, it } from 'vitest'
 import { expectBad } from 'safebyok-big/testing'
-import { lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { BankScope, GateScope, RootScope, bankThingOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, nextOf, rootBoxOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'

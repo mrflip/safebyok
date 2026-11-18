@@ -3,7 +3,7 @@
 import type * as Z from 'zod'
 import { CX, GX, Phrases, Validator } from 'safebyok-big/internals'
 import { LabelpathOfOtherKind } from '../phrases'
-import { BoxThingFormat, isLabelpathOfKind, thingRecord, wayins } from '../storage/shapes-thing'
+import { BoxThingFormat, isLabelpathOfKind, thingRecord, wayins } from './shapes-thing'
 
 // == [The stamps]: bankScope, bankStamp, gateStamp, stampedGate, boxStamp, BankScope, BankStamp, GateStamp, StampedGate, BoxStamp
 

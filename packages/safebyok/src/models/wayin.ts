@@ -1,8 +1,8 @@
 import type * as Z from 'zod'
 import type { Consts, CX, EX } from 'safebyok-big/internals'
 import { Crypto, GX, Helpers } from 'safebyok-big/internals'
-import * as Stamps from './stamps'
-import type { DeviceTok, EpochMillis } from '../storage/primitives'
+import * as Stamps from '../shapes/shapes-stamps'
+import type { DeviceTok, EpochMillis } from '../shapes/primitives'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
