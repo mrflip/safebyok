@@ -9,7 +9,7 @@ import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './
 import {
   type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type StoredCited, type Thing, type ThingCited, type ThingScope, type ThingWatchScope, type Track,
   type Tracked, type WorldRecord, type WriteAsk,
-  KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
+  KindChecks, MainGateLabelpath, RootBoxLabelpath, isLabelpathOfKind, isTombstone, kindChecksOf, sparseOf, storedCited, storedWayins, thingScope,
 } from './shapes-thing'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
@@ -25,7 +25,7 @@ type Presence = 'void' | 'gone' | 'live'
 /** The presence of `stored`, `'void'` for null. */
 function presenceOf(stored: ThingCited | null): Presence {
   if (stored === null) { return 'void' }
-  return (stored.am === 'a') ? 'live' : 'gone'
+  return isTombstone(stored) ? 'gone' : 'live'
 }
 
 /** The stored revtok compared with the ask's.
@@ -276,7 +276,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
   const beside = trackedFieldOf(ask, worldFetched.tracked)
   if (isRefusedAct(act))  { return { ok: false, act, world, listed: [], parent, damaged_rows: [], ...beside } }
   // A tombstone or none has no children.
-  if (stored?.am !== 'a') { return { ok: true, act, world, listed: [], parent, damaged_rows: [], ...beside } }
+  if ((stored === null) || isTombstone(stored)) { return { ok: true, act, world, listed: [], parent, damaged_rows: [], ...beside } }
   const { userid, banklabel } = ask
   // A child hangs off its parent's live lifepath: an earlier life's children are not its.
   const lifepathUnder = `${stored.lifepath}/`

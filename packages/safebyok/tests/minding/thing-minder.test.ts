@@ -832,16 +832,14 @@ describe("Each minder's watch", () => {
     expect(boxMinder.at(BoxAsk)).to.deep.equal(carOf(box))
   })
 
-  it("keeps the unchanged parts of a newer record as they were", () => {
+  it("caches a newer record as it arrived, in a full car", () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
     const gate0 = TH.gateThingOf()
     receive(noticeOf(gate0))
-    const held0 = minder.at(GateAsk)?.newest as GateThing
     const gate1 = structuredClone(TH.nextGateOf(gate0))
     receive(noticeOf(gate1))
     const held1 = minder.at(GateAsk)
-    expect(held1).to.have.nested.property('newest.revseq', 1)
-    expect(held1).to.have.nested.property('newest.wayins').that.eq(held0.wayins)
+    expect(held1?.newest).to.deep.equal(gate1)
     expect(held1?.newest).to.eq(held1?.fullest)
   })
 })

@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
   type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, AskChecks, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf,
-  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isVoidSentinel,
+  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isTombstone, isVoidSentinel,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -345,6 +345,18 @@ describe("isVoidSentinel(record)", () => {
     const box = TH.boxThingOf()
     for (const shell of [shellOf(TH.GateScope), shellOf(TH.BoxScope, TH.rootBoxOf())]) { expect(isVoidSentinel(shell)).to.be.true }
     for (const record of [box, TH.boxTombOf(box), sparseOf(box)]) { expect(isVoidSentinel(record)).to.be.false }
+  })
+})
+
+describe("isTombstone(record)", () => {
+  it("is true of a tombstone, whole or sparse", () => {
+    const tombstone = TH.boxTombOf(TH.boxThingOf())
+    for (const record of [tombstone, sparseOf(tombstone)]) { expect(isTombstone(record)).to.be.true }
+  })
+
+  it("is false of a live record, whole or sparse, the void sentinel, or what is not a record", () => {
+    const box = TH.boxThingOf()
+    for (const val of [box, sparseOf(box), shellOf(TH.BoxScope, TH.rootBoxOf()), shellOf(TH.GateScope), null, undefined, 'x']) { expect(isTombstone(val)).to.be.false }
   })
 })
 

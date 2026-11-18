@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { type ThingCar, carOf, isThingCar, isVaultDBNewer, mergedCarOf } from '../../src/minding/thing-car'
+import { type ThingCar, bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
 import { type Thing, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
@@ -37,6 +37,29 @@ describe("carOf", () => {
     expect(car.fullest).to.eq(car.newest)
   })
 
+  it("makes a behind car of a sparse record and an older whole record of its life", () => {
+    const car = carOf(sparseOf(Box1), Box0)
+    expect(car).to.deep.equal(behindOf(Box1, Box0))
+    expect(car.fullest).to.eq(Box0)
+    expect(Object.isFrozen(car)).to.be.true
+  })
+
+  it("makes a full car of a whole record, whatever fullest is given", () => {
+    expect(carOf(Box1, Box0)).to.deep.equal(carOf(Box1))
+  })
+
+  const BadFullests = [
+    [sparseOf(Box1),     sparseOf(Box0), 'a sparse fullest'],
+    [sparseOf(Box0),     Box1,           'a fullest newer than the record'],
+    [sparseOf(Box1),     { ...Box1 },    'a fullest of the same revision'],
+    [sparseOf(BoxReborn), Box0,          'a fullest of an earlier life'],
+  ] as const
+  for (const [newest, fullest, blurb] of BadFullests) {
+    it(`refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => carOf(newest, fullest as Thing), 'bad_record')
+    })
+  }
+
   const NotRecords = [
     [undefined,                       'nothing at all'],
     [42,                              'a number'],
@@ -51,10 +74,10 @@ describe("carOf", () => {
   }
 })
 
-describe("mergedCarOf", () => {
+describe("bestCarOf", () => {
   it("returns the car that is delivered over nothing", () => {
     const car = carOf(Box0)
-    expect(mergedCarOf(undefined, car)).to.eq(car)
+    expect(bestCarOf(undefined, car)).to.eq(car)
   })
 
   const MergeCases = [
@@ -73,7 +96,7 @@ describe("mergedCarOf", () => {
   ] as const
   for (const [prior, delivered, expected, blurb] of MergeCases) {
     it(blurb, () => {
-      expect(mergedCarOf(prior, delivered)).to.deep.equal(expected)
+      expect(bestCarOf(prior, delivered)).to.deep.equal(expected)
     })
   }
 
@@ -88,21 +111,21 @@ describe("mergedCarOf", () => {
   ] as const
   for (const [prior, delivered, blurb] of PriorWinsCases) {
     it(`returns the prior car where ${blurb}`, () => {
-      expect(mergedCarOf(prior, delivered)).to.eq(prior)
+      expect(bestCarOf(prior, delivered)).to.eq(prior)
     })
   }
 
-  it("leaves the unchanged parts of a later record as they were, and freezes the car", () => {
-    const prior  = carOf(Box0)
-    const merged = mergedCarOf(prior, carOf(structuredClone(Box1)))
-    expect(merged).to.have.nested.property('newest.whisper_sealed').that.eq(Box0.whisper_sealed)
+  it("makes a frozen full car of the later record itself", () => {
+    const later  = structuredClone(Box1)
+    const merged = bestCarOf(carOf(Box0), carOf(later))
+    expect(merged.newest).to.eq(later)
     expect(merged.newest).to.eq(merged.fullest)
     expect(Object.isFrozen(merged)).to.be.true
   })
 
   it("returns the car of a Thing at another scope, whatever its revision", () => {
     const theirs = carOf(TH.boxThingOf('anthropic'))
-    expect(mergedCarOf(carOf(Box1), theirs)).to.eq(theirs)
+    expect(bestCarOf(carOf(Box1), theirs)).to.eq(theirs)
   })
 
   const BrokenCars = [
@@ -116,8 +139,21 @@ describe("mergedCarOf", () => {
     [{ liveness: 'gone',   newest: BoxGone,             fullest: undefined },      'a gone car whose fullest is undefined'],
   ] as const
   for (const [car, blurb] of BrokenCars) {
-    it(`refuses ${blurb} on the way out`, () => {
-      TH.expectSyncRefusal(() => mergedCarOf(undefined, car as ThingCar<Thing>), 'unexpected_error')
+    it(`refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => bestCarOf(undefined, car), 'unexpected_error')
+    })
+  }
+
+  const NotCarPairs = [
+    [undefined,   Box0,        'a record delivered'],
+    [undefined,   null,        'null delivered'],
+    [Box0,        carOf(Box0), 'a record as the prior'],
+    [null,        carOf(Box0), 'null as the prior'],
+    [carOf(Box0), undefined,   'nothing delivered over a car'],
+  ] as const
+  for (const [prior, delivered, blurb] of NotCarPairs) {
+    it(`refuses ${blurb}`, () => {
+      TH.expectSyncRefusal(() => bestCarOf(prior, delivered), 'unexpected_error')
     })
   }
 })
@@ -141,13 +177,13 @@ describe("isThingCar", () => {
   }
 })
 
-describe("isVaultDBNewer", () => {
+describe("dbHasNewer", () => {
   it("is true of a behind or bare car, and false of the rest", () => {
     const cars = [carOf(Box0), behindOf(Box1, Box0), carOf(sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]
-    expect(cars.map((car) => [car.liveness, isVaultDBNewer(car)])).to.deep.equal([['full', false], ['behind', true], ['bare', true], ['gone', false], ['void', false]])
+    expect(cars.map((car) => [car.liveness, dbHasNewer(car)])).to.deep.equal([['full', false], ['behind', true], ['bare', true], ['gone', false], ['void', false]])
   })
 
   it("reads the liveness alone", () => {
-    expect([isVaultDBNewer({ liveness: 'bare' }), isVaultDBNewer({ liveness: 'full' })]).to.deep.equal([true, false])
+    expect([dbHasNewer({ liveness: 'bare' }), dbHasNewer({ liveness: 'full' })]).to.deep.equal([true, false])
   })
 })

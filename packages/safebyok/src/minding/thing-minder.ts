@@ -14,14 +14,14 @@ import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Userid } from '../storage/primitives'
 import {
   type GetAsk, type LoggableAsk, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
-  AskChecks, RootBoxLabelpath, loggableAskOf, modelkindOf, shellOf, thingkindVals,
+  AskChecks, RootBoxLabelpath, cmpThings, loggableAskOf, modelkindOf, shellOf, thingkindVals,
 } from '../storage/shapes-thing'
 import { type BadAnswer, type GoodAnswer, type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
 import {
   type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAskOpts, minderListener, minderScope, minderTrack, queryCacheOpts, tsqClient,
 } from './shapes-minder'
-import { type DeliverableThing, type ThingCar, type Tombstone, carOf, cmpRecords, isThingCar, isVaultDBNewer, mergedCarOf } from './thing-car'
+import { type DeliverableThing, type ThingCar, type Tombstone, bestCarOf, carOf, dbHasNewer } from './thing-car'
 
 // == [Answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer
 
@@ -140,7 +140,7 @@ export class ThingMinder {
       ...FixedQueryCacheOpts,
       staleTime:         staleTimeFnOf(staleTime),
       queryFn:           ({ queryKey }) => this.#fetchCar(this.#bank.makeGetAsk(this.#scopeOfKey(queryKey))),
-      structuralSharing: mergedValOf,
+      structuralSharing: bestCarOf,
     })
     this.#isReady = true
     // The root box's car stays, whatever the host's gcTime: its own query key's defaults reach no box under it.
@@ -321,7 +321,7 @@ export class ThingMinder {
     if (! answer.ok) { throw answer.err }
     const record = answer.val ?? this.#shellAt(ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
-    if ((prior !== undefined) && (cmpRecords(prior.newest, record) < 0)) { throw staleRead(ask) }
+    if ((prior !== undefined) && (cmpThings(prior.newest, record) < 0)) { throw staleRead(ask) }
     return carOf(record)
   }
 
@@ -391,16 +391,11 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: minderNotStarted, notACar, staleRead, isCarEvent, gotAnswerOf, staleTimeFnOf, isStaleQuery, mergedValOf
+// == [Helpers]: minderNotStarted, staleRead, isCarEvent, gotAnswerOf, staleTimeFnOf, isStaleQuery
 
 /** The refusal of a read on a minder that is not minding. */
 function minderNotStarted(): Errors.VaultError {
   return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
-}
-
-/** The refusal of a value in a minder's query that is not a car. */
-function notACar(): Errors.VaultError {
-  return new Errors.VaultError('unexpected_error', Phrases.NotACar)
 }
 
 /** The refusal of a get answered with a revision older than one cached when it began. */
@@ -427,11 +422,11 @@ function gotAnswerOf(ask: GetAsk, car: ThingCar<Thing> | undefined, isTimely: bo
 }
 
 // A query under this minder's prefix has a car this minder cached.
-/** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link isVaultDBNewer}. */
+/** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link dbHasNewer}. */
 function staleTimeFnOf(staleTime: number): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => number {
   return (carQuery) => {
     const car = carQuery.state.data as ThingCar<Thing> | undefined
-    return ((car !== undefined) && isVaultDBNewer(car)) ? 0 : staleTime
+    return ((car !== undefined) && dbHasNewer(car)) ? 0 : staleTime
   }
 }
 
@@ -440,11 +435,4 @@ function isStaleQuery(carQuery: TSQ.Query<ThingCar<Thing>> | undefined, staleTim
   return carQuery?.isStaleByTime(staleTimeFnOf(staleTime)(carQuery)) ?? true
 }
 
-// TanStack also calls it on an observer's selected and placeholder values, which is why a minder's query refuses both.
-/** The car TanStack caches when `delivered` arrives over `prior` ({@link mergedCarOf}). Anything but a car refuses, `prior` also undefined. */
-function mergedValOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
-  if (! isThingCar(delivered))                        { throw notACar() }
-  if ((prior !== undefined) && (! isThingCar(prior))) { throw notACar() }
-  return mergedCarOf(prior, delivered)
-}
 // --

@@ -15,7 +15,7 @@ export type { BadAnswer, GoodAnswer, ListThingsAnswer, VaultDB, WriteThingAnswer
 export { type BoxThing, type DelAskDraft, type PutAskDraft, type VoidSentinel, isVoidSentinel } from './storage/shapes-thing'
 export { DefaultQueryCacheOpts, FixedQueryCacheOpts, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type QueryCacheOpts, type ThingTies } from './minding/shapes-minder'
 export { type CarFreshness, type GotAnswer, type MinderOpts, type TSQAnswer, type TSQGotAnswer, ThingMinder } from './minding/thing-minder'
-export { type BoxCar, type DeliverableThing, type GateCar, type ThingCar, type Tombstone, carLivenessVals, carOf, isVaultDBNewer } from './minding/thing-car'
+export { type BoxCar, type DeliverableThing, type GateCar, type ThingCar, type Tombstone, carLivenessVals, carOf, dbHasNewer } from './minding/thing-car'
 
 // From safebyok-big: its refusals, what a device is handed, and what a gating's dialog and a box carry.
 export { IsVaultError, VaultError, isVaultError, type RefusalFamily, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'

@@ -6,7 +6,7 @@ import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok
 import { AnswerNotMade } from '../phrases'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
-  type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf, watchArgs,
+  type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, isTombstone, loggableAskOf, watchArgs,
 } from './shapes-thing'
 import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
 import type {
@@ -152,7 +152,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       let val: Thing
       try { val = watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
-      try { onNotice({ ok: true, act: (val.am === 'a') ? 'gotlive' : 'gotgone', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+      try { onNotice({ ok: true, act: isTombstone(val) ? 'gotgone' : 'gotlive', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     } }
     this.#feeds.add(feed)
     const stop = this.doWatch(bankScope, feed.receive, onBadNews)

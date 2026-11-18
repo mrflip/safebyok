@@ -1,12 +1,11 @@
 /** `ThingCar`, what a ThingMinder caches for one scope, and how two cars of one Thing merge. */
 
-import * as TSQ from '@tanstack/query-core'
 import { Validator } from 'safebyok-big/internals'
 import type { TombstoneOf } from '../models/sealers'
 import * as Phrases from '../phrases'
 import {
-  type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type ThingScope, type VoidSentinel,
-  isVoidSentinel, kindChecksOf, thingCited, thingScope,
+  type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type VoidSentinel,
+  cmpThings, haveSameScope, isSparse, isTombstone, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
 } from '../storage/shapes-thing'
 
 // == [The car]: Tombstone, ThingCar, BoxCar, GateCar, DeliverableThing, carLivenessVals
@@ -14,21 +13,20 @@ import {
 /** A tombstone of a RecordT, sparse or whole. */
 export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
 
-// The vaultDB has a newer whole record when liveness is 'behind' or 'bare' (isVaultDBNewer).
-/** A ThingMinder's frozen cache value for one scope: the newest revision heard of, perhaps sparse, and the fullest record seen.
- * Show `fullest ?? newest`, the fullest record the car has, and write against `newest`.
- * - `newest` is always a record: the void sentinel when none is stored.
- * - `fullest` is null when gone or void, and undefined when bare.
- * - Both records are of one scope and one life: they share a lifepath.
- * - When `full`, they are one record: `newest === fullest`.
- * - When `behind`, `fullest` is of an earlier revision: `newest.revseq > fullest.revseq`, never equal.
+// The vaultDB has a newer whole record when liveness is 'behind' or 'bare' (dbHasNewer).
+/** A ThingMinder's frozen cache value for a Thing: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
+ * - `newest` is always a record: full, sparse, the void sentinel when void, or a tombstone when gone.
+ * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
+ * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
+ * - On `full`, the two are *identical* (`newest === fullest`): the same object, not just the same content.
+ * - When `behind`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
  */
 export type ThingCar<RecordT extends ThingRecord> = Readonly<
-  | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both
-  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is older
-  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched whole
-  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a tombstone, sparse or whole
-  | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // none stored
+  | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
+  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
+  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
+  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a tombstone: known to be gone. dbHasNewer: false
+  | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
 >
 
 /** The car of a box. */
@@ -43,127 +41,114 @@ export type DeliverableThing = Thing | Sparse<Thing> | VoidSentinel
 export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as const
 // --
 
-// == [Making cars]: carOf, mergedCarOf, carOfPair, carOfParts, sharedCarOf, newerWholeOf
+// == [Making cars]: carOf, bestCarOf, tagBestNewestSL, tagBestFullestSL, tagBestNewestRecordSL
 
-/** The car of `record` alone. A tombstone's car is `gone`, even when the tombstone is sparse. */
-export function carOf(record: DeliverableThing): ThingCar<Thing> {
-  ArgChecks.deliverableThing.parse(record)
-  if (isVoidSentinel(record)) { return Object.freeze({ liveness: 'void', newest: record, fullest: null }) }
-  if (isTombstone(record))    { return Object.freeze({ liveness: 'gone', newest: record, fullest: null }) }
-  if (isWholeRecord(record))  { return Object.freeze({ liveness: 'full', newest: record, fullest: record }) }
-  return                               Object.freeze({ liveness: 'bare', newest: record, fullest: undefined })
-}
-
-/** The merge of `delivered` over `prior`: the newer newest, with the newer fullest of the same life.
- * It is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined or of another Thing.
+/** The car of `newest`, with `fullest` the whole record of its life where `newest` is sparse.
+ * A tombstone's car is `gone`, even when the tombstone is sparse. A sparse `newest` with no `fullest` makes a `bare` car.
  */
-export function mergedCarOf(prior: ThingCar<Thing> | undefined, delivered: ThingCar<Thing>): ThingCar<Thing> {
-  const merged = ((prior === undefined) || (! isSameScope(prior.newest, delivered.newest))) ? delivered : carOfPair(prior, delivered)
-  Checks.thingCar.parse(merged)
-  return merged
+export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing> {
+  ArgChecks.deliverableThing.parse(newest)
+  if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
+  if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
+  if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
+  if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
+  kindChecksOf(newest.labelpath).record.parse(fullest)
+  const behind = Object.freeze({ liveness: 'behind', newest, fullest } as const)
+  ArgChecks.thingCar.parse(behind)
+  return behind
 }
 
-/** The merge of two cars of one Thing: see {@link mergedCarOf}. On a tie, the result is `prior`'s record. */
-function carOfPair(prior: ThingCar<Thing>, delivered: ThingCar<Thing>): ThingCar<Thing> {
-  const newer = (cmpRecords(prior.newest, delivered.newest) > 0) ? delivered : prior
-  if (newer.fullest === null) { return newer }
-  const fullest = newerWholeOf(prior.fullest, delivered.fullest)
-  const ofLife  = (fullest?.lifepath === newer.newest.lifepath) ? fullest : undefined
-  return sharedCarOf(prior, carOfParts(newer.newest, ofLife))
+// TanStack also calls it on an observer's selected and placeholder values, which is why a minder's query refuses both.
+/** The car of the newest record of `prior` and `delivered`, and the fullest of its life, from either car, with `prior`'s on a tie.
+ * It serves as a minder query's structural sharing: it is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined or of another scope.
+ * Anything but a car refuses `unexpected_error`; `prior` may also be undefined.
+ */
+export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
+  demandCar(delivered, Phrases.NotACar)
+  if (prior === undefined) { return delivered }
+  demandCar(prior, Phrases.NotACar)
+  if (! haveSameScope(prior.newest, delivered.newest))     { return delivered }
+  if (prior.newest.lifepath !== delivered.newest.lifepath) { return (cmpThings(prior.newest, delivered.newest) > 0) ? delivered : prior }
+  const [newestTag,  newest]  = tagBestNewestSL(prior, delivered)
+  const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)
+  if ((newestTag === 'prior') && (fullestTag === 'prior')) { return prior }
+  // A tombstone has a life of its own, so two cars of one life are both live, or both gone, or both void: where `newest`
+  // is live and sparse, the one case carOf reads `fullest`, it is whole or undefined.
+  const best = carOf(newest, fullest as Thing | undefined)
+  demandCar(best)
+  return best
 }
 
-/** The car of live `newest`, with `fullest` the newest whole record of its life, or undefined for none. */
-function carOfParts(newest: Sparse<Thing>, fullest: Thing | undefined): ThingCar<Thing> {
-  if (fullest === undefined)               { return Object.freeze({ liveness: 'bare',   newest, fullest }) }
-  if (cmpRecords(fullest, newest) === 0)   { return Object.freeze({ liveness: 'full',   newest: fullest, fullest }) }
-  return                                            Object.freeze({ liveness: 'behind', newest, fullest })
+/** The newer of the two cars' newest records, tagged with its car. On a tie, `delivered`'s where it alone is full, else `prior`'s. */
+function tagBestNewestSL(prior: ThingCar<Thing>, delivered: ThingCar<Thing>): ['prior' | 'delivered', DeliverableThing] {
+  const cmp = cmpThings(prior.newest, delivered.newest)
+  if (cmp < 0) { return ['prior',     prior.newest] }
+  if (cmp > 0) { return ['delivered', delivered.newest] }
+  if (delivered.liveness !== 'full') { return ['prior',     prior.newest] }
+  if (prior.liveness     !== 'full') { return ['delivered', delivered.newest] }
+  return ['prior', prior.newest]
 }
 
-// TanStack's own default sharing, applied to the car: `prior` itself where nothing differs.
-/** `car`, with each part that is unchanged from `prior` left as it was. */
-function sharedCarOf(prior: ThingCar<Thing>, car: ThingCar<Thing>): ThingCar<Thing> {
-  const shared = TSQ.replaceEqualDeep(prior, car)
-  if (shared === prior)            { return prior }
-  // A full car has one record in both fields: the one shared with prior's fullest has the most of its body.
-  if (shared.liveness === 'full')  { return Object.freeze({ ...shared, newest: shared.fullest }) }
-  return Object.freeze(shared)
+/** The newer of the two cars' fullest records, tagged with its car: a bare car offers none, any other its `fullest ?? newest`. On a tie, `prior`'s. */
+function tagBestFullestSL(prior: ThingCar<Thing>, delivered: ThingCar<Thing>): ['prior' | 'delivered', DeliverableThing | null | undefined] {
+  if (delivered.liveness === 'bare') { return ['prior',     prior.fullest] }
+  if (prior.liveness     === 'bare') { return ['delivered', delivered.fullest] }
+  return tagBestNewestRecordSL(prior.fullest ?? prior.newest, delivered.fullest ?? delivered.newest)
 }
 
-/** The newer of two whole records, or undefined where both are absent. On a tie, `ante`. */
-function newerWholeOf(ante: Thing | null | undefined, post: Thing | null | undefined): Thing | undefined {
-  if (! ante) { return post ?? undefined }
-  if (! post) { return ante }
-  return (cmpRecords(ante, post) > 0) ? post : ante
+/** The newer of two records, tagged with its car. On a tie, `prior`'s. */
+function tagBestNewestRecordSL(prior: DeliverableThing, delivered: DeliverableThing): ['prior' | 'delivered', DeliverableThing] {
+  return (cmpThings(prior, delivered) <= 0) ? ['prior', prior] : ['delivered', delivered]
 }
 // --
 
-// == [Reading cars and records]: isThingCar, isVaultDBNewer, isWholeRecord, isTombstone, cmpRecords, isSameScope
+// == [Reading cars]: isThingCar, dbHasNewer, demandCar
 
 // TanStack also shares an observer's selected and placeholder values, which may be anything, a `liveness` field included.
 /** True when `val` is a sound car. */
 export function isThingCar(val: unknown): val is ThingCar<Thing> {
-  return Checks.thingCar.safeParse(val).success
+  return CarChecks.thingCar.safeParse(val).success
 }
 
 /** True when the vaultDB has a whole record newer than `car`'s fullest. */
-export function isVaultDBNewer(car: Pick<ThingCar<Thing>, 'liveness'>): boolean {
+export function dbHasNewer(car: Pick<ThingCar<Thing>, 'liveness'>): boolean {
   return (car.liveness === 'behind') || (car.liveness === 'bare')
 }
 
-/** True when `record` is whole, with its body, and not sparse. */
-export function isWholeRecord(record: Sparse<Thing>): record is Thing {
-  return kindChecksOf(record.labelpath).record.safeParse(record).success
-}
-
-// Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
-/** True when `record` is a tombstone, sparse or whole. The void sentinel is not one. */
-export function isTombstone<RecordT extends Thing>(record: Sparse<RecordT>): record is Tombstone<RecordT> {
-  return (record.am === 'x') && (! isVoidSentinel(record))
-}
-
-// The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0. Lifeseqs are
-// fixed-width base-32 digits, 0-9 then a-v, so lifepaths compare as strings; the shell's '-' sorts below them all.
-/** Compare two revisions, life first: positive when `post` is later than `ante`, negative when earlier, zero when the same. */
-export function cmpRecords(ante: Pick<DeliverableThing, 'lifepath' | 'revseq'>, post: Pick<DeliverableThing, 'lifepath' | 'revseq'>): number {
-  if (ante.lifepath !== post.lifepath) { return (post.lifepath > ante.lifepath) ? 1 : -1 }
-  return post.revseq - ante.revseq
-}
-
-/** True when `ante` and `post` are at one labelpath of one bank. */
-function isSameScope(ante: ThingScope, post: ThingScope): boolean {
-  return (ante.labelpath === post.labelpath) && (ante.userid === post.userid) && (ante.banklabel === post.banklabel)
+/** Demand that `val` is a sound car, refusing `unexpected_error` with `advice`. */
+function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing> {
+  CarChecks.thingCar.parse(val, { advice })
 }
 // --
 
-// == [Checks]: isLiveSparse, ArgChecks, Checks
+// == [Checks]: CarChecks, ArgChecks
 
-/** True when `record` is live, and not whole. */
-function isLiveSparse(record: Sparse<Thing>): boolean { return (record.am === 'a') && (! isWholeRecord(record)) }
-
-/** The check of {@link carOf}'s record: a Thing's scope and revision. */
-const ArgChecks = Validator.Checkers('bad_record', ({ obj }) => ({
-  deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
-}))
-
-/** The check of a car's invariants, as {@link ThingCar} states them. A car that fails it is a bug in the minder. */
-const Checks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
-  const recordShape = obj({ ...thingScope.shape, ...thingCited.shape })
+/** The checks of a car's invariants, as {@link ThingCar} states them, each liveness by name. A car that fails one is a bug in safebyok. */
+const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
+  const citedShape = obj({ ...thingScope.shape, ...thingCited.shape })
   // Its records pass through as they are, so that a refinement can compare them by reference.
-  const record = custom<Sparse<Thing>>((val) => recordShape.safeParse(val).success, Phrases.CarRecordShape)
-  const whole = custom<Thing>((val) => recordShape.safeParse(val).success && isWholeRecord(val as Sparse<Thing>), Phrases.CarFullestShape)
-  const thingCar = discrim('liveness', [
-    obj({ liveness: lit('full'), newest: record, fullest: whole })
-      .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit),
-    obj({ liveness: lit('behind'), newest: record, fullest: whole })
-      .refine(({ newest }) => isLiveSparse(newest), Phrases.CarNewestNotSparse)
-      .refine(({ newest, fullest }) => isSameScope(newest, fullest) && (newest.lifepath === fullest.lifepath) && (fullest.revseq < newest.revseq), Phrases.CarBehindOfOtherRevision),
-    obj({ liveness: lit('bare'), newest: record, fullest: lit(undefined) })
-      .refine(({ newest }) => isLiveSparse(newest), Phrases.CarNewestNotSparse),
-    obj({ liveness: lit('gone'), newest: record, fullest: lit(null) })
-      .refine(({ newest }) => isTombstone(newest), Phrases.CarGoneNotTombstone),
-    obj({ liveness: lit('void'), newest: record, fullest: lit(null) })
-      .refine(({ newest }) => isVoidSentinel(newest), Phrases.CarVoidNotShell),
-  ])
-  return { thingCar }
+  const cited = custom<Sparse<Thing>>((val) => citedShape.safeParse(val).success, Phrases.CarRecordShape)
+  const whole = custom<Thing>((val) => citedShape.safeParse(val).success && isWholeRecord(val as Sparse<Thing>), Phrases.CarFullestShape)
+  const fullCar   = obj({ liveness: lit('full'), newest: cited, fullest: whole })
+    .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit)
+  const behindCar = obj({ liveness: lit('behind'), newest: cited, fullest: whole })
+    .refine(({ newest }) => isSparse(newest), Phrases.CarNewestNotSparse)
+    .refine(({ newest, fullest }) => haveSameScope(newest, fullest) && (newest.lifepath === fullest.lifepath) && (fullest.revseq < newest.revseq), Phrases.CarBehindOfOtherRevision)
+  const bareCar   = obj({ liveness: lit('bare'), newest: cited, fullest: lit(undefined) })
+    .refine(({ newest }) => isSparse(newest), Phrases.CarNewestNotSparse)
+  const goneCar   = obj({ liveness: lit('gone'), newest: cited, fullest: lit(null) })
+    .refine(({ newest }) => isTombstone(newest), Phrases.CarGoneNotTombstone)
+  const voidCar   = obj({ liveness: lit('void'), newest: cited, fullest: lit(null) })
+    .refine(({ newest }) => isVoidSentinel(newest), Phrases.CarVoidNotShell)
+  const thingCar  = discrim('liveness', [fullCar, behindCar, bareCar, goneCar, voidCar])
+  return { thingCar, fullCar, behindCar, bareCar, goneCar, voidCar }
 })
+
+/** The checks of {@link carOf}'s arguments, refusing `bad_record`: a Thing's scope and revision, and the car a pair of records makes. */
+const ArgChecks = {
+  ...Validator.Checkers('bad_record', ({ obj }) => ({
+    deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
+  })),
+  thingCar: CarChecks.thingCar.refusingAs('bad_record'),
+}
 // --

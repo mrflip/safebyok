@@ -282,7 +282,7 @@ export function childShellCited(parentLifepath: Lifepath): ThingCited {
 }
 // --
 
-// == [Shells]: ShellChecks, VoidSentinel, isVoidSentinel, ShellScoped, ShellParent, shellOf
+// == [Shells]: ShellChecks, VoidSentinel, ShellScoped, ShellParent, shellOf
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
 const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, union, str }) => {
@@ -323,9 +323,6 @@ function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): bo
  */
 export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
 
-/** True when `record` is a void sentinel: its revseq is the shell's -1. */
-export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
-
 /** What {@link shellOf} reads of its first argument: the scope, and any other Thing field it proposes for the shell, its labelpath or label among them. */
 export type ShellScoped = Pick<ThingScope, 'userid' | 'banklabel'> & Partial<ThingRecord>
 
@@ -350,6 +347,44 @@ export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel
   if (lifepath === undefined) { throw new Errors.VaultError('bad_record', Phrases.ShellLifeless) }
   const shell = { fmt: ThingFormats[modelkindOf(labelpath)], ...proposed, labelpath, label: label ?? labelpath.slice(labelpath.lastIndexOf('/') + 1), lifepath }
   return Object.freeze(ShellChecks.shell.parse(shell)) as VoidSentinel
+}
+// --
+
+// == [Reading records]: isVoidSentinel, isWholeRecord, isTombstone, isSparse, haveSameScope, cmpThings
+
+/** True when `record` is a void sentinel: its revseq is the shell's -1. */
+export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
+
+/** True when `record` is whole, with its body, and not sparse. */
+export function isWholeRecord(record: Sparse<Thing>): record is Thing {
+  return kindChecksOf(record.labelpath).record.safeParse(record).success
+}
+
+// Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it. The void sentinel's `am` is 'x' too.
+/** True when `record` is a tombstone, sparse or whole. The void sentinel is not one. */
+export function isTombstone<RecordT extends Thing>(record: unknown): record is Sparse<RecordT> & Readonly<{ am: 'x' }> {
+  return ((record as Partial<ThingCited> | null | undefined)?.am === 'x') && (! isVoidSentinel(record as Sparse<Thing>))
+}
+
+/** True when `record` is live, and not whole. */
+export function isSparse(record: Sparse<Thing>): boolean {
+  return (record.am === 'a') && (! isWholeRecord(record))
+}
+
+/** True when `ante` and `post` are at one labelpath of one bank. */
+export function haveSameScope(ante: ThingScope, post: ThingScope): boolean {
+  return (ante.labelpath === post.labelpath) && (ante.userid === post.userid) && (ante.banklabel === post.banklabel)
+}
+
+// The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0, and the parent's later
+// lifeseq orders it after. Lifeseqs are fixed-width base-32 digits, 0-9 then a-v, so lifepaths compare as strings, and
+// the shell's '-' sorts below them all.
+/** Compare two revisions: by life, then revision. Returns: positive (`post` newer), negative (`ante` newer), zero (the same).
+ * The output is **not** restricted to -1, 0, 1: it may be any integer.
+ */
+export function cmpThings(ante: Pick<ThingCited, 'lifepath' | 'revseq'>, post: Pick<ThingCited, 'lifepath' | 'revseq'>): number {
+  if (ante.lifepath !== post.lifepath) { return (post.lifepath > ante.lifepath) ? 1 : -1 }
+  return post.revseq - ante.revseq
 }
 // --
 
