@@ -5,7 +5,8 @@ import { AdapterVaultDB, type Received } from './adapter-vault-db'
 import { Labelpath } from '../shapes/primitives'
 import { type Thing } from '../shapes/shapes-thing'
 import { type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
-import { type BankRootsFetched, type WorldFetched, isWriteAct, trackedFetchedOf, trackedFieldOf, worldOf, writtenRootsOf, writtenThingOf } from './thing-classifier'
+import type { BankRootsFetched, WorldFetched } from './thing-classifier'
+import * as Classifier from './thing-classifier'
 import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 
 /** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
@@ -40,7 +41,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   #write(record: Thing): Thing {
     const things = this.#thingsOf(record)
     things.set(record.labelpath, structuredClone(record))
-    return writtenThingOf(record, structuredClone(things.get(record.labelpath)))
+    return Classifier.writtenThingOf(record, structuredClone(things.get(record.labelpath)))
   }
 
   /** The raw roots of `ask`'s bank, each a copy, or null for none, and how its bank, main gate and root box compare with what `ask` tracks. */
@@ -54,13 +55,13 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const things  = this.#thingsOf(ask)
     const fetched = structuredClone({ bank: things.get('bank') ?? null, maingate: things.get(Labelpath.MainGate) ?? null })
     const rows    = { bank: fetched.bank, [Labelpath.MainGate]: fetched.maingate, [Labelpath.RootBox]: structuredClone(things.get(Labelpath.RootBox) ?? null) }
-    return { ...fetched, tracked: trackedFetchedOf(ask, rows) }
+    return { ...fetched, tracked: Classifier.trackedFetchedOf(ask, rows) }
   }
 
   /** The world of `ask`'s bank as it now stands, and its `tracked` for what `ask` tracks. */
   #worldAfter(ask: AnyAsk): { world: WorldRecord | null, tracked?: Tracked } {
     const fetched = this.#worldFetchedOf(ask)
-    return { world: worldOf(ask, fetched), ...trackedFieldOf(ask, fetched.tracked) }
+    return { world: Classifier.worldOf(ask, fetched), ...Classifier.trackedFieldOf(ask, fetched.tracked) }
   }
 
   // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
@@ -86,7 +87,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
   protected doWriteThing(ask: WriteAsk): Actual<EX.PutAct | EX.DelAct> {
     const things = this.#thingsOf(ask)
     const actual = this.classifyWriteThing(ask, structuredClone(things.get(ask.labelpath) ?? null), this.#worldFetchedOf(ask))
-    if (! (actual.ok && isWriteAct(actual.act))) { return actual }
+    if (! (actual.ok && Classifier.isWriteAct(actual.act))) { return actual }
     const record = this.#write(ask.record)
     const after  = this.#worldAfter(ask)
     this.#notify(record, after.world)
@@ -107,7 +108,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const actual = this.classifyBirthBank(puts, this.#rootsOf(ask))
     if (! (actual.ok && (actual.act === 'born'))) { return actual }
     for (const { labelpath, record } of puts) { things.set(labelpath, structuredClone(record)) }
-    const written = writtenRootsOf(puts, this.#rootsOf(ask))
+    const written = Classifier.writtenRootsOf(puts, this.#rootsOf(ask))
     const after   = this.#worldAfter(ask)
     for (const thing of Object.values(written)) { this.#notify(thing, after.world) }
     return { ...actual, ...after, things: written }

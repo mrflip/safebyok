@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import { classifyListThings } from '../../src/storage/thing-classifier'
+import * as Classifier from '../../src/storage/thing-classifier'
 import * as TH from '../test-helpers'
 
 TH.describeVaultDBBattery('MemoryVaultDB', {
@@ -69,9 +69,9 @@ describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
   })
 })
 
-describe("classifyListThings(ask, fetched, roots)", () => {
+describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    TH.expectSyncRefusal(() => classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [child] }, { bank: null, maingate: null }), 'storage_issue')
+    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [child] }, { bank: null, maingate: null }), 'storage_issue')
   })
 })
