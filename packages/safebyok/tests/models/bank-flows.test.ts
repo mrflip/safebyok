@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
 import type { Bank, BoxShell, BoxUnsealed } from '../../src/models/bank'
 import type { BoxRecord } from '../../src/models/sealers'
-import { type BoxThing, ShellLifeseq, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
+import { type BoxThing, VoidLifeseq, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -53,7 +53,7 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
   it("gives the shell of a box not stored, under the root box's life, for its first revision to cite", async () => {
     const bank = await storedBank()
     const shell = await priorOf(bank)
-    expect(shell).to.include({ ...bank.scope, labelpath: Openai, label: 'openai', am: 'x', lifeseq: ShellLifeseq, lifepath: `${bank.rootBox.lifeseq}/${ShellLifeseq}` })
+    expect(shell).to.include({ ...bank.scope, labelpath: Openai, label: 'openai', am: 'x', lifeseq: VoidLifeseq, lifepath: `${bank.rootBox.lifeseq}/${VoidLifeseq}` })
   })
 
   it("puts a box over its shell, and again over itself, each put unsealing what the one before sealed", async () => {

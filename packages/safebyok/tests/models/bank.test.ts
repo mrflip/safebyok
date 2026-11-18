@@ -6,7 +6,7 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { BoxRecord, BoxTombstone } from '../../src/models/sealers'
 import type { Lifeseq } from '../../src/storage/primitives'
-import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, ShellLifeseq, boxThing, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
+import { BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, VoidLifeseq, boxThing, getAskOf, lifeseqOfLifenum, sparseOf } from '../../src/storage/shapes-thing'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -76,7 +76,7 @@ describe("Bank.makeRecord(dna)", () => {
 
   it("makes the root box its shell, which the birth seals as the first revision of its first life", async () => {
     const { record, bank } = await TH.buildBornBank()
-    expect(record.rootBox).to.deep.equal({ ...TH.RootScope, label: 'box', fmt: BoxThingFormat, ...ShellCited, lifeseq: ShellLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime })
+    expect(record.rootBox).to.deep.equal({ ...TH.RootScope, label: 'box', fmt: BoxThingFormat, ...ShellCited, lifeseq: VoidLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime })
     expect(bank.rootBox).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0, written_at: TH.T0 })
     expect(bank.rootBox).to.include.keys('sidecar', 'whisper_sealed')
   })
@@ -423,7 +423,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   // lifeseq is bound; the bank refuses it before any seal.
   it("refuses at the seal, the tombstone and the unseal a box under another life of the root box", async () => {
     const { bank } = await TH.buildBornBank()
-    await TH.expectRefusal(bank.sealBox(TH.boxShellOf({ lifepath: `${Life2}/${ShellLifeseq}` }), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'record_conflict')
+    await TH.expectRefusal(bank.sealBox(TH.boxShellOf({ lifepath: `${Life2}/${VoidLifeseq}` }), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'record_conflict')
     const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const moved = { lifepath: `${Life2}/${box.lifeseq}` }
     await TH.expectRefusal(bank.tombstoneBox({ ...box, ...moved }), 'record_conflict')

@@ -4,9 +4,9 @@ export { MemoryVaultDB } from './storage/memory-vault-db'
 export type { Banklabel, DeviceTok, EpochMillis, Labelpath, Lifenum, Lifepath, Lifeseq, Revtok, Userid } from './storage/primitives'
 export {
   type AnyAsk, type BankRecord, type BankRoots, type BankThing, type BankWriteAsk, type BirthBankAsk, type BirthPuts, type BoxThing, type BoxWriteAsk, type CitedOf, type DelAskDraft,
-  type GateThing, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type Sealed, type ShellParent, type ShellScoped, type VoidSentinel, type Wayins,
+  type GateThing, type GateWriteAsk, type GetAskDraft, type GetAsk, type ListAskDraft, type ListAsk, type LoggableAsk, type PutAskDraft, type Sealed, type VoidSentinel, type Wayins,
   type Sparse, type StoredCited, type Thing, type ThingCited, type ThingRecord, type ThingScope, type ThingWatchScope, type Thingkind, type Track, type Tracked, type WorldRecord, type WriteAsk,
-  BankThingFormat, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifepath, ShellLifeseq,
+  BankThingFormat, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, RootVoidLifepath, VoidLifeseq,
   ThingFormats, boxRecord, boxRecordOrShell, boxSealable, childShellCited, delAskOf, getAskOf, isGone, isTombstoneLifeseq, isLabelpathOfKind, isTombstone, isVoidSentinel, lifenumOfLifeseq, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, modelkindOf,
   putAskOf, sealed, shellOf, sparseOf, thingkindVals, wayins,
 } from './storage/shapes-thing'

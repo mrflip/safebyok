@@ -17,7 +17,7 @@ import { Lease, type LeaseBank } from '../../src/models/lease'
 import { type GateRevisionedStamp, NOVEL, PasskeyProving, PassphraseProving, type Proving, type ProvingDevice, guardKeyDeriver } from '../../src/models/proving'
 import { type StrengthChecker, guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/models/stamps'
-import { BoxThingFormat, ShellLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
+import { BoxThingFormat, VoidLifeseq, lifeseqOfLifenum } from '../../src/storage/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAsk } from '../../src/storage/shapes-thing'
@@ -157,7 +157,7 @@ export const Sidecar = Object.freeze({ account: 'work' })
 export function boxShellOf(overrides: Partial<BoxShell> = {}): BoxShell {
   return {
     userid: WorldScope.userid, banklabel: WorldScope.banklabel, labelpath: 'box/anthropic_api_key', label: 'anthropic_api_key', fmt: BoxThingFormat,
-    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: ShellLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${ShellLifeseq}`,
+    revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifeseq: VoidLifeseq, lifepath: `${lifeseqOfLifenum(0)}/${VoidLifeseq}`,
     born_at: T0, written_at: T0, ...overrides,
   }
 }

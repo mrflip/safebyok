@@ -8,18 +8,18 @@ import type { TombstoneOf } from '../models/sealers'
 import * as Phrases from '../phrases'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
-// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isTombstoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
+// == [Lifeseqs]: VoidLifeseq, RootVoidLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isTombstoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
 
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10
 
 /** The shell's lifeseq, for life -1. It is never stored, and sorts below every life's. */
-export const ShellLifeseq = '-000000001'
+export const VoidLifeseq = '-000000001'
 /** A root's shell lifepath: the shell's lifeseq alone. */
-export const ShellLifepath = ShellLifeseq
+export const RootVoidLifepath = VoidLifeseq
 
 /** The lifeseq of life `lifenum`: its base-32 digits (`0-9a-v`) padded to 10, which sort in the order of the lives. Life -1's is the shell's. */
-export function lifeseqOfLifenum(lifenum: Lifenum): Lifeseq { return (lifenum === -1) ? ShellLifeseq : lifenum.toString(32).padStart(LifeseqDigits, '0') }
+export function lifeseqOfLifenum(lifenum: Lifenum): Lifeseq { return (lifenum === -1) ? VoidLifeseq : lifenum.toString(32).padStart(LifeseqDigits, '0') }
 
 /** The lifenum of `lifeseq`, the number of the life it names: -1 for the shell's. */
 export function lifenumOfLifeseq(lifeseq: Lifeseq): Lifenum { return Number.parseInt(lifeseq, 32) }
@@ -76,7 +76,7 @@ function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some(
 
 const LifeseqPattern       = /^[0-9a-v]{10}$/
 const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/
-const ShellLifepathPattern = /^(?:[0-9a-v]{10}\/)*-000000001$/
+const RootVoidLifepathPattern = /^(?:[0-9a-v]{10}\/)*-000000001$/
 
 type Labelled = { labelpath: Labelpath, label: string }
 type Lived    = { lifepath: Lifepath, am: string }
@@ -101,23 +101,31 @@ function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT 
 /** True when a citation is the shell in all three of its marks, or in none. */
 function isShellCitable({ revtok, revseq, lifepath }: Revised): boolean {
   const isShell = (revseq === SX.VoidRevisionSeq)
-  return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifeseqOfLifepath(lifepath) === ShellLifeseq))
+  return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifeseqOfLifepath(lifepath) === VoidLifeseq))
 }
 
 /** The checks of a Thing's fields, of each kind of Thing and its citation, and of what a write reads of the Thing stored. */
-export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell } = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, union, discrim, user_id, label, epochMillis }) => {
+export const ThingChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, lit, oneof, union, discrim, user_id, label, epochMillis }) => {
+  // A root's labelpath is its modelkind alone.
+  const modelkind    = oneof(thingkindVals)
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
+  const voidLifeseq  = lit(VoidLifeseq)
+  const anyLifeseq   = lifeseq.or(voidLifeseq)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
+  const voidLifepath = str.regex(RootVoidLifepathPattern, Phrases.LifepathShape)
+  const anyLifepath  = lifepath.or(voidLifepath)
   const am           = SX.am.exclude(['d'])
-  const thingScope   = obj({ userid: user_id, banklabel: label, labelpath })
+  const bankScope    = obj({ userid: user_id, banklabel: label })
+  const thingScope   = bankScope.extend({ labelpath })
+  // FIXME revtok is much more constrained than this.
   const revisioned   = { revtok: str.min(1), revseq: uint, am, lifeseq, lifepath, born_at: epochMillis, written_at: epochMillis }
   // Just what the act tables compare. A write may cite the shell, so its revseq and life may be the shell's -1.
   const thingCited   = obj({
     revtok:   revisioned.revtok,
     revseq:   int.min(SX.VoidRevisionSeq),
     am,
-    lifepath: union([lifepath, str.regex(ShellLifepathPattern, Phrases.LifepathShape)]),
+    lifepath: union([lifepath, str.regex(RootVoidLifepathPattern, Phrases.LifepathShape)]),
   })
   const thingRecord  = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
@@ -193,7 +201,7 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   // A box's shell, as a bank gives it, carries the shell's lifeseq.
-  const lifeseqOrShell = union([lifeseq, lit(ShellLifeseq)])
+  const lifeseqOrShell = union([lifeseq, lit(VoidLifeseq)])
   const boxCited     = obj({ ...exactPartialOf(boxLive.shape), lifeseq: exactOptional(lifeseqOrShell), ...thingCited.shape }).strict()
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
@@ -228,8 +236,8 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     revtok:         lit(SX.VoidRevisionTok),
     revseq:         lit(SX.VoidRevisionSeq),
     am:             lit('x'),
-    lifeseq:        lit(ShellLifeseq),
-    lifepath:       str.regex(ShellLifepathPattern, Phrases.LifepathShape),
+    lifeseq:        lit(VoidLifeseq),
+    lifepath:       str.regex(RootVoidLifepathPattern, Phrases.LifepathShape),
     born_at:        lit(SX.VoidTime),
     written_at:     lit(SX.VoidTime),
   }).strict()
@@ -238,10 +246,15 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isLifepathDeep, Phrases.LifepathDepth)
   const boxRecordOrShell = union([boxRecord, boxShell])
   return {
+    modelkind, labelpath, anyLifeseq, voidLifeseq, anyLifepath, voidLifepath, ...revisioned, bankScope, label,
     thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord,
     boxRecordOrShell,
   }
 })
+/** Each of {@link ThingChecks}, by name. */
+export const {
+  thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
+} = ThingChecks
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof thingScope>>
@@ -274,39 +287,38 @@ export function sparseOf<RecordT extends ThingRecord>(record: RecordT): Sparse<R
 
 /** The citation for a root's birth: the shell, the void sentinel for no Thing stored. */
 export const ShellCited: ThingCited = Object.freeze({
-  revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: ShellLifepath,
+  revtok: SX.VoidRevisionTok, revseq: SX.VoidRevisionSeq, am: 'x', lifepath: RootVoidLifepath,
 })
 
 /** The citation for the birth of a child of the Thing at `parentLifepath`: the shell, at the parent's lifepath then the shell's lifeseq. */
 export function childShellCited(parentLifepath: Lifepath): ThingCited {
-  return Object.freeze({ ...ShellCited, lifepath: `${parentLifepath}/${ShellLifeseq}` })
+  return Object.freeze({ ...ShellCited, lifepath: `${parentLifepath}/${VoidLifeseq}` })
 }
 // --
 
-// == [Shells]: ShellChecks, VoidSentinel, ShellScoped, ShellParent, shellOf
+// == [Shells]: ShellChecks, VoidSentinel, shellOf, scopedWithParentage, lifepathWithParentage
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
-const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, union, str }) => {
+const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, str }) => {
   const fixed = {
     revtok:     lit(SX.VoidRevisionTok).default(SX.VoidRevisionTok),
     revseq:     lit(SX.VoidRevisionSeq).default(SX.VoidRevisionSeq),
-    am:         lit('x').default('x'),
-    lifeseq:    lit(ShellLifeseq).default(ShellLifeseq),
+    am:         lit('x').default('x'), //
+    lifeseq:    ThingChecks.voidLifeseq.default(VoidLifeseq),
     born_at:    lit(SX.VoidTime).default(SX.VoidTime),
     written_at: lit(SX.VoidTime).default(SX.VoidTime),
   }
-  const shellLifepath = str.regex(ShellLifepathPattern, Phrases.LifepathShape)
+  const shellLifepath = str.regex(RootVoidLifepathPattern, Phrases.LifepathShape)
   return {
     shellScoped: obj({
       userid:    thingScope.shape.userid,
       banklabel: thingScope.shape.banklabel,
-      labelpath: thingScope.shape.labelpath.optional(),
-      label:     label.optional(),
-      lifepath:  shellLifepath.optional(),
-      fmt:       uint.optional(),
+      labelpath: exactOptional(thingScope.shape.labelpath),
+      label:     exactOptional(label),
+      lifepath:  exactOptional(shellLifepath),
+      fmt:       exactOptional(uint),
       ...fixed,
     }),
-    shellParent: obj({ labelpath: thingScope.shape.labelpath, lifepath: union([thingRecord.shape.lifepath, shellLifepath]) }),
     // What a shell proposed must meet, of a record's rules.
     shell: obj({ ...thingScope.shape, label, fmt: uint, lifepath: shellLifepath, ...fixed })
       .refine(isLabelLast,    Phrases.LabelNotLast)
@@ -319,36 +331,83 @@ const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, u
 /** True when a Thing's fmt is its kind's. */
 function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): boolean { return fmt === ThingFormats[modelkindOf(labelpath)] }
 
-/** The shell of a scope, as cached where storage holds nothing: a tombstone with every Thing field and no body.
- * Its revseq is -1. A write cites it as the Thing it expects to find, to make the Thing's first revision.
+/** A shell tombstone with every Thing field (and no body).
+ * Its revseq is -1. Cite this when creating a new Thing (revseq 0)
  */
 export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
 
-/** What {@link shellOf} reads of its first argument: the scope, and any other Thing field it proposes for the shell, its labelpath or label among them. */
-export type ShellScoped = Pick<ThingScope, 'userid' | 'banklabel'> & Partial<ThingRecord>
-
-/** What {@link shellOf} reads of a parent: its labelpath and lifepath, from a record, a sparse record, an instance or a literal. */
-export type ShellParent = Pick<ThingRecord, 'labelpath' | 'lifepath'>
-
-/** The shell of the Thing at `scoped`'s scope, the record its first revision cites.
- * A root's shell needs no life. Below a root, the life comes from `parent`, or from `scoped.lifepath`, the shell's own.
- * With `parent`, `scoped` may give its `label` in place of its `labelpath`. Each field of `scoped` that the shell has is proposed for it,
- * and must hold the shell's value; the rest are not read.
+/** Builds a shell tombstone (stands in for a void row: never been created)
+ *  It will have magic values for revseq (-1), lifeseq ('-000000001'), and am ('x').
+ *  In the root case, supply a labelpath equal to the modelkind
+ *  Otherwise: either an explicit labelpath/lifepath, or a label and a parent's labelpath/lifepath.
  */
-export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel {
-  const { labelpath: given, label, lifepath: givenLifepath, ...proposed } = ShellChecks.shellScoped.parse(scoped)
-  const kin = (parent === undefined) ? undefined : ShellChecks.shellParent.parse(parent)
-  const labelpath = given ?? (((kin === undefined) || (label === undefined)) ? undefined : `${kin.labelpath}/${label}`)
-  if (labelpath === undefined) { throw new Errors.VaultError('bad_record', Phrases.ShellUnscoped) }
-  const parentpath = labelpath.slice(0, Math.max(0, labelpath.lastIndexOf('/')))
-  if ((kin !== undefined) && (kin.labelpath !== parentpath)) { throw new Errors.VaultError('bad_record', Phrases.ShellNotChild) }
-  const kinLifepath = (kin === undefined) ? undefined : `${kin.lifepath}/${ShellLifeseq}`
-  if ((kinLifepath !== undefined) && (givenLifepath !== undefined) && (givenLifepath !== kinLifepath)) { throw new Errors.VaultError('bad_record', Phrases.ShellOfOtherLife) }
-  const lifepath = givenLifepath ?? kinLifepath ?? ((parentpath === '') ? ShellLifepath : undefined)
-  if (lifepath === undefined) { throw new Errors.VaultError('bad_record', Phrases.ShellLifeless) }
-  const shell = { fmt: ThingFormats[modelkindOf(labelpath)], ...proposed, labelpath, label: label ?? labelpath.slice(labelpath.lastIndexOf('/') + 1), lifepath }
-  return Object.freeze(ShellChecks.shell.parse(shell)) as VoidSentinel
+export function shellOf(raw: Partial<ThingRecord>, parent?: Partial<ThingRecord>): VoidSentinel {
+  const proposed = ShellChecks.shellScoped.parse(raw)
+  if (ThingChecks.modelkind.safeParse(proposed.labelpath).success) { return rootShellOf(proposed) }
+  const labels    = labelpathWithParentage(proposed, parent)
+  const lives    = lifepathWithParentage(proposed, parent)
+  const fmt      = ThingFormats[modelkindOf(labels.labelpath)]
+  const shell    = ShellChecks.shell.parse({ fmt, ...proposed, ...labels, ...lives })
+  demandConsistentParent(shell, parent)
+  return Object.freeze(shell) as VoidSentinel
 }
+function rootShellOf(proposed: Partial<ThingRecord>): VoidSentinel {
+  const modelkind = ThingChecks.modelkind.parse(proposed.labelpath)
+  return Object.freeze(ShellChecks.shell.parse({
+    fmt: ThingFormats[modelkind], label: modelkind, lifepath: RootVoidLifepath, ...proposed,
+  })) as VoidSentinel
+}
+
+function demandConsistentParent(partialThing: Pick<ThingRecord, 'userid' | 'banklabel' | 'labelpath' | 'lifepath'>, parent?: Partial<ThingRecord>): void {
+  if (! parent) { return }
+  const bankScope = ThingChecks.bankScope.parse(partialThing)
+  const parentpath = parentpathOf(partialThing.labelpath)
+  const parentlife = leadingLifeseqsOf(partialThing.lifepath)
+  Validator.demandConsistent({ ...bankScope, labelpath: parentpath, lifepath: parentlife }, parent)
+}
+
+/** Extract labelpath and label from a record: an explicit labelpath on the record, or a label and a parent's labelpath.
+ *  Caller must check that nothing in the record, or its parent, disagrees.
+ */
+export function labelpathWithParentage(
+  raw: Partial<Pick<ThingRecord, 'labelpath' | 'label'>>, parent?: Partial<Pick<ThingRecord, 'labelpath'>>,
+): Pick<ThingRecord, 'labelpath' | 'label'> {
+  if (raw.labelpath) { // if raw has a labelpath, find the label of it; prefer raw so it survives to the consistent check.
+    const labelpath = ThingChecks.labelpath.parse(raw.labelpath)
+    const label     = raw.label ?? labelOfLabelpath(labelpath)
+    return labelpathWithParentageChecker.parse({ labelpath, label })
+  }
+  const label      = ThingChecks.label.parse(raw.label)
+  const labelpath  = ThingChecks.labelpath.parse(parent?.labelpath) + '/' + label
+  return labelpathWithParentageChecker.parse({ labelpath, label })
+}
+const labelpathWithParentageChecker = Validator.Checker(() => thingRecord.pick({ labelpath: true, label: true }))
+
+/** Extract lifeseq and lifepath from a record: an explicit lifepath on the record, or a lifeseq and a parent's lifepath.
+ *  Caller must check that nothing in the record, or its parent, disagrees.
+ */
+export function lifepathWithParentage(raw: Partial<Pick<ThingRecord, 'lifepath' | 'lifeseq'>>, parent?: Partial<Pick<ThingRecord, 'lifepath'>>): Pick<ThingRecord, 'lifepath' | 'lifeseq'> {
+  // if raw has a lifepath, find the lifeseq. Consistency check is done by the caller.
+  if (raw.lifepath) {
+    const lifeseq = lifeseqOfLifepath(raw.lifepath)
+    return lifepathWithParentageChecker.parse({ lifeseq, lifepath: raw.lifepath })
+  }
+  // otherwise, build a lifepath from the parent's lifepath and the raw's lifeseq.
+  const lifeseq  = raw.lifeseq ?? ''
+  const lifepath = ThingChecks.lifepath.parse(parent?.lifepath) + '/' + lifeseq
+  return lifepathWithParentageChecker.parse({ lifeseq, lifepath })
+}
+const lifepathWithParentageChecker = Validator.Checker(({ obj }) => obj({ lifepath: ThingChecks.anyLifepath, lifeseq: ThingChecks.anyLifeseq }))
+
+function labelOfLabelpath(labelpath: Labelpath): string {
+  return labelpath.slice(labelpath.lastIndexOf('/') + 1)
+}
+
+/** The labelpath of a Thing's parent: its labelpath less its own label, `''` for a root. */
+function parentpathOf(labelpath: Labelpath): Labelpath {
+  return labelpath.slice(0, Math.max(0, labelpath.lastIndexOf('/')))
+}
+
 // --
 
 // == [Reading records]: Tombstone, isVoidSentinel, isWholeRecord, isTombstone, isGone, isSparse, haveSameScope, cmpThings
@@ -357,17 +416,21 @@ export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel
 export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
 
 /** True when `record` is a void sentinel: its revseq is the shell's -1. */
-export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
+export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel {
+  if (! isTombstone(record)) { return false }
+  return record.revseq === SX.VoidRevisionSeq
+}
 
 // The void sentinel is a whole tombstone, though no record check accepts it: a store must never take a shell as a record.
 /** True when `record` is whole, with its body, and not sparse. The void sentinel is whole. */
-export function isWholeRecord(record: Sparse<Thing>): record is Thing | VoidSentinel {
+export function isWholeRecord(record: Sparse<Thing>): record is Thing {
   return isVoidSentinel(record) || kindChecksOf(record.labelpath).record.safeParse(record).success
 }
 
 // Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
 /** True when `record` is a tombstone, sparse or whole, the void sentinel among them. */
 export function isTombstone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
+  // FIXME: use a safe-parse checker here
   return (record as Partial<ThingCited> | null | undefined)?.am === 'x'
 }
 
