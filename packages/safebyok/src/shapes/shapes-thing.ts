@@ -248,6 +248,7 @@ export const BoxChecks = Object.freeze({
   sealable: PerKindChecks.boxSealable, live: PerKindChecks.boxRecord, liveOrShell: PerKindChecks.boxRecordOrShell,
 } as const)
 
+/** The bundle of each kind of Thing, by its modelkind. */
 const byKind = { bank: BankChecks, gate: GateChecks, box: BoxChecks } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, policies: readonly EX.StoragePolicy[] }>
 
 /** The checks for the kind of Thing at `labelpath`, which must be sound. */
@@ -257,7 +258,8 @@ function ofLabelpath(labelpath: Labelpath): typeof byKind[Thingkind] { return by
 const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_record')
 
 /** The checks of a Thing's fields, of its citation, of what a write reads of the Thing stored, and of a host's vaultDB.
- * `byKind` holds the bundle of each kind of Thing: {@link BankChecks}, {@link GateChecks} and {@link BoxChecks}.
+ * `byKind` holds the bundle of each kind of Thing: {@link BankChecks}, {@link GateChecks} and {@link BoxChecks}; `ofLabelpath` gives the one for a labelpath.
+ * Also `ThingFormats`, the `fmt` of each kind, and `thingkindVals`, the kinds.
  */
 export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, byKind, ofLabelpath, ThingFormats, thingkindVals })
 

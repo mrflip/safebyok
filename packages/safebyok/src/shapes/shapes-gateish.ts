@@ -164,7 +164,7 @@ const StrengthChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, BigPhrases.StrengthCheckerShape),
 }))
 
-/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice} and a host's {@link StrengthChecker}.
+/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, a {@link LeaseBank} and a host's {@link StrengthChecker}.
  * Also `gatingkindVals`, the kinds of gating.
  */
 export const GateishChecks = Object.freeze({ ...RawChecks, ...StrengthChecks, gatingkindVals })
