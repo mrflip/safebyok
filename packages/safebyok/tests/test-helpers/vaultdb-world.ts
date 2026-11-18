@@ -7,7 +7,7 @@ import {
   type ThingCited, type Track, type WriteAsk,
   BankThingFormat, BoxThingFormat, GateThingFormat, ShellCited, delAskOf, getAskOf, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, putAskOf, lifenumOfLifeseq,
 } from '../../src/storage/shapes-thing'
-import { T0 } from './models-world'
+import { FirstRevtok, T0, revtokOf } from './models-world'
 
 /** The bank the Things stand in. */
 export const ThingBank = Object.freeze({ userid: 'u1', banklabel: 'acme' })
@@ -33,7 +33,7 @@ export const FakeSealed = Object.freeze({ key_wrapped: FakeCiphered, ciphered: F
 export const Life0 = lifeseqOfLifenum(0)
 
 /** The fields every Thing here starts from: revision 0 of life 0, born and written at {@link T0}. */
-const FirstRevision = { am: 'a', revtok: 'rev-0', revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
+const FirstRevision = { am: 'a', revtok: FirstRevtok, revseq: 0, lifeseq: Life0, born_at: T0, written_at: T0 } as const
 
 /** The track of the bank, main gate and root box `bank`, `gate` and `box`: their revseq and lifepath. */
 export function trackOf(bank: Thing = bankThingOf(), gate: Thing = gateThingOf(), box: Thing = rootBoxOf()): Track {
@@ -72,7 +72,7 @@ export function boxThingOf(label = 'openai', overrides: Partial<BoxThing> = {}):
 
 /** The revision after `prior`, written a millisecond later, with `overrides` laid over it. */
 export function nextOf<RecordT extends Thing>(prior: RecordT, overrides: Partial<RecordT> = {}): RecordT {
-  return { ...prior, revtok: `rev-${String(prior.revseq + 1)}`, revseq: prior.revseq + 1, written_at: prior.written_at + 1, ...overrides }
+  return { ...prior, revtok: revtokOf(String(prior.revseq + 1)), revseq: prior.revseq + 1, written_at: prior.written_at + 1, ...overrides }
 }
 
 /** The revision of the main gate after `prior`: see {@link nextOf}. */

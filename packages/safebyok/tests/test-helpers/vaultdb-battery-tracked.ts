@@ -6,6 +6,7 @@ import {
   BankStaleTrack, GateStaleTrack, RootStaleTrack, bankThingOf, birthAskOf, birthBankAskOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
+import { OtherRevtok } from './models-world'
 
 /** Register the battery's cases of `tracked`. */
 export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld): void {
@@ -34,14 +35,14 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
 
     it("is carried by a refusal", async () => {
       const vaultDB = await bornBank()
-      const refusal = await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: 'rev-other' })), track: GateStaleTrack })
+      const refusal = await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: OtherRevtok })), track: GateStaleTrack })
       expect(refusal).to.deep.include({ ok: false, act: 'stale', tracked: { bank: 'same', gate: gateThingOf(), box: 'same' } })
     })
 
     it("is the roots written or found, to a birth", async () => {
       const vaultDB = await fresh()
       expect(await vaultDB.tryBirthBank({ ...birthBankAskOf(), track: BankStaleTrack })).to.deep.include({ ok: true, act: 'born', tracked: { bank: bankThingOf(), gate: 'same', box: 'same' } })
-      const other = birthBankAskOf({ bank: bankThingOf({ revtok: 'rev-other' }), track: trackOf() })
+      const other = birthBankAskOf({ bank: bankThingOf({ revtok: OtherRevtok }), track: trackOf() })
       expect(await vaultDB.tryBirthBank(other)).to.deep.include({ ok: true, act: 'passed', tracked: { bank: 'same', gate: 'same', box: 'same' } })
     })
 

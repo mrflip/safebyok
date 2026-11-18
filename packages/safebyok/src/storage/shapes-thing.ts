@@ -2,7 +2,7 @@
 
 import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
-import { exactOptional } from 'zod'
+import { exactOptional, uuid } from 'zod'
 import { BX, type Consts, CX, EX, Errors, SX, Validator } from 'safebyok-big/internals'
 import type { TombstoneOf } from '../models/sealers'
 import * as Phrases from '../phrases'
@@ -74,9 +74,13 @@ function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some(
 
 // == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell, StoredCited, Sealed, Wayins, Sparse, sparseOf, ShellCited, childShellCited
 
-const LifeseqPattern       = /^[0-9a-v]{10}$/
-const LifepathPattern      = /^[0-9a-v]{10}(?:\/[0-9a-v]{10})*$/
-const RootVoidLifepathPattern = /^(?:[0-9a-v]{10}\/)*-000000001$/
+// A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
+// and only its last may be void: a void lifepath is the void lifeseq under its parent's lifepath, or alone at a root.
+const LifeseqPattern      = /^[0-9a-v]{10}$/
+const AnyLifeseqPattern   = /^(?:[0-9a-v]{10}|-000000001)$/
+const LifepathPattern     = /^(?:[0-9a-v]{10}\/)*[0-9a-v]{10}$/
+const VoidLifepathPattern = /^(?:[0-9a-v]{10}\/)*-000000001$/
+const AnyLifepathPattern  = /^(?:[0-9a-v]{10}\/)*(?:[0-9a-v]{10}|-000000001)$/
 
 type Labelled = { labelpath: Labelpath, label: string }
 type Lived    = { lifepath: Lifepath, am: string }
@@ -111,21 +115,21 @@ export const ThingChecks = Validator.Checkers('bad_record', ({ obj, str, int, ui
   const labelpath    = str.refine(isLabelpath, Phrases.LabelpathShape)
   const lifeseq      = str.regex(LifeseqPattern, Phrases.LifeseqShape)
   const voidLifeseq  = lit(VoidLifeseq)
-  const anyLifeseq   = lifeseq.or(voidLifeseq)
+  const anyLifeseq   = str.regex(AnyLifeseqPattern, Phrases.LifeseqShape)
   const lifepath     = str.regex(LifepathPattern, Phrases.LifepathShape)
-  const voidLifepath = str.regex(RootVoidLifepathPattern, Phrases.LifepathShape)
-  const anyLifepath  = lifepath.or(voidLifepath)
+  const voidLifepath = str.regex(VoidLifepathPattern, Phrases.LifepathShape)
+  const anyLifepath  = str.regex(AnyLifepathPattern, Phrases.LifepathShape)
   const am           = SX.am.exclude(['d'])
   const bankScope    = obj({ userid: user_id, banklabel: label })
   const thingScope   = bankScope.extend({ labelpath })
-  // FIXME revtok is much more constrained than this.
-  const revisioned   = { revtok: str.min(1), revseq: uint, am, lifeseq, lifepath, born_at: epochMillis, written_at: epochMillis }
+  // A revtok is minted by crypto.randomUUID; the void revtok is the nil UUID.
+  const revisioned   = { revtok: uuid(Phrases.RevtokShape), revseq: uint, am, lifeseq, lifepath, born_at: epochMillis, written_at: epochMillis }
   // Just what the act tables compare. A write may cite the shell, so its revseq and life may be the shell's -1.
   const thingCited   = obj({
     revtok:   revisioned.revtok,
     revseq:   int.min(SX.VoidRevisionSeq),
     am,
-    lifepath: union([lifepath, str.regex(RootVoidLifepathPattern, Phrases.LifepathShape)]),
+    lifepath: anyLifepath,
   })
   const thingRecord  = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
@@ -201,8 +205,7 @@ export const ThingChecks = Validator.Checkers('bad_record', ({ obj, str, int, ui
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   // A box's shell, as a bank gives it, carries the shell's lifeseq.
-  const lifeseqOrShell = union([lifeseq, lit(VoidLifeseq)])
-  const boxCited     = obj({ ...exactPartialOf(boxLive.shape), lifeseq: exactOptional(lifeseqOrShell), ...thingCited.shape }).strict()
+  const boxCited     = obj({ ...exactPartialOf(boxLive.shape), lifeseq: exactOptional(anyLifeseq), ...thingCited.shape }).strict()
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
@@ -213,7 +216,7 @@ export const ThingChecks = Validator.Checkers('bad_record', ({ obj, str, int, ui
     labelpath:      boxLive.shape.labelpath,
     fmt:            lit(BoxThingFormat),
     revseq:         thingCited.shape.revseq,
-    lifeseq:        lifeseqOrShell,
+    lifeseq:        anyLifeseq,
     lifepath:       thingCited.shape.lifepath,
     sidecar:        exactOptional(CX.sidecar),
   })
@@ -236,8 +239,8 @@ export const ThingChecks = Validator.Checkers('bad_record', ({ obj, str, int, ui
     revtok:         lit(SX.VoidRevisionTok),
     revseq:         lit(SX.VoidRevisionSeq),
     am:             lit('x'),
-    lifeseq:        lit(VoidLifeseq),
-    lifepath:       str.regex(RootVoidLifepathPattern, Phrases.LifepathShape),
+    lifeseq:        voidLifeseq,
+    lifepath:       voidLifepath,
     born_at:        lit(SX.VoidTime),
     written_at:     lit(SX.VoidTime),
   }).strict()
@@ -299,7 +302,7 @@ export function childShellCited(parentLifepath: Lifepath): ThingCited {
 // == [Shells]: ShellChecks, VoidSentinel, shellOf, scopedWithParentage, lifepathWithParentage
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
-const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, str }) => {
+const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label }) => {
   const fixed = {
     revtok:     lit(SX.VoidRevisionTok).default(SX.VoidRevisionTok),
     revseq:     lit(SX.VoidRevisionSeq).default(SX.VoidRevisionSeq),
@@ -308,7 +311,7 @@ const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, s
     born_at:    lit(SX.VoidTime).default(SX.VoidTime),
     written_at: lit(SX.VoidTime).default(SX.VoidTime),
   }
-  const shellLifepath = str.regex(RootVoidLifepathPattern, Phrases.LifepathShape)
+  const shellLifepath = ThingChecks.voidLifepath
   return {
     shellScoped: obj({
       userid:    thingScope.shape.userid,
@@ -430,9 +433,10 @@ export function isWholeRecord(record: Sparse<Thing>): record is Thing {
 // Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
 /** True when `record` is a tombstone, sparse or whole, the void sentinel among them. */
 export function isTombstone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
-  // FIXME: use a safe-parse checker here
-  return (record as Partial<ThingCited> | null | undefined)?.am === 'x'
+  return TombstoneCheck.safeParse(record).success
 }
+/** What every tombstone has, sparse or whole: a Thing's scope and citation, marked deleted. */
+const TombstoneCheck = Validator.Checker(({ obj, lit }) => obj({ ...thingScope.shape, ...thingCited.shape, am: lit('x') }))
 
 /** True when `record` is the tombstone of a deleted Thing, sparse or whole: any tombstone but the void sentinel. */
 export function isGone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {

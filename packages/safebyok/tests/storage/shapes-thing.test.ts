@@ -272,8 +272,8 @@ describe("checkedWriteAsk(ask), of the main gate", () => {
     [{ ...good, record: { ...next, label: 'main' } },                                Phrases.LabelNotLast,       'a label not the last of its labelpath'],
     [{ ...good, record: { ...next, wayins: {} } } as never,                         'wayins.main',              'a gate with no passphrase wayin'],
     // the citation is not a sound one:
-    [{ ...good, cited: { ...ShellCited, revtok: 'rev-0' } },                          Phrases.CitedHalfShell,     'a citation half the shell'],
-    [{ ...good, cited: { revtok: 'rev-0', revseq: 0 } } as never,                   'lifepath',                 'a citation of too little'],
+    [{ ...good, cited: { ...ShellCited, revtok: TH.revtokOf('0') } },                          Phrases.CitedHalfShell,     'a citation half the shell'],
+    [{ ...good, cited: { revtok: TH.revtokOf('0'), revseq: 0 } } as never,                   'lifepath',                 'a citation of too little'],
     [{ ...good, cited: { ...noTestimony, am: 'x' } },                                Phrases.LifeseqParity,      'a citation whose am its lifepath belies'],
     [{ ...good, cited: { ...noTestimony, lifepath: `${Life0}/${Life0}` } },          Phrases.LifepathNotKept,    'a citation of another lifepath'],
     [{ ...good, cited: { ...stored, wayins: {} } } as never,                        'wayins.main',              'a cited gate whose wayins fail'],
@@ -403,7 +403,7 @@ describe("the ask builders", () => {
   })
 
   it("never throw: a record with no scope, or args that are not a bag, go to the verb as given", () => {
-    const noScope = putAskOf({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)
+    const noScope = putAskOf({ cited: ShellCited, record: { revtok: TH.revtokOf('0') } } as never)
     TH.expectSyncRefusal(() => checkedWriteAsk(noScope), 'bad_record')
     expect(putAskOf(null as never)).to.eq(null)
     expect(listAskOf(7 as never)).to.eq(7)
@@ -481,7 +481,7 @@ describe("boxSealable", () => {
 
   const BadSparseCases = [
     [{ ...shell, revseq: 0 },                                     Phrases.SealableHalfShell,  'half the shell: its revseq moved'],
-    [{ ...shell, revtok: 'rev-0' },                               Phrases.SealableHalfShell,  'half the shell: its revtok moved'],
+    [{ ...shell, revtok: TH.revtokOf('0') },                               Phrases.SealableHalfShell,  'half the shell: its revtok moved'],
     [{ ...shell, lifeseq: Life0, lifepath: `${Life0}/${Life0}` }, Phrases.LifeseqParity,   'the shell made live in its lifeseq alone'],
     [{ ...shell, lifeseq: Life0 },                                Phrases.LifeseqNotOwn,   'a lifeseq not the last of its lifepath'],
     [{ ...shell, revseq: -2 },                                    'revseq',                'a revseq below the shell\'s'],
@@ -500,14 +500,14 @@ describe("loggableAskOf(ask)", () => {
   it("keeps the scope, the flags and what each record cites, and drops a gate's wayins", () => {
     const loggable = loggableAskOf(TH.birthAskOf())
     expect(loggable).to.deep.include({ op: 'put', modelkind: 'gate', ...TH.GateScope, ifAbsent: 'add', ifPresent: 'fail' })
-    expect(loggable.record).to.deep.equal({ revtok: 'rev-0', revseq: 0, am: 'a', lifepath: Life0 })
+    expect(loggable.record).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })
     expect(JSON.stringify(loggable)).to.not.include(TH.BW.mainWayin.salt_b64)
   })
 
   it("keeps what a bank's birth cites of each root, and drops their bodies", () => {
     const loggable = loggableAskOf(TH.birthBankAskOf())
     expect(loggable).to.deep.include({ op: 'birth', ...TH.ThingBank })
-    expect(loggable.root).to.deep.equal({ revtok: 'rev-0', revseq: 0, am: 'a', lifepath: Life0 })
+    expect(loggable.root).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })
     expect(JSON.stringify(loggable)).to.not.include(TH.BW.mainWayin.salt_b64)
     expect(JSON.stringify(loggable)).to.not.include(TH.FakeSealed.codectag)
   })

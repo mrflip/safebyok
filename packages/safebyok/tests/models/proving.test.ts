@@ -623,8 +623,8 @@ describe("proving.buildLease(bank, gate)", () => {
   it("records the revision of the gate cited", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    const lease = await proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, revtok: 'gate-revision-tok-5' })
-    expect(lease.gate_revtok).to.eq('gate-revision-tok-5')
+    const lease = await proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, revtok: TH.revtokOf('gate5') })
+    expect(lease.gate_revtok).to.eq(TH.revtokOf('gate5'))
   })
 
   it("builds leases over one bankKey from both provings", async () => {

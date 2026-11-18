@@ -941,13 +941,13 @@ describe("Each minder's watch", () => {
 
   it("puts a record of a later life after one of a higher revseq", () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
-    const oldLife = TH.gateThingOf({ lifeseq: '0000000000', lifepath: '0000000000', revtok: 'old-life', revseq: 3 })
-    const newLife = TH.gateThingOf({ lifeseq: '0000000002', lifepath: '0000000002', revtok: 'new-life', revseq: 0 })
+    const oldLife = TH.gateThingOf({ lifeseq: '0000000000', lifepath: '0000000000', revtok: TH.revtokOf('old'), revseq: 3 })
+    const newLife = TH.gateThingOf({ lifeseq: '0000000002', lifepath: '0000000002', revtok: TH.revtokOf('new'), revseq: 0 })
     receive(noticeOf(oldLife))
     receive(noticeOf(newLife))
-    expect(revtokAt(minder)).to.eq('new-life')
+    expect(revtokAt(minder)).to.eq(TH.revtokOf('new'))
     receive(noticeOf(oldLife))
-    expect(revtokAt(minder)).to.eq('new-life')
+    expect(revtokAt(minder)).to.eq(TH.revtokOf('new'))
   })
 
   it("puts any record after the shell", async () => {

@@ -20,7 +20,7 @@ const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 /** A live box at its first revision, without its sealed whisper: the first revision over {@link TH.boxShellOf}'s shell. */
 function liveRevisionOf(): RevisionOf<BoxRecord, BoxCleartexts> {
-  return { ...TH.boxShellOf(), revtok: 'box-revision-tok-1', revseq: 0, am: 'a', lifeseq: Life0, lifepath: `${Life0}/${Life0}`, sidecar: TH.Sidecar }
+  return { ...TH.boxShellOf(), revtok: TH.revtokOf('box1'), revseq: 0, am: 'a', lifeseq: Life0, lifepath: `${Life0}/${Life0}`, sidecar: TH.Sidecar }
 }
 
 describe("CoreBox", () => {
@@ -130,7 +130,7 @@ describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
   const DonorCases = [
     [() => ({ ...TH.boxShellOf(), am: 'd' }),                'a donor of a damaged row'],
     [() => ({ ...TH.boxShellOf(), revseq: 1.5 }),            'a revseq that is not an integer'],
-    [() => ({ ...TH.boxShellOf(), revtok: 'rev-1' }),        'half the shell: its revtok moved, its revseq and lifeseq not'],
+    [() => ({ ...TH.boxShellOf(), revtok: TH.revtokOf('1') }),        'half the shell: its revtok moved, its revseq and lifeseq not'],
     [() => ({ ...TH.boxShellOf(), fmt: 5000 }),              'a donor of another fmt'],
     [() => ({ ...TH.boxShellOf(), labelpath: 'gate/main' }), 'a donor of another kind'],
     [() => TH.omitting(TH.boxShellOf(), 'lifepath'),         'a donor with no lifepath'],

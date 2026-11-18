@@ -7,7 +7,7 @@ import {
   GateScope, Life0, RootScope, ThingBank, WithPasskey, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, getGateAskOf,
   nextGateOf, nextOf, replaceAskOf, rootBoxOf,
 } from './vaultdb-world'
-import { T0 } from './models-world'
+import { FirstRevtok, OtherRevtok, T0, revtokOf } from './models-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 
 /** Register the battery's cases of a Thing's get and write. */
@@ -69,7 +69,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     it("passes the live gate back, writing nothing, under ifPresent 'get' when it expected another", async () => {
       const stored = gateThingOf()
       const vaultDB = await withGate(stored)
-      const answer = await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: 'rev-other' })), ifPresent: 'get' })
+      const answer = await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: OtherRevtok })), ifPresent: 'get' })
       expect(answer).to.deep.include({ ok: true, act: 'passed', val: stored })
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(stored)
     })
@@ -90,14 +90,14 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     const otherLife = { lifeseq: lifeseq2, lifepath: lifeseq2 }
     const ActCases = [
       // the store moved on:
-      ["stale",  replaceAskOf(stored, nextGateOf(stored, { revtok: 'rev-1b' })), 'expects a revision the store has moved past'],
+      ["stale",  replaceAskOf(stored, nextGateOf(stored, { revtok: revtokOf('1b') })), 'expects a revision the store has moved past'],
       ["retcon", replaceAskOf(stored, next),                                      'resends a write that already landed'],
-      ["forked", replaceAskOf({ ...next, revtok: 'rev-fork' }, nextGateOf(next)), 'expects the revseq stored under another revtok'],
+      ["forked", replaceAskOf({ ...next, revtok: revtokOf('fork') }, nextGateOf(next)), 'expects the revseq stored under another revtok'],
       // the caller is ahead of the store, or confused:
       ["ahead",  replaceAskOf(later, nextGateOf(later)),                          'expects a revision the store has not reached'],
       ["clash",  replaceAskOf({ ...next, ...otherLife }, { ...nextGateOf(next), ...otherLife }), 'expects the revtok stored in another life'],
       ["camped", { ...replaceAskOf(next, nextGateOf(next)), ifPresent: 'fail' as const }, 'finds the live gate it expects under ifPresent fail'],
-      ["stale",  birthAskOf(gateThingOf({ revtok: 'rev-other' })),               'births a gate over a live one'],
+      ["stale",  birthAskOf(gateThingOf({ revtok: OtherRevtok })),               'births a gate over a live one'],
     ] as const
 
     for (const [act, ask, blurb] of ActCases) {
@@ -133,7 +133,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("carries what it refused, loggable, on its refusal", async () => {
       const vaultDB = await withGate(stored)
-      const answer = await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: 'rev-other' })))
+      const answer = await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: OtherRevtok })))
       const err = await expectBad(Promise.resolve(answer), 'stale_write')
       expect(err.meta).to.deep.include({ oplabel: 'writeThing', act: 'stale' })
       expect(JSON.stringify(err.meta)).to.not.include(BW.mainWayin.salt_b64)
@@ -306,7 +306,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("leave every refusal to the verb, which answers it", async () => {
       const vaultDB = await fresh()
-      await expectBad(vaultDB.tryWriteThing(putAskOf({ cited: ShellCited, record: { revtok: 'rev-0' } } as never)), 'bad_record')
+      await expectBad(vaultDB.tryWriteThing(putAskOf({ cited: ShellCited, record: { revtok: FirstRevtok } } as never)), 'bad_record')
       await expectBad(vaultDB.tryGetThing(getAskOf(null as never)), 'bad_record')
     })
   })

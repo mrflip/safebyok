@@ -31,6 +31,9 @@ export const LabelpathOfOtherKind = "A Thing's labelpath starts with its own mod
 /** A lifeseq that is not 10 base-32 digits. */
 export const LifeseqShape = "A lifeseq is 10 base-32 digits, 0-9 and a-v."
 
+/** A revtok not of a UUID's shape. */
+export const RevtokShape = "A revtok is a UUID: hex digits in groups of 8, 4, 4, 4 and 12, joined by '-'."
+
 /** A lifepath that is not lifeseqs, each after a '/'. */
 export const LifepathShape = "A lifepath is one or more lifeseqs, joined by '/'."
 
