@@ -2,7 +2,6 @@
 
 import type * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
-import { exactOptional } from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
@@ -60,9 +59,9 @@ export const {
   // Zod refuses to `extend` a refined object over keys it has; `safeExtend` narrows them, and keeps the refinement.
   const minderGetAsk     = AskChecks.getAsk.safeExtend({ ifAbsent: lit('nil'), track: trackShape })
   const tsqStaleTime     = union([staleMillis, lit(Infinity), lit('static')])
-  // Each option may be left out, and never given as undefined.
-  const minderGetAskOpts = obj({ staleTime: exactOptional(tsqStaleTime) }).strict()
-  const minderAskOpts    = minderGetAskOpts.extend({ ifStale: exactOptional(oneof(['get', 'refresh'])) }).strict()
+  // Each option may be left out, or given as undefined, for no opinion.
+  const minderGetAskOpts = obj({ staleTime: tsqStaleTime.optional() }).strict()
+  const minderAskOpts    = minderGetAskOpts.extend({ ifStale: oneof(['get', 'refresh']).optional() }).strict()
   return { queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts }
 })
 
@@ -73,9 +72,9 @@ export type TsqStaleTime = Z.input<typeof tsqStaleTime>
 
 /** A get ask with `ifAbsent: 'nil'` and a `track`, which the minder sends to the vaultDB exactly as given. */
 export type MinderGetAsk     = GetAsk & Readonly<{ ifAbsent: 'nil', track: Track }>
-/** A get's options: `staleTime` overrides the minder's own. */
+/** A get's options: `staleTime` overrides the minder's own, unless it is undefined. */
 export type MinderGetAskOpts = Z.input<typeof minderGetAskOpts>
-/** `tryAt`'s options:
+/** `tryAt`'s options, each of which may be undefined for no opinion:
  * - `staleTime`          -- overrides the minder's own
  * - `ifStale: 'get'`     -- read the cache alone (default)
  * - `ifStale: 'refresh'` -- also fetch a stale or missing car in the background

@@ -363,6 +363,14 @@ describe("ThingMinder.tryAt", () => {
     expect(minder.tryAt(GateAsk)).to.deep.include({ ok: true, act: 'gotlive', val: gate, car: carOf(gate), isTimely: true, isFetching: false, lastErr: null })
   })
 
+  it("takes options given as undefined as no opinion", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(GateAsk)
+    expect(minder.tryAt(GateAsk, { staleTime: undefined, ifStale: undefined })).to.deep.include({ ok: true, act: 'gotlive', val: gate, isTimely: true })
+  })
+
   it("answers gotlive for a full car under a staleTime of Infinity or 'static'", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
@@ -454,7 +462,6 @@ describe("ThingMinder.tryAt", () => {
     [{ ...GateAsk, labelpath: 'box/openai' }, {},                       'refuses bad_record for a labelpath of another kind'],
     [noTrack,                                 {},                       'refuses bad_record for an ask that tracks nothing'],
     [{ ...GateAsk, staleTime: 0 },            {},                       'refuses bad_record for an ask that carries an option'],
-    [GateAsk,                                 { staleTime: undefined }, 'refuses bad_record for a staleTime given as undefined'],
     [GateAsk,                                 { ifStale: 'keep' },      'refuses bad_record for an ifStale it does not know'],
     [GateAsk,                                 { staleTime: MaxTimerMillis + 1 }, 'refuses bad_record for a staleTime past MaxTimerMillis'],
   ] as const
@@ -476,12 +483,20 @@ describe("ThingMinder.tryAt", () => {
 })
 
 describe("ThingMinder.get", () => {
-  it("refuses bad_record for an ask that tracks nothing, or a staleTime given as undefined", async () => {
+  it("refuses bad_record for an ask that tracks nothing", async () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     const { track: _track, ...noTrack } = GateAsk
     await TH.expectRefusal(minder.get(noTrack as never), 'bad_record')
-    // @ts-expect-error -- an explicit undefined is the point
-    await TH.expectRefusal(minder.get(GateAsk, { staleTime: undefined }), 'bad_record')
+  })
+
+  it("takes a staleTime given as undefined as the minder's own", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    await minder.get(GateAsk, { staleTime: undefined })
+    await minder.get(GateAsk, { staleTime: undefined })
+    expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
   it("returns the car of the record stored, and reads the cache after", async () => {
@@ -808,6 +823,12 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(TH.GateScope, { staleTime: 0 })).to.be.true
   })
 
+  it("takes a staleTime given as undefined as the minder's own", async () => {
+    const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
+    await minder.get(GateAsk)
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: undefined })).to.be.false
+  })
+
   it("takes an ask or a record as its scope", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
@@ -872,7 +893,6 @@ describe("ThingMinder.isStaleAt", () => {
   const BadArgs = [
     [TH.BoxScope,                          {},                       'a scope of another kind'],
     [{ ...TH.GateScope, banklabel: 'zz' }, {},                       "another bank's scope"],
-    [TH.GateScope,                         { staleTime: undefined }, 'a staleTime given as undefined'],
     [TH.GateScope,                         { staleTime: -1 },        'a negative staleTime'],
     [TH.GateScope,                         { staleTime: 'never' },   'a staleTime of another word'],
     [TH.GateScope,                         { staleTime: MaxTimerMillis + 1 }, 'a staleTime past MaxTimerMillis'],

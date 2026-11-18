@@ -322,6 +322,7 @@ export class ThingMinder {
   /** The query key `scoped`'s car is cached under. */
   queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
 
+  // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
   /** TanStack's query options for a get of `ask`, with `opts.staleTime` where given, else the minder's query defaults' own. */
   #tsqQueryRunner(ask: GetAsk, opts: MinderGetAskOpts): TSQ.QueryExecuteOptions<ThingCar<Thing>> {
     const runner = { queryKey: this.queryKey(ask), queryFn: () => this.#fetchCar(ask) }
