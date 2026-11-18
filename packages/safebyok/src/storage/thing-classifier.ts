@@ -1,13 +1,13 @@
 /** Classify a vaultDB ask against the Thing stored, by big's act tables in `notes/answer-contract.md`. */
 
 import { sortBy } from 'es-toolkit'
-import { CX, EX, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
-import { bankRootsMissing, bornAtNotStored, gateIssue, rowOfOtherAddress } from '../refusals/throwers'
+import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import { type StoredCited, type Thing, type ThingCited, type ThingScope, BankChecks, BoxChecks, GateChecks, ThingChecks, sparseOf } from '../shapes/shapes-thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
+import * as Throwers from '../refusals/throwers'
 
 // == [Columns]: WriteCmpAsk, Presence, presenceOf, RevtokCmp, RevseqCmp, revtokCmpOf, revseqCmpOf, isLifeMismatch
 // The columns of big's tables: what is stored, and the two revision comparisons. A revtok names one revision of a Thing,
@@ -279,7 +279,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
   const living: Thing[] = []
   const damaged_rows: DamagedThing[] = []
   for (const { labelpath, raw } of children) {
-    if (! isChildLabelpath(ask, labelpath)) { throw rowOfOtherAddress(['labelpath']) }
+    if (! isChildLabelpath(ask, labelpath)) { throw Throwers.rowOfOtherAddress(['labelpath']) }
     const child = listedThingOf({ userid, banklabel, labelpath }, raw)
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
@@ -325,14 +325,14 @@ export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | 
 /** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
 export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
   if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
-  throw bornAtNotStored(storedThingOf(ask, raw))
+  throw Throwers.bornAtNotStored(storedThingOf(ask, raw))
 }
 
 /** Throw `gate_issue` if a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only a gate's writes name storage policies. */
 export function demandPolicies(ask: WriteAsk, raw: unknown): void {
   if ((ask.modelkind !== 'gate') || ((ask.options?.policies.length ?? 0) === 0)) { return }
   const why = policyRefusalOf(ask, storedWayinsChecker.parse(raw).wayins)
-  if (why !== null) { throw gateIssue(storedThingOf(ask, raw), why) }
+  if (why !== null) { throw Throwers.gateIssue(storedThingOf(ask, raw), why) }
 }
 const storedWayinsChecker = GateChecks.storedWayins.refusingAs('damaged_row')
 
@@ -346,7 +346,7 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
     const bank = storedOf(BankChecks.stored, bankPut, fetched.bank)
     const gate = storedOf(GateChecks.stored, gatePut, fetched.gate)
     const root = storedOf(BoxChecks.stored,  rootPut, fetched.root)
-    if ((bank === null) || (gate === null) || (root === null)) { throw bankRootsMissing() }
+    if ((bank === null) || (gate === null) || (root === null)) { throw Throwers.bankRootsMissing() }
     return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, things: { bank, gate, root }, ...trackedFieldOf(bankPut, fetched.tracked) }
   }
   for (const [put, raw] of [[bankPut, fetched.bank], [gatePut, fetched.gate], [rootPut, fetched.root]] as const) {

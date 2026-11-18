@@ -1,5 +1,5 @@
 import type { Consts } from 'safebyok-big/internals'
-import { Clock, Crypto, Errors, Phrases as BigPhrases, Throwers, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
 import { BaseThing } from './base-thing'
 import { CoreBox } from './core-box'
@@ -12,11 +12,11 @@ import type { GateRevisionedStamp } from '../shapes/shapes-gateish'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
-import { boxOfOtherRoot, otherThanBox } from '../refusals/throwers'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
 import { type BankThing, type BoxThing, type Thing, BankChecks, BankThingFormat, BoxChecks, BoxThingFormat, GateChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
+import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
@@ -272,7 +272,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
       return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) as BoxShell }
     }
     const { val } = answer
-    if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer) } }
+    if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) } }
     return { ...answer, val }
   }
 
@@ -313,7 +313,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** Demand that `box` is a box of this bank, under its current root box. */
   #demandOwnBox(box: unknown): void {
     const { lifepath } = BoxChecks.sealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
-    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw boxOfOtherRoot() }
+    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw Throwers.boxOfOtherRoot() }
   }
 
   /** The attached lease. Demands that the bank is enabled and unlocked. */

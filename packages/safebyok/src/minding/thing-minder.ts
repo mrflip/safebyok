@@ -9,8 +9,7 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { Outcome, Throwers, Validator } from 'safebyok-big/internals'
-import { minderNotStarted, staleRead } from '../refusals/throwers'
+import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type Thing, type ThingScope, type VoidSentinel, Shell, ThingChecks, cmpThings } from '../shapes/shapes-thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
@@ -21,6 +20,7 @@ import {
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
+import * as Throwers from '../refusals/throwers'
 
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them.
  * Three sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
@@ -191,7 +191,7 @@ export class ThingMinder {
       fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
     } catch (err) {
       // TanStack cancels a get under way when goodbye empties the cache.
-      throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
+      throw (err instanceof TSQ.CancelledError) ? Throwers.minderNotStarted() : err
     }
     // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
     // get may have left the cache a later record.
@@ -208,7 +208,7 @@ export class ThingMinder {
     if (! answer.ok) { throw answer.err }
     const record = answer.val ?? this.#shellAt(ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
-    if ((prior !== undefined) && (cmpThings(prior.newest, record) < 0)) { throw staleRead(ask) }
+    if ((prior !== undefined) && (cmpThings(prior.newest, record) < 0)) { throw Throwers.staleRead(ask) }
     return carOf(record)
   }
 
@@ -277,7 +277,7 @@ export class ThingMinder {
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
   #demandReady(): void {
-    if (! this.#isReady) { throw minderNotStarted() }
+    if (! this.#isReady) { throw Throwers.minderNotStarted() }
   }
 
   /** The scope whose car is cached under `queryKey`, one of this minder's query keys. */

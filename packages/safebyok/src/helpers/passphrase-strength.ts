@@ -1,7 +1,8 @@
 import { HostErrorSanitizer } from 'safebyok-big'
-import { Consts, Errors, GX, Helpers, Phrases, Strength, Throwers } from 'safebyok-big/internals'
+import { Consts, Errors, GX, Helpers, Phrases, Strength } from 'safebyok-big/internals'
 import { type GuardedStrengthChecker, type StrengthChecker, GateishChecks } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
+import * as Throwers from '../refusals/throwers'
 
 // == [The default]: DefaultStrengthChecker
 

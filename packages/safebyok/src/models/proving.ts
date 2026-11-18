@@ -1,11 +1,12 @@
 import type { Consts, Deriver } from 'safebyok-big/internals'
-import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Throwers, Validator } from 'safebyok-big/internals'
+import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { Lease } from './lease'
 import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, StampedGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
 import { Wayin, wayinCtxOf } from './wayin'
+import * as Throwers from '../refusals/throwers'
 
 // == [NOVEL and the usages]: NOVEL, Novel, RewrapUsage, CheckUsage
 

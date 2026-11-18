@@ -1,4 +1,4 @@
-import { Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, Throwers, VX, Validator } from 'safebyok-big/internals'
+import { Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
 import { Gating, birthBank } from './gating'
 import { guardKeyDeriver } from './proving'
@@ -9,6 +9,7 @@ import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
 import { ThingChecks } from '../shapes/shapes-thing'
+import * as Throwers from '../refusals/throwers'
 
 // == [Defaults]: DefaultLeaseMillis
 

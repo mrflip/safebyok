@@ -3,11 +3,11 @@
 import type * as Z from 'zod'
 import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { bornAtNotNow, lifepathNotKept, lifeseqNotNext, opNotOfRecord, recordOfOtherScope, revseqNotNext, revtokNotNew, testimonyMissing, tombstoneOverTombstone } from '../refusals/throwers'
 import { Labelpath, Lifeseq } from './primitives'
 import {
   type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, type ThingScope, type Thingkind, BankChecks, BoxChecks, GateChecks, Shell, ThingChecks,
 } from './shapes-thing'
+import * as Throwers from '../refusals/throwers'
 
 // == [Asks]: RawChecks, loggableAsk, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
@@ -127,7 +127,7 @@ export type Tracked         = Readonly<{ bank: BankRecord | 'same', [Labelpath.M
 /** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {
   const writeAsk = withRecordsChecked(AskChecks.writeAsk.parse(ask))
-  if ((writeAsk.op === 'put') !== (writeAsk.record.am === 'a')) { throw opNotOfRecord(writeAsk) }
+  if ((writeAsk.op === 'put') !== (writeAsk.record.am === 'a')) { throw Throwers.opNotOfRecord(writeAsk) }
   checkWriteInvariants(writeAsk)
   return writeAsk
 }
@@ -162,16 +162,16 @@ export function birthPutsOf({ userid, banklabel, bank, gate, root }: BirthBankAs
 /** Refuse a write whose record does not follow from the Thing it cites. */
 function checkWriteInvariants(ask: WriteAsk): void {
   const { cited, record, userid, banklabel, labelpath } = ask
-  if (record.revseq !== cited.revseq + 1)                                                           { throw revseqNotNext(ask) }
-  if ((record.revtok === cited.revtok) || (record.revtok === SX.VoidRevisionTok))                   { throw revtokNotNew(ask) }
-  if (! Validator.isConsistent(record, { userid, banklabel, labelpath }))                           { throw recordOfOtherScope(ask) }
-  if ((record.am === 'x') && (cited.am === 'x'))                                                    { throw tombstoneOverTombstone(ask) }
-  if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw lifepathNotKept(ask) }
+  if (record.revseq !== cited.revseq + 1)                                                           { throw Throwers.revseqNotNext(ask) }
+  if ((record.revtok === cited.revtok) || (record.revtok === SX.VoidRevisionTok))                   { throw Throwers.revtokNotNew(ask) }
+  if (! Validator.isConsistent(record, { userid, banklabel, labelpath }))                           { throw Throwers.recordOfOtherScope(ask) }
+  if ((record.am === 'x') && (cited.am === 'x'))                                                    { throw Throwers.tombstoneOverTombstone(ask) }
+  if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw Throwers.lifepathNotKept(ask) }
   const isLifeFlipped = (record.am !== cited.am)
-  if (Lifeseq.lifenumOf(record.lifeseq) !== Lifeseq.lifenumOf(Lifeseq.ofLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw lifeseqNotNext(ask) }
+  if (Lifeseq.lifenumOf(record.lifeseq) !== Lifeseq.lifenumOf(Lifeseq.ofLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw Throwers.lifeseqNotNext(ask) }
   // A live record over a live one keeps the stored born_at: the store checks that, against the Thing it has.
-  if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw bornAtNotNow(ask) }
-  if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw testimonyMissing(ask) }
+  if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw Throwers.bornAtNotNow(ask) }
+  if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw Throwers.testimonyMissing(ask) }
 }
 // --
 

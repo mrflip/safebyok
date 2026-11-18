@@ -1,13 +1,24 @@
-/** The throwers of the refusals this package makes itself, each from a phrase in phrases.ts. The rest are `safebyok-big`'s, through its Throwers. */
+/** The throwers of the refusals this package makes itself, each from a phrase in phrases.ts, and the `safebyok-big` throwers it calls, re-exported. */
 
 // The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
 
-import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
+import { Errors, Phrases as BigPhrases, Throwers as BigThrowers } from 'safebyok-big/internals'
 import type { EX } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type Thing } from '../shapes/shapes-thing'
 import { type GetAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { GoodAnswer } from '../storage/vault-db'
+
+// == [Big's Throwers]: the throwers of safebyok-big that this package calls
+
+// Re-exported, never redefined: a refusal is one class in both packages (notes/transition.md).
+/** The throwers of `safebyok-big` this package calls, each as it defines it. */
+export const {
+  actRefused, alreadyAsking, attemptInFlight, cleartextsThrew, damagedLease, deviceDisabled, gateMadeElsewhere, gatingConcluded, gatingDismissed, gatingUnlaunched, insecureContext,
+  keyDeriverLoadFailed, keyDeriverThrew, leaseNotInForce, needUnlocked, noPasskeyWayin, notKeyBytes, otherPasskey, otherPrfSalt, passkeyAlreadyAdded, requestCleartextThrew, storageIssue,
+  strengthCheckerLoadFailed, undecipheredWhisper, undecodedWhisper, unexpectedError, unknownKeyDeriver, wayinMadeAlready, wayinNotMadeYet, weakPassphrase, wrongPassphrase, wrongPasskey,
+} = BigThrowers
+// --
 
 // == [Model Throwers]: tombstoneSecretsGiven, sidecarMissing, tombstoneSidecarGiven, boxOfOtherRoot, otherThanBox
 

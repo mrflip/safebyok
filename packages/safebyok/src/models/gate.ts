@@ -1,11 +1,12 @@
 import type { Consts } from 'safebyok-big/internals'
-import { Crypto, Throwers, Validator } from 'safebyok-big/internals'
+import { Crypto, Validator } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
 import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
 import { type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
 import { type GateThing, type ThingScope, type Wayins, GateThingFormat, GateChecks, ThingChecks } from '../shapes/shapes-thing'
+import * as Throwers from '../refusals/throwers'
 
 /** One revision of a bank's gate: its passphrase wayin, and its passkey wayin if it has one.
  * A gate verb makes the next revision as a new Gate; this one never changes.

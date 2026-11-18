@@ -1,11 +1,11 @@
 import { exactOptional } from 'zod'
-import { CX, Clock, Crypto, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
+import { CX, Clock, Crypto, StableJsonify, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { sidecarMissing, tombstoneSidecarGiven } from '../refusals/throwers'
 import { type BoxThing, type Sealed, BoxChecks } from '../shapes/shapes-thing'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from '../shapes/shapes-sealers'
 import { type BoxStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Lifeseq } from '../shapes/primitives'
+import * as Throwers from '../refusals/throwers'
 
 /** The tags of a box's sealed whisper: the whisper as stable JSON, in its first schema. */
 const BoxTags: SealTags = Object.freeze({ codectag: 'json_v1', schematag: 'whisper_v1' })
@@ -42,7 +42,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static nextRevisionOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
     const { sidecar: donorSidecar, ...thing                        } = BoxChecks.sealable.parse(donorProps)
     const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar === undefined) { throw sidecarMissing() }
+    if (sidecar === undefined) { throw Throwers.sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
     if (thing.am === 'a') {
       return { ...thing, ...revision }
@@ -57,7 +57,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static tombstoneOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxTombstone, BoxCleartexts> {
     const { sidecar: _sidecar, ...thing             } = Checks.liveBoxSealable.parse(donorProps)
     const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar !== undefined) { throw tombstoneSidecarGiven() }
+    if (sidecar !== undefined) { throw Throwers.tombstoneSidecarGiven() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x' } as const
     return { ...thing, ...nextLifeOf(thing), ...revision }
   }

@@ -2,8 +2,7 @@
 
 import { noop } from 'es-toolkit'
 import type * as Z from 'zod'
-import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
-import { answerNotMade } from '../refusals/throwers'
+import { EX, Errors, Outcome, Validator, type Helpers } from 'safebyok-big/internals'
 import { type Thing, isGone } from '../shapes/shapes-thing'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
@@ -13,6 +12,7 @@ import * as Classifier from './thing-classifier'
 import type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
 } from './vault-db'
+import * as Throwers from '../refusals/throwers'
 
 // == [Answers]: Received, answerOf
 
@@ -188,7 +188,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as Thing | null
       return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: answerNotMade() }
+      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: Throwers.answerNotMade() }
     }
   }
   // --
