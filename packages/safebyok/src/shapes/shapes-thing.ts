@@ -3,9 +3,10 @@
 import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
-import { BX, type Consts, CX, EX, Errors, SX, Validator } from 'safebyok-big/internals'
+import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
 import type { TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
+import { bornAtNotNow, lifepathNotKept, lifeseqNotNext, opNotOfRecord, recordOfOtherScope, revseqNotNext, revtokNotNew, testimonyMissing, tombstoneOverTombstone } from '../refusals/throwers'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
 // == [Lifeseqs]: VoidLifeseq, RootVoidLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isTombstoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
@@ -617,41 +618,6 @@ function checkWriteInvariants(ask: WriteAsk): void {
   if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw bornAtNotNow(ask) }
   if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw testimonyMissing(ask) }
 }
-// --
-
-// == [Write throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing
-// Each refuses a write ask, and its meta carries the loggable part of the ask.
-
-/** A `bad_record` refusal: a put's record is a tombstone, or a del's is live. */
-function opNotOfRecord(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.OpNotOfRecord, { meta: { ask: loggableAskOf(ask) } }) }
-
-/** A `bad_record` refusal: the record's revseq is not one past the cited one's. */
-function revseqNotNext(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RevseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
-
-/** A `bad_record` refusal: the record's revtok is the cited one's, or the void one. */
-function revtokNotNew(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RevtokNotNew, { meta: { ask: loggableAskOf(ask) } }) }
-
-/** A `bad_record` refusal: the record is not at the scope the ask names. */
-function recordOfOtherScope(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RecordOfOtherScope, { meta: { ask: loggableAskOf(ask) } }) }
-
-// A del citing a tombstone, the shell among them, refuses dubdel when the ask is made, before anything is fetched, so its
-// answer has no dbhas. Its refusal kind is the one big's act tables give dubdel.
-/** An `absent_vault` refusal, act `dubdel`: a del cites a tombstone or the shell. */
-function tombstoneOverTombstone(ask: WriteAsk): Errors.VaultError {
-  return new Errors.VaultError('absent_vault', Phrases.TombstoneOverTombstone, { meta: { ask: loggableAskOf(ask), act: 'dubdel' } })
-}
-
-/** A `bad_record` refusal: the record changes a leading lifeseq of the lifepath it cites. */
-function lifepathNotKept(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifepathNotKept, { meta: { ask: loggableAskOf(ask) } }) }
-
-/** A `bad_record` refusal: the record's lifeseq is not the cited one, or the next one when am flips. */
-function lifeseqNotNext(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifeseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
-
-/** A `bad_record` refusal: a birth's born_at is not its written_at. */
-function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.BornAtNotNow, { meta: { ask: loggableAskOf(ask) } }) }
-
-/** A `bad_record` refusal: a replace_passphrase write does not cite the gate's wayins. */
-function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
 // == [Ask builders]: GetAskDraft, ListAskDraft, PutAskDraft, DelAskDraft, getAskOf, listAskOf, putAskOf, delAskOf, scopeGiven, trackGiven, modelkindGiven

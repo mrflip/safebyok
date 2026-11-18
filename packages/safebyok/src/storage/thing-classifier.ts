@@ -1,9 +1,9 @@
 /** Classify a vaultDB ask against the Thing stored, by big's act tables in `notes/answer-contract.md`. */
 
 import { sortBy } from 'es-toolkit'
-import { CX, EX, Errors, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
-import { BankRootsMissing, BornAtNotStored } from '../phrases'
-import { PoliciedMeta, gateIssue, policyRefusalOf } from './policies'
+import { CX, EX, Phrases as BigPhrases, SX, Throwers, Validator } from 'safebyok-big/internals'
+import { bankRootsMissing, bornAtNotStored, gateIssue, rowOfOtherAddress } from '../refusals/throwers'
+import { policyRefusalOf } from './policies'
 import type { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
 import {
@@ -283,7 +283,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
   const living: Thing[] = []
   const damaged_rows: DamagedThing[] = []
   for (const { labelpath, raw } of children) {
-    if (! isChildLabelpath(ask, labelpath)) { throw new Errors.VaultError('storage_issue', BigPhrases.rowOfOtherAddress(['labelpath'])) }
+    if (! isChildLabelpath(ask, labelpath)) { throw rowOfOtherAddress(['labelpath']) }
     const child = listedThingOf({ userid, banklabel, labelpath }, raw)
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
@@ -329,7 +329,7 @@ export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | 
 /** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
 export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
   if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
-  throw new Errors.VaultError('bad_record', BornAtNotStored, { rows: { dbhas: storedThingOf(ask, raw) }, meta: PoliciedMeta })
+  throw bornAtNotStored(storedThingOf(ask, raw))
 }
 
 const StoredWayinsCheck = storedWayins.refusingAs('damaged_row')
@@ -351,7 +351,7 @@ export function unwrittenBirthOf(puts: BirthPuts, fetched: BankRootsFetched): Bi
     const bank = storedOf(KindChecks.bank.stored, bankPut, fetched.bank)
     const gate = storedOf(KindChecks.gate.stored, gatePut, fetched.gate)
     const root = storedOf(KindChecks.box.stored,  rootPut, fetched.root)
-    if ((bank === null) || (gate === null) || (root === null)) { throw new Errors.VaultError('storage_issue', BankRootsMissing) }
+    if ((bank === null) || (gate === null) || (root === null)) { throw bankRootsMissing() }
     return { ok: true, act: 'passed', world: { ...bank, maingate: gate }, things: { bank, gate, root }, ...trackedFieldOf(bankPut, fetched.tracked) }
   }
   for (const [put, raw] of [[bankPut, fetched.bank], [gatePut, fetched.gate], [rootPut, fetched.root]] as const) {

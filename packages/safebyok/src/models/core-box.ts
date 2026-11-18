@@ -1,6 +1,7 @@
 import { exactOptional } from 'zod'
-import { CX, Clock, Crypto, Errors, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
+import { CX, Clock, Crypto, StableJsonify, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import { sidecarMissing, tombstoneSidecarGiven } from '../refusals/throwers'
 import { type BoxThing, type Sealed, boxSealable, boxThing, lifeseqOfLifenum, lifenumOfLifeseq } from '../shapes/shapes-thing'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from '../shapes/shapes-sealers'
 import { type BoxStamp, boxStamp } from '../shapes/shapes-stamps'
@@ -50,7 +51,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static nextRevisionOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
     const { sidecar: donorSidecar, ...thing } = Checks.boxSealable.parse(donorProps)
     const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar === undefined) { throw new Errors.VaultError('bad_record', Phrases.SidecarMissing) }
+    if (sidecar === undefined) { throw sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
     if (thing.am === 'a') { return { ...thing, ...revision } }
     return { ...thing, ...nextLifeOf(thing), ...revision, born_at: written_at }
@@ -63,7 +64,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static tombstoneOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxTombstone, BoxCleartexts> {
     const { sidecar: _sidecar, ...thing } = Checks.liveBoxSealable.parse(donorProps)
     const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
-    if (sidecar !== undefined) { throw new Errors.VaultError('bad_record', Phrases.TombstoneSidecarGiven) }
+    if (sidecar !== undefined) { throw tombstoneSidecarGiven() }
     return { ...thing, ...nextLifeOf(thing), revtok: Crypto.randomId(), revseq: thing.revseq + 1, am: 'x', written_at }
   }
   // --

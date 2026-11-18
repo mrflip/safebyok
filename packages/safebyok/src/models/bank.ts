@@ -10,6 +10,7 @@ import { type GateRevisionedStamp, Proving } from './proving'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps, UnsealedOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
+import { boxOfOtherRoot, otherThanBox } from '../refusals/throwers'
 import type { DeviceTok, Labelpath } from '../shapes/primitives'
 import {
   type BankThing, type BoxThing, type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Thing, type Track, type WorldRecord,
@@ -365,7 +366,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   /** Demand that `box` is a box of this bank, under its current root box. */
   #demandOwnBox(box: unknown): void {
     const { lifepath } = Checks.boxSealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
-    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
+    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw boxOfOtherRoot() }
   }
 
   /** The attached lease. Demands that the bank is enabled and unlocked. */
@@ -380,7 +381,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   get modelkind(): 'bank' { return 'bank' satisfies Consts.Modelkind }
 }
 
-// == [Helpers]: trackPairOf, disabledAnswerOf, otherThanBox
+// == [Helpers]: trackPairOf, disabledAnswerOf
 
 /** The revseq and lifepath of a Thing, as a `track` holds them. */
 function trackPairOf({ revseq, lifepath }: Pick<Thing, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
@@ -390,9 +391,4 @@ function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<
   return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: endCause }
 }
 
-// The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.
-/** A `storage_issue` refusal of `answer`, the vaultDB's to a box's get, whose Thing is not a box. */
-function otherThanBox({ ask, val }: GoodAnswer<Thing, EX.GotAct>): Errors.VaultError {
-  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
-}
 // --

@@ -1,0 +1,107 @@
+/** The throwers of the refusals this package makes itself, each from a phrase in phrases.ts. The rest are `safebyok-big`'s, through its Throwers. */
+
+// The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
+
+import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
+import type { EX } from 'safebyok-big/internals'
+import * as Phrases from '../phrases'
+import { type GetAsk, type Thing, type WriteAsk, loggableAskOf } from '../shapes/shapes-thing'
+import type { GoodAnswer } from '../storage/vault-db'
+
+// == [Model Throwers]: tombstoneSecretsGiven, sidecarMissing, tombstoneSidecarGiven, boxOfOtherRoot, otherThanBox
+
+/** A `bad_record` refusal: a tombstone's seal was given secret props. */
+export function tombstoneSecretsGiven(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TombstoneSecretsGiven) }
+
+/** A `bad_record` refusal: a live box's revision has no sidecar. */
+export function sidecarMissing(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.SidecarMissing) }
+
+/** A `bad_record` refusal: a tombstone was given a sidecar. */
+export function tombstoneSidecarGiven(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TombstoneSidecarGiven) }
+
+/** A `record_conflict` refusal: a box's lifepath is of another life of its bank's root box. */
+export function boxOfOtherRoot(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
+
+// The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.
+/** A `storage_issue` refusal of `answer`, the vaultDB's to a box's get, whose Thing is not a box. */
+export function otherThanBox({ ask, val }: GoodAnswer<Thing, EX.GotAct>): Errors.VaultError {
+  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
+}
+// --
+
+// == [Write Throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing
+// Each refuses a write ask, and its meta carries the loggable part of the ask.
+
+/** A `bad_record` refusal: a put's record is a tombstone, or a del's is live. */
+export function opNotOfRecord(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.OpNotOfRecord, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: the record's revseq is not one past the cited one's. */
+export function revseqNotNext(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RevseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: the record's revtok is the cited one's, or the void one. */
+export function revtokNotNew(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RevtokNotNew, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: the record is not at the scope the ask names. */
+export function recordOfOtherScope(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RecordOfOtherScope, { meta: { ask: loggableAskOf(ask) } }) }
+
+// A del citing a tombstone, the shell among them, refuses dubdel when the ask is made, before anything is fetched, so its
+// answer has no dbhas. Its refusal kind is the one big's act tables give dubdel.
+/** An `absent_vault` refusal, act `dubdel`: a del cites a tombstone or the shell. */
+export function tombstoneOverTombstone(ask: WriteAsk): Errors.VaultError {
+  return new Errors.VaultError('absent_vault', Phrases.TombstoneOverTombstone, { meta: { ask: loggableAskOf(ask), act: 'dubdel' } })
+}
+
+/** A `bad_record` refusal: the record changes a leading lifeseq of the lifepath it cites. */
+export function lifepathNotKept(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifepathNotKept, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: the record's lifeseq is not the cited one, or the next one when am flips. */
+export function lifeseqNotNext(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.LifeseqNotNext, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: a birth's born_at is not its written_at. */
+export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.BornAtNotNow, { meta: { ask: loggableAskOf(ask) } }) }
+
+/** A `bad_record` refusal: a replace_passphrase write does not cite the gate's wayins. */
+export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
+// --
+
+// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, rowOfOtherAddress, bankRootsMissing, answerNotMade
+
+// Big types a refusal's meta.act as its own BadAct, which has no `policied`.
+/** Refusal meta with act `policied`, for a write the put table allows but a storage policy or the born_at check refuses. */
+export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
+
+/** A `gate_issue` refusal of a write over `stored`, saying `why`. */
+export function gateIssue(stored: Thing | null, why: string): Errors.VaultError {
+  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
+}
+
+/** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it does not keep. */
+export function bornAtNotStored(stored: Thing | null): Errors.VaultError {
+  return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
+}
+
+/** A `storage_issue` refusal: storage answered a row at another address than asked, by the `fieldnames` that disagree. */
+export function rowOfOtherAddress(fieldnames: readonly string[]): Errors.VaultError { return new Errors.VaultError('storage_issue', BigPhrases.rowOfOtherAddress(fieldnames)) }
+
+/** A `storage_issue` refusal: a live bank is stored without its main gate or its root box. */
+export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.BankRootsMissing) }
+
+/** An `unexpected_error` refusal: a vaultDB could not make the answer for a failure. */
+export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
+// --
+
+// == [Minding Throwers]: modelkindMismatch, minderNotStarted, staleRead
+
+/** A `bad_record` refusal: a scope of another modelkind than the minder's. */
+export function modelkindMismatch(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.ModelkindMismatch) }
+
+/** The refusal of a read on a minder that is not minding. */
+export function minderNotStarted(): Errors.VaultError {
+  return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
+}
+
+/** The refusal of a get answered with a revision older than one cached when it began. */
+export function staleRead(ask: GetAsk): Errors.VaultError {
+  return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
+}
+// --

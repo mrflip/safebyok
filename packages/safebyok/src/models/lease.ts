@@ -1,8 +1,9 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
-import { Crypto, Errors, Helpers, Throwers, Validator } from 'safebyok-big/internals'
+import { Crypto, Helpers, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import { tombstoneSecretsGiven } from '../refusals/throwers'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
 import type { ThingRecord } from '../shapes/shapes-thing'
 import type { Bank } from './bank'
@@ -134,7 +135,7 @@ export class Lease implements LeaseStamp {
     const kept = withoutSecrets(sealer.donorPropsOf(donorProps))
     const given = sealer.publicPropsOf(publicProps)
     const isGone = (given.am === 'x')
-    if (isGone && (secretProps !== undefined)) { throw new Errors.VaultError('bad_record', Phrases.TombstoneSecretsGiven) }
+    if (isGone && (secretProps !== undefined)) { throw tombstoneSecretsGiven() }
     const revision   = isGone ? sealer.tombstoneOf(kept, given) : sealer.nextRevisionOf(kept, given)
     const cleartexts = isGone ? sealer.tombstoneSecrets         : sealer.secretPropsOf(secretProps)
     const sealed = await this.#sealText(sealer, revision, sealer.encode(cleartexts))

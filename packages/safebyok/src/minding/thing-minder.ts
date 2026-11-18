@@ -11,6 +11,7 @@ import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Errors, Outcome, Throwers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import { minderNotStarted, modelkindMismatch, staleRead } from '../refusals/throwers'
 import type { Banklabel, EpochMillis, Labelpath, Userid } from '../shapes/primitives'
 import {
   type GetAsk, type LoggableAsk, type Thing, type ThingScope, type ThingWatchScope, type Thingkind, type VoidSentinel,
@@ -360,7 +361,7 @@ export class ThingMinder {
   /** The scope of `scoped`, demanding that it is in this minder's bank, of its modelkind. */
   #demandOwnScope(scoped: ThingScope): ThingScope {
     const scope = minderScope.parseConsistent(scoped, this.ties)
-    if (modelkindOf(scope.labelpath) !== this.modelkind) { throw new Errors.VaultError('bad_record', Phrases.ModelkindMismatch) }
+    if (modelkindOf(scope.labelpath) !== this.modelkind) { throw modelkindMismatch() }
     return scope
   }
 
@@ -393,17 +394,7 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: minderNotStarted, staleRead, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf
-
-/** The refusal of a read on a minder that is not minding. */
-function minderNotStarted(): Errors.VaultError {
-  return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
-}
-
-/** The refusal of a get answered with a revision older than one cached when it began. */
-function staleRead(ask: GetAsk): Errors.VaultError {
-  return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
-}
+// == [Helpers]: isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf
 
 // A record arrives (success), a get is refused or the car invalidated (both leave the car untimely), or the car is
 // removed. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.

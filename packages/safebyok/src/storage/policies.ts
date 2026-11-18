@@ -1,10 +1,10 @@
 /** The storage policies a write names, each refusing it unless the Thing stored allows it. */
 
 import { isEqual, omit } from 'es-toolkit'
-import { type EX, Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
-import type { GateWriteAsk, Thing, Wayins } from '../shapes/shapes-thing'
+import { type EX, Phrases as BigPhrases } from 'safebyok-big/internals'
+import type { GateWriteAsk, Wayins } from '../shapes/shapes-thing'
 
-// == [Policies]: GatePolicies, policyRefusalOf, PoliciedMeta, gateIssue
+// == [Policies]: GatePolicies, policyRefusalOf
 // Each runs once the put table has found the write would replace the live gate. Each line is one row of its policy's table
 // in notes/storage-policies.md, in the same order, less big's registered_at row: every live-over-live write keeps its born_at.
 
@@ -42,12 +42,4 @@ export function policyRefusalOf(ask: GateWriteAsk, stored: Wayins): string | nul
   return null
 }
 
-// Big types a refusal's meta.act as its own BadAct, which has no `policied`.
-/** Refusal meta with act `policied`, for a write the put table allows but a storage policy or the born_at check refuses. */
-export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
-
-/** A `gate_issue` refusal of a write over `stored`, saying `why`. */
-export function gateIssue(stored: Thing | null, why: string): Errors.VaultError {
-  return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
-}
 // --

@@ -3,7 +3,7 @@
 import { noop } from 'es-toolkit'
 import type * as Z from 'zod'
 import { EX, Errors, Outcome, Throwers, Validator, type Helpers } from 'safebyok-big/internals'
-import { AnswerNotMade } from '../phrases'
+import { answerNotMade } from '../refusals/throwers'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type Thing, type ThingWatchScope, type Tracked, type WorldRecord,
   type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, isGone, loggableAskOf, watchArgs,
@@ -196,7 +196,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as Thing | null
       return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: new Errors.VaultError('unexpected_error', AnswerNotMade) }
+      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: answerNotMade() }
     }
   }
   // --
