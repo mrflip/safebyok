@@ -1,9 +1,18 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, TombstoneSecretsGiven, TombstoneSidecarGiven, BoxOfOtherRoot, GotOtherThanBox
+// == [Models]: VaultDBExpected, SealerExpected, ProvingExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, TombstoneSidecarGiven, BoxOfOtherRoot, GotOtherThanBox
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
+
+/** Something other than a Proving, where one is expected. */
+export const ProvingExpected = 'Expected a Proving'
+
+/** Something other than NOVEL or a Proving, given as a wayin's source. */
+export const NovelOrProvingExpected = 'Expected NOVEL or a proving'
+
+/** Something other than a Wayin, where one is expected. */
+export const WayinExpected = 'Expected a Wayin'
 
 /** A sealer that lacks one of its methods, its tags or its purposes. */
 export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a function for each of its methods.'

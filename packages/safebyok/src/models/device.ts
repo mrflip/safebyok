@@ -6,9 +6,9 @@ import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphr
 import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, deviceRecord } from '../shapes/shapes-bankish'
 import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, bankScope } from '../shapes/shapes-stamps'
-import * as Phrases from '../phrases'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
-import { type VaultDB, isVaultDB } from '../storage/vault-db'
+import type { VaultDB } from '../storage/vault-db'
+import { vaultDBShape } from '../shapes/shapes-thing'
 
 // == [Defaults]: DefaultLeaseMillis
 
@@ -209,7 +209,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
   deviceMakeArgs: obj({
     record: deviceRecord,
     opts:   Validator.objCheck(() => ({
-      vaultDB:         custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+      vaultDB:         vaultDBShape,
       keyDeriver:      custom<Deriver.KeyDeriver>(),
       strengthChecker: custom<StrengthChecker>().optional(),
       logger:          custom<Logger.VaultLogger>().optional(),

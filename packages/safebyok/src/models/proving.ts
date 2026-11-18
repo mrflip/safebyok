@@ -1,7 +1,8 @@
 import type { Consts, Deriver } from 'safebyok-big/internals'
-import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases, Throwers, Validator } from 'safebyok-big/internals'
+import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Throwers, Validator } from 'safebyok-big/internals'
+import * as Phrases from '../phrases'
 import { Lease } from './lease'
-import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, gateRevisionedStamp, provingDevice } from '../shapes/shapes-gateish'
+import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, gateRevisionedStamp, leaseBank, provingDevice } from '../shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, StampedGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
 import { Wayin, wayinCtxOf } from './wayin'
@@ -80,8 +81,8 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
     if (this.#wayin !== null) { throw Throwers.wayinMadeAlready() }
     const checked = Checks.wayinSource.parse(source)
     if (checked !== NOVEL) {
-      Validator.checkedConsistent(checked.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherGate })
-      Validator.checkedConsistent(checked.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: Phrases.ProvingOfOtherGate })
+      Validator.checkedConsistent(checked.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
+      Validator.checkedConsistent(checked.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
     }
     const bankKey = checked === NOVEL ? await Crypto.makeBankKey() : await checked.#unwrapBankKey()
     return this.#wrapBankKey(bankKey)
@@ -91,8 +92,8 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
   /** Build a lease on `bank`, citing the gate revision `gate`. The bankKey this proving unwraps is wrapped under a fresh, non-extractable leaseKey. */
   async buildLease(bank: LeaseBank, gate: GateRevisionedStamp): Promise<Lease> {
     const { bank: { stamp: bankStamp }, gate: cited } = Checks.provingLeaseArgs.parse({ bank, gate })
-    Validator.checkedConsistent(bankStamp, this.bankStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
-    Validator.checkedConsistent(cited, this.gateStamp, { kind: 'unexpected_error', message: Phrases.LeaseOfOtherGate })
+    Validator.checkedConsistent(bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
+    Validator.checkedConsistent(cited, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     const granted = {
       fmt: Stamps.LeaseFormat, ...bankStamp, gate_labelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
     } as const
@@ -311,10 +312,10 @@ async function passphraseKeyOf(keyDeriver: GuardedKeyDeriver, passphrase: GX.Pas
 // Defined here, not with the shapes: they name a model class.
 // The builders' checks are big's, over the lean core's stamps and the lean core's strength checker.
 /** The checks of {@link Proving.buildWayin}'s `source`, {@link Proving.buildLease}'s arguments, and the static builders' and `judgeStrength`'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => {
+const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   return {
-    wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), 'Expected NOVEL or a proving'),
-    provingLeaseArgs:     obj({ bank: obj({ stamp: Stamps.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }), gate: gateRevisionedStamp }),
+    wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), Phrases.NovelOrProvingExpected),
+    provingLeaseArgs:     obj({ bank: leaseBank, gate: gateRevisionedStamp }),
     passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
     passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.bankStamp, gateStamp: Stamps.gateStamp, device: provingDevice }),
     passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.stampedGate, device: provingDevice }),
