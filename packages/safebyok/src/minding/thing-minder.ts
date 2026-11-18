@@ -66,7 +66,8 @@ export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
   /** The TanStack Query client whose cache has the cars. A host may share its own.
-   * An observer of a minder's query gives neither a `select` nor a `placeholderData`: a value that is not a car refuses `unexpected_error`.
+   * TanStack passes an observer's selected and placeholder values through the minder's structural sharing, which throws `unexpected_error` on anything but a car.
+   * An observer that gives its own `structuralSharing` replaces the minder's for its query, which then stops merging the records that arrive.
    */
   tsq:             TSQ.QueryClient
   /** The cache's timings ({@link QueryCacheOpts}). A field left out defaults from {@link DefaultQueryCacheOpts}. */

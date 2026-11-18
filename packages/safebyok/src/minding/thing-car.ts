@@ -56,7 +56,7 @@ export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing
   return behind
 }
 
-// TanStack also calls it on an observer's selected and placeholder values, which is why a minder's query refuses both.
+// TanStack also calls it on an observer's selected and placeholder values, so it throws for one that is not a car.
 /** The car of the newest record of `prior` and `delivered`, and the fullest of its life, from either car, with `prior`'s on a tie.
  * It serves as a minder query's structural sharing: it is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined or of another scope.
  * Anything but a car refuses `unexpected_error`; `prior` may also be undefined.

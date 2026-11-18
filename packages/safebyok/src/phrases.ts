@@ -149,7 +149,7 @@ export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of mil
 export const ModelkindMismatch = "A ThingMinder minds one modelkind: the scope's labelpath must start with it."
 
 /** A value in a minder's query that is not a car. */
-export const NotACar = "A ThingMinder's query was given a value that is not a ThingCar, by a select, a placeholder or a write under its query key: only cars belong there."
+export const NotACar = "A ThingMinder's structural sharing was given a value that is not a ThingCar, by a select, a placeholder or a write under its query key: only cars belong there."
 
 /** A car whose newest is not a Thing's scope and revision. */
 export const CarRecordShape = "A ThingCar's newest record lacks a Thing's scope or revision: this is a bug in safebyok."
