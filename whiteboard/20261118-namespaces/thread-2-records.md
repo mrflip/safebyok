@@ -1,6 +1,6 @@
 # Thread 2: records (2026-11-18)
 
-Branch `20261118-records`, stacked on #740 (`20261118-namespaces`, itself on #728). Proved: `pnpm --filter safebyok test` 1018 passed, typecheck and eslint clean for safebyok, safebyok-react, safebyok-postgres; `pnpm justify` at the tip: see the PR's Tests line.
+Branch `20261118-records`, PR #744, stacked on #740 (`20261118-namespaces`, itself on #728). Proved: `pnpm --filter safebyok test` 1018 passed, typecheck and eslint clean for safebyok, safebyok-react, safebyok-postgres; `pnpm justify` at the tip: see the PR's Tests line.
 
 The Coach's rule (2026-11-18): `FooRecord` is a plain object's type, always and only; a bare `Foo` is a class. This thread brings the new core's record types back to it, so that a later thread can make `Thing` a class.
 
