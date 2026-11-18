@@ -4,10 +4,11 @@ import { pick } from 'es-toolkit'
 import type * as Z from 'zod'
 import { exactOptional } from 'zod'
 import { BX, type Consts, CX, EX, Errors, SX, Validator } from 'safebyok-big/internals'
+import type { TombstoneOf } from '../models/sealers'
 import * as Phrases from '../phrases'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
-// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isGoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
+// == [Lifeseqs]: ShellLifeseq, ShellLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isTombstoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
 
 /** How many base-32 digits a stored lifeseq has. */
 const LifeseqDigits = 10
@@ -24,7 +25,7 @@ export function lifeseqOfLifenum(lifenum: Lifenum): Lifeseq { return (lifenum ==
 export function lifenumOfLifeseq(lifeseq: Lifeseq): Lifenum { return Number.parseInt(lifeseq, 32) }
 
 /** True when `lifeseq` is a tombstone's: an odd life, the shell's among them. */
-export function isGoneLifeseq(lifeseq: Lifeseq): boolean { return Math.abs(lifenumOfLifeseq(lifeseq) % 2) === 1 }
+export function isTombstoneLifeseq(lifeseq: Lifeseq): boolean { return Math.abs(lifenumOfLifeseq(lifeseq) % 2) === 1 }
 
 /** The Thing's own lifeseq: the last of its lifepath. */
 export function lifeseqOfLifepath(lifepath: Lifepath): Lifeseq { return lifepath.slice(lifepath.lastIndexOf('/') + 1) }
@@ -88,7 +89,7 @@ function isLifeseqOwn({ lifepath, lifeseq }: Lived & { lifeseq: Lifeseq }): bool
 /** True when a Thing's lifepath has one lifeseq for each segment of its labelpath. */
 function isLifepathDeep({ lifepath, labelpath }: Lived & Labelled): boolean { return lifepath.split('/').length === labelpath.split('/').length }
 /** True when a Thing's own lifeseq is odd exactly when it is a tombstone. */
-function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === isGoneLifeseq(lifeseqOfLifepath(lifepath)) }
+function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === isTombstoneLifeseq(lifeseqOfLifepath(lifepath)) }
 /** True unless the Thing is a deleted main gate. */
 function isMainGateLive({ labelpath, am }: Lived & Labelled): boolean { return (labelpath !== MainGateLabelpath) || (am === 'a') }
 /** The fields of `shape`, each optional: it may be omitted, but not undefined. */
@@ -98,7 +99,7 @@ function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT 
 }
 
 /** True when a citation is the shell in all three of its marks, or in none. */
-function isShellWhole({ revtok, revseq, lifepath }: Revised): boolean {
+function isShellCitable({ revtok, revseq, lifepath }: Revised): boolean {
   const isShell = (revseq === SX.VoidRevisionSeq)
   return (isShell === (revtok === SX.VoidRevisionTok)) && (isShell === (lifeseqOfLifepath(lifepath) === ShellLifeseq))
 }
@@ -186,15 +187,15 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
 
   // A citation must carry what ThingCited names; any other field of its kind it carries must check.
   const bankCited    = obj({ ...exactPartialOf(bankBase.shape), ...thingCited.shape }).strict()
-    .refine(isShellWhole,   Phrases.CitedHalfShell)
+    .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   const gateCited    = obj({ ...exactPartialOf(gateBase.shape), ...thingCited.shape }).strict()
-    .refine(isShellWhole,   Phrases.CitedHalfShell)
+    .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   // A box's shell, as a bank gives it, carries the shell's lifeseq.
   const lifeseqOrShell = union([lifeseq, lit(ShellLifeseq)])
   const boxCited     = obj({ ...exactPartialOf(boxLive.shape), lifeseq: exactOptional(lifeseqOrShell), ...thingCited.shape }).strict()
-    .refine(isShellWhole,   Phrases.CitedHalfShell)
+    .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
   // A box's sealable keeps only its Thing fields and sidecar, so a whisper given with it, sealed or not, is dropped. The
@@ -212,7 +213,7 @@ export const { thingScope, thingCited, thingRecord, storedCited, storedWayins, s
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
-    .refine(isShellWhole,   Phrases.SealableHalfShell)
+    .refine(isShellCitable,   Phrases.SealableHalfShell)
 
   // A bank keeps its root box whole: live once the bank is born, and its shell before.
   const boxRecord    = boxLive
@@ -282,7 +283,7 @@ export function childShellCited(parentLifepath: Lifepath): ThingCited {
 }
 // --
 
-// == [Shells]: ShellChecks, VoidSentinel, isVoidSentinel, ShellScoped, ShellParent, shellOf
+// == [Shells]: ShellChecks, VoidSentinel, ShellScoped, ShellParent, shellOf
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
 const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label, union, str }) => {
@@ -323,9 +324,6 @@ function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): bo
  */
 export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
 
-/** True when `record` is a void sentinel: its revseq is the shell's -1. */
-export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
-
 /** What {@link shellOf} reads of its first argument: the scope, and any other Thing field it proposes for the shell, its labelpath or label among them. */
 export type ShellScoped = Pick<ThingScope, 'userid' | 'banklabel'> & Partial<ThingRecord>
 
@@ -353,6 +351,53 @@ export function shellOf(scoped: ShellScoped, parent?: ShellParent): VoidSentinel
 }
 // --
 
+// == [Reading records]: Tombstone, isVoidSentinel, isWholeRecord, isTombstone, isGone, isSparse, haveSameScope, cmpThings
+
+/** A tombstone of a RecordT, sparse or whole. */
+export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
+
+/** True when `record` is a void sentinel: its revseq is the shell's -1. */
+export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel { return record.revseq === SX.VoidRevisionSeq }
+
+// The void sentinel is a whole tombstone, though no record check accepts it: a store must never take a shell as a record.
+/** True when `record` is whole, with its body, and not sparse. The void sentinel is whole. */
+export function isWholeRecord(record: Sparse<Thing>): record is Thing | VoidSentinel {
+  return isVoidSentinel(record) || kindChecksOf(record.labelpath).record.safeParse(record).success
+}
+
+// Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
+/** True when `record` is a tombstone, sparse or whole, the void sentinel among them. */
+export function isTombstone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
+  return (record as Partial<ThingCited> | null | undefined)?.am === 'x'
+}
+
+/** True when `record` is the tombstone of a deleted Thing, sparse or whole: any tombstone but the void sentinel. */
+export function isGone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
+  return isTombstone(record) && (! isVoidSentinel(record))
+}
+
+/** True when `record` is live, and not whole. */
+export function isSparse(record: Sparse<Thing>): boolean {
+  return (record.am === 'a') && (! isWholeRecord(record))
+}
+
+/** True when `ante` and `post` are at one labelpath of one bank. */
+export function haveSameScope(ante: ThingScope, post: ThingScope): boolean {
+  return (ante.labelpath === post.labelpath) && (ante.userid === post.userid) && (ante.banklabel === post.banklabel)
+}
+
+// The lifepath decides first: a Thing born under a new life of its parent starts again at revseq 0, and the parent's later
+// lifeseq orders it after. Lifeseqs are fixed-width base-32 digits, 0-9 then a-v, so lifepaths compare as strings, and
+// the shell's '-' sorts below them all.
+/** Compare two revisions: by life, then revision. Returns: positive (`post` newer), negative (`ante` newer), zero (the same).
+ * The output is **not** restricted to -1, 0, 1: it may be any integer.
+ */
+export function cmpThings(ante: Pick<ThingCited, 'lifepath' | 'revseq'>, post: Pick<ThingCited, 'lifepath' | 'revseq'>): number {
+  if (ante.lifepath !== post.lifepath) { return (post.lifepath > ante.lifepath) ? 1 : -1 }
+  return post.revseq - ante.revseq
+}
+// --
+
 // == [Each kind's checks]: KindChecks, kindChecksOf
 
 /** The checks of each kind of Thing stored in a vaultDB: the record proposed, cited and stored, and the storage policies it may name. */
@@ -366,7 +411,7 @@ export const KindChecks = {
 export function kindChecksOf(labelpath: Labelpath): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
-// == [Asks]: AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedGetAsk, checkedListAsk, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -383,8 +428,10 @@ function isPolicyOwn({ modelkind, options }: Flagged): boolean {
   return (options?.policies ?? []).every((policy) => owned.includes(policy))
 }
 
-/** The checks of a vaultDB ask, its records aside, and of a watch's scope and handlers. */
-const AskChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
+/** The checks of a vaultDB ask, its records aside, and of a watch's scope and handlers.
+ * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
+ */
+export const AskChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof, label, user_id, fn }) => {
   const modelkind       = oneof(thingkindVals)
   const thingWatchScope = thingScope.pick({ userid: true, banklabel: true })
   const thingOptions    = obj({
@@ -454,12 +501,6 @@ export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
 /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
 export type Tracked         = Readonly<{ bank: BankRecord | 'same', [MainGateLabelpath]: GateThing | 'same', [RootBoxLabelpath]: BoxThing | 'same' }>
 
-/** Check a get `ask`, throwing `bad_record`, and return it typed. */
-export function checkedGetAsk(ask: unknown): GetAsk { return AskChecks.getAsk.parse(ask) }
-
-/** Check a list `ask`, throwing `bad_record`, and return it typed. */
-export function checkedListAsk(ask: unknown): ListAsk { return AskChecks.listAsk.parse(ask) }
-
 /** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {
   const checked = withRecordsChecked(AskChecks.writeAsk.parse(ask))
@@ -526,9 +567,9 @@ function revtokNotNew(ask: WriteAsk): Errors.VaultError { return new Errors.Vaul
 /** A `bad_record` refusal: the record is not at the scope the ask names. */
 function recordOfOtherScope(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RecordOfOtherScope, { meta: { ask: loggableAskOf(ask) } }) }
 
-// A del is the only write of a tombstone, so this is the act table's dubdel, found before anything is fetched. Its refusal
-// kind is the one big's act tables give dubdel.
-/** An `absent_vault` refusal, act `dubdel`: a del cites a tombstone. */
+// A del citing a tombstone, the shell among them, refuses dubdel when the ask is made, before anything is fetched, so its
+// answer has no dbhas. Its refusal kind is the one big's act tables give dubdel.
+/** An `absent_vault` refusal, act `dubdel`: a del cites a tombstone or the shell. */
 function tombstoneOverTombstone(ask: WriteAsk): Errors.VaultError {
   return new Errors.VaultError('absent_vault', Phrases.TombstoneOverTombstone, { meta: { ask: loggableAskOf(ask), act: 'dubdel' } })
 }

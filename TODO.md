@@ -2,6 +2,28 @@
 
 The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog of `safebyok-big`.
 
+* **Share a record's unchanged parts across revisions in `bestCarOf`.** A car now holds each record exactly as the
+  vaultDB sent it, so a consumer memoized on a nested part (a box's sidecar, a gate's wayins) recomputes on every new
+  revision. Should one need it: only the fullest has parts worth sharing, so where the fullest came from `delivered` and
+  `prior` has one, `shared = TSQ.replaceEqualDeep(prior.fullest, fullest)`; a full car's newest is that same record and
+  takes `shared` too; a sparse newest takes nothing. One call, no fix-up after (the Coach, 2026-11-18: left simple).
+* **Reevaluate keeping void and gone separate in the minder.** For a host they differ only in act names, and the
+  cache decides nothing differently between them; only a birth's cited record differs, and the writer builds that from
+  the parent it holds. The minder makes up a shell for a void answer (`#shellAt`, `RootNotCached`, the `void` car) so
+  that a car's `newest` is always a record. Consider a void car that holds no record, or folding void into gone, and
+  making the shell only where a birth cites it.
+* **Give fine-grained invalidation in the minder's `get`, its fetch and `isStaleAt`.** A get has one `staleTime`
+  today. Let it say a sparse record is acceptable (`sparseOk`) apart from how old a record may be, and let invalidation
+  and a refused get count as stale, as TanStack counts them; and decide whether `'static'` has any use for a car, whose
+  newest the vaultDB can always replace (whiteboard/20261115-lean_buttonup, the staleTime table, 2026-11-18).
+* **The vaultDB should not return sparse tombstones.** A list sends each tombstone, and a gone parent, sparse
+  (`classifyListThings`' `sparseOf`), and its types and docs promise them (`vault-db.ts`); a get's tombstone is always
+  whole. Send every tombstone whole, so that "sparse" means live and not whole, and the minder's `gotgone` answers a
+  whole tombstone as the vaultDB's does.
+* **Redo `bestCarOf` for titles and sparse tombstones.** The vaultDB is to send only whole tombstones, and the void
+  sentinel counts as a tombstone, not gone (the Coach, 2026-11-18). `bestCarOf`, `carOf`, the car's checks and
+  `isTombstone` are written for sparse tombstones and for a tombstone that excludes the void sentinel; rename them for
+  what they test, and drop what a sparse tombstone needed.
 * **`cleartext` names two things.** VOCABULARY.md's cleartext is the passphrase or passkey answer a gating accepts.
   `BoxCleartexts`, in `models/sealers.ts`, uses it for what a seal ciphers: a box's whisper. One of them needs
   another name. Every other name tried so far has been worse.

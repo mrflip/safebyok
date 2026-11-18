@@ -1,8 +1,8 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
-  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedGetAsk, checkedListAsk, checkedWriteAsk, delAskOf, getAskOf,
-  isGoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isVoidSentinel,
+  type BankRecord, type BoxThing, type GateThing, type Tracked, type WriteAsk, AskChecks, BoxThingFormat, GateThingFormat, MainGateLabelpath, RootBoxLabelpath, ShellCited, ShellLifeseq, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf,
+  isTombstoneLifeseq, isLabelpathOfKind, lifeseqOfLifenum, lifeseqOfLifepath, listAskOf, loggableAskOf, modelkindOf, putAskOf, lifenumOfLifeseq, childShellCited, shellOf, sparseOf, boxSealable, isGone, isTombstone, isWholeRecord, isVoidSentinel,
 } from '../../src/storage/shapes-thing'
 import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
@@ -51,9 +51,9 @@ describe("lifeseqOfLifepath(lifepath)", () => {
   })
 })
 
-describe("isGoneLifeseq(lifeseq)", () => {
+describe("isTombstoneLifeseq(lifeseq)", () => {
   it("is true of odd lives, the shell's among them", () => {
-    expect([ShellLifeseq, lifeseqOfLifenum(0), lifeseqOfLifenum(1), lifeseqOfLifenum(32), lifeseqOfLifenum(33)].map((lifeseq) => isGoneLifeseq(lifeseq))).to.deep.equal([true, false, true, false, true])
+    expect([ShellLifeseq, lifeseqOfLifenum(0), lifeseqOfLifenum(1), lifeseqOfLifenum(32), lifeseqOfLifenum(33)].map((lifeseq) => isTombstoneLifeseq(lifeseq))).to.deep.equal([true, false, true, false, true])
   })
 })
 
@@ -141,11 +141,11 @@ describe("modelkindOf(labelpath) and isLabelpathOfKind(labelpath, modelkind)", (
   })
 })
 
-describe("checkedGetAsk(ask) and checkedListAsk(ask)", () => {
+describe("AskChecks.getAsk and AskChecks.listAsk", () => {
   it("accepts an ask of each kind", () => {
     for (const labelpath of ['bank', 'gate', 'gate/second', 'box', 'box/openai']) {
-      expect(checkedGetAsk(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
-      expect(checkedListAsk(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
+      expect(AskChecks.getAsk.parse(TH.getAskAt(labelpath))).to.deep.equal(TH.getAskAt(labelpath))
+      expect(AskChecks.listAsk.parse(TH.listAskAt(labelpath))).to.deep.equal(TH.listAskAt(labelpath))
     }
   })
 
@@ -161,11 +161,11 @@ describe("checkedGetAsk(ask) and checkedListAsk(ask)", () => {
   ] as const
 
   for (const [ask, blurb] of BadGetCases) {
-    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => checkedGetAsk(ask), 'bad_record') })
+    it(`refuses ${blurb}`, () => { TH.expectSyncRefusal(() => AskChecks.getAsk.parse(ask), 'bad_record') })
   }
 
   it("refuses a list ask that is a get", () => {
-    TH.expectSyncRefusal(() => checkedListAsk(TH.getAskAt('box')), 'bad_record')
+    TH.expectSyncRefusal(() => AskChecks.listAsk.parse(TH.getAskAt('box')), 'bad_record')
   })
 })
 
@@ -329,7 +329,7 @@ describe("the ask builders", () => {
     const tomb = TH.boxTombOf(box)
     TH.expectSyncRefusal(() => checkedWriteAsk(delAskOf({ cited: box, record: tomb, options: { policies: [] } } as never)), 'bad_record')
     TH.expectSyncRefusal(() => checkedWriteAsk(putAskOf({ cited: box, record: box, extra: 1 } as never)), 'bad_record')
-    TH.expectSyncRefusal(() => checkedGetAsk(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_record')
+    TH.expectSyncRefusal(() => AskChecks.getAsk.parse(getAskOf({ ...TH.GateScope, ifAbsent: 'add' } as never)), 'bad_record')
   })
 
   it("never throw: a record with no scope, or args that are not a bag, go to the verb as given", () => {
@@ -345,6 +345,42 @@ describe("isVoidSentinel(record)", () => {
     const box = TH.boxThingOf()
     for (const shell of [shellOf(TH.GateScope), shellOf(TH.BoxScope, TH.rootBoxOf())]) { expect(isVoidSentinel(shell)).to.be.true }
     for (const record of [box, TH.boxTombOf(box), sparseOf(box)]) { expect(isVoidSentinel(record)).to.be.false }
+  })
+})
+
+describe("isWholeRecord(record)", () => {
+  it("is true of a whole record, live or tombstone, and of the void sentinel", () => {
+    const box = TH.boxThingOf()
+    for (const record of [box, TH.boxTombOf(box), shellOf(TH.BoxScope, TH.rootBoxOf()), shellOf(TH.GateScope)]) { expect(isWholeRecord(record)).to.be.true }
+  })
+
+  it("is false of a sparse record, live or tombstone", () => {
+    const box = TH.boxThingOf()
+    for (const record of [sparseOf(box), sparseOf(TH.boxTombOf(box))]) { expect(isWholeRecord(record)).to.be.false }
+  })
+})
+
+describe("isTombstone(record)", () => {
+  it("is true of a tombstone, whole or sparse, and of the void sentinel", () => {
+    const tombstone = TH.boxTombOf(TH.boxThingOf())
+    for (const record of [tombstone, sparseOf(tombstone), shellOf(TH.BoxScope, TH.rootBoxOf()), shellOf(TH.GateScope)]) { expect(isTombstone(record)).to.be.true }
+  })
+
+  it("is false of a live record, whole or sparse, or what is not a record", () => {
+    const box = TH.boxThingOf()
+    for (const val of [box, sparseOf(box), null, undefined, 'x']) { expect(isTombstone(val)).to.be.false }
+  })
+})
+
+describe("isGone(record)", () => {
+  it("is true of a deleted Thing's tombstone, whole or sparse", () => {
+    const tombstone = TH.boxTombOf(TH.boxThingOf())
+    for (const record of [tombstone, sparseOf(tombstone)]) { expect(isGone(record)).to.be.true }
+  })
+
+  it("is false of the void sentinel, a live record, whole or sparse, or what is not a record", () => {
+    const box = TH.boxThingOf()
+    for (const val of [shellOf(TH.BoxScope, TH.rootBoxOf()), shellOf(TH.GateScope), box, sparseOf(box), null, undefined, 'x']) { expect(isGone(val)).to.be.false }
   })
 })
 

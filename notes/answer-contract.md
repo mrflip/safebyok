@@ -196,6 +196,8 @@ Soft cap: a put that would be `born` may refuse `vault_full` instead (err, 🔁)
 
 | abbr | `b_tok` | `b_seq` | flags | box    | act       | returning     | result |
 | ---- | :-----: | ------- | :---: | ------ | --------- | ------------- | :----: |
+| DX0  |    —    | —       |       | @      | `dubdel` (new core: cites the shell or a tombstone) | err |   🔁    |
+|      |         |         |       |        |           |               |        |
 | DV1  |  birth  | birth   |       | *void* | `void`    | dbnil         |   🔁    |
 | DV2  |   neq   | ahead   |       | *void* | `ahead`   | dbnil         |   🌀    |
 |      |         |         |       |        |           |               |        |
@@ -219,6 +221,11 @@ Soft cap: a put that would be `born` may refuse `vault_full` instead (err, 🔁)
 
 Coverage check: void has 2 seq values in 2 rows. Gone and live each have 8 `b_tok` × `b_seq`
 cases in 8 rows (eq with birth can't occur). del has no flags, so nothing splits further.
+
+DX0 is the new core's (`packages/safebyok`) alone. There, a del citing the shell or a tombstone refuses `dubdel` when
+the ask is made, before anything is fetched, so its answer has no dbhas, and the rows it would reach below (DV1, DG3,
+DL3, DG9, and any other row whose cited record is a tombstone) are not reached. safebyok-big classifies such a del by
+the stored row, by the rows below.
 
 ## Vault ops table
 

@@ -122,13 +122,11 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, RootNotCached, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarGoneNotTombstone, CarVoidNotShell
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, QueryClientExpected, GcTimeShape, StaleTimeShape, ModelkindMismatch, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
 
-/** A get of an empty Thing below a root, before the minder has that root. */
-export const RootNotCached = "This ThingMinder has not cached the root box yet, so it cannot make the shell of a Thing below it: its notice or a get of the root box comes first."
 
 /** A minder read before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it.'
@@ -139,11 +137,17 @@ export const StaleRead = 'Storage answered with a revision older than one this d
 /** A minder handed something that is not a TanStack Query client. */
 export const QueryClientExpected = 'A ThingMinder is made with a QueryClient from @tanstack/query-core.'
 
-/** A gcTime that is not Infinity or a whole number of milliseconds up to 2^31 - 1. */
-export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2147483647 (about 24.8 days): a longer timer fires at once.'
+/** A gcTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
+export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
+
+/** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
+export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
+
+/** A scope of another modelkind than the minder's. */
+export const ModelkindMismatch = "A ThingMinder minds one modelkind: the scope's labelpath must start with it."
 
 /** A value in a minder's query that is not a car. */
-export const NotACar = "A ThingMinder's query was given a value that is not a ThingCar, by a select, a placeholder or a write under its query key: only cars belong there."
+export const NotACar = "A ThingMinder's structural sharing was given a value that is not a ThingCar, by a select, a placeholder or a write under its query key: only cars belong there."
 
 /** A car whose newest is not a Thing's scope and revision. */
 export const CarRecordShape = "A ThingCar's newest record lacks a Thing's scope or revision: this is a bug in safebyok."
@@ -160,8 +164,8 @@ export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is 
 /** A behind car whose fullest is not an earlier revision of its newest's life. */
 export const CarBehindOfOtherRevision = "A behind ThingCar's fullest record is an earlier revision of its newest's Thing and life, and this one's is not: this is a bug in safebyok."
 
-/** A gone car whose newest is not a tombstone. */
-export const CarGoneNotTombstone = "A gone ThingCar's newest record is a tombstone, and this one's is not: this is a bug in safebyok."
+/** A gone car whose newest is not gone: a live record, or the void sentinel. */
+export const CarNewestNotGone = "A gone ThingCar's newest record is the tombstone of a deleted Thing, and this one's is a live record or the void sentinel: this is a bug in safebyok."
 
 /** A void car whose newest is not the void sentinel. */
 export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel, and this one's is not: this is a bug in safebyok."
