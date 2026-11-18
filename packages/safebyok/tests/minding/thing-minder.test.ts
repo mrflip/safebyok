@@ -316,7 +316,7 @@ describe("ThingMinder.at", () => {
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
-    expect(minder.isStaleAt(GateAsk, { staleTime: 0 })).to.be.true
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: 0 })).to.be.true
     const car = minder.at(GateAsk)
     expect(car).to.deep.equal({ liveness: 'full', newest: gate, fullest: gate })
     expect(car?.newest).to.eq(car?.fullest)
@@ -348,6 +348,29 @@ describe("ThingMinder.tryAt", () => {
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(GateAsk)
     expect(minder.tryAt(GateAsk)).to.deep.include({ ok: true, act: 'gotlive', val: gate, car: carOf(gate), isTimely: true, isFetching: false, lastErr: null })
+  })
+
+  it("answers gotlive for a full car under a staleTime of Infinity or 'static'", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(GateAsk)
+    for (const staleTime of [Infinity, 'static'] as const) {
+      expect(minder.tryAt(GateAsk, { staleTime })).to.deep.include({ ok: true, act: 'gotlive', val: gate, isTimely: true })
+    }
+  })
+
+  it("counts a behind car timely under a staleTime of Infinity, and a bare car never", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box0    = await storedBoxOf(vaultDB)
+    const { boxMinder } = minderWorldOf(vaultDB)
+    await boxMinder.list()
+    expect(boxMinder.tryAt(BoxAsk, { staleTime: Infinity })).to.deep.include({ ok: true, act: 'untimely', isTimely: false })
+    await boxMinder.get(BoxAsk)
+    vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.nextOf(box0))
+    await boxMinder.list()
+    expect(boxMinder.tryAt(BoxAsk, { staleTime: Infinity })).to.have.property('isTimely', true)
+    expect(boxMinder.tryAt(BoxAsk)).to.have.property('isTimely', false)
   })
 
   it("answers untimely, without the record but with its car, where it is older than staleTime", async () => {
@@ -597,7 +620,7 @@ describe("ThingMinder.list", () => {
     const { boxMinder } = minderWorldOf(vaultDB)
     expect(await boxMinder.list()).to.deep.equal([TH.BoxScope.labelpath])
     expect(boxMinder.at(BoxAsk)).to.deep.equal({ liveness: 'bare', newest: sparseOf(box), fullest: undefined })
-    expect(boxMinder.isStaleAt(BoxAsk)).to.be.true
+    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.true
     expect(await boxMinder.get(BoxAsk)).to.deep.equal(carOf(box))
   })
 
@@ -609,7 +632,7 @@ describe("ThingMinder.list", () => {
     await boxMinder.list()
     expect(boxMinder.at(BoxAsk)).to.eq(got)
     expect(got).to.deep.equal(carOf(box))
-    expect(boxMinder.isStaleAt(BoxAsk)).to.be.false
+    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.false
   })
 
   it("leaves a box the cache has at an older revision behind and stale, still showing the older record whole", async () => {
@@ -621,7 +644,7 @@ describe("ThingMinder.list", () => {
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box1)
     await boxMinder.list()
     expect(boxMinder.at(BoxAsk)).to.deep.equal({ liveness: 'behind', newest: sparseOf(box1), fullest: box0 })
-    expect(boxMinder.isStaleAt(BoxAsk)).to.be.true
+    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.true
     expect(await boxMinder.get(BoxAsk)).to.deep.equal(carOf(box1))
   })
 
@@ -766,18 +789,48 @@ describe("ThingMinder.listen", () => {
 describe("ThingMinder.isStaleAt", () => {
   it("is true before any get, false after, and true past staleTime", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
-    expect(minder.isStaleAt(GateAsk)).to.be.true
+    expect(minder.isStaleAt(TH.GateScope)).to.be.true
     await minder.get(GateAsk)
-    expect(minder.isStaleAt(GateAsk)).to.be.false
-    expect(minder.isStaleAt(GateAsk, { staleTime: 0 })).to.be.true
+    expect(minder.isStaleAt(TH.GateScope)).to.be.false
+    expect(minder.isStaleAt(TH.GateScope, { staleTime: 0 })).to.be.true
   })
 
-  it("refuses bad_record for an ask that tracks nothing, or another bank's", () => {
-    const { minder } = minderWorldOf(new MemoryVaultDB())
-    const { track: _track, ...noTrack } = GateAsk
-    TH.expectSyncRefusal(() => minder.isStaleAt(noTrack as never), 'bad_record')
-    TH.expectSyncRefusal(() => minder.isStaleAt({ ...GateAsk, banklabel: 'other' }), 'bad_record')
+  it("takes an ask or a record as its scope", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(GateAsk)
+    expect([minder.isStaleAt(GateAsk), minder.isStaleAt(gate)]).to.deep.equal([false, false])
   })
+
+  it("counts a behind car timely under a staleTime of Infinity or 'static', and a bare car under neither", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box0    = await storedBoxOf(vaultDB)
+    const { boxMinder } = minderWorldOf(vaultDB)
+    await boxMinder.list()
+    expect(boxMinder.at(TH.BoxScope)).to.have.property('liveness', 'bare')
+    for (const staleTime of [Infinity, 'static'] as const) { expect(boxMinder.isStaleAt(TH.BoxScope, { staleTime })).to.be.true }
+    await boxMinder.get(BoxAsk)
+    vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.nextOf(box0))
+    await boxMinder.list()
+    expect(boxMinder.at(TH.BoxScope)).to.have.property('liveness', 'behind')
+    for (const staleTime of [Infinity, 'static'] as const) { expect(boxMinder.isStaleAt(TH.BoxScope, { staleTime })).to.be.false }
+    expect(boxMinder.isStaleAt(TH.BoxScope)).to.be.true
+  })
+
+  const BadArgs = [
+    [TH.BoxScope,                          {},                       'a scope of another kind'],
+    [{ ...TH.GateScope, banklabel: 'zz' }, {},                       "another bank's scope"],
+    [TH.GateScope,                         { staleTime: undefined }, 'a staleTime given as undefined'],
+    [TH.GateScope,                         { staleTime: -1 },        'a negative staleTime'],
+    [TH.GateScope,                         { staleTime: 'never' },   'a staleTime of another word'],
+  ] as const
+  for (const [scoped, opts, blurb] of BadArgs) {
+    it(`refuses bad_record for ${blurb}`, () => {
+      const { minder } = minderWorldOf(new MemoryVaultDB())
+      TH.expectSyncRefusal(() => minder.isStaleAt(scoped, opts as never), 'bad_record')
+    })
+  }
 })
 
 describe("Each minder's watch", () => {

@@ -6,7 +6,7 @@ import { exactOptional } from 'zod'
 import { Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
-import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
+import { type GetAsk, type ThingWatchScope, type Thingkind, type Track, AskChecks, thingScope, thingWatchScope, trackShape } from '../storage/shapes-thing'
 import type { TSQGotAnswer } from './thing-minder'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxGcTime
@@ -32,10 +32,12 @@ export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry:
 const MaxGcTime = (2 ** 31) - 1
 // --
 
-// == [Checks]: queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts
+// == [Checks]: queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts
 
 /** The checks of a ThingMinder's arguments and options. */
-export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts } = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
+export const {
+  queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts,
+} = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
   const gcTime           = union([uint.max(MaxGcTime, Phrases.GcTimeShape), lit(Infinity)])
   const queryCacheOpts   = obj({
     staleTime: orDefault(uint, DefaultQueryCacheOpts.staleTime),
@@ -49,13 +51,19 @@ export const { queryCacheOpts, minderFriend, tsqClient, minderListener, minderSc
   const minderListener   = fn<(answer: TSQGotAnswer) => void>()
   // Its fields alone: an ask or a record passes, and is read as its scope.
   const minderScope      = obj(thingScope.shape)
-  // The rest of the ask is the vaultDB's, which checks it.
-  const minderTrack      = obj({ track: trackShape }).loose()
+  // Zod refuses to `extend` a refined object over keys it has; `safeExtend` narrows them, and keeps the refinement.
+  const minderGetAsk     = AskChecks.getAsk.safeExtend({ ifAbsent: lit('nil'), track: trackShape })
+  const tsqStaleTime     = union([uint, lit(Infinity), lit('static')])
   // Each option may be left out, and never given as undefined.
-  const minderGetAskOpts = obj({ staleTime: exactOptional(uint) }).strict()
+  const minderGetAskOpts = obj({ staleTime: exactOptional(tsqStaleTime) }).strict()
   const minderAskOpts    = minderGetAskOpts.extend({ ifStale: exactOptional(oneof(['get', 'refresh'])) }).strict()
-  return { queryCacheOpts, minderFriend, tsqClient, minderListener, minderScope, minderTrack, minderAskOpts, minderGetAskOpts }
+  return { queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts }
 })
+
+/** How long a minder's get or read counts a car timely: milliseconds, or `Infinity` or `'static'` for a car that is never stale by age.
+ * A `bare` car is never timely, whatever the staleTime. Under `Infinity` or `'static'`, a `behind` car is timely.
+ */
+export type TsqStaleTime = Z.input<typeof tsqStaleTime>
 
 /** A get ask with `ifAbsent: 'nil'` and a `track`, which the minder sends to the vaultDB exactly as given. */
 export type MinderGetAsk     = GetAsk & Readonly<{ ifAbsent: 'nil', track: Track }>
