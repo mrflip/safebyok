@@ -6,30 +6,43 @@ PROCESS.md, *Dependencies*.
 
 ## Pushing to a Dependabot branch is allowed
 
-Nothing forbids it, but it changes who owns the branch:
+Push whatever gets the PR green. It changes who owns the branch:
 
-* **Dependabot stops managing it.** Once the branch has a commit that is not Dependabot's,
-  Dependabot stops rebasing it, and `@dependabot rebase` does nothing. From then on the PR is
-  maintained by hand, and rebased by hand like any other (PROCESS.md, *The history we keep*).
-* **CI treats it as an ordinary PR.** The changeset rule is the one in `notes/ci.md`: if the PR moves
-  a public package's runtime dependencies, `dependabot-changeset.yml` has already written the
-  changeset once, and will not write it again. After a push that changes what the PR does, check
-  that the changeset still describes it.
+* **The PR is yours from then on.** Once the branch has a commit that is not Dependabot's,
+  Dependabot stops rebasing it, and `@dependabot rebase` does nothing. Maintain it like any branch
+  you own.
+* **CI treats it as an ordinary PR, so it needs a changeset.** Where the bump moves a public
+  package's runtime dependencies, `dependabot-changeset.yml` has already written one; check that it
+  still describes the PR. Otherwise (a devDependency, a tool, an image) add an empty one with
+  `pnpm changeset --empty`, renamed `.changeset/dependabot-<PR>.md`, in the same push as your fix.
 * **The seven-day rule still applies.** Do not use `minimumReleaseAgeExclude` to turn a red PR green.
   It is for a security fix that cannot wait, with its entry in `notes/security.md`.
-* **Never force-push over Dependabot's commits.** Add commits on top. Rebasing is Dependabot's job.
+* **Leave Dependabot's commit as it is.** Your changes go in commits of their own on top, so the
+  bump and the fix read apart in history.
+* **Look for the `queue` label before you push.** A queued PR takes a push only to fix what the
+  queue refused (PROCESS.md, *The history we keep*).
+
+## When it falls behind main
+
+* **No commits of yours yet:** comment `@dependabot rebase`. If nothing happens within about a
+  quarter of an hour, rebase it by hand, as below.
+* **Commits of yours:** rebase by hand onto `origin/main`. On a lockfile conflict, take main's
+  `pnpm-lock.yaml` and run `pnpm install --no-frozen-lockfile` to apply the bump again, rather than
+  merging the lockfile by hand. Run `pnpm justify` at the tip, then force-push with a lease on the
+  sha you rebased from. Dependabot's commit keeps its author.
 
 ## First, find the cause
 
 Read the failing job's log, then decide which of these it is:
 
-1. **The bump breaks our code**: an API that changed, a stricter type, or a behaviour a test pinned.
-   Push the fix to the PR in its own commit, with a `deps:` or other fitting prefix and a message
+1. **The bump needs a change of ours**: an API that changed, a stricter type, a behaviour a test
+   pinned, or a pin that must move in two places (`e2e/compose.yaml`'s Postgres image and
+   `ci.yml`'s, say). Push the fix to the PR in its own commit, with a fitting prefix and a message
    saying why. Keep it small. If it grows past a sitting, close the PR and make the migration a
    thread of its own: a large hand-built branch under a bot's title is hard to review.
-2. **The failure does not depend on the bump**: a flaky test, or a latent bug the update exposed.
-   Fix it on `main` in its own PR, then comment `@dependabot rebase`. The PR stays purely
-   Dependabot's, and the fix has its own place in history.
+2. **The failure does not depend on the bump**: a latent bug the update exposed. A fix of a few
+   lines rides along on the PR, as in case 1. A larger one goes to `main` in its own PR, and then
+   `@dependabot rebase`.
 3. **One package in a group is the culprit.** Bisect the lockfile diff to find it. If the fix is a
    code change, treat it as case 1. If the upstream package is broken, add an `ignore` entry for it
    in `.github/dependabot.yml` with a comment saying why, or comment `@dependabot ignore this
