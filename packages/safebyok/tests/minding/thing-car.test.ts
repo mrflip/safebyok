@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { type ThingCar, bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
-import { type Thing, shellOf, sparseOf } from '../../src/storage/shapes-thing'
+import { type BoxThing, type Thing, shellOf, sparseOf } from '../../src/storage/shapes-thing'
 import * as TH from '../test-helpers'
 
 const Box0      = TH.boxThingOf()
@@ -115,12 +115,48 @@ describe("bestCarOf", () => {
     })
   }
 
-  it("makes a frozen full car of the later record itself", () => {
+  it("makes a frozen full car of the later record itself, where the prior car has no whole record", () => {
     const later  = structuredClone(Box1)
-    const merged = bestCarOf(carOf(Box0), carOf(later))
+    const merged = bestCarOf(carOf(sparseOf(Box1)), carOf(later))
     expect(merged.newest).to.eq(later)
     expect(merged.newest).to.eq(merged.fullest)
     expect(Object.isFrozen(merged)).to.be.true
+  })
+
+  // Each delivered record is a clone, so a part is the prior record's own only where the merge shared it.
+  describe("shares the prior whole record's unchanged parts with a newer whole record", () => {
+    it("in a full car, whose newest is its fullest", () => {
+      const merged = bestCarOf(carOf(Box0), carOf(structuredClone(Box1)))
+      expect(merged).to.deep.equal(carOf(Box1))
+      expect(merged.newest).to.eq(merged.fullest)
+      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
+    })
+
+    it("keeping the newer record's changed parts its own", () => {
+      // A live box, which alone has a sidecar.
+      type LiveBox = Extract<BoxThing, { am: 'a' }>
+      const later  = TH.nextOf(Box0, { sidecar: { account: 'home' } })
+      const merged = bestCarOf(carOf(Box0), carOf(structuredClone(later)))
+      expect(merged.fullest).to.deep.equal(later)
+      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
+      expect((merged.fullest as LiveBox).sidecar).to.not.eq((Box0 as LiveBox).sidecar)
+    })
+
+    it("in a behind car, whose newest stays the prior car's", () => {
+      const prior     = behindOf(Box2, Box0)
+      const delivered = carOf(structuredClone(sparseOf(Box2)), structuredClone(Box1))
+      const merged    = bestCarOf(prior, delivered)
+      expect(merged).to.deep.equal(behindOf(Box2, Box1))
+      expect(merged.newest).to.eq(prior.newest)
+      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
+    })
+
+    it("in the full car a behind car becomes, whose newest is its fullest", () => {
+      const merged = bestCarOf(behindOf(Box1, Box0), carOf(structuredClone(Box1)))
+      expect(merged).to.deep.equal(carOf(Box1))
+      expect(merged.newest).to.eq(merged.fullest)
+      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
+    })
   })
 
   it("returns the car of a Thing at another scope, whatever its revision", () => {

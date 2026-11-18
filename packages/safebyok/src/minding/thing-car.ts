@@ -1,5 +1,5 @@
-/** `ThingCar`, what a ThingMinder caches for one scope, and how two cars of one Thing merge. */
-
+/** `ThingCar`: carries the newest record seen; since that might be sparse, it also carries the most recent useful revision seen. */
+import * as TSQ from '@tanstack/query-core'
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
@@ -68,7 +68,9 @@ export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
   const [newestTag,  newest]  = tagBestNewestSL(prior,  delivered)
   const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)
   if ((newestTag === 'prior') && (fullestTag === 'prior')) { return prior }
-  return carOf(newest, fullest as Thing | undefined)
+  // Only a whole record has parts worth sharing, and a newer one can come only from `delivered`. A full car's newest is its fullest, so it takes the shared record too.
+  const shared = (((fullestTag === 'delivered') && prior.fullest) ? TSQ.replaceEqualDeep(prior.fullest, fullest) : fullest) as Thing | undefined
+  return carOf((newest === fullest) ? shared! : newest, shared)
 }
 
 /** The newer of the two cars' newest records, tagged with its car. On a tie, `delivered`'s where it alone is full, else `prior`'s. */
