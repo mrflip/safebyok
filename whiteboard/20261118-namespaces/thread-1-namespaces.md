@@ -1,6 +1,6 @@
 # Thread 1: namespaces (2026-11-18)
 
-Branch `20261118-namespaces`, PR #TBD, stacked on #728. Proved: see the PR's Tests line (`pnpm justify` at the tip).
+Branch `20261118-namespaces`, PR #740, stacked on #728. Proved: see the PR's Tests line (`pnpm justify` at the tip).
 
 * **Built**: a mechanical rename of what `packages/safebyok` exports, with callers in `safebyok-react` and `safebyok-postgres`. No behaviour changes. One commit per item of the plan.
   1. *Checker bundles.* `ThingChecks` (shapes-thing) holds the kind-generic checks plus `byKind`, `ofLabelpath`, `ThingFormats`, `thingkindVals`. `BankChecks`, `GateChecks`, `BoxChecks` hold each kind's `record`, `cited`, `stored`, `policies`, `labelpath` (gate: `wayins`, `storedWayins`; box: `sealable`, `live`, `liveOrShell`). `AskChecks` (now with `loggableAsk`), `StampChecks` (with `LeaseFormat`), `MinderChecks` (with `DefaultQueryCacheOpts`, `MaxTimerMillis`), `GateishChecks` (with `gatingkindVals`), `BankishChecks`. `adapterVaultDBOpts` is now in `adapter-vault-db.ts`'s foot `Checks`; `AdapterVaultDBOpts` is exported from there.
