@@ -1,0 +1,87 @@
+/** A Device for the giver's tests over the new core's box minder: one bank, born in a memory vaultDB, already started. */
+
+import { QueryClient } from '@tanstack/react-query'
+import { type BoxCar, type MinderFriend, type MinderGetAsk, ThingMinder } from 'safebyok'
+import { type BoxThing, type Thing, MemoryVaultDB, getAskOf, listAskOf, shellOf } from 'safebyok/storage'
+import * as LeanTH from 'safebyok/testing'
+import { giverBankOfMinder } from '../../src/giver/minder-bank'
+import type { DeviceSnapshot, GiverBank, GiverDevice } from '../../src/giver/react-giver'
+
+// == [Asks]: minderGetAskOf
+
+/** The get ask for the Thing at `labelpath` in the core's test bank, tracking its roots at revision 0, as the minder takes it. */
+function minderGetAskOf({ labelpath }: Readonly<{ labelpath: string }>): MinderGetAsk {
+  return getAskOf({ ...LeanTH.ThingBank, labelpath, ifAbsent: 'nil', track: LeanTH.trackOf() }) as MinderGetAsk
+}
+// --
+
+// == [The world]: MinderGiverWorld, makeMinderGiverWorld, minderDeviceOf, unsubscribeNothing
+
+/** A Device over one started bank's box minder, and the test's ways past it. */
+export interface MinderGiverWorld {
+  device:    GiverDevice<BoxCar>
+  vaultDB:   MemoryVaultDB
+  boxMinder: ThingMinder
+  /** How many gets the vaultDB has answered. */
+  counts:    { gets: number }
+  /** Store `box` under the root box, as its first revision. */
+  _cheat_birthBox(box: BoxThing): Promise<void>
+  /** Store `next` over `prior`. */
+  _cheat_replace(prior: Thing, next: Thing): Promise<void>
+}
+
+/** A Device signed in as the user of the core's test bank ({@link LeanTH.ThingBank}), that bank born with no box under its root, and the bank object started.
+ * Unless `isWatching` is false, the minder hears each write to the vaultDB.
+ */
+export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<MinderGiverWorld> {
+  const vaultDB = new MemoryVaultDB()
+  if (! isWatching) { vaultDB.watch = () => unsubscribeNothing }
+  const counts  = { gets: 0 }
+  const tryGetThing = vaultDB.tryGetThing.bind(vaultDB)
+  vaultDB.tryGetThing = (ask) => {
+    counts.gets += 1
+    return tryGetThing(ask)
+  }
+  await LeanTH.expectGood(vaultDB.tryBirthBank(LeanTH.birthBankAskOf()))
+
+  const friend: MinderFriend = Object.freeze({
+    scope:       LeanTH.ThingBank,
+    rootBox:     LeanTH.rootBoxOf(),
+    makeGetAsk:  minderGetAskOf,
+    makeListAsk: ({ labelpath }) => listAskOf({ ...LeanTH.ThingBank, labelpath, track: LeanTH.trackOf() }),
+    tellBadNews: (badnews) => { throw new AggregateError(badnews, 'The minder told of bad news') },
+  })
+  const boxMinder = ThingMinder.make({ modelkind: 'box' }, { vaultDB, tsq: new QueryClient(), queryCacheOpts: {} }, friend)
+  boxMinder.hello()
+
+  return {
+    device:          minderDeviceOf(giverBankOfMinder(boxMinder, friend)),
+    vaultDB,
+    boxMinder,
+    counts,
+    _cheat_birthBox: async (box) => {
+      const shell = shellOf({ ...LeanTH.ThingBank, labelpath: box.labelpath }, LeanTH.rootBoxOf())
+      await LeanTH.expectGood(vaultDB.tryWriteThing(LeanTH.birthAskOf(box, shell)))
+    },
+    _cheat_replace:  async (prior, next) => { await LeanTH.expectGood(vaultDB.tryWriteThing(LeanTH.replaceAskOf(prior, next))) },
+  }
+}
+
+/** A Device signed in as `bank`'s user, its one bank object `bank`, never ending. */
+function minderDeviceOf(bank: GiverBank<BoxCar>): GiverDevice<BoxCar> {
+  const snapshot: DeviceSnapshot = Object.freeze({ userid: bank.userid, banks: Object.freeze({}) })
+  return Object.freeze({
+    subscribe:         () => unsubscribeNothing,
+    getSnapshot:       () => snapshot,
+    getServerSnapshot: () => snapshot,
+    ensureBank:        () => Promise.resolve(bank),
+    onBankStart:       (starter: (started: GiverBank<BoxCar>) => () => void) => {
+      starter(bank)
+      return unsubscribeNothing
+    },
+  })
+}
+
+/** What a subscription that hears nothing returns: a stop with nothing to stop. */
+function unsubscribeNothing(): void { /* nothing to stop */ }
+// --

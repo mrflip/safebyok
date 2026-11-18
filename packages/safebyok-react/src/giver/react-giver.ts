@@ -2,6 +2,7 @@
 
 import { queryOptions, skipToken, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query'
 import { useEffect, useSyncExternalStore } from 'react'
+import type { carLivenessVals } from 'safebyok'
 import { type Banklabel, type UserID } from 'safebyok-big'
 import { Checkers } from 'safebyok-big/storage'
 import { bridgeDevice } from './react-bridge'
@@ -24,7 +25,7 @@ export type BankSnapshot = Readonly<{
 export type DeviceSnapshot = Readonly<{ userid: string | null, banks: Readonly<Record<string, BankSnapshot>> }>
 
 /** The fields of a minder's car that the giver reads: how current the car is, and the fullest record known. */
-export type CarFields = Readonly<{ liveness: 'full' | 'behind' | 'bare' | 'gone' | 'void', fullest: unknown }>
+export type CarFields = Readonly<{ liveness: (typeof carLivenessVals)[number], fullest: unknown }>
 
 /** What the giver asks of a started bank object. */
 export interface GiverBank<CarT extends CarFields> {
@@ -137,12 +138,12 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>, bankla
    */
   function useBoxRecord(labelpath: string, opts: BoxRecordOpts<CarT> = {}): UseQueryResult<CarT['fullest']> {
     const userid  = useUserid()
-    const checked = Checks.labelpath.parse(labelpath)
+    const labelpathC = Checks.labelpath.parse(labelpath)
     return useQuery({
       staleTime: CarStaleTime,
       ...opts,
-      queryKey:  boxCarQueryKey({ userid, banklabel, labelpath: checked }),
-      queryFn:   carQueryFnOf(userid, checked),
+      queryKey:  boxCarQueryKey({ userid, banklabel, labelpath: labelpathC }),
+      queryFn:   carQueryFnOf(userid, labelpathC),
       select:    fullestOf,
     })
   }
@@ -152,8 +153,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>, bankla
    */
   function boxCarQueryOptions(labelpath: string) {
     const { userid } = device.getSnapshot()
-    const checked    = Checks.labelpath.parse(labelpath)
-    return queryOptions({ queryKey: boxCarQueryKey({ userid, banklabel, labelpath: checked }), queryFn: carQueryFnOf(userid, checked), staleTime: CarStaleTime })
+    const labelpathC = Checks.labelpath.parse(labelpath)
+    return queryOptions({ queryKey: boxCarQueryKey({ userid, banklabel, labelpath: labelpathC }), queryFn: carQueryFnOf(userid, labelpathC), staleTime: CarStaleTime })
   }
 
   return Object.freeze({ useBankSnapshot, useBoxRecord, boxCarQueryOptions })

@@ -1,6 +1,8 @@
 /** The bridge: keeps the host's React Query entries of a Device's boxes current with each bank's minders. */
 
 import type { QueryClient, QueryKey } from '@tanstack/react-query'
+// eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
+import { dbHasNewer } from 'safebyok'
 import { bankQueryKey, boxCarQueryKey, type CarFields, type GiverDevice } from './react-giver'
 
 /** Copy each box car every bank's minders cache into the host's entry for it, wherever a hook has made one. Returns the function that stops copying.
@@ -30,8 +32,5 @@ export function bridgeDevice<CarT extends CarFields>(client: QueryClient, device
 function deliverCar(client: QueryClient, queryKey: QueryKey, car: CarFields): void {
   if (client.getQueryCache().find({ queryKey, exact: true }) === undefined) { return }
   if (car.liveness !== 'bare') { client.setQueryData(queryKey, car) }
-  if (isDBNewer(car)) { void client.invalidateQueries({ queryKey, exact: true }) }
+  if (dbHasNewer(car)) { void client.invalidateQueries({ queryKey, exact: true }) }
 }
-
-/** True when the vaultDB holds a newer revision than the car's fullest record. */
-function isDBNewer(car: CarFields): boolean { return (car.liveness === 'behind') || (car.liveness === 'bare') }
