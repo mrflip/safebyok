@@ -16,7 +16,7 @@ export abstract class BaseThing<RecordT extends ThingRecord, ScopeT, StampT> imp
   declare readonly labelpath:  Labelpath
   /** The last label of `labelpath`. */
   declare readonly label:      string
-  declare readonly fmt:        Sparse<ThingRecord>['fmt']
+  declare readonly fmt:        RecordT['fmt']
   /** The lifeseqs of this Thing's life and of each life above it, root first. */
   declare readonly lifepath:   Lifepath
   /** This Thing's life, as a lifeseq. A Thing born again has the next. */

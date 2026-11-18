@@ -2,7 +2,7 @@
 
 import type * as Z from 'zod'
 import { CX, GX, Phrases, Validator } from 'safebyok-big/internals'
-import { BoxChecks, BoxThingFormat, GateChecks, ThingChecks } from './shapes-thing'
+import { BoxChecks, GateChecks, ThingChecks, ThingFormat } from './shapes-thing'
 
 // == [The stamps]: PlainChecks, BankScope, BankStamp, GateStamp, StampedGate, BoxStamp
 
@@ -18,7 +18,7 @@ const PlainChecks = Validator.Checkers('bad_record', ({ obj, lit }) => {
     // Every Thing field, so a box's revision and its record have the same stamp. The shell has no revision, and refuses.
     boxStamp:    ThingChecks.sparse.extend({
       labelpath: BoxChecks.labelpath,
-      fmt:       lit(BoxThingFormat),
+      fmt:       lit(ThingFormat),
     }),
   }
 })

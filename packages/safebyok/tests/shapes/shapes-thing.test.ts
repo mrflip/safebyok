@@ -2,7 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
   type BankRecord, type BoxRecord, type GateRecord,
-  BoxChecks, BoxThingFormat, GateThingFormat, Shell, isGone, isTombstone, isVoidSentinel, isWholeRecord, sparseOf,
+  BoxChecks, Shell, ThingFormat, isGone, isTombstone, isVoidSentinel, isWholeRecord, sparseOf,
 } from '../../src/shapes/shapes-thing'
 import { type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'
@@ -70,12 +70,12 @@ describe("Shell.Cited and Shell.childCited(parentLifepath)", () => {
 
 describe("Shell.of(scoped, parent?)", () => {
   const Void = { revtok: Shell.Cited.revtok, revseq: -1, am: 'x', lifeseq: Shell.VoidLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime } as const
-  const rootShell = { ...TH.RootScope, label: 'box', fmt: BoxThingFormat, ...Void, lifepath: Shell.VoidLifeseq }
-  const boxShell  = { ...TH.BoxScope, label: 'openai', fmt: BoxThingFormat, ...Void, lifepath: `${Life0}/${Shell.VoidLifeseq}` }
+  const rootShell = { ...TH.RootScope, label: 'box', fmt: ThingFormat, ...Void, lifepath: Shell.VoidLifeseq } as const
+  const boxShell  = { ...TH.BoxScope, label: 'openai', fmt: ThingFormat, ...Void, lifepath: `${Life0}/${Shell.VoidLifeseq}` } as const
 
   it("is a root's shell at lifepath '-000000001', given only its scope", () => {
     expect(Shell.of(TH.RootScope)).to.deep.equal(rootShell)
-    expect(Shell.of(TH.GateScope)).to.deep.include({ label: 'gate', fmt: GateThingFormat, lifepath: Shell.VoidLifeseq })
+    expect(Shell.of(TH.GateScope)).to.deep.include({ label: 'gate', fmt: ThingFormat, lifepath: Shell.VoidLifeseq })
     expect(Object.isFrozen(Shell.of(TH.BankScope))).to.be.true
   })
 
@@ -99,7 +99,7 @@ describe("Shell.of(scoped, parent?)", () => {
   const BadShellCases: [() => unknown, string, string][] = [
     [() => Shell.of(TH.boxThingOf()),                                                    'revseq',                   'a live record, on its revseq'],
     [() => Shell.of(TH.boxTombOf(TH.boxThingOf())),                                      'revseq',                   'a tombstone, on its revseq'],
-    [() => Shell.of({ ...boxShell, fmt: GateThingFormat }),                              Phrases.ShellFmtOfOtherKind, 'the fmt of another kind'],
+    [() => Shell.of({ ...boxShell, fmt: 5103 as never }),                            'expected 100501',          'a fmt that is not the Thing format'],
     [() => Shell.of(TH.BoxScope),                                                        "expected string",          'a Thing below a root given no life'],
     [() => Shell.of({ ...TH.ThingBank, label: 'openai' }),                               "expected string",      'a label with no parent'],
     [() => Shell.of({ ...TH.ThingBank, labelpath: 'gate/openai' }, TH.rootBoxOf()),      "another labelpath than",      'a labelpath not one label under its parent'],
@@ -327,7 +327,7 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     [TH.birthAskOf(TH.boxThingOf('openai', { lifepath: Life0 }), under),             Phrases.LifepathDepth,      'a box whose lifepath is shallower than its labelpath'],
     [TH.birthAskOf(TH.boxThingOf('openai', { label: 'other' }), under),              Phrases.LabelNotLast,       'a box whose label is not its last'],
     [TH.birthAskOf({ ...box, sidecar: undefined } as never, under),                  'sidecar',                  'a live box with no sidecar'],
-    [TH.delAskFor(box, { ...tomb, sidecar: {} } as never),                           Unaccepted,                 'a tombstone with a sidecar'],
+    [TH.delAskFor(box, { ...tomb, sidecar: undefined } as never),                    'sidecar',                  'a tombstone with no sidecar'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, codectag: 1 } } as never, under), 'codectag', 'a box whose sealed whisper is misshapen'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, schematag: 'Whisper v1' } }, under), 'schematag', 'a box whose schematag is not a label'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, nonce: 'n' } } as never, under), Unaccepted, 'a box whose sealed whisper has a field no sealed part has'],
@@ -466,7 +466,7 @@ describe("sparseOf(record)", () => {
 
 describe("BoxChecks.sealable", () => {
   const shell = Object.freeze({
-    ...TH.ThingBank, labelpath: 'box/openai', label: 'openai', fmt: 5103, revtok: Shell.Cited.revtok, revseq: Shell.Cited.revseq, am: 'x',
+    ...TH.ThingBank, labelpath: 'box/openai', label: 'openai', fmt: ThingFormat, revtok: Shell.Cited.revtok, revseq: Shell.Cited.revseq, am: 'x',
     lifeseq: Shell.VoidLifeseq, lifepath: `${Life0}/${Shell.VoidLifeseq}`, born_at: TH.T0, written_at: TH.T0,
   })
 
@@ -474,7 +474,7 @@ describe("BoxChecks.sealable", () => {
     const box = TH.boxThingOf()
     expect(BoxChecks.sealable.parse(box)).to.deep.equal({ ...sparseOf(box), sidecar: {} })
     const tomb = TH.boxTombOf(box)
-    expect(BoxChecks.sealable.parse(tomb)).to.deep.equal(sparseOf(tomb))
+    expect(BoxChecks.sealable.parse(tomb)).to.deep.equal({ ...sparseOf(tomb), sidecar: {} })
     expect(BoxChecks.sealable.parse(shell)).to.deep.equal(shell)
   })
 
@@ -536,9 +536,16 @@ describe("LiveOf, TombstoneOf and ShellOf", () => {
     expectTypeOf<ShellOf<GateRecord>['am']>().toEqualTypeOf<'x'>()
   })
 
-  it("keep a box tombstone from having a sidecar, and a live box having one", () => {
-    expectTypeOf<LiveOf<BoxRecord>>().toHaveProperty('sidecar')
-    expectTypeOf<TombstoneOf<BoxRecord>>().not.toHaveProperty('sidecar')
+  it("mark a box, whose am is one field, as they mark a gate", () => {
+    expectTypeOf<LiveOf<BoxRecord>['am']>().toEqualTypeOf<'a'>()
+    expectTypeOf<TombstoneOf<BoxRecord>['am']>().toEqualTypeOf<'x'>()
+    expectTypeOf<ShellOf<BoxRecord>['am']>().toEqualTypeOf<'x'>()
+  })
+
+  it("give a box tombstone every field of a live box, and the shell none of its body", () => {
+    expectTypeOf<TombstoneOf<BoxRecord>>().toHaveProperty('sidecar')
+    expectTypeOf<TombstoneOf<BoxRecord>>().toHaveProperty('whisper_sealed')
+    expectTypeOf<ShellOf<BoxRecord>>().not.toHaveProperty('sidecar')
     expectTypeOf<ShellOf<BoxRecord>>().not.toHaveProperty('whisper_sealed')
   })
 })

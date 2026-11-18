@@ -20,10 +20,10 @@ export type UnsealedOf<RecordT, CleartextsT> = RecordT extends unknown
   : never
 
 /** The live records of `RecordT`. */
-export type LiveOf<RecordT> = RecordT extends unknown ? RecordT & Readonly<{ am: 'a' }> : never
+export type LiveOf<RecordT> = RecordT & Readonly<{ am: 'a' }>
 
 /** The tombstones of `RecordT`. */
-export type TombstoneOf<RecordT> = RecordT extends unknown ? RecordT & Readonly<{ am: 'x' }> : never
+export type TombstoneOf<RecordT> = RecordT & Readonly<{ am: 'x' }>
 
 /** The shell of `RecordT`: the void record, without a body, that its first revision is sealed over and cites. */
 export type ShellOf<RecordT extends Sparse<ThingRecord>> = Sparse<TombstoneOf<RecordT>>

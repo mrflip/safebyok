@@ -13,7 +13,7 @@ import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type ThingRecord, BankChecks, BankThingFormat, BoxChecks, BoxThingFormat, GateChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type ThingRecord, BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
 import * as Throwers from '../refusals/throwers'
@@ -112,7 +112,7 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
   static makeRecord(dna: BankDna): BankMakeRecord {
     const { userid, banklabel, lifeseq, born_at } = StampChecks.bankStamp.parse(dna)
     const bank = BankChecks.record.parse({
-      userid, banklabel, labelpath: 'bank', label: 'bank', fmt: BankThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
+      userid, banklabel, labelpath: 'bank', label: 'bank', fmt: ThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
     })
     const rootBox = BoxChecks.liveOrShell.parse(Shell.of({ userid, banklabel, labelpath: Labelpath.RootBox }))
     return { ...bank, maingate: Gate.makeRecord(dna.maingate), rootBox }
@@ -208,7 +208,7 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
 
   /** Seal and return the next revision of the box `donorProps`, with `publicProps` applied and the whisper of `secretProps` encrypted. Needs the bank unlocked.
    * The seal checks its arguments (an unknown key in `publicProps` or `secretProps` refuses) and the box it returns, so pass `donorProps` as you have it: whole, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
-   * After a tombstone or the shell, the revision begins the box's next life. Its sidecar is `publicProps.sidecar`, or else the sidecar of `donorProps`.
+   * A live box's revision keeps its sidecar unless `publicProps` gives one. After a tombstone or the shell, the revision begins the box's next life, and `publicProps` must give its sidecar.
    * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead ({@link tombstoneBox}), and refuses a sidecar or `secretProps`.
    * Its `written_at` is `publicProps.written_at`, or now.
    * @example
@@ -272,8 +272,9 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
       return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) as ShellOf<BoxRecord> }
     }
     const { val } = answer
-    if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) } }
-    return { ...answer, val }
+    if (! Labelpath.isOfModelkind(val.labelpath, 'box')) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) } }
+    // The labelpath says it is a box's; a later thread's kind-checking guards replace this cast.
+    return { ...answer, val: val as BoxRecord }
   }
 
   /** Write the live box `ask.record` over the box `ask.cited` cites: the one stored at its scope, or its shell. */

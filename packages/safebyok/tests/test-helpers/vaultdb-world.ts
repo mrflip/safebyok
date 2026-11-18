@@ -4,7 +4,7 @@ import { BW } from 'safebyok-big/testing'
 import { type Labelpath, type Lifepath, Lifeseq } from '../../src/shapes/primitives'
 import {
   type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord,
-  BankThingFormat, BoxThingFormat, GateThingFormat, Shell,
+  Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { FirstRevtok, T0, revtokOf } from './models-world'
@@ -46,26 +46,26 @@ export function trackOf(bank: ThingRecord = bankThingOf(), gate: ThingRecord = g
 
 /** The bank Thing at revision 0 of life 0, with `overrides` laid over it. */
 export function bankThingOf(overrides: Partial<BankRecord> = {}): BankRecord {
-  return { ...BankScope, label: 'bank', fmt: BankThingFormat, ...FirstRevision, lifepath: Life0, ...overrides }
+  return { ...BankScope, label: 'bank', fmt: ThingFormat, ...FirstRevision, lifepath: Life0, ...overrides }
 }
 
 /** The main gate at revision 0 of life 0, with `overrides` laid over it. */
 export function gateThingOf(overrides: Partial<GateRecord> = {}): GateRecord {
   return {
-    ...GateScope, label: 'gate', fmt: GateThingFormat, ...FirstRevision, lifepath: Life0,
+    ...GateScope, label: 'gate', fmt: ThingFormat, ...FirstRevision, lifepath: Life0,
     wayins: MainOnly, auth: {}, sigs: {}, meta: {}, ...overrides,
   }
 }
 
 /** The root box at revision 0 of life 0, with `overrides` laid over it. */
 export function rootBoxOf(overrides: Partial<BoxRecord> = {}): BoxRecord {
-  return { ...RootScope, label: 'box', fmt: BoxThingFormat, ...FirstRevision, lifepath: Life0, sidecar: {}, whisper_sealed: FakeSealed, ...overrides }
+  return { ...RootScope, label: 'box', fmt: ThingFormat, ...FirstRevision, lifepath: Life0, sidecar: {}, whisper_sealed: FakeSealed, ...overrides }
 }
 
 /** A live box at revision 0 of life 0, one `label` under the root box's life 0, with `overrides` laid over it. */
 export function boxThingOf(label = 'openai', overrides: Partial<BoxRecord> = {}): BoxRecord {
   return {
-    ...ThingBank, labelpath: `box/${label}`, label, fmt: BoxThingFormat, ...FirstRevision, lifepath: `${Life0}/${Life0}`,
+    ...ThingBank, labelpath: `box/${label}`, label, fmt: ThingFormat, ...FirstRevision, lifepath: `${Life0}/${Life0}`,
     sidecar: {}, whisper_sealed: FakeSealed, ...overrides,
   }
 }
@@ -84,11 +84,11 @@ export function lifepathPlus(lifepath: Lifepath, lives: number): Lifepath {
   return `${leading}${Lifeseq.ofLifenum(Lifeseq.lifenumOf(Lifeseq.ofLifepath(lifepath)) + lives)}`
 }
 
-/** The tombstone of the live box `prior`: its next revision, in its next life, sealing an empty whisper, with no sidecar. */
+/** The tombstone of the live box `prior`: its next revision, in its next life, sealing an empty whisper, with the sidecar `{}`. */
 export function boxTombOf(prior: BoxRecord, overrides: Partial<BoxRecord> = {}): BoxRecord {
-  const { sidecar: _sidecar, ...next } = nextOf(prior) as BoxRecord & { sidecar?: unknown }
+  const next     = nextOf(prior)
   const lifepath = lifepathPlus(prior.lifepath, 1)
-  return { ...next, am: 'x', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), ...overrides } as BoxRecord
+  return { ...next, am: 'x', lifepath, lifeseq: Lifeseq.ofLifepath(lifepath), sidecar: {}, ...overrides }
 }
 
 /** The box reborn over the tombstone `prior`: its next revision, in its next life, born when it is written. */

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
 import type { ThingCar } from '../../src/shapes/shapes-minder'
+import type { LiveOf } from '../../src/shapes/shapes-sealers'
 import { type BoxRecord, type ThingRecord, Shell, sparseOf } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
@@ -154,12 +155,11 @@ describe("bestCarOf", () => {
 
     it("keeping the newer record's changed parts its own", () => {
       // A live box, which alone has a sidecar.
-      type LiveBox = Extract<BoxRecord, { am: 'a' }>
       const later  = TH.nextOf(Box0, { sidecar: { account: 'home' } })
       const merged = bestCarOf(carOf(Box0), carOf(structuredClone(later)))
       expect(merged.fullest).to.deep.equal(later)
       expect((merged.fullest as BoxRecord).whisper_sealed).to.eq(Box0.whisper_sealed)
-      expect((merged.fullest as LiveBox).sidecar).to.not.eq((Box0 as LiveBox).sidecar)
+      expect((merged.fullest as LiveOf<BoxRecord>).sidecar).to.not.eq((Box0 as LiveOf<BoxRecord>).sidecar)
     })
 
     it("in a behind car, whose newest stays the prior car's", () => {

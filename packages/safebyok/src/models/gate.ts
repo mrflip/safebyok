@@ -5,7 +5,7 @@ import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
 import { type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
-import { type GateRecord, type ThingScope, type Wayins, GateChecks, GateThingFormat, ThingChecks } from '../shapes/shapes-thing'
+import { type GateRecord, type ThingScope, type Wayins, GateChecks, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
 /** One revision of a bank's gate: its passphrase wayin, and its passkey wayin if it has one.
@@ -64,7 +64,7 @@ export class Gate extends BaseThing<GateRecord, ThingScope, GateStamp> implement
   static makeRecord(dna: GateDna): GateRecord {
     const { wayins, ...stamp } = Checks.makeRecordArgs.parse(dna)
     return GateChecks.record.parse({
-      ...stamp, label: stamp.labelpath, fmt: GateThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a',
+      ...stamp, label: stamp.labelpath, fmt: ThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a',
       lifepath: stamp.lifeseq, written_at: stamp.born_at, wayins: wayinsOf(wayins), auth: {}, sigs: {}, meta: {},
     })
   }

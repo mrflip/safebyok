@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
-import { type GateRecord, GateThingFormat } from '../../src/shapes/shapes-thing'
+import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
 
@@ -34,7 +34,7 @@ describe("Gate.makeRecord(dna)", () => {
   it("is a gate Thing at the first revision of its life, of the stamp, with the wayins handed", async () => {
     const wayins = await wayinsOf()
     const record = Gate.makeRecord({ ...TH.WorldGateStamp, wayins })
-    expect(record).to.include({ ...TH.WorldGateStamp, label: 'gate', fmt: GateThingFormat, revseq: 0, lifepath: TH.WorldGateStamp.lifeseq, written_at: TH.T0, am: 'a' })
+    expect(record).to.include({ ...TH.WorldGateStamp, label: 'gate', fmt: ThingFormat, revseq: 0, lifepath: TH.WorldGateStamp.lifeseq, written_at: TH.T0, am: 'a' })
     expect(record.wayins).to.deep.equal({ main: wayins.main.pickle(), passkey0: null })
     expect(record).to.deep.include({ auth: {}, sigs: {}, meta: {} })
     const gate = Gate.make(record, { bank: WorldBank })

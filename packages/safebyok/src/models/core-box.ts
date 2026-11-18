@@ -36,12 +36,14 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
 
   /** The next live revision after `donorProps`, without its sealed whisper.
    * After a tombstone or the shell, it begins the box's next life.
-   * Its sidecar is `publicProps.sidecar`, or else the sidecar of `donorProps`. One of the two must have one.
+   * Its sidecar is `publicProps.sidecar`, or else the sidecar of a live `donorProps`. One of the two must have one.
    * Its `written_at` is `publicProps.written_at`, or now.
    */
   static nextRevisionOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<LiveOf<BoxRecord>, BoxCleartexts> {
     const { sidecar: donorSidecar, ...thing                        } = BoxChecks.sealable.parse(donorProps)
-    const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
+    // A tombstone's `{}` is not inherited: the next life's sidecar is given, as it is after the shell.
+    const heirSidecar = (thing.am === 'a') ? donorSidecar : undefined
+    const { sidecar = heirSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar === undefined) { throw Throwers.sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
     if (thing.am === 'a') {
@@ -52,13 +54,13 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
 
   /** The tombstone of the live box `donorProps`, without its sealed whisper.
    * Its `written_at` is `publicProps.written_at`, or now.
-   * A tombstone has no sidecar: the sidecar of `donorProps` is dropped, and a sidecar given in `publicProps` refuses.
+   * A tombstone's sidecar is `{}`, whatever the sidecar of `donorProps`: a sidecar given in `publicProps` refuses.
    */
   static tombstoneOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<TombstoneOf<BoxRecord>, BoxCleartexts> {
     const { sidecar: _sidecar, ...thing             } = Checks.liveBoxSealable.parse(donorProps)
     const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar !== undefined) { throw Throwers.tombstoneSidecarGiven() }
-    const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x' } as const
+    const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x', sidecar: {} } as const
     return { ...thing, ...nextLifeOf(thing), ...revision }
   }
   // --
