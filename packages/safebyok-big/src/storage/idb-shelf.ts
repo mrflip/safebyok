@@ -11,8 +11,8 @@ const dbprefixOfArgs = Checker(({ str }) => str.min(1).optional(), 'bad_record')
 // Every database this library writes starts `safebyok`, so a host can tell them from its own. Nothing else scopes a name: every row's key begins `user_id`, `banklabel`.
 /** The start of every IndexedDB database name for the host's `dbName`: `safebyok`, or `safebyok-<dbName>` when there is one. */
 export function dbprefixOf(dbName?: string): string {
-  const checked = dbprefixOfArgs.parse(dbName, { where: 'dbprefixOf' })
-  return (checked === undefined) ? 'safebyok' : `safebyok-${checked}`
+  const dbNameC = dbprefixOfArgs.parse(dbName, { where: 'dbprefixOf' })
+  return (dbNameC === undefined) ? 'safebyok' : `safebyok-${dbNameC}`
 }
 
 /** The parts of a versioned shelf's name: its {@link dbprefixOf}, the kind of database, and the layout version. */
@@ -48,17 +48,17 @@ const shelves = new Map<string, UseStore>()
  * Its first use starts deleting the databases of the same stem at older or unreadable versions, and those named in `oldnames`.
  */
 export function versionedShelfOf(spec: VersionedShelfSpec): UseStore {
-  const checked = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
-  const dbname = `${checked.dbprefix}:${checked.dbstem}-v${checked.version}`
+  const specC = versionedShelfSpec.parse(spec, { where: 'versionedShelfOf' })
+  const dbname = `${specC.dbprefix}:${specC.dbstem}-v${specC.version}`
   const kept = shelves.get(dbname)
   if (kept !== undefined) { return kept }
-  const shelf = createStore(dbname, checked.storename)
+  const shelf = createStore(dbname, specC.storename)
   let isWiped = false
   const made: UseStore = async (txMode, callback) => {
     if (! isWiped) {
       isWiped = true
       // The old databases are deleted unread and never awaited: a tab that still has one open blocks its delete (notes/wontfix-big.md).
-      void wipeOlderDBs(checked)
+      void wipeOlderDBs(specC)
     }
     return await shelf(txMode, callback)
   }

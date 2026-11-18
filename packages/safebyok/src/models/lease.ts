@@ -57,10 +57,10 @@ export class Lease implements LeaseStamp {
   static make(record: Z.input<typeof leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
   private constructor(record: Z.input<typeof leaseRecord>, opts: LeaseOpts) {
-    const { record: parsed, opts: checked } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(bankStamp.parse(parsed), checked.bank.stamp, { kind: 'damaged_lease' })
-    this.#record = parsed
-    Helpers.tattoo(this, leaseStamp.parse(parsed), { configurable: false })
+    const { record: recordC, opts: { bank } } = Checks.leaseMakeArgs.parse({ record, opts })
+    Validator.checkedConsistent(bankStamp.parse(recordC), bank.stamp, { kind: 'damaged_lease' })
+    this.#record = recordC
+    Helpers.tattoo(this, leaseStamp.parse(recordC), { configurable: false })
     this.#bank = opts.bank
     Object.freeze(this)
   }
@@ -112,10 +112,10 @@ export class Lease implements LeaseStamp {
   async unseal<RecordT extends ThingRecord, CleartextsT>(sealer: Sealers.Sealer<RecordT, CleartextsT>, record: RecordT): Promise<Sealers.UnsealedOf<RecordT, CleartextsT>> {
     Checks.sealer.parse(sealer)
     // The answer is built from the record as the sealer checks a stored one, never from the caller's object.
-    const parsed = sealer.recordOf(record, sealer.sealedOf(record))
-    const cleartexts = sealer.decode(await this.#openSealed(sealer, parsed))
+    const recordC = sealer.recordOf(record, sealer.sealedOf(record))
+    const cleartexts = sealer.decode(await this.#openSealed(sealer, recordC))
     // The spread's type is UnsealedOf's, which TypeScript cannot see through for a record of any kind.
-    return Object.freeze({ ...withoutSecrets(parsed), ...cleartexts }) as Sealers.UnsealedOf<RecordT, CleartextsT>
+    return Object.freeze({ ...withoutSecrets(recordC), ...cleartexts }) as Sealers.UnsealedOf<RecordT, CleartextsT>
   }
 
   /** Encrypt `cleartext` for `revision` under a fresh key wrapped under the bankKey, as a {@link Sealers.Sealed} with the sealer's tags. */

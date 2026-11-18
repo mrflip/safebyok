@@ -43,9 +43,9 @@ export abstract class DeviceDB {
       const leaseQuery = SX.leaseQuery.parse(asked)
       const stored = await this.doPeek(leaseQuery)
       if (stored === null) { return null }
-      const parsed = SX.leaseRow.safeParse(stored)
-      if (! parsed.success) { throw Refuse.damagedLease() }
-      return (parsed.data.bank_tok === leaseQuery.bank_tok) ? parsed.data : null
+      const leaseRow = SX.leaseRow.safeParse(stored)
+      if (! leaseRow.success) { throw Refuse.damagedLease() }
+      return (leaseRow.data.bank_tok === leaseQuery.bank_tok) ? leaseRow.data : null
     } catch (err) { throw refusalOf(err, 'peek') }
   }
 
@@ -71,7 +71,7 @@ export abstract class DeviceDB {
   async listLeases(): Promise<LeaseDated[]> {
     try {
       const filed = await this.doListLeases()
-      const leases = filed.flatMap(({ row }) => { const parsed = SX.leaseDated.safeParse(row); return parsed.success ? [parsed.data] : [] })
+      const leases = filed.flatMap(({ row }) => { const leaseDated = SX.leaseDated.safeParse(row); return leaseDated.success ? [leaseDated.data] : [] })
       return leases.toSorted((one, other) => one.proved_at - other.proved_at)
     } catch (err) { throw refusalOf(err, 'listLeases') }
   }
@@ -92,8 +92,8 @@ export abstract class DeviceDB {
   /** Forget the row filed under a scopepath from `listRawLeases`, damaged or not, without matching a `bank_tok`. */
   async forgetRawLease(scopepath: LeaseScopepath): Promise<void> {
     try {
-      const checked = SX.leaseScopepath.parse(scopepath)
-      await this.doForgetRawLease(checked)
+      const leaseScopepath = SX.leaseScopepath.parse(scopepath)
+      await this.doForgetRawLease(leaseScopepath)
     } catch (err) { throw refusalOf(err, 'forgetRawLease') }
   }
 

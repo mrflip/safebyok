@@ -102,9 +102,9 @@ export const DefaultLogger: VaultLogger = forwarding()
  * @param logger - The app's own logger. Null or undefined puts the console back.
  */
 export function setDefaultLogger(logger: VaultLogger | null | undefined): void {
-  const parsed = parseLogger(logger)
+  const target = parseLogger(logger)
   // The default handed back as its own target would hand each call to itself, forever.
-  defaults.target = parsed === DefaultLogger ? GuardedConsole : parsed
+  defaults.target = target === DefaultLogger ? GuardedConsole : target
 }
 
 /** Call `hostLogger` at `level`, dropping whatever it throws or rejects with. */

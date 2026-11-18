@@ -78,14 +78,14 @@ const LeaseRowsTable = ({ deviceDB }: { deviceDB: DeviceDB }) => {
 }
 
 const LeaseRowLine = ({ row, scopepath, onForget, onForgetRaw }: LeaseRowLineProps) => {
-  const asked = leaseQuery.safeParse(row)
+  const leaseQueryC = leaseQuery.safeParse(row)
   const others = Object.keys(row).filter((fieldname) => ! (LeaseColumns as readonly string[]).includes(fieldname))
   return (
-    <tr className="dev-lease-row" data-named={asked.success}>
+    <tr className="dev-lease-row" data-named={leaseQueryC.success}>
       {LeaseColumns.map((fieldname) => <td key={fieldname}>{cellOf(fieldname, row[fieldname])}</td>)}
       <td>{others.map((fieldname) => `${fieldname}: ${cellOf(fieldname, row[fieldname])}`).join(', ')}</td>
       <td>
-        {asked.success && <button type="button" onClick={() => { void onForget(asked.data) }}>forget</button>}
+        {leaseQueryC.success && <button type="button" onClick={() => { void onForget(leaseQueryC.data) }}>forget</button>}
         {(onForgetRaw !== null) && (scopepath !== null) && <button type="button" onClick={() => { void onForgetRaw(scopepath) }}>forgetRawLease</button>}
       </td>
     </tr>

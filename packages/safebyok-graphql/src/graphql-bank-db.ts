@@ -75,8 +75,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link buildBank}. */
   async tryBuildBank(ask: BX.BankBuildAsk): Promise<BX.GateAnswer> {
     try {
-      const checked = BX.bankBuild.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.buildBank, 'safebyokBuildBank', { ask: checked })
+      const bankBuildAsk = BX.bankBuild.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.buildBank, 'safebyokBuildBank', { ask: bankBuildAsk })
       return BX.buildBankAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'buildBank', ask) }
   }
@@ -87,8 +87,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link delBank}. */
   async tryDelBank(ask: BX.BankDelAsk): Promise<BX.DelBankAnswer> {
     try {
-      const checked = BX.bankDel.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.delBank, 'safebyokDelBank', { ask: checked })
+      const bankDelAsk = BX.bankDel.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.delBank, 'safebyokDelBank', { ask: bankDelAsk })
       return BX.delBankAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'delBank', ask) }
   }
@@ -102,8 +102,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link putGate}. */
   async tryPutGate(ask: BX.GatePutAsk): Promise<BX.GateAnswer> {
     try {
-      const checked = BX.gatePut.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.putGate, 'safebyokPutGate', { ask: checked })
+      const gatePutAsk = BX.gatePut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.putGate, 'safebyokPutGate', { ask: gatePutAsk })
       return BX.putGateAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'putGate', ask) }
   }
@@ -117,8 +117,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link getVault}. */
   async tryGetVault(ask: BX.VaultGetAsk): Promise<BX.VaultAnswer> {
     try {
-      const checked = BX.vaultGet.parse(ask)
-      const crossed = await this.#runQuery(BankOperations.getVault, 'safebyokGetVault', { ask: checked })
+      const vaultGetAsk = BX.vaultGet.parse(ask)
+      const crossed = await this.#runQuery(BankOperations.getVault, 'safebyokGetVault', { ask: vaultGetAsk })
       return BX.getVaultAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'getVault', ask) }
   }
@@ -129,8 +129,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link putVault}. */
   async tryPutVault(ask: BX.VaultPutAsk): Promise<BX.VaultAnswer> {
     try {
-      const checked = BX.vaultPut.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.putVault, 'safebyokPutVault', { ask: checked })
+      const vaultPutAsk = BX.vaultPut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.putVault, 'safebyokPutVault', { ask: vaultPutAsk })
       return BX.putVaultAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'putVault', ask) }
   }
@@ -141,8 +141,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link delVault}. */
   async tryDelVault(ask: BX.VaultDelAsk): Promise<BX.VaultAnswer> {
     try {
-      const checked = BX.vaultDel.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.delVault, 'safebyokDelVault', { ask: checked })
+      const vaultDelAsk = BX.vaultDel.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.delVault, 'safebyokDelVault', { ask: vaultDelAsk })
       return BX.delVaultAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'delVault', ask) }
   }
@@ -168,8 +168,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link getBox}. */
   async tryGetBox(ask: BX.BoxGetAsk): Promise<BX.BoxAnswer> {
     try {
-      const checked = BX.boxGet.parse(ask)
-      const crossed = await this.#runQuery(BankOperations.getBox, 'safebyokGetBox', { ask: checked })
+      const boxGetAsk = BX.boxGet.parse(ask)
+      const crossed = await this.#runQuery(BankOperations.getBox, 'safebyokGetBox', { ask: boxGetAsk })
       return BX.getBoxAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'getBox', ask) }
   }
@@ -180,8 +180,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link putBox}. */
   async tryPutBox(ask: BX.BoxPutAsk): Promise<BX.BoxAnswer> {
     try {
-      const checked = BX.boxPut.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.putBox, 'safebyokPutBox', { ask: checked })
+      const boxPutAsk = BX.boxPut.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.putBox, 'safebyokPutBox', { ask: boxPutAsk })
       return BX.putBoxAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'putBox', ask) }
   }
@@ -192,8 +192,8 @@ export class GraphQLBankDB implements BX.BankDB {
   /** Non-throwing form of {@link delBox}. */
   async tryDelBox(ask: BX.BoxDelAsk): Promise<BX.BoxAnswer> {
     try {
-      const checked = BX.boxDel.parse(ask)
-      const crossed = await this.#runMutation(BankOperations.delBox, 'safebyokDelBox', { ask: checked })
+      const boxDelAsk = BX.boxDel.parse(ask)
+      const crossed = await this.#runMutation(BankOperations.delBox, 'safebyokDelBox', { ask: boxDelAsk })
       return BX.delBoxAnswer.parse(rowAnswerOf(crossed))
     } catch (err) { return answerForRefusal(err, 'delBox', ask) }
   }

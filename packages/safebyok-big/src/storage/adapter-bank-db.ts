@@ -109,9 +109,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link ensureBank}. */
   async tryEnsureBank(ask: BankEnsureAsk): Promise<EnsureBankAnswer> {
     try {
-      const checked     = BX.bankEnsure.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doEnsureBank(checked)
+      const bankEnsureAsk = BX.bankEnsure.parse(ask)
+      const loggableAsk   = BX.loggableAsk.parse(bankEnsureAsk)
+      const stored        = await this.doEnsureBank(bankEnsureAsk)
       return { ok: true, ask: loggableAsk, act: stored.act, val: stored.ensured, parent: stored.parent }
     } catch (err) { return this.answerForRefusal(err, 'ensureBank', ask) }
   }
@@ -122,9 +122,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link buildBank}. */
   async tryBuildBank(ask: BankBuildAsk): Promise<GateAnswer> {
     try {
-      const checked     = BX.bankBuild.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doBuildBank(checked)
+      const bankBuildAsk = BX.bankBuild.parse(ask)
+      const loggableAsk  = BX.loggableAsk.parse(bankBuildAsk)
+      const stored       = await this.doBuildBank(bankBuildAsk)
       // A good answer has a gate row: the one stored, or the live bank's.
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.gate!, parent: stored.parent } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'buildBank', ask: loggableAsk })
@@ -138,9 +138,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link delBank}. */
   async tryDelBank(ask: BankDelAsk): Promise<DelBankAnswer> {
     try {
-      const checked     = BX.bankDel.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doDelBank(checked)
+      const bankDelAsk  = BX.bankDel.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(bankDelAsk)
+      const stored      = await this.doDelBank(bankDelAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.bank, parent: BX.BankTop } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'delBank', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: BX.BankTop, dbhas: stored.bank, err: refusal }
@@ -156,9 +156,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link putGate}. */
   async tryPutGate(ask: GatePutAsk): Promise<GateAnswer> {
     try {
-      const checked     = BX.gatePut.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doPutGate(checked)
+      const gatePutAsk  = BX.gatePut.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(gatePutAsk)
+      const stored      = await this.doPutGate(gatePutAsk)
       // A good answer has a gate row: the one stored.
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.gate!, parent: stored.parent } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'putGate', ask: loggableAsk })
@@ -175,9 +175,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link getVault}. */
   async tryGetVault(ask: VaultGetAsk): Promise<VaultAnswer> {
     try {
-      const checked     = BX.vaultGet.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doGetVault(checked)
+      const vaultGetAsk = BX.vaultGet.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(vaultGetAsk)
+      const stored      = await this.doGetVault(vaultGetAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, parent: stored.parent } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'getVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.vault, err: refusal }
@@ -190,9 +190,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link putVault}. */
   async tryPutVault(ask: VaultPutAsk): Promise<VaultAnswer> {
     try {
-      const checked     = BX.vaultPut.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doPutVault(checked)
+      const vaultPutAsk = BX.vaultPut.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(vaultPutAsk)
+      const stored      = await this.doPutVault(vaultPutAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, parent: stored.parent } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'putVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.vault, err: refusal }
@@ -205,9 +205,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link delVault}. */
   async tryDelVault(ask: VaultDelAsk): Promise<VaultAnswer> {
     try {
-      const checked     = BX.vaultDel.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doDelVault(checked)
+      const vaultDelAsk = BX.vaultDel.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(vaultDelAsk)
+      const stored      = await this.doDelVault(vaultDelAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.vault, parent: stored.parent } }
       const refusal = Refuse.actRefused('vault', stored.act, { oplabel: 'delVault', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.vault, err: refusal }
@@ -223,9 +223,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link listBoxes}. When the vault row refuses, `parent` is that stored row. */
   async tryListBoxes(ask: BoxListAsk): Promise<ListBoxesAnswer> {
     try {
-      const checked     = BX.boxList.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doListBoxes(checked)
+      const boxListAsk  = BX.boxList.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(boxListAsk)
+      const stored      = await this.doListBoxes(boxListAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.listed, parent: stored.parent } }
       const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'listBoxes', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, err: refusal }
@@ -238,9 +238,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link getBox}. */
   async tryGetBox(ask: BoxGetAsk): Promise<BoxAnswer> {
     try {
-      const checked     = BX.boxGet.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doGetBox(checked)
+      const boxGetAsk   = BX.boxGet.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(boxGetAsk)
+      const stored      = await this.doGetBox(boxGetAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, parent: stored.parent } }
       const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'getBox', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.box, err: refusal }
@@ -262,10 +262,10 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link putBox}. */
   async tryPutBox(ask: BoxPutAsk): Promise<BoxAnswer> {
     try {
-      const checked     = BX.boxPut.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      this.#demandEnoughVolume(checked)
-      const stored      = await this.doPutBox(checked)
+      const boxPutAsk   = BX.boxPut.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(boxPutAsk)
+      this.#demandEnoughVolume(boxPutAsk)
+      const stored      = await this.doPutBox(boxPutAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, parent: stored.parent } }
       const capacity = ((stored.act === 'vault_full') && (stored.capacity !== null)) ? { capacity: stored.capacity } : {}
       const refusal  = Refuse.actRefused('box', stored.act, { oplabel: 'putBox', ask: loggableAsk, ...capacity })
@@ -279,9 +279,9 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link delBox}. */
   async tryDelBox(ask: BoxDelAsk): Promise<BoxAnswer> {
     try {
-      const checked     = BX.boxDel.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const stored      = await this.doDelBox(checked)
+      const boxDelAsk   = BX.boxDel.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(boxDelAsk)
+      const stored      = await this.doDelBox(boxDelAsk)
       if (stored.ok) { return { ok: true, ask: loggableAsk, act: stored.act, val: stored.box, parent: stored.parent } }
       const refusal = Refuse.actRefused('box', stored.act, { oplabel: 'delBox', ask: loggableAsk })
       return { ok: false, ask: loggableAsk, act: stored.act, parent: stored.parent, dbhas: stored.box, err: refusal }
@@ -297,10 +297,10 @@ export abstract class AdapterBankDB implements BankDB {
   /** Non-throwing form of {@link tidyGone}. */
   async tryTidyGone(ask: BoxTidyAsk): Promise<TidyGoneAnswer> {
     try {
-      const checked     = SX.boxTidy.parse(ask)
-      const loggableAsk = BX.loggableAsk.parse(checked)
-      const val         = await this.doTidyGone(checked)
-      const { user_id, banklabel } = checked
+      const boxTidyAsk  = SX.boxTidy.parse(ask)
+      const loggableAsk = BX.loggableAsk.parse(boxTidyAsk)
+      const val         = await this.doTidyGone(boxTidyAsk)
+      const { user_id, banklabel } = boxTidyAsk
       return { ok: true, ask: loggableAsk, act: 'tidied', val, parent: { user_id, banklabel } }
     } catch (err) { return this.answerForRefusal(err, 'tidyGone', ask) }
   }
@@ -313,10 +313,10 @@ export abstract class AdapterBankDB implements BankDB {
    */
   watch(scope: WatchScope, onNotice: (notice: Notice) => void, onBadNews: (news: VaultError) => void = noBadNews): () => void {
     return this.doWatch(SX.watchScope.parse(scope), ({ row, parent }) => {
-      const val   = BX.noticedRow.safeParse(row)
-      const above = (parent === undefined) ? null : BX.noticedParent.safeParse(parent)
-      if ((! val.success) || ((above !== null) && (! above.success))) { return }
-      onNotice({ act: (val.data.am === 'x') ? 'gotgone' : 'gotlive', val: val.data, parent: BX.noticeParentOf(val.data, above?.data ?? null) })
+      const noticedRow = BX.noticedRow.safeParse(row)
+      const above      = (parent === undefined) ? null : BX.noticedParent.safeParse(parent)
+      if ((! noticedRow.success) || ((above !== null) && (! above.success))) { return }
+      onNotice({ act: (noticedRow.data.am === 'x') ? 'gotgone' : 'gotlive', val: noticedRow.data, parent: BX.noticeParentOf(noticedRow.data, above?.data ?? null) })
     }, onBadNews)
   }
   // --

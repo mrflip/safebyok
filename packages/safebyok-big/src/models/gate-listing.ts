@@ -33,9 +33,9 @@ export class GateListing extends Listing<GateScope, GateRecord, GateSparse, Gate
 
   /** The listing of `bank`'s gate. */
   constructor(bank: Bank, opts: ListingOpts) {
-    const checked = VX.listedUnder.bank.parse(bank)
-    super(checked.device, opts)
-    this.bank = checked
+    const bankC = VX.listedUnder.bank.parse(bank)
+    super(bankC.device, opts)
+    this.bank = bankC
     Object.freeze(this)
   }
 

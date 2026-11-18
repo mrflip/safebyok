@@ -67,21 +67,21 @@ export class Lease implements LeaseStamp {
     try {
       const peeked = await friend.peekLease()
       if (peeked === null) { return null }
-      const checked = leaseRecord.safeParse(peeked)
+      const peekedC = leaseRecord.safeParse(peeked)
       // The damaged row stands until the next lease is cached over it.
-      if (! checked.success) { throw damagedLease() }
+      if (! peekedC.success) { throw damagedLease() }
       // Broken, as the to-do list says (*A cached lease newer than the vault in hand*): a row citing a newer gate revision may be another
       // tab's good lease over a gate this one has stale. It should refresh the gate; today it forgets the row.
-      if ((checked.data.gate_tok !== cited.gate_tok) || (checked.data.gate_revision_tok !== cited.revision_tok)) {
+      if ((peekedC.data.gate_tok !== cited.gate_tok) || (peekedC.data.gate_revision_tok !== cited.revision_tok)) {
         await friend.tryForgetLease()
         return null
       }
-      if (! isConsistent(bankStamp.parse(checked.data), bankStamp.parse(friend))) {
+      if (! isConsistent(bankStamp.parse(peekedC.data), bankStamp.parse(friend))) {
         await friend.tryForgetLease()
         throw damagedLease()
       }
-      if (isPastAutolock(checked.data, friend)) { return null }
-      return new Lease(friend, checked.data, true)
+      if (isPastAutolock(peekedC.data, friend)) { return null }
+      return new Lease(friend, peekedC.data, true)
     } catch (err) {
       if (! isVaultError(err)) { throw err }
       friend.tellBadNews([err])
@@ -119,12 +119,12 @@ export class Lease implements LeaseStamp {
 
   /** When the lease cached on this device is due for locking, in epoch milliseconds; null if none is cached. */
   static async expiresAt(friend: LeaseFriend): Promise<EpochMillis | null> {
-    const checked = leaseFriend.parse(friend)
-    const peeked = await checked.peekLease()
+    const friendC = leaseFriend.parse(friend)
+    const peeked = await friendC.peekLease()
     if (peeked === null) { return null }
-    const row = leaseRecord.safeParse(peeked)
-    if (! row.success) { throw damagedLease() }
-    return expiryOf(row.data, checked)
+    const peekedC = leaseRecord.safeParse(peeked)
+    if (! peekedC.success) { throw damagedLease() }
+    return expiryOf(peekedC.data, friendC)
   }
 
   /** Non-throwing form of {@link expiresAt}. */

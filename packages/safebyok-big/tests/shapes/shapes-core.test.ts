@@ -48,12 +48,12 @@ describe("whisper and sidecar refusing by kind", () => {
 
   it("hands back a copy, never the object it was given, nor anything inside it", () => {
     const given = { apiKey: 'sk-ant-fake', deep: { orgId: null } }
-    const parsed = CX.whisper.parse(given) as typeof given
-    expect(parsed).to.deep.equal(given)
-    expect(parsed).to.not.eq(given)
-    expect(parsed.deep).to.not.eq(given.deep)
+    const whisper = CX.whisper.parse(given) as typeof given
+    expect(whisper).to.deep.equal(given)
+    expect(whisper).to.not.eq(given)
+    expect(whisper.deep).to.not.eq(given.deep)
     given.apiKey = 'sk-ant-changed'
-    expect(parsed.apiKey).to.eq('sk-ant-fake')
+    expect(whisper.apiKey).to.eq('sk-ant-fake')
   })
 
   it("quotes nothing of what it was handed, a secret or a field's name, in its message, meta, cause or stack", () => {
@@ -108,9 +108,9 @@ describe("whisper", () => {
 
   it("hands back a copy of an object or array, sharing none of the caller's own", () => {
     const bag = { apiKey: 'fake', scopes: ['read', { tier: 2 }] }
-    const checked = CX.whisper.parse(bag) as typeof bag
-    expect(checked).to.not.eq(bag)
-    expect(checked.scopes[1]).to.not.eq(bag.scopes[1])
+    const whisper = CX.whisper.parse(bag) as typeof bag
+    expect(whisper).to.not.eq(bag)
+    expect(whisper.scopes[1]).to.not.eq(bag.scopes[1])
   })
 })
 
@@ -149,11 +149,11 @@ describe("sidecar", () => {
   })
 
   it("hands back a copy, sharing none of the caller's own objects", () => {
-    const sidecar = { note: 'work account', tags: [{ team: 'atlas' }] }
-    const checked = CX.sidecar.parse(sidecar)
-    expect(checked).to.deep.equal(sidecar)
-    expect(checked).to.not.eq(sidecar)
-    expect(checked['tags']).to.not.eq(sidecar.tags)
+    const given = { note: 'work account', tags: [{ team: 'atlas' }] }
+    const sidecar = CX.sidecar.parse(given)
+    expect(sidecar).to.deep.equal(given)
+    expect(sidecar).to.not.eq(given)
+    expect(sidecar['tags']).to.not.eq(given.tags)
   })
 })
 
@@ -163,17 +163,17 @@ describe("CX.bankScope, CX.vaultScope and CX.boxscope", () => {
   // CX.vaultScope @example
   it("hand back a frozen copy of the scope a record carries, its other fields left out", () => {
     const vault = { ...scope, vault_tok: 'tok', format: 'safebyok-vault-v1', lock: () => null }
-    const parsed = CX.vaultScope.parse(vault)
-    expect(parsed).to.deep.equal(scope)
-    expect(Object.isFrozen(parsed)).to.be.true
+    const vaultScope = CX.vaultScope.parse(vault)
+    expect(vaultScope).to.deep.equal(scope)
+    expect(Object.isFrozen(vaultScope)).to.be.true
     expect(CX.bankScope.parse(vault)).to.deep.equal({ user_id: 'u1', banklabel: 'acme' })
     expect(CX.boxscope.parse({ ...vault, boxlabel: 'openai' })).to.deep.equal({ ...scope, boxlabel: 'openai' })
   })
 
   it("leave the scope handed in as it was, unfrozen, handing back a copy", () => {
     const handed = { ...scope }
-    const parsed = CX.vaultScope.parse(handed)
-    expect(parsed).to.not.eq(handed)
+    const vaultScope = CX.vaultScope.parse(handed)
+    expect(vaultScope).to.not.eq(handed)
     expect(Object.isFrozen(handed)).to.be.false
   })
 

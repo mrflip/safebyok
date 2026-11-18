@@ -70,8 +70,8 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
    * A throw from the checker is replaced, so no error quotes the passphrase.
    */
   static async judgeStrength(device: ProvingDevice, scope: BankScope, passphraseCleartext: string): Promise<GX.PassphraseVerdict> {
-    const { passphraseClear: typed, scope: checkedScope, device: checkedDevice } = Checks.strengthArgs.parse({ passphraseClear: passphraseCleartext, scope, device })
-    return checkedDevice.strengthChecker(typed, checkedScope)
+    const { passphraseClear: typed, scope: scopeC, device: deviceC } = Checks.strengthArgs.parse({ passphraseClear: passphraseCleartext, scope, device })
+    return deviceC.strengthChecker(typed, scopeC)
   }
 
   /** Wrap a bankKey into this proving's wayin: a new one for `NOVEL`, or the one `source` unwraps.
@@ -79,12 +79,12 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
    */
   async buildWayin(source: Novel | Proving): Promise<Wayin> {
     if (this.#wayin !== null) { throw Throwers.wayinMadeAlready() }
-    const checked = Checks.wayinSource.parse(source)
-    if (checked !== NOVEL) {
-      Validator.checkedConsistent(checked.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
-      Validator.checkedConsistent(checked.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
+    const wayinSource = Checks.wayinSource.parse(source)
+    if (wayinSource !== NOVEL) {
+      Validator.checkedConsistent(wayinSource.bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
+      Validator.checkedConsistent(wayinSource.gateStamp, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.ProvingOfOtherGate })
     }
-    const bankKey = checked === NOVEL ? await Crypto.makeBankKey() : await checked.#unwrapBankKey()
+    const bankKey = wayinSource === NOVEL ? await Crypto.makeBankKey() : await wayinSource.#unwrapBankKey()
     return this.#wrapBankKey(bankKey)
   }
 
@@ -160,12 +160,12 @@ export class PassphraseProving extends Proving<GX.PassphraseWayinHeader> {
    * Throws `weak_passphrase` if the strength checker judges the passphrase weak.
    */
   static async buildNovel(device: ProvingDevice, bankStamp: BankStamp, gateStamp: GateStamp, passphraseCleartext: GX.PassphraseCleartext): Promise<PassphraseProving> {
-    const { bankStamp: checkedBank, gateStamp: checkedGate, passphraseClear: typed } = Checks.passphraseNovelArgs.parse({ device, bankStamp, gateStamp, passphraseClear: passphraseCleartext })
-    const verdict = await super.judgeStrength(device, checkedBank, typed)
+    const { bankStamp: bankStampC, gateStamp: gateStampC, passphraseClear: typed } = Checks.passphraseNovelArgs.parse({ device, bankStamp, gateStamp, passphraseClear: passphraseCleartext })
+    const verdict = await super.judgeStrength(device, bankStampC, typed)
     if (! verdict.strong) { throw Throwers.weakPassphrase(verdict.reason) }
     const header = mintPassphraseHeader(device)
     const wayinKey = await passphraseKeyOf(device.keyDeriver, typed, Crypto.fromB64(header.salt_b64))
-    return this.make({ bankStamp: checkedBank, gateStamp: checkedGate, header, stored: null }, { wayinKey })
+    return this.make({ bankStamp: bankStampC, gateStamp: gateStampC, header, stored: null }, { wayinKey })
   }
 
   /** Build the proving of `gate`'s passphrase wayin from `passphraseCleartext`.
@@ -193,10 +193,10 @@ export class PasskeyProving extends Proving<GX.PasskeyWayinHeader> {
 
   /** Build a proving for a new passkey wayin of the gate stamped `gateStamp`, in the bank stamped `bankStamp`. */
   static async buildNovel(device: ProvingDevice, bankStamp: BankStamp, gateStamp: GateStamp, passkeyCleartext: GX.PasskeyAnswer): Promise<PasskeyProving> {
-    const { bankStamp: checkedBank, gateStamp: checkedGate, passkeyClear: answer } = Checks.passkeyNovelArgs.parse({ device, bankStamp, gateStamp, passkeyClear: passkeyCleartext })
+    const { bankStamp: bankStampC, gateStamp: gateStampC, passkeyClear: answer } = Checks.passkeyNovelArgs.parse({ device, bankStamp, gateStamp, passkeyClear: passkeyCleartext })
     const header = mintPasskeyHeader(device, answer)
-    const wayinKey = await Crypto.deriveWrappingKey(answer.prfBytes, wayinCtxOf(checkedBank, checkedGate, header))
-    return this.make({ bankStamp: checkedBank, gateStamp: checkedGate, header, stored: null }, { wayinKey })
+    const wayinKey = await Crypto.deriveWrappingKey(answer.prfBytes, wayinCtxOf(bankStampC, gateStampC, header))
+    return this.make({ bankStamp: bankStampC, gateStamp: gateStampC, header, stored: null }, { wayinKey })
   }
 
   /** Build the proving of `gate`'s passkey wayin from `passkeyCleartext`.

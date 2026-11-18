@@ -30,9 +30,9 @@ export class VaultListing extends Listing<VaultScope, VaultRecord, VaultSparse, 
 
   /** The listing of `bank`'s vaults. */
   constructor(bank: Bank, opts: ListingOpts) {
-    const checked = VX.listedUnder.bank.parse(bank)
-    super(checked.device, opts)
-    this.bank = checked
+    const bankC = VX.listedUnder.bank.parse(bank)
+    super(bankC.device, opts)
+    this.bank = bankC
     Object.freeze(this)
   }
 
