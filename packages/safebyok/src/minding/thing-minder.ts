@@ -10,15 +10,14 @@
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
 import { Outcome, Throwers, Validator } from 'safebyok-big/internals'
-import * as Phrases from '../phrases'
 import { minderNotStarted, modelkindMismatch, staleRead } from '../refusals/throwers'
 import type { Banklabel, Labelpath, Userid } from '../shapes/primitives'
-import { type Thing, type ThingScope, type Thingkind, type VoidSentinel, RootBoxLabelpath, cmpThings, modelkindOf, shellOf, thingkindVals } from '../shapes/shapes-thing'
+import { type Thing, type ThingScope, type Thingkind, type VoidSentinel, RootBoxLabelpath, cmpThings, modelkindOf, shellOf, thingScope, thingkindVals, vaultDBShape } from '../shapes/shapes-thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
-import { type ThingNotice, type VaultDB, isVaultDB } from '../storage/vault-db'
+import type { ThingNotice, VaultDB } from '../storage/vault-db'
 import {
   type CarFreshness, type DeliverableThing, type GotAnswer, type MinderAskOpts, type MinderFriend, type MinderGetAsk, type MinderGetAskOpts, type MinderOpts, type QueryCacheOpts,
-  type TSQAnswer, type TSQGotAnswer, type ThingCar, type ThingTies, type TsqStaleTime, DefaultQueryCacheOpts, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAsk, minderGetAskOpts, minderListener, minderScope, queryCacheOpts, tsqClient,
+  type TSQAnswer, type TSQGotAnswer, type ThingCar, type ThingTies, type TsqStaleTime, FixedQueryCacheOpts, minderAskOpts, minderFriend, minderGetAsk, minderGetAskOpts, minderListener, queryCacheOptsOrDefault, tsqClient,
 } from '../shapes/shapes-minder'
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
 
@@ -294,7 +293,8 @@ export class ThingMinder {
 
   /** The scope of `scoped`, demanding that it is in this minder's bank, of its modelkind. */
   #demandOwnScope(scoped: ThingScope): ThingScope {
-    const scope = minderScope.parseConsistent(scoped, this.ties)
+    // Its fields alone: an ask or a record passes, and is read as its scope.
+    const scope = thingScope.parseConsistent(scoped, this.ties)
     if (modelkindOf(scope.labelpath) !== this.modelkind) { throw modelkindMismatch() }
     return scope
   }
@@ -376,13 +376,13 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
 // == [Checks]: Checks
 
 /** The checks of {@link ThingMinder.make}'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, oneof, custom, orDefault }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, oneof }) => ({
   minderMakeArgs: obj({
     ties: obj({ modelkind: oneof(thingkindVals) }),
     opts: obj({
-      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
+      vaultDB:        vaultDBShape,
       tsq:            tsqClient,
-      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
+      queryCacheOpts: queryCacheOptsOrDefault,
     }),
     bank: minderFriend,
   }),

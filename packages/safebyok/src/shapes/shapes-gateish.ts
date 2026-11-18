@@ -10,7 +10,7 @@ import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
 import type { guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
-import { type BankScope, type BankStamp, type GateStamp, gateStamp } from './shapes-stamps'
+import { type BankScope, type BankStamp, type GateStamp, bankStamp, gateStamp } from './shapes-stamps'
 import { thingRecord } from './shapes-thing'
 
 // == [The gating's forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
@@ -107,7 +107,12 @@ export interface ProvingOpts {
 }
 // --
 
-// == [What a lease is handed]: LeaseBank, SecretFieldname, LeaseOpts
+// == [What a lease is handed]: leaseBank, LeaseBank, SecretFieldname, LeaseOpts
+
+/** The check of a {@link LeaseBank}. */
+export const { leaseBank } = Validator.Checkers('bad_record', ({ obj, fn, bool }) => ({
+  leaseBank: obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
+}))
 
 /** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>

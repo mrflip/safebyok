@@ -1,6 +1,6 @@
 import type { Consts } from 'safebyok-big/internals'
-import { Clock, Crypto, Errors, Throwers, Validator } from 'safebyok-big/internals'
-import { DefaultQueryCacheOpts, type QueryCacheOpts, queryCacheOpts } from '../shapes/shapes-minder'
+import { Clock, Crypto, Errors, Phrases as BigPhrases, Throwers, Validator } from 'safebyok-big/internals'
+import { type QueryCacheOpts, queryCacheOptsOrDefault } from '../shapes/shapes-minder'
 import { BaseThing } from './base-thing'
 import { CoreBox } from './core-box'
 import { Device } from './device'
@@ -15,10 +15,10 @@ import * as Phrases from '../phrases'
 import { boxOfOtherRoot, otherThanBox } from '../refusals/throwers'
 import type { DeviceTok } from '../shapes/primitives'
 import {
-  type BankThing, type BoxThing, type Thing, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, gateThing, lifeseqOfLifenum, shellOf,
+  type BankThing, type BoxThing, type Thing, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, gateThing, lifeseqOfLifenum, shellOf, vaultDBShape,
 } from '../shapes/shapes-thing'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
-import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer, isVaultDB } from '../storage/vault-db'
+import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
@@ -336,16 +336,16 @@ function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<
 
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Bank.make}'s arguments, and of the proving `unlockByProving` is given. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom, orDefault }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
     record: obj({ maingate: gateThing, rootBox: boxRecordOrShell }).loose(),
     opts:   obj({
-      device:         custom<Device>((val) => val instanceof Device, 'Expected a Device'),
-      vaultDB:        custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected),
-      queryCacheOpts: orDefault(queryCacheOpts, DefaultQueryCacheOpts),
+      device:         custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
+      vaultDB:        vaultDBShape,
+      queryCacheOpts: queryCacheOptsOrDefault,
     }),
   }),
-  proving: custom<Proving>((val) => val instanceof Proving, 'Expected a Proving'),
+  proving: custom<Proving>((val) => val instanceof Proving, Phrases.ProvingExpected),
 }))
 // --

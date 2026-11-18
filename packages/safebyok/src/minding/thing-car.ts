@@ -4,7 +4,7 @@ import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import {
   type Sparse, type Thing,
-  cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, kindChecksOf, thingCited, thingScope,
+  cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, kindChecksOf, scopedCited,
 } from '../shapes/shapes-thing'
 import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
 
@@ -14,7 +14,7 @@ import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
  * A deleted Thing's car is `gone`, even when its tombstone is sparse, and the void sentinel's is `void`. A sparse `newest` with no `fullest` makes a `bare` car.
  */
 export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing> {
-  CarOfChecks.deliverableThing.parse(newest)
+  scopedCited.parse(newest)
   if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
   if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
   if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
@@ -88,10 +88,9 @@ function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing
 
 /** The checks of a car's invariants, as {@link ThingCar} states them, each liveness by name. A car that fails one is a bug in safebyok. */
 const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
-  const citedShape = obj({ ...thingScope.shape, ...thingCited.shape })
   // Its records pass through as they are, so that a refinement can compare them by reference.
-  const cited = custom<Sparse<Thing>>((val) => citedShape.safeParse(val).success, Phrases.CarRecordShape)
-  const whole = custom<Thing>((val) => citedShape.safeParse(val).success && isWholeRecord(val as Sparse<Thing>), Phrases.CarFullestShape)
+  const cited = custom<Sparse<Thing>>((val) => scopedCited.safeParse(val).success, Phrases.CarRecordShape)
+  const whole = custom<Thing>((val) => scopedCited.safeParse(val).success && isWholeRecord(val as Sparse<Thing>), Phrases.CarFullestShape)
   const fullCar   = obj({ liveness: lit('full'), newest: cited, fullest: whole })
     .refine(({ newest, fullest }) => (newest === fullest) && (newest.am === 'a'), Phrases.CarFullSplit)
   const behindCar = obj({ liveness: lit('behind'), newest: cited, fullest: whole })
@@ -107,11 +106,8 @@ const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, c
   return { thingCar, fullCar, behindCar, bareCar, goneCar, voidCar }
 })
 
-/** The checks of {@link carOf}'s arguments, refusing `bad_record`: a Thing's scope and revision, and the behind car a pair of records makes. */
+/** The check of the behind car {@link carOf} makes of a pair of records, refusing `bad_record`. */
 const CarOfChecks = {
-  ...Validator.Checkers('bad_record', ({ obj }) => ({
-    deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
-  })),
   behindCar: CarChecks.behindCar.refusingAs('bad_record'),
 }
 // --

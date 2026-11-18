@@ -3,7 +3,7 @@
 import type * as Z from 'zod'
 import { CX, GX, Phrases, Validator } from 'safebyok-big/internals'
 import { LabelpathOfOtherKind } from '../phrases'
-import { BoxThingFormat, isLabelpathOfKind, thingRecord, wayins } from './shapes-thing'
+import { BoxThingFormat, ThingChecks, isLabelpathOfKind, thingRecord, wayins } from './shapes-thing'
 
 // == [The stamps]: bankScope, bankStamp, gateStamp, stampedGate, boxStamp, BankScope, BankStamp, GateStamp, StampedGate, BoxStamp
 
@@ -14,7 +14,7 @@ export const { bankScope, bankStamp, gateStamp, stampedGate, boxStamp } = Valida
   const bankStamp = thingRecord.pick({ userid: true, banklabel: true, lifeseq: true, born_at: true })
   const gateStamp = thingRecord.pick({ userid: true, banklabel: true, labelpath: true, lifeseq: true, born_at: true })
   return {
-    bankScope:   thingRecord.pick({ userid: true, banklabel: true }),
+    bankScope:   ThingChecks.bankScope,
     bankStamp,
     gateStamp,
     stampedGate: obj({ bankStamp, stamp: gateStamp, wayins }),

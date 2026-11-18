@@ -7,6 +7,7 @@ import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
 import type { TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
 import type { AdapterVaultDB } from '../storage/adapter-vault-db'
+import { type VaultDB, isVaultDB } from '../storage/vault-db'
 import type { Labelpath, Lifenum, Lifepath, Lifeseq, Revtok } from './primitives'
 
 // == [Lifeseqs]: VoidLifeseq, RootVoidLifepath, lifeseqOfLifenum, lifenumOfLifeseq, isTombstoneLifeseq, lifeseqOfLifepath, leadingLifeseqsOf
@@ -73,7 +74,7 @@ export function isLabelpathOfKind(labelpath: Labelpath, modelkind: Thingkind): b
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => isLabelpathOfKind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell, StoredCited, Sealed, Wayins, Sparse, sparseOf, ShellCited, childShellCited
+// == [Thing]: thingScope, thingCited, scopedCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell, StoredCited, Sealed, Wayins, Sparse, sparseOf, ShellCited, childShellCited
 
 // A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
 // and only its last may be void: a void lifepath is the void lifeseq under its parent's lifepath, or alone at a root.
@@ -132,6 +133,8 @@ export const ThingChecks = Validator.Checkers('bad_record', ({ obj, str, int, ui
     am,
     lifepath: anyLifepath,
   })
+  // A Thing's scope and citation: what every record and tombstone has, sparse or whole.
+  const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape })
   const thingRecord  = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
@@ -251,13 +254,13 @@ export const ThingChecks = Validator.Checkers('bad_record', ({ obj, str, int, ui
   const boxRecordOrShell = union([boxRecord, boxShell])
   return {
     modelkind, labelpath, anyLifeseq, voidLifeseq, anyLifepath, voidLifepath, ...revisioned, bankScope, label,
-    thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord,
+    thingScope, thingCited, scopedCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord,
     boxRecordOrShell,
   }
 })
 /** Each of {@link ThingChecks}, by name. */
 export const {
-  thingScope, thingCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
+  thingScope, thingCited, scopedCited, thingRecord, storedCited, storedWayins, sealed, wayins, bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
 } = ThingChecks
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
@@ -435,7 +438,7 @@ export function isTombstone<RecordT extends Thing>(record: unknown): record is T
   return tombstoneChecker.safeParse(record).success
 }
 /** What every tombstone has, sparse or whole: a Thing's scope and citation, marked deleted. */
-const tombstoneChecker = Validator.Checker(({ obj, lit }) => obj({ ...thingScope.shape, ...thingCited.shape, am: lit('x') }))
+const tombstoneChecker = Validator.Checker(({ lit }) => scopedCited.extend({ am: lit('x') }))
 
 /** True when `record` is the tombstone of a deleted Thing, sparse or whole: any tombstone but the void sentinel. */
 export function isGone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
@@ -477,7 +480,10 @@ export const KindChecks = {
 export function kindChecksOf(labelpath: Labelpath): typeof KindChecks[Thingkind] { return KindChecks[modelkindOf(labelpath)] }
 // --
 
-// == [Adapters]: adapterVaultDBOpts, AdapterVaultDBOpts
+// == [The vaultDB]: vaultDBShape, adapterVaultDBOpts, AdapterVaultDBOpts
+
+/** The check of a host's {@link VaultDB}, by {@link isVaultDB}. */
+export const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_record')
 
 /** The check of the options of a vaultDB that extends {@link AdapterVaultDB}. */
 export const adapterVaultDBOpts = Validator.Checker(({ obj, bool }) => obj({

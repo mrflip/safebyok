@@ -1,6 +1,7 @@
 import type { Consts } from 'safebyok-big/internals'
 import { Crypto, Throwers, Validator } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
+import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
 import { type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
@@ -94,7 +95,7 @@ function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
 // Defined here, not with the shapes: they name a model class.
 /** The checks of {@link Gate.make}'s and {@link Gate.makeRecord}'s arguments. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
-  const wayin = custom<Wayin>((val) => val instanceof Wayin, 'Expected a Wayin')
+  const wayin = custom<Wayin>((val) => val instanceof Wayin, Phrases.WayinExpected)
   return {
     gateMakeArgs:   obj({ record: gateThing, opts: obj({ bank: obj({ stamp: bankStamp }) }) }),
     makeRecordArgs: gateStamp.extend({ wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),

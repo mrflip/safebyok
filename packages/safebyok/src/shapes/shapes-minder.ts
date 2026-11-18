@@ -38,11 +38,11 @@ export const MaxTimerHours = 588
 export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 // --
 
-// == [Checks]: queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts
+// == [Checks]: queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, tsqClient, minderListener, minderGetAsk, minderAskOpts, minderGetAskOpts
 
 /** The checks of a ThingMinder's arguments and options. */
 export const {
-  queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts,
+  queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, tsqClient, minderListener, minderGetAsk, minderAskOpts, minderGetAskOpts,
 } = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
   const gcTime           = union([uint.max(MaxTimerMillis, Phrases.GcTimeShape), lit(Infinity)])
   const staleMillis      = uint.max(MaxTimerMillis, Phrases.StaleTimeShape)
@@ -51,21 +51,21 @@ export const {
     staleTime: orDefault(staleTime, DefaultQueryCacheOpts.staleTime),
     gcTime:    orDefault(gcTime, DefaultQueryCacheOpts.gcTime),
   }).strict()
+  // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
+  const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
   const friendFields     = obj({ scope: thingWatchScope, rootBox: obj({ ...thingScope.shape, lifepath: thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const tsqVerbs         = obj({ query: fn(), setQueryData: fn(), setQueryDefaults: fn(), getQueryCache: fn(), removeQueries: fn() })
   const tsqClient        = custom<TSQ.QueryClient>((val) => tsqVerbs.safeParse(val).success, Phrases.QueryClientExpected)
   const minderListener   = fn<(answer: TSQGotAnswer) => void>()
-  // Its fields alone: an ask or a record passes, and is read as its scope.
-  const minderScope      = obj(thingScope.shape)
   // Zod refuses to `extend` a refined object over keys it has; `safeExtend` narrows them, and keeps the refinement.
   const minderGetAsk     = AskChecks.getAsk.safeExtend({ ifAbsent: lit('nil'), track: trackShape })
   const tsqStaleTime     = union([staleMillis, lit(Infinity), lit('static')])
   // Each option may be left out, or given as undefined, for no opinion.
   const minderGetAskOpts = obj({ staleTime: tsqStaleTime.optional() }).strict()
   const minderAskOpts    = minderGetAskOpts.extend({ ifStale: oneof(['get', 'refresh']).optional() }).strict()
-  return { queryCacheOpts, tsqStaleTime, minderFriend, tsqClient, minderListener, minderScope, minderGetAsk, minderAskOpts, minderGetAskOpts }
+  return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, tsqClient, minderListener, minderGetAsk, minderAskOpts, minderGetAskOpts }
 })
 
 /** How long a minder's get or read counts a car timely: milliseconds up to {@link MaxTimerMillis}, or `Infinity` or `'static'` for a car that never ages.

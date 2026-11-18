@@ -6,7 +6,7 @@ import * as Phrases from '../phrases'
 import { tombstoneSecretsGiven } from '../refusals/throwers'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
 import type { ThingRecord } from '../shapes/shapes-thing'
-import type { LeaseBank, LeaseOpts, SecretFieldname } from '../shapes/shapes-gateish'
+import { type LeaseBank, type LeaseOpts, type SecretFieldname, leaseBank } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from '../shapes/shapes-stamps'
 
@@ -228,8 +228,7 @@ function sealerMembersOf(val: unknown): Partial<Record<keyof AnySealer, unknown>
 
 // Defined here, not with the shapes: it names a model class.
 /** The checks of {@link Lease.make}'s arguments, and of the sealer a seal or unseal is given. */
-const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, bool, custom }) => {
-  const bank = obj({ stamp: bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() })
+const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, custom }) => {
   const sealerMembers = obj({
     donorPropsOf:     fn(),
     publicPropsOf:    fn(),
@@ -246,7 +245,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, bool, custom })
     recordOf:         fn(),
   })
   return {
-    leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank }) }),
+    leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank: leaseBank }) }),
     sealer:        custom<AnySealer>((val) => sealerMembers.safeParse(sealerMembersOf(val)).success, Phrases.SealerExpected),
   }
 })
