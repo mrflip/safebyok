@@ -566,9 +566,9 @@ function revtokNotNew(ask: WriteAsk): Errors.VaultError { return new Errors.Vaul
 /** A `bad_record` refusal: the record is not at the scope the ask names. */
 function recordOfOtherScope(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RecordOfOtherScope, { meta: { ask: loggableAskOf(ask) } }) }
 
-// A del is the only write of a tombstone, so this is the act table's dubdel, found before anything is fetched. Its refusal
-// kind is the one big's act tables give dubdel.
-/** An `absent_vault` refusal, act `dubdel`: a del cites a tombstone. */
+// A del citing a tombstone, the shell among them, refuses dubdel when the ask is made, before anything is fetched, so its
+// answer has no dbhas. Its refusal kind is the one big's act tables give dubdel.
+/** An `absent_vault` refusal, act `dubdel`: a del cites a tombstone or the shell. */
 function tombstoneOverTombstone(ask: WriteAsk): Errors.VaultError {
   return new Errors.VaultError('absent_vault', Phrases.TombstoneOverTombstone, { meta: { ask: loggableAskOf(ask), act: 'dubdel' } })
 }
