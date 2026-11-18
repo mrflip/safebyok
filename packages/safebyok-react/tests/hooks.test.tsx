@@ -103,11 +103,15 @@ describe("useVault and useVaultSnapshot", () => {
     const spy = TH.spyLogger()
     render(<BankProvider {...TH.providerPropsOf(world, { logger: spy.logger })}><TH.ShowsVault /><ShowsMain /></BankProvider>)
     await waitFor(() => { expect(screen.getByTestId("main").textContent).to.eq('present') })
+    const reported = vi.fn()
+    vi.stubGlobal('reportError', reported)
     const cause = new VaultError('identity_revoked', 'signed out')
     await act(async () => { await TH.seenBanks[0]?.device.vacate({ cause }) })
     expect(screen.getByTestId("main").textContent).to.eq('spent identity_revoked')
     expect(shown('vault')).to.eq('spent none')
     expect(spy.calls.map((call) => call.level)).to.deep.equal(['error'])
+    expect(reported).toHaveBeenCalledExactlyOnceWith(cause)
+    vi.unstubAllGlobals()
   })
 
   it("read a vault deleted elsewhere as absent", async () => {
