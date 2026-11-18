@@ -41,11 +41,11 @@ export abstract class DeviceDB {
   async peek(asked: LeaseQuery): Promise<LeaseRow | null> {
     try {
       const leaseQuery = SX.leaseQuery.parse(asked)
-      const stored = await this.doPeek(leaseQuery)
-      if (stored === null) { return null }
-      const parsed = SX.leaseRow.safeParse(stored)
-      if (! parsed.success) { throw Refuse.damagedLease() }
-      return (parsed.data.bank_tok === leaseQuery.bank_tok) ? parsed.data : null
+      const storedU = await this.doPeek(leaseQuery)
+      if (storedU === null) { return null }
+      const stored = SX.leaseRow.safeParse(storedU)
+      if (! stored.success) { throw Refuse.damagedLease() }
+      return (stored.data.bank_tok === leaseQuery.bank_tok) ? stored.data : null
     } catch (err) { throw refusalOf(err, 'peek') }
   }
 
@@ -71,7 +71,7 @@ export abstract class DeviceDB {
   async listLeases(): Promise<LeaseDated[]> {
     try {
       const filed = await this.doListLeases()
-      const leases = filed.flatMap(({ row }) => { const parsed = SX.leaseDated.safeParse(row); return parsed.success ? [parsed.data] : [] })
+      const leases = filed.flatMap(({ row: rowU }) => { const row = SX.leaseDated.safeParse(rowU); return row.success ? [row.data] : [] })
       return leases.toSorted((one, other) => one.proved_at - other.proved_at)
     } catch (err) { throw refusalOf(err, 'listLeases') }
   }

@@ -65,23 +65,23 @@ export class Lease implements LeaseStamp {
   static async buildFromCache(friend: LeaseFriend, gate: CitedGate): Promise<Lease | null> {
     const { gate: cited } = leaseFromCacheArgs.parse({ friend, gate })
     try {
-      const peeked = await friend.peekLease()
-      if (peeked === null) { return null }
-      const checked = leaseRecord.safeParse(peeked)
+      const peekedU = await friend.peekLease()
+      if (peekedU === null) { return null }
+      const peeked = leaseRecord.safeParse(peekedU)
       // The damaged row stands until the next lease is cached over it.
-      if (! checked.success) { throw damagedLease() }
+      if (! peeked.success) { throw damagedLease() }
       // Broken, as the to-do list says (*A cached lease newer than the vault in hand*): a row citing a newer gate revision may be another
       // tab's good lease over a gate this one has stale. It should refresh the gate; today it forgets the row.
-      if ((checked.data.gate_tok !== cited.gate_tok) || (checked.data.gate_revision_tok !== cited.revision_tok)) {
+      if ((peeked.data.gate_tok !== cited.gate_tok) || (peeked.data.gate_revision_tok !== cited.revision_tok)) {
         await friend.tryForgetLease()
         return null
       }
-      if (! isConsistent(bankStamp.parse(checked.data), bankStamp.parse(friend))) {
+      if (! isConsistent(bankStamp.parse(peeked.data), bankStamp.parse(friend))) {
         await friend.tryForgetLease()
         throw damagedLease()
       }
-      if (isPastAutolock(checked.data, friend)) { return null }
-      return new Lease(friend, checked.data, true)
+      if (isPastAutolock(peeked.data, friend)) { return null }
+      return new Lease(friend, peeked.data, true)
     } catch (err) {
       if (! isVaultError(err)) { throw err }
       friend.tellBadNews([err])
@@ -118,13 +118,13 @@ export class Lease implements LeaseStamp {
   // == [Expiry]: expiresAt, tryExpiresAt
 
   /** When the lease cached on this device is due for locking, in epoch milliseconds; null if none is cached. */
-  static async expiresAt(friend: LeaseFriend): Promise<EpochMillis | null> {
-    const checked = leaseFriend.parse(friend)
-    const peeked = await checked.peekLease()
-    if (peeked === null) { return null }
-    const row = leaseRecord.safeParse(peeked)
-    if (! row.success) { throw damagedLease() }
-    return expiryOf(row.data, checked)
+  static async expiresAt(friendU: LeaseFriend): Promise<EpochMillis | null> {
+    const friend = leaseFriend.parse(friendU)
+    const peekedU = await friend.peekLease()
+    if (peekedU === null) { return null }
+    const peeked = leaseRecord.safeParse(peekedU)
+    if (! peeked.success) { throw damagedLease() }
+    return expiryOf(peeked.data, friend)
   }
 
   /** Non-throwing form of {@link expiresAt}. */

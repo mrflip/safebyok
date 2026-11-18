@@ -380,14 +380,14 @@ function boxStampOf(record: BoxSparse): CipherCtxRecord { return BX.boxSparse.pa
 // What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
 /** Parse the whisper in the JSON `text`, throwing `damaged_whisper` for anything else. */
 function deserializeWhisper(text: string): Whisper {
-  let parsed: unknown
+  let whisperU: unknown
   try {
-    parsed = JSON.parse(text)
+    whisperU = JSON.parse(text)
   } catch {
     throw undecodedWhisper()
   }
-  const checked = CX.whisper.safeParse(parsed)
-  if (! checked.success) { throw undecodedWhisper() }
-  return checked.data
+  const whisper = CX.whisper.safeParse(whisperU)
+  if (! whisper.success) { throw undecodedWhisper() }
+  return whisper.data
 }
 // --
