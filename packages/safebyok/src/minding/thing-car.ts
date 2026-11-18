@@ -45,13 +45,13 @@ export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as con
  * A deleted Thing's car is `gone`, even when its tombstone is sparse, and the void sentinel's is `void`. A sparse `newest` with no `fullest` makes a `bare` car.
  */
 export function carOf(newest: DeliverableThing, fullest?: Thing): ThingCar<Thing> {
-  CarChecks.deliverableThing.parse(newest)
+  CarOfChecks.deliverableThing.parse(newest)
   if (isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
   if (isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
   if (isWholeRecord(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
   if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
   kindChecksOf(newest.labelpath).record.parse(fullest)
-  return      Object.freeze(CarChecks.behindCar.parse({ liveness: 'behind', newest, fullest } as const))
+  return      Object.freeze(CarOfChecks.behindCar.parse({ liveness: 'behind', newest, fullest } as const))
 }
 
 // TanStack also calls it on an observer's selected and placeholder values, so it throws for one that is not a car.
@@ -65,7 +65,7 @@ export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<Thing> {
   demandCar(prior, Phrases.NotACar)
   if (! haveSameScope(prior.newest, delivered.newest))     { return delivered }
   if (prior.newest.lifepath !== delivered.newest.lifepath) { return (cmpThings(prior.newest, delivered.newest) > 0) ? delivered : prior }
-  const [newestTag,  newest]  = tagBestNewestSL(prior, delivered)
+  const [newestTag,  newest]  = tagBestNewestSL(prior,  delivered)
   const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)
   if ((newestTag === 'prior') && (fullestTag === 'prior')) { return prior }
   return carOf(newest, fullest as Thing | undefined)
@@ -113,10 +113,10 @@ function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing
 }
 // --
 
-// == [Checks]: UnexpectedCarChecks, CarChecks
+// == [Checks]: CarChecks, CarOfChecks
 
 /** The checks of a car's invariants, as {@link ThingCar} states them, each liveness by name. A car that fails one is a bug in safebyok. */
-const UnexpectedCarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
+const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom }) => {
   const citedShape = obj({ ...thingScope.shape, ...thingCited.shape })
   // Its records pass through as they are, so that a refinement can compare them by reference.
   const cited = custom<Sparse<Thing>>((val) => citedShape.safeParse(val).success, Phrases.CarRecordShape)
@@ -136,12 +136,11 @@ const UnexpectedCarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, 
   return { thingCar, fullCar, behindCar, bareCar, goneCar, voidCar }
 })
 
-/** The checks of {@link carOf}'s arguments, refusing `bad_record`: a Thing's scope and revision, and the car a pair of records makes. */
-const CarChecks = {
-  ...UnexpectedCarChecks,
+/** The checks of {@link carOf}'s arguments, refusing `bad_record`: a Thing's scope and revision, and the behind car a pair of records makes. */
+const CarOfChecks = {
   ...Validator.Checkers('bad_record', ({ obj }) => ({
     deliverableThing: obj({ ...thingScope.shape, ...thingCited.shape }),
   })),
-  thingCar: UnexpectedCarChecks.thingCar.refusingAs('bad_record'),
+  behindCar: CarChecks.behindCar.refusingAs('bad_record'),
 }
 // --
