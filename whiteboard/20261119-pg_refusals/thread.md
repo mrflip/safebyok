@@ -1,8 +1,8 @@
 # Thread 2: pg_refusals (2026-11-19)
 
 Branch `20261119-pg_refusals`, PR [#763](https://github.com/mrflip/safebyok/pull/763), on main (batch `sentinel_audit`, not a sprint). Proved:
-package tests, typecheck and lint for safebyok-postgres (337 tests), safebyok-graphql (446, its
-dependencies built), safebyok-fastkey (43); `pnpm justify` after the catch-up rebase, see the PR.
+`pnpm justify` green after the catch-up onto origin/main at b9ec1b520: postgres 337, graphql 446,
+fastkey 43, safebyok 1073, big 2941, convex 329, indexeddb 213, react 300, demo 99, e2e 576.
 
 Items are the audit's ids (`human/20261119-sentinel_audit.md` in the base checkout), each with the
 Coach's "go".
