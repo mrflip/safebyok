@@ -425,7 +425,7 @@ describe("birthBank(device, cleartexts, friend), the birth_bank attempt", () => 
     expect(births.banks[0]!.isLocked).to.be.true
   })
 
-  it("throws the device's refusal where the device is swept while the vaultDB stores the bank, evicting the new lease and leaving the bank locked", async () => {
+  it("throws the device's refusal where the device is swept mid-birth", async () => {
     const device = TH.makeDevice()
     const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
     const births = TH.spyBirths(device, async (ask) => {

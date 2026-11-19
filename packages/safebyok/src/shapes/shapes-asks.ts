@@ -83,7 +83,7 @@ const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => 
   }
 }, 'bad_record')
 
-/** `schema` as a field of a loggable ask: optional, and undefined where its value fails. */
+/** `schema`, made optional, and read as absent where its value fails. */
 function soundOrAbsent<SchemaT extends Z.ZodType>(schema: SchemaT): Z.ZodCatch<Z.ZodOptional<SchemaT>> { return schema.optional().catch(undefined) }
 
 /** The checks of a vaultDB ask, its records aside, of a watch's scope and handlers, and of the part of an ask that is safe to log.

@@ -268,8 +268,11 @@ describe("BaseBox.encode(cleartexts) and decode(text)", () => {
     })
   }
 
-  it("refuses 'damaged_whisper' for JSON that is no whisper with the whisper check's own sentence, and for text that is no JSON without it", () => {
+  it("refuses 'damaged_whisper' for JSON that is no whisper, with the whisper check's sentence", () => {
     expect(TH.expectSyncRefusal(() => BaseBox.decode('["sk-test-0000"]'), 'damaged_whisper').message).to.include(`${Phrases.OpenedNoWhisper}: `)
+  })
+
+  it("refuses 'damaged_whisper' for text that is no JSON, without the whisper check's sentence", () => {
     expect(TH.expectSyncRefusal(() => BaseBox.decode('{"apiKey":'), 'damaged_whisper').message).to.not.include(`${Phrases.OpenedNoWhisper}: `)
   })
 })
@@ -298,7 +301,7 @@ describe("BaseBox.sealedOf(record) and recordOf(next, sealed)", () => {
     TH.expectSyncRefusal(() => BaseBox.recordOf(TH.boxShellOf() as never, Sealed), 'bad_record')
   })
 
-  it("refuses 'damaged_whisper' for a sealed whisper of other tags, as a form this version does not read, quoting none of it", () => {
+  it("refuses 'damaged_whisper' for a sealed whisper of other tags", () => {
     for (const tags of [{ codectag: 'json_v2' }, { schematag: 'whisper_v2' }]) {
       const record = BaseBox.recordOf(liveRevisionOf(), { ...Sealed, ...tags })
       const err = TH.expectSyncRefusal(() => BaseBox.sealedOf(record), 'damaged_whisper')

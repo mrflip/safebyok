@@ -111,7 +111,7 @@ describe("Lease.make(record, { bank })", () => {
   ] as const
 
   for (const [stamp, blurb] of OtherBankCases) {
-    it(`refuses unexpected_error, a caller's mixup, for a bank of ${blurb}`, async () => {
+    it(`refuses a bank of ${blurb}`, async () => {
       const { record } = await leaseWorld()
       TH.expectSyncRefusal(() => Lease.make(record, { bank: TH.fakeLeaseBankOf(stamp) }), 'unexpected_error')
     })
