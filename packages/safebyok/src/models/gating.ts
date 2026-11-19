@@ -3,7 +3,9 @@ import { Bank } from './bank'
 import { Device } from './device'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Banklabel, Userid } from '../shapes/primitives'
-import { type AskUser, type CleartextsForGatingkind, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, gatingkindVals } from '../shapes/shapes-gateish'
+import {
+  type AskUser, type BankGatingFriend, type BirthFriend, type CleartextsForGatingkind, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, gatingkindVals,
+} from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Modelkind } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
@@ -164,15 +166,15 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
 }
 
-// == [The attempts]: birthBank
+// == [The attempts]: birthBank, unlockBank, replacePassphrase, addPasskey, revokePasskey
 
 // Each attempt proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving
-// builder, and a proving never leaves the attempt that built it.
+// builder, and a proving never leaves the attempt that built it but for the bank's private verbs its friend carries (G9).
 
 /** Birth a bank of `device`'s scope from the user's passphrase and optional passkey: write it, and unlock it.
  * Refuses `gate_made_elsewhere` if a live bank is already stored there.
  */
-export async function birthBank(device: Device, cleartexts: unknown): Promise<Bank> {
+export async function birthBank(device: Device, cleartexts: unknown, friend: BirthFriend): Promise<Bank> {
   const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
   // A birth's stamps are minted here, one pair per attempt.
   const { bankStamp, gateStamp } = Bank.mintStamps(device)
@@ -182,7 +184,55 @@ export async function birthBank(device: Device, cleartexts: unknown): Promise<Ba
   const main     = await passphraseProving.buildWayin(NOVEL)
   const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
   const bankRecord = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins: { main, passkey0 } } })
-  return Bank.birth(bankRecord, { device, vaultDB: device.vaultDB, proving: passphraseProving })
+  return friend.birth(bankRecord, passphraseProving)
+}
+
+/** Unlock `bank` by its passphrase or its passkey. */
+export async function unlockBank(bank: Bank, cleartexts: unknown, friend: Pick<BankGatingFriend, 'unlockByProving'>): Promise<Bank> {
+  const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.bankUnlockCleartexts, cleartexts)
+  const gate   = bank.maingate
+  const proved = (passphraseCleartext === undefined)
+    ? await PasskeyProving.buildStored(gate, passkeyCleartext)
+    : await PassphraseProving.buildStored(bank.device, gate, passphraseCleartext)
+  return friend.unlockByProving(proved)
+}
+
+// Each gate change writes the main gate's next revision over the one it proved against, then unlocks the bank under a
+// lease citing the gate it wrote. The bankKey does not change.
+
+/** Replace the passphrase of `bank`, proved by the current one. */
+export async function replacePassphrase(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
+  const { antePassphraseClear: antePassphraseCleartext, nextPassphraseClear: nextPassphraseCleartext } = checkedCleartexts(GX.passphraseReplaceCleartexts, cleartexts)
+  if (antePassphraseCleartext === nextPassphraseCleartext) { throw Throwers.samePassphrase() }
+  const ante        = bank.maingate
+  const anteProving = await PassphraseProving.buildStored(bank.device, ante, antePassphraseCleartext)
+  const nextProving = await PassphraseProving.buildNovel(bank.device, bank.stamp, ante.stamp, nextPassphraseCleartext)
+
+  const main = await nextProving.buildWayin(anteProving)
+  await friend.putGate({ cited: ante.pickle(), record: ante.makeNextRecord({ main, passkey0: ante.passkey0 }), options: { policies: ['replace_passphrase'] } })
+  return friend.unlockByProving(anteProving)
+}
+
+/** Add a passkey to `bank`, proved by its passphrase. */
+export async function addPasskey(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
+  const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.passkeyAddCleartexts, cleartexts)
+  const ante           = bank.maingate
+  const proved         = await PassphraseProving.buildStored(bank.device, ante, passphraseCleartext)
+  const passkeyProving = await PasskeyProving.buildNovel(bank.device, bank.stamp, ante.stamp, passkeyCleartext)
+
+  const passkey0 = await passkeyProving.buildWayin(proved)
+  await friend.putGate({ cited: ante.pickle(), record: ante.makeNextRecord({ main: ante.main, passkey0 }), options: { policies: ['add_passkey'] } })
+  return friend.unlockByProving(proved)
+}
+
+/** Revoke the passkey of `bank`, proved by its passphrase. */
+export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
+  const { passphraseClear: passphraseCleartext } = checkedCleartexts(GX.passkeyRevokeCleartexts, cleartexts)
+  const ante   = bank.maingate
+  const proved = await PassphraseProving.buildStored(bank.device, ante, passphraseCleartext)
+
+  await friend.putGate({ cited: ante.pickle(), record: ante.makeNextRecord({ main: ante.main, passkey0: null }), options: { policies: ['revoke_passkey'] } })
+  return friend.unlockByProving(proved)
 }
 // --
 

@@ -59,7 +59,3 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   that a host's object is a `VaultDB`, a device store or a query client by sampling its member names. Gathered in one
   module they would leave the files that hold them now, if the imports allow it without a cycle. Optional: one sitting
   alone in `ThingChecks` is fine (the Coach, 2026-11-18).
-* **Make `Bank.unlockByProving` and `Proving.buildLease` non-public.** `Lease`, `Gate`, `Gating` and `Wayin` are values
-  on the entries since #748, and both methods are public, so a host holding a proving could unlock a bank outside any
-  gating. Only keeping the Proving classes types-only on every entry holds that line today (notes/security.md). The
-  Coach takes this up in a session of their own (2026-11-19).

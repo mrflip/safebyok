@@ -17,10 +17,9 @@ what differs from big, in a sentence or two.
 
 ## Drifted
 
-* 2026-11-18 (namespaces, PR #740; found by an export survey, the method itself predates it), G9: **A public Bank
-  method accepts a proving.** `Bank.unlockByProving(proved, cited?)` is public
-  (`packages/safebyok/src/models/bank.ts`), and so is `Proving.buildLease` (`src/models/proving.ts`), where big has no
-  public `Device`, `Bank` or `Gate` method that accepts one. A host still cannot hold a proving: they are built only
-  inside a gating's attempt (`src/models/gating.ts`) and handed straight to `Bank.birth` or `unlockByProving`, and the
-  Proving classes are exported from no entry point but as types (`safebyok/core`). G9 now rests on that export, not on
-  the method's visibility.
+* 2026-11-19 (bank_gatings), the leaseKey's access chain: **A device's sweep evicts no lease.** In big, the device's
+  sweep reaches `bank.lock()`, which evicts the lease. The new core's `Device` holds no handle to its banks, so
+  `device.sweep()` reaches none: a bank of a swept device refuses every call (its `isEnabled` reads its device's), and
+  its lease refuses every seal and unseal, but the lease keeps its leaseKey until the `Bank` is let go.
+  `bank.sweep()` (`packages/safebyok/src/models/bank.ts`) evicts it through `lease.sweep()`; nothing calls it from the
+  device yet.

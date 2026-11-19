@@ -16,7 +16,7 @@ import type { Labelpath } from './primitives'
 
 // == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed
 
-/** The record {@link Bank.make} and {@link Bank.birth} take: the bank's Thing, with its main gate's Thing at `maingate` and its root box at `rootBox`.
+/** The record {@link Bank.make} and a bank's birth take: the bank's Thing, with its main gate's Thing at `maingate` and its root box at `rootBox`.
  * The root box is whole, or its shell before the bank is born.
  */
 export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: LiveOf<BoxRecord> | ShellOf<BoxRecord> }>
@@ -56,7 +56,7 @@ export interface BankOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
-/** The options of {@link Bank.birth}, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the gating attempt underway. */
+/** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the `birth_bank` attempt underway. */
 export interface BirthOpts extends BankOpts {
   proving: Proving
 }

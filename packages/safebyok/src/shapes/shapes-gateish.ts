@@ -8,16 +8,18 @@ import type { Device } from '../models/device'
 import type { Gate } from '../models/gate'
 import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
-import type { guardKeyDeriver } from '../models/proving'
+import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
 import type { BankScope, BankStamp, GateStamp } from './shapes-stamps'
 import { BankChecks, GateChecks } from './shapes-thingkinds'
-import { ThingChecks } from './shapes-thing'
+import { type GateRecord, ThingChecks } from './shapes-thing'
+import type { PutAskDraft } from './shapes-asks'
+import type { BankMakeRecord } from './shapes-bankish'
 
 // == [The gating's forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
 
 /** The kinds of gating: what each asks the user to prove, and for what. */
-export const gatingkindVals = ['birth_bank'] as const
+export const gatingkindVals = ['birth_bank', 'unlock_bank', 'replace_passphrase', 'add_passkey', 'revoke_passkey'] as const
 /** A kind of gating, one of {@link gatingkindVals}. */
 export type Gatingkind = typeof gatingkindVals[number]
 
@@ -26,11 +28,15 @@ export type GatingSnapshot = BankScope & { readonly gatingkind: Gatingkind, read
 
 /** The cleartexts a dialog hands `attempt`, by kind of gating. */
 export interface CleartextsForGatingkind {
-  birth_bank: Z.input<typeof GX.bankBuildCleartexts>
+  birth_bank:         Z.input<typeof GX.bankBuildCleartexts>
+  unlock_bank:        Z.input<typeof GX.bankUnlockCleartexts>
+  replace_passphrase: Z.input<typeof GX.passphraseReplaceCleartexts>
+  add_passkey:        Z.input<typeof GX.passkeyAddCleartexts>
+  revoke_passkey:     Z.input<typeof GX.passkeyRevokeCleartexts>
 }
 // --
 
-// == [Given to a gating]: GatingAttempt, RequestCleartext, AskUser, GatingOpts, GatingRecord
+// == [Given to a gating]: GatingAttempt, RequestCleartext, AskUser, GatingOpts, GatingRecord, BirthFriend, BankGatingFriend
 
 /** An attempt's work: prove the user's cleartexts, then make the change its gating is for. */
 export type GatingAttempt = (cleartexts: unknown) => Promise<Bank>
@@ -56,6 +62,20 @@ export interface GatingOpts {
 /** A gating's record: its kind. */
 export interface GatingRecord<KindT extends Gatingkind = Gatingkind> {
   gatingkind: KindT
+}
+
+/** The private birth `Bank.launchBirthBankPrompt` hands the `birth_bank` attempt. Internal. */
+export interface BirthFriend {
+  /** Write the bank of `record`, and resolve it unlocked under a lease `proving` builds. */
+  birth: (record: BankMakeRecord, proving: Proving) => Promise<Bank>
+}
+
+/** The private verbs a bank hands the attempt of a gating on it. Internal. */
+export interface BankGatingFriend {
+  /** Unlock the bank under a lease `proved` builds, citing its main gate. */
+  unlockByProving: (proved: Proving) => Promise<Bank>
+  /** Write the main gate's next revision, and hold the gate written as the bank's main gate. */
+  putGate:         (ask: PutAskDraft<GateRecord>) => Promise<Gate>
 }
 // --
 
@@ -129,7 +149,7 @@ export interface LeaseOpts {
 /** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link GX.PassphraseVerdict}.
  * It is given the passphrase as typed, and the bank's scope, `{ userid, banklabel }`: words a guesser who knows the user tries first.
  * It runs on each new passphrase before any key is derived: the one a `birth_bank` gating births the bank
- * with. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
+ * with, and the one a `replace_passphrase` gating puts in place. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
  * throws, or returns no verdict, refuses its call.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never quote

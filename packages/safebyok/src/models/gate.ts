@@ -1,4 +1,4 @@
-import { Crypto, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, Validator } from 'safebyok-big/internals'
 import { Thing } from './thing'
 import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
@@ -40,7 +40,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   get bankStamp(): BankStamp { return this.#bank.stamp }
   // --
 
-  // == [Construction]: make, constructor, makeRecord
+  // == [Construction]: make, constructor, makeRecord, makeNextRecord
 
   /** Make the gate of `record`, which must be of `opts.bank`'s scope. */
   static make(record: GateRecord, opts: GateOpts): Gate {
@@ -67,6 +67,12 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
       ...stamp, label: stamp.labelpath, fmt: ThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a',
       lifepath: stamp.lifeseq, written_at: stamp.born_at, wayins: wayinsOf(wayins), auth: {}, sigs: {}, meta: {},
     })
+  }
+
+  /** The record of this gate's next revision, written now, with `wayins` in place of its own. */
+  makeNextRecord(wayins: GateDna['wayins']): GateRecord {
+    const nextWayins = Checks.nextRecordArgs.parse(wayins)
+    return GateChecks.record.parse({ ...this.pickle(), revtok: Crypto.randomId(), revseq: this.revseq + 1, written_at: Clock.nowMillis(), wayins: wayinsOf(nextWayins) })
   }
   // --
 
@@ -97,12 +103,14 @@ function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Gate.make}'s and {@link Gate.makeRecord}'s arguments. */
+/** The checks of the arguments of {@link Gate.make}, {@link Gate.makeRecord} and {@link Gate.makeNextRecord}. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   const wayin = custom<Wayin>((val) => val instanceof Wayin, Phrases.WayinExpected)
+  const wayins = obj({ main: wayin, passkey0: wayin.nullable() })
   return {
     gateMakeArgs:   obj({ record: GateChecks.record, opts: obj({ bank: obj({ stamp: BankChecks.stamp }) }) }),
-    makeRecordArgs: GateChecks.stamp.extend({ wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),
+    makeRecordArgs: GateChecks.stamp.extend({ wayins }),
+    nextRecordArgs: wayins,
   }
 })
 // --

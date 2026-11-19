@@ -67,7 +67,13 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  // == [Ending one]: evict
+  // == [Ending one]: sweep, evict
+
+  /** Drop the keys for good, as its bank's sweep does. */
+  sweep(): this {
+    this.evict()
+    return this
+  }
 
   /** Drop the keys. */
   evict(): void { this.#record = null }

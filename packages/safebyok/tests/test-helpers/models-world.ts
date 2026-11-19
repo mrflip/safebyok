@@ -9,14 +9,14 @@
 
 import { type Mock, type MockInstance, afterEach, beforeEach, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
-import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
+import { Consts, Crypto, GX, Outcome, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
 import { Device } from '../../src/models/device'
 import { Lease } from '../../src/models/lease'
-import { NOVEL, PasskeyProving, PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
+import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
-import type { DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
+import type { BankMakeRecord, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BoxRecord } from '../../src/shapes/shapes-thing'
 import type { GateRevisionedStamp, LeaseBank, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
@@ -102,7 +102,23 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
 export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) } }
 // --
 
-// == [A born bank]: BornBankGiven, BornBank, buildBornBank
+// == [A born bank]: answerPrompt, BornBankGiven, BornBank, buildBornBank
+
+/** Answer the gating `launching` opened on `device` with `cleartexts`, as a host's dialog would: resolve the bank the attempt lands, or reject with its refusal.
+ * A gating the attempt leaves open, after a correctable refusal, is dismissed. A launch refused before it opened a gating rejects as it came.
+ */
+export async function answerPrompt(device: Device, launching: Promise<unknown>, cleartexts: unknown): Promise<Bank> {
+  const gating = device.openGating
+  if (gating === null) {
+    await launching
+    throw new Error('the prompt opened no gating')
+  }
+  const launched = Outcome.outcomeOf(() => launching)
+  const outcome = await gating.attempt(cleartexts as never)
+  gating.dismiss()
+  await launched
+  return Outcome.valOf(outcome)
+}
 
 /** What a test may say of a {@link buildBornBank} bank. */
 export interface BornBankGiven {
@@ -120,15 +136,22 @@ export interface BornBank {
   proving: PassphraseProving
 }
 
-/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB as a birth makes it, and so unlocked by its passphrase's proving. */
+/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB through a `birth_bank` gating, and so unlocked.
+ * Its proving is a stored proving of the main gate, by {@link TestPassphrase}.
+ */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
-  const proving = await PassphraseProving.buildNovel(device, WorldBankStamp, WorldGateStamp, TestPassphrase)
-  const passkeyProving = passkeyCleartext && await PasskeyProving.buildNovel(device, WorldBankStamp, WorldGateStamp, passkeyCleartext)
-  const main = await proving.buildWayin(NOVEL)
-  const passkey0 = await passkeyProving?.buildWayin(proving) ?? null
-  const record = Bank.makeRecord({ ...WorldBankStamp, maingate: { ...WorldGateStamp, wayins: { main, passkey0 } } })
-  const bank = await Bank.birth(record, { device, vaultDB: device.vaultDB, proving })
-  return { device, bank, record, proving }
+  const mintStamps = vi.spyOn(Bank, 'mintStamps').mockReturnValue({ bankStamp: WorldBankStamp, gateStamp: WorldGateStamp })
+  const makeRecord = vi.spyOn(Bank, 'makeRecord')
+  try {
+    const passkeyClear = passkeyCleartext && copyOfAnswer(passkeyCleartext)
+    const bank = await answerPrompt(device, Bank.launchBirthBankPrompt(device), { passphraseClear: TestPassphrase, passkeyClear })
+    const record = makeRecord.mock.results.at(-1)!.value as BankMakeRecord
+    const proving = await PassphraseProving.buildStored(device, bank.maingate, TestPassphrase)
+    return { device, bank, record, proving }
+  } finally {
+    mintStamps.mockRestore()
+    makeRecord.mockRestore()
+  }
 }
 // --
 

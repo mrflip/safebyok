@@ -1,12 +1,9 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, ProvingExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, GotOtherThanBox
+// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, GotOtherThanBox, BankSwept
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
-
-/** Something other than a Proving, where one is expected. */
-export const ProvingExpected = 'Expected a Proving'
 
 /** Something other than NOVEL or a Proving, given as a wayin's source. */
 export const NovelOrProvingExpected = 'Expected NOVEL or a proving'
@@ -25,6 +22,9 @@ export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its b
 
 /** A box get answered with a Thing of another kind: the vaultDB is broken. */
 export const GotOtherThanBox = 'A box get was answered with a Thing that is not a box: the vaultDB is broken.'
+
+/** A call on a bank after its sweep. */
+export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
 // --
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks
