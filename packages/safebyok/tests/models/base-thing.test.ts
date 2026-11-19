@@ -25,6 +25,15 @@ describe("Thing.isVoidSentinel(val)", () => {
     for (const shell of [Shell.of(TH.GateScope), Shell.of(TH.BoxScope, TH.rootBoxOf())]) { expect(Thing.isVoidSentinel(shell)).to.be.true }
     for (const val of [box, TH.boxTombOf(box), Thing.sparseOf(box), null, undefined, 'x']) { expect(Thing.isVoidSentinel(val)).to.be.false }
   })
+
+  it("is false of a tombstone at the shell's revseq whose revtok or lifeseq is not the void one, which is gone instead", () => {
+    const shell = Shell.of(TH.GateScope)
+    for (const val of [{ ...shell, revtok: crypto.randomUUID() }, { ...shell, lifeseq: TH.Life0, lifepath: TH.Life0 }]) {
+      expect(Thing.isTombstone(val)).to.be.true
+      expect(Thing.isVoidSentinel(val)).to.be.false
+      expect(Thing.isGone(val)).to.be.true
+    }
+  })
 })
 
 describe("Thing.isWhole(record)", () => {
