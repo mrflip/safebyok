@@ -126,8 +126,8 @@ export const AnswerNotMade = "The vaultDB could not make an answer for a failure
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
 
 
-/** A minder read before `hello`, or after `goodbye`. */
-export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it.'
+/** A minder read or written through before `hello`, or after `goodbye`. */
+export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it or writing through it.'
 
 /** A get that storage answered older than the record the minder held when it began. */
 export const StaleRead = 'Storage answered with a revision older than one this device already held. The newer record stays cached, and a later get asks again.'

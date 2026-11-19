@@ -8,13 +8,13 @@
 /** `ThingMinder`, which minds every Thing in one bank in a TanStack Query cache of its own. */
 
 import * as TSQ from '@tanstack/query-core'
-import { noop, union } from 'es-toolkit'
+import { noop, omit, union } from 'es-toolkit'
 import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
-import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
-import type { ThingNotice, VaultDB } from '../storage/vault-db'
+import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
+import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import {
   type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
   type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
@@ -25,10 +25,11 @@ import * as Throwers from '../refusals/throwers'
 
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
  * the children of each Thing listed.
- * Three sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
- * Thing's shell where nothing is stored), the watch's notice of each write, and a list's sparse record. Each lands
- * in the Thing's car through one merge, and adds the Thing to its parent's listing, where one is cached. A list sets
- * the parent's listing. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
+ * Four sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
+ * Thing's shell where nothing is stored), the watch's notice of each write, a list's sparse record, and each record a
+ * write's answer carries. Each lands in the Thing's car through one merge, and adds the Thing to its parent's listing,
+ * where one is cached. A list sets the parent's listing. It caches only from `hello` until `goodbye`, and `goodbye`
+ * empties its cache.
  *
  * ## Invariants
  * - For a caller or listener using the library as documented, what it shows depends only on which records the minder
@@ -45,6 +46,12 @@ import * as Throwers from '../refusals/throwers'
  * - A listing lists only Things the vaultDB has stored, tombstones included, never a shell. It lists by labelpath alone:
  *   when the parent's life changes, it keeps the earlier life's children beside the new life's.
  * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it.
+ * - Nothing of a write's ask is cached: the minder hears of a write only from its answer, or from the watch's notice.
+ * - While the minder is minding, every record a write's answer carries has landed before the write resolves: the record
+ *   written or the refusal's `dbhas`, the bank and main gate of its `world`, and each Thing its `tracked` reports stored.
+ *   So a listener has heard of each car first.
+ * - A write's answer and the watch's notice of the same write leave the same car and listing, in either order: the
+ *   later changes nothing.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
@@ -154,7 +161,8 @@ export class ThingMinder {
   }
 
   /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included.
-   * Each joins the Thing's listing ({@link listingAt}), which keeps every labelpath it had. Each record is cached sparse.
+   * Each Thing it answers joins the listing of the Thing at `labelpath` ({@link listingAt}). A list never drops a labelpath
+   * from that listing. Each record is cached sparse.
    * Where that leaves a car `behind` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
    * answers from the cache.
    */
@@ -199,6 +207,27 @@ export class ThingMinder {
   }
   // --
 
+  // == [Writing]: tryWrite
+
+  /** Write `ask` through the vaultDB, and answer as it did, a refusal included, once every record its answer carries is cached.
+   * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
+   * A write answered after `goodbye` caches nothing.
+   */
+  async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
+    try {
+      this.#demandReady()
+      this.#demandOwnScope(ask)
+    } catch (err) {
+      return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Outcome.storageRefusalOf(err) }
+    }
+    const answer = await this.#vaultDB.tryWriteThing(ask)
+    TSQ.notifyManager.batch(() => {
+      for (const record of recordsOfWriteAnswer(answer)) { this.#sendToTSQ(record) }
+    })
+    return answer
+  }
+  // --
+
   // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #sendListingToTSQ, #joinParentListing
 
   // Its refusal is cached beside the car, where the next tryAt finds it as `lastErr`.
@@ -207,7 +236,8 @@ export class ThingMinder {
     void this.#doGet(scoped, opts).catch(noop)
   }
 
-  /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. Its Thing joins its parent's listing. */
+  // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
+  /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
     let fetched: ThingCar<ThingRecord>
     try {
@@ -248,7 +278,7 @@ export class ThingMinder {
   }
 
   // Every record that lands but a get's comes through here: TanStack lands a get's in the car itself.
-  /** Send `record`'s car to TanStack, to merge into its cached car, and add it to its parent's listing, while minding. */
+  /** Land `record` in its car and its parent's listing, while minding. */
   #sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
     this.#tsq.setQueryData(this.queryKey(record), carOf(record))
@@ -388,7 +418,16 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+// == [Helpers]: recordsOfWriteAnswer, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+
+// A tracked Thing that is not 'same' is the one stored, as the watch also tells.
+/** Each record a write's `answer` carries, in its val or dbhas, its world and its tracked. */
+function recordsOfWriteAnswer(answer: WriteThingAnswer): ThingRecord[] {
+  const found   = answer.ok ? answer.val : answer.dbhas
+  const roots   = (answer.world === null) ? [] : [omit(answer.world, ['maingate']), answer.world.maingate]
+  const tracked = Object.values(answer.tracked ?? {}).filter((thing) => thing !== 'same')
+  return [...((found === null) ? [] : [found]), ...roots, ...tracked]
+}
 
 // A record arrives (success), a get is refused (which leaves the car untimely), or the car is removed. A fetch starting,
 // pausing or failing once, and the observers' bookkeeping change none.

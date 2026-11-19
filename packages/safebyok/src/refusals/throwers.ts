@@ -99,7 +99,7 @@ export function answerNotMade(): Errors.VaultError { return new Errors.VaultErro
 
 // == [Minding Throwers]: minderNotStarted, staleRead
 
-/** The refusal of a read on a minder that is not minding. */
+/** The refusal of a read or a write on a minder that is not minding. */
 export function minderNotStarted(): Errors.VaultError {
   return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
 }
