@@ -15,10 +15,13 @@ export type RecordOfKind<KindT extends Thingkind | null> = KindT extends Thingki
 /** A class whose records are of the kind `KindT`, or of any kind for null. */
 export type Kinded<KindT extends Thingkind | null> = { readonly modelkind: KindT }
 
-// A member of ValT that is neither wider nor narrower than RecordT is another kind's record: a BoxRecord, asked about as
-// a gate. Each branch is ValT or never, so TypeScript takes the result as a ValT, as a type predicate requires.
-/** The members of `ValT` that a record of `RecordT`'s kind may be. */
-type MembersOfKind<ValT, RecordT> = ValT extends unknown ? (ValT extends RecordT ? ValT : (RecordT extends ValT ? ValT : never)) : never
+// A member of ValT that is neither wider nor narrower than RecordT, nor wide enough for its shell, is another kind's
+// record: a BoxRecord, asked about as a gate. Each branch is ValT or never, so TypeScript takes the result as a ValT, as a
+// type predicate requires.
+/** The members of `ValT` that a record of `RecordT`'s kind, or its shell, may be. */
+type MembersOfKind<ValT, RecordT extends Sparse<ThingRecord>> = ValT extends unknown
+  ? (ValT extends RecordT ? ValT : (RecordT extends ValT ? ValT : (ShellOf<RecordT> extends ValT ? ValT : never)))
+  : never
 
 /** `ValT`, narrowed to a live Thing of the kind `KindT`: sparse, unless `ValT` says it is whole. */
 export type LiveOfKind<KindT extends Thingkind | null, ValT> = MembersOfKind<ValT, RecordOfKind<KindT>> & Sparse<RecordOfKind<KindT>> & Readonly<{ am: 'a' }>

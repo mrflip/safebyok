@@ -170,8 +170,17 @@ describe("the guards' types", () => {
     if (BaseBox.isVoidSentinel(val)) { expectTypeOf(val).toExtend<ShellOf<BoxRecord>>() }
   })
 
+  it("narrow a shell of the kind to a shell, not to never", () => {
+    const shell: VoidSentinel = TH.boxShellOf()
+    const boxShell = TH.boxShellOf()
+    if (Thing.isVoidSentinel(shell))      { expectTypeOf(shell).not.toBeNever() }
+    if (BaseBox.isTombstone(boxShell))    { expectTypeOf(boxShell).not.toBeNever() }
+    if (BaseBox.isVoidSentinel(boxShell)) { expectTypeOf(boxShell).not.toBeNever() }
+  })
+
   it("narrow another kind's record to never", () => {
     const box = TH.boxThingOf()
-    if (Gate.isTombstone(box)) { expectTypeOf(box).toBeNever() }
+    if (Gate.isTombstone(box))    { expectTypeOf(box).toBeNever() }
+    if (Gate.isVoidSentinel(box)) { expectTypeOf(box).toBeNever() }
   })
 })
