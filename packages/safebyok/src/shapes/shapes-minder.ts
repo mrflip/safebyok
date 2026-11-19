@@ -19,6 +19,7 @@ export interface QueryCacheOpts {
   staleTime: number
   /** How long a car stays in the cache after it was first cached or last fetched from the vaultDB, in milliseconds up to {@link MaxTimerMillis}. `Infinity` means until `goodbye`.
    * A record that arrives by a notice or a list does not extend it, and nor does a get answered from the cache. The root box's car stays until `goodbye`, whatever the gcTime.
+   * A listing stays as long after it was first listed, the root box's too: a later list does not extend it, and restores it once collected.
    */
   gcTime:    number
 }
@@ -184,13 +185,13 @@ export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thin
   car:       ThingCar<RecordOfKind<KindT>> | undefined
 }> : never
 
-/** A listing changed: the labelpaths it now lists. */
+/** A listing changed: the labelpaths it now lists, or undefined once it is removed. */
 export type ListingEvent = Readonly<{
   carkind:    'listing'
-  /** The modelkind of the Things listed. */
+  /** The modelkind of the parent and of every Thing listed, which is the same: a labelpath starts with its parent's. */
   modelkind:  Thingkind
-  /** The labelpaths listed, in labelpath order. */
-  labelpaths: readonly Labelpath[]
+  /** The labelpaths listed, in labelpath order, as cached, so that it is the same array until one joins, or undefined once removed. */
+  labelpaths: readonly Labelpath[] | undefined
   /** The listing's name: `'kids'`, the Things directly under `of.parentpath`. */
   tag:        'kids'
   /** What the listing selects: the Things under the Thing at `parentpath`. */

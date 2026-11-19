@@ -25,11 +25,11 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   'engineering', 'L']`. No label can be `'.'`, `'/'` or `'L'`. Then `[…, 'engineering', '/']` matches every car and
   listing under the Thing and neither of its own; a listing is beside its Thing's car, and nowhere else (the Coach,
   2026-11-19).
-* **A listing of a Thing's children, by labelpath.** It has the labelpaths of the children the minder has heard of,
-  tombstones included, from every source: a list, a get, a write's answer, a notice. It never has sparse records,
-  which would be a second copy of each car's newest (the Coach, 2026-11-19). The vaultDB's list answer can be made
-  small: the parent's scope and life once, then for each child its label, revseq, revtok, lifeseq and `written_at`.
-  Re-listing after a lapse then costs one small request per listing, where re-getting would cost one per box.
+* **A small list answer.** The vaultDB's list answers a sparse record for each child, where the minder's listing keeps
+  only labelpaths and each car keeps its own newest. Make it small: the parent's scope and life once, then for each
+  child its label, revseq, revtok, lifeseq and `written_at`. Re-listing after a lapse then costs one small request per
+  listing, where re-getting would cost one per box. Not for the giver_needs sprint: no proposal, no adapter change yet
+  (the Coach, 2026-11-19).
 * **Drop a gone parent's subtree.** When a Thing is tombstoned, or a newer life of it is heard of (a lapse can hide the
   tombstone between), the minder removes every query under its subtree prefix; TanStack tells listeners of each removal
   at once. A get of a child under way is then cancelled, and `#doGet` reads any cancellation as `goodbye`, refusing
