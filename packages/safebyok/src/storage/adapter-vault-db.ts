@@ -101,7 +101,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk = loggableAskOf(writeAsk)
       const actual      = await this.doWriteThing(writeAsk) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'writeThing', loggableAsk)
-      // Out to in: the bank, the main gate, the root box, then the dbhas. A listener notified of a refusal's dbhas has already heard of whichever of the bank and main gate changed.
+      // Out to in: the bank, the main gate, the root box, then the dbhas. A listener notified of a refusal's dbhas has already heard of whichever of the bank and main gate the answer's tracked reports changed.
       this.notifyTrackedRecords(writeAsk, answer)
       this.notifyDbhas(answer)
       return answer
