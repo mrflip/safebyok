@@ -95,12 +95,12 @@ describe("ThingMinder.invalidate", () => {
   })
 
   const BadArgs = [
-    ["box",   undefined,              'needs its second argument'],
-    ["box",   {},                     'refuses options that name no listings'],
-    ["box",   { list: "some" },       'refuses a listing choice other than all'],
-    ["box",   { list: "all", extra: 1 },  'refuses an option it does not know'],
-    ["vault", { list: "all" },        "refuses a labelpath that is no Thing's"],
-    [42,      { list: "all" },        'refuses a labelpath that is not a string'],
+    ["box",    undefined,                  'needs its second argument'],
+    ["box",    {},                         'refuses options that name no listings'],
+    ["box",    { list: "some" },           'refuses a listing choice other than all'],
+    ["box",    { list: "all", extra: 1 },  'refuses an option it does not know'],
+    ["vault",  { list: "all" },            "refuses a labelpath that is no Thing's"],
+    [42,       { list: "all" },            'refuses a labelpath that is not a string'],
   ] as const
   for (const [labelpath, opts, blurb] of BadArgs) {
     it(blurb, async () => {
