@@ -1,12 +1,13 @@
-import { type Thingkind, ThingFormat } from 'safebyok/storage'
+import type { Thingkind } from 'safebyok/storage'
 
 // == [Names]: TableVersion, SqlRevision, VaultFunctionNames
 
-// TableVersion is safebyok's ThingFormat: bump that when any table's columns, CHECKs or stored record format change, for
-// functions built for other tables will not work. Bump SqlRevision when a function's behaviour or signature changes over
+// TableVersion is safebyok's ThingFormat, spelled out because safebyok is private and a published package never imports it
+// at runtime; a test holds them equal. Bump both when any table's columns, CHECKs or stored record format change: functions
+// built for other tables will not work. Bump SqlRevision when a function's behaviour or signature changes over
 // the same tables, and reset it to 0 when TableVersion moves. Each pair names a new set of functions; the older sets stay installed beside it.
-/** The head of every vault function's name: the tables these functions are built for. */
-export const TableVersion = ThingFormat
+/** The head of every vault function's name: the tables these functions are built for, and the `fmt` of the Things in them. */
+export const TableVersion = 'a010501'
 /** The tail of every vault function's name: the revision of these functions over the same tables. */
 export const SqlRevision  = 0
 

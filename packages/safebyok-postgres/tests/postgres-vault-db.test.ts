@@ -2,12 +2,12 @@
 
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq } from 'safebyok/storage'
+import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq, ThingFormat } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
 import * as Phrases from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
 import type { PostgresListen } from '../src/postgres-bank-db'
-import { VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
+import { TableVersion, VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
 import { VaultTablesSql } from '../src/vault-tables'
 import * as TH from './test-helpers'
 
@@ -161,6 +161,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const db = await database()
     const { rows } = await db.query<{ proname: string }>("SELECT DISTINCT proname FROM pg_proc WHERE proname LIKE 'safebyok\\_%'")
     expect(new Set(rows.map((row) => row.proname))).to.deep.equal(new Set(Object.values(VaultFunctionNames)))
+    expect(TableVersion).to.equal(ThingFormat)
     expect(VaultFunctionNames.write_box).to.equal('safebyok_a010501_r000_write_box')
   })
 
