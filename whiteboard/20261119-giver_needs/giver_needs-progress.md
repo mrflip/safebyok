@@ -65,7 +65,23 @@ writes it.
 * Order tests: `ListingOrders` in `thing-minder.test.ts`, all 6 orders of a list, a get and a notice, twice; its
   comment says where thread 4 adds a write step.
 
+## Thread 4, minder_writes (#758)
+
+*Orchestrator:*
+* `tryWrite(ask: WriteAsk): Promise<WriteThingAnswer>`, in a `Writing` section, never throws for what it checks: it
+  answers the vaultDB's answer as it came, after landing `val` or a refusal's `dbhas`, the bank and main gate in
+  `world`, and each `tracked` Thing not `'same'` (beyond M3's list; before the Coach), in one batch via `#sendToTSQ`.
+  Not minding refuses `disabled`, a scope outside the bank `bad_record`, both without asking. A broken adapter's
+  rejection propagates, as in `list`.
+* A birth joins its parent's listing; a delete leaves the car `gone` and its tombstone listed.
+* After a `stale_write`, `at(scope).newest` is the record the vaultDB reported, a full car.
+* `QuietVaultDB` (test class): `MemoryVaultDB`'s watch can deliver a write's notice before its answer lands.
+* `ListingOrders` now runs all 24 orders of list, get, write and notice.
+* Thread 3's three narrating doc blocks were reworded here (b55e239b8).
+
 ## Thread 5, ahead (*Orchestrator:*)
+
+* First commit: split `thing-minder.test.ts` (1,484 lines) into `tests/minding/thing-minder/`, a pure move.
 
 * TanStack's `invalidateQueries` calls `query.invalidate()` on each match, which dispatches `{ type: 'invalidate' }`
   only if `!state.isInvalidated`; the cache tells `{ type: 'updated', query, action: { type: 'invalidate' } }`, one per
