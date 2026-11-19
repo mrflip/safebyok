@@ -1,6 +1,6 @@
 # Thread 4 (sentinel_audit): minder_damage (2026-11-19)
 
-Branch `20261119-minder_damage`, PR [#761](https://github.com/mrflip/safebyok/pull/761), stacked on [#759](https://github.com/mrflip/safebyok/pull/759) (the giver_needs minder line). Proved: `vitest run tests/minding` 268 passed; safebyok lint and `tsc --noEmit` clean; `pnpm justify` at ready (see the PR's **Tests:** line).
+Branch `20261119-minder_damage`, PR [#761](https://github.com/mrflip/safebyok/pull/761), on main (rebased after #759 and #765 merged). Proved: `vitest run tests/minding` 268 passed; safebyok lint and `tsc --noEmit` clean; `pnpm justify` at ready (see the PR's **Tests:** line).
 
 What it does: the ThingMinder now reports what it drops, and keeps another bank's records out of its cache.
 
@@ -15,7 +15,7 @@ What it does: the ThingMinder now reports what it drops, and keeps another bank'
   * **D, `#fetchCar`** now branches on `answer.act === 'gotvoid'`, as `Bank.tryGetBox` does.
   * **E, records of another bank or Thing**
     * A new private `#demandDelivered(record, scoped)` checks a record with `ThingChecks.thingScope.refusingAs('unexpected_error').parseConsistent(...)`, using `Phrases.DeliveredOfOtherScope`.
-    * `#sendToTSQ` runs it against the minder's bank scope. This covers notices, write answers and list records.
+    * `#sendToTSQ` runs it against the minder's bank scope. This covers notices, the record a write answer carries (the record written, or a refusal's `dbhas`), and list records.
     * `#fetchCar` runs it against the ask, so the labelpath is checked as well.
     * `bestCarOf` throws `Throwers.carsOfOtherThings()` (`unexpected_error`) for cars of two Things, where it used to answer `delivered`.
 * **Where each throw lands, and how it is reported**
