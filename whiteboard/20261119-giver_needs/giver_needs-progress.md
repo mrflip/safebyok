@@ -38,8 +38,9 @@ writes it.
 ## Rulings
 
 * **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk
-  deletion which has a whole bags of wormses in it and is not needed." With the Coach's edit of giver_needs.md: no
-  delete verb, no delete tests through the minder.
+  deletion which has a whole bags of wormses in it and is not needed." Corrected the same day ("I overspake"):
+  deleting a box, a write of its tombstone, is in, tests too; deleting a parent (the root box) and cascading it, with
+  all the machinery that entails, is out.
 * **listen's events** (the Coach, 2026-11-19), a tagged union on `carkind`:
   - `{ carkind: 'thing', modelkind, labelpath, car }`: `car` is the cached car itself, identity kept; undefined when
     the car is removed. `listen` no longer carries `act`, `isTimely`, `lastErr` (`tryAt` still does).

@@ -22,8 +22,10 @@ M1, M2, M3, M4, M6, M7. M5 is marked "not this sprint", and Part 2 "not yet".
 
 ## Ground rules
 
-* **Scope is ruled** (the Coach, 2026-11-19): Part 1 as planned, on origin/main plus #751. No bulk deletion: no
-  subtree drop, no forgetting a gone parent's children, nothing of M5.
+* **Scope is ruled** (the Coach, 2026-11-19): Part 1 as planned, on origin/main plus #751. Deleting a box: yes,
+  as a write of its tombstone. Deleting a parent (the root box) and cascading it, with all the machinery that entails:
+  no. No subtree drop, no forgetting a gone parent's children, nothing of M5. (This corrects the Coach's earlier "no
+  delete verb or delete tests through the minder": "I overspake.")
 * **Stacked on #751** (`20261119-giver_order`, draft, green). Every thread stacks on the one before, in one line.
 * **Every invariant in the class doc block holds** after each thread; a new behaviour states its invariant there, and an
   order test shows it across every order of arrival.
@@ -149,8 +151,8 @@ queries. **Size:** medium. **Levels:** defaults.
 
 *Gloss.* Touches the minder (a new write verb), `MinderFriend` only if it must, and order tests. The bank already makes
 the write ask (`Bank.makePutAsk`, sealed by `sealBox`); `Bank.tryPutBox` and `tryDelBox` write around the minder today
-and stay as they are. *Orchestrator:* the Coach's later edit of giver_needs.md (2026-11-19) takes deletes out of scope:
-the verb is not refused a tombstone, but nothing here adds, tests or documents a delete through the minder. The verb's name and answer wait on *Open Matters*. **Depends on:**
+and stay as they are. *Orchestrator:* the Coach corrected the quoted "No delete verb" (2026-11-19, "I overspake"): a
+box's delete, a write of its tombstone, is in, with its tests; deleting a parent and cascading it is out. The verb's name and answer wait on *Open Matters*. **Depends on:**
 thread 3. **Look-ahead:** Part 2's `putBoxOnce` and `delBox` write through this verb. **Size:** medium. **Levels:**
 defaults.
 
