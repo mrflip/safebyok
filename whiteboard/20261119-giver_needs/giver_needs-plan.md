@@ -6,7 +6,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
 * **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1157), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
-* **Status:** threads 1–3 filed, PRs #753, #756, #757 (drafts until #751 leaves draft); thread 4 ready, PR #758, in review (no compactions); thread 5 building.
+* **Status:** threads 1–4 filed, PRs #753, #756, #757, #758 (drafts); thread 5 building. Main merged #754 and #755 at 06:16; the line conflicts with main in `storage.ts` (thread 1's `BoxLabelpath` export beside #754's tidy), so GitHub runs no CI on #753–#758 until a restack, which needs #751 merged or rebased.
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
 on 2026-11-19 with `dream-hooks.ts.md` and the Coach's edits to `internals.md`. This sprint is its **Part 1, the minder**:
@@ -165,6 +165,11 @@ and stay as they are. *Orchestrator:* the Coach corrected the quoted "No delete 
 box's delete, a write of its tombstone, is in, with its tests; deleting a parent and cascading it is out. The verb's name and answer wait on *Open Matters*. **Depends on:**
 thread 3. **Look-ahead:** Part 2's `putBoxOnce` and `delBox` write through this verb. **Size:** medium. **Levels:**
 defaults.
+
+*Review:* fixed three (two refusal-test titles named `bad_record`, `tryWrite`'s doc block narrating, the write
+invariant now "While the minder is minding"; a delete-test title). Dropped: `loggableAskOf` cannot throw; a world or
+tracked record cannot displace a newer car (`bestCarOf`); a broken adapter's rejection propagates (as `list`).
+Checked and kept: `tracked` landing (before the Coach), `QuietVaultDB`.
 
 ### 5. minder_invalidate: M4, invalidate listings, and tell of it
 
