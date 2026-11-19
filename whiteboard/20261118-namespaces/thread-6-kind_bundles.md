@@ -1,6 +1,6 @@
 # Thread 6: kind_bundles (2026-11-19)
 
-Branch `20261119-kind_bundles`, PR pending, stacked on #749. Proved: `pnpm --filter safebyok test` (1067), lint and typecheck green at e1c7d281d; `pnpm justify` to follow the catch-up.
+Branch `20261119-kind_bundles`, PR #750, stacked on #749. Proved: `pnpm --filter safebyok test` (1067), lint and typecheck green at e1c7d281d; `pnpm justify` to follow the catch-up.
 
 * **Built**:
   - `packages/safebyok/src/shapes/shapes-thingkinds.ts`, above shapes-thing, shapes-stamps and shapes-asks. It exports `BankChecks` (`record`, `cited`, `stored`, `policies`, `labelpath`, plus `stamp` = `StampChecks.bankStamp` and `birthAsk` = `AskChecks.birthBankAsk`), `GateChecks` (the five, `wayins`, `storedWayins`, plus `stamp` = `StampChecks.gateStamp` and `stampedGate` = `StampChecks.stampedGate`), `BoxChecks` (the five, `sealable`, `live`, `liveOrShell`, plus `stamp` = `StampChecks.boxStamp`), and `ThingkindChecks` (`byModelkind`, `ofLabelpath`). Each bundle names every carried check on its own row, `key: Module.check`; no bundle is spread into another. Frozen plain objects.
