@@ -76,7 +76,8 @@ each scope's `user_id` from that check, never from the request.
 
 A failed statement that a retry may mend is refused with `storage_unavailable`: a lost or refused
 connection, a serialization failure or deadlock, a server short of resources or shutting down, a
-lock not granted in time (SQLSTATE classes `08`, `40`, `53`, `57`, and `55P03`). A lost or refused
+lock not granted in time, a write sent to a server that is read-only for now, as during a failover
+(SQLSTATE classes `08`, `40`, `53`, `57`, and `55P03` and `25006`). A lost or refused
 connection is also told by a Node system error code such as `ECONNRESET`, or by `pg`'s own message
 for one; a wrapper for another driver passes it on with a SQLSTATE or a Node code as the error's
 `code`. Every other failed statement, a missing table or privilege among them, is refused with

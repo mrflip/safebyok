@@ -1,10 +1,13 @@
 /** PostgresBankDB on PGlite: the battery every bankDB runs, plus tests of its Postgres-specific behavior. */
 
+import { readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as DB from 'safebyok-big/storage'
 import type { Notice } from 'safebyok-big/storage'
 import type { UserID } from 'safebyok-big'
 import { PostgresBankDB, bankChannelOf } from '../src/index'
+import { PgConnectionLost } from '../src/postgres-bank-db'
 import { StoredNothing } from '../src/phrases'
 import type { PostgresListen } from '../src/index'
 import * as BH from './bank-helpers'
@@ -97,7 +100,7 @@ describe("PostgresBankDB's refusals", () => {
     const transient = [
       coded('terminating connection due to administrator command', '57P01'), coded('could not serialize access', '40001'),
       coded('too many connections', '53300'), coded('connection failure', '08006'), coded('canceling statement due to lock timeout', '55P03'),
-      coded('read ECONNRESET', 'ECONNRESET'), new Error('Connection terminated unexpectedly'), new Error('timeout exceeded when trying to connect'),
+      coded('cannot execute INSERT in a read-only transaction', '25006'), coded('read ECONNRESET', 'ECONNRESET'), new Error('Connection terminated unexpectedly'), new Error('timeout exceeded when trying to connect'),
     ]
     const lasting = [
       coded('relation "safebyok_banks" does not exist', '42P01'), coded('new row violates check constraint', '23514'), coded('raised', 'P0001'),
@@ -109,6 +112,14 @@ describe("PostgresBankDB's refusals", () => {
     for (const err of lasting) {
       await TH.expectRefusal(new PostgresBankDB({ client: throwingClient(err) }).ensureBank(TH.BW.bankEnsureAsk), 'unexpected_error')
     }
+  })
+
+  // pg gives these failures no code, so a release that rewords one would turn a lost connection into an unexpected error.
+  it("counts as a lost connection only messages the installed pg and pg-pool throw", () => {
+    const pgClient = createRequire(import.meta.url).resolve('pg/lib/client.js')
+    const pgPool   = createRequire(pgClient).resolve('pg-pool')
+    const sources  = [pgClient, pgPool].map((path) => readFileSync(path, 'utf8')).join('\n')
+    for (const message of PgConnectionLost) { expect(sources).to.include(message) }
   })
 
   it("reports a write function that stored nothing where the classifier finds a write as an unexpected error", async () => {

@@ -99,7 +99,7 @@ function isHeardIn(scope: WatchScope, told: Told): boolean {
 
 /** The VaultError for what a driver threw: `storage_unavailable` where a retry may mend it, else `unexpected_error`. A VaultError is kept as it is.
  * A retry may mend a lost or refused connection, a serialization failure or deadlock, exhausted resources, a cancelled statement or a
- * server shutting down, and a lock not granted in time. Anything else, a constraint the row breaks, a `RAISE`, a missing table or a bug,
+ * server shutting down, a lock not granted in time, and a write refused by a server that is read-only for now. Anything else, a constraint the row breaks, a `RAISE`, a missing table or a bug,
  * fails the same way again.
  */
 export function refusalOf(thrown: unknown): VaultError {
@@ -127,15 +127,18 @@ function codeOf(thrown: unknown): string | undefined {
 }
 
 // SQLSTATE classes 08 (connection exception), 40 (transaction rollback: a serialization failure or deadlock), 53 (insufficient
-// resources) and 57 (operator intervention: a cancelled statement, a server shutting down), and 55P03 (lock not available).
-const TransientSqlstate = /^(?:(?:08|40|53|57)[0-9A-Z]{3}|55P03)$/
+// resources) and 57 (operator intervention: a cancelled statement, a server shutting down), 55P03 (lock not available), and
+// 25006 (read-only SQL transaction: a write sent to a standby, as during a failover).
+const TransientSqlstate = /^(?:(?:08|40|53|57)[0-9A-Z]{3}|55P03|25006)$/
 
 // Node's system errors for a socket that could not connect, or that dropped, and a host name that could not be looked up for now.
 const TransientSystemCodes = new Set(['ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'EPIPE', 'EHOSTUNREACH', 'ENETUNREACH', 'ENETDOWN', 'EAI_AGAIN'])
 
-// pg 8 throws these as plain Errors, with no code, so only the message tells them apart: a connection dropped or timed out
-// (`pg/lib/client.js`), and a pool that found no connection in time (`pg-pool/index.js`). A client the host ended itself is left out.
-const PgConnectionLost = new Set([
+// pg 8 throws these as plain Errors, with no code, so only the message tells them apart. A test checks each against the installed pg.
+/** The messages of pg's connection failures a retry may mend: a connection dropped or timed out (`pg/lib/client.js`), and a pool that
+ * found no connection in time (`pg-pool/index.js`). A client the host ended itself is left out.
+ */
+export const PgConnectionLost: ReadonlySet<string> = new Set([
   'Connection terminated unexpectedly',
   'Client has encountered a connection error and is not queryable',
   'Query read timeout',
