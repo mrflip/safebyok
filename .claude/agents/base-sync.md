@@ -140,9 +140,15 @@ report `bailed`.
    { git cherry HEAD "$old"; git cherry HEAD <sprint>; } | awk '$1 == "+" { print $2 }' > "$snap/unheld"
    git rev-list --reverse --topo-order --no-merges "$old" <sprint> --not HEAD \
      | grep -Fxf "$snap/unheld" > "$snap/candidates"
+   # Author time and subject of every commit the new tree gained, to catch one landed on main or
+   # the stack from a different parent, whose patch `git cherry` no longer matches.
+   git log --format='%at %s' HEAD --not "$old" > "$snap/landed"
    ```
 
-   Then pick them in order. A candidate whose subject ends `squashed by base-sync` is an earlier
+   Then pick them in order. A candidate whose author time and subject match a commit in `landed`
+   is already in the tree, landed by another route, and is skipped as `landed`: picking it puts
+   its hunks through `-X ours`, and the clean ones can be second copies of what the tree holds.
+   A candidate whose subject ends `squashed by base-sync` is an earlier
    run's plan squash, which the new one replaces: picking it would bring back a plan line the sprint
    has since changed, so it is skipped as `superseded`. A candidate reachable from the sprint
    branch whose every path is in `plan-paths` is skipped: the squash is the sprint's version of
@@ -153,6 +159,7 @@ report `bailed`.
    pick() { GIT_COMMITTER_DATE="$(git log -1 --format=%aI "$1")" git -c rerere.enabled=false cherry-pick "${@:2}" "$1"; }
    empty() { [ -z "$(git diff --name-only --diff-filter=U)" ] && git diff --cached --quiet; }
    while read -r c; do
+     if grep -qFx "$(git log -1 --format='%at %s' "$c")" "$snap/landed"; then echo "$c landed"; continue; fi
      if git log -1 --format=%s "$c" | grep -q ', squashed by base-sync$'; then echo "$c superseded"; continue; fi
      if git merge-base --is-ancestor "$c" <sprint> \
        && git diff-tree --no-commit-id --name-only -r "$c" | grep -vqFxf "$snap/plan-paths"; then :
@@ -308,7 +315,7 @@ Lead with a status line: `synced` | `bailed`, the branch, its new tip, and step 
 
 * **Shape**: `origin/main <sha>` -> each stack branch at its tip in `B` (`stack-tips`) -> `plan` (squash, at
   the sprint's SHA) -> each replayed commit (`<sha> <subject>`), and the candidates left out, with
-  why (in the tree already, superseded by the squash, a conflict it could not take in part). A
+  why (in the tree already, landed by another route, superseded by the squash, a conflict it could not take in part). A
   commit kept with conflicting hunks dropped says so, with its paths and
   `<snap>/dropped/<sha>/`, and a line on what each dropped hunk said. A stack branch whose tip in
   `B` differs from its ref's was replayed: give both SHAs, and say the line wants a restack.
