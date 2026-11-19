@@ -1,6 +1,6 @@
 # Thread 3: core_refusals (2026-11-19)
 
-Branch `20261119-core_refusals`, PR #TBD, on main (cut at 240a5bca2). Batch `sentinel_audit`.
+Branch `20261119-core_refusals`, PR [#762](https://github.com/mrflip/safebyok/pull/762), on main (cut at 240a5bca2). Batch `sentinel_audit`.
 Proved: `pnpm --filter safebyok` lint, typecheck and test (20 files, 1084 tests) green before the catch-up; `pnpm justify` after it, see the PR's **Tests:** line.
 
 * **Built**, all in `packages/safebyok/src/`, phrases in `phrases.ts`, throwers in `refusals/throwers.ts`:
