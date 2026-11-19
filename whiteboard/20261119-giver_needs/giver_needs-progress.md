@@ -114,3 +114,8 @@ writes it.
   carries has landed (the Coach: "we want both eventually ... carry on with what goes with the grain"). A throwing verb
   comes later; the Coach is looking into how throwing bears on invalidation.
 * **`invalidate`'s second argument is required** (the Coach: "exactly"): `invalidate(labelpath?, { list: 'all' })`.
+* **Batch of 2026-11-19, late** (the Coach): `carkind` kept as ruled ("ok"), with a VOCABULARY *car* line; event type
+  names kept ("ok"); `labelpaths` undefined on removal kept ("ok"); a VOCABULARY *listing* row (took the Rec); the
+  first-list race: "seed the root box listing as bare wherever it is that the root box is seeded. have hello fetch the
+  listing if that's not a can of worms" (thread 6). `tracked` landing: explained (the vaultDB's write acts on one
+  subject and hands `world` and `tracked` back; `tryWrite` delivers them); back with the Coach.
