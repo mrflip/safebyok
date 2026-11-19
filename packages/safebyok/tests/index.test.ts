@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { Errors, Logger } from 'safebyok-big/internals'
+import * as BigThrowers from 'safebyok-big/refusals/throwers'
+import * as BigStorage from 'safebyok-big/storage'
 import * as Browser from '../src/browser'
 import * as Core from '../src/core'
 import * as Front from '../src/index'
@@ -32,5 +34,16 @@ describe("the front door, safebyok", () => {
     for (const [entryname, entry] of Object.entries(entries)) {
       for (const exportname of ['Proving', 'PassphraseProving', 'PasskeyProving', 'NOVEL']) { expect(entry, `${entryname}.${exportname}`).to.not.have.property(exportname) }
     }
+  })
+})
+
+describe("safebyok/storage", () => {
+  it("re-exports safebyok-big's throwers, checkers and storage policies, the very ones an adapter's refusals are made with", () => {
+    const exportnames = [
+      'Checker', 'Checkers', 'VaultError', 'fetchFailed', 'identityRevoked', 'isVaultError', 'objCheck', 'sanitizeForeignError', 'storageFailed', 'storagePolicyVals', 'storageUnavailable',
+      'unexpectedError',
+    ] as const
+    for (const exportname of exportnames) { expect(Storage, exportname).to.have.property(exportname).that.eq(BigStorage[exportname]) }
+    expect(Storage.storageIssue).to.eq(BigThrowers.storageIssue)
   })
 })
