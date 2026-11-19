@@ -180,7 +180,7 @@ export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: un
 /** The raw bank and main gate a store fetched for an ask's bank, each null for none, and its {@link TrackedFetched}. */
 export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
 
-// A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
+// A world is news: a bank or main gate that fails its checks leaves it null, and the step's answer stands. Only a broken store refuses.
 /** The world of the bank at `bankScope`, from its raw `fetched` bank and main gate; null where either is missing or fails its checks.
  * Refuses `storage_issue` where either is not an object, or is filed at another scope.
  */
