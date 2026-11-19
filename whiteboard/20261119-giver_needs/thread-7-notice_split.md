@@ -11,9 +11,10 @@ wording changes). This file describes the rework; the first build is in commit `
 * **Built** (`packages/safebyok/src/storage/adapter-vault-db.ts`):
   - `watch` turns each `Received` into one notice of its Thing; the `world` is ignored. `worldThingsOf` is gone. A feed is
     `{ scope, tell(raw) }`.
-  - `notifyTrackedRecords` queues the bank, main gate and root box by name, out to in, each not `'same'`. `doNotifyTracked`
-    covers these alone.
-  - `notifyDbhas` queues a refused answer's `dbhas` where it is a Thing, whatever the option, after the tracked Things. It
+  - `notifyTrackedRecords` queues the bank, main gate and root box by name, out to in, each not `'same'`.
+  - `AdapterVaultDB` takes no options (the Coach's ruling, 585d65007): no switch sits in the notify path. `doNotifyTracked`,
+    the constructor and `AdapterVaultDBOpts` are gone; `PostgresVaultDBOpts` is `{ client, listen? }`.
+  - `notifyDbhas` queues a refused answer's `dbhas` where it is a Thing, after the tracked Things. It
     runs for `tryGetThing`, `tryWriteThing` and `tryBirthBank`, on their returned refusals and on a thrown refusal that
     carries `rows.dbhas` (`gate_issue`). A refused listing's `dbhas` is a list and is not notified.
   - `#queueNotices` queues one microtask per watch of the bank, so every notice reaches its watch before the verb returns.
@@ -22,8 +23,7 @@ wording changes). This file describes the rework; the first build is in commit `
     bullets are *Settled*'s, word for word but for the orchestrator's "itself".
 * **Tests**: the watch battery (birth 3 notices; a box write 1; a refused write's dbhas alone; a thrown refusal's dbhas
   once; tracked out to in, then dbhas; `'same'` untracked); adapter (no world notice, dbhas before the answer for each verb,
-  nothing for a good val, null dbhas, a dbhas-less throw or a refused listing); memory (`doNotifyTracked: false` still tells
-  a stale_write's dbhas); minder writes (a stale_write's record is heard by a listener before `tryWrite` resolves, through
+  nothing for a good val, null dbhas, a dbhas-less throw or a refused listing); minder writes (a stale_write's record is heard by a listener before `tryWrite` resolves, through
   the watch; under QuietVaultDB a refused write changes no car); staleness (a repeated main gate keeps its car, tells twice).
 * **Decisions made**: the dbhas comes after the tracked Things in every verb, not only writes, so one rule holds. The thrown
   path notifies too: its refusal reaches the caller as an answer like any other.
@@ -31,18 +31,18 @@ wording changes). This file describes the rework; the first build is in commit `
   - `VaultDB.watch`'s first two bullets are built as the Coach calibrated them (notify-plan.md, *Wording changed by the
     orchestrator*): a notice carries one Thing "as `ThingNotice` is shaped today", and the vaultDB does not echo back a good
     answer's `val` or a bank's `world`. The third keeps only the repeat, with an example that holds as built (a write refused
-    on a Thing it also tracks). The first bullet's "Where a store passes the adapter several at once" names the adapter in
-    the interface's doc, and no store passes several today: flagged, built as worded.
-  - Left out of `VaultDB.watch`, false as built: "A handler will never be run inside the progress of a verb. What a handler
-    awaits happens after the verb's caller resumes." False for a store's own notice: `MemoryVaultDB#notify` runs between
-    `doWriteThing` settling and the verb returning, and Postgres LISTEN arrives at any time. Proposed: "A handler of a notice
-    the vaultDB sends for a verb's answer is never run inside the progress of that verb: what it awaits happens after the
-    verb's caller resumes."
-  - Kept as worded, flagged: `tryWriteThing`'s comment ("has already heard of whichever of the bank and main gate changed")
-    and the minder bullet "each changed tracked Thing [is] cached before the operation answers" fail under
-    `doNotifyTracked: false`, and a thrown answer carries no `tracked`.
+    on a Thing it also tracks). "Where a store passes the adapter several at once, each goes out as a notice of its own"
+    lives on `AdapterVaultDB.watch`, not the interface (review).
+  - The handler bullet, as the Coach reworded it: "A verb never calls code of its caller, or any handler, inside its own
+    progress: every notice is queued, so none runs on the verb's stack. Like any async call, a verb yields at each await,
+    and other code may run then." `AdapterVaultDB.doWatch` says what keeps it true for a store's own notice: never call
+    `receive` synchronously from inside a `do*` call. Settled's "A handler will never be run inside the progress of a
+    verb" read as false for a store's own notice, which runs at the verb's await.
+  - `tryWriteThing`'s comment and the minder bullet promise only what the answer's `tracked` reports changed (review): a
+    thrown answer carries no `tracked`.
   - Changed outside *Settled* to stay true: the minder's "Four sources" paragraph, `tryWrite`'s doc, `AdapterVaultDB`'s class
-    doc, the `doNotifyTracked` opt doc.
+    doc.
+  - *Settled*'s test "with `doNotifyTracked: false`, a stale_write still notifies its dbhas" went with the switch.
   - `whiteboard/20261116-react_backwards/giver_needs.md` (M3's done-when) not edited: the Coach has uncommitted edits to it
     in the base checkout. M3's "a stale_write leaves the car's newest at the record the vaultDB reported" now holds through
     the watch, and is tested so in `thing-minder-writes`.
