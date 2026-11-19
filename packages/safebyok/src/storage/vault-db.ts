@@ -93,11 +93,12 @@ export interface VaultDB {
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
-   * - A watch is notified of one Thing per notice.
-   * - A notice reports a change, never a plain observation: a Thing written, a tracked Thing found changed, or a refusal's
-   *   `dbhas`. A bank's `world` is never notified.
-   * - A verb never sends a notice on purpose for the `val` of its good answer: its caller has that. Where the same Thing is
-   *   notified for another reason (a put of the root box by an ask that also tracks it), it is notified again, and nothing
+   * - Each notice carries one Thing, as `ThingNotice` is shaped today. Where a store passes the adapter several at once, each
+   *   goes out as a notice of its own.
+   * - A notice tells of a Thing that changed: one written, a tracked Thing found changed, or a refusal's `dbhas`. The vaultDB
+   *   does not echo back what a verb's caller already has: a good answer's `val` is not notified, and neither is a bank's
+   *   `world` as such; a bank or main gate that changed is notified as a Thing of its own.
+   * - A Thing notified for two reasons in one verb (a write refused on a Thing it also tracks) is notified twice, and nothing
    *   looks for or avoids the repeat.
    * - Every notice the vaultDB sends for a verb's answer (a changed tracked Thing, a refusal's `dbhas`) reaches each watch
    *   before the verb's answer reaches its caller, so a handler's synchronous work is complete by then. Rely on nothing stronger.

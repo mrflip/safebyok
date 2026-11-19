@@ -19,7 +19,7 @@ import * as Throwers from '../refusals/throwers'
 // == [Answers]: Received, answerOf
 
 /** A change a store's watch passes to `receive`: the changed Thing, raw, and its bank's world as the store last read it.
- * The watch tells of the Thing alone, and ignores the world.
+ * The watch tells of the Thing and ignores the world: a bank or main gate that changed is notified as a Thing of its own.
  */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
@@ -157,7 +157,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** Watch a bank's Things ({@link VaultDB.watch}).
-   * Each change a store passes to `receive` becomes one notice of the changed Thing. The world beside it is not notified.
+   * Each change a store passes to `receive` goes out as a notice of the changed Thing, as {@link ThingNotice} is shaped today.
+   * The world beside it is not notified: a bank or main gate that changed is notified as a Thing of its own.
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
