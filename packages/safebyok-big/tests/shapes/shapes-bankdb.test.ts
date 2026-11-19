@@ -72,7 +72,8 @@ describe("BX.endedLivesOf", () => {
   it("keeps a vault tombstone of the live bank, and ends every box row under it", () => {
     const lives = BX.endedLivesOf(bank, entries)
     expect(lives.ended).not.to.include(entries[2])
-    expect(lives.isEnded({ ...gone, vault_tok: 'life1' })).to.be.true
+    expect(lives.isEnded(gone)).to.be.true
+    expect(lives.isEnded({ ...gone, vault_tok: 'life0' })).to.be.true
   })
 
   it("ends every vault life of a bank that is absent or a tombstone", () => {
