@@ -122,11 +122,10 @@ export class ThingMinder {
     if (this.#isReady) { return }
     this.#isReady = true
     this.#seedListing(this.#rootBoxScope)
-    // A vaultDB need not catch what its onNotice throws, such as the refusal of a record of another bank.
     this.#unwatch = this.#vaultDB.watch(
       this.scope,
       // Synchronous on purpose: the vaultDB notifies of a refusal's dbhas and each changed tracked Thing before its verb returns. An await here would cache them after the operation resumes.
-      (notice: ThingNotice) => { try { this.#sendToTSQ(notice.val) } catch (err) { this.#bank.tellBadNews([err]) } },
+      (notice: ThingNotice) => { this.#sendToTSQ(notice.val) },
       (news)                => { this.#bank.tellBadNews([news]) },
     )
   }
