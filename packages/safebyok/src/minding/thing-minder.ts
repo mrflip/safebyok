@@ -71,7 +71,7 @@ import * as Throwers from '../refusals/throwers'
  * - `invalidate` asks the vaultDB nothing, and changes no car and no listing's labelpaths: it marks listings, never cars.
  */
 export class ThingMinder {
-  // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
+  // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #minding, #isReady
   readonly userid:    Userid
   readonly banklabel: Banklabel
   readonly #bank:           MinderFriend
@@ -79,8 +79,11 @@ export class ThingMinder {
   readonly #tsq:            TSQ.QueryClient
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   #unwatch: (() => void) | null = null
+  /** A token for each stretch of minding, from `hello` until `goodbye`, or null while not minding. */
+  #minding: symbol | null = null
+
   /** True while minding: from `hello` until `goodbye`. */
-  #isReady = false
+  get #isReady(): boolean { return this.#minding !== null }
   // --
 
   // == [Construction]: make, constructor, #makeTSQ
@@ -126,7 +129,7 @@ export class ThingMinder {
    */
   hello(): void {
     if (this.#isReady) { return }
-    this.#isReady = true
+    this.#minding = Symbol('minding')
     this.#seedListing(this.#rootBoxScope)
     this.#unwatch = this.#vaultDB.watch(
       this.scope,
@@ -138,7 +141,7 @@ export class ThingMinder {
 
   /** Stop minding, and empty the cache. A get still waiting refuses `disabled`. A later `hello` starts minding again. */
   goodbye(): void {
-    this.#isReady = false
+    this.#minding = null
     if (this.#unwatch) { this.#unwatch() }
     this.#unwatch = null
     this.#tsq.clear()
@@ -292,6 +295,7 @@ export class ThingMinder {
   // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
   /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
+    const minding = this.#minding
     let fetched: ThingCar<ThingRecord>
     try {
       fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
@@ -299,6 +303,9 @@ export class ThingMinder {
       // TanStack cancels a get under way when goodbye empties the cache.
       throw (err instanceof TSQ.CancelledError) ? Throwers.minderNotStarted() : err
     }
+    // A get whose fetch had settled when goodbye came is not cancelled, and resumes some microtasks later, perhaps after a
+    // fresh hello: its record belongs to the cache goodbye emptied, and must join no listing of the new one.
+    if (this.#minding !== minding) { throw Throwers.minderNotStarted() }
     // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
     // get may have left the cache a later record.
     const car = this.#cachedAt(scoped) ?? fetched
