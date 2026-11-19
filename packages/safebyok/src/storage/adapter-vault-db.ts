@@ -1,8 +1,7 @@
 /** The `AdapterVaultDB` base class: a store extends it by writing the `do*` calls. */
 
 import { noop } from 'es-toolkit'
-import type * as Z from 'zod'
-import { EX, Errors, Outcome, Validator, type Helpers } from 'safebyok-big/internals'
+import { EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import type { ThingRecord } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
@@ -49,20 +48,12 @@ function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked
 
 /** The base class of a vaultDB that keeps its Things in a datastore. A subclass writes the `do*` calls, each one atomic step.
  * The class checks each ask and classifies what a `do*` call fetches, per the act tables in `notes/answer-contract.md`.
- * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, unless made with `doNotifyTracked: false`,
- * and of a refused answer's `dbhas` where it is a Thing, whatever the opts.
+ * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, and of a refused answer's `dbhas` where it is a Thing.
  */
 export abstract class AdapterVaultDB implements VaultDB {
-  // == [Props]: #doNotifyTracked, #feeds
+  // == [Props]: #feeds
 
-  readonly #doNotifyTracked: boolean
   readonly #feeds = new Set<Feed>()
-
-  /** Throws `bad_record` for opts it does not know. */
-  constructor(opts: AdapterVaultDBOpts = {}) {
-    const { doNotifyTracked = true } = Checks.adapterVaultDBOpts.parse(opts)
-    this.#doNotifyTracked = doNotifyTracked
-  }
   // --
 
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
@@ -178,11 +169,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Notifying]: notifyTrackedRecords, notifyDbhas, #queueNotices
 
   // Queued before the verb returns. That means each watcher's synchronous work is done before the verb's caller resumes -- no handler runs inside the operation verb.
-  /** Notify each watch of `ask`'s bank of the bank, the main gate and the root box, in that order, each where `tracked` reports it other than `'same'`.
-   * Does nothing for a vaultDB made with `doNotifyTracked: false`.
-   */
+  /** Notify each watch of `ask`'s bank of the bank, the main gate and the root box, in that order, each where `tracked` reports it other than `'same'`. */
   protected notifyTrackedRecords(ask: AnyAsk, { tracked }: { tracked?: Tracked }): void {
-    if ((tracked === undefined) || (! this.#doNotifyTracked)) { return }
+    if (tracked === undefined) { return }
     // Unspecified for a missing or damaged row: notes/wontfix.md.
     for (const record of [tracked.bank, tracked[Labelpath.MainGate], tracked[Labelpath.RootBox]]) {
       if (record !== 'same') { this.#queueNotices(ask, record) }
@@ -263,17 +252,3 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
   // --
 }
-
-// == [Checks]: Checks
-
-/** The checks of the options of a vaultDB that extends {@link AdapterVaultDB}. */
-const Checks = Validator.Checkers('bad_record', ({ obj, bool }) => ({
-  adapterVaultDBOpts: obj({
-    /** False to notify no watch of the Things in an answer's `tracked` ({@link AdapterVaultDB.notifyTrackedRecords}). A refusal's `dbhas` is notified either way. Default true. */
-    doNotifyTracked: bool.optional(),
-  }).strict(),
-}))
-
-/** The options of a vaultDB that extends {@link AdapterVaultDB}. */
-export type AdapterVaultDBOpts = Readonly<Z.infer<typeof Checks.adapterVaultDBOpts>>
-// --

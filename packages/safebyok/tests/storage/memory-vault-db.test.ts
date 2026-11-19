@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { ThingNotice } from '../../src/storage/vault-db'
 import * as Classifier from '../../src/storage/thing-classifier'
 import * as TH from '../test-helpers'
 
@@ -49,39 +48,6 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
     const ask = TH.birthBankAskOf({ root: TH.boxThingOf() })
     await TH.expectBad(vaultDB.tryBirthBank(ask), 'bad_record')
     expect(vaultDB._cheat_things(TH.ThingBank).size).to.eq(0)
-  })
-})
-
-describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
-  it("answers tracked but tells its watches nothing of it, made with doNotifyTracked: false", async () => {
-    const vaultDB = new MemoryVaultDB({ doNotifyTracked: false })
-    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const notices: unknown[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
-    const track = TH.trackOf(TH.bankThingOf({ revseq: 3 }), TH.gateThingOf())
-    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box'), track })).to.deep.include({ tracked: { bank: TH.bankThingOf(), gate: 'same', box: 'same' } })
-    await TH.aWhile()
-    expect(notices).to.deep.equal([])
-  })
-
-  it("still tells its watches a stale_write's dbhas, made with doNotifyTracked: false", async () => {
-    const vaultDB = new MemoryVaultDB({ doNotifyTracked: false })
-    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const [root0, rootNext] = [TH.rootBoxOf(), TH.nextOf(TH.rootBoxOf())]
-    await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(root0, rootNext)))
-    await TH.aWhile()
-    const notices: ThingNotice[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
-    const answer = await vaultDB.tryWriteThing({ ...TH.replaceAskOf(root0, rootNext), track: TH.BankStaleTrack })
-    await TH.expectBad(Promise.resolve(answer), 'stale_write')
-    expect(answer).to.deep.include({ dbhas: rootNext, tracked: { bank: TH.bankThingOf(), gate: 'same', box: rootNext } })
-    await TH.aWhile()
-    expect(notices.map(({ val }) => val)).to.deep.equal([rootNext])
-  })
-
-  it("refuses an opt it does not know, or one of the wrong type", () => {
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTracked: 'no' } as never), 'bad_record')
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTrack: false } as never), 'bad_record')
   })
 })
 
