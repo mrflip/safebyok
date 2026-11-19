@@ -5,6 +5,7 @@ import * as DB from 'safebyok-big/storage'
 import type { Notice } from 'safebyok-big/storage'
 import type { UserID } from 'safebyok-big'
 import { PostgresBankDB, bankChannelOf } from '../src/index'
+import { StoredNothing } from '../src/phrases'
 import type { PostgresListen } from '../src/index'
 import * as BH from './bank-helpers'
 import * as TH from './test-helpers'
@@ -19,6 +20,28 @@ function throwingClient(err: Error) {
     query:       () => Promise.reject(err),
     transaction: () => Promise.reject(err),
   }
+}
+
+/** A client whose every statement answers the one row `row`. */
+function answeringClient(row: object) {
+  return {
+    query:       () => Promise.resolve({ rows: [row] }),
+    transaction: () => Promise.reject(new Error('no transaction here')),
+  }
+}
+
+/** An Error with a driver's `code`. */
+function coded(message: string, code: string): Error { return Object.assign(new Error(message), { code }) }
+
+/** A listen that hands each watch's notify handler to `onNotifies`, and counts its unlistens in `stopped`. */
+function capturingListen() {
+  const onNotifies: ((text: string) => void)[] = []
+  const stopped: string[] = []
+  const listen: PostgresListen = (channel, onNotify) => {
+    onNotifies.push(onNotify)
+    return () => { stopped.push(channel) }
+  }
+  return { listen, onNotifies, stopped }
 }
 
 /** Watch `scope` on `bankDB` until the test ends. Returns the array that collects its notices. */
@@ -60,13 +83,29 @@ describe("PostgresBankDB's constructor", () => {
 })
 
 describe("PostgresBankDB's refusals", () => {
-  it("reports a missing table or privilege as an unexpected error, and any other failed statement as storage unavailable", async () => {
-    const noTable = Object.assign(new Error('relation "safebyok_banks" does not exist'), { code: '42P01' })
-    const missing = new PostgresBankDB({ client: throwingClient(noTable) })
-    const dropped = new PostgresBankDB({ client: throwingClient(new Error('Connection terminated unexpectedly')) })
-    await TH.expectRefusal(missing.ensureBank(TH.BW.bankEnsureAsk), 'unexpected_error')
-    await TH.expectRefusal(missing.buildBank(TH.BW.bankBuildAskOf()), 'unexpected_error')
-    await TH.expectRefusal(dropped.getVault(TH.BW.vaultGetAskOf()), 'storage_unavailable')
+  it("reports a failed statement a retry may mend as storage unavailable, and any other as an unexpected error", async () => {
+    const transient = [
+      coded('terminating connection due to administrator command', '57P01'), coded('could not serialize access', '40001'),
+      coded('too many connections', '53300'), coded('connection failure', '08006'), coded('canceling statement due to lock timeout', '55P03'),
+      coded('read ECONNRESET', 'ECONNRESET'), new Error('Connection terminated unexpectedly'), new Error('timeout exceeded when trying to connect'),
+    ]
+    const lasting = [
+      coded('relation "safebyok_banks" does not exist', '42P01'), coded('new row violates check constraint', '23514'), coded('raised', 'P0001'),
+      coded('channel name too long', '22023'), new TypeError('rows is undefined'), new Error('Connection terminated'), coded('dropped', 'not a code'),
+    ]
+    for (const err of transient) {
+      await TH.expectRefusal(new PostgresBankDB({ client: throwingClient(err) }).getVault(TH.BW.vaultGetAskOf()), 'storage_unavailable')
+    }
+    for (const err of lasting) {
+      await TH.expectRefusal(new PostgresBankDB({ client: throwingClient(err) }).ensureBank(TH.BW.bankEnsureAsk), 'unexpected_error')
+    }
+  })
+
+  it("reports a write function that stored nothing where the classifier finds a write as an unexpected error", async () => {
+    const bankDB = new PostgresBankDB({ client: answeringClient({ ok: false, bank: null, gate: null }) })
+    const { err } = await bankDB.tryBuildBank(TH.BW.bankBuildAskOf())
+    expect(DB.isVaultError(err, 'unexpected_error')).to.be.true
+    expect(err?.cause).to.deep.include({ message: StoredNothing })
   })
 
   it("keeps a driver error's name, message and code as the cause, and none of the statement's parameters", async () => {
@@ -124,7 +163,7 @@ describe("PostgresBankDB's watch", () => {
   })
 })
 
-const refusingListen: PostgresListen = () => Promise.reject(new Error('connection refused'))
+const refusingListen: PostgresListen = () => Promise.reject(coded('connect ECONNREFUSED', 'ECONNREFUSED'))
 
 describe("PostgresBankDB's channels", () => {
   it("listens for a watch on its user's channel", async () => {
@@ -152,6 +191,33 @@ describe("PostgresBankDB's channels", () => {
     unwatch()
   })
 
+  it("ends a watch, telling its onBadNews, where a notice's fetch fails in a way a retry would not mend", async () => {
+    const { listen, onNotifies, stopped } = capturingListen()
+    const watcher = new PostgresBankDB({ client: throwingClient(coded('relation "safebyok_banks" does not exist', '42P01')), listen })
+    const badnews: DB.VaultError[] = []
+    watcher.watch(BW.bankScope, () => undefined, (news) => { badnews.push(news) })
+    await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
+    const notice = JSON.stringify({ at: { user_id: BW.bankScope.user_id, banklabel: BW.bankScope.banklabel } })
+    onNotifies[0]?.(notice)
+    onNotifies[0]?.(notice)
+    await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
+    await TH.aWhile()
+    expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+
+  it("drops a notice whose fetch fails in a way a retry may mend, and keeps watching", async () => {
+    const { listen, onNotifies, stopped } = capturingListen()
+    const watcher = new PostgresBankDB({ client: throwingClient(coded('terminating connection due to administrator command', '57P01')), listen })
+    const badnews: DB.VaultError[] = []
+    const unwatch = watcher.watch(BW.bankScope, () => undefined, (news) => { badnews.push(news) })
+    await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
+    onNotifies[0]?.(JSON.stringify({ at: { user_id: BW.bankScope.user_id, banklabel: BW.bankScope.banklabel } }))
+    await TH.aWhile()
+    expect(badnews).to.deep.equal([])
+    expect(stopped).to.deep.equal([])
+    unwatch()
+  })
+
   it("refuses a user_id that fails its check", () => {
     for (const user_id of ['', 'a b', 'a/b', '..', 'caf\u{E9}', 7 as never]) {
       TH.expectSyncRefusal(() => bankChannelOf(user_id), 'bad_record')
@@ -176,7 +242,7 @@ describe("PostgresBankDB's channels", () => {
     await bankDB.buildBank(buildAskFor(longest))
     for (const user_id of ['u'.repeat(55), encodeURIComponent('é'.repeat(9)) + 'u']) {
       const { err } = await bankDB.tryBuildBank(buildAskFor(user_id))
-      expect(DB.isVaultError(err, 'storage_unavailable')).to.be.true
+      expect(DB.isVaultError(err, 'unexpected_error')).to.be.true
       expect(err?.cause).to.deep.include({ message: 'channel name too long', code: '22023' })
       expect(await bankDB.ensureBank({ ...BW.bankEnsureAsk, user_id })).to.deep.include({ act: 'gotvoid' })
     }

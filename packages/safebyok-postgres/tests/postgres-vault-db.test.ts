@@ -1,9 +1,10 @@
 /** PostgresVaultDB on PGlite: the battery every vaultDB runs, plus what only Postgres can show. */
 
 import { PGlite } from '@electric-sql/pglite'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { type ThingScope, type Thingkind, Labelpath, Lifeseq } from 'safebyok/storage'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
+import { StoredNothing } from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
 import type { PostgresListen } from '../src/postgres-bank-db'
 import { VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
@@ -72,6 +73,32 @@ async function plant(scope: ThingScope, raw: unknown): Promise<void> {
 
 /** The backdoor to the stored rows. */
 function rowsOf(): VT.VaultDBRowCheats { return { plant, remove } }
+// --
+
+// == [Fakes]: coded, throwingClient, capturingListen
+
+/** An Error with a driver's `code`. */
+function coded(message: string, code: string): Error { return Object.assign(new Error(message), { code }) }
+
+/** A client whose every statement fails with `err`. */
+function throwingClient(err: Error) { return { query: () => Promise.reject(err) } }
+
+/** A client whose every statement answers the one row `row`. */
+function answeringClient(row: object) { return { query: () => Promise.resolve({ rows: [row] }) } }
+
+/** A listen that hands each watch's notify handler to `onNotifies`, and counts its unlistens in `stopped`. */
+function capturingListen() {
+  const onNotifies: ((text: string) => void)[] = []
+  const stopped: string[] = []
+  const listen: PostgresListen = (channel, onNotify) => {
+    onNotifies.push(onNotify)
+    return () => { stopped.push(channel) }
+  }
+  return { listen, onNotifies, stopped }
+}
+
+/** A notice of the root box in the battery's bank that carries neither the Thing nor its world. */
+const BareNotice = JSON.stringify({ at: { userid: VT.ThingBank.userid, banklabel: VT.ThingBank.banklabel, labelpath: VT.getAskAt('box').labelpath } })
 // --
 
 beforeAll(async () => { await database() }, TH.BootMillis)
@@ -148,6 +175,39 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const writers = [`${write_bank}(jsonb, jsonb)`, `${write_gate}(jsonb, jsonb, text[])`, `${write_box}(jsonb, jsonb)`, `${birth_roots}(jsonb, jsonb, jsonb)`, `${tell_thing}(jsonb, jsonb)`]
     const { rows: grants } = await db.query("SELECT bool_or(has_function_privilege('public', writer, 'EXECUTE')) AS any FROM unnest($1::text[]) AS writer", [writers])
     expect(grants).to.deep.equal([{ any: false }])
+  })
+
+  it("reports a birth whose function stored nothing, though the classifier finds a write, as an unexpected error", async () => {
+    const vaultDB = new PostgresVaultDB({ client: answeringClient({ ok: false, bank: null, gate: null, root: null, tracked: null }) })
+    const answer  = await vaultDB.tryBirthBank(VT.birthBankAskOf())
+    expect(answer).to.have.nested.property('err.refusalkind', 'unexpected_error')
+    expect(answer).to.have.nested.property('err.cause.message', StoredNothing)
+  })
+
+  it("ends a watch, telling its onBadNews, where a notice's fetch fails in a way a retry would not mend", async () => {
+    const { listen, onNotifies, stopped } = capturingListen()
+    const vaultDB = new PostgresVaultDB({ client: throwingClient(coded('relation "safebyok_box_things" does not exist', '42P01')), listen })
+    const badnews: VaultError[] = []
+    vaultDB.watch(VT.ThingBank, () => undefined, (news) => { badnews.push(news) })
+    await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
+    onNotifies[0]?.(BareNotice)
+    onNotifies[0]?.(BareNotice)
+    await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
+    await VT.aWhile()
+    expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+
+  it("drops a notice whose fetch fails in a way a retry may mend, and keeps watching", async () => {
+    const { listen, onNotifies, stopped } = capturingListen()
+    const vaultDB = new PostgresVaultDB({ client: throwingClient(coded('terminating connection due to administrator command', '57P01')), listen })
+    const badnews: VaultError[] = []
+    const unwatch = vaultDB.watch(VT.ThingBank, () => undefined, (news) => { badnews.push(news) })
+    await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
+    onNotifies[0]?.(BareNotice)
+    await VT.aWhile()
+    expect(badnews).to.deep.equal([])
+    expect(stopped).to.deep.equal([])
+    unwatch()
   })
 
   it("refuses a client, listen or opt it cannot use", async () => {
