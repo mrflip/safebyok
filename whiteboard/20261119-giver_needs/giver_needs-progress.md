@@ -94,6 +94,19 @@ writes it.
   `labels` ("they may not be constrained to the tight string formal label requires"). Thread 5 changes thread 2's
   `InvalidationEvent` (`tags: 'all'` → `tag: 'kids'`). The ask stays `invalidate(labelpath?, { list: 'all' })`.
 
+## Thread 6, minder_seed (#765)
+
+*Orchestrator:*
+* `hello` seeds the root box's listing `[]` before the watch starts, and tells a listing event. Bare = TanStack's
+  `dataUpdatedAt` of 0 (never fetched); a join keeps the time, so it stays bare through joins and `invalidate` until a
+  `list` sets it. `isListingBareAt(scope)` tells a caller. `listingAt(root)` answers from `hello` on. A complete
+  listing's time no longer moves on a join.
+* The root's `'#'` key prefix has `gcTime: Infinity`; per-listing defaults merge over it.
+* `hello` does not fetch (judged a can of worms; before the Coach).
+* `tryWrite` lands only `val` or `dbhas` (f9909e81d). The bank and gate in `world` never got notices of their own:
+  thread 7 makes them.
+* VOCABULARY: *listing* row, *sparse* reworded, `carkind` line in *car*.
+
 ## Rulings
 
 * **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk
