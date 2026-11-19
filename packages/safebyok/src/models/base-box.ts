@@ -123,11 +123,11 @@ function deserializeWhisper(text: string): CX.Whisper {
   } catch {
     throw Throwers.undecodedWhisper()
   }
-  return WhisperChecker.parse(jsonVal, { where: Phrases.OpenedNoWhisper })
+  return whisperChecker.parse(jsonVal, { where: Phrases.OpenedNoWhisper })
 }
 // --
 
-// == [Checks]: Checks, WhisperChecker
+// == [Checks]: Checks, whisperChecker
 
 /** Checks for what a box's seal takes: a live sealable for a tombstone, the public props of a revision and of a tombstone, and the secret props. */
 const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
@@ -144,5 +144,5 @@ const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis 
 }))
 
 /** The check of a whisper decoded from a box, refusing `damaged_whisper`. */
-const WhisperChecker = CX.whisper.refusingAs('damaged_whisper')
+const whisperChecker = CX.whisper.refusingAs('damaged_whisper')
 // --
