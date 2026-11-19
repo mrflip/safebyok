@@ -38,7 +38,7 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
     return { ok: false, ask: loggableAsk, act: actual.act, world, ...beside, dbhas: record, err }
   }
   // Every good act but gotvoid finds or writes a Thing: a store that reports none is broken.
-  if ((record === null) && (actual.act !== 'gotvoid')) { throw Throwers.storageIssue() }
+  if ((record === null) && (actual.act !== 'gotvoid')) { throw Throwers.noThingReported() }
   return { ok: true, ask: loggableAsk, act: actual.act, world, ...beside, val: record }
 }
 
@@ -199,6 +199,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // All the error treatment of the verbs is here, and it has its own try/catch, so a verb never throws.
   /** The refused answer for a verb that threw. A refusal is kept, and anything else becomes `storage_unavailable`.
    * Its act is the one in the refusal's meta, else `unclassified_storing`.
+   * Where what was thrown, or the ask, cannot be read or added to, the answer refuses `unexpected_error`, with what was thrown as its cause.
    * Override it to tell one of your datastore's errors from another.
    */
   protected answerForThrown(thrown: unknown, oplabel: string, ask: unknown): BadAnswer {
@@ -210,7 +211,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as ThingRecord | null
       return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: Throwers.answerNotMade() }
+      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: Throwers.answerNotMade(thrown) }
     }
   }
   // --

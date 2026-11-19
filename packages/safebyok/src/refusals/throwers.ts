@@ -74,7 +74,7 @@ export function bornAtNotNow(ask: WriteAsk): Errors.VaultError { return new Erro
 export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TestimonyMissing, { meta: { ask: loggableAskOf(ask) } }) }
 // --
 
-// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, rowOfOtherAddress, bankRootsMissing, answerNotMade
+// == [Storing Throwers]: PoliciedMeta, gateIssue, bornAtNotStored, rowOfOtherAddress, bankRootsMissing, noThingReported, answerNotMade
 
 // Big types a refusal's meta.act as its own BadAct, which has no `policied`.
 /** Refusal meta with act `policied`, for a write the put table allows but a storage policy or the born_at check refuses. */
@@ -96,8 +96,12 @@ export function rowOfOtherAddress(fieldnames: readonly string[]): Errors.VaultEr
 /** A `storage_issue` refusal: a live bank is stored without its main gate or its root box. */
 export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.BankRootsMissing) }
 
-/** An `unexpected_error` refusal: a vaultDB could not make the answer for a failure. */
-export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
+/** A `storage_issue` refusal: a store reported a good act, other than gotvoid, with no Thing. */
+export function noThingReported(): Errors.VaultError { return new Errors.VaultError('storage_issue', Phrases.NoThingReported) }
+
+// `thrown` is kept as it came, not through sanitizeForeignError, which looks at it: it may be what could not be read.
+/** An `unexpected_error` refusal, `thrown` its cause: a vaultDB verb threw `thrown`, and its refused answer could not be made. */
+export function answerNotMade(thrown: unknown): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade, { cause: thrown }) }
 // --
 
 // == [Minding Throwers]: minderNotStarted, staleRead, childrenStoredDamaged, carsOfOtherThings

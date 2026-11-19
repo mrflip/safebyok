@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { type EX, Errors } from 'safebyok-big/internals'
-import { AnswerNotMade } from '../../src/phrases'
+import { AnswerNotMade, NoThingReported } from '../../src/phrases'
 import { AdapterVaultDB, type Received } from '../../src/storage/adapter-vault-db'
 import type { BirthBankAsk, GetAsk, ListAsk, ThingWatchScope, WriteAsk } from '../../src/shapes/shapes-asks'
 import type { ThingRecord } from '../../src/shapes/shapes-thing'
@@ -58,7 +58,19 @@ describe("AdapterVaultDB, a step that throws", () => {
     const answer = await vaultDB.tryGetThing(TH.getGateAskOf())
     const err = await TH.expectBad(Promise.resolve(answer), 'unexpected_error')
     expect(err.message).to.eq(AnswerNotMade)
+    expect(err.cause).to.equal(Booby)
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
+  })
+
+  it("answers unexpected_error for a frozen refusal, which it cannot add the verb to, with the refusal as its cause", async () => {
+    const frozen = new Errors.VaultError('identity_revoked', 'The backend no longer serves this user.')
+    Object.freeze(frozen)
+    const vaultDB = new ScriptedVaultDB(() => { throw frozen })
+    const answer = await vaultDB.tryGetThing(TH.getGateAskOf())
+    const err = await TH.expectBad(Promise.resolve(answer), 'unexpected_error')
+    expect(err.message).to.eq(AnswerNotMade)
+    expect(err.cause).to.equal(frozen)
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', ask: {} })
   })
 
   it("answers a listing that throws with no children, no parent and no damaged rows", async () => {
@@ -88,14 +100,16 @@ describe("AdapterVaultDB, a step that throws", () => {
 describe("AdapterVaultDB.tryGetThing(ask), a store that reports oddly", () => {
   it("refuses a good get that reports no Thing, other than gotvoid, as a broken store", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, record: null }))
-    await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    const err = await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'storage_issue')
+    expect(err.message).to.eq(NoThingReported)
   })
 })
 
 describe("AdapterVaultDB.tryWriteThing(ask), a store that reports oddly", () => {
   it("refuses a good write that reports no Thing as a broken store", async () => {
     const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'born', world: null, record: null }))
-    await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+    const err = await TH.expectBad(vaultDB.tryWriteThing(TH.birthAskOf()), 'storage_issue')
+    expect(err.message).to.eq(NoThingReported)
   })
 })
 

@@ -122,8 +122,11 @@ export const PolicyNotOwn = "Only a gate's writes name storage policies: a bank 
 /** A live bank stored without one of its roots. */
 export const BankRootsMissing = "A live bank is stored without its main gate or its root box: the store needs mending by hand."
 
-/** The last resort of a vaultDB's error handler. */
-export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
+/** A store that reports a good act, other than gotvoid, with no Thing. */
+export const NoThingReported = "The vault's storage reported finding or writing a Thing, but answered with none. Trying again is unlikely to help: the database or its storage adapter needs someone to look at it."
+
+/** A vaultDB verb that threw, whose refused answer could not be made either. */
+export const AnswerNotMade = "A vaultDB verb failed, and so did making its refused answer: what was thrown, or the ask, could not be read or added to (a frozen error, say). What the verb threw is this error's cause."
 // --
 
 // == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
