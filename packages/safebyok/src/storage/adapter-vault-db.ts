@@ -148,11 +148,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** Watch a bank's Things ({@link VaultDB.watch}).
-   * Each change a store passes to `receive` goes out as a notice of the changed Thing, as {@link ThingNotice} is shaped today.
-   * The world beside it is not notified: a bank or main gate that changed is notified as a Thing of its own.
-   * Where a store passes the adapter several at once, each goes out as a notice of its own.
-   * The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for a datastore that provides assurance.
-   * The synthetic notifications (for tracked and dbhas) generated at the end of a VaultDB operation are assured to complete before the calling verb resumes.
+   * A VaultDB notification carries one Thing per notice. If a datastore pushes several records to its adapter in a notification, they will be split and sent individually.
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
@@ -181,7 +177,7 @@ export abstract class AdapterVaultDB implements VaultDB {
     }
   }
 
-  // The verb's caller gets the refusal and never lands its dbhas, so the watch notifies it. A good answer's val is the caller's to land, and the vaultDB sends no notice of it.
+  // The verb's caller gets the refusal and never lands its dbhas, so the watch notifies it. A good answer's val is the caller's to land, and is not notified.
   /** Notify each watch of the answer's bank of a refused answer's `dbhas`, where it is a Thing. */
   protected notifyDbhas(answer: Answer<unknown, EX.GoodAct>): void {
     if (answer.ok || (answer.dbhas === null)) { return }
@@ -251,7 +247,6 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
   /** Start a watch: call `receive` with each changed Thing, raw, and its bank's world as the store last read it, and `onBadNews` with
    * trouble, whether or not it ends the watch. Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
-   * Never call `receive` synchronously from inside a `do*` call.
    */
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
   // --

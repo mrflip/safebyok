@@ -56,9 +56,9 @@ import * as Throwers from '../refusals/throwers'
  * - An operation caches only its own good answer: the record got, written or listed. Nothing of a write's ask is cached.
  * - Every other record an answer carries (a refusal's `dbhas`, the bank, the main gate, the root box) is cached only as
  *   the watch notifies it.
- * - Under a vaultDB that keeps `watch`'s order, a refusal's `dbhas` and each tracked Thing the answer reports changed are
- *   cached before the operation answers or refuses. A listener has heard of them by then.
- * - A refused write itself changes no car and marks nothing stale.
+ * - Records accompanying an operation (updates in `tracked`, or a record in `dbhas`) will be delivered to the Minder -- and
+ *   therefore cached -- before returning to the operation.
+ * - A refused write itself changes no car and marks nothing stale. (Its `dbhas`, delivered via notify, may update its car.)
  * - A write's answer and the watch's notice of the same write leave the same car and listing, in either order: the
  *   later changes nothing.
  * - `invalidate` asks the vaultDB nothing, and changes no car and no listing's labelpaths: it marks listings, never cars.

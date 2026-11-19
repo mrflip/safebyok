@@ -168,6 +168,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     return unwritten
   }
 
+  // The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for datastores that provide assurance. The synthetic notifications (for tracked and dbhas) generated at the end of a VaultDB operation are assured to complete before the calling verb resumes.
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
     const listen = this.#listen
     if (listen === undefined) { return super.doWatch(scope, receive, onBadNews) }

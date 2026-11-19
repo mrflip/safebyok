@@ -93,17 +93,11 @@ export interface VaultDB {
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
-   * - Each notice carries one Thing, as `ThingNotice` is shaped today.
-   * - A notice tells of a Thing that changed: one written, a tracked Thing found changed, or a refusal's `dbhas`. The vaultDB
-   *   does not echo back what a verb's caller already has: a good answer's `val` is not notified, and neither is a bank's
-   *   `world` as such; a bank or main gate that changed is notified as a Thing of its own.
    * - A Thing notified for two reasons in one verb (a write refused on a Thing it also tracks) is notified twice, and nothing
    *   looks for or avoids the repeat.
-   * - Every notice the vaultDB sends for a verb's answer (a changed tracked Thing, a refusal's `dbhas`) reaches each watch
-   *   before the verb's answer reaches its caller, so a handler's synchronous work is complete by then. Rely on nothing stronger.
+   * - Every notice a verb causes reaches each watch before the verb's answer reaches its caller, so a handler's synchronous
+   *   work is complete by then. Rely on nothing stronger.
    * - A verb's notices come "out to in": the bank, the main gate, the root box, then the `dbhas`.
-   * - A verb never calls code of its caller, or any handler, inside its own progress: every notice is queued, so none runs
-   *   on the verb's stack. Like any async call, a verb yields at each await, and other code may run then.
    * - A notice goes to every watch of the bank, whoever sent the ask.
    * - A watch may be notified of a Thing again at a revision it has notified, or at an older one.
    * - A change the store itself reports arrives when the store delivers it, in no promised order against a verb's answer.
