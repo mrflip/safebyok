@@ -2,9 +2,8 @@
 
 import { queryOptions, skipToken, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query'
 import { useEffect, useSyncExternalStore } from 'react'
-import type { carLivenessVals } from 'safebyok'
-import { type Banklabel, type UserID } from 'safebyok-big'
-import { Checkers } from 'safebyok-big/storage'
+// eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
+import { type Banklabel, type UserID, type carLivenessVals, Checkers } from 'safebyok'
 import { bridgeDevice } from './react-bridge'
 
 // == [What a giver asks of the Device]: BankStage, BankSnapshot, DeviceSnapshot, CarFields, GiverBank, GiverDevice

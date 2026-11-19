@@ -1,10 +1,7 @@
 /** A giver's bank over a bank's minder in the new core, for a Device to hand the giver. */
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
-import { type BoxCar, ThingMinder } from 'safebyok'
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- as above
-import { Labelpath } from 'safebyok/storage'
-import { Checkers } from 'safebyok-big/storage'
+import { type BoxCar, Checkers, Labelpath, ThingMinder } from 'safebyok'
 import type { GiverBank } from './react-giver'
 
 // == [Checks]: Checks, BoxLabelpath, isBoxLabelpath

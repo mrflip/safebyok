@@ -1,10 +1,9 @@
 /** A vaultDB that keeps its Things in Postgres. */
 
-import { type EX, type Errors, Throwers, Validator } from 'safebyok-big/internals'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type Actual, type AnyAsk, type AdapterVaultDBOpts, type BirthBankActual, type BirthBankAsk, type BirthPuts, type GetAsk, type ListThingsActual, type ListAsk, type Received,
-  type ThingWatchScope, type WriteAsk, AdapterVaultDB, Classifier, Shell, getAskOf,
+  type Actual, type AnyAsk, type AdapterVaultDBOpts, type BirthBankActual, type BirthBankAsk, type BirthPuts, type DelAct, type GetAsk, type GotAct, type ListThingsActual, type ListAsk, type PutAct,
+  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, AdapterVaultDB, Classifier, Shell, getAskOf, objCheck, storageIssue,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, unlistenOnceListening } from './postgres-bank-db'
 import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vault-queries'
@@ -23,7 +22,7 @@ function isPostgresQueryable(candidate: unknown): candidate is PostgresQueryable
 }
 
 // `custom` and `fn` return the same client and listen objects they were given, so the driver's methods keep their `this`.
-const postgresVaultDBOpts = Validator.objCheck(({ custom, fn, bool }) => ({
+const postgresVaultDBOpts = objCheck(({ custom, fn, bool }) => ({
   client:          custom<PostgresQueryable>(isPostgresQueryable, 'Expected a client with a query function'),
   listen:          fn<PostgresListen>().optional(),
   doNotifyTracked: bool.optional(),
@@ -42,7 +41,7 @@ export function thingsChannelOf(userid: string): string { return `safebyok_thing
 /** A parsed notice: the labelpath of the Thing stored, and the Thing and raw world, where they fit. */
 type Told = { labelpath: string, thing?: unknown, world?: unknown }
 
-const toldCheck = Validator.objCheck(({ obj, str, unk }) => ({
+const toldCheck = objCheck(({ obj, str, unk }) => ({
   at:    obj({ userid: str, banklabel: str, labelpath: str }),
   thing: unk.optional(),
   world: unk.optional(),
@@ -73,7 +72,7 @@ function mayWrite({ op, cited, ifAbsent, ifPresent }: WriteAsk): boolean {
 }
 
 /** The act of a write the store made, over the Thing the ask cites. */
-function writtenActOf({ op, cited }: WriteAsk): EX.WriteAct {
+function writtenActOf({ op, cited }: WriteAsk): WriteAct {
   if (op === 'del')                        { return 'deleted' }
   if (cited.revseq === Shell.Cited.revseq)  { return 'born' }
   return (cited.am === 'a') ? 'replaced' : 'reborn'
@@ -120,12 +119,12 @@ export class PostgresVaultDB extends AdapterVaultDB {
 
   // == [Protected, the calls of AdapterVaultDB]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
 
-  protected async doGetThing(ask: GetAsk): Promise<Actual<EX.GotAct>> {
+  protected async doGetThing(ask: GetAsk): Promise<Actual<GotAct>> {
     const { thing, world, tracked } = await this.#fetchThing(ask)
     return this.classifyGetThing(ask, thing, { ...world, tracked })
   }
 
-  protected async doWriteThing(ask: WriteAsk): Promise<Actual<EX.PutAct | EX.DelAct>> {
+  protected async doWriteThing(ask: WriteAsk): Promise<Actual<PutAct | DelAct>> {
     if (! mayWrite(ask)) {
       const { thing, world, tracked } = await this.#fetchThing(ask)
       return this.classifyWriteThing(ask, thing, { ...world, tracked })
@@ -146,7 +145,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     if (! written.born_at_ok)          { Classifier.demandBornAtKept(ask, written.thing) }
     if (written.policies_ok === false) { Classifier.demandPolicies(ask, written.thing) }
     // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.
-    throw Throwers.storageIssue()
+    throw storageIssue()
   }
 
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
@@ -166,11 +165,11 @@ export class PostgresVaultDB extends AdapterVaultDB {
     }
     // The store refused. The act tables name why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
     const unwritten = Classifier.unwrittenBirthOf(puts, written)
-    if (unwritten === null) { throw Throwers.storageIssue() }
+    if (unwritten === null) { throw storageIssue() }
     return unwritten
   }
 
-  protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
+  protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
     const listen = this.#listen
     if (listen === undefined) { return super.doWatch(scope, receive, onBadNews) }
     let isListening = true
@@ -179,7 +178,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
       if ((told === null) || (! isListening)) { return }
       void this.#receivedOrNull(scope, told).then((received) => { if ((received !== null) && isListening) { receive(received) } })
     }
-    const onListenFailed = (news: Errors.VaultError): void => {
+    const onListenFailed = (news: VaultError): void => {
       if (! isListening) { return }
       isListening = false
       onBadNews(news)
