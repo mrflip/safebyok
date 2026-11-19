@@ -12,7 +12,7 @@ export { Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
 export type {
-  BodyOf, BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, PublicPropsOf, RevisionOf, SealPurposes, SealTags, Sealable, Sealed,
+  BodyOf, BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, PublicPropsOf, RevisionOf, SealPurposes, SealTags, Sealable, Sealed,
   SealedOf, SealedPartsOf, Sealer, ShellOf, TombstoneOf, TombstonePublicProps, UnsealedOf,
 } from './shapes/shapes-sealers'
 export {

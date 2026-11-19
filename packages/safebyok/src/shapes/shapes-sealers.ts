@@ -106,7 +106,7 @@ export interface Sealer<RecordT extends Sparse<ThingRecord>, CleartextsT> {
 }
 // --
 
-// == [A box's records]: BoxCleartexts, BoxPublicProps
+// == [A box's records]: BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps
 
 /** The cleartexts of a box: its whisper. */
 export interface BoxCleartexts {
@@ -115,4 +115,7 @@ export interface BoxCleartexts {
 
 /** The public props of a box's seal ({@link PublicPropsOf}): its sidecar, `am` and `written_at`, each optional. */
 export type BoxPublicProps = PublicPropsOf<BoxRecord, BoxCleartexts>
+
+/** The public props of a box tombstone's seal ({@link TombstonePublicProps}): its sidecar may be given too, as `{}`, a tombstone's own. */
+export type BoxTombstonePublicProps = TombstonePublicProps & Readonly<{ sidecar?: Record<string, never> }>
 // --

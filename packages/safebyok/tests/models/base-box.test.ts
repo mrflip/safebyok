@@ -167,9 +167,21 @@ describe("BaseBox.tombstoneOf(donor)", () => {
     expect(next).to.include({ am: 'x', written_at: TH.T0 - 3 })
   })
 
-  it("refuses a sidecar given, as a tombstone's is always `{}`", () => {
+  it("takes the sidecar `{}` given, a tombstone's own", () => {
+    const next = BaseBox.tombstoneOf(liveRevisionOf(), { sidecar: {}, written_at: TH.T0 - 3 })
+    expect(next).to.deep.include({ am: 'x', written_at: TH.T0 - 3, sidecar: {} })
+  })
+
+  it("refuses any other sidecar given, as a tombstone's is always `{}`", () => {
     const err = TH.expectSyncRefusal(() => BaseBox.tombstoneOf(liveRevisionOf(), { sidecar: { account: 'home' } }), 'bad_record')
-    expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarGiven)
+    expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarNotEmpty)
+  })
+
+  it("never keeps the donor's sidecar, given `{}` or none", () => {
+    const live = liveRevisionOf()
+    expect(live.sidecar).to.not.deep.equal({})
+    expect(BaseBox.tombstoneOf(live).sidecar).to.deep.equal({})
+    expect(BaseBox.tombstoneOf(live, { sidecar: {} }).sidecar).to.deep.equal({})
   })
 
   it("refuses a tombstone or the shell", () => {

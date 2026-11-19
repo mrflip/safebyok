@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, ProvingExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, TombstoneSidecarGiven, BoxOfOtherRoot, GotOtherThanBox
+// == [Models]: VaultDBExpected, SealerExpected, ProvingExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, GotOtherThanBox
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -19,8 +19,6 @@ export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a 
 
 /** A tombstone's seal given secret props. */
 export const TombstoneSecretsGiven = "A tombstone seals no secrets: give `{ am: 'x' }` with no secret props."
-/** A box tombstone's seal given a sidecar. */
-export const TombstoneSidecarGiven = "A tombstone's sidecar is always `{}`: give `{ am: 'x' }` with no sidecar."
 
 /** A box whose lifepath is not under the bank's root box. */
 export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its bank's root box: this one is of another life of the root."

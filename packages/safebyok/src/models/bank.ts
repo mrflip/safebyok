@@ -9,7 +9,7 @@ import type { Lease } from './lease'
 import { Proving } from './proving'
 import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxUnsealed, GetBoxAnswer, GetBoxAskDraft } from '../shapes/shapes-bankish'
 import type { GateRevisionedStamp } from '../shapes/shapes-gateish'
-import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf, TombstonePublicProps } from '../shapes/shapes-sealers'
+import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
@@ -209,12 +209,12 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Seal and return the next revision of the box `donorProps`, with `publicProps` applied and the whisper of `secretProps` encrypted. Needs the bank unlocked.
    * The seal checks its arguments (an unknown key in `publicProps` or `secretProps` refuses) and the box it returns, so pass `donorProps` as you have it: whole, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
    * A live box's revision keeps its sidecar unless `publicProps` gives one. After a tombstone or the shell, the revision begins the box's next life, and `publicProps` must give its sidecar.
-   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead ({@link tombstoneBox}), and refuses a sidecar or `secretProps`.
+   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead ({@link tombstoneBox}), and refuses `secretProps` or any sidecar but `{}`.
    * Its `written_at` is `publicProps.written_at`, or now.
    * @example
    *   await bank.sealBox(box, { sidecar: { account: 'work' } }, { whisper })
    */
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: TombstonePublicProps): Promise<TombstoneOf<BoxRecord>>
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<TombstoneOf<BoxRecord>>
   sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<LiveOf<BoxRecord>>
   sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord>
   async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
@@ -226,7 +226,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Seal the tombstone of the live box `donorProps`. Needs the bank unlocked.
    * Its sealed empty whisper authenticates it. Its `written_at` is `publicProps.written_at`, or now.
    */
-  tombstoneBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: Partial<TombstonePublicProps> = {}): Promise<TombstoneOf<BoxRecord>> {
+  tombstoneBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: Partial<BoxTombstonePublicProps> = {}): Promise<TombstoneOf<BoxRecord>> {
     return this.sealBox(donorProps, { ...publicProps, am: 'x' })
   }
 

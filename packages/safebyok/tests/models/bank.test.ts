@@ -521,6 +521,19 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     await TH.expectRefusal(bank.sealBox(box, { am: 'x' }, { whisper: TH.Whisper }), 'bad_record')
   })
 
+  it("writes a tombstone given the sidecar `{}`, a tombstone's own", async () => {
+    const { bank } = await TH.buildBornBank()
+    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(await bank.tombstoneBox(box, { sidecar: {} })).to.deep.include({ am: 'x', sidecar: {} })
+  })
+
+  it("refuses a tombstone given any other sidecar", async () => {
+    const { bank } = await TH.buildBornBank()
+    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    // @ts-expect-error -- sloppy input is the point: a box tombstone's sidecar is typed as `{}`
+    await TH.expectRefusal(bank.tombstoneBox(box, { sidecar: TH.Sidecar }), 'bad_record')
+  })
+
   it("unseals a tombstone to its Thing fields and an empty whisper", async () => {
     const { bank } = await TH.buildBornBank()
     const tombstone = await bank.tombstoneBox(await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))

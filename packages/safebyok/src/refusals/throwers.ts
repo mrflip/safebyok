@@ -15,16 +15,13 @@ import type { GoodAnswer } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: tombstoneSecretsGiven, sidecarMissing, tombstoneSidecarGiven, boxOfOtherRoot, otherThanBox
+// == [Model Throwers]: tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, otherThanBox
 
 /** A `bad_record` refusal: a tombstone's seal was given secret props. */
 export function tombstoneSecretsGiven(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TombstoneSecretsGiven) }
 
 /** A `bad_record` refusal: a live box's revision has no sidecar. */
 export function sidecarMissing(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.SidecarMissing) }
-
-/** A `bad_record` refusal: a tombstone was given a sidecar. */
-export function tombstoneSidecarGiven(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TombstoneSidecarGiven) }
 
 /** A `record_conflict` refusal: a box's lifepath is of another life of its bank's root box. */
 export function boxOfOtherRoot(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
