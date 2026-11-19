@@ -40,7 +40,7 @@ describe("ThingMinder.listen", () => {
     expect(heard.mock.calls[1]?.[0]).to.have.property('car', cached)
   })
 
-  it("tells the void car of the shell, and the gone car of a tombstone", async () => {
+  it("tells the void car of the shell, and the gone car of a tombstone, which joins the root box's listing", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder, receive } = minderWorldOf(vaultDB)
     const heard = listenerOf()
@@ -48,7 +48,7 @@ describe("ThingMinder.listen", () => {
     await minder.get(TH.BoxScope)
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     receive(noticeOf(tombstone))
-    expect(toldOf(heard)).to.deep.equal([['box/openai', 'void'], ['box/openai', 'gone']])
+    expect(toldOf(heard)).to.deep.equal([['box/openai', 'void'], ['box/openai', 'gone'], ['listing']])
     expect(heard.mock.calls[1]?.[0]).to.have.nested.property('car.newest', tombstone)
   })
 
@@ -88,7 +88,7 @@ describe("ThingMinder.listen", () => {
     expect(toldOf(heard)).to.deep.equal([['gate', undefined]])
   })
 
-  it("tells no car for each car goodbye removes", async () => {
+  it("tells no car for each car goodbye removes, and no labelpaths for the root box's listing", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
@@ -96,7 +96,7 @@ describe("ThingMinder.listen", () => {
     const heard = listenerOf()
     minder.listen(heard)
     minder.goodbye()
-    expect(toldOf(heard)).to.have.deep.members([['box', undefined], ['gate', undefined]])
+    expect(toldOf(heard)).to.have.deep.members([['box', undefined], ['gate', undefined], ['listing']])
   })
 
   it("tells a listing as cached, with its parent and the kind of its Things", async () => {
@@ -109,6 +109,14 @@ describe("ThingMinder.listen", () => {
     const listed = heard.mock.calls.map(([event]) => event).filter((event) => event.carkind === 'listing')
     expect(listed).to.deep.equal([{ carkind: 'listing', modelkind: 'box', labelpaths: ['box/openai'], tag: 'kids', of: { parentpath: 'box' } }])
     expect(listed[0]).to.have.property('labelpaths', minder.listingAt(TH.RootScope))
+  })
+
+  it("tells the root box's listing, empty, when hello caches it", () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
+    const heard = listenerOf()
+    minder.listen(heard)
+    minder.hello()
+    expect(heard.mock.calls).to.deep.equal([[{ carkind: 'listing', modelkind: 'box', labelpaths: [], tag: 'kids', of: { parentpath: 'box' } }]])
   })
 
   it("tells a listing once a labelpath joins it, and not for a record that joins none", async () => {

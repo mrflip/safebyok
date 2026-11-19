@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { carOf } from '../../../src/minding/thing-car'
 import { ThingMinder } from '../../../src/minding/thing-minder'
 import { Shell } from '../../../src/shapes/shapes-thing'
+import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
 import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf } from './world'
 
@@ -16,19 +17,21 @@ describe("ThingMinder.tryWrite", () => {
     expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(TH.boxThingOf()))
   })
 
-  it("caches the bank and main gate of the answer's world", async () => {
-    const vaultDB = await bornOf(new QuietVaultDB())
-    const { minder } = minderWorldOf(vaultDB)
-    await minder.tryWrite(boxBirthAskOf())
-    expect(minder.at(TH.BankScope)).to.deep.equal(carOf(TH.bankThingOf()))
-    expect(minder.at(TH.GateScope)).to.deep.equal(carOf(TH.gateThingOf()))
-  })
-
-  it("caches a Thing the answer reports stored at another revision than the ask tracks", async () => {
+  it("leaves the bank, the main gate and a tracked root box the answer reports stored to the watch", async () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
-    await minder.tryWrite({ ...boxBirthAskOf(), track: TH.RootStaleTrack })
-    expect(minder.at(TH.RootScope)).to.deep.equal(carOf(TH.rootBoxOf()))
+    const answer = await minder.tryWrite({ ...boxBirthAskOf(), track: TH.RootStaleTrack })
+    expect(answer.world).to.not.be.null
+    expect(Object.values(answer.tracked ?? {})).to.deep.include(TH.rootBoxOf())
+    expect([minder.at(TH.BankScope), minder.at(TH.GateScope), minder.at(TH.RootScope)]).to.deep.equal([undefined, undefined, undefined])
+  })
+
+  it("hears of a tracked main gate the answer reports stored from the vaultDB's watch alone", async () => {
+    const vaultDB = await bornOf(new MemoryVaultDB())
+    const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
+    await minder.tryWrite({ ...boxBirthAskOf(), track: TH.GateStaleTrack })
+    await TH.eventually(() => minder.at(TH.GateScope) !== undefined)
+    expect(minder.at(TH.GateScope)).to.deep.equal(carOf(TH.gateThingOf()))
   })
 
   it("leaves the car's newest at the record a stale_write reports stored", async () => {
