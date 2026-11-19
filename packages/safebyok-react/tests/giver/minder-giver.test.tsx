@@ -38,6 +38,16 @@ describe("giverBankOfMinder", () => {
       await TH.expectRefusal(bank.getBoxCar(labelpath), 'bad_record')
     }
   })
+
+  it("tells each box car the minder caches, and no other kind's car, nor a removed one", async () => {
+    const { minder } = await TH.makeMinderGiverWorld()
+    const told: [string, string][] = []
+    giverBankOfMinder(minder).listenBoxCars((labelpath, car) => { told.push([labelpath, car.liveness]) })
+    await minder.get({ ...minder.scope, labelpath: 'gate' })
+    await minder.get({ ...minder.scope, labelpath: OpenaiPath })
+    minder.goodbye()
+    expect(told).to.deep.equal([[OpenaiPath, 'void']])
+  })
 })
 
 describe("the giver over a minder", () => {
