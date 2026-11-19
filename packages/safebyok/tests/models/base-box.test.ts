@@ -177,6 +177,14 @@ describe("BaseBox.tombstoneOf(donor)", () => {
     expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarNotEmpty)
   })
 
+  it("takes the am `'x'` given, a tombstone's own", () => {
+    expect(BaseBox.tombstoneOf(liveRevisionOf(), { am: 'x' })).to.include({ am: 'x' })
+  })
+
+  it("refuses the am `'a'` given, as a tombstone's is always `'x'`", () => {
+    TH.expectSyncRefusal(() => BaseBox.tombstoneOf(liveRevisionOf(), { am: 'a' }), 'bad_record')
+  })
+
   it("never keeps the donor's sidecar, given `{}` or none", () => {
     const live = liveRevisionOf()
     expect(live.sidecar).to.not.deep.equal({})
