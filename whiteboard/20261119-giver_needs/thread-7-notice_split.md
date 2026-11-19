@@ -1,6 +1,6 @@
 # Thread 7: notice_split (2026-11-19)
 
-Branch `20261119-notice_split`, PR #TBD, stacked on [#765](https://github.com/mrflip/safebyok/pull/765). Proved: safebyok
+Branch `20261119-notice_split`, PR [#766](https://github.com/mrflip/safebyok/pull/766), stacked on [#765](https://github.com/mrflip/safebyok/pull/765). Proved: safebyok
 `vitest` 1210 green, typecheck and lint clean; safebyok-postgres 331 green (it runs the watch battery on PGlite, against a
 rebuilt `safebyok/testing`).
 
