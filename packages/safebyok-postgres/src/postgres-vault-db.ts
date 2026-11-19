@@ -2,7 +2,7 @@
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
-  type Actual, type AnyAsk, type AdapterVaultDBOpts, type BirthBankActual, type BirthBankAsk, type BirthPuts, type DelAct, type GetAsk, type GotAct, type ListThingsActual, type ListAsk, type PutAct,
+  type Actual, type AnyAsk, type BirthBankActual, type BirthBankAsk, type BirthPuts, type DelAct, type GetAsk, type GotAct, type ListThingsActual, type ListAsk, type PutAct,
   type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, AdapterVaultDB, Classifier, Shell, getAskOf, isVaultError, objCheck,
 } from 'safebyok/storage'
 import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-bank-db'
@@ -10,11 +10,11 @@ import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vaul
 
 // == [The driver]: PostgresVaultDBOpts, isPostgresQueryable
 
-/** Options for `new PostgresVaultDB(opts)`, beside {@link AdapterVaultDBOpts}:
+/** Options for `new PostgresVaultDB(opts)`:
  * - `client` -- runs the queries: a pool, a connection, or a PGlite
  * - `listen` -- subscribes to Postgres notifications for `watch`, which hears nothing without it
  */
-export type PostgresVaultDBOpts = Readonly<AdapterVaultDBOpts & { client: PostgresQueryable, listen?: PostgresListen }>
+export type PostgresVaultDBOpts = Readonly<{ client: PostgresQueryable, listen?: PostgresListen }>
 
 /** True for a client with a `query` function. */
 function isPostgresQueryable(candidate: unknown): candidate is PostgresQueryable {
@@ -22,10 +22,9 @@ function isPostgresQueryable(candidate: unknown): candidate is PostgresQueryable
 }
 
 // `custom` and `fn` return the same client and listen objects they were given, so the driver's methods keep their `this`.
-const postgresVaultDBOpts = objCheck(({ custom, fn, bool }) => ({
-  client:          custom<PostgresQueryable>(isPostgresQueryable, 'Expected a client with a query function'),
-  listen:          fn<PostgresListen>().optional(),
-  doNotifyTracked: bool.optional(),
+const postgresVaultDBOpts = objCheck(({ custom, fn }) => ({
+  client: custom<PostgresQueryable>(isPostgresQueryable, 'Expected a client with a query function'),
+  listen: fn<PostgresListen>().optional(),
 }), 'bad_record')
 // --
 
@@ -93,8 +92,8 @@ export class PostgresVaultDB extends AdapterVaultDB {
   // == [Construction]: constructor
 
   constructor(opts: PostgresVaultDBOpts) {
-    const { client, listen, ...adapterOpts } = postgresVaultDBOpts.parse(opts)
-    super(adapterOpts)
+    const { client, listen } = postgresVaultDBOpts.parse(opts)
+    super()
     this.#client = client
     this.#listen = listen
   }
@@ -169,6 +168,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     return unwritten
   }
 
+  // The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for datastores that provide assurance. The synthetic notifications (for tracked and dbhas) generated at the end of a VaultDB operation are assured to complete before the calling verb resumes.
   protected override doWatch(scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: VaultError) => void): () => void {
     const listen = this.#listen
     if (listen === undefined) { return super.doWatch(scope, receive, onBadNews) }

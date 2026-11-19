@@ -26,10 +26,11 @@ import * as Throwers from '../refusals/throwers'
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
  * the children of the root box and of each Thing listed.
  * Four sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
- * Thing's shell where nothing is stored), the watch's notice of each write, a list's sparse record, and the record a
- * write's answer carries. Each lands in the Thing's car through one merge, and adds the Thing to its parent's listing,
- * where one is cached. A list sets the parent's listing. It caches only from `hello` until `goodbye`, and `goodbye`
- * empties its cache. `hello` caches the root box's listing, empty and bare: bare until a list sets it.
+ * Thing's shell where nothing is stored), the watch's notice (of each write, each changed tracked Thing and each
+ * refusal's `dbhas`), a list's sparse record, and the record a good write's answer carries. Each lands in the Thing's
+ * car through one merge, and adds the Thing to its parent's listing, where one is cached. A list sets the parent's
+ * listing. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache. `hello` caches the root box's
+ * listing, empty and bare: bare until a list sets it.
  *
  * ## Invariants
  * - For a caller or listener using the library as documented, what it shows depends only on which records the minder
@@ -52,10 +53,12 @@ import * as Throwers from '../refusals/throwers'
  *   when the parent's life changes, it keeps the earlier life's children beside the new life's.
  * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it. The root
  *   box always has one cached.
- * - Nothing of a write's ask is cached: the minder hears of a write only from its answer, or from the watch's notice.
- * - While the minder is minding, a write's own record has landed before the write resolves: the record written, or the
- *   refusal's `dbhas`. So a listener has heard of its car first. The other records the answer carries, its `world` and
- *   `tracked`, land only as the watch tells of them.
+ * - An operation caches only its own good answer: the record got, written or listed. Nothing of a write's ask is cached.
+ * - Every other record an answer carries (a refusal's `dbhas`, the bank, the main gate, the root box) is cached only as
+ *   the watch notifies it.
+ * - Records accompanying an operation (updates in `tracked`, or a record in `dbhas`) will be delivered to the Minder -- and
+ *   therefore cached -- before returning to the operation.
+ * - A refused write itself changes no car and marks nothing stale. (Its `dbhas`, delivered via notify, may update its car.)
  * - A write's answer and the watch's notice of the same write leave the same car and listing, in either order: the
  *   later changes nothing.
  * - `invalidate` asks the vaultDB nothing, and changes no car and no listing's labelpaths: it marks listings, never cars.
@@ -120,6 +123,7 @@ export class ThingMinder {
     this.#seedListing(this.#rootBoxScope)
     this.#unwatch = this.#vaultDB.watch(
       this.scope,
+      // Synchronous on purpose: the vaultDB notifies of a refusal's dbhas and each changed tracked Thing before its verb returns. An await here would cache them after the operation resumes.
       (notice: ThingNotice) => { this.#sendToTSQ(notice.val) },
       (news)                => { this.#bank.tellBadNews([news]) },
     )
@@ -247,7 +251,7 @@ export class ThingMinder {
   // == [Writing]: tryWrite
 
   /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
-   * The record written, or a refusal's `dbhas`, is cached before it answers. The bank, main gate and tracked Things its answer reports are cached only as the watch tells of them.
+   * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
    * A write answered after `goodbye` caches nothing.
    */
@@ -259,8 +263,8 @@ export class ThingMinder {
       return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Outcome.storageRefusalOf(err) }
     }
     const answer = await this.#vaultDB.tryWriteThing(ask)
-    const record = answer.ok ? answer.val : answer.dbhas
-    if (record !== null) { this.#sendToTSQ(record) }
+    // Only the record written lands here. A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
+    if (answer.ok) { this.#sendToTSQ(answer.val) }
     return answer
   }
   // --
@@ -297,6 +301,7 @@ export class ThingMinder {
     // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
     const prior  = this.#cachedAt(ask)
     const answer = await this.#vaultDB.tryGetThing(ask)
+    // Thrown as it came. The `dbhas` is delivered through the watch, never from here.
     if (! answer.ok) { throw answer.err }
     const record = answer.val ?? this.#shellAt(ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.

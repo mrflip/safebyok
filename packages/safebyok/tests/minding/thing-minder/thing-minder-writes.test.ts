@@ -34,18 +34,39 @@ describe("ThingMinder.tryWrite", () => {
     expect(minder.at(TH.GateScope)).to.deep.equal(carOf(TH.gateThingOf()))
   })
 
-  it("leaves the car's newest at the record a stale_write reports stored", async () => {
-    const vaultDB = new QuietVaultDB()
+  it("holds the record a stale_write reports stored once it answers, as the watch told a listener first", async () => {
+    const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
     const box1 = TH.nextOf(box0)
-    const mine = TH.nextOf(box0, { revtok: TH.revtokOf('mine') })
     cheatBox(vaultDB, box1)
+    let isResolved = false
+    const told: { isResolved: boolean, car: unknown }[] = []
+    minder.listen((event) => {
+      if ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.car }) }
+    })
+    const mine = TH.nextOf(box0, { revtok: TH.revtokOf('mine') })
     const answer = await minder.tryWrite(TH.replaceAskOf(box0, mine))
+    isResolved = true
     await TH.expectBad(answer, 'stale_write')
     expect(answer).to.deep.include({ dbhas: box1 })
     expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(box1))
+    expect(told).to.deep.equal([{ isResolved: false, car: carOf(box1) }])
+  })
+
+  it("changes no car itself for a refused write: a stale_write's record lands only through the watch", async () => {
+    const vaultDB = new QuietVaultDB()
+    const box0    = await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(TH.BoxScope)
+    const car = minder.at(TH.BoxScope)
+    cheatBox(vaultDB, TH.nextOf(box0))
+    const mine = TH.nextOf(box0, { revtok: TH.revtokOf('mine') })
+    const answer = await minder.tryWrite(TH.replaceAskOf(box0, mine))
+    await TH.expectBad(answer, 'stale_write')
+    expect(minder.at(TH.BoxScope)).to.eq(car)
+    expect(minder.isStaleAt(TH.BoxScope)).to.be.false
   })
 
   it("caches nothing of the write while the vaultDB has not answered", async () => {
@@ -83,9 +104,9 @@ describe("ThingMinder.tryWrite", () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder, receive } = minderWorldOf(vaultDB)
     await minder.list('box')
-    const answer = await minder.tryWrite(boxBirthAskOf())
+    await minder.tryWrite(boxBirthAskOf())
     const [car, listing] = [minder.at(TH.BoxScope), minder.listingAt(TH.RootScope)]
-    receive(noticeOf(TH.boxThingOf(), answer.world))
+    receive(noticeOf(TH.boxThingOf()))
     expect(minder.at(TH.BoxScope)).to.eq(car)
     expect(minder.listingAt(TH.RootScope)).to.eq(listing)
     expect(car).to.deep.equal(carOf(TH.boxThingOf()))

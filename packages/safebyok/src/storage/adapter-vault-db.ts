@@ -1,12 +1,12 @@
 /** The `AdapterVaultDB` base class: a store extends it by writing the `do*` calls. */
 
 import { noop } from 'es-toolkit'
-import type * as Z from 'zod'
-import { EX, Errors, Outcome, Validator, type Helpers } from 'safebyok-big/internals'
+import { EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
+import { Labelpath } from '../shapes/primitives'
 import type { ThingRecord } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import {
-  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
+  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
 import type { BankRootsFetched, ThingsFetched, WorldFetched } from './thing-classifier'
 import * as Classifier from './thing-classifier'
@@ -17,11 +17,13 @@ import * as Throwers from '../refusals/throwers'
 
 // == [Answers]: Received, answerOf
 
-/** A change a store's watch passes to `receive`: the changed Thing, raw, and its bank's world as the store last read it. */
+/** A change a store's watch passes to `receive`: the changed Thing, raw, and its bank's world as the store last read it.
+ * The watch tells of the Thing and ignores the world: a bank or main gate that changed is notified as a Thing of its own.
+ */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
-/** A watch the adapter keeps: its bank, and the function called with each Thing received. */
-type Feed = { scope: ThingWatchScope, receive: (received: Received) => void }
+/** A watch the adapter keeps: its bank, and the function that tells it of one raw Thing. */
+type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void }
 
 /** The answer a verb gives for its store's report: `record` becomes `val` when good, `dbhas` when refused.
  * Throws `storage_issue` if a good report other than `gotvoid` has no Thing.
@@ -46,19 +48,12 @@ function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked
 
 /** The base class of a vaultDB that keeps its Things in a datastore. A subclass writes the `do*` calls, each one atomic step.
  * The class checks each ask and classifies what a `do*` call fetches, per the act tables in `notes/answer-contract.md`.
- * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, unless made with `doNotifyTracked: false`.
+ * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, and of a refused answer's `dbhas` where it is a Thing.
  */
 export abstract class AdapterVaultDB implements VaultDB {
-  // == [Props]: #doNotifyTracked, #feeds
+  // == [Props]: #feeds
 
-  readonly #doNotifyTracked: boolean
   readonly #feeds = new Set<Feed>()
-
-  /** Throws `bad_record` for opts it does not know. */
-  constructor(opts: AdapterVaultDBOpts = {}) {
-    const { doNotifyTracked = true } = Checks.adapterVaultDBOpts.parse(opts)
-    this.#doNotifyTracked = doNotifyTracked
-  }
   // --
 
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
@@ -90,8 +85,13 @@ export abstract class AdapterVaultDB implements VaultDB {
       const actual      = await this.doGetThing(thingGetAsk) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'getThing', loggableAsk)
       this.notifyTrackedRecords(thingGetAsk, answer)
+      this.notifyDbhas(answer)
       return answer
-    } catch (err) { return this.answerForThrown(err, 'getThing', ask) }
+    } catch (err) {
+      const answer = this.answerForThrown(err, 'getThing', ask)
+      this.notifyDbhas(answer)
+      return answer
+    }
   }
 
   /** Write `ask.record` over the Thing `ask.cited` ({@link VaultDB.tryWriteThing}). */
@@ -101,9 +101,15 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk = loggableAskOf(writeAsk)
       const actual      = await this.doWriteThing(writeAsk) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'writeThing', loggableAsk)
+      // Out to in: the bank, the main gate, the root box, then the dbhas. Of the synthetic notifications this operation dispatches, by the time a listener is notified of the subject Thing, it has already been notified of the bank and main gate.
       this.notifyTrackedRecords(writeAsk, answer)
+      this.notifyDbhas(answer)
       return answer
-    } catch (err) { return this.answerForThrown(err, 'writeThing', ask) }
+    } catch (err) {
+      const answer = this.answerForThrown(err, 'writeThing', ask)
+      this.notifyDbhas(answer)
+      return answer
+    }
   }
 
   /** The children of the Thing at `ask`'s scope ({@link VaultDB.tryListThings}). */
@@ -132,42 +138,57 @@ export abstract class AdapterVaultDB implements VaultDB {
         ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.things }
         : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.record, err: Throwers.actRefused('vault', actual.act, { oplabel: 'birthBank', ask: loggableAsk }) }
       this.notifyTrackedRecords(birthBankAsk, answer)
+      this.notifyDbhas(answer)
       return answer
-    } catch (err) { return this.answerForThrown(err, 'birthBank', ask) }
+    } catch (err) {
+      const answer = this.answerForThrown(err, 'birthBank', ask)
+      this.notifyDbhas(answer)
+      return answer
+    }
   }
 
   /** Watch a bank's Things ({@link VaultDB.watch}).
+   * A VaultDB notification carries one Thing per notice. If a datastore pushes several records to its adapter in a notification, they will be split and sent individually.
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
-    const feed: Feed = { scope: bankScope, receive: ({ record, world }) => {
+    const feed: Feed = { scope: bankScope, tell: (raw) => {
       let val: ThingRecord
-      try { val = Classifier.watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+      try { val = Classifier.watchedThingOf(bankScope, raw) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
-      try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+      try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     } }
     this.#feeds.add(feed)
-    const stop = this.doWatch(bankScope, feed.receive, onBadNews)
+    const stop = this.doWatch(bankScope, ({ record }) => { feed.tell(record) }, onBadNews)
     return () => { this.#feeds.delete(feed); stop() }
   }
   // --
 
-  // == [Tracked]: notifyTrackedRecords
+  // == [Notifying]: notifyTrackedRecords, notifyDbhas, #queueNotices
 
-  // Each verb calls it last, on the answer it returns. Each watch is called on a later microtask, so nothing it does runs inside the verb.
-  /** Notify each watch of `ask`'s bank of each Thing in `answer.tracked` that is not `'same'`, with `answer.world`.
-   * Does nothing for a vaultDB made with `doNotifyTracked: false`.
-   */
-  protected notifyTrackedRecords(ask: AnyAsk, { world, tracked }: { world: WorldRecord | null, tracked?: Tracked }): void {
-    if ((tracked === undefined) || (! this.#doNotifyTracked)) { return }
+  // Queued before the verb returns. That means each watcher's synchronous work is done before the verb's caller resumes -- no handler runs inside the operation verb.
+  /** Notify each watch of `ask`'s bank of the bank, the main gate and the root box, in that order, each where `tracked` reports it other than `'same'`. */
+  protected notifyTrackedRecords(ask: AnyAsk, { tracked }: { tracked?: Tracked }): void {
+    if (tracked === undefined) { return }
     // Unspecified for a missing or damaged row: notes/wontfix.md.
-    for (const record of Object.values(tracked)) {
-      if (record === 'same') { continue }
-      for (const { scope, receive } of this.#feeds) {
-        if ((scope.userid === ask.userid) && (scope.banklabel === ask.banklabel)) {
-          queueMicrotask(() => { receive({ record: structuredClone(record), world: structuredClone(world) }) })
-        }
+    for (const record of [tracked.bank, tracked[Labelpath.MainGate], tracked[Labelpath.RootBox]]) {
+      if (record !== 'same') { this.#queueNotices(ask, record) }
+    }
+  }
+
+  // The verb's caller gets the refusal and never lands its dbhas, so the watch notifies it. A good answer's val is the caller's to land, and is not notified.
+  /** Notify each watch of the answer's bank of a refused answer's `dbhas`, where it is a Thing. */
+  protected notifyDbhas(answer: Answer<unknown, EX.GoodAct>): void {
+    if (answer.ok || (answer.dbhas === null)) { return }
+    this.#queueNotices(answer.ask, answer.dbhas)
+  }
+
+  /** Queue one notice of `record` to each watch of `scoped`'s bank. */
+  #queueNotices(scoped: Pick<LoggableAsk, 'userid' | 'banklabel'>, record: ThingRecord): void {
+    for (const { scope, tell } of this.#feeds) {
+      if ((scope.userid === scoped.userid) && (scope.banklabel === scoped.banklabel)) {
+        queueMicrotask(() => { tell(structuredClone(record)) })
       }
     }
   }
@@ -230,17 +251,3 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
   // --
 }
-
-// == [Checks]: Checks
-
-/** The checks of the options of a vaultDB that extends {@link AdapterVaultDB}. */
-const Checks = Validator.Checkers('bad_record', ({ obj, bool }) => ({
-  adapterVaultDBOpts: obj({
-    /** False to notify no watch of the Things in an answer's `tracked` ({@link AdapterVaultDB.notifyTrackedRecords}). Default true. */
-    doNotifyTracked: bool.optional(),
-  }).strict(),
-}))
-
-/** The options of a vaultDB that extends {@link AdapterVaultDB}. */
-export type AdapterVaultDBOpts = Readonly<Z.infer<typeof Checks.adapterVaultDBOpts>>
-// --

@@ -66,6 +66,7 @@ export class MemoryVaultDB extends AdapterVaultDB {
 
   // Each watcher is called on a later microtask, so nothing it does runs inside the write that notified it.
   /** Notify each watcher of `thing`'s bank of it, and of the bank as `world`. */
+  // The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for datastores that provide assurance. The synthetic notifications (for tracked and dbhas) generated at the end of a VaultDB operation are assured to complete before the calling verb resumes.
   #notify(thing: ThingRecord, world: WorldRecord | null): void {
     for (const { scope, receive, onBadNews } of this.#watchers) {
       if ((scope.userid === thing.userid) && (scope.banklabel === thing.banklabel)) {

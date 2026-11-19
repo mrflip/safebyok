@@ -64,7 +64,7 @@ describe("a ThingMinder's listing is the same, in any order", () => {
     }
   })
 
-  describe("of a first list answered before the get's, the write's and the notice's boxes were born, a get, a write and a notice", () => {
+  describe("of a stale first list, a get, a write and a notice", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')
       it(blurb, async () => {

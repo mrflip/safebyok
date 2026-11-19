@@ -42,9 +42,9 @@ const listen: PostgresListen = (channel, onNotify) => {
   return () => onNotifies.delete(onNotify)
 }
 
-/** A PostgresVaultDB on this file's PGlite, listening, with `opts` laid over it. */
-async function vaultDBOver(opts: { doNotifyTracked?: boolean } = {}): Promise<PostgresVaultDB> {
-  return new PostgresVaultDB({ client: await database(), listen, ...opts })
+/** A PostgresVaultDB on this file's PGlite, listening. */
+async function vaultDBOver(): Promise<PostgresVaultDB> {
+  return new PostgresVaultDB({ client: await database(), listen })
 }
 
 /** A PostgresVaultDB over empty tables. */
@@ -120,19 +120,6 @@ afterAll(async () => {
 VT.describeVaultDBBattery('PostgresVaultDB', { makeVaultDB, _cheat_rowsOf: rowsOf })
 
 describe("PostgresVaultDB, what only Postgres can show", () => {
-  it("answers tracked but tells its watches nothing of it, made with doNotifyTracked: false", async () => {
-    await makeVaultDB()
-    const vaultDB = await vaultDBOver({ doNotifyTracked: false })
-    await VT.expectGood(vaultDB.tryBirthBank(VT.birthBankAskOf()))
-    await VT.aWhile()
-    const notices: unknown[] = []
-    vaultDB.watch(VT.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
-    const answer = await vaultDB.tryGetThing({ ...VT.getAskAt('box'), track: VT.BankStaleTrack })
-    expect(answer).to.deep.include({ tracked: { bank: VT.bankThingOf(), gate: 'same', box: 'same' } })
-    await VT.aWhile()
-    expect(notices).to.deep.equal([])
-  })
-
   it("reports, called past the adapter, the verdict of each check of the gate stored that refused its write", async () => {
     await makeVaultDB()
     const db = await database()
@@ -232,7 +219,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
 
   it("refuses a client, listen or opt it cannot use", async () => {
     const client = await database()
-    const unusable = [{}, { client: {} }, { client, listen: 'yes' }, { client, doNotifyTracked: 'no' }, { client, pushWorld: true }]
+    const unusable = [{}, { client: {} }, { client, listen: 'yes' }, { client, pushWorld: true }]
     for (const opts of unusable) { TH.expectSyncRefusal(() => new PostgresVaultDB(opts as never), 'bad_record') }
   })
 })

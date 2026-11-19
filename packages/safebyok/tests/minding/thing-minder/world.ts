@@ -131,9 +131,9 @@ export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['
   return box
 }
 
-/** A watch notice of `thing`, as the vaultDB sends one, with `world` beside it. */
-export function noticeOf(thing: ThingNotice['val'], world: ThingNotice['world'] = null): ThingNotice {
-  return { ok: true, act: (thing.am === 'a') ? 'gotlive' : 'gotgone', val: thing, world }
+/** A watch notice of `thing`, as the vaultDB sends one. */
+export function noticeOf(thing: ThingNotice['val']): ThingNotice {
+  return { ok: true, act: (thing.am === 'a') ? 'gotlive' : 'gotgone', val: thing }
 }
 
 /** The revtok of the newest record the minder has for the main gate, or undefined for nothing or the void sentinel. */

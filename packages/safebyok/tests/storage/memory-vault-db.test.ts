@@ -51,24 +51,6 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
   })
 })
 
-describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
-  it("answers tracked but tells its watches nothing of it, made with doNotifyTracked: false", async () => {
-    const vaultDB = new MemoryVaultDB({ doNotifyTracked: false })
-    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
-    const notices: unknown[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
-    const track = TH.trackOf(TH.bankThingOf({ revseq: 3 }), TH.gateThingOf())
-    expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box'), track })).to.deep.include({ tracked: { bank: TH.bankThingOf(), gate: 'same', box: 'same' } })
-    await TH.aWhile()
-    expect(notices).to.deep.equal([])
-  })
-
-  it("refuses an opt it does not know, or one of the wrong type", () => {
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTracked: 'no' } as never), 'bad_record')
-    TH.expectSyncRefusal(() => new MemoryVaultDB({ doNotifyTrack: false } as never), 'bad_record')
-  })
-})
-
 describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }

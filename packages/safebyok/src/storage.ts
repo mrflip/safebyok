@@ -1,7 +1,7 @@
 // safebyok/storage: what a storage adapter is written against. The vaultDB, which keeps every kind as a Thing, its memory
 // store, the asks it is given and the answers it gives, and from safebyok-big the acts, throwers and checkers an adapter's
 // own code reaches for, re-exported so that each stays one binding across both packages.
-export { type AdapterVaultDBOpts, type Received, AdapterVaultDB } from './storage/adapter-vault-db'
+export { type Received, AdapterVaultDB } from './storage/adapter-vault-db'
 export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
 export {

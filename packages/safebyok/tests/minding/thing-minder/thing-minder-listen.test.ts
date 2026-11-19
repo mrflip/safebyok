@@ -40,7 +40,7 @@ describe("ThingMinder.listen", () => {
     expect(heard.mock.calls[1]?.[0]).to.have.property('car', cached)
   })
 
-  it("tells the void car of the shell, and the gone car of a tombstone, which joins the root box's listing", async () => {
+  it("tells the void car of a shell and the gone car of a tombstone", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder, receive } = minderWorldOf(vaultDB)
     const heard = listenerOf()
@@ -88,7 +88,7 @@ describe("ThingMinder.listen", () => {
     expect(toldOf(heard)).to.deep.equal([['gate', undefined]])
   })
 
-  it("tells no car for each car goodbye removes, and no labelpaths for the root box's listing", async () => {
+  it("tells nothing cached for each car and listing goodbye removes", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
