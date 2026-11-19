@@ -1,7 +1,7 @@
 # Thread 1: tidy_damage (2026-11-19)
 
 Branch `20261119-tidy_damage`, PR [#764](https://github.com/mrflip/safebyok/pull/764), on main (batch `sentinel_audit`; audit `human/20261119-sentinel_audit.md`, items A1, A2, B5, C8, D).
-Proved: `vitest run` in safebyok-big (2946), safebyok-convex (333), safebyok-indexeddb (215); lint and `tsc --noEmit` clean in all three. `pnpm justify` pending.
+Proved: `pnpm justify` green after the catch-up onto origin/main at b9ec1b520: safebyok-big 2946, safebyok-convex 333, safebyok-indexeddb 215, safebyok 1073, postgres 331, graphql 445, react 300, fastkey 43, demo 99, e2e 576, scripts 328.
 
 * **Built**:
   * `BX.endedLivesOf(bankRaw, vaults)` in `packages/safebyok-big/src/shapes/shapes-bankdb.ts`, beside `vaultLifeOf`, with
