@@ -439,9 +439,7 @@ function listingOf(prior: readonly Labelpath[], labelpaths: readonly Labelpath[]
 }
 
 /** TanStack's structural sharing for a listing: `prior` where `next` lists the same labelpaths, else `next`, frozen. */
-function stableListingOf(prior: unknown, next: unknown): unknown {
-  return Object.freeze(TSQ.replaceEqualDeep(prior, next))
-}
+const stableListingOf = (prior: unknown, next: unknown): unknown => Object.freeze(TSQ.replaceEqualDeep(prior, next))
 // --
 
 // == [Checks]: Checks
