@@ -1,0 +1,51 @@
+import * as TSQ from '@tanstack/query-core'
+import { describe, expect, it } from 'vitest'
+import type { ThingScope } from '../../../src/shapes/shapes-thing'
+import * as TH from '../../test-helpers'
+import { minderWithoutStart } from './world'
+
+describe("ThingMinder keys", () => {
+  const DeepScope = { ...TH.BoxScope, labelpath: 'box/openai/deep' }
+
+  it("interleave '/' between the labels, then end with '!' for the Thing's car", () => {
+    const minder = minderWithoutStart()
+    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'gate', '!'])
+    expect(minder.queryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '!'])
+    expect(minder.queryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '!'])
+    expect(minder.queryKey(TH.BankScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'bank', '!'])
+  })
+
+  it("put the list of a Thing's children under '#' and 'kids'", () => {
+    const minder = minderWithoutStart()
+    expect(minder.listingQueryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '#', 'kids'])
+    expect(minder.listingQueryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '#', 'kids'])
+  })
+
+  it("make a subtree prefix of the labels and '/', which no key of the Thing's own starts", () => {
+    const minder = minderWithoutStart()
+    expect(minder.subtreeQueryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/'])
+    expect(minder.subtreeQueryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '/'])
+  })
+
+  it("match, for a subtree prefix, every key under the Thing and neither of the Thing's own", () => {
+    const minder = minderWithoutStart()
+    const matches = (prefixScope: ThingScope, keyScope: ThingScope) => {
+      const prefix = minder.subtreeQueryKey(prefixScope)
+      return [minder.queryKey(keyScope), minder.listingQueryKey(keyScope)].map((queryKey) => TSQ.partialMatchKey(queryKey, prefix))
+    }
+    expect(matches(TH.RootScope, TH.RootScope)).to.deep.equal([false, false])
+    expect(matches(TH.RootScope, TH.BoxScope)).to.deep.equal([true, true])
+    expect(matches(TH.RootScope, DeepScope)).to.deep.equal([true, true])
+    expect(matches(TH.BoxScope, TH.BoxScope)).to.deep.equal([false, false])
+    expect(matches(TH.BoxScope, DeepScope)).to.deep.equal([true, true])
+    expect(matches(TH.BoxScope, TH.RootScope)).to.deep.equal([false, false])
+    expect(matches(TH.BoxScope, { ...TH.BoxScope, labelpath: 'box/openai2' })).to.deep.equal([false, false])
+    expect(matches(TH.RootScope, TH.GateScope)).to.deep.equal([false, false])
+  })
+
+  it("start no other key with the root box's car key, the one its gcTime default is set on", () => {
+    const minder = minderWithoutStart()
+    const queryKeys = [minder.queryKey(TH.RootScope), minder.listingQueryKey(TH.RootScope), minder.queryKey(TH.BoxScope)]
+    expect(queryKeys.map((queryKey) => TSQ.partialMatchKey(queryKey, minder.queryKey(TH.RootScope)))).to.deep.equal([true, false, false])
+  })
+})

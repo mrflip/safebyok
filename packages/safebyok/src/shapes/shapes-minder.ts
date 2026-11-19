@@ -63,7 +63,8 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   // Each option may be left out, or given as undefined, for no opinion.
   const minderGetOpts    = obj({ staleTime: tsqStaleTime.optional() }).strict()
   const minderTryAtOpts  = minderGetOpts.extend({ ifStale: oneof(['get', 'refresh']).optional() }).strict()
-  return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, minderLabelpath, minderTryAtOpts, minderGetOpts }
+  const minderInvalidateOpts = obj({ list: lit('all') }).strict()
+  return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, minderLabelpath, minderTryAtOpts, minderGetOpts, minderInvalidateOpts }
 })
 
 /** The checks of a ThingMinder's arguments and options.
@@ -84,6 +85,8 @@ export type MinderGetOpts    = Z.input<typeof MinderChecks.minderGetOpts>
  * - `ifStale: 'refresh'` -- also fetch a stale or missing car in the background
  */
 export type MinderTryAtOpts  = Z.input<typeof MinderChecks.minderTryAtOpts>
+/** `invalidate`'s options, which it requires: `list: 'all'` marks every listing under the labelpath stale. */
+export type MinderInvalidateOpts = Z.input<typeof MinderChecks.minderInvalidateOpts>
 /** The parts of a {@link Bank} a minder uses: its scope, its ask builders, and where trouble no caller waits on goes. */
 export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
 // --
@@ -171,7 +174,7 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 
 // == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, InvalidationEvent
 
-/** What a minder's `listen` tells, told apart by `carkind`: a car changed, a listing changed, or a listing went stale. */
+/** What a minder's `listen` tells, told apart by `carkind`: a car changed, a listing changed, or a listing was marked stale. */
 export type MinderEvent = ThingEvent | ListingEvent | InvalidationEvent
 
 /** A car changed: the car as now cached, or undefined where none is cached (it is removed, or its first get was refused). Its `modelkind` types its car. */
@@ -198,17 +201,17 @@ export type ListingEvent = Readonly<{
   of:         Readonly<{ parentpath: Labelpath }>
 }>
 
-/** A Thing's listings went stale: the next read of one asks the vaultDB again. */
+/** A Thing's listing was marked stale. It still lists what it did, until a list sets it again. */
 export type InvalidationEvent = Readonly<{
   carkind:   'invalidation'
   /** The modelkind of the Thing. */
   modelkind: Thingkind
   /** Where the Thing is stored in its bank. */
   labelpath: Labelpath
-  /** Which of the Thing's caches went stale: `'list'`, its listings. */
+  /** Which of the Thing's caches went stale: `'list'`, its listing. */
   card:      'list'
-  /** Which of its listings, by tag: `'all'`. */
-  tags:      'all'
+  /** The listing's own tag, as in its {@link ListingEvent}: `'kids'`, the Things directly under `labelpath`. */
+  tag:       ListingEvent['tag']
 }>
 // --
 
