@@ -6,7 +6,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
 * **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1157), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
-* **Status:** threads 1–4 filed, PRs #753, #756, #757, #758 (drafts); thread 5 building. Main merged #754 and #755 at 06:16; the line conflicts with main in `storage.ts` (thread 1's `BoxLabelpath` export beside #754's tidy), so GitHub runs no CI on #753–#758 until a restack, which needs #751 merged or rebased.
+* **Status:** all five threads filed: #753, #756, #757, #758, #759 (drafts), stacked on #751. Wrap-up waits on the restack onto main (the line conflicts in `storage.ts` since #754 merged; no CI runs until then), which waits on the Coach: #751 merged, or a yes to rebase it too.
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
 on 2026-11-19 with `dream-hooks.ts.md` and the Coach's edits to `internals.md`. This sprint is its **Part 1, the minder**:
@@ -189,6 +189,10 @@ Checked and kept: `tracked` landing (before the Coach), `QuietVaultDB`.
 *Gloss.* Touches the minder (`invalidate`), `isUsefulTSQEvent`, the `invalidation` member of the union. Selecting "the
 listings under a labelpath" uses thread 1's subtree prefix plus the Thing's own listing. **Depends on:** thread 4 (only
 for the line; its code stands on threads 1–3). **Size:** small. **Levels:** worker `sonnet`, review `low`.
+
+*Review (thread 5):* fixed two (a table's alignment; two-clause test titles split, and `invalidate`'s doc block now
+says the mark clears when a record joins the listing too). The test split moves the same 129 titles unchanged. Left:
+a shared `isListingKey` (the next thread touching key marks); `shapes-minder.ts` alignment.
 
 ## For the Coach
 
