@@ -43,6 +43,8 @@ which moves every other branch in the range). Delete a snapshot. Resolve a confl
 branches of the stack: that is a restack (the `restacker` skill), not yours. Read anything named
 `secret`. Let `git rerere` resolve anything: every rebase and cherry-pick here runs with
 `-c rerere.enabled=false`, since a resolution it replays silently makes a conflict look empty.
+Call a bare `grep`: the shell may define it as a function (here, one that runs ugrep, whose
+`-vqFxf` exits differently), so every `grep` here is `command grep`.
 
 ## 1. Check the ground (no branch or file touched)
 
@@ -139,10 +141,16 @@ report `bailed`.
    # `<sprint>` in rev-list, and the loop's two squash tests.
    { git cherry HEAD "$old"; git cherry HEAD <sprint>; } | awk '$1 == "+" { print $2 }' > "$snap/unheld"
    git rev-list --reverse --topo-order --no-merges "$old" <sprint> --not HEAD \
-     | grep -Fxf "$snap/unheld" > "$snap/candidates"
+     | command grep -Fxf "$snap/unheld" > "$snap/candidates"
+   # Author time and subject of every commit the new tree gained, to catch one landed on main or
+   # the stack from a different parent, whose patch `git cherry` no longer matches.
+   git log --format='%at %s' HEAD --not "$old" > "$snap/landed"
    ```
 
-   Then pick them in order. A candidate whose subject ends `squashed by base-sync` is an earlier
+   Then pick them in order. A candidate whose author time and subject match a commit in `landed`
+   is already in the tree, landed by another route, and is skipped as `landed`: picking it puts
+   its hunks through `-X ours`, and the clean ones can be second copies of what the tree holds.
+   A candidate whose subject ends `squashed by base-sync` is an earlier
    run's plan squash, which the new one replaces: picking it would bring back a plan line the sprint
    has since changed, so it is skipped as `superseded`. A candidate reachable from the sprint
    branch whose every path is in `plan-paths` is skipped: the squash is the sprint's version of
@@ -153,9 +161,10 @@ report `bailed`.
    pick() { GIT_COMMITTER_DATE="$(git log -1 --format=%aI "$1")" git -c rerere.enabled=false cherry-pick "${@:2}" "$1"; }
    empty() { [ -z "$(git diff --name-only --diff-filter=U)" ] && git diff --cached --quiet; }
    while read -r c; do
-     if git log -1 --format=%s "$c" | grep -q ', squashed by base-sync$'; then echo "$c superseded"; continue; fi
+     if command grep -qFx "$(git log -1 --format='%at %s' "$c")" "$snap/landed"; then echo "$c landed"; continue; fi
+     if git log -1 --format=%s "$c" | command grep -q ', squashed by base-sync$'; then echo "$c superseded"; continue; fi
      if git merge-base --is-ancestor "$c" <sprint> \
-       && git diff-tree --no-commit-id --name-only -r "$c" | grep -vqFxf "$snap/plan-paths"; then :
+       && git diff-tree --no-commit-id --name-only -r "$c" | command grep -vqFxf "$snap/plan-paths"; then :
      elif git merge-base --is-ancestor "$c" <sprint>; then echo "$c squashed"; continue; fi
      pick "$c" > /dev/null 2>&1 && { echo "$c picked"; continue; }
      empty && { git cherry-pick --skip; echo "$c held"; continue; }
@@ -203,12 +212,12 @@ t=$snap/tmp; mkdir -p "$snap/merged"
   # Author time: a rebase or cherry-pick keeps it, so it says when the change was written.
   tnew=$(git log -1 --format=%at "$new" --not "$old" -- "$p"); by=$(git log -1 --format='%h %s' "$new" --not "$old" -- "$p")
   # The squash carries the sprint tip's date; a plan path's own time is its last sprint commit's.
-  if grep -qFx "$p" "$snap/plan-paths" 2> /dev/null && [ -n "$tnew" ]; then
+  if command grep -qFx "$p" "$snap/plan-paths" 2> /dev/null && [ -n "$tnew" ]; then
     tnew=$(git log -1 --format=%at <sprint> -- "$p"); by=$(git log -1 --format='%h %s' <sprint> -- "$p"); fi
   # A conflict an earlier run restored with markers is the Coach's, unresolved: keep it as it is.
-  if [ -n "$mine" ] && git cat-file blob "$mine" | grep -q '^<<<<<<< new tree$'; then v=carried
+  if [ -n "$mine" ] && git cat-file blob "$mine" | command grep -q '^<<<<<<< new tree$'; then v=carried
   elif [ "$mine" = "$now" ]; then v=identical
-  elif [ -n "$mine" ] && [ -n "$now" ] && git diff --numstat "$now" "$mine" | grep -q '^-'; then v=binary
+  elif [ -n "$mine" ] && [ -n "$now" ] && git diff --numstat "$now" "$mine" | command grep -q '^-'; then v=binary
   elif [ "$now" = "$base" ]; then v=untouched
   elif [ -z "$mine" ] || [ -z "$now" ]; then v=deleted-vs-changed
   else
@@ -284,7 +293,7 @@ done < "$snap/actions.tsv"
 ```
 
 An `untouched` row that was staged gets its staging back, since the new tree did not change that
-path: `grep -qFx <p> "$snap/staged" && git restore --staged --source="$stash^2" -- <p>` for each.
+path: `command grep -qFx <p> "$snap/staged" && git restore --staged --source="$stash^2" -- <p>` for each.
 Every other restored change comes back unstaged.
 
 Then check: `git status --short` lists exactly the rows restored, merged or in conflict, and
@@ -308,7 +317,7 @@ Lead with a status line: `synced` | `bailed`, the branch, its new tip, and step 
 
 * **Shape**: `origin/main <sha>` -> each stack branch at its tip in `B` (`stack-tips`) -> `plan` (squash, at
   the sprint's SHA) -> each replayed commit (`<sha> <subject>`), and the candidates left out, with
-  why (in the tree already, superseded by the squash, a conflict it could not take in part). A
+  why (in the tree already, landed by another route, superseded by the squash, a conflict it could not take in part). A
   commit kept with conflicting hunks dropped says so, with its paths and
   `<snap>/dropped/<sha>/`, and a line on what each dropped hunk said. A stack branch whose tip in
   `B` differs from its ref's was replayed: give both SHAs, and say the line wants a restack.
