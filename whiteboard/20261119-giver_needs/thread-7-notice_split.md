@@ -28,12 +28,16 @@ wording changes). This file describes the rework; the first build is in commit `
 * **Decisions made**: the dbhas comes after the tracked Things in every verb, not only writes, so one rule holds. The thrown
   path notifies too: its refusal reaches the caller as an answer like any other.
 * **Deviations**, all reported, none softened:
-  - Left out of `VaultDB.watch`, false as built: (a) "A store may pass the adapter several at once; each is notified as a
-    notice of its own." A store passes one record and a world, and the world is not notified; the interface also knows no
-    adapter. (b) "A handler will never be run inside the progress of a verb. What a handler awaits happens after the verb's
-    caller resumes." False for a store's own notice: `MemoryVaultDB#notify` runs between `doWriteThing` settling and the
-    verb returning, and Postgres LISTEN arrives at any time. Proposed: "A handler of a notice the vaultDB sends for a verb's
-    answer is never run inside the progress of that verb: what it awaits happens after the verb's caller resumes."
+  - `VaultDB.watch`'s first two bullets are built as the Coach calibrated them (notify-plan.md, *Wording changed by the
+    orchestrator*): a notice carries one Thing "as `ThingNotice` is shaped today", and the vaultDB does not echo back a good
+    answer's `val` or a bank's `world`. The third keeps only the repeat, with an example that holds as built (a write refused
+    on a Thing it also tracks). The first bullet's "Where a store passes the adapter several at once" names the adapter in
+    the interface's doc, and no store passes several today: flagged, built as worded.
+  - Left out of `VaultDB.watch`, false as built: "A handler will never be run inside the progress of a verb. What a handler
+    awaits happens after the verb's caller resumes." False for a store's own notice: `MemoryVaultDB#notify` runs between
+    `doWriteThing` settling and the verb returning, and Postgres LISTEN arrives at any time. Proposed: "A handler of a notice
+    the vaultDB sends for a verb's answer is never run inside the progress of that verb: what it awaits happens after the
+    verb's caller resumes."
   - Kept as worded, flagged: `tryWriteThing`'s comment ("has already heard of whichever of the bank and main gate changed")
     and the minder bullet "each changed tracked Thing [is] cached before the operation answers" fail under
     `doNotifyTracked: false`, and a thrown answer carries no `tracked`.
