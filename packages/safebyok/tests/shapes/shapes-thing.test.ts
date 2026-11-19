@@ -189,7 +189,7 @@ describe("Shell.lifepathWithParentage(raw, parent?)", () => {
   }
 })
 
-describe("Labelpath.modelkindOf(labelpath) and Labelpath.isOfModelkind(labelpath, modelkind)", () => {
+describe("Labelpath.modelkindOf(labelpath), Labelpath.isOfModelkind(labelpath, modelkind) and Labelpath.isBox(labelpath)", () => {
   const LabelpathCases = [
     ['bank',             'bank', true,  "the bank's root"],
     ['bank/main',        'bank', false, 'a label under bank'],
@@ -207,6 +207,7 @@ describe("Labelpath.modelkindOf(labelpath) and Labelpath.isOfModelkind(labelpath
     it(`${isKind ? 'accepts' : 'refuses'} ${blurb}`, () => {
       expect(Labelpath.modelkindOf(labelpath)).to.eq(modelkind)
       expect(Labelpath.isOfModelkind(labelpath, modelkind)).to.eq(isKind)
+      expect(Labelpath.isBox(labelpath)).to.eq(isKind && (modelkind === 'box'))
     })
   }
 

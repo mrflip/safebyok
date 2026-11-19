@@ -5,13 +5,15 @@
 import { type CX, Validator } from 'safebyok-big/internals'
 import type { Thingkind } from './shapes-thing'
 
-// == [Scope]: Userid, Banklabel, Labelpath, MaxLabelsUnder
+// == [Scope]: Userid, Banklabel, Labelpath, BoxLabelpath, MaxLabelsUnder
 /** The id of a user, as the host gives it (`userid`). */
 export type Userid = string
 /** A bank's label, chosen by the host (`banklabel`). */
 export type Banklabel = string
 /** Where a Thing is stored in its bank: its modelkind, then at most one label after a `/` (`bank`, `gate`, `box/aa`). */
 export type Labelpath = string
+/** The labelpath of a box: the root box's, or one under it. */
+export type BoxLabelpath = 'box' | `box/${string}`
 
 /** The most labels a labelpath of each kind has after its modelkind: none for the bank, one for a gate or a box. */
 const MaxLabelsUnder = { bank: 0, gate: 1, box: 1 } as const satisfies Record<Thingkind, number>
@@ -29,6 +31,8 @@ export const Labelpath = Object.freeze({
     const [head, ...labels] = labelpath.split('/')
     return (head === modelkind) && (labels.length <= MaxLabelsUnder[modelkind]) && labels.every((label) => Validator.Kit.label.safeParse(label).success)
   },
+  /** True when `labelpath` is a box's: the root box's, or one under it. */
+  isBox(labelpath: Labelpath): labelpath is BoxLabelpath { return Labelpath.isOfModelkind(labelpath, 'box') },
   /** The label of a Thing: the last segment of its labelpath, which for a root is its modelkind. */
   labelOf(labelpath: Labelpath): string { return labelpath.slice(labelpath.lastIndexOf('/') + 1) },
   /** The labelpath of a Thing's parent: its labelpath less its own label, `''` for a root. */
