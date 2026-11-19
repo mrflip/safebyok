@@ -4,7 +4,7 @@ import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { badnewsOf, boxBirthAskOf, listenerOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, toldOf } from './world'
+import { badnewsOf, listenerOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, toldOf } from './world'
 
 describe("ThingMinder.isStaleAt", () => {
   it("is true before any get, false after, and true past staleTime", async () => {
@@ -108,29 +108,18 @@ describe("ThingMinder's watch", () => {
     expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate))
   })
 
-  it("caches the bank and main gate the watch tells of beside a box written", async () => {
+  it("keeps the main gate's car when the watch tells of it again, and tells a listener each time", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
-    await TH.wakeupAtNextTick()
-    expect([minder.at(TH.BankScope), minder.at(TH.GateScope)]).to.deep.equal([undefined, undefined])
-    await TH.expectGood(vaultDB.tryWriteThing(boxBirthAskOf()))
-    await TH.eventually(() => minder.at(TH.GateScope) !== undefined)
-    expect(minder.at(TH.BankScope)).to.deep.equal(carOf(TH.bankThingOf()))
-    expect(minder.at(TH.GateScope)).to.deep.equal(carOf(TH.gateThingOf()))
-  })
-
-  it("keeps the bank's car when the watch tells of it again, and tells a listener each time", async () => {
-    const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
-    await TH.expectGood(vaultDB.tryWriteThing(boxBirthAskOf('alpha')))
-    await TH.eventually(() => minder.at(TH.BankScope) !== undefined)
-    const car = minder.at(TH.BankScope)
+    const staleGet = { ...TH.getAskAt('box'), track: TH.GateStaleTrack }
+    await TH.expectGood(vaultDB.tryGetThing(staleGet))
+    const car = minder.at(TH.GateScope)
+    expect(car).to.deep.equal(carOf(TH.gateThingOf()))
     const listener = listenerOf()
     minder.listen(listener)
-    await TH.expectGood(vaultDB.tryWriteThing(boxBirthAskOf('beta')))
-    await TH.eventually(() => toldOf(listener).some(([labelpath]) => labelpath === 'gate'))
-    expect(minder.at(TH.BankScope)).to.eq(car)
-    expect(toldOf(listener).filter(([labelpath]) => labelpath === 'bank')).to.deep.equal([['bank', 'full']])
+    await TH.expectGood(vaultDB.tryGetThing(staleGet))
+    expect(minder.at(TH.GateScope)).to.eq(car)
+    expect(toldOf(listener)).to.deep.equal([['gate', 'full']])
   })
 
   it("skips a Thing while the minder is not minding", () => {

@@ -1,13 +1,12 @@
 /** The battery's cases of a watch. */
 import { describe, expect, it } from 'vitest'
-import { chunk } from 'es-toolkit'
 import type { Errors } from 'safebyok-big/internals'
 import { aWhile, eventually, expectSyncRefusal } from 'safebyok-big/testing'
 import type { ThingWatchScope } from '../../src/shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../../src/storage/vault-db'
 import { Shell } from '../../src/shapes/shapes-thing'
 import {
-  BankStaleTrack, GateStaleTrack, Life0, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
+  BankStaleTrack, GateStaleTrack, Life0, RootStaleTrack, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
@@ -33,35 +32,48 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
       expect(badNews).to.deep.equal([])
     })
 
-    it("hears each of a bank's roots at its birth, each followed by the bank and main gate", async () => {
+    it("hears each of a bank's roots at its birth, one notice each", async () => {
       const vaultDB = await fresh()
       const { notices, badNews } = heardOf(vaultDB)
       await vaultDB.tryBirthBank(birthBankAskOf())
-      await eventually(() => notices.length === 9)
-      const told = chunk(notices.map(({ val }) => val), 3)
-      expect(told.map(([changed]) => changed?.labelpath)).to.have.members(['bank', 'box', 'gate'])
-      expect(told.map(([, ...world]) => world)).to.deep.equal(Array.from({ length: 3 }, () => [bankThingOf(), gateThingOf()]))
+      await eventually(() => notices.length === 3)
+      await aWhile()
+      expect(notices.map(({ val }) => val)).to.have.deep.members([bankThingOf(), gateThingOf(), rootBoxOf()])
       expect(badNews).to.deep.equal([])
     })
 
-    it("hears a box written in a born bank, then the bank and main gate", async () => {
+    it("hears a box written in a born bank, and nothing of the bank or main gate", async () => {
       const vaultDB = await bornBank()
       const { notices } = heardOf(vaultDB)
       const box = boxThingOf()
       await vaultDB.tryWriteThing(birthAskOf(box, Shell.childCited(Life0)))
-      await eventually(() => notices.length === 3)
+      await eventually(() => notices.length === 1)
       await aWhile()
-      expect(notices).to.deep.equal([box, bankThingOf(), gateThingOf()].map((val) => ({ ok: true, act: 'gotlive', val })))
+      expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: box }])
     })
 
-    it("hears nothing of another bank, nor of a refused write", async () => {
+    it("hears the dbhas of a refused write alone, and nothing in another bank", async () => {
       const vaultDB = await withGate()
       const other = heardOf(vaultDB, { ...ThingBank, banklabel: 'other' })
       const own = heardOf(vaultDB)
       await vaultDB.tryWriteThing(birthAskOf(gateThingOf({ revtok: OtherRevtok })))
+      expect(own.notices).to.deep.equal([{ ok: true, act: 'gotlive', val: gateThingOf() }])
       await aWhile()
-      expect([...other.notices, ...own.notices]).to.have.lengthOf(0)
+      expect(own.notices).to.have.lengthOf(1)
+      expect(other.notices).to.deep.equal([])
       expect([...other.badNews, ...own.badNews]).to.deep.equal([])
+    })
+
+    it("hears the dbhas a thrown refusal carries, once", async () => {
+      const vaultDB = await withGate()
+      const { notices, badNews } = heardOf(vaultDB)
+      const gate = gateThingOf()
+      const answer = await vaultDB.tryWriteThing(replaceAskOf(gate, nextGateOf(gate), { policies: ['revoke_passkey'] }))
+      expect(answer).to.deep.include({ ok: false, act: 'policied', dbhas: gate })
+      expect(notices.map(({ val }) => val)).to.deep.equal([gate])
+      await aWhile()
+      expect(notices).to.have.lengthOf(1)
+      expect(badNews).to.deep.equal([])
     })
 
     it("hears nothing once stopped", async () => {
@@ -80,39 +92,46 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
       const notices: ThingNotice[] = []
       vaultDB.watch(ThingBank, (notice) => { notices.push(notice); throw new Error('host bug') }, (news) => { badNews.push(news) })
       await vaultDB.tryBirthBank(birthBankAskOf())
-      await eventually(() => badNews.length === 9)
-      expect(notices).to.have.lengthOf(9)
+      await eventually(() => badNews.length === 3)
+      expect(notices).to.have.lengthOf(3)
       expect(new Set(badNews.map((news) => news.refusalkind))).to.deep.equal(new Set(['unexpected_error']))
     })
 
     describe("of what an answer's tracked reports", () => {
-      it("hears each Thing tracked other than as 'same', then the bank and main gate, in the tracked bank alone", async () => {
+      it("hears each Thing tracked other than as 'same', alone and before the verb answers, in the tracked bank alone", async () => {
         const vaultDB = await bornBank()
         const own = heardOf(vaultDB)
         const other = heardOf(vaultDB, { ...ThingBank, banklabel: 'other' })
         await vaultDB.tryGetThing({ ...getAskAt('box'), track: GateStaleTrack })
-        await eventually(() => own.notices.length === 3)
+        expect(own.notices.map(({ val }) => val)).to.deep.equal([gateThingOf()])
         await aWhile()
-        expect(own.notices.map(({ val }) => val)).to.deep.equal([gateThingOf(), bankThingOf(), gateThingOf()])
+        expect(own.notices).to.have.lengthOf(1)
         expect(other.notices).to.deep.equal([])
       })
 
       it("hears of tracked Things to a listing, a refusal and a write", async () => {
         const vaultDB = await bornBank()
         const { notices } = heardOf(vaultDB)
-        const told = [bankThingOf(), bankThingOf(), gateThingOf()]
         await vaultDB.tryListThings({ ...listAskAt('box'), track: BankStaleTrack })
-        await eventually(() => notices.length === 3)
-        expect(notices.map(({ val }) => val)).to.deep.equal(told)
+        expect(notices.map(({ val }) => val)).to.deep.equal([bankThingOf()])
         await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: OtherRevtok })), track: BankStaleTrack })
-        await eventually(() => notices.length === 6)
-        expect(notices.slice(3).map(({ val }) => val)).to.deep.equal(told)
+        expect(notices.slice(1).map(({ val }) => val)).to.deep.equal([bankThingOf(), gateThingOf()])
         const next = nextGateOf(gateThingOf())
         await vaultDB.tryWriteThing({ ...replaceAskOf(gateThingOf(), next), track: trackOf() })
-        await eventually(() => notices.length >= 9)
+        await eventually(() => notices.length === 5)
         await aWhile()
-        for (const { val } of notices.slice(6)) { expect([next, bankThingOf()]).to.deep.include(val) }
-        expect(notices.slice(6).filter(({ val }) => val.labelpath === 'gate')).to.not.have.lengthOf(0)
+        expect(notices.slice(3).map(({ val }) => val)).to.deep.equal([next, next])
+      })
+
+      it("hears a refused write's changed bank, main gate and root box, then its dbhas, in that order", async () => {
+        const vaultDB = await bornBank()
+        const { notices, badNews } = heardOf(vaultDB)
+        const track = { bank: BankStaleTrack.bank, gate: GateStaleTrack.gate, box: RootStaleTrack.box }
+        await vaultDB.tryWriteThing({ ...birthAskOf(gateThingOf({ revtok: OtherRevtok })), track })
+        expect(notices.map(({ val }) => val)).to.deep.equal([bankThingOf(), gateThingOf(), rootBoxOf(), gateThingOf()])
+        await aWhile()
+        expect(notices).to.have.lengthOf(4)
+        expect(badNews).to.deep.equal([])
       })
 
       it("hears nothing more where each tracked Thing is 'same', or the ask tracks nothing", async () => {
@@ -122,9 +141,9 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
         await vaultDB.tryListThings(listAskAt('box'))
         const rootNext = nextOf(rootBoxOf())
         await vaultDB.tryWriteThing(replaceAskOf(rootBoxOf(), rootNext))
-        await eventually(() => notices.length === 3)
+        await eventually(() => notices.length === 1)
         await aWhile()
-        expect(notices.map(({ val }) => val.labelpath)).to.deep.equal(['box', 'bank', 'gate'])
+        expect(notices.map(({ val }) => val)).to.deep.equal([rootNext])
         expect(badNews).to.deep.equal([])
       })
     })

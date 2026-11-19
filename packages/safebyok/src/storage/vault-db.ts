@@ -92,10 +92,19 @@ export interface VaultDB {
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
-   * `onNotice` gets a notice for each changed Thing, and for each Thing in a verb's answer's `tracked` that is not `'same'`.
-   * Each is followed by a notice of the bank and one of its main gate, as the store last read them, where it found both
-   * sound. So a watcher may hear of a Thing again at a revision it has already heard of.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
+   * - A watch is notified of one Thing per notice.
+   * - A notice reports a change, never a plain observation: a Thing written, a tracked Thing found changed, or a refusal's
+   *   `dbhas`. A bank's `world` is never notified.
+   * - A verb never sends a notice on purpose for the `val` of its good answer: its caller has that. Where the same Thing is
+   *   notified for another reason (a put of the root box by an ask that also tracks it), it is notified again, and nothing
+   *   looks for or avoids the repeat.
+   * - Every notice the vaultDB sends for a verb's answer (a changed tracked Thing, a refusal's `dbhas`) reaches each watch
+   *   before the verb's answer reaches its caller, so a handler's synchronous work is complete by then. Rely on nothing stronger.
+   * - A verb's notices come "out to in": the bank, the main gate, the root box, then the `dbhas`.
+   * - A notice goes to every watch of the bank, whoever sent the ask.
+   * - A watch may be notified of a Thing again at a revision it has notified, or at an older one.
+   * - A change the store itself reports arrives when the store delivers it, in no promised order against a verb's answer.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void
 }

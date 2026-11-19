@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import type { ThingNotice } from '../../src/storage/vault-db'
 import * as Classifier from '../../src/storage/thing-classifier'
 import * as TH from '../test-helpers'
 
@@ -61,6 +62,21 @@ describe("AdapterVaultDB's opts, on a MemoryVaultDB", () => {
     expect(await vaultDB.tryGetThing({ ...TH.getAskAt('box'), track })).to.deep.include({ tracked: { bank: TH.bankThingOf(), gate: 'same', box: 'same' } })
     await TH.aWhile()
     expect(notices).to.deep.equal([])
+  })
+
+  it("still tells its watches a stale_write's dbhas, made with doNotifyTracked: false", async () => {
+    const vaultDB = new MemoryVaultDB({ doNotifyTracked: false })
+    await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
+    const [root0, rootNext] = [TH.rootBoxOf(), TH.nextOf(TH.rootBoxOf())]
+    await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(root0, rootNext)))
+    await TH.aWhile()
+    const notices: ThingNotice[] = []
+    vaultDB.watch(TH.ThingBank, (notice) => { notices.push(notice) }, () => undefined)
+    const answer = await vaultDB.tryWriteThing({ ...TH.replaceAskOf(root0, rootNext), track: TH.BankStaleTrack })
+    await TH.expectBad(Promise.resolve(answer), 'stale_write')
+    expect(answer).to.deep.include({ dbhas: rootNext, tracked: { bank: TH.bankThingOf(), gate: 'same', box: rootNext } })
+    await TH.aWhile()
+    expect(notices.map(({ val }) => val)).to.deep.equal([rootNext])
   })
 
   it("refuses an opt it does not know, or one of the wrong type", () => {
