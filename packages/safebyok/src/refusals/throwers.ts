@@ -114,6 +114,6 @@ export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly Damag
   return new Errors.VaultError('damaged_row', Phrases.ChildrenStoredDamaged, { meta: { ask: loggableAskOf(ask), labelpaths: damaged_rows.map(({ labelpath }) => labelpath) } })
 }
 
-/** An `unexpected_error` refusal: a minder's structural sharing was given the cars of two different Things. */
+/** The refusal of the cars of two different Things, given to a minder's structural sharing. */
 export function carsOfOtherThings(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.CarsOfOtherThings) }
 // --

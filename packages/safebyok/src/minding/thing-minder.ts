@@ -259,7 +259,8 @@ export class ThingMinder {
   /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
    * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
-   * A write answered after `goodbye` caches nothing. An answer carrying a record of another bank rejects, whether or not the write was made.
+   * A write answered after `goodbye` caches nothing.
+   * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
@@ -301,7 +302,8 @@ export class ThingMinder {
   }
 
   /** Fetch `ask`'s car from the vaultDB, made of its shell where storage has nothing.
-   * Refuses `stale_read` for an answer older than the revision cached when it began, and `unexpected_error` for a record of another Thing than `ask`'s.
+   * Refuses an answer older than the revision cached when it began.
+   * Refuses a record of another Thing than `ask`'s.
    */
   async #fetchCar(ask: GetAsk): Promise<ThingCar<ThingRecord>> {
     // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
@@ -309,7 +311,7 @@ export class ThingMinder {
     const answer = await this.#vaultDB.tryGetThing(ask)
     // Thrown as it came. The `dbhas` is delivered through the watch, never from here.
     if (! answer.ok) { throw answer.err }
-    const record = (answer.act === 'gotvoid') ? this.#shellAt(ask) : this.#demandDelivered(answer.val, ask)
+    const record = (answer.act === 'gotvoid') ? this.#shellAt(ask) : this.#checkedDelivered(answer.val, ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
     if ((prior !== undefined) && (Thing.cmp(prior.newest, record) < 0)) { throw Throwers.staleRead(ask) }
     return carOf(record)
@@ -326,10 +328,10 @@ export class ThingMinder {
   }
 
   // Every record that lands but a get's comes through here: TanStack lands a get's in the car itself.
-  /** Land `record` in its car and its parent's listing, while minding. A record of another bank refuses `unexpected_error`. */
+  /** Land `record` in its car and its parent's listing, while minding. A record of another bank refuses. */
   #sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
-    this.#demandDelivered(record, this.scope)
+    this.#checkedDelivered(record, this.scope)
     this.#tsq.setQueryData(this.queryKey(record), carOf(record))
     this.#joinParentListing(record)
   }
@@ -414,7 +416,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Checks]: scope, rootBox, #rootBoxScope, #demandOwnScope, #demandDelivered, #demandReady, #scopeOfQueryKey
+  // == [Checks]: scope, rootBox, #rootBoxScope, #demandOwnScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
 
   /** The scope of this minder's bank. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
@@ -431,8 +433,8 @@ export class ThingMinder {
     return ThingChecks.thingScope.parseConsistent(scoped, this.scope)
   }
 
-  /** `record`, demanding that the vaultDB delivered it of `scoped`'s bank, and of its labelpath where `scoped` has one. */
-  #demandDelivered<RecordT extends DeliverableThing>(record: RecordT, scoped: ThingWatchScope): RecordT {
+  /** `record`, refused where the vaultDB delivered it of another bank, or of another labelpath than `scoped` names. */
+  #checkedDelivered<RecordT extends DeliverableThing>(record: RecordT, scoped: ThingWatchScope): RecordT {
     DeliveredChecks.thingScope.parseConsistent(record, scoped, { message: Phrases.DeliveredOfOtherScope })
     return record
   }

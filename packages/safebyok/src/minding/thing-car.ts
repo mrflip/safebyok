@@ -26,7 +26,7 @@ export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar
 // TanStack Query types the values it hands structural sharing as unknown, so both are checked as cars.
 /** The car of the newest record of `prior` and `delivered`, and the fullest of its life, from either car, with `prior`'s on a tie.
  * It serves as a minder query's structural sharing: it is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined.
- * Anything but a car, or two cars of different Things, refuses `unexpected_error`; `prior` may also be undefined.
+ * Refuses anything but a car, and two cars of different Things; `prior` may also be undefined.
  */
 export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<ThingRecord> {
   demandCar(delivered, Phrases.NotACar)
