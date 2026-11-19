@@ -38,6 +38,12 @@ import * as Throwers from '../refusals/throwers'
  *   has heard of, never on the order they arrived in.
  * - The order records arrive in never changes a car's liveness, or the revisions it carries.
  * - A car never goes back: it carries the newest revision any source has told of, and a newer life replaces an older one whole.
+ * - A listener is told of each car and listing as the cache changes, in that order, so what it is told never goes back either.
+ *   Each car told of a Thing has a newest no older than the last, and within one life it never loses its fullest record or
+ *   takes an older one. A refused get tells the car unchanged. Each listing told lists every labelpath the last one did.
+ *   Only a removal breaks the run: it tells no car, and what arrives after starts afresh. Removal is contemplated as part of a
+ *   later feature allowing nested boxes, but not yet. Access after `goodbye()` or altering the gcTime is misuse (the customer
+ *   may do as they please with the Giver's React Query cache).
  * - A sparse live record never displaces a whole live record of the same life: it leaves the car `behind`, its fullest
  *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
  *   get fetches the newest whole.
