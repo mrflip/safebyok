@@ -58,7 +58,8 @@ One object store, `rows`, keyed by array. A bank row is filed at `['bank', user_
 its vault's life at `['box', user_id, banklabel, vaultlabel, bank_tok, vault_tok, boxlabel]`, so one key range fetches a
 bank's vaults or a vault life's boxes. A deleted bank, and a vault or box deleted on its own, stays as a tombstone; deleting
 a bank removes its gate, vault and box rows outright. `tidyGone` deletes the vault rows left from an earlier life of the bank
-and the box rows of any vault life that is over.
+and the box rows of any vault life that is over. A row that fails the core's checks is never taken for one of a life that is
+over: a vault row is kept, with its box rows, and a bank row makes `tidyGone` refuse `damaged_row`, deleting nothing.
 
 ## Writing an adapter of your own
 

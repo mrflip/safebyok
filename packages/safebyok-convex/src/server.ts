@@ -60,6 +60,8 @@ export class SafebyokBankComponent {
     const publicMutation: MutationBuilder<DataModel, 'public'> = mutationGeneric
 
     // An ask is any value until the component parses it, so its `user_id` is read here with the core's own check of one.
+    // An ask with no lawful `user_id` refuses `identity_revoked` too, not `bad_scope`: until the caller is shown to be the user
+    // the ask names, nothing is said to them about the ask.
     /** Throw `identity_revoked` unless the caller is signed in as the `user_id` of `scope`. */
     async function demandCaller(ctx: GenericQueryCtx<DataModel>, scope: unknown): Promise<void> {
       const callerId = await opts.getUserId(ctx)

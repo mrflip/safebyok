@@ -1,7 +1,7 @@
 import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
 import type { BankScope, VaultScope, WatchScope } from 'safebyok-big/storage'
-import type { BankTok, Boxlabel, Vaultlabel } from 'safebyok-big'
+import type { Boxlabel, Vaultlabel } from 'safebyok-big'
 import { ConvexError, getDocumentSize } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
@@ -48,7 +48,7 @@ export const buildBank = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const gateDoc = await getGateDoc(ctx.db, ask, 'main')
     const fetched = { bank: bankDoc?.bank ?? null, gate: gateDoc?.gate ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyBuildBank(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyBuildBank(ask, fetched))) { return { ...fetched, written: null } }
     const bank = await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
     const gate = await writeGateDoc(ctx.db, gateDoc, ask.gate)
     return { ...fetched, written: { bank, gate } }
@@ -64,7 +64,7 @@ export const putGate = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const gateDoc = await getGateDoc(ctx.db, ask, ask.gatelabel)
     const fetched = { bank: bankDoc?.bank ?? null, gate: gateDoc?.gate ?? null }
-    if (! isWrite(storedOrNull(() => policedGateOf(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => policedGateOf(ask, fetched))) { return { ...fetched, written: null } }
     return { ...fetched, written: { gate: await writeGateDoc(ctx.db, gateDoc, ask.record) } }
   },
 })
@@ -81,7 +81,7 @@ export const delBank = mutation({
     const ask = askFor(() => BX.bankDel.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyDelBank(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyDelBank(ask, fetched))) { return { ...fetched, written: null } }
     const bank = await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
     await deleteBank(ctx.db, ask)
     return { ...fetched, written: { bank } }
@@ -112,7 +112,7 @@ export const putVault = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null, vault: vaultDoc?.vault ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyStoredVault(ask, fetched))) { return { ...fetched, written: null } }
     return { ...fetched, written: { vault: await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record) } }
   },
 })
@@ -126,7 +126,7 @@ export const delVault = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null, vault: vaultDoc?.vault ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyStoredVault(ask, fetched))) { return { ...fetched, written: null } }
     const vault = await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record)
     // A vault's boxes end with its life, and the component's limits keep a life small enough to delete in this transaction.
     await deleteBoxes(ctx.db, lifeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
@@ -179,12 +179,12 @@ export const putBox = mutation({
     const reckoning = await Tallies.reckon(ctx.db, life)
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
-    const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity: Tallies.capacityOf(reckoning.tally, cap) }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))) { return { ...fetched, written: null, roomless: false } }
+    const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity: Tallies.capacityOf(reckoning, cap) }
+    if (! wouldWrite(() => BX.classifyStoredBox(ask, fetched))) { return { ...fetched, written: null, roomless: false } }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
     const growth = Tallies.growthOf(anteDoc, boxDoc)
-    if (Tallies.wouldPassLimit(reckoning.tally, growth, cap)) { return { ...fetched, written: null, roomless: true } }
+    if (Tallies.wouldPassLimit(reckoning, growth, cap)) { return { ...fetched, written: null, roomless: true } }
     const box = await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
     return { ...fetched, written: { box }, roomless: false }
@@ -201,7 +201,7 @@ export const delBox = mutation({
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
     const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyStoredBox(ask, fetched))) { return { ...fetched, written: null } }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     const box = await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     // The tombstone replaces the row and still counts as one box row: of the `all_*` figures, only the size changes.
@@ -213,12 +213,12 @@ export const delBox = mutation({
 
 // == [Upkeep]: tidyGone, watchRows
 
-// A vault row is of an ended life when its `bank_tok` is not the live bank row's, and a box row or a tally when its life pair is
-// not that of a live vault row. A vault row that fails its checks is left alone, with every box row and tally under its
-// vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one transaction can carry, so it
-// deletes a batch of them, and a host calls it again until it answers that none are left.
+// Which lives have ended is `BX.endedLivesOf`'s to say. A vault row that fails its checks is left alone, with every box row
+// and tally under its vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one
+// transaction can carry, so it deletes a batch of them, and a host calls it again until it answers that none are left.
 /** Delete the vault rows and tallies of every ended life in a bank, and a batch of their box rows.
  * Returns how many box rows its live vaults have, and what is left of the box rows of ended lives.
+ * Deletes nothing, and refuses, when the bank row fails its checks.
  */
 export const tidyGone = mutation({
   args:    CVX.askArgs,
@@ -226,49 +226,38 @@ export const tidyGone = mutation({
   handler: async (ctx, { ask: sent }) => {
     const ask = askFor(() => DB.boxTidy.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, ask)
-    const bank_tok = liveBankTokOf(bankDoc?.bank ?? null)
+    const bank = (bankDoc === null) ? null : storedFor(() => BX.storedBankRow.parse(bankDoc.bank))
     const vaultDocs = await listVaultDocs(ctx.db, ask)
-    const lives: Life[] = []
-    const damagedlabels: Vaultlabel[] = []
-    for (const vaultDoc of vaultDocs) {
-      const { vaultlabel } = vaultDoc
-      const vaultReport = BX.vaultRow.safeParse(vaultDoc.vault)
-      if (! vaultReport.success) {
-        damagedlabels.push(vaultlabel)
-      } else if (vaultReport.data.bank_tok !== bank_tok) {
-        await ctx.db.delete('safebyok_vaults', vaultDoc._id)
-      } else if (vaultReport.data.am === 'a') {
-        lives.push(lifeOf({ ...ask, vaultlabel, bank_tok: vaultReport.data.bank_tok, vault_tok: vaultReport.data.vault_tok }))
-      }
-    }
-    const liveCkeys = new Set(lives.map((life) => ckeyOfLife(life)))
-    const isEnded = (doc: Life) => (! damagedlabels.includes(doc.vaultlabel)) && (! liveCkeys.has(ckeyOfLife(doc)))
+    const lives = BX.endedLivesOf(bank, vaultDocs)
+    for (const { _id } of lives.ended) { await ctx.db.delete('safebyok_vaults', _id) }
     const tallyDocs = await listTallyDocs(ctx.db, ask)
     for (const tallyDoc of tallyDocs) {
-      if (isEnded(tallyDoc)) { await ctx.db.delete('safebyok_tallies', tallyDoc._id) }
+      if (lives.isEnded(tallyDoc)) { await ctx.db.delete('safebyok_tallies', tallyDoc._id) }
     }
-    const leftover = await deleteEndedBoxes(ctx.db, ask, isEnded)
+    const leftover = await deleteEndedBoxes(ctx.db, ask, lives.isEnded)
     let totalCount = 0
-    for (const life of lives) { totalCount += await Tallies.countBoxes(ctx.db, life) }
+    for (const { vaultlabel, bank_tok, vault_tok } of lives.live) { totalCount += await Tallies.countBoxes(ctx.db, lifeOf({ ...ask, vaultlabel, bank_tok, vault_tok })) }
     return { totalCount, leftover }
   },
 })
 
 // A Convex query reads whole documents, so a bank-wide watch reads every box row of the bank's live vaults each time it runs.
-/** List the bank row, every gate and vault row in `scope`, and the box rows of each live vault, for a client to subscribe to. */
+/** List the bank row, every gate and vault row in `scope`, and the box rows of each live vault, for a client to subscribe to.
+ * Refuses when the bank row fails its checks.
+ */
 export const watchRows = query({
   args:    CVX.watchRowsArgs,
   returns: CVX.rowsWatched,
   handler: async (ctx, { scope: sent }) => {
     const scope = askFor(() => DB.watchScope.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, scope)
-    const bank_tok = liveBankTokOf(bankDoc?.bank ?? null)
+    const bank = (bankDoc === null) ? null : storedFor(() => BX.storedBankRow.parse(bankDoc.bank))
     const gateDocs = (scope.vaultlabel === undefined) ? await listGateDocs(ctx.db, scope) : []
     const vaultDocs = await listVaultDocs(ctx.db, scope)
     const boxes: { vaultlabel: Vaultlabel, boxlabel: Boxlabel, box: unknown }[] = []
     for (const { vaultlabel, vault } of vaultDocs) {
       const vaultReport = BX.vaultRecord.safeParse(vault)
-      if ((! vaultReport.success) || (vaultReport.data.bank_tok !== bank_tok)) { continue }
+      if ((bank?.am !== 'a') || (! vaultReport.success) || (vaultReport.data.bank_tok !== bank.bank_tok)) { continue }
       const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, lifeOf({ ...scope, vaultlabel, bank_tok: vaultReport.data.bank_tok, vault_tok: vaultReport.data.vault_tok })).collect()
       boxes.push(...boxDocs.map(({ boxlabel, box }) => ({ vaultlabel, boxlabel, box })))
     }
@@ -282,7 +271,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Asks and refusals]: askFor, crossingOf, policedGateOf, storedOrNull, isWrite
+// == [Asks and refusals]: askFor, storedFor, crossingOf, policedGateOf, wouldWrite
 
 // Anyone signed in may call these functions with an ask of their own making, so each parses its ask again here, with the core's
 // own checker, before a row is read, and continues with what the parse returns.
@@ -290,6 +279,16 @@ export const watchRows = query({
 function askFor<AskT>(parse: () => AskT): AskT {
   try {
     return parse()
+  } catch (err) {
+    throw crossingOf(err)
+  }
+}
+
+// A stored row a function cannot go on without, and that fails its checks, refuses where it is found, and the client hears why.
+/** Return what `check` returns, rethrowing a refusal of a stored row as a ConvexError the client sees. */
+function storedFor<ValT>(check: () => ValT): ValT {
+  try {
+    return check()
   } catch (err) {
     throw crossingOf(err)
   }
@@ -314,18 +313,15 @@ function policedGateOf(ask: BX.GatePutAsk, fetched: BX.GateFetched): BX.GateStor
 }
 
 // The client classifies the same rows with the same classifier, and throws the refusal itself, with its rows.
-/** What `classify` returns, or null if it refuses. */
-function storedOrNull<StoredT>(classify: () => StoredT): StoredT | null {
+/** True when the outcome `classify` returns has a write for its act; false when it has another act, or refuses. */
+function wouldWrite(classify: () => { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct }): boolean {
   try {
-    return classify()
+    return BX.isWriteAct(classify().act)
   } catch (err) {
-    if (DB.isVaultError(err)) { return null }
+    if (DB.isVaultError(err)) { return false }
     throw err
   }
 }
-
-/** True when `stored` is the classifier's outcome and its act is a write. */
-function isWrite(stored: { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct } | null): boolean { return (stored !== null) && BX.isWriteAct(stored.act) }
 // --
 
 // == [Cascades]: deleteBank, deleteBoxes, deleteWithin, deleteEndedBoxes
@@ -379,19 +375,10 @@ async function deleteEndedBoxes(db: DatabaseWriter, scope: BankScope, isEnded: (
 }
 // --
 
-// == [Helpers]: lifeOf, ckeyOfLife, liveBankTokOf, getBankDoc, getGateDoc, getVaultDoc, getBoxDoc, writeBankDoc, writeGateDoc, writeVaultDoc, writeBoxDoc, the list queries, BankDoc, GateDoc, VaultDoc, BoxDoc
+// == [Helpers]: lifeOf, getBankDoc, getGateDoc, getVaultDoc, getBoxDoc, writeBankDoc, writeGateDoc, writeVaultDoc, writeBoxDoc, the list queries, BankDoc, GateDoc, VaultDoc, BoxDoc
 
 /** The {@link Life} of an ask or a record, without its other fields. */
 function lifeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life): Life { return { user_id, banklabel, vaultlabel, bank_tok, vault_tok } }
-
-/** The ckey of `life`, among the lives of one bank. */
-function ckeyOfLife({ vaultlabel, bank_tok, vault_tok }: Life): string { return DB.ckeyOf(vaultlabel, bank_tok, vault_tok) }
-
-/** The `bank_tok` of `bankRaw` when it is a live bank row, else null. */
-function liveBankTokOf(bankRaw: unknown): BankTok | null {
-  const bankReport = BX.bankRecord.safeParse(bankRaw)
-  return bankReport.success ? bankReport.data.bank_tok : null
-}
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in
 // the same transaction, so two would mean damage, and that should fail loudly.

@@ -191,22 +191,16 @@ export class IdbBankDB extends DB.AdapterBankDB {
     return stored
   }
 
-  // The rows are trusted to be rows: a row damaged inside the datastore is out of scope.
+  // A box row under a vault row that fails its checks is kept, and counted with the rest.
   protected async doTidyGone(ask: DB.BoxTidyAsk): Promise<BX.Tidied> {
     return await DB.inOneStep(this.#shelf, 'readwrite', async (store) => {
-      const [bankRaw, vaults, boxes] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), filedIn(store, vaultsRangeOf(ask)), filedIn(store, boxesRangeOf(ask))])
-      const bank = bankRaw as BX.BankRow | null
-      const bank_tok = (bank?.am === 'a') ? bank.bank_tok : null
-      const vaultOfLabel = new Map<Vaultlabel, BX.VaultRow>()
-      for (const { scopepath, row } of vaults) {
-        const vault = row as BX.VaultRow
-        if (vault.bank_tok === bank_tok) { vaultOfLabel.set(vaultlabelOf(scopepath), vault) } else { store.delete(scopepath) }
-      }
+      const [bank, filedVaults, filedBoxes] = await Promise.all([DB.rowAt(store, bankScopepathOf(ask)), filedIn(store, vaultsRangeOf(ask)), filedIn(store, boxesRangeOf(ask))])
+      const vaults = filedVaults.map(({ scopepath, row }) => ({ scopepath, vaultlabel: vaultlabelOf(scopepath), vault: row }))
+      const lives = BX.endedLivesOf(bank, vaults)
+      for (const { scopepath } of lives.ended) { store.delete(scopepath) }
       let totalCount = 0
-      for (const { scopepath } of boxes) {
-        const { vaultlabel, ...tokpair } = boxPlaceOf(scopepath)
-        const vault = vaultOfLabel.get(vaultlabel)
-        if ((vault === undefined) || (vault.am === 'x') || (BX.vaultLifeOf(vault) !== BX.vaultLifeOf(tokpair))) { store.delete(scopepath) } else { totalCount += 1 }
+      for (const { scopepath } of filedBoxes) {
+        if (lives.isEnded(boxPlaceOf(scopepath))) { store.delete(scopepath) } else { totalCount += 1 }
       }
       return { totalCount, leftover: 'none' }
     })

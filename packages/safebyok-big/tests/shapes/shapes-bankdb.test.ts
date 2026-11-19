@@ -4,7 +4,7 @@ import * as SX from '../../src/shapes/shapes-storage'
 import { VaultError } from '../../src/refusals/errors'
 import { expectCases } from '../test-helpers/cases'
 import {
-  bankAt, bankBuildAskOf, bankDelAskOf, bankEnsureAsk, bankScope, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
+  bankAt, bankBuildAskOf, bankDelAskOf, bankTombstoneOf, bankEnsureAsk, bankScope, gateAt, gatePutAskOf, mainWayin, otherMainWayin, passkey0Wayin,
   vaultAt, vaultDelAskOf, vaultGetAskOf, vaultPutAskOf, vaultScope, vaultTombstoneOf,
 } from '../test-helpers/bankdb-world'
 
@@ -51,6 +51,52 @@ describe("BX.vaultRow", () => {
     [{ ...vault, gate: gate },                           false, 'refuses a gate'],
     [{ ...vault, bank_tok: undefined },                  false, 'refuses a vault row without a bank_tok'],
   ])
+})
+
+describe("BX.endedLivesOf", () => {
+  const live     = vaultAt(0, 'bank1', 'life1', { vaultlabel: 'live' })
+  const stranger = vaultAt(0, 'bank0', 'life1', { vaultlabel: 'stranger' })
+  const gone     = vaultTombstoneOf(vaultAt(0, 'bank1', 'life1', { vaultlabel: 'gone' }))
+  const entries  = [live, stranger, gone].map((row) => ({ vaultlabel: row.vaultlabel, vault: row }))
+  const damaged  = { vaultlabel: 'damaged', vault: { ...live, vaultlabel: 'damaged', smuggled: 'field' } }
+
+  it("ends the lives of the vault rows under another bank life, and keeps the live ones", () => {
+    const lives = BX.endedLivesOf(bank, entries)
+    expect(lives.ended.map(({ vaultlabel }) => vaultlabel)).to.deep.equal(['stranger'])
+    expect(lives.live).to.deep.equal([live])
+    expect(lives.isEnded(live)).to.be.false
+    expect(lives.isEnded({ ...live, vault_tok: 'life0' })).to.be.true
+    expect(lives.isEnded(stranger)).to.be.true
+  })
+
+  it("keeps a vault tombstone of the live bank, and ends every box row under it", () => {
+    const lives = BX.endedLivesOf(bank, entries)
+    expect(lives.ended).not.to.include(entries[2])
+    expect(lives.isEnded(gone)).to.be.true
+    expect(lives.isEnded({ ...gone, vault_tok: 'life0' })).to.be.true
+  })
+
+  it("ends every vault life of a bank that is absent or a tombstone", () => {
+    for (const bankRaw of [null, bankTombstoneOf(bank)]) {
+      const lives = BX.endedLivesOf(bankRaw, entries)
+      expect(lives.ended).to.deep.equal(entries)
+      expect(lives.live).to.deep.equal([])
+      expect(lives.isEnded(live)).to.be.true
+    }
+  })
+
+  it("keeps a vault row that fails its checks, and every box row under its vaultlabel, whatever the bank", () => {
+    for (const bankRaw of [bank, null, bankTombstoneOf(bank)]) {
+      const lives = BX.endedLivesOf(bankRaw, [damaged])
+      expect(lives.ended).to.deep.equal([])
+      expect(lives.live).to.deep.equal([])
+      expect(lives.isEnded({ vaultlabel: 'damaged', bank_tok: 'bank0', vault_tok: 'life9' })).to.be.false
+    }
+  })
+
+  it("refuses damaged_row for a bank row that fails its checks", () => {
+    expect(() => BX.endedLivesOf({ ...bank, smuggled: 'field' }, entries)).to.throw(VaultError).with.property('refusalkind', 'damaged_row')
+  })
 })
 
 describe("BX.storedBankRow, BX.storedGateRow and BX.storedVaultRow", () => {

@@ -307,6 +307,80 @@ describe("ConvexBankDB's tidyGone, within one transaction", () => {
   })
 })
 
+describe("ConvexBankDB over damaged rows", () => {
+  const endedScope = BW.vaultScopeOf('ended')
+  const ended = BW.vaultAt(0, 'bank0', 'life1', { vaultlabel: 'ended' })
+
+  /** A bankDB with a live vault and box, and a vault of an ended bank life with a box under it. */
+  async function plantedBankDB() {
+    const deployment = deploy(TH.componentHost())
+    const bankDB = bankDBOn(deployment)
+    await bankDB.buildBank(BW.bankBuildAskOf())
+    await bankDB.putVault(BW.vaultPutAskOf(BW.vaultAt()))
+    await bankDB.putBox(BW.boxPutAskOf(BW.boxAt()))
+    await convexRowsOf(bankDB).plantVaultRow(endedScope, ended)
+    await convexRowsOf(bankDB).plantBoxRow({ ...endedScope, boxlabel: 'openai' }, 'bank0', 'life1', BW.boxAt(0, 'bank0', 'life1', { vaultlabel: 'ended' }))
+    return { deployment, bankDB, rows: convexRowsOf(bankDB) }
+  }
+
+  it("refuses damaged_row in tidyGone, deleting nothing, where the bank row fails its checks", async () => {
+    const { deployment, bankDB, rows } = await plantedBankDB()
+    await rows.plantBankRow(BW.bankScope, { ...BW.bankAt(), smuggled: 'field' })
+    await TH.expectRefusal(bankDB.tidyGone(BW.boxTidyAsk), 'damaged_row')
+    expect(await rows.vaultRowOf(endedScope)).to.deep.equal(ended)
+    expect(await boxCountOf(deployment)).to.eq(2)
+    expect(await tallyCountOf(deployment)).to.eq(1)
+  })
+
+  it("refuses damaged_row in tidyGone, deleting nothing, where the bank document holds a null row", async () => {
+    const { deployment, bankDB, rows } = await plantedBankDB()
+    await rows.plantBankRow(BW.bankScope, null)
+    await TH.expectRefusal(bankDB.tidyGone(BW.boxTidyAsk), 'damaged_row')
+    expect(await rows.vaultRowOf(endedScope)).to.deep.equal(ended)
+    expect(await boxCountOf(deployment)).to.eq(2)
+    expect(await tallyCountOf(deployment)).to.eq(1)
+  })
+
+  it("keeps a vault row that fails its checks in tidyGone, with its box rows and tally", async () => {
+    const { deployment, bankDB, rows } = await plantedBankDB()
+    const other = BW.vaultAt(0, 'bank1', 'life1', { vaultlabel: 'other' })
+    await bankDB.putVault(BW.vaultPutAskOf(other))
+    await bankDB.putBox(BW.boxPutAskOf(BW.boxAt(0, 'bank1', 'life1', { vaultlabel: 'other' })))
+    const damaged = { ...other, smuggled: 'field' }
+    await rows.plantVaultRow(BW.vaultScopeOf('other'), damaged)
+    await bankDB.tidyGone(BW.boxTidyAsk)
+    expect(await rows.vaultRowOf(BW.vaultScopeOf('other'))).to.deep.equal(damaged)
+    expect(await rows.vaultRowOf(endedScope)).to.be.null
+    expect(await boxCountOf(deployment)).to.eq(2)
+    expect(await tallyCountOf(deployment)).to.eq(2)
+  })
+
+  it("tells a watch's onBadNews of damaged_row where the bank row fails its checks", async () => {
+    const { deployment, bankDB, rows } = await plantedBankDB()
+    const onBadNews = vi.fn()
+    const unwatch = bankDB.watch(BW.bankScope, () => undefined, onBadNews)
+    await vi.waitFor(() => { expect(deployment.watching()).to.have.lengthOf(1) })
+    await rows.plantBankRow(BW.bankScope, { ...BW.bankAt(), smuggled: 'field' })
+    await vi.waitFor(() => { expect(onBadNews).toHaveBeenCalled() })
+    expect(onBadNews.mock.calls[0]?.[0]).to.have.property('refusalkind', 'damaged_row')
+    unwatch()
+  })
+
+  it("hands the client bad_scope, with the core's sentence, for an ask whose scope fails its checks", async () => {
+    const refusal = await TH.convexRefusalOf(TH.componentTest().query(TH.rootBankApi.ensureBank, { ask: { ...BW.bankEnsureAsk, banklabel: '' } }))
+    expect(refusal.kind).to.eq('bad_scope')
+    expect(refusal).to.have.property('message').that.is.a('string')
+  })
+})
+
+/** How many tally rows are stored under the bank, across every life. */
+async function tallyCountOf(deployment: ComponentDeployment): Promise<number> {
+  const tallyDocs = await deployment.as(null).run(async ({ db }) => await db.query('safebyok_tallies')
+    .withIndex('by_life', (idx) => idx.eq('user_id', BW.bankScope.user_id).eq('banklabel', BW.bankScope.banklabel))
+    .collect())
+  return tallyDocs.length
+}
+
 /** How many box rows are stored under the bank, across every life. */
 async function boxCountOf(deployment: ComponentDeployment): Promise<number> {
   const boxDocs = await deployment.as(null).run(async ({ db }) => await db.query('safebyok_boxes')
