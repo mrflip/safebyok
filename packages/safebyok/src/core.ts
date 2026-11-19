@@ -2,7 +2,7 @@
 // through its vaultDB; no caching. Private while it is built.
 export { Bank } from './models/bank'
 export { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from './models/device'
-export { type Kinded, type LiveOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
+export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { BaseBox } from './models/base-box'
 export { Gate } from './models/gate'
 export { Gating } from './models/gating'

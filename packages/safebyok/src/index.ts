@@ -4,7 +4,7 @@
 // `safebyok/storage` the vaultDB. What a host needs that
 // safebyok-big defines is re-exported from it, so that `VaultError` stays one class across both packages.
 export { Bank } from './models/bank'
-export { type Kinded, type LiveOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
+export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { Thing } from './models/thing'
 export { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from './models/device'
 export { type BadNews, type BadNewsHandler, type BankAskDraft, type BankMakeRecord, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type GetBoxAnswer, type GetBoxAskDraft, BankishChecks } from './shapes/shapes-bankish'

@@ -4,10 +4,10 @@ import { type Banklabel, type EpochMillis, type Lifepath, type Lifeseq, type Rev
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, ThingChecks } from '../shapes/shapes-thing'
 
-// == [Kinds]: RecordOfKind, Kinded, MembersOfKind, LiveOfKind, TombstoneOfKind, VoidSentinelOfKind, WholeOfKind
+// == [Kinds]: KindRecords, RecordOfKind, Kinded, MembersOfKind, LiveOfKind, TombstoneOfKind, VoidSentinelOfKind, WholeOfKind
 
 /** The record of each kind of Thing, by its modelkind. */
-type KindRecords = { bank: BankRecord, gate: GateRecord, box: BoxRecord }
+export type KindRecords = { bank: BankRecord, gate: GateRecord, box: BoxRecord }
 
 /** The record of the kind `KindT`, or of any kind for null. */
 export type RecordOfKind<KindT extends Thingkind | null> = KindT extends Thingkind ? KindRecords[KindT] : ThingRecord
@@ -19,7 +19,7 @@ export type Kinded<KindT extends Thingkind | null> = { readonly modelkind: KindT
 // record: a BoxRecord, asked about as a gate. Each branch is ValT or never, so TypeScript takes the result as a ValT, as a
 // type predicate requires.
 /** The members of `ValT` that a record of `RecordT`'s kind, or its shell, may be. */
-type MembersOfKind<ValT, RecordT extends Sparse<ThingRecord>> = ValT extends unknown
+export type MembersOfKind<ValT, RecordT extends Sparse<ThingRecord>> = ValT extends unknown
   ? (ValT extends RecordT ? ValT : (RecordT extends ValT ? ValT : (ShellOf<RecordT> extends ValT ? ValT : never)))
   : never
 
