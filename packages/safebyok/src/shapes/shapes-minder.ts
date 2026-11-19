@@ -4,10 +4,11 @@ import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
 import type { ThingMinder } from '../minding/thing-minder'
 import type { Bank } from '../models/bank'
+import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
 import type { BoxLabelpath, EpochMillis, Labelpath } from './primitives'
-import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, ThingChecks } from './shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel, ThingChecks } from './shapes-thing'
 import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
@@ -55,7 +56,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
   const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
-  const minderListener   = fn<(answer: TSQGotAnswer) => void>()
+  const minderListener   = fn<(event: MinderEvent) => void>()
   const minderLabelpath  = ThingChecks.thingScope.shape.labelpath
   const tsqStaleTime     = union([staleMillis, lit(Infinity), lit('static')])
   // Each option may be left out, or given as undefined, for no opinion.
@@ -165,6 +166,49 @@ export type TSQAnswer<RecordT extends ThingRecord = ThingRecord> = TSQGotAnswer<
 
 /** A scope whose labelpath is `LabelpathT`, which types the car a minder answers for it ({@link ThingAt}). */
 export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labelpath: LabelpathT }>
+// --
+
+// == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, InvalidationEvent
+
+/** What a minder's `listen` tells, told apart by `carkind`: a car changed, a listing changed, or a listing went stale. */
+export type MinderEvent = ThingEvent | ListingEvent | InvalidationEvent
+
+/** A car changed: the car as now cached, or undefined where none is cached (it is removed, or its first get was refused). Its `modelkind` types its car. */
+export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind ? Readonly<{
+  carkind:   'thing'
+  /** The modelkind of the Thing, which its labelpath starts with. */
+  modelkind: KindT
+  /** Where the Thing is stored in its bank. */
+  labelpath: Labelpath
+  /** The car itself, as cached, so that it is the same object until it changes, or undefined where none is cached. */
+  car:       ThingCar<RecordOfKind<KindT>> | undefined
+}> : never
+
+/** A listing changed: the labelpaths it now lists. */
+export type ListingEvent = Readonly<{
+  carkind:    'listing'
+  /** The modelkind of the Things listed. */
+  modelkind:  Thingkind
+  /** The labelpaths listed, in labelpath order. */
+  labelpaths: readonly Labelpath[]
+  /** The listing's name: `'kids'`, the Things directly under `of.parentpath`. */
+  tag:        'kids'
+  /** What the listing selects: the Things under the Thing at `parentpath`. */
+  of:         Readonly<{ parentpath: Labelpath }>
+}>
+
+/** A Thing's listings went stale: the next read of one asks the vaultDB again. */
+export type InvalidationEvent = Readonly<{
+  carkind:   'invalidation'
+  /** The modelkind of the Thing. */
+  modelkind: Thingkind
+  /** Where the Thing is stored in its bank. */
+  labelpath: Labelpath
+  /** Which of the Thing's caches went stale: `'list'`, its listings. */
+  card:      'list'
+  /** Which of its listings, by tag: `'all'`. */
+  tags:      'all'
+}>
 // --
 
 // == [A minder's making]: MinderOpts

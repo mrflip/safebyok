@@ -24,12 +24,10 @@ export function giverBankOfMinder(minder: ThingMinder): GiverBank<BoxCar> {
     banklabel:     minder.banklabel,
     getBoxCar:     async (labelpath: string) => minder.get({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
     peekBoxCar:    (labelpath: string) => minder.at({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
-    listenBoxCars: (listener: (labelpath: string, car: BoxCar) => void) => minder.listen((answer) => {
-      const { labelpath } = answer.ask
+    listenBoxCars: (listener: (labelpath: string, car: BoxCar) => void) => minder.listen((event) => {
       // A removed car has none: the bank object that removed it is ending, and the bridge resets its entries.
-      if ((answer.car === undefined) || (! Labelpath.isBox(labelpath))) { return }
-      // The minder's listen is not typed by kind: a car at a box's labelpath is a box's.
-      listener(labelpath, answer.car as BoxCar)
+      if ((event.carkind !== 'thing') || (event.modelkind !== 'box') || (event.car === undefined)) { return }
+      listener(event.labelpath, event.car)
     }),
   })
 }

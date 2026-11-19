@@ -16,8 +16,8 @@ import { Thing } from '../models/thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../storage/vault-db'
 import {
-  type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts, type QueryCacheOpts,
-  type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type TsqStaleTime,
+  type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
+  type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
@@ -162,19 +162,19 @@ export class ThingMinder {
     return (! isTimelyQuery(carQuery, opts.staleTime ?? this.#queryCacheOpts.staleTime))
   }
 
-  /** Call `listener` each time a car changes, with the answer for its scope. Returns the function that stops it.
-   * A car changes when a record arrives in it (even one that changes nothing), a get of it is refused, or it is
-   * removed. The answer's `isTimely` uses the minder's own `staleTime`.
+  /** Call `listener` with each change the cache tells of, as a {@link MinderEvent}. Returns the function that stops it.
+   * It tells of cars alone: a `thing` event each time a record arrives in a car (even one that changes nothing), a get of
+   * it is refused, or it is removed.
    * Nothing is called when a car ages past `staleTime`, and listening caches no car.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
-  listen(listener: (answer: TSQGotAnswer) => void): () => void {
+  listen(listener: (event: MinderEvent) => void): () => void {
     MinderChecks.minderListener.parse(listener)
-    return this.#tsq.getQueryCache().subscribe((event: unknown) => {
-      if (! isUsefulTSQEvent(event)) { return }
-      const answer = this.#answerOfTSQ(this.#askAt(this.#scopeOfQueryKey(event.query.queryKey)), {})
+    return this.#tsq.getQueryCache().subscribe((tsqEvent: unknown) => {
+      const event = this.#minderEventOf(tsqEvent)
+      if (event === undefined) { return }
       try {
-        listener(answer)
+        listener(event)
       } catch (err) {
         this.#bank.tellBadNews([Throwers.unexpectedError(err)])
       }
@@ -307,7 +307,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Helpers]: #answerOfTSQ
+  // == [TSQ Helpers]: #answerOfTSQ, #minderEventOf
 
   // Its caller starts any refresh first, so that a vacant answer is isFetching. A removed car is vacant.
   /** The {@link TSQGotAnswer} the cache gives for `ask`'s scope, timely within `opts.staleTime`, or the minder's own. */
@@ -321,6 +321,21 @@ export class ThingMinder {
       lastErr:     (lastErr === null) ? null : Outcome.storageRefusalOf(lastErr),
     }
   }
+
+  // A key's mark says what its query caches: '!' a car. A removed query keeps its last state, but no longer caches it.
+  /** What a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for one it is not told of. */
+  #minderEventOf(tsqEvent: unknown): MinderEvent | undefined {
+    if (! isUsefulTSQEvent(tsqEvent)) { return undefined }
+    const { queryKey, state } = tsqEvent.query
+    const { labelpath }       = this.#scopeOfQueryKey(queryKey)
+    const modelkind           = Labelpath.modelkindOf(labelpath)
+    if (queryKey.at(-1) === '!') {
+      const car = (tsqEvent.type === 'removed') ? undefined : state.data
+      // The car at a labelpath is of the kind its labelpath starts with.
+      return { carkind: 'thing', modelkind, labelpath, car } as ThingEvent
+    }
+    return undefined
+  }
   // --
 }
 
@@ -328,7 +343,7 @@ export class ThingMinder {
 
 // A record arrives (success), a get is refused (which leaves the car untimely), or the car is removed. A fetch starting,
 // pausing or failing once, and the observers' bookkeeping change none.
-/** True for a cache event a listener hears: a car removed, or a query's success or error. */
+/** True for a cache event a listener may hear of: a query removed, or a query's success or error. */
 function isUsefulTSQEvent(event: unknown): event is Readonly<{ type: 'removed' | 'updated', query: TSQ.Query }> {
   if (! (event instanceof Object)) { return false }
   const qcne = event as TSQ.QueryCacheNotifyEvent
