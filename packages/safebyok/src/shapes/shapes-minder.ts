@@ -6,7 +6,7 @@ import type { ThingMinder } from '../minding/thing-minder'
 import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
-import type { EpochMillis, Labelpath } from './primitives'
+import type { BoxLabelpath, EpochMillis, Labelpath } from './primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, ThingChecks } from './shapes-thing'
 import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 
@@ -114,7 +114,7 @@ export type GateCar = ThingCar<GateRecord>
 /** The kind of Thing stored at `LabelpathT`, read from its modelkind, or any Thing for a labelpath not known when compiled. */
 export type ThingAt<LabelpathT extends Labelpath> =
   LabelpathT extends 'gate' | `gate/${string}` ? GateRecord
-    : LabelpathT extends 'box' | `box/${string}` ? BoxRecord
+    : LabelpathT extends BoxLabelpath ? BoxRecord
       : LabelpathT extends 'bank' ? BankRecord
         : ThingRecord
 

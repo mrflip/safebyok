@@ -20,7 +20,7 @@ export {
   StampChecks,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
-export { type Banklabel, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
+export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
 export {
   type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type ListThingsAnswer, type ListedBeside,
   type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,

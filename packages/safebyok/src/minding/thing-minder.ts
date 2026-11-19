@@ -235,14 +235,27 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: queryKey, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: queryKey, listingQueryKey, subtreeQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
 
-  // Each label is a segment of its own, so that the key without its final '.' selects a Thing and everything under it.
-  // The '.' marks the Thing itself, and can never be a label: TanStack matches query defaults by key prefix, so without
-  // it the root box's key would start every box's key, and no defaults could single out the root box. A labelpath
-  // starts with its modelkind, so the key does too.
+  // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
+  // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
+  // under the Thing and neither of its own keys. No label is '!', '/' or '#', so no mark is mistaken for one. TanStack matches
+  // query defaults by key prefix too, so without a mark the root box's key would start every box's key, and no defaults
+  // could single out the root box. A labelpath starts with its modelkind, so the key does too.
   /** The query key `scoped`'s car is cached under. */
-  queryKey(scoped: ThingScope): TSQ.QueryKey { return ['safebyok', this.userid, this.banklabel, ...scoped.labelpath.split('/'), '.'] }
+  queryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '!'] }
+
+  /** The query key the list of `scoped`'s children is cached under. */
+  listingQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '#', 'kids'] }
+
+  /** The key prefix of everything cached under `scoped`, a car or a listing, and of neither of its own. */
+  subtreeQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '/'] }
+
+  /** The part of a query key that `scoped` has in common with each of its keys. */
+  #keyHeadOf(scoped: ThingScope): string[] {
+    const labels = scoped.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
+    return ['safebyok', this.userid, this.banklabel, ...labels]
+  }
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
   /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
@@ -286,9 +299,11 @@ export class ThingMinder {
     if (! this.#isReady) { throw Throwers.minderNotStarted() }
   }
 
-  /** The scope whose car is cached under `queryKey`, one of this minder's query keys. */
+  /** The scope whose car, or whose list of children, is cached under `queryKey`, one of this minder's query keys. */
   #scopeOfQueryKey(queryKey: TSQ.QueryKey): ThingScope {
-    return { ...this.scope, labelpath: queryKey.slice(3, -1).join('/') }
+    const afterBank = queryKey.slice(3)
+    const labels    = afterBank.slice(0, afterBank.findIndex((segment) => (segment === '!') || (segment === '#')))
+    return { ...this.scope, labelpath: labels.filter((segment) => segment !== '/').join('/') }
   }
   // --
 
