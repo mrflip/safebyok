@@ -75,7 +75,7 @@ async function plant(scope: ThingScope, raw: unknown): Promise<void> {
 function rowsOf(): VT.VaultDBRowCheats { return { plant, remove } }
 // --
 
-// == [Fakes]: coded, throwingClient, capturingListen
+// == [Fakes]: coded, throwingClient, answeringClient, capturingListen, tellingListen, BareNotice
 
 /** An Error with a driver's `code`. */
 function coded(message: string, code: string): Error { return Object.assign(new Error(message), { code }) }
@@ -95,6 +95,16 @@ function capturingListen() {
     return () => { stopped.push(channel) }
   }
   return { listen, onNotifies, stopped }
+}
+
+/** A listen that tells each watch `text` before it has started listening, and counts its unlistens in `stopped`. */
+function tellingListen(text: string) {
+  const stopped: string[] = []
+  const listen: PostgresListen = (channel, onNotify) => {
+    onNotify(text)
+    return () => { stopped.push(channel) }
+  }
+  return { listen, stopped }
 }
 
 /** A notice of the root box in the battery's bank that carries neither the Thing nor its world. */
@@ -195,6 +205,16 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
     await VT.aWhile()
     expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+
+  it("hears a notice told while its listen is still starting", async () => {
+    const { listen, stopped } = tellingListen(BareNotice)
+    const vaultDB = new PostgresVaultDB({ client: throwingClient(coded('relation "safebyok_box_things" does not exist', '42P01')), listen })
+    const badnews: VaultError[] = []
+    vaultDB.watch(VT.ThingBank, () => undefined, (news) => { badnews.push(news) })
+    await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
+    expect(badnews).to.have.lengthOf(1)
+    expect(badnews[0]?.cause).to.deep.include({ code: '42P01' })
   })
 
   it("drops a notice whose fetch fails in a way a retry may mend, and keeps watching", async () => {

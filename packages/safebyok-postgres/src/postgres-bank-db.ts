@@ -411,7 +411,6 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       isListening = false
       onBadNews(news)
     }
-    const listening = listenOrNull(listen, channelOf(scope.user_id), onNotify, onListenFailed)
     const unwatch = (): void => {
       if (! isListening) { return }
       isListening = false
@@ -423,6 +422,8 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       unwatch()
       onBadNews(news)
     }
+    // Listen last, so a notice heard while `listen` runs finds every handler above.
+    const listening = listenOrNull(listen, channelOf(scope.user_id), onNotify, onListenFailed)
     return unwatch
   }
   // --

@@ -183,7 +183,6 @@ export class PostgresVaultDB extends AdapterVaultDB {
       isListening = false
       onBadNews(news)
     }
-    const listening = listenOrNull(listen, thingsChannelOf(scope.userid), onNotify, onListenFailed)
     const unwatch = (): void => {
       if (! isListening) { return }
       isListening = false
@@ -195,6 +194,8 @@ export class PostgresVaultDB extends AdapterVaultDB {
       unwatch()
       onBadNews(news)
     }
+    // Listen last, so a notice heard while `listen` runs finds every handler above.
+    const listening = listenOrNull(listen, thingsChannelOf(scope.userid), onNotify, onListenFailed)
     return unwatch
   }
   // --

@@ -44,6 +44,16 @@ function capturingListen() {
   return { listen, onNotifies, stopped }
 }
 
+/** A listen that tells each watch `text` before it has started listening, and counts its unlistens in `stopped`. */
+function tellingListen(text: string) {
+  const stopped: string[] = []
+  const listen: PostgresListen = (channel, onNotify) => {
+    onNotify(text)
+    return () => { stopped.push(channel) }
+  }
+  return { listen, stopped }
+}
+
 /** Watch `scope` on `bankDB` until the test ends. Returns the array that collects its notices. */
 function watching(bankDB: PostgresBankDB, scope: DB.WatchScope = BW.vaultScope) {
   const notices: Notice[] = []
@@ -203,6 +213,16 @@ describe("PostgresBankDB's channels", () => {
     await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
     await TH.aWhile()
     expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+
+  it("hears a notice told while its listen is still starting", async () => {
+    const { listen, stopped } = tellingListen(JSON.stringify({ at: { user_id: BW.bankScope.user_id, banklabel: BW.bankScope.banklabel } }))
+    const watcher = new PostgresBankDB({ client: throwingClient(coded('relation "safebyok_banks" does not exist', '42P01')), listen })
+    const badnews: DB.VaultError[] = []
+    watcher.watch(BW.bankScope, () => undefined, (news) => { badnews.push(news) })
+    await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
+    expect(badnews).to.have.lengthOf(1)
+    expect(badnews[0]?.cause).to.deep.include({ code: '42P01' })
   })
 
   it("drops a notice whose fetch fails in a way a retry may mend, and keeps watching", async () => {
