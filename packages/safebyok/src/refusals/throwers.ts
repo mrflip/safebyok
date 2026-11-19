@@ -15,7 +15,7 @@ import type { DamagedThing, GoodAnswer } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: bankSwept, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, otherThanBox
+// == [Model Throwers]: bankSwept, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, otherThanBox, unknownWhisperForm
 
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
@@ -34,6 +34,9 @@ export function boxOfOtherRoot(): Errors.VaultError { return new Errors.VaultErr
 export function otherThanBox({ ask, val }: GoodAnswer<ThingRecord, EX.GotAct>): Errors.VaultError {
   return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
 }
+
+/** A `damaged_whisper` refusal: a box's whisper was sealed under tags this version does not read. */
+export function unknownWhisperForm(): Errors.VaultError { return new Errors.VaultError('damaged_whisper', Phrases.UnknownWhisperForm) }
 // --
 
 // == [Write Throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing

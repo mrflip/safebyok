@@ -94,7 +94,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp> {
   /** The sealed whisper of `record`, which must carry a box's tags. */
   static sealedOf(record: BoxRecord): Sealed {
     const { whisper_sealed } = BoxChecks.record.parse(record)
-    if (! Validator.isConsistent(whisper_sealed, BoxTags)) { throw Throwers.undecodedWhisper() }
+    if (! Validator.isConsistent(whisper_sealed, BoxTags)) { throw Throwers.unknownWhisperForm() }
     return whisper_sealed
   }
 
@@ -123,13 +123,11 @@ function deserializeWhisper(text: string): CX.Whisper {
   } catch {
     throw Throwers.undecodedWhisper()
   }
-  const whisperReport = CX.whisper.safeParse(jsonVal)
-  if (! whisperReport.success) { throw Throwers.undecodedWhisper() }
-  return whisperReport.data
+  return WhisperChecker.parse(jsonVal, { where: Phrases.OpenedNoWhisper })
 }
 // --
 
-// == [Checks]: Checks
+// == [Checks]: Checks, WhisperChecker
 
 /** Checks for what a box's seal takes: a live sealable for a tombstone, the public props of a revision and of a tombstone, and the secret props. */
 const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
@@ -144,4 +142,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis 
   }).strict(),
   boxCleartexts:        obj({ whisper: CX.whisper }).strict(),
 }))
+
+/** The check of a whisper decoded from a box, refusing `damaged_whisper`. */
+const WhisperChecker = CX.whisper.refusingAs('damaged_whisper')
 // --

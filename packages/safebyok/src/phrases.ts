@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, GotOtherThanBox, BankSwept
+// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, GotOtherThanBox, BankSwept, UnknownWhisperForm, OpenedNoWhisper
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -25,6 +25,12 @@ export const GotOtherThanBox = 'A box get was answered with a Thing that is not 
 
 /** A call on a bank after its sweep. */
 export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
+
+/** A box whose sealed whisper carries a codec or schema tag this version does not know. */
+export const UnknownWhisperForm = "That box's whisper was sealed in a form this version of safebyok does not read, most likely by another version. It was left as it is, and not opened."
+
+/** What leads the refusal of a box that opened to something other than a whisper. */
+export const OpenedNoWhisper = 'That box opened, but what was inside is not a whisper this package knows'
 // --
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks
