@@ -101,7 +101,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk = loggableAskOf(writeAsk)
       const actual      = await this.doWriteThing(writeAsk) // has act and ok, but no err yet
       const answer      = answerOf(actual, 'writeThing', loggableAsk)
-      // Out to in: the bank, the main gate, the root box, then the dbhas. A listener notified of a refusal's dbhas has already heard of whichever of the bank and main gate the answer's tracked reports changed.
+      // Out to in: the bank, the main gate, the root box, then the dbhas. Of the synthetic notifications this operation dispatches, by the time a listener is notified of the subject Thing, it has already been notified of the bank and main gate.
       this.notifyTrackedRecords(writeAsk, answer)
       this.notifyDbhas(answer)
       return answer
@@ -151,6 +151,8 @@ export abstract class AdapterVaultDB implements VaultDB {
    * Each change a store passes to `receive` goes out as a notice of the changed Thing, as {@link ThingNotice} is shaped today.
    * The world beside it is not notified: a bank or main gate that changed is notified as a Thing of its own.
    * Where a store passes the adapter several at once, each goes out as a notice of its own.
+   * The order and timing of an *adapter*'s notifications relative to reads, writes, or other notifications is unspecified, even for a datastore that provides assurance.
+   * The synthetic notifications (for tracked and dbhas) generated at the end of a VaultDB operation are assured to complete before the calling verb resumes.
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
