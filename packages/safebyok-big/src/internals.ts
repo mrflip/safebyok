@@ -23,3 +23,9 @@ export * as SX from './shapes/shapes-storage'
 export * as VX from './shapes/shapes-vaultish'
 // The plain aliases of ids, labels, tokens and times, flat: each name is unique across the namespaces.
 export type { BankTok, Banklabel, BoxTok, Boxlabel, DeviceTok, EpochMillis, GateTok, KeyDeriverLabel, RevisionSeq, RevisionTok, UserID, VaultTok, Vaultlabel } from './helpers/aliases'
+// Types the new core's entry points re-export by name, flat: a stored wayin and its salts, a cipher's context, and the acts
+// and options of an ask.
+export type { PasskeyWayinRecord, PassphraseWayinRecord, WayinRecord } from './shapes/shapes-gateish'
+export type { PassphraseSalt, PrfSalt } from './shapes/shapes-core'
+export type { CipherCtxRecord } from './helpers/crypto'
+export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from './shapes/shapes-enums'
