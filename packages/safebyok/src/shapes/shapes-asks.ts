@@ -95,7 +95,7 @@ export type ListAsk         = Readonly<Z.infer<typeof AskChecks.listAsk>>
 /** A write's citation of a Thing of `RecordT`'s kind: {@link ThingCited}, and optionally any other of its fields. */
 export type CitedOf<RecordT extends ThingRecord> = ThingCited & Partial<Omit<RecordT, keyof ThingCited>>
 /** The flags of a write ask, its modelkind and records aside. */
-type WriteAskFlags = Readonly<Omit<Z.infer<typeof AskChecks.writeAsk>, 'modelkind' | 'cited' | 'record'>>
+export type WriteAskFlags = Readonly<Omit<Z.infer<typeof AskChecks.writeAsk>, 'modelkind' | 'cited' | 'record'>>
 /** A write ask of the bank: see {@link WriteAsk}. */
 export type BankWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'bank', cited: CitedOf<BankRecord>, record: BankRecord }>
 /** A write ask of a gate: see {@link WriteAsk}. */
@@ -179,7 +179,7 @@ function checkWriteInvariants(ask: WriteAsk): void {
 // nothing: what it was given that is wrong goes through as given, for the verb's checks to refuse in its answer.
 
 /** The storage policies a write names. */
-type ThingOptions = Readonly<Z.infer<typeof AskChecks.thingOptions>>
+export type ThingOptions = Readonly<Z.infer<typeof AskChecks.thingOptions>>
 
 /** The draft of a get ask: a Thing's scope, its `ifAbsent` (default `'nil'`), and what its sender tracks.
  * {@link getAskOf} fills in what it leaves out, to make the {@link GetAsk}.

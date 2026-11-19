@@ -266,7 +266,7 @@ export type ThingCited   = Readonly<Z.infer<typeof ThingChecks.thingCited>>
 /** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace keeps. */
 export type StoredCited  = Readonly<Z.infer<typeof ThingChecks.storedCited>>
 /** The name of a Thing field: the fields every kind of Thing has, which the store reads. The rest of a record is its body. */
-type ThingFieldname = keyof Z.infer<typeof ThingChecks.sparse>
+export type ThingFieldname = keyof Z.infer<typeof ThingChecks.sparse>
 /** The bank, as a Thing. */
 export type BankRecord   = Readonly<Z.infer<typeof BankChecks.record>>
 /** A gate, as a Thing: the main gate, at `gate`. */

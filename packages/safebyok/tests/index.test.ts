@@ -1,14 +1,24 @@
 import { describe, expect, it } from 'vitest'
 import { Errors, Logger } from 'safebyok-big/internals'
+import * as BigThrowers from 'safebyok-big/refusals/throwers'
+import * as BigStorage from 'safebyok-big/storage'
+import * as Browser from '../src/browser'
 import * as Core from '../src/core'
 import * as Front from '../src/index'
+import * as Storage from '../src/storage'
 
 describe("the front door, safebyok", () => {
-  it("exports what a host touches, the same values safebyok/core does", () => {
-    expect(Front.Device).to.eq(Core.Device)
-    expect(Front.Bank).to.eq(Core.Bank)
-    expect(Front.DefaultLeaseMillis).to.eq(Core.DefaultLeaseMillis)
-    expect(Front.gatingkindVals).to.eq(Core.gatingkindVals)
+  it("exports every value safebyok/core exports, the same value", () => {
+    for (const [exportname, val] of Object.entries(Core)) { expect(Front, exportname).to.have.property(exportname).that.eq(val) }
+  })
+
+  it("exports every value safebyok/storage exports, the same value", () => {
+    for (const [exportname, val] of Object.entries(Storage)) { expect(Front, exportname).to.have.property(exportname).that.eq(val) }
+  })
+
+  it("exports the minder, which safebyok/core leaves out", () => {
+    expect(Front.ThingMinder).to.be.a('function')
+    expect(Core).to.not.have.property('ThingMinder')
   })
 
   it("re-exports safebyok-big's refusals and logger, the very ones the core throws and logs with", () => {
@@ -17,7 +27,23 @@ describe("the front door, safebyok", () => {
     expect(Front.setDefaultLogger).to.eq(Logger.setDefaultLogger)
   })
 
-  it("keeps the lease, proving and sealer machinery behind safebyok/core", () => {
-    for (const internal of ['Lease', 'Gating', 'Gate', 'Wayin', 'BaseBox', 'guardRequestCleartext']) { expect(Front).to.not.have.property(internal) }
+  // `Proving.buildLease` and `Bank.unlockByProving` are public, so a host holding a proving could unlock a bank outside any
+  // gating. Keeping the proving classes off every entry is what holds that line for now.
+  it("exports no proving class from any entry", () => {
+    const entries = { Front, Core, Storage, Browser }
+    for (const [entryname, entry] of Object.entries(entries)) {
+      for (const exportname of ['Proving', 'PassphraseProving', 'PasskeyProving', 'NOVEL']) { expect(entry, `${entryname}.${exportname}`).to.not.have.property(exportname) }
+    }
+  })
+})
+
+describe("safebyok/storage", () => {
+  it("re-exports safebyok-big's throwers, checkers and storage policies, the very ones an adapter's refusals are made with", () => {
+    const exportnames = [
+      'Checker', 'Checkers', 'VaultError', 'fetchFailed', 'identityRevoked', 'isVaultError', 'objCheck', 'sanitizeForeignError', 'storageFailed', 'storagePolicyVals', 'storageUnavailable',
+      'unexpectedError',
+    ] as const
+    for (const exportname of exportnames) { expect(Storage, exportname).to.have.property(exportname).that.eq(BigStorage[exportname]) }
+    expect(Storage.storageIssue).to.eq(BigThrowers.storageIssue)
   })
 })

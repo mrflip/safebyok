@@ -64,6 +64,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./browser": {
+      "@safebyok/source": "./src/browser.ts",
+      "import": "./dist/browser.js",
+      "require": "./dist/browser.cjs"
+    },
     "./core": {
       "@safebyok/source": "./src/core.ts",
       "import": "./dist/core.js",
@@ -102,6 +107,10 @@
         "import": "./dist/index.js",
         "require": "./dist/index.cjs"
       },
+      "./browser": {
+        "import": "./dist/browser.js",
+        "require": "./dist/browser.cjs"
+      },
       "./core": {
         "import": "./dist/core.js",
         "require": "./dist/core.cjs"
@@ -122,6 +131,9 @@
   "types": "./dist/index.d.cts",
   "typesVersions": {
     "*": {
+      "browser": [
+        "./dist/browser.d.cts"
+      ],
       "core": [
         "./dist/core.d.cts"
       ],
