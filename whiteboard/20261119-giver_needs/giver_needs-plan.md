@@ -5,7 +5,7 @@
 * **Mode:** normal.
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
-* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87, body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
+* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 168), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
 * **Status:** thread 1 filed, PR #753 (draft until #751 leaves draft); threads 2–5 wait on rows in *Open Matters*.
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
@@ -22,6 +22,8 @@ M1, M2, M3, M4, M6, M7. M5 is marked "not this sprint", and Part 2 "not yet".
 
 ## Ground rules
 
+* **Scope is ruled** (the Coach, 2026-11-19): Part 1 as planned, on origin/main plus #751. No bulk deletion: no
+  subtree drop, no forgetting a gone parent's children, nothing of M5.
 * **Stacked on #751** (`20261119-giver_order`, draft, green). Every thread stacks on the one before, in one line.
 * **Every invariant in the class doc block holds** after each thread; a new behaviour states its invariant there, and an
   order test shows it across every order of arrival.

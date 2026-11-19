@@ -37,4 +37,6 @@ writes it.
 
 ## Rulings
 
-None yet.
+* **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk
+  deletion which has a whole bags of wormses in it and is not needed." With the Coach's edit of giver_needs.md: no
+  delete verb, no delete tests through the minder.
