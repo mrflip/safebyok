@@ -48,6 +48,23 @@ writes it.
 * A fresh worktree needs `pnpm --filter safebyok-big build`, then `pnpm --filter safebyok build`, before the
   safebyok-react tests resolve.
 
+## Thread 3, minder_listings (#757)
+
+*Orchestrator:*
+* `listingAt(scope)` reads a cached listing synchronously; `list` adds what it answers to the listing and never drops
+  a labelpath; `#joinParentListing` is the one place a landing feeds its parent's listing (only where one is cached),
+  called from `#sendToTSQ` and from the end of `#doGet` (a get's record lands through the queryFn).
+* A listing is a plain TanStack query whose options ride `setQueryDefaults` on its own key, set when `list` first
+  caches it: `queryFn: skipToken` (never fetched), structural sharing `replaceEqualDeep` then freeze, the host's
+  `staleTime` and `gcTime` (the root box's listing too). Invalidating it only marks it stale.
+* `#minderEventOf` has the `'#'` branch; `ListingEvent.labelpaths` is the cached array itself, and undefined once the
+  listing is removed (before the Coach). A list always tells a listing event, before its cars' events in the batch.
+* A listing's `modelkind` is the parent's, which is every child's: mixed kinds cannot arise today.
+* Once a listing is collected, nothing grows it until the next `list`; a child landing before its parent's first
+  listing joins none (before the Coach as the first-list race).
+* Order tests: `ListingOrders` in `thing-minder.test.ts`, all 6 orders of a list, a get and a notice, twice; its
+  comment says where thread 4 adds a write step.
+
 ## Rulings
 
 * **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk
