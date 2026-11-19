@@ -28,7 +28,7 @@
     "build:watch": "tsdown --watch",
     "build:deps": "[ \"$SAFEBYOK_SKIP_BUILD_DEPS\" = 1 ] || SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok^...' build",
     "lint": "eslint --cache --cache-strategy content --cache-location .eslintcache .",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && node ../../scripts/forgotten-exports.ts .",
     "test": "vitest run",
     "pretest": "pnpm build:deps",
     "test:watch": "vitest",
