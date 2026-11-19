@@ -5,8 +5,8 @@
 * **Mode:** normal.
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
-* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1157), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
-* **Status:** all five threads filed: #753, #756, #757, #758, #759 (drafts), stacked on #751. Wrap-up waits on the restack onto main (the line conflicts in `storage.ts` since #754 merged; no CI runs until then), which waits on the Coach: #751 merged, or a yes to rebase it too.
+* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1649), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
+* **Status:** threads 1–5 filed (#753, #756, #757, #758, #759, drafts); thread 6 building. The restack onto main waits on #751 (still an open draft on GitHub).
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
 on 2026-11-19 with `dream-hooks.ts.md` and the Coach's edits to `internals.md`. This sprint is its **Part 1, the minder**:
@@ -193,6 +193,23 @@ for the line; its code stands on threads 1–3). **Size:** small. **Levels:** wo
 *Review (thread 5):* fixed two (a table's alignment; two-clause test titles split, and `invalidate`'s doc block now
 says the mark clears when a record joins the listing too). The test split moves the same 129 titles unchanged. Left:
 a shared `isListingKey` (the next thread touching key marks); `shapes-minder.ts` alignment.
+
+### 6. minder_seed: the root box's listing seeded bare; VOCABULARY's *listing* and `carkind`
+
+> seed the root box listing as bare wherever it is that the root box is seeded. have hello  fetch the listing if that's
+> not a can of worms
+
+(the Coach, 2026-11-19, on Open Matters' "A child heard of before its parent's first listing", #757); and, taking the
+Recs: a VOCABULARY.md *listing* row for the minder's sense, *minded* and *givable* applying to it, *sparse*'s use of
+"listing" reworded; a line in *car* saying `carkind` spans all three events (#756).
+
+*Gloss.* Touches the minder where the root box's car and query defaults are set up (`#makeTSQ`, `hello`), the listing
+code thread 3 built (`#joinParentListing`, `list`, `listingAt`), the first-list-race invariant in the class doc block,
+and VOCABULARY.md. "Bare" is the car's word for "known incomplete; the vaultDB has more": a seeded root listing joins
+every child that lands, and reads as incomplete until a `list` sets it. The worker designs how a listing says so with
+TanStack's grain (its invalid mark is one candidate) and reports. `hello` fetching the root listing is new: until now
+the minder fetched nothing itself; the worker judges whether it is "a can of worms" (`hello` is synchronous; a refused
+list) and reports either way. **Depends on:** thread 5. **Size:** small to medium. **Levels:** defaults.
 
 ## For the Coach
 
