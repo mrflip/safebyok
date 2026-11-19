@@ -1,6 +1,6 @@
 # Thread 7: exports_tidy (2026-11-19)
 
-Branch `20261119-exports_tidy`, PR [#754](https://github.com/mrflip/safebyok/pull/754), on main. Proved: safebyok 1073 tests and typecheck; `tests/scripts/forgotten-exports.test.ts` 27 and `tests/scripts/front-door.test.ts` 14; safebyok's build with its front-door step, attw and publint clean. `pnpm justify` at the tip: see the PR's **Tests:** line.
+Branch `20261119-exports_tidy`, PR [#754](https://github.com/mrflip/safebyok/pull/754), on main. Proved: `pnpm justify` green at 9c913f777 (safebyok 1073, safebyok-big 2941, safebyok-react 287, postgres 331, convex 329, indexeddb 213, fastkey 43, graphql 445, demo 99, e2e 576, scripts 328, with forgotten-exports 27 and front-door 14 among them; forgotten-exports clean in safebyok's typecheck, front-door clean after its build; attw and publint clean).
 
 The ten items are the Coach's 2026-11-19 answers to thread 4's open questions.
 
