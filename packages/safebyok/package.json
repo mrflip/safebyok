@@ -51,6 +51,7 @@
     "eslint-plugin-jsdoc": "^65.4.5",
     "eslint-plugin-sonarjs": "^4.2.2",
     "eslint-plugin-unicorn": "^79.0.0",
+    "fake-indexeddb": "^6.2.8",
     "publint": "^0.3.25",
     "tsdown": "^0.23.7",
     "typescript": "6.0.3",
