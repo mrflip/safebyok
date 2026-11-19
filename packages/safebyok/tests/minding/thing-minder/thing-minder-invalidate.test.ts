@@ -20,13 +20,18 @@ async function listedWorldOf() {
 }
 
 describe("ThingMinder.invalidate", () => {
-  it("asks the vaultDB nothing, and tells a listener of each listing under the labelpath, its own included", async () => {
-    const { minder, vaultDB, heard } = await listedWorldOf()
-    const asked = [vi.spyOn(vaultDB, 'tryGetThing'), vi.spyOn(vaultDB, 'tryListThings'), vi.spyOn(vaultDB, 'tryWriteThing')]
+  it("tells a listener of each listing under the labelpath, its own included", async () => {
+    const { minder, heard } = await listedWorldOf()
     minder.listen(heard)
     minder.invalidate('box', { list: 'all' })
     expect(heard.mock.calls.map(([event]) => event)).to.have.deep.members([invalidationOf('box'), invalidationOf('box/openai')])
     expect(heard.mock.calls).to.have.lengthOf(2)
+  })
+
+  it("asks the vaultDB nothing", async () => {
+    const { minder, vaultDB } = await listedWorldOf()
+    const asked = [vi.spyOn(vaultDB, 'tryGetThing'), vi.spyOn(vaultDB, 'tryListThings'), vi.spyOn(vaultDB, 'tryWriteThing')]
+    minder.invalidate(undefined, { list: 'all' })
     for (const ask of asked) { expect(ask.mock.calls).to.have.lengthOf(0) }
   })
 
@@ -73,7 +78,7 @@ describe("ThingMinder.invalidate", () => {
     expect(heard.mock.calls).to.have.lengthOf(3)
   })
 
-  it("has a later list replace the listing and clear its mark, so invalidating it again tells again", async () => {
+  it("tells again of a listing that a later list has set", async () => {
     const { minder, vaultDB, heard } = await listedWorldOf()
     minder.invalidate('box', { list: 'all' })
     vaultDB._cheat_things(TH.ThingBank).set('box/anthropic', TH.boxThingOf('anthropic'))

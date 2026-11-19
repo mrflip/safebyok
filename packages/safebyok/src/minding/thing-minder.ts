@@ -211,7 +211,7 @@ export class ThingMinder {
   // == [Invalidating]: invalidate
 
   /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
-   * Each listing marked tells an `invalidation` event, once until a list sets it again. It asks the vaultDB nothing, and
+   * Each listing marked tells an `invalidation` event, once until the listing is next set, by a list or by a record joining it. It asks the vaultDB nothing, and
    * leaves what each listing lists as it was.
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
