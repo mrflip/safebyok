@@ -1,6 +1,6 @@
 # Thread 5: round_trip (2026-11-19)
 
-Branch `20261119-round_trip`, PR #PRNUM, stacked on #748. Proved: `pnpm --filter safebyok` test (1059), typecheck and lint green at 3334256cf; `pnpm justify` result below once run.
+Branch `20261119-round_trip`, PR #749, stacked on #748. Proved: `pnpm --filter safebyok` test (1059), typecheck and lint green at 3334256cf; `pnpm justify` result below once run.
 
 * **Built**:
   - `BaseBox.tombstoneOf` (`packages/safebyok/src/models/base-box.ts`) follows the Coach's round-trip rule (2026-11-18): `publicProps` may give `sidecar: {}`, the value a tombstone is forced to have, and any other sidecar refuses as `bad_record` through a check. The if-then-throw (`Throwers.tombstoneSidecarGiven`) is gone, and so is the `sidecar: _sidecar` rest-spread that dropped the donor's sidecar: the donor spreads whole, and the revision's `sidecar: {}` overrides it. The two `parse` rows keep the Coach's aligned `=`.
