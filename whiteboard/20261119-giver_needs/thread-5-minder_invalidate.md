@@ -1,6 +1,6 @@
 # Thread 5: minder_invalidate (2026-11-19)
 
-Branch `20261119-minder_invalidate`, PR #TBD, stacked on #758. Proved: see the PR body.
+Branch `20261119-minder_invalidate`, PR #759, stacked on #758. Proved: see the PR body.
 
 * **Built**
   * **Test split** (`tests/minding/thing-minder/`, a pure `tests:` commit, 181 tests before and after, redone after the rebase onto #758's reviewed tip so it carries the reviewed titles): `world.ts` (every helper and test vaultDB the sections share, exported) and `thing-minder-{lifecycle,cache,reads,listen,writes,listing-orders,staleness,keys}.test.ts`. `listingAfter` stays in `listing-orders`, its one user.
