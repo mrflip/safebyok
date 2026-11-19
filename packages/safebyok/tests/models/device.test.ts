@@ -1,32 +1,16 @@
-/** The device: its options, the host's functions it wraps, its sweep, and the birth of its bank through a gating, over its MemoryVaultDB. */
+/** The device: its options, the host's functions it wraps, and its sweep, over its MemoryVaultDB. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 // fake-indexeddb installs IndexedDB's globals, for the device database browserOpts() opens: no browser.
 import 'fake-indexeddb/auto'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
+import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
 import type { BadNews } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
-
-/** A host's dialog that types `passphrases` into the gating it is shown, one attempt each, until one lands, keeping each outcome. */
-function typingDialog(...passphrases: string[]) {
-  const outcomes: unknown[] = []
-  const passkeyCleartexts = passphrases.map(() => TH.passkeyAnswerOf())
-  async function requestCleartext(gating: Gating): Promise<void> {
-    for (const [ii, passphraseCleartext] of passphrases.entries()) {
-      const outcome = await gating.attempt({ passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartexts[ii]! })
-      outcomes.push(outcome)
-      if (! gating.isOpen) { return }
-    }
-  }
-  return { requestCleartext, outcomes, passkeyCleartexts }
-}
-
-/** A strength checker that finds `'weak'` weak and every other passphrase strong. */
-function strengthChecker(passphrase: string) { return (passphrase === 'weak' ? { strong: false as const, reason: 'too short' } : { strong: true as const }) }
 
 describe("a page that is not a secure context", () => {
   afterEach(() => { vi.unstubAllGlobals() })
@@ -205,7 +189,7 @@ describe("device.sweep()", () => {
 
   it("dismisses the gating open on the device", async () => {
     const device = TH.makeDevice()
-    const prompting = TH.expectRefusal(device.birthBankPrompt(), 'dismissed')
+    const prompting = TH.expectRefusal(Bank.launchBirthBankPrompt(device), 'dismissed')
     const gating = device.openGating!
     device.sweep()
     await prompting
@@ -220,7 +204,7 @@ describe("device.sweep()", () => {
       return TH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
     } }
     const device = TH.makeDevice({}, { keyDeriver })
-    const prompting = TH.expectRefusal(device.birthBankPrompt(), 'disabled')
+    const prompting = TH.expectRefusal(Bank.launchBirthBankPrompt(device), 'disabled')
     const gating = device.openGating!
     const attempting = gating.attempt({ passphraseClear: TH.TestPassphrase })
     device.sweep()
@@ -234,7 +218,7 @@ describe("device.sweep()", () => {
   it("refuses a gating launched after it", async () => {
     const device = TH.makeDevice()
     device.sweep()
-    await TH.expectRefusal(device.birthBankPrompt(), 'disabled')
+    await TH.expectRefusal(Bank.launchBirthBankPrompt(device), 'disabled')
     expect(device.openGating).to.be.null
   })
 })
@@ -301,106 +285,5 @@ describe("tellBadNewsTo", () => {
     TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, {} as never, [news]) }, 'bad_record')
     TH.expectSyncRefusal(() => { tellBadNewsTo(onBadNews, device, [new Error("Down.") as never]) }, 'bad_record')
     expect(onBadNews).not.toHaveBeenCalled()
-  })
-})
-
-describe("device.birthBankPrompt()", () => {
-  it("resolves an unlocked bank whose main gate has the wayins the dialog's attempt typed, and zeroes the passkey answer", async () => {
-    const dialog = typingDialog(TH.TestPassphrase)
-    const device = TH.makeDevice({}, { requestCleartext: dialog.requestCleartext })
-    const bank = await device.birthBankPrompt()
-    expect(bank.isUnlocked).to.be.true
-    expect(bank.device).to.equal(device)
-    expect(bank.maingate.main.wayinkind).to.eq('passphrase')
-    expect(bank.maingate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: dialog.passkeyCleartexts[0]!.credential_id })
-    expect(TH.isZeroed(dialog.passkeyCleartexts[0]!.prfBytes)).to.be.true
-    expect(device.openGating).to.be.null
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const { whisper } = await bank.unsealBox(box)
-    expect(whisper).to.deep.equal(TH.Whisper)
-  })
-
-  it("births the bank in its vaultDB before it unlocks", async () => {
-    const device = TH.makeDevice({}, { requestCleartext: typingDialog(TH.TestPassphrase).requestCleartext })
-    const births = TH.spyBirths(device)
-    const bank = await device.birthBankPrompt()
-    expect(births.tryBirthBank).toHaveBeenCalledOnce()
-    expect(births.banks).to.deep.equal([bank])
-    expect(births.lockedAtBirths).to.deep.equal([true])
-  })
-
-  it("concludes the gating with a refusal when a live bank is stored at its scope, leaving no lease", async () => {
-    const dialog = typingDialog(TH.TestPassphrase)
-    const device = TH.makeDevice({}, { requestCleartext: dialog.requestCleartext })
-    await TH.buildBornBank({ device })
-    const births = TH.spyBirths(device)
-    const err = await TH.expectRefusal(device.birthBankPrompt(), 'gate_made_elsewhere')
-    expect(err.message).to.match(/another device/)
-    expect(dialog.outcomes).to.have.lengthOf(1)
-    await TH.expectBad(dialog.outcomes[0] as never, 'gate_made_elsewhere')
-    expect(births.banks[0]!.isLocked).to.be.true
-    expect(device.openGating).to.be.null
-  })
-
-  it("concludes the gating with any refusal of the vaultDB, as it came", async () => {
-    const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
-    const device = TH.makeDevice({}, { requestCleartext: typingDialog(TH.TestPassphrase).requestCleartext })
-    const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
-    expect(await TH.expectRefusal(device.birthBankPrompt(), 'storage_unavailable')).to.eq(refusal)
-    expect(births.banks[0]!.isLocked).to.be.true
-  })
-
-  it("stays open after a weak passphrase, its passkey answer unspent, and the next attempt lands", async () => {
-    const dialog = typingDialog('weak', TH.TestPassphrase)
-    const device = TH.makeDevice({}, { strengthChecker, requestCleartext: dialog.requestCleartext })
-    const births = TH.spyBirths(device)
-    const bank = await device.birthBankPrompt()
-    await TH.expectBad(dialog.outcomes[0] as never, 'weak_passphrase')
-    expect(TH.isZeroed(dialog.passkeyCleartexts[0]!.prfBytes)).to.be.false
-    expect(bank.isUnlocked).to.be.true
-    expect(births.tryBirthBank).toHaveBeenCalledTimes(1)
-  })
-
-  it("concludes 'dismissed' when the dialog closes after weak passphrases alone", async () => {
-    const device = TH.makeDevice({}, { strengthChecker, requestCleartext: typingDialog('weak', 'weak').requestCleartext })
-    const births = TH.spyBirths(device)
-    await TH.expectRefusal(device.birthBankPrompt(), 'dismissed')
-    expect(births.tryBirthBank).not.toHaveBeenCalled()
-  })
-
-  it("waits, with no host dialog, for an attempt on the device's open gating", async () => {
-    const device = TH.makeDevice()
-    const prompting = device.birthBankPrompt()
-    const gating = device.openGating!
-    expect(gating.toJSON()).to.deep.equal({ gatingkind: 'birth_bank', gatingTok: gating.gatingTok, ...TH.WorldScope })
-    await TH.wakeupAtNextTick()
-    expect(gating.isOpen).to.be.true
-    const bank = await TH.expectGood(gating.attempt({ passphraseClear: TH.TestPassphrase }))
-    expect(await prompting).to.equal(bank)
-  })
-
-  it("waits, with no host dialog, for a dismiss of the device's open gating", async () => {
-    const device = TH.makeDevice()
-    const prompting = TH.expectRefusal(device.birthBankPrompt(), 'dismissed')
-    device.openGating!.dismiss()
-    await prompting
-    expect(device.openGating).to.be.null
-  })
-
-  it("refuses a second prompt while one is open, leaving the first open", async () => {
-    const device = TH.makeDevice()
-    const first = TH.expectRefusal(device.birthBankPrompt(), 'dismissed')
-    const gating = device.openGating!
-    await TH.expectRefusal(device.birthBankPrompt(), 'already_asking')
-    expect(device.openGating).to.equal(gating)
-    gating.dismiss()
-    await first
-  })
-
-  it("concludes with a refusal quoting nothing when the dialog throws", async () => {
-    const device = TH.makeDevice({}, { requestCleartext: () => { throw new Error(TH.TestPassphrase) } })
-    const err = await TH.expectRefusal(device.birthBankPrompt(), 'unexpected_error')
-    expect(err.cause).to.be.undefined
-    expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
 })

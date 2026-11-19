@@ -15,7 +15,10 @@ import type { GoodAnswer } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, otherThanBox
+// == [Model Throwers]: bankSwept, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, otherThanBox
+
+/** A `disabled` refusal: the bank was swept. */
+export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
 
 /** A `bad_record` refusal: a tombstone's seal was given secret props. */
 export function tombstoneSecretsGiven(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TombstoneSecretsGiven) }

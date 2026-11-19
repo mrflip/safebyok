@@ -1,13 +1,13 @@
 // safebyok/core: the device, bank, gate, gating, wayin and lease, the bank's methods that put its Things through its vaultDB,
 // and every type their signatures name; no caching, so neither the ThingMinder nor TanStack Query. Private while it is built.
-// The proving classes are exported as types alone: a proving's `buildLease` and the bank's `unlockByProving` are public, and a
-// host holding a proving could unlock outside any gating.
+// The proving and gating classes are exported as types alone: a proving's `buildLease` is public, and a gating is made only
+// by the bank's prompts, which hand its attempt the bank's private verbs.
 export { Bank } from './models/bank'
 export { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from './models/device'
 export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
 export { BaseBox } from './models/base-box'
 export { Gate } from './models/gate'
-export { Gating } from './models/gating'
+export type { Gating } from './models/gating'
 export { Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
 export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
@@ -30,7 +30,7 @@ export {
   type GetBoxAskDraft, BankishChecks,
 } from './shapes/shapes-bankish'
 export {
-  type AskUser, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,
+  type AskUser, type BankGatingFriend, type BirthFriend, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,
   type Gatingkind, type GuardedKeyDeriver, type GuardedStrengthChecker, type LeaseBank, type LeaseOpts, type ProvingDevice, type ProvingOpts, type ProvingParts, type RequestCleartext,
   type SecretFieldname, type StrengthChecker, GateishChecks, gatingkindVals,
 } from './shapes/shapes-gateish'

@@ -1,6 +1,5 @@
 import { Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
-import type { Bank } from './bank'
-import { Gating, birthBank } from './gating'
+import type { Gating } from './gating'
 import { guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, BankishChecks } from '../shapes/shapes-bankish'
@@ -20,7 +19,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #askUser, #openGating, #endCause, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #endCause, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -33,11 +32,11 @@ export class Device {
   readonly logger:             Logger.VaultLogger
   /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   readonly leaseMillis:        number
+  /** The host's dialog, guarded, or null to leave the host to render `openGating` itself. */
+  readonly askUser:            AskUser | null
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The host's dialog, guarded, or null to leave the host to render `openGating` itself. */
-  readonly #askUser: AskUser | null
   #openGating: Gating | null = null
   /** Why a sweep disabled the device, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
@@ -75,21 +74,10 @@ export class Device {
     this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
+    this.askUser = (requestCleartext === undefined) ? null : guardRequestCleartext(requestCleartext)
     this.#onBadNews = onBadNews
-    this.#askUser = (requestCleartext === undefined) ? null : guardRequestCleartext(requestCleartext)
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
-  }
-  // --
-
-  // == [Prompts]: birthBankPrompt
-
-  /** Ask the user for a new passphrase and optional passkey, and birth this device's bank with them. Resolves the unlocked bank.
-   * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
-   */
-  async birthBankPrompt(): Promise<Bank> {
-    const gating = Gating.make({ gatingkind: 'birth_bank' }, { device: this, bank: null, askUser: this.#askUser, attempt: (cleartexts) => birthBank(this, cleartexts) })
-    return gating.launch()
   }
   // --
 

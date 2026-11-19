@@ -4,30 +4,32 @@ import { Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
+import { Gating, addPasskey, birthBank, replacePassphrase, revokePasskey, unlockBank } from './gating'
 import type { Lease } from './lease'
-import { Proving } from './proving'
+import type { Proving } from './proving'
 import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxUnsealed, GetBoxAnswer, GetBoxAskDraft } from '../shapes/shapes-bankish'
-import type { GateRevisionedStamp } from '../shapes/shapes-gateish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
-import * as Phrases from '../phrases'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type ThingRecord, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
-import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
+import { type BadAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
 import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease
+  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #endCause
 
   readonly #device:   Device
   readonly #vaultDB:  VaultDB
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
-  readonly #maingate: Gate
+
+  // Replaced where a gate change lands: by the gate it wrote.
+  /** The main gate, as this bank last wrote or was made with it. */
+  #maingate: Gate
 
   // Set once more, where the bank's birth lands: from the shell to the root box stored.
   /** The root box: its shell until the bank is born, then its stored record. */
@@ -35,6 +37,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** The attached lease, null while locked. */
   #lease: Lease | null = null
+
+  /** Why a sweep disabled the bank, or null until then. */
+  #endCause: Errors.VaultError | null = null
   // --
 
   // == [Getters]: device, device_tok, scope, stamp, maingate, rootBox, track, queryCacheOpts
@@ -66,23 +71,10 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
   // --
 
-  // == [Construction]: make, birth, constructor, mintStamps, makeRecord
+  // == [Construction]: make, constructor, mintStamps, makeRecord
 
   /** Make the bank of `record`, with its main gate and root box, on `opts.device`, keeping its boxes in `opts.vaultDB`. */
   static make(record: BankMakeRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
-
-  /** Write a new bank of `record`, with its main gate and root box, and return it unlocked under a lease built from `opts.proving`.
-   * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.
-   */
-  static async birth(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
-    const { proving, ...bankOpts } = opts
-    const bank = this.make(record, bankOpts)
-    const born = await bank.#tryBirth(proving)
-    if (! born.ok) { throw born.err }
-    // The user must hear that their passphrase was not set: the bank stored is another's.
-    if (born.val.bank.revtok !== bank.revtok) { throw Throwers.gateMadeElsewhere() }
-    return bank
-  }
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
     const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB, queryCacheOpts } } = Checks.bankMakeArgs.parse({ record, opts })
@@ -108,7 +100,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     }
   }
 
-  /** The first record of a new bank, made from `dna`, with its main gate and its root box's shell. `Bank.birth` seals the root box over the shell. */
+  /** The first record of a new bank, made from `dna`, with its main gate and its root box's shell. The birth seals the root box over the shell. */
   static makeRecord(dna: BankDna): BankMakeRecord {
     const { userid, banklabel, lifeseq, born_at } = BankChecks.stamp.parse(dna)
     const bank = BankChecks.record.parse({
@@ -155,43 +147,133 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [The birth]: tryBirth
+  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt
+  // Each hands its gating's attempt a friend of this bank's private verbs: no public method accepts a proving (G9).
 
-  /** Write the bank's three roots, sealing the root box under a lease built from `proved`. Unlocks the bank under that lease when its own roots were written. */
-  async #tryBirth(proved: Proving): Promise<BirthBankAnswer> {
-    const baseAsk = { ...this.scope, op: 'birth' } as const
-    const { endCause } = this.#device
-    if (endCause !== null) { return disabledAnswerOf(baseAsk, endCause) }
-    const lease  = await Checks.proving.parse(proved).buildLease(this, this.#maingate)
-    const root   = await lease.seal(BaseBox, this.#rootBox, { sidecar: {} }, { whisper: {} })
-    //
-    const ask    = { ...baseAsk, bank: this.pickle(), gate: this.#maingate.pickle(), root }
-    const answer = await this.#vaultDB.tryBirthBank(ask)
-    if (answer.ok && (answer.val.bank.revtok === this.revtok) && lease.isEnabled) {
-      this.#rootBox = Object.freeze(BoxChecks.live.parse(answer.val.root))
-      this.#attachLease(lease)
-    } else {
-      lease.evict()
+  /** Ask the user for a new passphrase and optional passkey, and birth the bank of `device`'s scope with them. Resolves the bank, unlocked.
+   * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
+   */
+  static async launchBirthBankPrompt(device: Device): Promise<Bank> {
+    const friend = {
+      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birth(record, { device, vaultDB: device.vaultDB, proving }),
     }
-    return answer
+    const gating = Gating.make({ gatingkind: 'birth_bank' }, {
+      device, bank: null, askUser: device.askUser, attempt: (cleartexts) => birthBank(device, cleartexts, friend),
+    })
+    return gating.launch()
+  }
+
+  /** Ask the user for the passphrase or the passkey, and unlock this bank with it. */
+  async launchUnlockBankPrompt(): Promise<this> {
+    this.demandEnabled()
+    const friend = {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+    }
+    const gating = Gating.make({ gatingkind: 'unlock_bank' }, {
+      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => unlockBank(this, cleartexts, friend),
+    })
+    await gating.launch()
+    return this
+  }
+
+  /** Ask the user for the current passphrase and a new one, and replace the passphrase. Leaves the bank unlocked.
+   * The passkey stays, and the bankKey does not change.
+   */
+  async launchReplacePassphrasePrompt(): Promise<this> {
+    this.demandEnabled()
+    const friend = {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
+    }
+    const gating = Gating.make({ gatingkind: 'replace_passphrase' }, {
+      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => replacePassphrase(this, cleartexts, friend),
+    })
+    await gating.launch()
+    return this
+  }
+
+  /** Ask the user for the passphrase and a new passkey, and add the passkey. Leaves the bank unlocked.
+   * A gate has one passkey at most: this refuses, asking nobody, while it has one.
+   */
+  async launchAddPasskeyPrompt(): Promise<this> {
+    this.demandEnabled()
+    this.#maingate.demandPasskeyAddable()
+    const friend = {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
+    }
+    const gating = Gating.make({ gatingkind: 'add_passkey' }, {
+      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => addPasskey(this, cleartexts, friend),
+    })
+    await gating.launch()
+    return this
+  }
+
+  /** Ask the user for the passphrase, and revoke the passkey. Leaves the bank unlocked.
+   * With no passkey, it returns at once and asks nobody. The bankKey does not change.
+   */
+  async launchRevokePasskeyPrompt(): Promise<this> {
+    this.demandEnabled()
+    if (this.#maingate.passkey0 === null) { return this }
+    const friend = {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
+    }
+    const gating = Gating.make({ gatingkind: 'revoke_passkey' }, {
+      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => revokePasskey(this, cleartexts, friend),
+    })
+    await gating.launch()
+    return this
   }
   // --
 
-  // == [Unlocking and locking]: unlockByProving, attachLease, lock
+  // == [The gatings' private verbs]: birth, unlockByProving, putGate
 
-  /** Unlock this bank with `proved`, a proving of its gate, built in the gating attempt underway.
-   * The lease cites `cited`, by default this bank's main gate.
+  /** Write a new bank of `record`, with its main gate and its root box sealed under a lease `opts.proving` builds, and resolve it unlocked under that lease.
+   * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.
    */
-  async unlockByProving(proved: Proving, cited: GateRevisionedStamp = this.maingate): Promise<this> {
-    this.demandEnabled()
-    Checks.proving.parse(proved)
-    const lease = await proved.buildLease(this, cited)
+  static async #birth(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
+    const { proving, ...bankOpts } = opts
+    const bank   = this.make(record, bankOpts)
+    bank.demandEnabled()
+    const lease  = await proving.buildLease(bank, bank.#maingate)
+    const root   = await lease.seal(BaseBox, bank.#rootBox, { sidecar: {} }, { whisper: {} })
+    //
+    const answer = await bank.#vaultDB.tryBirthBank({ ...bank.scope, op: 'birth', bank: bank.pickle(), gate: bank.#maingate.pickle(), root })
+    if (! answer.ok) { lease.evict(); throw answer.err }
+    // The user must hear that their passphrase was not set: the bank stored is another's.
+    if (answer.val.bank.revtok !== bank.revtok) { lease.evict(); throw Throwers.gateMadeElsewhere() }
+    bank.#attachLease(lease)
+    bank.#rootBox = Object.freeze(BoxChecks.live.parse(answer.val.root))
+    return bank
+  }
+
+  /** Unlock this bank under a lease `proved` builds, citing its main gate. */
+  async #unlockByProving(proved: Proving): Promise<this> {
+    const lease = await proved.buildLease(this, this.#maingate)
     this.#attachLease(lease)
     return this
   }
 
-  /** Attach `lease`, evicting the one it replaces */
+  /** Write `ask.record`, the main gate's next revision, over `ask.cited`, and hold the gate written as this bank's main gate. Resolves that gate. */
+  async #putGate(ask: PutAskDraft<GateRecord>): Promise<Gate> {
+    this.demandEnabled()
+    const answer = await this.#vaultDB.tryWriteThing({ ...this.makePutAsk(ask), modelkind: 'gate' })
+    if (! answer.ok) { throw answer.err }
+    // The ask's modelkind is the gate's, which the vaultDB checks what it answers against.
+    this.#maingate = Gate.make(answer.val as GateRecord, { bank: this })
+    return this.#maingate
+  }
+  // --
+
+  // == [Unlocking, locking and sweeping]: attachLease, lock, sweep
+
+  /** Attach `lease`, evicting the one it replaces. Once this bank is disabled, it evicts `lease` instead, and refuses. */
   #attachLease(lease: Lease): void {
+    if (! this.isEnabled) {
+      lease.evict()
+      this.demandEnabled()
+    }
     this.#lease?.evict()
     this.#lease = lease
   }
@@ -199,6 +281,15 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Lock the bank: drop its lease and the keys in it. */
   lock(): this {
     this.#lease?.evict()
+    this.#lease = null
+    return this
+  }
+
+  /** Disable this bank for good, and sweep its lease. Never throws. */
+  sweep(): this {
+    if (this.#endCause !== null) { return this }
+    this.#endCause = Throwers.bankSwept()
+    this.#lease?.sweep()
     this.#lease = null
     return this
   }
@@ -247,7 +338,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** The boxes directly under the root box, tombstones included, with the root box as `parent`. */
   tryListBoxes(): Promise<ListThingsAnswer> {
     const ask = this.makeListAsk({ labelpath: Labelpath.RootBox })
-    const { endCause } = this.#device
+    const { endCause } = this
     if (endCause !== null) { return Promise.resolve({ ...disabledAnswerOf(ask, endCause), parent: null, damaged_rows: [] }) }
     return this.#vaultDB.tryListThings(ask)
   }
@@ -262,7 +353,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     // Spread, so that an ask that is not a bag reaches the vaultDB's check and refuses in the answer.
     const { labelpath, ifAbsent } = { ...ask }
     const thingAsk = { ...this.makeGetAsk({ labelpath, ifAbsent: (ifAbsent === 'shell' || ifAbsent === undefined) ? 'nil' : ifAbsent }), modelkind: 'box' } as const
-    const { endCause } = this.#device
+    const { endCause } = this
     if (endCause !== null) { return disabledAnswerOf(thingAsk, endCause) }
     const answer = await this.#vaultDB.tryGetThing(thingAsk)
     if (! answer.ok) { return answer }
@@ -278,7 +369,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Write the live box `ask.record` over the box `ask.cited` cites: the one stored at its scope, or its shell. */
   tryPutBox(ask: PutAskDraft<BoxRecord>): Promise<WriteThingAnswer> {
     const thingAsk = { ...this.makePutAsk(ask), modelkind: 'box' } as const
-    const { endCause } = this.#device
+    const { endCause } = this
     if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
     return this.#vaultDB.tryWriteThing(thingAsk)
   }
@@ -286,16 +377,19 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Write the tombstone `ask.record` over the live box `ask.cited` cites. */
   tryDelBox(ask: DelAskDraft<BoxRecord>): Promise<WriteThingAnswer> {
     const thingAsk = { ...this.makeDelAsk(ask), modelkind: 'box' } as const
-    const { endCause } = this.#device
+    const { endCause } = this
     if (endCause !== null) { return Promise.resolve(disabledAnswerOf(thingAsk, endCause)) }
     return this.#vaultDB.tryWriteThing(thingAsk)
   }
   // --
 
-  // == [Guards]: isEnabled, isLocked, isUnlocked, demandEnabled, demandOwnBox, demandLease
+  // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandOwnBox, demandLease
 
-  /** True while this bank's device is enabled. */
-  get isEnabled(): boolean { return this.#device.isEnabled }
+  /** True until this bank or its device is swept. */
+  get isEnabled(): boolean { return this.endCause === null }
+
+  /** The refusal every call on this bank meets once it or its device is swept, or null while it is enabled. */
+  get endCause(): Errors.VaultError | null { return this.#endCause ?? this.#device.endCause }
 
   /** True when no lease is attached to this bank. */
   get isLocked(): boolean { return this.#lease === null }
@@ -305,7 +399,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** Throw unless {@link isEnabled}. */
   demandEnabled(): this {
-    this.#device.demandEnabled()
+    const { endCause } = this
+    if (endCause !== null) { throw endCause }
     return this
   }
 
@@ -335,7 +430,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 /** The revseq and lifepath of a Thing, as a `track` holds them. */
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
 
-/** The refused answer to `ask` while the bank's device is disabled: its `err` is the device's `endCause`. */
+/** The refused answer to `ask` while the bank is disabled: its `err` is the bank's `endCause`. */
 function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<null> {
   return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: endCause }
 }
@@ -344,7 +439,7 @@ function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, and of the proving `unlockByProving` is given. */
+/** The checks of {@link Bank.make}'s arguments. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
@@ -355,6 +450,5 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
       queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
     }),
   }),
-  proving: custom<Proving>((val) => val instanceof Proving, Phrases.ProvingExpected),
 }))
 // --
