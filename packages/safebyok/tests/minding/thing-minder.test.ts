@@ -8,7 +8,7 @@ import { carOf } from '../../src/minding/thing-car'
 import { ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../src/shapes/primitives'
-import { type GateThing, type Thing, BoxChecks, Shell, isVoidSentinel, sparseOf } from '../../src/shapes/shapes-thing'
+import { type GateRecord, type ThingRecord, BoxChecks, Shell, isVoidSentinel, sparseOf } from '../../src/shapes/shapes-thing'
 import { type GetAsk, getAskOf, listAskOf } from '../../src/shapes/shapes-asks'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -87,7 +87,7 @@ async function bornOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT): Promis
 }
 
 /** A vaultDB holding a born bank with its main gate at revision `revseq`, and the gate it holds. */
-async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<GateThing> {
+async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<GateRecord> {
   let gate = TH.gateThingOf()
   await bornOf(vaultDB)
   for (let ii = 0; ii < revseq; ii++) {
@@ -353,7 +353,7 @@ describe("ThingMinder.at", () => {
     expectTypeOf(minder.at(TH.RootScope)).toEqualTypeOf<BoxCar | undefined>()
     expectTypeOf(minder.at({ ...TH.ThingBank, labelpath: `box/${label}` as const })).toEqualTypeOf<BoxCar | undefined>()
     expectTypeOf(minder.at(TH.BankScope)).toEqualTypeOf<BankCar | undefined>()
-    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingCar<Thing> | undefined>()
+    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingCar<ThingRecord> | undefined>()
   })
 })
 

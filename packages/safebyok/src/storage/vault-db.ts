@@ -1,7 +1,7 @@
 /** The `VaultDB` interface the models call, the answers its verbs resolve, and what a store reports to its adapter. */
 
 import type { EX, Errors } from 'safebyok-big/internals'
-import type { Sparse, Thing, ThingScope } from '../shapes/shapes-thing'
+import type { Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
 import type { BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, ThingWatchScope, Tracked, WorldRecord, WriteAsk } from '../shapes/shapes-asks'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
@@ -18,26 +18,26 @@ export type BadAct = EX.BadAct | 'policied'
 /** A vaultDB verb's refused answer: its `err` and `act`, the Thing found stored (`dbhas`), its bank's `world`, and the loggable part of its `ask`.
  * `world` is null if the verb threw.
  */
-export type BadAnswer<DbhasT = Thing | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, tracked?: Tracked, dbhas: DbhasT, err: Errors.VaultError }
+export type BadAnswer<DbhasT = ThingRecord | null> = { ok: false, ask: LoggableAsk, act: BadAct, world: WorldRecord | null, tracked?: Tracked, dbhas: DbhasT, err: Errors.VaultError }
 
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
 
 /** The answer to `tryGetThing`: a live Thing (`gotlive`), a tombstone (`gotgone`), or null (`gotvoid`). */
-export type GetThingAnswer   = GoodAnswer<Thing, 'gotlive' | 'gotgone'> | GoodAnswer<null, 'gotvoid'> | BadAnswer
+export type GetThingAnswer   = GoodAnswer<ThingRecord, 'gotlive' | 'gotgone'> | GoodAnswer<null, 'gotvoid'> | BadAnswer
 /** The answer to `tryWriteThing`: the Thing the store reports writing, or under `passed` the live Thing it found. */
-export type WriteThingAnswer = Answer<Thing, EX.PutAct | EX.DelAct>
+export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 
 /** A child Thing that fails its kind's checks: its scope, and `am: 'd'`. */
 export type DamagedThing = Readonly<ThingScope & { am: 'd' }>
 
 /** The `parent` and `damaged_rows` of a listing answer, good or refused. */
-export type ListedBeside<RecordT extends Thing = Thing> = { parent: Sparse<RecordT> | null, damaged_rows: readonly DamagedThing[] }
+export type ListedBeside<RecordT extends ThingRecord = ThingRecord> = { parent: Sparse<RecordT> | null, damaged_rows: readonly DamagedThing[] }
 
 /** The answer to `tryListThings`: the parent's children, sparse and in labelpath order, tombstones included. Its act is the parent's get act.
  * Refused under `void` or `gone`, its `dbhas` is `[]`. Under any other refusal it is null.
  */
-export type ListThingsAnswer<RecordT extends Thing = Thing> =
+export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
   | (GoodAnswer<Sparse<RecordT>[], EX.GotAct> & ListedBeside<RecordT>)
   | (BadAnswer<Sparse<RecordT>[] | null>      & ListedBeside<RecordT>)
 
@@ -45,7 +45,7 @@ export type ListThingsAnswer<RecordT extends Thing = Thing> =
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
 /** A changed Thing that a watch reports, shaped like a get's answer, with its bank's world as the store last read it. */
-export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val' | 'world'>
+export type ThingNotice = Pick<GoodAnswer<ThingRecord, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val' | 'world'>
 // --
 
 // == [What a store reports]: Actual, ListThingsActual, BirthBankActual
@@ -55,11 +55,11 @@ export type ThingNotice = Pick<GoodAnswer<Thing, 'gotlive' | 'gotgone'>, 'ok' | 
  * A refused report has no error: the adapter makes it from the act.
  */
 export type Actual<ActT extends EX.GoodAct> =
-  | { ok: true,  act: ActT,           world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
-  | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
+  | { ok: true,  act: ActT,           world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
+  | { ok: false, act: EX.RefusedAct,  world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
 
 /** A store's report of a listing: the parent's act, the children `listed`, the parent, and the children that failed their checks. */
-export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: Tracked, listed: Sparse<Thing>[] } & ListedBeside & (
+export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: Tracked, listed: Sparse<ThingRecord>[] } & ListedBeside & (
   | { ok: true,  act: EX.GotAct }
   | { ok: false, act: EX.RefusedAct }
 )>
@@ -67,7 +67,7 @@ export type ListThingsActual = Readonly<{ world: WorldRecord | null, tracked?: T
 /** A store's report of a bank's birth: the three roots, written or already stored, or the first refused act with the Thing stored at that root. */
 export type BirthBankActual =
   | { ok: true,  act: 'born' | 'passed', world: WorldRecord | null, tracked?: Tracked, things: BankRoots }
-  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, record: Thing | null }
+  | { ok: false, act: EX.RefusedAct,     world: WorldRecord | null, tracked?: Tracked, record: ThingRecord | null }
 // --
 
 // == [The interface]: VaultDB, VaultDBMembernames, isVaultDB

@@ -1,8 +1,8 @@
 import { exactOptional } from 'zod'
 import { CX, Clock, Crypto, StableJsonify, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type BoxThing, type Sealed, BoxChecks } from '../shapes/shapes-thing'
-import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, RevisionOf, SealTags, Sealable, Sealer } from '../shapes/shapes-sealers'
+import { type BoxRecord, type Sealed, BoxChecks } from '../shapes/shapes-thing'
+import type { BoxCleartexts, BoxPublicProps, LiveOf, RevisionOf, SealTags, Sealable, Sealer, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BoxStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Lifeseq } from '../shapes/primitives'
 import * as Throwers from '../refusals/throwers'
@@ -20,7 +20,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   /** The Thing fields and sidecar of `donorProps`, which may be a live box, a tombstone or the shell.
    * Every other field is dropped, including a whisper, sealed or not.
    */
-  static donorPropsOf(donorProps: Sealable<BoxRecord>): Sealable<BoxRecord> { return BoxChecks.sealable.parse(donorProps) }
+  static donorPropsOf(donorProps: Sealable<LiveOf<BoxRecord>>): Sealable<LiveOf<BoxRecord>> { return BoxChecks.sealable.parse(donorProps) }
 
   /** The sidecar, `am` and `written_at` of `publicProps`. Refuses any other field. */
   static publicPropsOf(publicProps: BoxPublicProps): BoxPublicProps { return Checks.boxPublicProps.parse(publicProps) }
@@ -36,12 +36,14 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
 
   /** The next live revision after `donorProps`, without its sealed whisper.
    * After a tombstone or the shell, it begins the box's next life.
-   * Its sidecar is `publicProps.sidecar`, or else the sidecar of `donorProps`. One of the two must have one.
+   * Its sidecar is `publicProps.sidecar`, or else the sidecar of a live `donorProps`. One of the two must have one.
    * Its `written_at` is `publicProps.written_at`, or now.
    */
-  static nextRevisionOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxRecord, BoxCleartexts> {
+  static nextRevisionOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<LiveOf<BoxRecord>, BoxCleartexts> {
     const { sidecar: donorSidecar, ...thing                        } = BoxChecks.sealable.parse(donorProps)
-    const { sidecar = donorSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
+    // A tombstone's `{}` is not inherited: the next life's sidecar is given, as it is after the shell.
+    const heirSidecar = (thing.am === 'a') ? donorSidecar : undefined
+    const { sidecar = heirSidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar === undefined) { throw Throwers.sidecarMissing() }
     const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'a', sidecar } as const
     if (thing.am === 'a') {
@@ -52,13 +54,13 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
 
   /** The tombstone of the live box `donorProps`, without its sealed whisper.
    * Its `written_at` is `publicProps.written_at`, or now.
-   * A tombstone has no sidecar: the sidecar of `donorProps` is dropped, and a sidecar given in `publicProps` refuses.
+   * A tombstone's sidecar is `{}`, whatever the sidecar of `donorProps`: a sidecar given in `publicProps` refuses.
    */
-  static tombstoneOf(donorProps: Sealable<BoxRecord>, publicProps: BoxPublicProps = {}): RevisionOf<BoxTombstone, BoxCleartexts> {
+  static tombstoneOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<TombstoneOf<BoxRecord>, BoxCleartexts> {
     const { sidecar: _sidecar, ...thing             } = Checks.liveBoxSealable.parse(donorProps)
     const { sidecar, written_at = Clock.nowMillis() } = Checks.boxPublicProps.parse(publicProps)
     if (sidecar !== undefined) { throw Throwers.tombstoneSidecarGiven() }
-    const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x' } as const
+    const revision = { revtok: Crypto.randomId(), revseq: thing.revseq + 1, written_at, am: 'x', sidecar: {} } as const
     return { ...thing, ...nextLifeOf(thing), ...revision }
   }
   // --
@@ -72,7 +74,7 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static readonly purposes = Object.freeze({ key: 'whisper_sealed.key_wrapped', cipher: 'whisper_sealed.ciphered' })
 
   /** The {@link BoxStamp} of `record`. Refuses the shell, which has no revision to seal. */
-  static stampOf(record: RevisionOf<BoxThing, BoxCleartexts>): BoxStamp { return StampChecks.boxStamp.parse(record) }
+  static stampOf(record: RevisionOf<BoxRecord, BoxCleartexts>): BoxStamp { return StampChecks.boxStamp.parse(record) }
 
   /** The whisper of `cleartexts` as stable JSON, with its keys sorted. */
   static encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(Checks.boxCleartexts.parse(cleartexts).whisper) }
@@ -81,24 +83,24 @@ export class CoreBox { // eslint-disable-line @typescript-eslint/no-extraneous-c
   static decode(text: string): BoxCleartexts { return { whisper: deserializeWhisper(text) } }
 
   /** The sealed whisper of `record`, which must carry a box's tags. */
-  static sealedOf(record: BoxThing): Sealed {
+  static sealedOf(record: BoxRecord): Sealed {
     const { whisper_sealed } = BoxChecks.record.parse(record)
     if (! Validator.isConsistent(whisper_sealed, BoxTags)) { throw Throwers.undecodedWhisper() }
     return whisper_sealed
   }
 
   /** `next` with `whisper_sealed` added, checked as a stored box, and frozen. */
-  static recordOf(next: RevisionOf<BoxThing, BoxCleartexts>, whisper_sealed: Sealed): BoxThing {
+  static recordOf(next: RevisionOf<BoxRecord, BoxCleartexts>, whisper_sealed: Sealed): BoxRecord {
     return Object.freeze(BoxChecks.record.parse({ ...next, whisper_sealed }))
   }
   // --
 }
-Object.freeze(CoreBox satisfies Sealer<BoxThing, BoxCleartexts>)
+Object.freeze(CoreBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
 // == [Helpers]: nextLifeOf, deserializeWhisper
 
 /** The lifeseq and lifepath of the life after the given box's */
-function nextLifeOf({ lifeseq, lifepath }: Pick<BoxThing, 'lifeseq' | 'lifepath'>): Pick<BoxThing, 'lifeseq' | 'lifepath'> {
+function nextLifeOf({ lifeseq, lifepath }: Pick<BoxRecord, 'lifeseq' | 'lifepath'>): Pick<BoxRecord, 'lifeseq' | 'lifepath'> {
   const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
   return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
 }

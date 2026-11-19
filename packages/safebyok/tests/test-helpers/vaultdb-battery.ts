@@ -3,7 +3,7 @@ import { describe } from 'vitest'
 import { type Helpers, Validator } from 'safebyok-big/internals'
 import { expectGood } from 'safebyok-big/testing'
 import type { Labelpath, Lifepath } from '../../src/shapes/primitives'
-import { type BoxThing, type GateThing, type Thing, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, type GateRecord, type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
 
 import type { VaultDB } from '../../src/storage/vault-db'
 import { Life0, birthAskOf, birthBankAskOf, gateThingOf, getAskAt } from './vaultdb-world'
@@ -51,13 +51,13 @@ export type VaultDBBatteryWorld = {
   /** A fresh vaultDB with a bank born in it, its three roots as `birthBankAskOf` makes them. */
   bornBank:  () => Promise<VaultDB>
   /** A fresh vaultDB with the main gate alone written in it, by a birth, and no bank. */
-  withGate:  (stored?: GateThing) => Promise<VaultDB>
+  withGate:  (stored?: GateRecord) => Promise<VaultDB>
   /** Write `thing` into `vaultDB`, born under its parent's life at `parentLifepath`. */
-  bornUnder: (vaultDB: VaultDB, thing: Thing, parentLifepath: Lifepath) => Promise<void>
+  bornUnder: (vaultDB: VaultDB, thing: ThingRecord, parentLifepath: Lifepath) => Promise<void>
   /** Write each of `boxes` into `vaultDB`, born under the root box's life 0, and return them. */
-  boxesBorn: (vaultDB: VaultDB, ...boxes: BoxThing[]) => Promise<BoxThing[]>
+  boxesBorn: (vaultDB: VaultDB, ...boxes: BoxRecord[]) => Promise<BoxRecord[]>
   /** The Thing `vaultDB` stores at `labelpath`, or null for none; throws on a refusal. */
-  gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<Thing | null>
+  gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<ThingRecord | null>
   /** The backdoor to what `vaultDB` stores. */
   rowsOf:    (vaultDB: VaultDB) => VaultDBRowCheats
   watches:   boolean
@@ -71,20 +71,20 @@ function worldOf<DBT extends VaultDB>({ makeVaultDB, _cheat_rowsOf, watches = tr
     await expectGood(vaultDB.tryBirthBank(birthBankAskOf()))
     return vaultDB
   }
-  async function withGate(stored: GateThing = gateThingOf()): Promise<VaultDB> {
+  async function withGate(stored: GateRecord = gateThingOf()): Promise<VaultDB> {
     const vaultDB = await fresh()
     await expectGood(vaultDB.tryWriteThing(birthAskOf(stored)))
     return vaultDB
   }
-  async function bornUnder(vaultDB: VaultDB, thing: Thing, parentLifepath: Lifepath): Promise<void> {
+  async function bornUnder(vaultDB: VaultDB, thing: ThingRecord, parentLifepath: Lifepath): Promise<void> {
     const ask = birthAskOf(thing, Shell.childCited(parentLifepath))
     await expectGood(vaultDB.tryWriteThing(ask))
   }
-  async function boxesBorn(vaultDB: VaultDB, ...boxes: BoxThing[]): Promise<BoxThing[]> {
+  async function boxesBorn(vaultDB: VaultDB, ...boxes: BoxRecord[]): Promise<BoxRecord[]> {
     for (const box of boxes) { await bornUnder(vaultDB, box, Life0) }
     return boxes
   }
-  async function gotAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<Thing | null> {
+  async function gotAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<ThingRecord | null> {
     const answer = await vaultDB.tryGetThing(getAskAt(labelpath))
     return await expectGood(answer)
   }

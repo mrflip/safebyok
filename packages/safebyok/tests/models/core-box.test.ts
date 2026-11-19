@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { CoreBox } from '../../src/models/core-box'
 import * as Phrases from '../../src/phrases'
-import type { BoxCleartexts, BoxRecord, RevisionOf } from '../../src/shapes/shapes-sealers'
+import type { BoxCleartexts, LiveOf, RevisionOf } from '../../src/shapes/shapes-sealers'
+import type { BoxRecord } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
@@ -20,7 +21,7 @@ const Life2 = Lifeseq.ofLifenum(2)
 const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 /** A live box at its first revision, without its sealed whisper: the first revision over {@link TH.boxShellOf}'s shell. */
-function liveRevisionOf(): RevisionOf<BoxRecord, BoxCleartexts> {
+function liveRevisionOf(): RevisionOf<LiveOf<BoxRecord>, BoxCleartexts> {
   return { ...TH.boxShellOf(), revtok: TH.revtokOf('box1'), revseq: 0, am: 'a', lifeseq: Life0, lifepath: `${Life0}/${Life0}`, sidecar: TH.Sidecar }
 }
 
@@ -118,6 +119,12 @@ describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
     expect(next).to.deep.include({ am: 'a', revseq: 2, lifeseq: Life2, lifepath: `${Life0}/${Life2}`, born_at: TH.T0 + 7, sidecar: { account: 'home' } })
   })
 
+  it("refuses a revival over a tombstone given no sidecar: the tombstone's `{}` is not inherited", () => {
+    const tombstone = CoreBox.tombstoneOf(liveRevisionOf())
+    const err = TH.expectSyncRefusal(() => CoreBox.nextRevisionOf(tombstone, {}), 'bad_record')
+    expect(TH.thrownText(err)).to.include(Phrases.SidecarMissing)
+  })
+
   it("leaves the donor it was handed as it was, and keeps none of a stored box's sealed whisper", () => {
     const shell = TH.boxShellOf()
     const copy = structuredClone(shell)
@@ -146,13 +153,13 @@ describe("CoreBox.nextRevisionOf(donor, publicProps)", () => {
 })
 
 describe("CoreBox.tombstoneOf(donor)", () => {
-  it("makes the tombstone of a live box: its next revision, at the next lifeseq, written now, with no sidecar", () => {
+  it("makes the tombstone of a live box: its next revision, at the next lifeseq, written now, with the sidecar `{}`", () => {
     const live = liveRevisionOf()
     vi.setSystemTime(TH.T0 + 5)
     const next = CoreBox.tombstoneOf(live)
     expect(next).to.include({ am: 'x', revseq: live.revseq + 1, lifeseq: Life1, lifepath: `${Life0}/${Life1}`, born_at: live.born_at, written_at: TH.T0 + 5 })
     expect(next.revtok).to.not.eq(live.revtok)
-    expect(next).to.not.have.property('sidecar')
+    expect(next.sidecar).to.deep.equal({})
   })
 
   it("is written at the written_at given", () => {
@@ -160,7 +167,7 @@ describe("CoreBox.tombstoneOf(donor)", () => {
     expect(next).to.include({ am: 'x', written_at: TH.T0 - 3 })
   })
 
-  it("refuses a sidecar given, as a tombstone has none", () => {
+  it("refuses a sidecar given, as a tombstone's is always `{}`", () => {
     const err = TH.expectSyncRefusal(() => CoreBox.tombstoneOf(liveRevisionOf(), { sidecar: { account: 'home' } }), 'bad_record')
     expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarGiven)
   })
@@ -195,7 +202,7 @@ describe("CoreBox.stampOf(record)", () => {
   })
 
   it("refuses the shell, which has no revision to bind", () => {
-    TH.expectSyncRefusal(() => CoreBox.stampOf(TH.boxShellOf()), 'bad_record')
+    TH.expectSyncRefusal(() => CoreBox.stampOf(TH.boxShellOf() as never), 'bad_record')
   })
 })
 
@@ -263,7 +270,7 @@ describe("CoreBox.sealedOf(record) and recordOf(next, sealed)", () => {
   })
 
   it("refuses to make a record of the shell", () => {
-    TH.expectSyncRefusal(() => CoreBox.recordOf(TH.boxShellOf(), Sealed), 'bad_record')
+    TH.expectSyncRefusal(() => CoreBox.recordOf(TH.boxShellOf() as never, Sealed), 'bad_record')
   })
 
   it("refuses 'damaged_whisper' for a sealed whisper of other tags, quoting none of it", () => {

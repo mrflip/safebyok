@@ -79,7 +79,7 @@ export interface GateOpts {
 const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => ({
   leaseBank:           obj({ stamp: StampChecks.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
-  gateRevisionedStamp: StampChecks.gateStamp.extend(ThingChecks.thingRecord.pick({ revtok: true }).shape),
+  gateRevisionedStamp: StampChecks.gateStamp.extend(ThingChecks.sparse.pick({ revtok: true }).shape),
   provingDevice:       GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected) }),
 }))
 

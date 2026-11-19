@@ -8,27 +8,24 @@ import type { Proving } from '../models/proving'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
 import type { GateDna, RequestCleartext, StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
-import type { BoxCleartexts, BoxRecord, BoxTombstone, UnsealedOf } from './shapes-sealers'
+import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealers'
 import type { BankStamp } from './shapes-stamps'
-import type { BoxThing, Sparse } from './shapes-thing'
+import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk, WorldRecord } from './shapes-asks'
 import type { Labelpath } from './primitives'
 
-// == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed, BoxShell
+// == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed
 
 /** The record {@link Bank.make} and {@link Bank.birth} take: the bank's Thing, with its main gate's Thing at `maingate` and its root box at `rootBox`.
  * The root box is whole, or its shell before the bank is born.
  */
-export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: BoxRecord | BoxShell }>
+export type BankMakeRecord = WorldRecord & Readonly<{ rootBox: LiveOf<BoxRecord> | ShellOf<BoxRecord> }>
 
 /** The dna of a new bank: its stamp, and its main gate's dna. */
 export type BankDna = BankStamp & { maingate: GateDna }
 
 /** A box unsealed: its record with its whisper in place of the sealed one. A tombstone's whisper is empty. */
-export type BoxUnsealed = UnsealedOf<BoxThing, BoxCleartexts>
-
-/** A box's shell: the void sparse record a box's first revision is sealed over and cites. */
-export type BoxShell = Sparse<BoxTombstone>
+export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 // --
 
 // == [The bank's drafts and answers]: GetBoxAskDraft, BankAskDraft, GetBoxAnswer
@@ -44,7 +41,7 @@ export type GetBoxAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAb
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 
 /** The answer of {@link Bank.tryGetBox}: the box, live or a tombstone; `VoidT` under `gotvoid`, when none is stored; or a refusal. */
-export type GetBoxAnswer<VoidT = null> = GoodAnswer<BoxThing, 'gotlive' | 'gotgone'> | GoodAnswer<VoidT, 'gotvoid'> | BadAnswer
+export type GetBoxAnswer<VoidT = null> = GoodAnswer<BoxRecord, 'gotlive' | 'gotgone'> | GoodAnswer<VoidT, 'gotvoid'> | BadAnswer
 // --
 
 // == [The bank's making]: BankOpts, BirthOpts

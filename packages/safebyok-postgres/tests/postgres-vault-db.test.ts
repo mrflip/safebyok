@@ -125,6 +125,14 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     }
   })
 
+  it("keeps no box tombstone whose sidecar is not {}", async () => {
+    await makeVaultDB()
+    const tomb = VT.boxTombOf(VT.boxThingOf())
+    const scope = { ...VT.ThingBank, labelpath: tomb.labelpath }
+    await plant(scope, tomb)
+    await expect(plant(scope, { ...tomb, sidecar: { account: 'home' } })).rejects.toThrow('check constraint')
+  })
+
   it("names each function it creates for the version of its tables and its revision", async () => {
     const db = await database()
     const { rows } = await db.query<{ proname: string }>("SELECT DISTINCT proname FROM pg_proc WHERE proname LIKE 'safebyok\\_%'")

@@ -4,7 +4,7 @@ import type { Consts, EX } from 'safebyok-big/internals'
 import { Crypto, Helpers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
-import type { ThingRecord } from '../shapes/shapes-thing'
+import type { Sparse, ThingRecord } from '../shapes/shapes-thing'
 import { type LeaseBank, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -82,16 +82,16 @@ export class Lease implements LeaseStamp {
    *   await lease.seal(CoreBox, box, { sidecar: { account: 'work' } }, { whisper })  // its next revision
    *   await lease.seal(CoreBox, box, { am: 'x' })                                     // its tombstone
    */
-  seal<RecordT extends ThingRecord, CleartextsT>(
+  seal<RecordT extends Sparse<ThingRecord>, CleartextsT>(
     sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.TombstonePublicProps,
   ): Promise<Sealers.TombstoneOf<RecordT>>
-  seal<RecordT extends ThingRecord, CleartextsT>(
+  seal<RecordT extends Sparse<ThingRecord>, CleartextsT>(
     sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.LivePublicPropsOf<RecordT, CleartextsT>, secretProps: CleartextsT,
   ): Promise<Sealers.LiveOf<RecordT>>
-  seal<RecordT extends ThingRecord, CleartextsT>(
+  seal<RecordT extends Sparse<ThingRecord>, CleartextsT>(
     sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.PublicPropsOf<RecordT, CleartextsT>, secretProps?: CleartextsT,
   ): Promise<RecordT>
-  async seal<RecordT extends ThingRecord, CleartextsT>(
+  async seal<RecordT extends Sparse<ThingRecord>, CleartextsT>(
     sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.PublicPropsOf<RecordT, CleartextsT>, secretProps?: CleartextsT,
   ): Promise<RecordT> {
     Checks.sealer.parse(sealer)
@@ -109,7 +109,7 @@ export class Lease implements LeaseStamp {
    * The answer is a new, frozen record built from `record` as checked, not `record` itself.
    * Unsealing authenticates the ciphertexts, the stamp and the tags together: a change to any of them refuses as damaged.
    */
-  async unseal<RecordT extends ThingRecord, CleartextsT>(sealer: Sealers.Sealer<RecordT, CleartextsT>, record: RecordT): Promise<Sealers.UnsealedOf<RecordT, CleartextsT>> {
+  async unseal<RecordT extends Sparse<ThingRecord>, CleartextsT>(sealer: Sealers.Sealer<RecordT, CleartextsT>, record: RecordT): Promise<Sealers.UnsealedOf<RecordT, CleartextsT>> {
     Checks.sealer.parse(sealer)
     // The answer is built from the record as the sealer checks a stored one, never from the caller's object.
     const recordChecked = sealer.recordOf(record, sealer.sealedOf(record))
@@ -136,7 +136,7 @@ export class Lease implements LeaseStamp {
   }
 
   /** The cleartext sealed in `record`, the part `sealer` seals. */
-  async #openSealed<RecordT extends ThingRecord>(sealer: Pick<Sealers.Sealer<RecordT, unknown>, 'sealedOf' | 'stampOf' | 'purposes'>, record: RecordT): Promise<string> {
+  async #openSealed<RecordT extends Sparse<ThingRecord>>(sealer: Pick<Sealers.Sealer<RecordT, unknown>, 'sealedOf' | 'stampOf' | 'purposes'>, record: RecordT): Promise<string> {
     const { key_wrapped, ciphered, ...tags } = sealer.sealedOf(record)
     const stamp   = sealer.stampOf(record)
     const { purposes } = sealer

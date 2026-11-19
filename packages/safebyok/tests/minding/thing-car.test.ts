@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
 import type { ThingCar } from '../../src/shapes/shapes-minder'
-import { type BoxThing, type Thing, Shell, sparseOf } from '../../src/shapes/shapes-thing'
+import type { LiveOf } from '../../src/shapes/shapes-sealers'
+import { type BoxRecord, type ThingRecord, Shell, sparseOf } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 const Box0      = TH.boxThingOf()
@@ -12,12 +13,12 @@ const BoxReborn = TH.boxRebornOf(BoxGone)
 const BoxShell  = Shell.of(TH.BoxScope, TH.rootBoxOf())
 
 /** The car `behind`, of the sparse `newest` and the older whole `fullest`, as a merge leaves it. */
-function behindOf(newest: Thing, fullest: Thing): ThingCar<Thing> {
+function behindOf(newest: ThingRecord, fullest: ThingRecord): ThingCar<ThingRecord> {
   return { liveness: 'behind', newest: sparseOf(newest), fullest }
 }
 
 /** `car`'s liveness, and the life and revision of each of its records. */
-function revisionsOf(car: ThingCar<Thing>) {
+function revisionsOf(car: ThingCar<ThingRecord>) {
   return {
     liveness: car.liveness,
     newest:   [car.newest.lifepath, car.newest.revseq],
@@ -66,7 +67,7 @@ describe("carOf", () => {
   ] as const
   for (const [newest, fullest, blurb] of BadFullests) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => carOf(newest, fullest as Thing), 'bad_record')
+      TH.expectSyncRefusal(() => carOf(newest, fullest as ThingRecord), 'bad_record')
     })
   }
 
@@ -79,7 +80,7 @@ describe("carOf", () => {
   ] as const
   for (const [val, blurb] of NotRecords) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => carOf(val as unknown as Thing), 'bad_record')
+      TH.expectSyncRefusal(() => carOf(val as unknown as ThingRecord), 'bad_record')
     })
   }
 })
@@ -149,17 +150,16 @@ describe("bestCarOf", () => {
       const merged = bestCarOf(carOf(Box0), carOf(structuredClone(Box1)))
       expect(merged).to.deep.equal(carOf(Box1))
       expect(merged.newest).to.eq(merged.fullest)
-      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
+      expect((merged.fullest as BoxRecord).whisper_sealed).to.eq(Box0.whisper_sealed)
     })
 
     it("keeping the newer record's changed parts its own", () => {
       // A live box, which alone has a sidecar.
-      type LiveBox = Extract<BoxThing, { am: 'a' }>
       const later  = TH.nextOf(Box0, { sidecar: { account: 'home' } })
       const merged = bestCarOf(carOf(Box0), carOf(structuredClone(later)))
       expect(merged.fullest).to.deep.equal(later)
-      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
-      expect((merged.fullest as LiveBox).sidecar).to.not.eq((Box0 as LiveBox).sidecar)
+      expect((merged.fullest as BoxRecord).whisper_sealed).to.eq(Box0.whisper_sealed)
+      expect((merged.fullest as LiveOf<BoxRecord>).sidecar).to.not.eq((Box0 as LiveOf<BoxRecord>).sidecar)
     })
 
     it("in a behind car, whose newest stays the prior car's", () => {
@@ -168,14 +168,14 @@ describe("bestCarOf", () => {
       const merged    = bestCarOf(prior, delivered)
       expect(merged).to.deep.equal(behindOf(Box2, Box1))
       expect(merged.newest).to.eq(prior.newest)
-      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
+      expect((merged.fullest as BoxRecord).whisper_sealed).to.eq(Box0.whisper_sealed)
     })
 
     it("in the full car a behind car becomes, whose newest is its fullest", () => {
       const merged = bestCarOf(behindOf(Box1, Box0), carOf(structuredClone(Box1)))
       expect(merged).to.deep.equal(carOf(Box1))
       expect(merged.newest).to.eq(merged.fullest)
-      expect((merged.fullest as BoxThing).whisper_sealed).to.eq(Box0.whisper_sealed)
+      expect((merged.fullest as BoxRecord).whisper_sealed).to.eq(Box0.whisper_sealed)
     })
   })
 

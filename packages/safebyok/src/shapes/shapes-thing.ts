@@ -1,6 +1,6 @@
 /** The shapes of a Thing, the record every kind is stored as in a vaultDB, and the checks of each. */
 
-import { pick } from 'es-toolkit'
+import { isEmptyObject, pick } from 'es-toolkit'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
 import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
@@ -9,22 +9,15 @@ import * as Phrases from '../phrases'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
 import { type Lifepath, type Revtok, Labelpath, Lifeseq, VoidLifeseq } from './primitives'
 
-// == [Kinds]: thingkindVals, Thingkind, BankThingFormat, GateThingFormat, BoxThingFormat, ThingFormats
+// == [Kinds]: thingkindVals, Thingkind, ThingFormat
 
 /** The kinds of Thing: the modelkind at the base of each labelpath. */
 export const thingkindVals = ['bank', 'gate', 'box'] as const satisfies readonly Consts.Modelkind[]
 /** A kind of Thing, one of {@link thingkindVals}. */
 export type Thingkind = typeof thingkindVals[number]
 
-/** The `fmt` of the bank's Thing, distinct from big's bank row (3001). */
-export const BankThingFormat = 3101
-/** The `fmt` of a gate's Thing, distinct from big's gate row (4001). */
-export const GateThingFormat = 4101
-/** The `fmt` of a box's Thing, distinct from big's box row (5003). */
-export const BoxThingFormat = 5103
-
-/** The `fmt` of each kind of Thing. */
-export const ThingFormats = { bank: BankThingFormat, gate: GateThingFormat, box: BoxThingFormat } as const satisfies Record<Thingkind, number>
+/** The `fmt` of every Thing, of every kind: the kind is in its labelpath. Distinct from big's rows' fmts (3001, 4001, 5003). */
+export const ThingFormat = 100_501
 
 /** True when `labelpath` is one of some kind of Thing's. */
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
@@ -54,6 +47,8 @@ function isLifepathDeep({ lifepath, labelpath }: Lived & Labelled): boolean { re
 function isParityRight({ am, lifepath }: Lived): boolean { return (am === 'x') === Lifeseq.isTombstone(Lifeseq.ofLifepath(lifepath)) }
 /** True unless the Thing is a deleted main gate. */
 function isMainGateLive({ labelpath, am }: Lived & Labelled): boolean { return (labelpath !== Labelpath.MainGate) || (am === 'a') }
+/** True unless the box is a tombstone whose sidecar is not empty. */
+function isGoneSidecarEmpty({ am, sidecar }: { am: string, sidecar: object }): boolean { return (am === 'a') || isEmptyObject(sidecar) }
 /** The fields of `shape`, each optional: it may be omitted, but not undefined. */
 function exactPartialOf<ShapeT extends Z.ZodRawShape>(shape: ShapeT): { [FieldT in keyof ShapeT]: Z.ZodExactOptional<ShapeT[FieldT]> } {
   // Object.fromEntries loses the fieldnames' types: the cast restores them.
@@ -91,7 +86,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   })
   // A Thing's scope and citation: what every record and tombstone has, sparse or whole.
   const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape })
-  const thingRecord  = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
+  const sparse       = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
   // The store checks only the shape of a sealed part: what is inside is the sealer's.
@@ -107,13 +102,13 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   }).strict()
   return {
     modelkind, labelpath, anyLifeseq, voidLifeseq, anyLifepath, voidLifepath, ...revisioned, bankScope, label,
-    thingScope, thingCited, scopedCited, thingRecord, storedCited, sealed,
+    thingScope, thingCited, scopedCited, sparse, storedCited, sealed,
   }
 })
 
 /** The checks of each kind of Thing: its record, its citation, and the parts of it a kind has. */
-const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union, discrim }) => {
-  const { labelpath, anyLifeseq, voidLifeseq, voidLifepath, thingRecord, thingCited, sealed } = GenericChecks
+const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union }) => {
+  const { labelpath, anyLifeseq, voidLifeseq, voidLifepath, sparse, thingCited, sealed } = GenericChecks
   const emptyBag     = obj({}).strict()
   // A record has no optional part: a gate with no passkey has `passkey0: null`.
   const wayins       = obj({ main: BX.wayins.shape.main, passkey0: BX.wayins.shape.passkey0.unwrap().nullable() }).strict()
@@ -126,15 +121,15 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union, discr
 
   // A stored record is strict: a field this version does not know is damage, or a newer format.
   const bankBase     = obj({
-    ...thingRecord.shape,
+    ...sparse.shape,
     labelpath:      bankLabelpath,
     label:          lit('bank'),
-    fmt:            lit(BankThingFormat),
+    fmt:            lit(ThingFormat),
   }).strict()
   const gateBase     = obj({
-    ...thingRecord.shape,
+    ...sparse.shape,
     labelpath:      gateLabelpath,
-    fmt:            lit(GateThingFormat),
+    fmt:            lit(ThingFormat),
     wayins,
     /** Reserved: always empty, and read by nothing. */
     auth:           emptyBag,
@@ -143,16 +138,15 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union, discr
     /** Reserved: always empty, and read by nothing. */
     meta:           emptyBag,
   }).strict()
-  const boxLive      = obj({
-    ...thingRecord.shape,
+  // A tombstone seals an empty whisper, and its sidecar is always `{}`.
+  const boxBase      = obj({
+    ...sparse.shape,
     labelpath:      boxLabelpath,
-    fmt:            lit(BoxThingFormat),
-    am:             lit('a'),
+    fmt:            lit(ThingFormat),
     sidecar:        CX.sidecar,
     whisper_sealed: sealed,
   }).strict()
-  // A tombstone seals an empty whisper, and has no sidecar.
-  const boxGone      = obj({ ...boxLive.omit({ sidecar: true }).shape, am: lit('x') }).strict()
+  const boxLive      = boxBase.extend({ am: lit('a') })
 
   const bankThing    = bankBase
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
@@ -164,11 +158,12 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union, discr
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
     .refine(isMainGateLive, Phrases.MainGateDeleted)
-  const boxThing     = discrim('am', [boxLive, boxGone])
+  const boxThing     = boxBase
     .refine(isLabelLast,    Phrases.LabelNotLast)
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
+    .refine(isGoneSidecarEmpty, Phrases.TombstoneSidecarNotEmpty)
 
   // A citation must carry what ThingCited names; any other field of its kind it carries must check.
   const bankCited    = obj({ ...exactPartialOf(bankBase.shape), ...thingCited.shape }).strict()
@@ -178,16 +173,16 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union, discr
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
   // A box's shell, as a bank gives it, carries the shell's lifeseq.
-  const boxCited     = obj({ ...exactPartialOf(boxLive.shape), lifeseq: exactOptional(anyLifeseq), ...thingCited.shape }).strict()
+  const boxCited     = obj({ ...exactPartialOf(boxBase.shape), lifeseq: exactOptional(anyLifeseq), ...thingCited.shape }).strict()
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
   // A box's sealable keeps only its Thing fields and sidecar, so a whisper given with it, sealed or not, is dropped. The
   // shell has no stored row, so its revseq, lifeseq and lifepath may be the shell's.
   const boxSealable  = obj({
-    ...thingRecord.shape,
+    ...sparse.shape,
     labelpath:      boxLabelpath,
-    fmt:            lit(BoxThingFormat),
+    fmt:            lit(ThingFormat),
     revseq:         thingCited.shape.revseq,
     lifeseq:        anyLifeseq,
     lifepath:       thingCited.shape.lifepath,
@@ -206,9 +201,9 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union, discr
     .refine(isLifepathDeep, Phrases.LifepathDepth)
     .refine(isParityRight,  Phrases.LifeseqParity)
   const boxShell     = obj({
-    ...thingRecord.shape,
+    ...sparse.shape,
     labelpath:      boxLabelpath,
-    fmt:            lit(BoxThingFormat),
+    fmt:            lit(ThingFormat),
     revtok:         lit(SX.VoidRevisionTok),
     revseq:         lit(SX.VoidRevisionSeq),
     am:             lit('x'),
@@ -259,9 +254,9 @@ const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB
 
 /** The checks of a Thing's fields, of its citation, of what a write reads of the Thing stored, and of a host's vaultDB.
  * `byModelkind` holds the bundle of each kind of Thing: {@link BankChecks}, {@link GateChecks} and {@link BoxChecks}; `ofLabelpath` gives the one for a labelpath.
- * Also `ThingFormats`, the `fmt` of each kind, and `thingkindVals`, the kinds.
+ * Also `ThingFormat`, the `fmt` of every Thing, and `thingkindVals`, the kinds.
  */
-export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, byModelkind, ofLabelpath, ThingFormats, thingkindVals })
+export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, byModelkind, ofLabelpath, ThingFormat, thingkindVals })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
@@ -269,42 +264,39 @@ export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
 export type ThingCited   = Readonly<Z.infer<typeof ThingChecks.thingCited>>
 /** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace keeps. */
 export type StoredCited  = Readonly<Z.infer<typeof ThingChecks.storedCited>>
-/** The fields every kind of Thing has, which the store reads. The rest of a record is its body. */
-export type ThingRecord  = Readonly<Z.infer<typeof ThingChecks.thingRecord>>
+/** The name of a Thing field: the fields every kind of Thing has, which the store reads. The rest of a record is its body. */
+type ThingFieldname = keyof Z.infer<typeof ThingChecks.sparse>
 /** The bank, as a Thing. */
-export type BankThing    = Readonly<Z.infer<typeof BankChecks.record>>
+export type BankRecord   = Readonly<Z.infer<typeof BankChecks.record>>
 /** A gate, as a Thing: the main gate, at `gate`. */
-export type GateThing    = Readonly<Z.infer<typeof GateChecks.record>>
-/** A box, as a Thing: live, with its sidecar and sealed whisper, or a tombstone, with a sealed empty whisper. */
-export type BoxThing     = Readonly<Z.infer<typeof BoxChecks.record>>
+export type GateRecord   = Readonly<Z.infer<typeof GateChecks.record>>
+/** A box, as a Thing: with its sidecar and sealed whisper. A tombstone's sidecar is `{}`, and its whisper is sealed empty. */
+export type BoxRecord    = Readonly<Z.infer<typeof BoxChecks.record>>
 /** Any Thing stored in a vaultDB. */
-export type Thing        = BankThing | GateThing | BoxThing
+export type ThingRecord  = BankRecord | GateRecord | BoxRecord
 /** One sealed part of a record, at `<part>_sealed`: a fresh key wrapped under the bankKey, the cleartext ciphered under that key, and the tags its unseal reads. */
 export type Sealed       = Readonly<Z.infer<typeof ThingChecks.sealed>>
 /** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin or null for none. */
 export type Wayins       = Readonly<Z.infer<typeof GateChecks.wayins>>
 
 /** A record's Thing fields, without its body: what a listing returns for each Thing. */
-export type Sparse<RecordT extends ThingRecord> = Pick<RecordT, keyof ThingRecord>
+export type Sparse<RecordT extends Sparse<ThingRecord>> = Pick<RecordT, ThingFieldname>
 
-const ThingFieldnames = Object.keys(ThingChecks.thingRecord.shape) as (keyof ThingRecord)[]
+const ThingFieldnames = Object.keys(ThingChecks.sparse.shape) as ThingFieldname[]
 
 /** The Thing fields of `record`, without its body. */
-export function sparseOf<RecordT extends ThingRecord>(record: RecordT): Sparse<RecordT> { return pick(record, ThingFieldnames) }
+export function sparseOf<RecordT extends Sparse<ThingRecord>>(record: RecordT): Sparse<RecordT> { return pick(record, ThingFieldnames) }
 // --
 
 // == [Shells]: ShellChecks, VoidSentinel, Shell
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
-/** True when a Thing's fmt is its kind's. */
-function isFmtOwn({ labelpath, fmt }: { labelpath: Labelpath, fmt: number }): boolean { return fmt === ThingFormats[Labelpath.modelkindOf(labelpath)] }
-
 /** A shell, whole: every Thing field of a tombstone and no body, its revseq -1.
  * What a ThingMinder's cache holds for a scope that stores nothing.
  */
-export type VoidSentinel = Sparse<Thing> & Readonly<{ am: 'x' }>
+export type VoidSentinel = Sparse<ThingRecord> & Readonly<{ am: 'x' }>
 
-const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label }) => {
+const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, label }) => {
   const fixed = {
     revtok:     lit(SX.VoidRevisionTok).default(SX.VoidRevisionTok),
     revseq:     lit(SX.VoidRevisionSeq).default(SX.VoidRevisionSeq),
@@ -321,29 +313,28 @@ const ShellChecks = Validator.Checkers('bad_record', ({ obj, lit, uint, label })
       labelpath: exactOptional(ThingChecks.thingScope.shape.labelpath),
       label:     exactOptional(label),
       lifepath:  exactOptional(shellLifepath),
-      fmt:       exactOptional(uint),
+      fmt:       exactOptional(lit(ThingFormat)),
       ...fixed,
     }),
     // What a shell proposed must meet, of a record's rules.
-    shell: obj({ ...ThingChecks.thingScope.shape, label, fmt: uint, lifepath: shellLifepath, ...fixed })
+    shell: obj({ ...ThingChecks.thingScope.shape, label, fmt: lit(ThingFormat), lifepath: shellLifepath, ...fixed })
       .refine(isLabelLast,    Phrases.LabelNotLast)
       .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
-      .refine(isLifepathDeep, Phrases.LifepathDepth)
-      .refine(isFmtOwn,       Phrases.ShellFmtOfOtherKind),
+      .refine(isLifepathDeep, Phrases.LifepathDepth),
   }
 })
 
-const labelpathWithParentageChecker = Validator.Checker(() => ThingChecks.thingRecord.pick({ labelpath: true, label: true }))
+const labelpathWithParentageChecker = Validator.Checker(() => ThingChecks.sparse.pick({ labelpath: true, label: true }))
 const lifepathWithParentageChecker = Validator.Checker(({ obj }) => obj({ lifepath: ThingChecks.anyLifepath, lifeseq: ThingChecks.anyLifeseq }))
 
-function rootShellOf(proposed: Partial<ThingRecord>): VoidSentinel {
+function rootShellOf(proposed: Partial<Sparse<ThingRecord>>): VoidSentinel {
   const modelkind = ThingChecks.modelkind.parse(proposed.labelpath)
   return Object.freeze(ShellChecks.shell.parse({
-    fmt: ThingFormats[modelkind], label: modelkind, lifepath: Shell.RootVoidLifepath, ...proposed,
-  })) as VoidSentinel
+    fmt: ThingFormat, label: modelkind, lifepath: Shell.RootVoidLifepath, ...proposed,
+  }))
 }
 
-function demandConsistentParent(partialThing: Pick<ThingRecord, 'userid' | 'banklabel' | 'labelpath' | 'lifepath'>, parent?: Partial<ThingRecord>): void {
+function demandConsistentParent(partialThing: Pick<Sparse<ThingRecord>, 'userid' | 'banklabel' | 'labelpath' | 'lifepath'>, parent?: Partial<Sparse<ThingRecord>>): void {
   if (! parent) { return }
   const bankScope = ThingChecks.bankScope.parse(partialThing)
   const parentpath = Labelpath.parentOf(partialThing.labelpath)
@@ -367,22 +358,21 @@ export const Shell = Object.freeze({
    * Name a root by its labelpath alone; any other Thing by its labelpath and lifepath, or by its label under `parent`.
    * Refuses a `raw` that disagrees with `parent`.
    */
-  of(raw: Partial<ThingRecord>, parent?: Partial<ThingRecord>): VoidSentinel {
+  of(raw: Partial<Sparse<ThingRecord>>, parent?: Partial<Sparse<ThingRecord>>): VoidSentinel {
     const proposed = ShellChecks.shellScoped.parse(raw)
     if (ThingChecks.modelkind.safeParse(proposed.labelpath).success) { return rootShellOf(proposed) }
     const labels    = Shell.labelpathWithParentage(proposed, parent)
     const lives    = Shell.lifepathWithParentage(proposed, parent)
-    const fmt      = ThingFormats[Labelpath.modelkindOf(labels.labelpath)]
-    const shell    = ShellChecks.shell.parse({ fmt, ...proposed, ...labels, ...lives })
+    const shell    = ShellChecks.shell.parse({ fmt: ThingFormat, ...proposed, ...labels, ...lives })
     demandConsistentParent(shell, parent)
-    return Object.freeze(shell) as VoidSentinel
+    return Object.freeze(shell)
   },
   /** The labelpath and label of `raw`: its own labelpath, or its label under `parent`'s.
    * It does not check `raw` against `parent`: the caller does.
    */
   labelpathWithParentage(
-    raw: Partial<Pick<ThingRecord, 'labelpath' | 'label'>>, parent?: Partial<Pick<ThingRecord, 'labelpath'>>,
-  ): Pick<ThingRecord, 'labelpath' | 'label'> {
+    raw: Partial<Pick<Sparse<ThingRecord>, 'labelpath' | 'label'>>, parent?: Partial<Pick<Sparse<ThingRecord>, 'labelpath'>>,
+  ): Pick<Sparse<ThingRecord>, 'labelpath' | 'label'> {
     if (raw.labelpath) { // if raw has a labelpath, find the label of it; prefer raw so it survives to the consistent check.
       const labelpath = ThingChecks.labelpath.parse(raw.labelpath)
       const label     = raw.label ?? Labelpath.labelOf(labelpath)
@@ -395,7 +385,7 @@ export const Shell = Object.freeze({
   /** The lifepath and lifeseq of `raw`: its own lifepath, or its lifeseq under `parent`'s.
    * It does not check `raw` against `parent`: the caller does.
    */
-  lifepathWithParentage(raw: Partial<Pick<ThingRecord, 'lifepath' | 'lifeseq'>>, parent?: Partial<Pick<ThingRecord, 'lifepath'>>): Pick<ThingRecord, 'lifepath' | 'lifeseq'> {
+  lifepathWithParentage(raw: Partial<Pick<Sparse<ThingRecord>, 'lifepath' | 'lifeseq'>>, parent?: Partial<Pick<Sparse<ThingRecord>, 'lifepath'>>): Pick<Sparse<ThingRecord>, 'lifepath' | 'lifeseq'> {
     // if raw has a lifepath, find the lifeseq. Consistency check is done by the caller.
     if (raw.lifepath) {
       const lifeseq = Lifeseq.ofLifepath(raw.lifepath)
@@ -412,35 +402,35 @@ export const Shell = Object.freeze({
 // == [Reading records]: Tombstone, isVoidSentinel, isWholeRecord, isTombstone, isGone, isSparse, haveSameScope, cmpThings
 
 /** A tombstone of a RecordT, sparse or whole. */
-export type Tombstone<RecordT extends ThingRecord> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
+export type Tombstone<RecordT extends Sparse<ThingRecord>> = TombstoneOf<RecordT> | (Sparse<RecordT> & Readonly<{ am: 'x' }>)
 
 /** True when `record` is a void sentinel: its revseq is the shell's -1. */
-export function isVoidSentinel(record: Sparse<Thing>): record is VoidSentinel {
+export function isVoidSentinel(record: Sparse<ThingRecord>): record is VoidSentinel {
   if (! isTombstone(record)) { return false }
   return record.revseq === SX.VoidRevisionSeq
 }
 
 // The void sentinel is a whole tombstone, though no record check accepts it: a store must never take a shell as a record.
 /** True when `record` is whole, with its body, and not sparse. The void sentinel is whole. */
-export function isWholeRecord(record: Sparse<Thing>): record is Thing {
+export function isWholeRecord(record: Sparse<ThingRecord>): record is ThingRecord {
   return isVoidSentinel(record) || ThingChecks.ofLabelpath(record.labelpath).record.safeParse(record).success
 }
 
 // Each kind types its `am` as 'a' | 'x', so TypeScript cannot narrow to a tombstone by it.
 /** True when `record` is a tombstone, sparse or whole, the void sentinel among them. */
-export function isTombstone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
+export function isTombstone<RecordT extends ThingRecord>(record: unknown): record is Tombstone<RecordT> {
   return tombstoneChecker.safeParse(record).success
 }
 /** What every tombstone has, sparse or whole: a Thing's scope and citation, marked deleted. */
 const tombstoneChecker = Validator.Checker(({ lit }) => ThingChecks.scopedCited.extend({ am: lit('x') }))
 
 /** True when `record` is the tombstone of a deleted Thing, sparse or whole: any tombstone but the void sentinel. */
-export function isGone<RecordT extends Thing>(record: unknown): record is Tombstone<RecordT> {
+export function isGone<RecordT extends ThingRecord>(record: unknown): record is Tombstone<RecordT> {
   return isTombstone(record) && (! isVoidSentinel(record))
 }
 
 /** True when `record` is live, and not whole. */
-export function isSparse(record: Sparse<Thing>): boolean {
+export function isSparse(record: Sparse<ThingRecord>): boolean {
   return (record.am === 'a') && (! isWholeRecord(record))
 }
 

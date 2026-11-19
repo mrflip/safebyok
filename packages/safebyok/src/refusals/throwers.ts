@@ -5,7 +5,7 @@
 import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import type { EX } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type Thing } from '../shapes/shapes-thing'
+import { type ThingRecord } from '../shapes/shapes-thing'
 import { type GetAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { GoodAnswer } from '../storage/vault-db'
 
@@ -31,7 +31,7 @@ export function boxOfOtherRoot(): Errors.VaultError { return new Errors.VaultErr
 
 // The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.
 /** A `storage_issue` refusal of `answer`, the vaultDB's to a box's get, whose Thing is not a box. */
-export function otherThanBox({ ask, val }: GoodAnswer<Thing, EX.GotAct>): Errors.VaultError {
+export function otherThanBox({ ask, val }: GoodAnswer<ThingRecord, EX.GotAct>): Errors.VaultError {
   return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
 }
 // --
@@ -78,12 +78,12 @@ export function testimonyMissing(ask: WriteAsk): Errors.VaultError { return new 
 export const PoliciedMeta = { act: 'policied' } as unknown as Errors.RefusalMeta
 
 /** A `gate_issue` refusal of a write over `stored`, saying `why`. */
-export function gateIssue(stored: Thing | null, why: string): Errors.VaultError {
+export function gateIssue(stored: ThingRecord | null, why: string): Errors.VaultError {
   return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
 }
 
 /** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it does not keep. */
-export function bornAtNotStored(stored: Thing | null): Errors.VaultError {
+export function bornAtNotStored(stored: ThingRecord | null): Errors.VaultError {
   return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
 }
 

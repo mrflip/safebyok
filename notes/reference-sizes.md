@@ -349,17 +349,19 @@ needs a box row of 8,210 bytes or less, about 3,600 bytes less than (c).
 The new core (`packages/safebyok`) stores a box as a Thing, with one sealed part, `whisper_sealed`, in place of big's
 `whisper_ciphered` and `box_key_wrapped`. **Measured** in one run on 2026-11-18: Node 24, `packages/safebyok` at
 `20261118-records` (dfe63d03d), each box sealed with real WebCrypto through `Bank.sealBox` and `Bank.tombstoneBox` on
-a born bank of the test helpers, whose userid has 2 characters and banklabel 4. Bytes of `JSON.stringify`.
+a born bank of the test helpers, whose userid has 2 characters and banklabel 4. Bytes of `JSON.stringify`. Every
+Thing's `fmt` was then its kind's four digits; it is now `100501`, so add 2 bytes to each figure (**Computed**). A box
+tombstone now carries `"sidecar":{}`, as in the last row.
 
 | Box Thing                                                    | Labels at minimum (`box/oa`) | 30-character label |
 | ------------------------------------------------------------ | ---------------------------- | ------------------ |
 | Live, `sidecar: {}`, empty whisper                           | 561                          | 617                |
 | Live, `sidecar: {}`, the API-key whisper (124 bytes of JSON) | 724                          | 780                |
-| A tombstone, as sealed today: no sidecar                     | 548                          | 604                |
-| The same tombstone with `"sidecar":{}`                       | 561                          | 617                |
+| A tombstone without a sidecar, as sealed then                | 548                          | 604                |
+| The same tombstone with `"sidecar":{}`, as sealed now        | 561                          | 617                |
 
 * **A tombstone's body.** Its `whisper_sealed`, the empty whisper sealed, is 291 bytes as a field: `key_wrapped` 120,
-  `ciphered` 80, and the tags `json_v1` and `whisper_v1`. An empty sidecar would add 13 (`"sidecar":{},`), so a
+  `ciphered` 80, and the tags `json_v1` and `whisper_v1`. Its empty sidecar adds 13 (`"sidecar":{},`), so a
   tombstone carrying every field of a live box costs 304 bytes of body over its 256 to 312 bytes of Thing fields, and
   is exactly the size of a live box with an empty sidecar and an empty whisper.
 * **The whisper's cost** follows the rule above: the API-key whisper adds 163 bytes over the empty one.

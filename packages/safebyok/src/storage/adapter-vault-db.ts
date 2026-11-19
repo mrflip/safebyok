@@ -3,7 +3,7 @@
 import { noop } from 'es-toolkit'
 import type * as Z from 'zod'
 import { EX, Errors, Outcome, Validator, type Helpers } from 'safebyok-big/internals'
-import { type Thing, isGone } from '../shapes/shapes-thing'
+import { type ThingRecord, isGone } from '../shapes/shapes-thing'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
@@ -27,7 +27,7 @@ type Feed = { scope: ThingWatchScope, receive: (received: Received) => void }
  */
 function answerOf(actual: Actual<EX.GotAct>, oplabel: string, loggableAsk: LoggableAsk): GetThingAnswer
 function answerOf(actual: Actual<EX.PutAct | EX.DelAct>, oplabel: string, loggableAsk: LoggableAsk): WriteThingAnswer
-function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<Thing | null, EX.GoodAct> {
+function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<ThingRecord | null, EX.GoodAct> {
   const { world, record } = actual
   const beside = trackedFieldOf(actual)
   if (! actual.ok) {
@@ -141,7 +141,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
     const feed: Feed = { scope: bankScope, receive: ({ record, world }) => {
-      let val: Thing
+      let val: ThingRecord
       try { val = Classifier.watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
       try { onNotice({ ok: true, act: isGone(val) ? 'gotgone' : 'gotlive', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
@@ -185,7 +185,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const loggableAsk = loggableAskOf(ask)
       Object.assign(err, { meta: { ...err.meta, oplabel, ask: loggableAsk } })
       // Only the classifier sets rows.dbhas, to a Thing it has checked.
-      const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as Thing | null
+      const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as ThingRecord | null
       return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
       return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: Throwers.answerNotMade() }

@@ -5,11 +5,12 @@ import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { Labelpath, Lifeseq } from './primitives'
 import {
-  type BankThing, type BoxThing, type GateThing, type Thing, type ThingCited, type ThingScope, type Thingkind, BankChecks, BoxChecks, GateChecks, Shell, ThingChecks,
+  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord, type ThingScope, type Thingkind,
+  BankChecks, BoxChecks, GateChecks, Shell, ThingChecks,
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, BankRecord, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -34,7 +35,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
     /** The storage policies the write must keep, each over the Thing stored. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
-  const trackPair       = obj({ revseq: ThingChecks.thingRecord.shape.revseq, lifepath: ThingChecks.thingRecord.shape.lifepath }).strict()
+  const trackPair       = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).strict()
   const trackShape      = obj({ bank: trackPair, [Labelpath.MainGate]: trackPair, [Labelpath.RootBox]: trackPair }).strict()
   const track           = trackShape.optional()
   return {
@@ -61,7 +62,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
  */
 const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => {
   const citedFields = ThingChecks.thingCited.partial()
-  const trackFields = obj({ revseq: ThingChecks.thingRecord.shape.revseq, lifepath: ThingChecks.thingRecord.shape.lifepath }).partial()
+  const trackFields = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).partial()
   return {
     op:        oneof(['get', 'list', 'put', 'del', 'birth']).optional(),
     modelkind: oneof(ThingChecks.thingkindVals).optional(),
@@ -92,22 +93,22 @@ export type GetAsk          = Readonly<Z.infer<typeof AskChecks.getAsk>>
 /** An ask for the children of the Thing at its scope. Its `ifAbsent` is the parent's. */
 export type ListAsk         = Readonly<Z.infer<typeof AskChecks.listAsk>>
 /** A write's citation of a Thing of `RecordT`'s kind: {@link ThingCited}, and optionally any other of its fields. */
-export type CitedOf<RecordT extends Thing> = ThingCited & Partial<Omit<RecordT, keyof ThingCited>>
+export type CitedOf<RecordT extends ThingRecord> = ThingCited & Partial<Omit<RecordT, keyof ThingCited>>
 /** The flags of a write ask, its modelkind and records aside. */
 type WriteAskFlags = Readonly<Omit<Z.infer<typeof AskChecks.writeAsk>, 'modelkind' | 'cited' | 'record'>>
 /** A write ask of the bank: see {@link WriteAsk}. */
-export type BankWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'bank', cited: CitedOf<BankThing>, record: BankThing }>
+export type BankWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'bank', cited: CitedOf<BankRecord>, record: BankRecord }>
 /** A write ask of a gate: see {@link WriteAsk}. */
-export type GateWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'gate', cited: CitedOf<GateThing>, record: GateThing }>
+export type GateWriteAsk = WriteAskFlags & Readonly<{ modelkind: 'gate', cited: CitedOf<GateRecord>, record: GateRecord }>
 /** A write ask of a box: see {@link WriteAsk}. */
-export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: CitedOf<BoxThing>,  record: BoxThing }>
+export type BoxWriteAsk  = WriteAskFlags & Readonly<{ modelkind: 'box',  cited: CitedOf<BoxRecord>,  record: BoxRecord }>
 /** An ask to write `record` over the Thing it `cited`: a `put` of a live record, or a `del` with a tombstone. With no `RecordT`, a write of any kind.
  * The store compares the {@link ThingCited} fields of `cited` with the Thing stored. Any other field of `cited` is read only by a storage policy, as testimony.
  * `modelkind` says which kind of Thing both are.
  */
-export type WriteAsk<RecordT extends Thing = Thing> = Extract<BankWriteAsk | GateWriteAsk | BoxWriteAsk, { record: RecordT }>
+export type WriteAsk<RecordT extends ThingRecord = ThingRecord> = Extract<BankWriteAsk | GateWriteAsk | BoxWriteAsk, { record: RecordT }>
 /** A bank's three roots: the bank, its main gate and its root box. */
-export type BankRoots       = Readonly<{ bank: BankThing, gate: GateThing, root: BoxThing }>
+export type BankRoots       = Readonly<{ bank: BankRecord, gate: GateRecord, root: BoxRecord }>
 /** An ask to write a new bank's first Things in one step: the bank, its main gate and its root box. */
 export type BirthBankAsk    = Readonly<Omit<Z.infer<typeof AskChecks.birthBankAsk>, keyof BankRoots> & BankRoots>
 /** Any ask a vaultDB answers: a get, a list, a put or del, or a birth. */
@@ -116,13 +117,11 @@ export type AnyAsk          = GetAsk | ListAsk | WriteAsk | BirthBankAsk
 export type BirthPuts       = readonly [BankWriteAsk, GateWriteAsk, BoxWriteAsk]
 /** The scope of a watch: a bank. */
 export type ThingWatchScope = Readonly<Z.infer<typeof AskChecks.thingWatchScope>>
-/** A bank's record: its Thing. */
-export type BankRecord      = BankThing
 /** The `world` of a vaultDB answer: the bank's record, with its main gate's Thing as `maingate`. */
-export type WorldRecord     = BankRecord & Readonly<{ maingate: GateThing }>
+export type WorldRecord     = BankRecord & Readonly<{ maingate: GateRecord }>
 // Unspecified for a missing or damaged row: notes/wontfix.md.
 /** For each Thing an ask tracks, `'same'` if it is stored at the revseq and lifepath tracked, else the Thing stored. */
-export type Tracked         = Readonly<{ bank: BankRecord | 'same', [Labelpath.MainGate]: GateThing | 'same', [Labelpath.RootBox]: BoxThing | 'same' }>
+export type Tracked         = Readonly<{ bank: BankRecord | 'same', [Labelpath.MainGate]: GateRecord | 'same', [Labelpath.RootBox]: BoxRecord | 'same' }>
 
 /** Check a write `ask`, and its records by their kind and against each other, throwing `bad_record`. Returns it typed. */
 export function checkedWriteAsk(ask: unknown): WriteAsk {
@@ -193,13 +192,13 @@ export type ListAskDraft = ThingScope & Readonly<{ ifAbsent?: EX.IfAbsent, track
 /** The draft of a put ask: the records, the flags (default `ifAbsent: 'add'`, `ifPresent: 'repl'`), the storage policies, and what its sender tracks.
  * {@link putAskOf} fills in what it leaves out, to make the {@link WriteAsk}.
  */
-export type PutAskDraft<RecordT extends Thing = Thing> = Readonly<{
+export type PutAskDraft<RecordT extends ThingRecord = ThingRecord> = Readonly<{
   cited: CitedOf<RecordT>, record: RecordT, ifAbsent?: EX.PutIfAbsent, ifPresent?: EX.IfPresent, options?: ThingOptions, track?: Track,
 }>
 /** The draft of a del ask: the records, and what its sender tracks.
  * A del's flags are fixed, so the draft has none; {@link delAskOf} fills them in to make the {@link WriteAsk}.
  */
-export type DelAskDraft<RecordT extends Thing = Thing> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, track?: Track }>
+export type DelAskDraft<RecordT extends ThingRecord = ThingRecord> = Readonly<{ cited: CitedOf<RecordT>, record: RecordT, track?: Track }>
 
 /** The get ask for the Thing at `ask`'s scope. */
 export function getAskOf(ask: GetAskDraft): GetAsk {
@@ -216,7 +215,7 @@ export function listAskOf(ask: ListAskDraft): ListAsk {
 }
 
 /** The put ask writing `ask.record` over `ask.cited`, at the record's scope. */
-export function putAskOf<RecordT extends Thing>(ask: PutAskDraft<RecordT>): WriteAsk<RecordT> {
+export function putAskOf<RecordT extends ThingRecord>(ask: PutAskDraft<RecordT>): WriteAsk<RecordT> {
   if (! CX.isPlainBag(ask)) { return ask }
   const { ifAbsent = 'add', ifPresent = 'repl', ...given } = ask
   const scope = scopeGiven(ask.record)
@@ -225,7 +224,7 @@ export function putAskOf<RecordT extends Thing>(ask: PutAskDraft<RecordT>): Writ
 }
 
 /** The del ask writing the tombstone `ask.record` over `ask.cited`, at the record's scope. */
-export function delAskOf<RecordT extends Thing>(ask: DelAskDraft<RecordT>): WriteAsk<RecordT> {
+export function delAskOf<RecordT extends ThingRecord>(ask: DelAskDraft<RecordT>): WriteAsk<RecordT> {
   if (! CX.isPlainBag(ask)) { return ask }
   const scope = scopeGiven(ask.record)
   // A field the del does not accept goes through, for the verb's strict check to refuse.

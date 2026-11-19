@@ -20,7 +20,7 @@ export const SealerExpected = 'Expected a sealer: its tags, its purposes, and a 
 /** A tombstone's seal given secret props. */
 export const TombstoneSecretsGiven = "A tombstone seals no secrets: give `{ am: 'x' }` with no secret props."
 /** A box tombstone's seal given a sidecar. */
-export const TombstoneSidecarGiven = "A tombstone has no sidecar: give `{ am: 'x' }` with no sidecar."
+export const TombstoneSidecarGiven = "A tombstone's sidecar is always `{}`: give `{ am: 'x' }` with no sidecar."
 
 /** A box whose lifepath is not under the bank's root box. */
 export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its bank's root box: this one is of another life of the root."
@@ -58,14 +58,14 @@ export const LifepathDepth = "A Thing's lifepath has one lifeseq for each segmen
 /** A Thing whose am and lifeseq disagree. */
 export const LifeseqParity = "A Thing's lifeseq is odd exactly when it is a tombstone (am: 'x')."
 
+/** A box tombstone whose sidecar is not empty. */
+export const TombstoneSidecarNotEmpty = "A box tombstone's sidecar is always `{}`."
+
 /** A citation that is half the shell. */
 export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a lifepath ending in '-000000001' and the void revtok, in all three or in none."
 
 /** A sealable box that matches the shell in some of its revseq, lifeseq and revtok, but not all three. */
 export const SealableHalfShell = "A box a revision is made from is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
-
-/** A shell asked for with the fmt of another kind of Thing. */
-export const ShellFmtOfOtherKind = "A shell's fmt is the fmt of its kind of Thing."
 
 /** A live box's revision made with no sidecar, given or kept. */
 export const SidecarMissing = "A live box has a sidecar: give one, or make the revision from a box that has one."
