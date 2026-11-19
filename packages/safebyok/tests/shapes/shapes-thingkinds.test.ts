@@ -25,7 +25,9 @@ describe("BankChecks, GateChecks and BoxChecks", () => {
 
 describe("ThingkindChecks", () => {
   it("gives each kind's bundle by its modelkind", () => {
-    expect(ThingkindChecks.byModelkind).to.deep.equal({ bank: BankChecks, gate: GateChecks, box: BoxChecks })
+    expect(ThingkindChecks.byModelkind.bank).to.eq(BankChecks)
+    expect(ThingkindChecks.byModelkind.gate).to.eq(GateChecks)
+    expect(ThingkindChecks.byModelkind.box).to.eq(BoxChecks)
   })
 
   it("gives each kind's bundle by a labelpath of that kind", () => {
