@@ -1216,8 +1216,8 @@ describe("ThingMinder.tryWrite", () => {
   })
 
   const RefusedAsks = [
-    [{ ...boxBirthAskOf(), userid: 'u2' }, 'refuses bad_record for an ask of another bank'],
-    ["box/openai",                         'refuses bad_record for an ask that is not a bag'],
+    [{ ...boxBirthAskOf(), userid: 'u2' }, 'refuses an ask of another bank'],
+    ["box/openai",                         'refuses an ask that is not a bag'],
   ] as const
   for (const [ask, blurb] of RefusedAsks) {
     it(blurb, async () => {
