@@ -1,6 +1,6 @@
 # Thread 3: minder_listings (2026-11-19)
 
-Branch `20261119-minder_listings`, PR #757, stacked on #756. Proved: `safebyok` lint, typecheck and `vitest run` (1099 pass); `safebyok-react` typecheck and `vitest run` (301 pass).
+Branch `20261119-minder_listings`, PR #757, stacked on #756. Proved: `pnpm justify` green after the catch-up onto #756 at 312ee4489: `safebyok` 1100 tests, `safebyok-react` 301, `safebyok-big` 2941, e2e 576, every package linted, typechecked and built.
 
 * **Built**
   * `ThingMinder.listingAt(scope)` (`packages/safebyok/src/minding/thing-minder.ts`, Reading): the cached listing of a Thing's children, read synchronously, as `at` reads a car. It holds labelpaths, tombstones included, in code-unit order, frozen. It is undefined until the Thing is first listed.
