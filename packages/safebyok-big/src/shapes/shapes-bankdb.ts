@@ -152,10 +152,8 @@ export const { storedBankRow, storedGateRow, storedVaultRow, storedBoxRow } = Ch
 /** The life of a vault, its bank's included, as one string: a vault row's, or the one a box row or box ask is under. */
 export function vaultLifeOf({ bank_tok, vault_tok }: { bank_tok: BankTok, vault_tok: VaultTok }): string { return `${bank_tok}/${vault_tok}` }
 
-/** What {@link endedLivesOf} finds of a bank's vault lives:
- * - `ended`   -- the vault rows of ended lives, as they were handed in
- * - `live`    -- the live vault rows
- * - `isEnded` -- true when a box row, or anything else kept under one vault life, is of an ended life, given where it is stored
+/** What {@link endedLivesOf} finds of a bank's vault lives.
+ * `ended` holds the vault entries as they were handed in, while `live` holds parsed records.
  */
 export type EndedLives<VaultEntryT> = {
   ended:   VaultEntryT[]
@@ -166,7 +164,7 @@ export type EndedLives<VaultEntryT> = {
 // Damage throws, or is kept, but never reads as ended: a vault row that fails its checks is neither of a live life nor
 // provably of an ended one.
 /** Which of a bank's vault rows, and of the box rows under them, are of ended lives, for `tidyGone` to delete.
- * Refuses `damaged_row` when the bank row fails its checks. A vault row that fails its checks is kept, with every box row under its vaultlabel.
+ * Refuses when the bank row fails its checks. A vault row that fails its checks is never ended: it is kept, with every box row under its vaultlabel.
  */
 export function endedLivesOf<VaultEntryT extends { vaultlabel: Vaultlabel, vault: unknown }>(bankRaw: unknown, vaults: readonly VaultEntryT[]): EndedLives<VaultEntryT> {
   const bank = (bankRaw === null) ? null : storedBankRow.parse(bankRaw)

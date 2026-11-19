@@ -77,7 +77,9 @@ export type Life = { user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlab
  */
 export type Tally = { all_count: number, live_count: number, all_size: number, live_size: number }
 
-/** A life's tally as read for a put: `isPastLimit` when the life is past a limit, else its `tally`, with `kept`, the stored tally row or null for none. */
+/** A life's tally as read for a put.
+ * `isPastLimit` means the life is already past a limit, so no tally is given.
+ */
 export type Reckoning = { isPastLimit: true } | { isPastLimit: false, tally: Tally, kept: Doc<'safebyok_tallies'> | null }
 
 /** A box document, stored or about to be. Its `box` row is `unknown` until the core has checked it. */

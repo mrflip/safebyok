@@ -218,7 +218,7 @@ export const delBox = mutation({
 // transaction can carry, so it deletes a batch of them, and a host calls it again until it answers that none are left.
 /** Delete the vault rows and tallies of every ended life in a bank, and a batch of their box rows.
  * Returns how many box rows its live vaults have, and what is left of the box rows of ended lives.
- * Refuses `damaged_row`, deleting nothing, when the bank row fails its checks.
+ * Deletes nothing, and refuses, when the bank row fails its checks.
  */
 export const tidyGone = mutation({
   args:    CVX.askArgs,
@@ -243,7 +243,7 @@ export const tidyGone = mutation({
 
 // A Convex query reads whole documents, so a bank-wide watch reads every box row of the bank's live vaults each time it runs.
 /** List the bank row, every gate and vault row in `scope`, and the box rows of each live vault, for a client to subscribe to.
- * Refuses `damaged_row` when the bank row fails its checks.
+ * Refuses when the bank row fails its checks.
  */
 export const watchRows = query({
   args:    CVX.watchRowsArgs,
