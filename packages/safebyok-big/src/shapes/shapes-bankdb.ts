@@ -146,11 +146,48 @@ export const { storedBankRow, storedGateRow, storedVaultRow, storedBoxRow } = Ch
 }))
 // --
 
-// == [Row helpers]: vaultLifeOf, shellBankOf, shellVaultOf, shellBoxOf, damagedBoxOf, noticeParentOf
+// == [Row helpers]: vaultLifeOf, endedLivesOf, EndedLives, shellBankOf, shellVaultOf, shellBoxOf, damagedBoxOf, noticeParentOf
 
 // A vault is reborn under a new `vault_tok`, and its bank under a new `bank_tok`: a box row under either ended life is no row.
 /** The life of a vault, its bank's included, as one string: a vault row's, or the one a box row or box ask is under. */
 export function vaultLifeOf({ bank_tok, vault_tok }: { bank_tok: BankTok, vault_tok: VaultTok }): string { return `${bank_tok}/${vault_tok}` }
+
+/** What {@link endedLivesOf} finds of a bank's vault lives:
+ * - `ended`   -- the vault rows of ended lives, as they were handed in
+ * - `live`    -- the live vault rows
+ * - `isEnded` -- true when a box row, or anything else kept under one vault life, is of an ended life, given where it is stored
+ */
+export type EndedLives<VaultEntryT> = {
+  ended:   VaultEntryT[]
+  live:    VaultRecord[]
+  isEnded: (place: { vaultlabel: Vaultlabel, bank_tok: BankTok, vault_tok: VaultTok }) => boolean
+}
+
+// Damage throws, or is kept, but never reads as ended: a vault row that fails its checks is neither of a live life nor
+// provably of an ended one.
+/** Which of a bank's vault rows, and of the box rows under them, are of ended lives, for `tidyGone` to delete.
+ * Refuses `damaged_row` when the bank row fails its checks. A vault row that fails its checks is kept, with every box row under its vaultlabel.
+ */
+export function endedLivesOf<VaultEntryT extends { vaultlabel: Vaultlabel, vault: unknown }>(bankRaw: unknown, vaults: readonly VaultEntryT[]): EndedLives<VaultEntryT> {
+  const bank = (bankRaw === null) ? null : storedBankRow.parse(bankRaw)
+  const ended: VaultEntryT[] = []
+  const live: VaultRecord[] = []
+  const keptlabels = new Set<Vaultlabel>()
+  const liveLifeOf = new Map<Vaultlabel, string>()
+  for (const entry of vaults) {
+    const vaultReport = vaultRow.safeParse(entry.vault)
+    if (! vaultReport.success) {
+      keptlabels.add(entry.vaultlabel)
+    } else if ((bank?.am !== 'a') || (vaultReport.data.bank_tok !== bank.bank_tok)) {
+      ended.push(entry)
+    } else if (vaultReport.data.am === 'a') {
+      live.push(vaultReport.data)
+      liveLifeOf.set(entry.vaultlabel, vaultLifeOf(vaultReport.data))
+    }
+  }
+  const isEnded = (place: { vaultlabel: Vaultlabel, bank_tok: BankTok, vault_tok: VaultTok }) => (! keptlabels.has(place.vaultlabel)) && (liveLifeOf.get(place.vaultlabel) !== vaultLifeOf(place))
+  return { ended, live, isEnded }
+}
 
 const shellTimes = { registered_at: SX.VoidTime, written_at: SX.VoidTime }
 
