@@ -107,6 +107,16 @@ writes it.
   thread 7 makes them.
 * VOCABULARY: *listing* row, *sparse* reworded, `carkind` line in *car*.
 
+## Thread 7, notice_split (#766)
+
+*Orchestrator:*
+* `AdapterVaultDB.watch` splits each `Received` into three `ThingNotice`s, the Thing, then the bank, then the main
+  gate, each checked by `watchedThingOf` (a failure to `onBadNews`, the others still come); a null world brings none.
+  `ThingNotice` has no `world`. `notifyTrackedRecords` goes through the same `receive`. Adapters' `Received` and
+  `doWatch` are untouched. The bank and main gate now reach the minder through the watch.
+* Repeats: each change makes three notices; a repeat keeps the car's identity but `listen` tells an event (before the
+  Coach). Nothing outside `storage/` reads a verb answer's `world` (before the Coach: notices, or drop it).
+
 ## Rulings
 
 * **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk
