@@ -12,5 +12,6 @@ Empty: the new `safebyok` is private, and nothing published reaches what changed
 - **`Bank.birth` on a device swept while the birth is in flight** throws the device's refusal (`disabled`), where it resolved a locked bank. The bank is stored all the same.
 - **A vaultDB's world** refuses `storage_issue` where the bank or main gate fetched beside the step is not an object, or is filed at another scope, and lets any failure that is not a refusal through; a bank or main gate that fails its checks still leaves the world null, and the step's answer stands. Before, every failure left the world null.
 - **A watched Thing whose labelpath is unsound** refuses `damaged_row`, naming the field, where it refused `storage_issue`.
+- **`PostgresVaultDB`'s watch** tells its `onBadNews` of a notice it cannot use, one whose carried world is not an object or whose fetch fails in a way a retry would not mend, and keeps listening, where it ended the watch. Ending it is the host's call. A carried world that is not an object used to escape as an unhandled rejection.
 
 Nothing stored changes.

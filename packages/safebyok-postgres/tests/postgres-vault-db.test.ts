@@ -120,18 +120,22 @@ afterAll(async () => {
 VT.describeVaultDBBattery('PostgresVaultDB', { makeVaultDB, _cheat_rowsOf: rowsOf })
 
 describe("PostgresVaultDB, what only Postgres can show", () => {
-  it("ends a watch, telling its onBadNews storage_issue, where a notice carries a world that is no object, with no rejection left unhandled", async () => {
+  it("tells its onBadNews storage_issue of a notice whose carried world is no object, and keeps watching", async () => {
     await makeVaultDB()
     const db = await database()
     const vaultDB = await vaultDBOver()
     const notices: unknown[] = []
     const badnews: VaultError[] = []
-    vaultDB.watch(VT.ThingBank, (notice) => { notices.push(notice) }, (news) => { badnews.push(news) })
+    const unwatch = vaultDB.watch(VT.ThingBank, (notice) => { notices.push(notice) }, (news) => { badnews.push(news) })
     const forged = JSON.stringify({ at: { ...VT.ThingBank, labelpath: 'bank' }, thing: VT.bankThingOf(), world: 'x' })
     await db.query('SELECT pg_notify($1, $2)', [thingsChannelOf(VT.ThingBank.userid), forged])
     await VT.aWhile()
     expect(notices).to.deep.equal([])
     expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['storage_issue'])
+    await VT.expectGood(vaultDB.tryBirthBank(VT.birthBankAskOf()))
+    await VT.aWhile()
+    expect(notices).to.not.deep.equal([])
+    unwatch()
   })
 
   it("reports, called past the adapter, the verdict of each check of the gate stored that refused its write", async () => {
@@ -195,7 +199,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     expect(answer).to.have.nested.property('err.cause.message', Phrases.StoredNothing)
   })
 
-  it("ends a watch, telling its onBadNews, where a notice's fetch fails in a way a retry would not mend", async () => {
+  it("tells its onBadNews of each notice whose fetch fails in a way a retry would not mend, and keeps watching", async () => {
     const { listen, onNotifies, stopped } = capturingListen()
     const vaultDB = new PostgresVaultDB({ client: throwingClient(coded('relation "safebyok_box_things" does not exist', '42P01')), listen })
     const badnews: VaultError[] = []
@@ -203,18 +207,17 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     await vi.waitFor(() => { expect(onNotifies).to.have.lengthOf(1) })
     onNotifies[0]?.(BareNotice)
     onNotifies[0]?.(BareNotice)
-    await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
-    await VT.aWhile()
-    expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error'])
+    await vi.waitFor(() => { expect(badnews).to.have.lengthOf(2) })
+    expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['unexpected_error', 'unexpected_error'])
+    expect(stopped).to.deep.equal([])
   })
 
   it("hears a notice told while its listen is still starting", async () => {
-    const { listen, stopped } = tellingListen(BareNotice)
+    const { listen } = tellingListen(BareNotice)
     const vaultDB = new PostgresVaultDB({ client: throwingClient(coded('relation "safebyok_box_things" does not exist', '42P01')), listen })
     const badnews: VaultError[] = []
     vaultDB.watch(VT.ThingBank, () => undefined, (news) => { badnews.push(news) })
-    await vi.waitFor(() => { expect(stopped).to.have.lengthOf(1) })
-    expect(badnews).to.have.lengthOf(1)
+    await vi.waitFor(() => { expect(badnews).to.have.lengthOf(1) })
     expect(badnews[0]?.cause).to.deep.include({ code: '42P01' })
   })
 
