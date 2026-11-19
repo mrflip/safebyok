@@ -98,9 +98,7 @@ function isHeardIn(scope: WatchScope, told: Told): boolean {
 // == [Refusals]: refusalOf, isTransient, causeOf, codeOf, TransientSqlstate, TransientSystemCodes, PgConnectionLost
 
 /** The VaultError for what a driver threw: `storage_unavailable` where a retry may mend it, else `unexpected_error`. A VaultError is kept as it is.
- * A retry may mend a lost or refused connection, a serialization failure or deadlock, exhausted resources, a cancelled statement or a
- * server shutting down, a lock not granted in time, and a write refused by a server that is read-only for now. Anything else, a constraint the row breaks, a `RAISE`, a missing table or a bug,
- * fails the same way again.
+ * A lost connection, a conflict between transactions, a busy or read-only server: anything else fails the same way again.
  */
 export function refusalOf(thrown: unknown): VaultError {
   if (DB.isVaultError(thrown)) { return thrown }
@@ -135,9 +133,8 @@ const TransientSqlstate = /^(?:(?:08|40|53|57)[0-9A-Z]{3}|55P03|25006)$/
 const TransientSystemCodes = new Set(['ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'EPIPE', 'EHOSTUNREACH', 'ENETUNREACH', 'ENETDOWN', 'EAI_AGAIN'])
 
 // pg 8 throws these as plain Errors, with no code, so only the message tells them apart. A test checks each against the installed pg.
-/** The messages of pg's connection failures a retry may mend: a connection dropped or timed out (`pg/lib/client.js`), and a pool that
- * found no connection in time (`pg-pool/index.js`). A client the host ended itself is left out.
- */
+// A connection dropped or timed out is in `pg/lib/client.js`, a pool that found no connection in time in `pg-pool/index.js`.
+/** The messages of pg's connection failures a retry may mend; a client the host ended itself is left out. */
 export const PgConnectionLost: ReadonlySet<string> = new Set([
   'Connection terminated unexpectedly',
   'Client has encountered a connection error and is not queryable',
@@ -148,7 +145,7 @@ export const PgConnectionLost: ReadonlySet<string> = new Set([
 ])
 // --
 
-// == [What the database returns]: Verdict, GateAnswered, BankAnswered, VaultAnswered, BoxAnswered, storedVerdict, parentVaultRow, RowOfOtherAddress, demandWrote, storedNothing
+// == [What the database returns]: Verdict, GateAnswered, BankAnswered, VaultAnswered, BoxAnswered, storedVerdict, parentVaultRow, RowOfOtherAddress, checkedWrote, storedNothing
 // A fetch returns rows alone. A write function also returns whether it wrote the record (`ok`), and if it did,
 // the `act` and the `presence` of what was stored before.
 
@@ -176,8 +173,8 @@ const parentVaultRow = BX.storedVaultRow.refusingAs('damaged_vault')
 const RowOfOtherAddress = { kind: 'storage_issue', message: DB.rowOfOtherAddress } as const
 
 // The classifier checked the rows, so a disagreement is our SQL function out of step with our classifier, never a damaged row.
-/** Return `stored`, demanding that the write function wrote where the classifier finds a write. */
-function demandWrote<StoredT extends { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct }>(answered: Verdict, stored: StoredT): StoredT {
+/** Check that the write function wrote where the classifier finds a write, and return `stored` typed. */
+function checkedWrote<StoredT extends { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct }>(answered: Verdict, stored: StoredT): StoredT {
   if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw storedNothing() }
   return stored
 }
@@ -255,13 +252,13 @@ export class PostgresBankDB extends DB.AdapterBankDB {
   /** Run a vault's write function `text` for the ask's record and the row it expects. */
   async #writeVault(ask: BX.VaultPutAsk | BX.VaultDelAsk, text: string): Promise<BX.VaultStored> {
     const answered = await this.#firstRow<VaultAnswered>(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected)])
-    return demandWrote(answered, this.classifyStoredVault(ask, answered))
+    return checkedWrote(answered, this.classifyStoredVault(ask, answered))
   }
 
   /** Run a box's write function `text` for the ask's record and the row it expects. */
   async #writeBox(ask: BX.BoxPutAsk | BX.BoxDelAsk, text: string): Promise<BX.BoxStored> {
     const answered = await this.#firstRow<BoxAnswered>(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected), this.#maxBoxes])
-    return demandWrote(answered, this.classifyStoredBox(ask, answered))
+    return checkedWrote(answered, this.classifyStoredBox(ask, answered))
   }
   // --
 
@@ -316,14 +313,14 @@ export class PostgresBankDB extends DB.AdapterBankDB {
   protected async doBuildBank(ask: BX.BankBuildAsk): Promise<BX.BankBuildStored> {
     const text     = (ask.expected.revision_seq === DB.VoidRevisionSeq) ? BirthBankSql : ReviseBankSql
     const answered = await this.#firstRow<GateAnswered>(text, [JSON.stringify(ask.record), JSON.stringify(ask.gate), JSON.stringify(ask.expected)])
-    return demandWrote(answered, this.classifyBuildBank(ask, answered))
+    return checkedWrote(answered, this.classifyBuildBank(ask, answered))
   }
 
   // The function checks the bank row as it puts, so putGate always calls it: when nothing is stored, the
   // classifier answers from the rows it returns.
   protected async doPutGate(ask: BX.GatePutAsk): Promise<BX.GateStored> {
     const answered = await this.#firstRow<GateAnswered>(PutGateSql, [JSON.stringify(ask.record), JSON.stringify(ask.expected), ask.options.policies])
-    return demandWrote(answered, this.classifyStoredGate(ask, answered))
+    return checkedWrote(answered, this.classifyStoredGate(ask, answered))
   }
 
   protected async doDelBank(ask: BX.BankDelAsk): Promise<BX.BankDelStored> {
@@ -332,7 +329,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       return this.classifyDelBank(ask, fetched)
     }
     const answered = await this.#firstRow<BankAnswered>(ReviseBankSql, [JSON.stringify(ask.record), null, JSON.stringify(ask.expected)])
-    return demandWrote(answered, this.classifyDelBank(ask, answered))
+    return checkedWrote(answered, this.classifyDelBank(ask, answered))
   }
 
   protected async doGetVault(ask: BX.VaultGetAsk): Promise<BX.VaultStored> {
