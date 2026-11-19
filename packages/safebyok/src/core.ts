@@ -10,7 +10,7 @@ export { Gate } from './models/gate'
 export { Gating } from './models/gating'
 export { Thing } from './models/thing'
 export { Lease, withoutSecrets } from './models/lease'
-export type { PasskeyProving, PassphraseProving, Proving } from './models/proving'
+export type { Novel, PasskeyProving, PassphraseProving, Proving } from './models/proving'
 export type {
   BodyOf, BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, PublicPropsOf, RevisionOf, SealPurposes, SealTags, Sealable, Sealed,
   SealedOf, SealedPartsOf, Sealer, ShellOf, TombstoneOf, TombstonePublicProps, UnsealedOf,
