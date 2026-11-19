@@ -40,3 +40,16 @@ writes it.
 * **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk
   deletion which has a whole bags of wormses in it and is not needed." With the Coach's edit of giver_needs.md: no
   delete verb, no delete tests through the minder.
+* **listen's events** (the Coach, 2026-11-19), a tagged union on `carkind`:
+  - `{ carkind: 'thing', modelkind, labelpath, car }`: `car` is the cached car itself, identity kept; undefined when
+    the car is removed. `listen` no longer carries `act`, `isTimely`, `lastErr` (`tryAt` still does).
+  - `{ carkind: 'listing', modelkind, labelpaths, tag: 'kids', of: { parentpath } }`: "Chosen to not restrict listings
+    to always be child listings." *Orchestrator:* read as `of: { parentpath: <the parent's labelpath> }`.
+  - `{ carkind: 'invalidation', modelkind, labelpath, card: 'list', tags: 'all' }`: "card being (not yet, but later)
+    'list', 'self', 'kids' (#, !, /); tags hold the string 'all' or later a list of labels." Only `card: 'list'` and
+    `tags: 'all'` exist now.
+* **The small list answer** is not for this sprint (the Coach): no proposal; thread 3 adds a TODO.md entry for it.
+* **The write verb** is `tryWrite(ask)`, answering the vaultDB's `WriteThingAnswer` as it came, once every record it
+  carries has landed (the Coach: "we want both eventually ... carry on with what goes with the grain"). A throwing verb
+  comes later; the Coach is looking into how throwing bears on invalidation.
+* **`invalidate`'s second argument is required** (the Coach: "exactly"): `invalidate(labelpath?, { list: 'all' })`.
