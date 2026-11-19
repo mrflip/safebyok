@@ -987,7 +987,7 @@ function minderWithoutStart(): ThingMinder { return minderWorldOf(new MemoryVaul
 describe("ThingMinder keys", () => {
   const DeepScope = { ...TH.BoxScope, labelpath: 'box/openai/deep' }
 
-  it("interleave '/' between the labels, then end with '!' for the Thing's car, so that the root box's key starts no box's", () => {
+  it("interleave '/' between the labels, then end with '!' for the Thing's car", () => {
     const minder = minderWithoutStart()
     expect(minder.queryKey(TH.GateScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'gate', '!'])
     expect(minder.queryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '!'])
