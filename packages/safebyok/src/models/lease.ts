@@ -59,7 +59,7 @@ export class Lease implements LeaseStamp {
 
   private constructor(record: Z.input<typeof StampChecks.leaseRecord>, opts: LeaseOpts) {
     const { record: recordChecked, opts: { bank } } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(BankChecks.stamp.parse(recordChecked), bank.stamp, { kind: 'damaged_lease' })
+    Validator.checkedConsistent(BankChecks.stamp.parse(recordChecked), bank.stamp, { kind: 'unexpected_error' })
     this.#record = recordChecked
     Helpers.tattoo(this, StampChecks.leaseStamp.parse(recordChecked), { configurable: false })
     this.#bank = opts.bank
