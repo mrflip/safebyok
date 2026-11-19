@@ -8,7 +8,7 @@ import type { Notice } from 'safebyok-big/storage'
 import type { UserID } from 'safebyok-big'
 import { PostgresBankDB, bankChannelOf } from '../src/index'
 import { PgConnectionLost } from '../src/postgres-bank-db'
-import { StoredNothing } from '../src/phrases'
+import * as Phrases from '../src/phrases'
 import type { PostgresListen } from '../src/index'
 import * as BH from './bank-helpers'
 import * as TH from './test-helpers'
@@ -126,7 +126,7 @@ describe("PostgresBankDB's refusals", () => {
     const bankDB = new PostgresBankDB({ client: answeringClient({ ok: false, bank: null, gate: null }) })
     const { err } = await bankDB.tryBuildBank(TH.BW.bankBuildAskOf())
     expect(DB.isVaultError(err, 'unexpected_error')).to.be.true
-    expect(err?.cause).to.deep.include({ message: StoredNothing })
+    expect(err?.cause).to.deep.include({ message: Phrases.StoredNothing })
   })
 
   it("keeps a driver error's name, message and code as the cause, and none of the statement's parameters", async () => {

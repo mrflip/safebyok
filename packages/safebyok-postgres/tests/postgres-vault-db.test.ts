@@ -4,7 +4,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { type ThingScope, type Thingkind, type VaultError, Labelpath, Lifeseq } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
-import { StoredNothing } from '../src/phrases'
+import * as Phrases from '../src/phrases'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
 import type { PostgresListen } from '../src/postgres-bank-db'
 import { VaultFunctionNames, VaultFunctionsSql } from '../src/vault-functions'
@@ -191,7 +191,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const vaultDB = new PostgresVaultDB({ client: answeringClient({ ok: false, bank: null, gate: null, root: null, tracked: null }) })
     const answer  = await vaultDB.tryBirthBank(VT.birthBankAskOf())
     expect(answer).to.have.nested.property('err.refusalkind', 'unexpected_error')
-    expect(answer).to.have.nested.property('err.cause.message', StoredNothing)
+    expect(answer).to.have.nested.property('err.cause.message', Phrases.StoredNothing)
   })
 
   it("ends a watch, telling its onBadNews, where a notice's fetch fails in a way a retry would not mend", async () => {

@@ -6,7 +6,7 @@ import { GraphQLError } from 'graphql'
 import * as DB from 'safebyok-big/storage'
 import type { BX } from 'safebyok-big/storage'
 import { GraphQLBankDB } from '../src/index'
-import { ServerErred } from '../src/phrases'
+import * as Phrases from '../src/phrases'
 import * as TH from './test-helpers'
 
 TH.bootDatabaseFirst()
@@ -187,7 +187,7 @@ describe("GraphQLBankDB's watch", () => {
     streams[0]?.({ error: new CombinedError({ graphQLErrors: [new GraphQLError('Cannot query field')] }), hasNext: true })
     streams[0]?.({ data: gotNotice, hasNext: true })
     expect(badnews).to.have.length(1)
-    expect(badnews[0]).to.include({ refusalkind: 'unexpected_error', message: ServerErred })
+    expect(badnews[0]).to.include({ refusalkind: 'unexpected_error', message: Phrases.ServerErred })
     expect(badnews[0]?.cause).to.be.undefined
     expect(heard).to.deep.eq([])
     expect(counts.unsubscribed).to.eq(1)
