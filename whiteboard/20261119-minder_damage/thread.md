@@ -39,5 +39,4 @@ What it does: the ThingMinder now reports what it drops, and keeps another bank'
   * `damaged_row` is the bad_news family's kind for this. No new refusal kind was needed.
   * `notes/security.md` has a 2026-11-19 entry for this thread (at the top of *Of Interest*).
 * **For the Coach**
-  * **tryWrite rejects vs tellBadNews.** I recommend keeping the rejection. The brief says to report damage by throwing where it is detected.
-  * **The list gap.** I recommend leaving it, since the case is an adapter bug.
+  * The Coach is reworking `tryWrite` on another branch, and will take up a record of another bank separately, so the `tryWrite` parts of E may change or move. This thread keeps its `tryWrite` diff to the briefed catch change and doc line.
