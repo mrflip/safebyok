@@ -19,7 +19,7 @@ What it does: the ThingMinder now reports what it drops, and keeps another bank'
     * `#fetchCar` runs it against the ask, so the labelpath is checked as well.
     * `bestCarOf` throws `Throwers.carsOfOtherThings()` (`unexpected_error`) for cars of two Things, where it used to answer `delivered`.
 * **Where each throw lands, and how it is reported**
-  * **Notice:** `hello`'s onNotice now wraps `#sendToTSQ` in a try and tells the bank's `tellBadNews`. `AdapterVaultDB.watch` already catches what onNotice throws, but the `VaultDB` interface does not promise that.
+  * **Notice:** `hello`'s onNotice calls `#sendToTSQ` bare. Every VaultDB is an `AdapterVaultDB`, whose `watch` sends a Thing of another bank to onBadNews before onNotice, and sends what onNotice throws to onBadNews, which the minder tells to `tellBadNews`. The minder's check on a notice is a tripwire. The Coach ruled (2026-11-19) against a try in the minder: it was a second route to the same place, and its test reached it only by calling the handler past the vaultDB.
   * **Write answer:** rejects `tryWrite`.
   * **List record:** rejects `list`.
   * **Get:** the queryFn throws, so TanStack puts the query in its error state and the get rejects. A background refresh shows the refusal as `tryAt`'s `lastErr`.
