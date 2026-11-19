@@ -249,6 +249,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
   /** Start a watch: call `receive` with each changed Thing, raw, and its bank's world as the store last read it, and `onBadNews` with
    * trouble, whether or not it ends the watch. Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
+   * Never call `receive` synchronously from inside a `do*` call.
    */
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
   // --

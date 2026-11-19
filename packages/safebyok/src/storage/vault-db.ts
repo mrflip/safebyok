@@ -102,8 +102,8 @@ export interface VaultDB {
    * - Every notice the vaultDB sends for a verb's answer (a changed tracked Thing, a refusal's `dbhas`) reaches each watch
    *   before the verb's answer reaches its caller, so a handler's synchronous work is complete by then. Rely on nothing stronger.
    * - A verb's notices come "out to in": the bank, the main gate, the root box, then the `dbhas`.
-   * - A handler of a notice the vaultDB sends for a verb's answer is never run inside the progress of that verb: what it
-   *   awaits happens after the verb's caller resumes.
+   * - A verb never calls code of its caller, or any handler, inside its own progress: every notice is queued, so none runs
+   *   on the verb's stack. Like any async call, a verb yields at each await, and other code may run then.
    * - A notice goes to every watch of the bank, whoever sent the ask.
    * - A watch may be notified of a Thing again at a revision it has notified, or at an older one.
    * - A change the store itself reports arrives when the store delivers it, in no promised order against a verb's answer.
