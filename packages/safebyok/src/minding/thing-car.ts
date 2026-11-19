@@ -15,8 +15,8 @@ export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar
   ThingChecks.scopedCited.parse(newest)
   if (Thing.isVoidSentinel(newest)) { return Object.freeze({ liveness: 'void',   newest, fullest: null }) }
   if (Thing.isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
-  if (Thing.isWhole(newest))  { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
-  if (fullest === undefined)  { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
+  if (Thing.isWhole(newest))        { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
+  if (fullest === undefined)        { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
   ThingChecks.ofLabelpath(newest.labelpath).record.parse(fullest)
   return      Object.freeze(CarOfChecks.behindCar.parse({ liveness: 'behind', newest, fullest } as const))
 }

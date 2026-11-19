@@ -93,17 +93,19 @@ describe("a kind's guards", () => {
   const boxTomb   = TH.boxTombOf(box)
   const boxShell  = Shell.of(TH.BoxScope, TH.rootBoxOf())
   const gate      = TH.gateThingOf()
+  const gateShell = Shell.of(TH.GateScope)
+  const bank      = TH.bankThingOf()
   const GuardCases = [
     // what Bank, Gate and BaseBox answer, in that order:
     [() => [Bank.isLive(box),                 Gate.isLive(box),                 BaseBox.isLive(box)],                 [false, false, true],  'isLive of a live box'],
     [() => [Bank.isLive(gate),                Gate.isLive(gate),                BaseBox.isLive(gate)],                [false, true,  false], 'isLive of a live gate'],
-    [() => [Bank.isLive(TH.bankThingOf()),    Gate.isLive(TH.bankThingOf()),    BaseBox.isLive(TH.bankThingOf())],    [true,  false, false], 'isLive of the bank'],
+    [() => [Bank.isLive(bank),                Gate.isLive(bank),                BaseBox.isLive(bank)],                [true,  false, false], 'isLive of the bank'],
     [() => [Bank.isTombstone(boxTomb),        Gate.isTombstone(boxTomb),        BaseBox.isTombstone(boxTomb)],        [false, false, true],  "isTombstone of a box's tombstone"],
     [() => [Bank.isTombstone(gateTombOf()),   Gate.isTombstone(gateTombOf()),   BaseBox.isTombstone(gateTombOf())],   [false, true,  false], "isTombstone of a gate's sparse tombstone"],
     [() => [Bank.isGone(boxTomb),             Gate.isGone(boxTomb),             BaseBox.isGone(boxTomb)],             [false, false, true],  "isGone of a box's tombstone"],
     [() => [Bank.isGone(boxShell),            Gate.isGone(boxShell),            BaseBox.isGone(boxShell)],            [false, false, false], "isGone of a box's shell"],
     [() => [Bank.isVoidSentinel(boxShell),    Gate.isVoidSentinel(boxShell),    BaseBox.isVoidSentinel(boxShell)],    [false, false, true],  "isVoidSentinel of a box's shell"],
-    [() => [Bank.isVoidSentinel(Shell.of(TH.GateScope)), Gate.isVoidSentinel(Shell.of(TH.GateScope)), BaseBox.isVoidSentinel(Shell.of(TH.GateScope))], [false, true, false], "isVoidSentinel of a gate's shell"],
+    [() => [Bank.isVoidSentinel(gateShell),   Gate.isVoidSentinel(gateShell),   BaseBox.isVoidSentinel(gateShell)],   [false, true,  false], "isVoidSentinel of a gate's shell"],
     [() => [Bank.isWhole(box),                Gate.isWhole(box),                BaseBox.isWhole(box)],                [false, false, true],  'isWhole of a whole box'],
     [() => [Bank.isWhole(boxShell),           Gate.isWhole(boxShell),           BaseBox.isWhole(boxShell)],           [false, false, true],  "isWhole of a box's shell"],
     [() => [Bank.isWhole(gate),               Gate.isWhole(gate),               BaseBox.isWhole(gate)],               [false, true,  false], 'isWhole of a whole gate'],
@@ -120,13 +122,17 @@ describe("a kind's guards", () => {
 })
 
 describe("Thing.cmp(ante, post)", () => {
-  const box = TH.boxThingOf()
+  const box       = TH.boxThingOf()
+  const boxNext   = TH.nextOf(box)
+  const boxTomb   = TH.boxTombOf(box)
+  const boxReborn = TH.boxRebornOf(boxTomb, { revseq: 0 })
+  const boxShell  = Shell.of(TH.BoxScope, TH.rootBoxOf())
   const CmpCases = [
-    [box,               TH.nextOf(box),        1,  'a later revision is newer'],
-    [TH.nextOf(box),    box,                   -1, 'an earlier revision is older'],
-    [box,               { ...box },            0,  'one revision is neither'],
-    [TH.boxTombOf(box), TH.boxRebornOf(TH.boxTombOf(box), { revseq: 0 }), 1, 'a later life is newer, whatever its revseq'],
-    [Shell.of(TH.BoxScope, TH.rootBoxOf()), box, 1, 'any life is newer than the shell'],
+    [box,      boxNext,    1,  'a later revision is newer'],
+    [boxNext,  box,        -1, 'an earlier revision is older'],
+    [box,      { ...box }, 0,  'one revision is neither'],
+    [boxTomb,  boxReborn,  1,  'a later life is newer, whatever its revseq'],
+    [boxShell, box,        1,  'any life is newer than the shell'],
   ] as const
 
   for (const [ante, post, sign, blurb] of CmpCases) {
