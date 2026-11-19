@@ -47,7 +47,7 @@ export type { QueryCacheOpts } from './shapes/shapes-minder'
 
 // From safebyok-big, re-exported so that each stays one binding across both packages: its refusals and logger, what a
 // device is handed, what a gating's dialog, a wayin and a box carry, and the acts a vaultDB's answer reports.
-export { IsVaultError, VaultError, isVaultError, type RefusalFamily, type RefusalFamilyForKind, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
+export { IsVaultError, VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalFamilyForKind, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
 export type { BadOutcome, GoodOutcome, Outcome } from 'safebyok-big'
 export { DefaultLogger, setDefaultLogger, type KeyDeriver, type VaultLogger } from 'safebyok-big'
 export { PrfAnswerSize, type PasskeyAnswer, type PassphraseCleartext, type PassphraseVerdict, type Sidecar, type Whisper } from 'safebyok-big'

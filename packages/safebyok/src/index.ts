@@ -21,4 +21,4 @@ export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphra
 export { correctablekindVals, type Modelkind } from 'safebyok-big'
 export { ForeverMillis, MaxLabelChars, MaxUserIdChars, MinuteMillis, PasskeySaltSize, PassphraseSaltSize, Patterns } from 'safebyok-big'
 export type { UserID } from 'safebyok-big'
-export { WhisperFieldAttributes, fromB64, mask, mash, toB64 } from 'safebyok-big/utils'
+export { WhisperFieldAttributes, fromB64, mask, mash, toB64, type MaskOpts } from 'safebyok-big/utils'
