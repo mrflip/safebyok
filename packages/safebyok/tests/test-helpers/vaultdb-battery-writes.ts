@@ -2,7 +2,8 @@
 import { describe, expect, it } from 'vitest'
 import { BW, expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { Shell, sparseOf } from '../../src/shapes/shapes-thing'
+import { Shell } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import { delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
   GateScope, Life0, RootScope, ThingBank, WithPasskey, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, getGateAskOf,
@@ -303,7 +304,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       expect(await vaultDB.tryGetThing(getAskOf(box))).to.deep.include({ ok: true, act: 'gotlive', val: box })
       const delAsk = delAskOf({ cited: box, record: boxTombOf(box) })
       expect(await vaultDB.tryWriteThing(delAsk)).to.deep.include({ ok: true, act: 'deleted' })
-      expect(await vaultDB.tryListThings(listAskOf(RootScope))).to.deep.include({ ok: true, val: [sparseOf(boxTombOf(box))] })
+      expect(await vaultDB.tryListThings(listAskOf(RootScope))).to.deep.include({ ok: true, val: [Thing.sparseOf(boxTombOf(box))] })
     })
 
     it("leave every refusal to the verb, which answers it", async () => {

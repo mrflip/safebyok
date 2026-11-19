@@ -7,7 +7,8 @@ import { Lease } from '../../src/models/lease'
 import { NOVEL, PassphraseProving, Proving } from '../../src/models/proving'
 import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { Lifeseq } from '../../src/shapes/primitives'
-import { type BoxRecord, BoxChecks, Shell, ThingFormat, sparseOf } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, BoxChecks, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -144,7 +145,7 @@ describe("Bank.make(record, { device, vaultDB })", () => {
     [(record: BankMakeRecord) => ({ ...record, maingate: null }),             'a null main gate'],
     [(record: BankMakeRecord) => TH.omitting(record, 'rootBox'),              'no root box'],
     [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, am: 'd' } }), 'a root box of a damaged row'],
-    [(record: BankMakeRecord) => ({ ...record, rootBox: sparseOf(TH.rootBoxOf()) }), "a live root box's Thing fields alone"],
+    [(record: BankMakeRecord) => ({ ...record, rootBox: Thing.sparseOf(TH.rootBoxOf()) }), "a live root box's Thing fields alone"],
     [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, revseq: 0 } }), 'a root box half the shell'],
     [(record: BankMakeRecord) => ({ ...record, born_at: 'yesterday' }),       'a born_at that is not epoch millis'],
     [() => null,                                                          'null'],
@@ -197,7 +198,7 @@ describe("Bank.make(record, { device, vaultDB })", () => {
 
   it("refuses a box other than the root box as its root box", async () => {
     const { record, device } = await TH.buildBornBank()
-    const box = TH.boxThingOf('openai')
+    const box: LiveOf<BoxRecord> = { ...TH.boxThingOf('openai'), am: 'a' }
     TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: box }, { device, vaultDB: device.vaultDB }), 'record_conflict')
   })
 

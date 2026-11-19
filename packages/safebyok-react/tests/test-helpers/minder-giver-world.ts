@@ -54,7 +54,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
 
   const friend: MinderFriend = Object.freeze({
     scope:       LeanTH.ThingBank,
-    rootBox:     LeanTH.rootBoxOf(),
+    rootBox:     { ...LeanTH.rootBoxOf(), am: 'a' },
     makeGetAsk:  minderGetAskOf,
     makeListAsk: ({ labelpath }) => listAskOf({ ...LeanTH.ThingBank, labelpath, track: LeanTH.trackOf() }),
     tellBadNews: (badnews) => { throw new AggregateError(badnews, 'The minder told of bad news') },

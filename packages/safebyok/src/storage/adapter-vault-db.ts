@@ -3,7 +3,8 @@
 import { noop } from 'es-toolkit'
 import type * as Z from 'zod'
 import { EX, Errors, Outcome, Validator, type Helpers } from 'safebyok-big/internals'
-import { type ThingRecord, isGone } from '../shapes/shapes-thing'
+import type { ThingRecord } from '../shapes/shapes-thing'
+import { Thing } from '../models/thing'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
@@ -144,7 +145,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       let val: ThingRecord
       try { val = Classifier.watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
-      try { onNotice({ ok: true, act: isGone(val) ? 'gotgone' : 'gotlive', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+      try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     } }
     this.#feeds.add(feed)
     const stop = this.doWatch(bankScope, feed.receive, onBadNews)

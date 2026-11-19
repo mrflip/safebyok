@@ -18,7 +18,7 @@ const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
 
 /** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
- * The sealer passed to each call, such as `CoreBox`, decides what is sealed and how. The lease itself knows only which fieldnames hold secrets.
+ * The sealer passed to each call, such as `BaseBox`, decides what is sealed and how. The lease itself knows only which fieldnames hold secrets.
  * A bankKey that will not unwrap locks the bank, and refuses `damaged_lease`.
  * Once evicted, or once its device is swept, it refuses every seal and unseal, even one in flight.
  */
@@ -75,12 +75,12 @@ export class Lease implements LeaseStamp {
   // == [Sealing under the bankKey]: seal, unseal, sealText, openSealed, ctxOf, bankKey
 
   /** Seal and return the next revision after `donorProps`, with `publicProps` applied and `secretProps` encrypted.
-   * The seal checks its arguments (`CoreBox` refuses an unknown key in `publicProps` or `secretProps`) and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
-   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live `donorProps` instead, and refuses any `secretProps`. The sealer may refuse body fields there too: `CoreBox` refuses a sidecar.
+   * The seal checks its arguments (`BaseBox` refuses an unknown key in `publicProps` or `secretProps`) and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
+   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live `donorProps` instead, and refuses any `secretProps`. The sealer may refuse body fields there too: `BaseBox` refuses a sidecar.
    * The seal is bound to the bank's stamp, the revision's stamp and the sealer's tags. The cleartext's bytes are zeroed afterwards.
    * @example
-   *   await lease.seal(CoreBox, box, { sidecar: { account: 'work' } }, { whisper })  // its next revision
-   *   await lease.seal(CoreBox, box, { am: 'x' })                                     // its tombstone
+   *   await lease.seal(BaseBox, box, { sidecar: { account: 'work' } }, { whisper })  // its next revision
+   *   await lease.seal(BaseBox, box, { am: 'x' })                                     // its tombstone
    */
   seal<RecordT extends Sparse<ThingRecord>, CleartextsT>(
     sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.TombstonePublicProps,

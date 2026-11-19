@@ -84,7 +84,8 @@
   "dependencies": {
     "@tanstack/query-core": "^5.107.1",
     "es-toolkit": "^1.53.2",
-    "safebyok-big": "workspace:*"
+    "safebyok-big": "workspace:*",
+    "type-fest": "^5.10.0"
   },
   "peerDependencies": {
     "zod": "^4.6.7",

@@ -1,8 +1,8 @@
 import type { Consts } from 'safebyok-big/internals'
 import { Clock, Crypto, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
-import { BaseThing } from './base-thing'
-import { CoreBox } from './core-box'
+import { Thing } from './thing'
+import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
 import type { Lease } from './lease'
@@ -21,7 +21,7 @@ import * as Throwers from '../refusals/throwers'
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
-export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements BankStamp {
+export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
   // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease
 
   readonly #device:   Device
@@ -163,7 +163,7 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
     const { endCause } = this.#device
     if (endCause !== null) { return disabledAnswerOf(baseAsk, endCause) }
     const lease  = await Checks.proving.parse(proved).buildLease(this, this.#maingate)
-    const root   = await lease.seal(CoreBox, this.#rootBox, { sidecar: {} }, { whisper: {} })
+    const root   = await lease.seal(BaseBox, this.#rootBox, { sidecar: {} }, { whisper: {} })
     //
     const ask    = { ...baseAsk, bank: this.pickle(), gate: this.#maingate.pickle(), root }
     const answer = await this.#vaultDB.tryBirthBank(ask)
@@ -220,7 +220,7 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
   async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
     const lease = this.#demandLease()
     this.#demandOwnBox(donorProps)
-    return lease.seal(CoreBox, donorProps, publicProps, secretProps)
+    return lease.seal(BaseBox, donorProps, publicProps, secretProps)
   }
 
   /** Seal the tombstone of the live box `donorProps`. Needs the bank unlocked.
@@ -236,7 +236,7 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
   async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
     const lease = this.#demandLease()
     this.#demandOwnBox(box)
-    return lease.unseal(CoreBox, box)
+    return lease.unseal(BaseBox, box)
   }
   // --
 
@@ -268,13 +268,11 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
     if (! answer.ok) { return answer }
     if (answer.act === 'gotvoid') {
       if (ifAbsent !== 'shell') { return answer }
-      // A box's labelpath, so its shell is a box's.
-      return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) as ShellOf<BoxRecord> }
+      return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) }
     }
     const { val } = answer
-    if (! Labelpath.isOfModelkind(val.labelpath, 'box')) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) } }
-    // The labelpath says it is a box's, and the cast relies on it.
-    return { ...answer, val: val as BoxRecord }
+    if (BaseBox.isLive(val) || BaseBox.isTombstone(val)) { return { ...answer, val } }
+    return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) }
   }
 
   /** Write the live box `ask.record` over the box `ask.cited` cites: the one stored at its scope, or its shell. */
@@ -327,6 +325,9 @@ export class Bank extends BaseThing<BankRecord, BankScope, BankStamp> implements
 
   /** Always `'bank'`: marks this model for a {@link Consts.Modelkind} check. */
   get modelkind(): 'bank' { return 'bank' satisfies Consts.Modelkind }
+
+  /** A bank's modelkind: the guards this class inherits answer for banks alone. */
+  static override readonly modelkind = 'bank'
 }
 
 // == [Helpers]: trackPairOf, disabledAnswerOf

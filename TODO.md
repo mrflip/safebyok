@@ -12,7 +12,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   and a refused get count as stale, as TanStack counts them; and decide whether `'static'` has any use for a car, whose
   newest the vaultDB can always replace (whiteboard/20261115-lean_buttonup, the staleTime table, 2026-11-18).
 * **The vaultDB should not return sparse tombstones.** A list sends each tombstone, and a gone parent, sparse
-  (`classifyListThings`' `sparseOf`), and its types and docs promise them (`vault-db.ts`); a get's tombstone is always
+  (`classifyListThings`' `Thing.sparseOf`), and its types and docs promise them (`vault-db.ts`); a get's tombstone is always
   whole. Send every tombstone whole, so that "sparse" means live and not whole, and the minder's `gotgone` answers a
   whole tombstone as the vaultDB's does.
 * **Redo `bestCarOf` for titles and sparse tombstones.** The vaultDB is to send only whole tombstones, and the void

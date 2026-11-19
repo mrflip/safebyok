@@ -2,10 +2,11 @@
 // through its vaultDB; no caching. Private while it is built.
 export { Bank } from './models/bank'
 export { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from './models/device'
-export { BaseThing } from './models/base-thing'
-export { CoreBox } from './models/core-box'
+export { type KindRecords, type Kinded, type LiveOfKind, type MembersOfKind, type RecordOfKind, type TombstoneOfKind, type VoidSentinelOfKind, type WholeOfKind, BaseThing } from './models/base-thing'
+export { BaseBox } from './models/base-box'
 export { Gate } from './models/gate'
 export { Gating } from './models/gating'
+export { Thing } from './models/thing'
 export { type Lease, withoutSecrets } from './models/lease'
 export type { PasskeyProving, PassphraseProving, Proving } from './models/proving'
 export type {
@@ -29,6 +30,6 @@ export {
 } from './shapes/shapes-gateish'
 export { type WorldRecord, AskChecks } from './shapes/shapes-asks'
 export {
-  type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel,
-  BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, cmpThings, haveSameScope, isGone, isSparse, isTombstone, isVoidSentinel, isWholeRecord, sparseOf, thingkindVals,
+  type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel,
+  BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'

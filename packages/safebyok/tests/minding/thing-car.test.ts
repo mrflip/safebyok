@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
 import type { ThingCar } from '../../src/shapes/shapes-minder'
 import type { LiveOf } from '../../src/shapes/shapes-sealers'
-import { type BoxRecord, type ThingRecord, Shell, sparseOf } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, type ThingRecord, Shell } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import * as TH from '../test-helpers'
 
 const Box0      = TH.boxThingOf()
@@ -14,7 +15,7 @@ const BoxShell  = Shell.of(TH.BoxScope, TH.rootBoxOf())
 
 /** The car `behind`, of the sparse `newest` and the older whole `fullest`, as a merge leaves it. */
 function behindOf(newest: ThingRecord, fullest: ThingRecord): ThingCar<ThingRecord> {
-  return { liveness: 'behind', newest: sparseOf(newest), fullest }
+  return { liveness: 'behind', newest: Thing.sparseOf(newest), fullest }
 }
 
 /** `car`'s liveness, and the life and revision of each of its records. */
@@ -29,9 +30,9 @@ function revisionsOf(car: ThingCar<ThingRecord>) {
 describe("carOf", () => {
   const CarCases = [
     [Box0,               "full", Box0,      'a whole live record is full'],
-    [sparseOf(Box0),     "bare", undefined, 'a sparse live record is bare'],
+    [Thing.sparseOf(Box0),     "bare", undefined, 'a sparse live record is bare'],
     [BoxGone,            "gone", null,      'a whole tombstone is gone'],
-    [sparseOf(BoxGone),  "gone", null,      'a sparse tombstone is gone'],
+    [Thing.sparseOf(BoxGone),  "gone", null,      'a sparse tombstone is gone'],
     [BoxShell,           "void", null,      'the void sentinel is void'],
   ] as const
   for (const [record, liveness, fullest, blurb] of CarCases) {
@@ -49,7 +50,7 @@ describe("carOf", () => {
   })
 
   it("makes a behind car of a sparse record and an older whole record of its life", () => {
-    const car = carOf(sparseOf(Box1), Box0)
+    const car = carOf(Thing.sparseOf(Box1), Box0)
     expect(car).to.deep.equal(behindOf(Box1, Box0))
     expect(car.fullest).to.eq(Box0)
     expect(Object.isFrozen(car)).to.be.true
@@ -60,10 +61,10 @@ describe("carOf", () => {
   })
 
   const BadFullests = [
-    [sparseOf(Box1),     sparseOf(Box0), 'a sparse fullest'],
-    [sparseOf(Box0),     Box1,           'a fullest newer than the record'],
-    [sparseOf(Box1),     { ...Box1 },    'a fullest of the same revision'],
-    [sparseOf(BoxReborn), Box0,          'a fullest of an earlier life'],
+    [Thing.sparseOf(Box1),     Thing.sparseOf(Box0), 'a sparse fullest'],
+    [Thing.sparseOf(Box0),     Box1,           'a fullest newer than the record'],
+    [Thing.sparseOf(Box1),     { ...Box1 },    'a fullest of the same revision'],
+    [Thing.sparseOf(BoxReborn), Box0,          'a fullest of an earlier life'],
   ] as const
   for (const [newest, fullest, blurb] of BadFullests) {
     it(`refuses ${blurb}`, () => {
@@ -76,7 +77,7 @@ describe("carOf", () => {
     [42,                              'a number'],
     [carOf(Box0),                     'a car'],
     [{ ...Box0, labelpath: 'vault' }, 'a record of a kind no minder serves'],
-    [{ ...sparseOf(Box0), am: 'd' },  'a record marked damaged'],
+    [{ ...Thing.sparseOf(Box0), am: 'd' },  'a record marked damaged'],
   ] as const
   for (const [val, blurb] of NotRecords) {
     it(`refuses ${blurb}`, () => {
@@ -94,16 +95,16 @@ describe("bestCarOf", () => {
   const MergeCases = [
     // the newest revision, and the newest whole record:
     [carOf(Box0),           carOf(Box1),                carOf(Box1),                 'a later whole record makes a full car of it'],
-    [carOf(Box0),           carOf(sparseOf(Box1)),      behindOf(Box1, Box0),        'a later sparse record leaves the whole one behind it'],
-    [carOf(sparseOf(Box1)), carOf(Box0),                behindOf(Box1, Box0),        'an older whole record under a newer sparse one stays behind it'],
+    [carOf(Box0),           carOf(Thing.sparseOf(Box1)),      behindOf(Box1, Box0),        'a later sparse record leaves the whole one behind it'],
+    [carOf(Thing.sparseOf(Box1)), carOf(Box0),                behindOf(Box1, Box0),        'an older whole record under a newer sparse one stays behind it'],
     [behindOf(Box2, Box0),  carOf(Box1),                behindOf(Box2, Box1),        'a newer whole record, still older than the newest, moves up behind it'],
     [behindOf(Box1, Box0),  carOf(Box1),                carOf(Box1),                 'the whole record of the newest revision makes the car full'],
-    [carOf(sparseOf(Box0)), carOf(Box0),                carOf(Box0),                 'the whole record of a bare revision makes the car full'],
+    [carOf(Thing.sparseOf(Box0)), carOf(Box0),                carOf(Box0),                 'the whole record of a bare revision makes the car full'],
     // tombstones and lives:
     [behindOf(Box1, Box0),  carOf(BoxGone),             carOf(BoxGone),              'a whole tombstone replaces the older whole record'],
-    [behindOf(Box1, Box0),  carOf(sparseOf(BoxGone)),   carOf(sparseOf(BoxGone)),    'a sparse tombstone replaces the older whole record'],
-    [carOf(Box2),           carOf(sparseOf(BoxReborn)), carOf(sparseOf(BoxReborn)),  'a later life heard sparse has no whole record of the earlier life'],
-    [carOf(BoxShell),       carOf(sparseOf(Box0)),      carOf(sparseOf(Box0)),       'any record replaces the void sentinel'],
+    [behindOf(Box1, Box0),  carOf(Thing.sparseOf(BoxGone)),   carOf(Thing.sparseOf(BoxGone)),    'a sparse tombstone replaces the older whole record'],
+    [carOf(Box2),           carOf(Thing.sparseOf(BoxReborn)), carOf(Thing.sparseOf(BoxReborn)),  'a later life heard sparse has no whole record of the earlier life'],
+    [carOf(BoxShell),       carOf(Thing.sparseOf(Box0)),      carOf(Thing.sparseOf(Box0)),       'any record replaces the void sentinel'],
   ] as const
   for (const [prior, delivered, expected, blurb] of MergeCases) {
     it(blurb, () => {
@@ -114,11 +115,11 @@ describe("bestCarOf", () => {
   const PriorWinsCases = [
     [carOf(Box1),               carOf(Box0),               'an older record arrives under a full car'],
     [carOf(Box1),               carOf({ ...Box1 }),        'an equal revision arrives on a full car'],
-    [carOf(Box1),               carOf(sparseOf(Box1)),     'a sparse equal revision arrives on a full car'],
-    [carOf(sparseOf(Box1)),     carOf(sparseOf(Box1)),     'a sparse equal revision arrives on a bare car'],
+    [carOf(Box1),               carOf(Thing.sparseOf(Box1)),     'a sparse equal revision arrives on a full car'],
+    [carOf(Thing.sparseOf(Box1)),     carOf(Thing.sparseOf(Box1)),     'a sparse equal revision arrives on a bare car'],
     [behindOf(Box2, Box1),      carOf(Box0),               'a whole record older than the fullest arrives on a behind car'],
     [carOf(BoxGone),            carOf(Box2),               'the whole record before the tombstone arrives on a gone car'],
-    [carOf(sparseOf(BoxGone)),  carOf(BoxGone),            'a whole tombstone arrives on a sparse one'],
+    [carOf(Thing.sparseOf(BoxGone)),  carOf(BoxGone),            'a whole tombstone arrives on a sparse one'],
   ] as const
   for (const [prior, delivered, blurb] of PriorWinsCases) {
     it(`returns the prior car where ${blurb}`, () => {
@@ -138,7 +139,7 @@ describe("bestCarOf", () => {
 
   it("makes a frozen full car of the later record itself, where the prior car has no whole record", () => {
     const later  = structuredClone(Box1)
-    const merged = bestCarOf(carOf(sparseOf(Box1)), carOf(later))
+    const merged = bestCarOf(carOf(Thing.sparseOf(Box1)), carOf(later))
     expect(merged.newest).to.eq(later)
     expect(merged.newest).to.eq(merged.fullest)
     expect(Object.isFrozen(merged)).to.be.true
@@ -164,7 +165,7 @@ describe("bestCarOf", () => {
 
     it("in a behind car, whose newest stays the prior car's", () => {
       const prior     = behindOf(Box2, Box0)
-      const delivered = carOf(structuredClone(sparseOf(Box2)), structuredClone(Box1))
+      const delivered = carOf(structuredClone(Thing.sparseOf(Box2)), structuredClone(Box1))
       const merged    = bestCarOf(prior, delivered)
       expect(merged).to.deep.equal(behindOf(Box2, Box1))
       expect(merged.newest).to.eq(prior.newest)
@@ -186,13 +187,13 @@ describe("bestCarOf", () => {
 
   const BrokenCars = [
     [{ liveness: 'full',   newest: Box0,                fullest: { ...Box0 } },    'a full car of two records'],
-    [{ liveness: 'full',   newest: sparseOf(Box0),      fullest: sparseOf(Box0) }, 'a full car of a sparse record'],
+    [{ liveness: 'full',   newest: Thing.sparseOf(Box0),      fullest: Thing.sparseOf(Box0) }, 'a full car of a sparse record'],
     [{ liveness: 'bare',   newest: Box0,                fullest: undefined },      'a bare car of a whole record'],
-    [{ liveness: 'behind', newest: sparseOf(Box0),      fullest: Box1 },           'a behind car whose fullest is newer'],
-    [{ liveness: 'behind', newest: sparseOf(BoxReborn), fullest: Box0 },           'a behind car whose fullest is of an earlier life'],
+    [{ liveness: 'behind', newest: Thing.sparseOf(Box0),      fullest: Box1 },           'a behind car whose fullest is newer'],
+    [{ liveness: 'behind', newest: Thing.sparseOf(BoxReborn), fullest: Box0 },           'a behind car whose fullest is of an earlier life'],
     [{ liveness: 'gone',   newest: Box0,                fullest: null },           'a gone car of a live record'],
     [{ liveness: 'gone',   newest: BoxShell,            fullest: null },           'a gone car of the void sentinel'],
-    [{ liveness: 'void',   newest: sparseOf(BoxGone),   fullest: null },           'a void car of a tombstone'],
+    [{ liveness: 'void',   newest: Thing.sparseOf(BoxGone),   fullest: null },           'a void car of a tombstone'],
     [{ liveness: 'gone',   newest: BoxGone,             fullest: undefined },      'a gone car whose fullest is undefined'],
   ] as const
   for (const [car, blurb] of BrokenCars) {
@@ -217,7 +218,7 @@ describe("bestCarOf", () => {
 
 describe("isThingCar", () => {
   it("is true of each car a merge may return", () => {
-    for (const car of [carOf(Box0), behindOf(Box1, Box0), carOf(sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]) { expect(isThingCar(car)).to.be.true }
+    for (const car of [carOf(Box0), behindOf(Box1, Box0), carOf(Thing.sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]) { expect(isThingCar(car)).to.be.true }
   })
 
   const NotCars = [
@@ -236,7 +237,7 @@ describe("isThingCar", () => {
 
 describe("dbHasNewer", () => {
   it("is true of a behind or bare car, and false of the rest", () => {
-    const cars = [carOf(Box0), behindOf(Box1, Box0), carOf(sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]
+    const cars = [carOf(Box0), behindOf(Box1, Box0), carOf(Thing.sparseOf(Box0)), carOf(BoxGone), carOf(BoxShell)]
     expect(cars.map((car) => [car.liveness, dbHasNewer(car)])).to.deep.equal([['full', false], ['behind', true], ['bare', true], ['gone', false], ['void', false]])
   })
 

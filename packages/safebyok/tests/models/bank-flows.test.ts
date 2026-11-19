@@ -3,7 +3,8 @@ import { Errors } from 'safebyok-big/internals'
 import type { Bank } from '../../src/models/bank'
 import type { BoxUnsealed } from '../../src/shapes/shapes-bankish'
 import type { LiveOf, ShellOf } from '../../src/shapes/shapes-sealers'
-import { type BoxRecord, Shell, sparseOf } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import { getAskOf } from '../../src/shapes/shapes-asks'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
@@ -50,7 +51,7 @@ describe("the box flows, through a bank and its MemoryVaultDB", () => {
     const listed = await bank.tryListBoxes()
     expect(listed).to.include({ ok: true, act: 'gotlive' })
     expect(listed.ok && listed.val).to.deep.equal([])
-    expect(listed.parent).to.deep.equal(sparseOf(bank.rootBox))
+    expect(listed.parent).to.deep.equal(Thing.sparseOf(bank.rootBox))
   })
 
   it("gives the shell of a box not stored, under the root box's life, for its first revision to cite", async () => {

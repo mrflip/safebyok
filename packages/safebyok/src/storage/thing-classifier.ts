@@ -5,7 +5,8 @@ import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/inter
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
-import { type StoredCited, type ThingCited, type ThingRecord, type ThingScope, BankChecks, BoxChecks, GateChecks, ThingChecks, sparseOf } from '../shapes/shapes-thing'
+import { type StoredCited, type ThingCited, type ThingRecord, type ThingScope, BankChecks, BoxChecks, GateChecks, ThingChecks } from '../shapes/shapes-thing'
+import { Thing } from '../models/thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
 
@@ -267,7 +268,7 @@ export type ThingsFetched = Readonly<{ parent: unknown, children: readonly Reado
 export function classifyListThings(ask: ListAsk, { parent: rawParent, children }: ThingsFetched, worldFetched: WorldFetched): ListThingsActual {
   const stored = storedThingOf(ask, rawParent)
   const act    = getActOf(ask, stored)
-  const parent = (stored === null) ? null : sparseOf(stored)
+  const parent = (stored === null) ? null : Thing.sparseOf(stored)
   const world  = worldOf(ask, worldFetched)
   const beside = trackedFieldOf(ask, worldFetched.tracked)
   if (isRefusedAct(act))  { return { ok: false, act, world, listed: [], parent, damaged_rows: [], ...beside } }
@@ -283,7 +284,7 @@ export function classifyListThings(ask: ListAsk, { parent: rawParent, children }
     const child = listedThingOf({ userid, banklabel, labelpath }, raw)
     if (child === null) { damaged_rows.push({ userid, banklabel, labelpath, am: 'd' }) } else if (child.lifepath.startsWith(lifepathUnder)) { living.push(child) }
   }
-  const listed = sortBy(living, [(thing) => thing.labelpath]).map((thing) => sparseOf(thing))
+  const listed = sortBy(living, [(thing) => thing.labelpath]).map((thing) => Thing.sparseOf(thing))
   return { ok: true, act, world, listed, parent, damaged_rows, ...beside }
 }
 

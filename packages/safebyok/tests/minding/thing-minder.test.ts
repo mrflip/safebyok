@@ -8,7 +8,8 @@ import { carOf } from '../../src/minding/thing-car'
 import { ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../src/shapes/primitives'
-import { type GateRecord, type ThingRecord, BoxChecks, Shell, isVoidSentinel, sparseOf } from '../../src/shapes/shapes-thing'
+import { type GateRecord, type ThingRecord, BoxChecks, Shell } from '../../src/shapes/shapes-thing'
+import { Thing } from '../../src/models/thing'
 import { type GetAsk, getAskOf, listAskOf } from '../../src/shapes/shapes-asks'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -20,7 +21,7 @@ const GateGetAsk: GetAsk = getAskOf({ ...TH.GateScope, ifAbsent: 'nil', track: T
 function fakeBankOf() {
   return {
     scope:       { ...TH.ThingBank },
-    rootBox:     TH.rootBoxOf(),
+    rootBox:     { ...TH.rootBoxOf(), am: 'a' },
     makeGetAsk:  (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     makeListAsk: (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
@@ -115,7 +116,7 @@ function noticeOf(thing: ThingNotice['val'], world: ThingNotice['world'] = null)
 /** The revtok of the newest record the minder has for the main gate, or undefined for nothing or the void sentinel. */
 function revtokAt(minder: ThingMinder): Revtok | undefined {
   const record: DeliverableThing | undefined = minder.at(TH.GateScope)?.newest
-  return ((record === undefined) || isVoidSentinel(record)) ? undefined : record.revtok
+  return ((record === undefined) || Thing.isVoidSentinel(record)) ? undefined : record.revtok
 }
 
 /** The act of `answer`, a tryAt's answer. */
@@ -238,7 +239,7 @@ describe("ThingMinder.hello", () => {
       expect(minder.at(TH.RootScope)?.newest).to.deep.equal(TH.rootBoxOf())
       expect(minder.at(TH.BoxScope)).to.be.undefined
       await minder.list('box')
-      expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(sparseOf(box)))
+      expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(Thing.sparseOf(box)))
       minder.goodbye()
       expect([minder.at(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([undefined, undefined])
     } finally {
@@ -651,7 +652,7 @@ describe("ThingMinder.list", () => {
     const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
     expect(await minder.list('box')).to.deep.equal([TH.BoxScope.labelpath])
-    expect(minder.at(TH.BoxScope)).to.deep.equal({ liveness: 'bare', newest: sparseOf(box), fullest: undefined })
+    expect(minder.at(TH.BoxScope)).to.deep.equal({ liveness: 'bare', newest: Thing.sparseOf(box), fullest: undefined })
     expect(minder.isStaleAt(TH.BoxScope)).to.be.true
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(box))
   })
@@ -675,7 +676,7 @@ describe("ThingMinder.list", () => {
     const box1 = TH.nextOf(box0)
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box1)
     await minder.list('box')
-    expect(minder.at(TH.BoxScope)).to.deep.equal({ liveness: 'behind', newest: sparseOf(box1), fullest: box0 })
+    expect(minder.at(TH.BoxScope)).to.deep.equal({ liveness: 'behind', newest: Thing.sparseOf(box1), fullest: box0 })
     expect(minder.isStaleAt(TH.BoxScope)).to.be.true
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(box1))
   })
@@ -689,7 +690,7 @@ describe("ThingMinder.list", () => {
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, tombstone)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     await minder.list('box')
-    expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(sparseOf(tombstone)))
+    expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(Thing.sparseOf(tombstone)))
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'gotgone', isTimely: true })
     const { liveness } = await minder.get(TH.BoxScope)
     expect(liveness).to.eq('gone')

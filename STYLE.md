@@ -423,6 +423,10 @@ validator splits it into its parts before checking them.
 * **A class names the shapes it passes for**: `class Lease implements LeaseStamp`. The compiler
   then enforces the class's duck typing. `implements` checks only that the fields exist with
   their types; the constructor and `Object.freeze(this)` make them own and frozen.
+* **A model's record guards are statics on its class, and read its kind from `this`**:
+  `Gate.isTombstone(rec)` is true only of a gate's tombstone, and narrows `rec` to one, where
+  `Thing.isTombstone(rec)` answers for any kind. Kind-generic code calls them through `Thing`. Pass
+  one as `(rec) => Gate.isTombstone(rec)`, never detached: without its class it has no kind.
 * **Freeze what we can**: each record handed out, each object's own fields, each snapshot.
 * **Name each outcome a reader must tell apart, even where the types overlap**: `Fetched` says
   whole, sparse or dead, though every record is a sparse to the compiler.

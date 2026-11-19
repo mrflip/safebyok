@@ -2,10 +2,10 @@
 import { describe, expect, it } from 'vitest'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 import type { Labelpath } from '../../src/shapes/primitives'
-import { sparseOf } from '../../src/shapes/shapes-thing'
 import type { VaultDB } from '../../src/storage/vault-db'
 import { Life0, ThingBank, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, listAskAt, rootBoxOf } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
+import { Thing } from '../../src/models/thing'
 
 /** A box under the root box that fails its checks, as a store that keeps only a row's columns can still hold it. */
 const DamagedBox = Object.freeze({ ...boxThingOf('bad'), whisper_sealed: {} })
@@ -40,14 +40,14 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       const mmGone = boxTombOf(mm!)
       await expectGood(vaultDB.tryWriteThing(delAskFor(mm!, mmGone)))
       const answer = await vaultDB.tryListThings(listAskAt('box'))
-      expect(answer).to.deep.include({ ok: true, act: 'gotlive', parent: sparseOf(rootBoxOf()), damaged_rows: [] })
-      expect(answer.ok && answer.val).to.deep.equal([aa, mmGone, zz].map((box) => sparseOf(box!)))
+      expect(answer).to.deep.include({ ok: true, act: 'gotlive', parent: Thing.sparseOf(rootBoxOf()), damaged_rows: [] })
+      expect(answer.ok && answer.val).to.deep.equal([aa, mmGone, zz].map((box) => Thing.sparseOf(box!)))
     })
 
     it("lists labels byte by byte, never by a locale's order", async () => {
       const vaultDB = await bornBank()
       const [ab, az, a9] = await boxesBorn(vaultDB, boxThingOf('ab'), boxThingOf('a_z'), boxThingOf('a9'))
-      expect(await listedAt(vaultDB, 'box')).to.deep.equal([a9, az, ab].map((box) => sparseOf(box!)))
+      expect(await listedAt(vaultDB, 'box')).to.deep.equal([a9, az, ab].map((box) => Thing.sparseOf(box!)))
     })
 
     it("leaves out the children of the parent's earlier lives", async () => {
@@ -58,7 +58,7 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       await expectGood(vaultDB.tryWriteThing(birthAskOf(rootAgain, RootGone)))
       const fresh = boxThingOf('fresh', { lifepath: `${rootAgain.lifepath}/${Life0}` })
       await bornUnder(vaultDB, fresh, rootAgain.lifepath)
-      expect(await listedAt(vaultDB, 'box')).to.deep.equal([sparseOf(fresh)])
+      expect(await listedAt(vaultDB, 'box')).to.deep.equal([Thing.sparseOf(fresh)])
     })
 
     it("names each child that fails its checks as a damaged row, and lists the rest", async () => {
@@ -67,19 +67,19 @@ export function describeVaultDBLists({ fresh, bornBank, bornUnder, boxesBorn, ro
       await rowsOf(vaultDB).plant({ ...ThingBank, labelpath: 'box/bad' }, DamagedBox)
       const answer = await vaultDB.tryListThings(listAskAt('box'))
       expect(answer).to.deep.include({ ok: true, damaged_rows: [{ ...ThingBank, labelpath: 'box/bad', am: 'd' }] })
-      expect(answer.ok && answer.val).to.deep.equal([sparseOf(aa!)])
+      expect(answer.ok && answer.val).to.deep.equal([Thing.sparseOf(aa!)])
     })
 
     it("answers no children, and the parent, for a parent gone under ifAbsent 'nil', reading no child", async () => {
       const vaultDB = await withRootGone()
       const answer = await vaultDB.tryListThings(listAskAt('box', 'nil'))
-      expect(answer).to.deep.include({ ok: true, act: 'gotgone', val: [], parent: sparseOf(RootGone), damaged_rows: [] })
+      expect(answer).to.deep.include({ ok: true, act: 'gotgone', val: [], parent: Thing.sparseOf(RootGone), damaged_rows: [] })
     })
 
     it("refuses a parent gone under ifAbsent 'fail', with no children as dbhas, reading no child", async () => {
       const vaultDB = await withRootGone()
       const answer = await vaultDB.tryListThings(listAskAt('box'))
-      expect(answer).to.deep.include({ ok: false, act: 'gone', dbhas: [], parent: sparseOf(RootGone), damaged_rows: [] })
+      expect(answer).to.deep.include({ ok: false, act: 'gone', dbhas: [], parent: Thing.sparseOf(RootGone), damaged_rows: [] })
     })
 
     it("answers or refuses a void parent by ifAbsent, with no children, reading no child", async () => {
