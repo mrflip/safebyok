@@ -97,5 +97,7 @@ export interface DeviceOpts {
   requestCleartext?: RequestCleartext | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:       BadNewsHandler | undefined
+  /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
+  deviceDB?:        unknown
 }
 // --

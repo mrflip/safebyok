@@ -217,6 +217,8 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       autolockMinutes: VX.positiveMinutes.optional(),
       requestCleartext: custom<RequestCleartext>().optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
+      // Ignored: the new core keeps no device database. Taken so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
+      deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
   }),
   tellBadNewsToArgs: obj({
