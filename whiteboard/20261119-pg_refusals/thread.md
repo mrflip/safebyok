@@ -1,6 +1,6 @@
 # Thread 2: pg_refusals (2026-11-19)
 
-Branch `20261119-pg_refusals`, PR #TBD, on main (batch `sentinel_audit`, not a sprint). Proved:
+Branch `20261119-pg_refusals`, PR [#763](https://github.com/mrflip/safebyok/pull/763), on main (batch `sentinel_audit`, not a sprint). Proved:
 package tests, typecheck and lint for safebyok-postgres (337 tests), safebyok-graphql (446, its
 dependencies built), safebyok-fastkey (43); `pnpm justify` after the catch-up rebase, see the PR.
 
