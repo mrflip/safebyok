@@ -1,6 +1,6 @@
 # Thread 1: tidy_damage (2026-11-19)
 
-Branch `20261119-tidy_damage`, PR #TBD, on main (batch `sentinel_audit`; audit `human/20261119-sentinel_audit.md`, items A1, A2, B5, C8, D).
+Branch `20261119-tidy_damage`, PR [#764](https://github.com/mrflip/safebyok/pull/764), on main (batch `sentinel_audit`; audit `human/20261119-sentinel_audit.md`, items A1, A2, B5, C8, D).
 Proved: `vitest run` in safebyok-big (2946), safebyok-convex (333), safebyok-indexeddb (215); lint and `tsc --noEmit` clean in all three. `pnpm justify` pending.
 
 * **Built**:
