@@ -1,6 +1,6 @@
 # Thread 2: minder_events (2026-11-19)
 
-Branch `20261119-minder_events`, PR #TBD, stacked on #753. Proved: `safebyok` typecheck, lint and `vitest run` (1073 pass); `safebyok-react` typecheck, lint and `vitest run` (301 pass). `pnpm justify` after the catch-up rebase: pending.
+Branch `20261119-minder_events`, PR #756, stacked on #753. Proved: `safebyok` typecheck, lint and `vitest run` (1073 pass); `safebyok-react` typecheck, lint and `vitest run` (301 pass). `pnpm justify` after the catch-up rebase: pending.
 
 * **Built**
   * `packages/safebyok/src/shapes/shapes-minder.ts`, section *What a listener is told*: `MinderEvent = ThingEvent | ListingEvent | InvalidationEvent`, told apart by `carkind`, in the Coach's ruled shapes. `ThingEvent<KindT extends Thingkind = Thingkind>` distributes over the kinds, so `modelkind: 'box'` narrows `car` to `BoxCar | undefined` (`RecordOfKind`). `ListingEvent` is `{ carkind: 'listing', modelkind, labelpaths, tag: 'kids', of: { parentpath } }`; `InvalidationEvent` is `{ carkind: 'invalidation', modelkind, labelpath, card: 'list', tags: 'all' }`. All four exported from `safebyok` (`src/index.ts`).
