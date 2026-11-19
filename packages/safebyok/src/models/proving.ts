@@ -94,7 +94,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
   async buildLease(bank: LeaseBank, gate: GateRevisionedStamp): Promise<Lease> {
     const { bank: { stamp: bankStamp }, gate: cited } = Checks.provingLeaseArgs.parse({ bank, gate })
     Validator.checkedConsistent(bankStamp, this.bankStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
-    Validator.checkedConsistent(cited, this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
+    Validator.checkedConsistent(cited,     this.gateStamp, { kind: 'unexpected_error', message: BigPhrases.LeaseOfOtherGate })
     const granted = {
       fmt: Stamps.StampChecks.LeaseFormat, ...bankStamp, gate_labelpath: cited.labelpath, gate_lifeseq: cited.lifeseq, gate_revtok: cited.revtok, proved_at: Clock.nowMillis(), wayinkind: this.wayinkind,
     } as const
