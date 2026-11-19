@@ -2,9 +2,10 @@ import { isEmptyObject } from 'es-toolkit'
 import { exactOptional } from 'zod'
 import { CX, Clock, Crypto, StableJsonify, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { type BoxRecord, type Sealed, type ThingScope, BoxChecks } from '../shapes/shapes-thing'
+import type { BoxRecord, Sealed, ThingScope } from '../shapes/shapes-thing'
+import { BoxChecks } from '../shapes/shapes-thingkinds'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, RevisionOf, SealTags, Sealable, Sealer, TombstoneOf } from '../shapes/shapes-sealers'
-import { type BoxStamp, StampChecks } from '../shapes/shapes-stamps'
+import type { BoxStamp } from '../shapes/shapes-stamps'
 import { Lifeseq } from '../shapes/primitives'
 import * as Throwers from '../refusals/throwers'
 import { Thing } from './thing'
@@ -81,7 +82,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp> {
   static readonly purposes = Object.freeze({ key: 'whisper_sealed.key_wrapped', cipher: 'whisper_sealed.ciphered' })
 
   /** The {@link BoxStamp} of `record`. Refuses the shell, which has no revision to seal. */
-  static stampOf(record: RevisionOf<BoxRecord, BoxCleartexts>): BoxStamp { return StampChecks.boxStamp.parse(record) }
+  static stampOf(record: RevisionOf<BoxRecord, BoxCleartexts>): BoxStamp { return BoxChecks.stamp.parse(record) }
 
   /** The whisper of `cleartexts` as stable JSON, with its keys sorted. */
   static encode(cleartexts: BoxCleartexts): string { return StableJsonify.stableJsonify(Checks.boxCleartexts.parse(cleartexts).whisper) }

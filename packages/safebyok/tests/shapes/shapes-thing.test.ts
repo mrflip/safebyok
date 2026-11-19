@@ -2,8 +2,9 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { SX } from 'safebyok-big/internals'
 import {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type ThingRecord, type VoidSentinel,
-  BoxChecks, Shell, ThingFormat,
+  Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
+import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../src/models/thing'
 import { type Tracked, type WriteAsk, AskChecks, checkedBirthBankAsk, checkedWriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import { Labelpath, Lifeseq } from '../../src/shapes/primitives'

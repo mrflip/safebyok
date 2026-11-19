@@ -24,7 +24,7 @@ export const ThingFormat = 100_501
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
 // --
 
-// == [Thing]: GenericChecks, vaultDBShape, PerKindChecks, BankChecks, GateChecks, BoxChecks, ThingChecks, ThingScope, ThingCited, StoredCited, Sealed, Wayins, Sparse, AnyThingRecord
+// == [Thing]: GenericChecks, vaultDBShape, PerKindChecks, policiesByModelkind, ThingChecks, ThingScope, ThingCited, StoredCited, Sealed, Wayins, Sparse, AnyThingRecord
 
 // A stored lifeseq is 10 base-32 digits; the void lifeseq, -000000001, is never stored. A lifepath joins lifeseqs with '/',
 // and only its last may be void: a void lifepath is the void lifeseq under its parent's lifepath, or alone at a root.
@@ -107,8 +107,10 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   }
 })
 
-/** The checks of each kind of Thing: its record, its citation, and the parts of it a kind has. */
-const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union }) => {
+/** The checks of each kind of Thing: its record, its citation, and the parts of it a kind has.
+ * A caller outside the shapes modules reads them through each kind's bundle in shapes-thingkinds.ts: `BankChecks`, `GateChecks`, `BoxChecks`.
+ */
+export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ obj, lit, union }) => {
   const { labelpath, anyLifeseq, voidLifeseq, voidLifepath, sparse, thingCited, sealed } = GenericChecks
   const emptyBag     = obj({}).strict()
   // A record has no optional part: a gate with no passkey has `passkey0: null`.
@@ -221,43 +223,18 @@ const PerKindChecks = Validator.Checkers('bad_record', ({ obj, lit, union }) => 
     bankLabelpath, gateLabelpath, boxLabelpath, wayins, storedWayins,
     bankThing, bankCited, gateThing, gateCited, boxThing, boxCited, boxSealable, boxRecord, boxRecordOrShell,
   }
-})
+}))
 
-/** The checks of the bank's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath. */
-export const BankChecks = Object.freeze({
-  record: PerKindChecks.bankThing, cited: PerKindChecks.bankCited, stored: PerKindChecks.bankThing.refusingAs('damaged_row'), policies: [], labelpath: PerKindChecks.bankLabelpath,
-} as const)
-
-/** The checks of a gate's Thing: its record, its citation and what is stored of it, the storage policies it may name, and its labelpath.
- * Also its wayins, and the wayins as a write under a storage policy reads them of the gate stored.
- */
-export const GateChecks = Object.freeze({
-  record: PerKindChecks.gateThing, cited: PerKindChecks.gateCited, stored: PerKindChecks.gateThing.refusingAs('damaged_row'), policies: EX.storagePolicyVals, labelpath: PerKindChecks.gateLabelpath,
-  wayins: PerKindChecks.wayins, storedWayins: PerKindChecks.storedWayins,
-} as const)
-
-/** The checks of a box's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its sealable, its `live` record, and its `liveOrShell` record, which a bank keeps of its root box.
- */
-export const BoxChecks = Object.freeze({
-  record: PerKindChecks.boxThing, cited: PerKindChecks.boxCited, stored: PerKindChecks.boxThing.refusingAs('damaged_row'), policies: [], labelpath: PerKindChecks.boxLabelpath,
-  sealable: PerKindChecks.boxSealable, live: PerKindChecks.boxRecord, liveOrShell: PerKindChecks.boxRecordOrShell,
-} as const)
-
-/** The bundle of each kind of Thing, by its modelkind. */
-const byModelkind = { bank: BankChecks, gate: GateChecks, box: BoxChecks } as const satisfies Record<Thingkind, { record: unknown, cited: unknown, stored: unknown, policies: readonly EX.StoragePolicy[] }>
-
-/** The checks for the kind of Thing at `labelpath`, which must be sound. */
-function ofLabelpath(labelpath: Labelpath): typeof byModelkind[Thingkind] { return byModelkind[Labelpath.modelkindOf(labelpath)] }
+/** The storage policies a write may name, by the modelkind of the Thing it writes: only a gate's write may name any. */
+export const policiesByModelkind = Object.freeze({ bank: [], gate: EX.storagePolicyVals, box: [] } as const satisfies Record<Thingkind, readonly EX.StoragePolicy[]>)
 
 /** The check of a host's {@link VaultDB}, by {@link isVaultDB}. */
 const vaultDBShape = Validator.Checker(({ custom }) => custom<VaultDB>(isVaultDB, Phrases.VaultDBExpected), 'bad_record')
 
 /** The checks of a Thing's fields, of its citation, of what a write reads of the Thing stored, and of a host's vaultDB.
- * `byModelkind` holds the bundle of each kind of Thing: {@link BankChecks}, {@link GateChecks} and {@link BoxChecks}; `ofLabelpath` gives the one for a labelpath.
  * Also `ThingFormat`, the `fmt` of every Thing, and `thingkindVals`, the kinds.
  */
-export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, byModelkind, ofLabelpath, ThingFormat, thingkindVals })
+export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, ThingFormat, thingkindVals })
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
@@ -268,11 +245,11 @@ export type StoredCited  = Readonly<Z.infer<typeof ThingChecks.storedCited>>
 /** The name of a Thing field: the fields every kind of Thing has, which the store reads. The rest of a record is its body. */
 export type ThingFieldname = keyof Z.infer<typeof ThingChecks.sparse>
 /** The bank, as a Thing. */
-export type BankRecord   = Readonly<Z.infer<typeof BankChecks.record>>
+export type BankRecord   = Readonly<Z.infer<typeof PerKindChecks.bankThing>>
 /** A gate, as a Thing: the main gate, at `gate`. */
-export type GateRecord   = Readonly<Z.infer<typeof GateChecks.record>>
+export type GateRecord   = Readonly<Z.infer<typeof PerKindChecks.gateThing>>
 /** A box, as a Thing: with its sidecar and sealed whisper. A tombstone's sidecar is `{}`, and its whisper is sealed empty. */
-export type BoxRecord    = Readonly<Z.infer<typeof BoxChecks.record>>
+export type BoxRecord    = Readonly<Z.infer<typeof PerKindChecks.boxThing>>
 /** Any Thing stored in a vaultDB. */
 export type ThingRecord  = BankRecord | GateRecord | BoxRecord
 /** Every field of every kind of Thing: those every kind has as they are, the rest optional, and each a union of its kinds' types. */
@@ -280,7 +257,7 @@ export type AnyThingRecord = AllUnionFields<ThingRecord>
 /** One sealed part of a record, at `<part>_sealed`: a fresh key wrapped under the bankKey, the cleartext ciphered under that key, and the tags its unseal reads. */
 export type Sealed       = Readonly<Z.infer<typeof ThingChecks.sealed>>
 /** A gate's wayins: `main`, its passphrase wayin, and `passkey0`, its passkey wayin or null for none. */
-export type Wayins       = Readonly<Z.infer<typeof GateChecks.wayins>>
+export type Wayins       = Readonly<Z.infer<typeof PerKindChecks.wayins>>
 
 /** A record's Thing fields, without its body: what a listing returns for each Thing. */
 export type Sparse<RecordT extends Sparse<ThingRecord>> = Pick<RecordT, ThingFieldname>

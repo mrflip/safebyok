@@ -3,6 +3,7 @@ import * as TSQ from '@tanstack/query-core'
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type Sparse, type ThingRecord, ThingChecks } from '../shapes/shapes-thing'
+import { ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
 import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
 
@@ -17,7 +18,7 @@ export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar
   if (Thing.isTombstone(newest))    { return Object.freeze({ liveness: 'gone',   newest, fullest: null }) }
   if (Thing.isWhole(newest))        { return Object.freeze({ liveness: 'full',   newest, fullest: newest }) }
   if (fullest === undefined)        { return Object.freeze({ liveness: 'bare',   newest, fullest: undefined }) }
-  ThingChecks.ofLabelpath(newest.labelpath).record.parse(fullest)
+  ThingkindChecks.ofLabelpath(newest.labelpath).record.parse(fullest)
   return      Object.freeze(CarOfChecks.behindCar.parse({ liveness: 'behind', newest, fullest } as const))
 }
 

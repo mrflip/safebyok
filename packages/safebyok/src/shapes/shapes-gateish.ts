@@ -10,7 +10,8 @@ import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
 import type { guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
-import { type BankScope, type BankStamp, type GateStamp, StampChecks } from './shapes-stamps'
+import type { BankScope, BankStamp, GateStamp } from './shapes-stamps'
+import { BankChecks, GateChecks } from './shapes-thingkinds'
 import { ThingChecks } from './shapes-thing'
 
 // == [The gating's forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
@@ -77,9 +78,9 @@ export interface GateOpts {
 
 /** The checks of what a lease and a proving are handed. */
 const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => ({
-  leaseBank:           obj({ stamp: StampChecks.bankStamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
+  leaseBank:           obj({ stamp: BankChecks.stamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
-  gateRevisionedStamp: StampChecks.gateStamp.extend(ThingChecks.sparse.pick({ revtok: true }).shape),
+  gateRevisionedStamp: GateChecks.stamp.extend(ThingChecks.sparse.pick({ revtok: true }).shape),
   provingDevice:       GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected) }),
 }))
 

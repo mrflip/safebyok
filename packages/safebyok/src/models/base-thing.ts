@@ -3,6 +3,7 @@ import { SX, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type EpochMillis, type Lifepath, type Lifeseq, type Revtok, type Userid, Labelpath } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, ThingChecks } from '../shapes/shapes-thing'
+import { ThingkindChecks } from '../shapes/shapes-thingkinds'
 
 // == [Kinds]: KindRecords, RecordOfKind, Kinded, MembersOfKind, LiveOfKind, TombstoneOfKind, VoidSentinelOfKind, WholeOfKind
 
@@ -153,7 +154,7 @@ function isVoidSentinelOfKind(modelkind: Thingkind | null, val: unknown): boolea
 /** True when `record` is whole and of `modelkind`, or is its void sentinel */
 function isWholeOfKind(modelkind: Thingkind | null, record: Sparse<ThingRecord>): boolean {
   if (isVoidSentinelOfKind(modelkind, record)) { return true }
-  return isOfKind(modelkind, record.labelpath) && ThingChecks.ofLabelpath(record.labelpath).record.safeParse(record).success
+  return isOfKind(modelkind, record.labelpath) && ThingkindChecks.ofLabelpath(record.labelpath).record.safeParse(record).success
 }
 // --
 

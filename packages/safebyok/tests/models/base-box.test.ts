@@ -3,7 +3,7 @@ import { BaseBox } from '../../src/models/base-box'
 import * as Phrases from '../../src/phrases'
 import type { BoxCleartexts, LiveOf, RevisionOf } from '../../src/shapes/shapes-sealers'
 import type { BoxRecord } from '../../src/shapes/shapes-thing'
-import { BoxChecks } from '../../src/shapes/shapes-thing'
+import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
 

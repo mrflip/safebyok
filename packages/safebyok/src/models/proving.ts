@@ -5,6 +5,7 @@ import { Lease } from './lease'
 import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, StampedGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
+import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { Wayin, wayinCtxOf } from './wayin'
 import * as Throwers from '../refusals/throwers'
 
@@ -317,10 +318,10 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   return {
     wayinSource:          custom<Novel | Proving>((val) => (val === NOVEL) || (val instanceof Proving), Phrases.NovelOrProvingExpected),
     provingLeaseArgs:     obj({ bank: GateishChecks.leaseBank, gate: GateishChecks.gateRevisionedStamp }),
-    passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.StampChecks.bankStamp, gateStamp: Stamps.StampChecks.gateStamp, device: GateishChecks.provingDevice }),
-    passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: Stamps.StampChecks.bankStamp, gateStamp: Stamps.StampChecks.gateStamp, device: GateishChecks.provingDevice }),
-    passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: Stamps.StampChecks.stampedGate, device: GateishChecks.provingDevice }),
-    passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: Stamps.StampChecks.stampedGate }),
+    passphraseNovelArgs:  GX.passphraseNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
+    passkeyNovelArgs:     GX.passkeyNovelArgs.omit({ bank: true, gate: true }).extend({ bankStamp: BankChecks.stamp, gateStamp: GateChecks.stamp, device: GateishChecks.provingDevice }),
+    passphraseStoredArgs: GX.passphraseStoredArgs.extend({ gate: GateChecks.stampedGate, device: GateishChecks.provingDevice }),
+    passkeyStoredArgs:    GX.passkeyStoredArgs.extend({ gate: GateChecks.stampedGate }),
     strengthArgs:         GX.strengthArgs.extend({ scope: Stamps.StampChecks.bankScope, device: GateishChecks.provingDevice }),
   }
 })
