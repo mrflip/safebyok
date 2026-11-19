@@ -11,7 +11,7 @@ import { type Thingkind, PerKindChecks, policiesByModelkind } from './shapes-thi
 // module and read their checks where they are made.
 
 /** The checks of the bank's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its `stamp`, and `birthAsk`, the ask that writes a new bank's first Things.
+ * Also its `stamp`, and `birthAsk`, the ask that writes a new bank's first Things: it leaves its three records unchecked, for `BankChecks.record`, `GateChecks.record` and `BoxChecks.record`.
  */
 export const BankChecks = Object.freeze({
   record:       PerKindChecks.bankThing,
