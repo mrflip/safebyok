@@ -180,10 +180,15 @@ describe("bestCarOf", () => {
     })
   })
 
-  it("returns the car of a Thing at another scope, whatever its revision", () => {
-    const theirs = carOf(TH.boxThingOf('anthropic'))
-    expect(bestCarOf(carOf(Box1), theirs)).to.eq(theirs)
-  })
+  const OtherThings = [
+    [TH.boxThingOf('anthropic'), 'refuses the car of a Thing at another labelpath'],
+    [{ ...Box2, userid: 'u2' },  'refuses the car of a Thing in another bank'],
+  ] as const
+  for (const [theirs, blurb] of OtherThings) {
+    it(blurb, () => {
+      TH.expectSyncRefusal(() => bestCarOf(carOf(Box1), carOf(theirs)), 'unexpected_error')
+    })
+  }
 
   const BrokenCars = [
     [{ liveness: 'full',   newest: Box0,                fullest: { ...Box0 } },    'a full car of two records'],

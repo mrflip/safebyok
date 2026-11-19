@@ -145,6 +145,8 @@ export type RefusalMeta = {
   act?:          BadAct
   /** A bankDB's refusal: what it carries of its ask, a `LoggableAsk`: its address, policies and revisions, never a whole record. */
   ask?:          Readonly<Record<string, unknown>>
+  /** The labelpath of each Thing the refusal names, such as each child a list found stored damaged. A labelpath is a name, never secret. */
+  labelpaths?:   readonly string[]
 }
 
 /** The rows `err` hands a bankDB's answer, empty where it has none. */

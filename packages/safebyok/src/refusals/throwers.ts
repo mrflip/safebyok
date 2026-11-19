@@ -6,8 +6,8 @@ import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
 import type { EX } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
-import { type GetAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
-import type { GoodAnswer } from '../storage/vault-db'
+import { type GetAsk, type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
+import type { DamagedThing, GoodAnswer } from '../storage/vault-db'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
 
@@ -97,7 +97,7 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: minderNotStarted, staleRead
+// == [Minding Throwers]: minderNotStarted, staleRead, childrenStoredDamaged, carsOfOtherThings
 
 /** The refusal of a read or a write on a minder that is not minding. */
 export function minderNotStarted(): Errors.VaultError {
@@ -108,4 +108,12 @@ export function minderNotStarted(): Errors.VaultError {
 export function staleRead(ask: GetAsk): Errors.VaultError {
   return new Errors.VaultError('stale_read', Phrases.StaleRead, { meta: { ask: loggableAskOf(ask) } })
 }
+
+/** The bad news of `damaged_rows`, the children a list for `ask` found stored damaged and left out, each named by its labelpath. */
+export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly DamagedThing[]): Errors.VaultError {
+  return new Errors.VaultError('damaged_row', Phrases.ChildrenStoredDamaged, { meta: { ask: loggableAskOf(ask), labelpaths: damaged_rows.map(({ labelpath }) => labelpath) } })
+}
+
+/** An `unexpected_error` refusal: a minder's structural sharing was given the cars of two different Things. */
+export function carsOfOtherThings(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.CarsOfOtherThings) }
 // --

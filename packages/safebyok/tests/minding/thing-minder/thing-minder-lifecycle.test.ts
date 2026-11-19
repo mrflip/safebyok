@@ -6,7 +6,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { fakeBankOf, LateVaultDB, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
+import { badnewsOf, fakeBankOf, LateVaultDB, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
 
 describe("ThingMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
@@ -81,6 +81,16 @@ describe("ThingMinder.hello", () => {
     const watching = vi.spyOn(vaultDB, 'watch')
     minderWorldOf(vaultDB)
     expect(watching.mock.calls.map(([scope]) => scope)).to.deep.equal([TH.ThingBank])
+  })
+
+  it("tells the bank's tellBadNews of a notice of another bank, and caches it nowhere", async () => {
+    const vaultDB = await bornOf(new MemoryVaultDB())
+    const { minder, bank, receive } = minderWorldOf(vaultDB)
+    await minder.list('box')
+    receive(noticeOf({ ...TH.boxThingOf(), banklabel: 'other' }))
+    expect(badnewsOf(bank)).to.deep.equal(['unexpected_error'])
+    expect(minder.at(TH.BoxScope)).to.be.undefined
+    expect(minder.listingAt(TH.RootScope)).to.deep.equal([])
   })
 
   it("opens no second watch when called again", () => {

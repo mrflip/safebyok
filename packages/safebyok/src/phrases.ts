@@ -120,7 +120,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -161,4 +161,13 @@ export const CarNewestNotGone = "A gone ThingCar's newest record is the tombston
 
 /** A void car whose newest is not the void sentinel. */
 export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel, and this one's is not: this is a bug in safebyok."
+
+/** Two cars of different Things given to a minder's structural sharing. */
+export const CarsOfOtherThings = "A ThingMinder's structural sharing was given the cars of two different Things: this is a bug in safebyok."
+
+/** A record the vaultDB delivered to a minder of another bank, or of another Thing than the minder asked for. */
+export const DeliveredOfOtherScope = "The vaultDB delivered a ThingMinder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."
+
+/** Children a list found stored damaged, and left out of its answer. */
+export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
 // --
