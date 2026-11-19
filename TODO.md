@@ -11,6 +11,33 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   today. Let it say a sparse record is acceptable (`sparseOk`) apart from how old a record may be, and let invalidation
   and a refused get count as stale, as TanStack counts them; and decide whether `'static'` has any use for a car, whose
   newest the vaultDB can always replace (whiteboard/20261115-lean_buttonup, the staleTime table, 2026-11-18).
+* **Re-check the minder's cars after its watch lapses.** Nothing notices a lapse today: the watch contract has no
+  signal for a drop or a resume, the minder's queries have no observers for TanStack's focus and reconnect refetches,
+  and the host's entries never go stale. The minder fetches nothing itself. On TanStack's own `onlineManager` and
+  `focusManager` hints, it invalidates its listings, all or under a key prefix, and tells `listen`. The bridge
+  invalidates the givable listings, and React Query refetches the observed ones through the minder's list; a box that
+  list shows `behind` is invalidated as today, and fetched again where it is shown. A mounted box also observes its
+  parent's listing, so a box shown alone is re-checked too; the first mount of a box under a parent lists that parent
+  once. The root box and the main gate have no parent listing: the bank object gets them again as it wakes (the Coach,
+  2026-11-19; whiteboard/20261116-react_backwards).
+* **A query key whose subtree is one prefix.** Interleave the labelpath's segments with `'/'`, and end the key with
+  `'.'` for the Thing's own car or `'L'` for its listing: `[…, 'box', '/', 'engineering', '.']`, `[…, 'box', '/',
+  'engineering', 'L']`. No label can be `'.'`, `'/'` or `'L'`. Then `[…, 'engineering', '/']` matches every car and
+  listing under the Thing and neither of its own; a listing is beside its Thing's car, and nowhere else (the Coach,
+  2026-11-19).
+* **A listing of a Thing's children, by labelpath.** It has the labelpaths of the children the minder has heard of,
+  tombstones included, from every source: a list, a get, a write's answer, a notice. It never has sparse records,
+  which would be a second copy of each car's newest (the Coach, 2026-11-19). The vaultDB's list answer can be made
+  small: the parent's scope and life once, then for each child its label, revseq, revtok, lifeseq and `written_at`.
+  Re-listing after a lapse then costs one small request per listing, where re-getting would cost one per box.
+* **Drop a gone parent's subtree.** When a Thing is tombstoned, or a newer life of it is heard of (a lapse can hide the
+  tombstone between), the minder removes every query under its subtree prefix; TanStack tells listeners of each removal
+  at once. A get of a child under way is then cancelled, and `#doGet` reads any cancellation as `goodbye`, refusing
+  `disabled` while the minder is still minding: it needs a refusal of its own. The giver's `listenBoxCars` skips
+  removals today; the bridge would reset the host's entry for each, so that a hook still showing one fetches again
+  (the Coach, 2026-11-19).
+* **A pouch: display data in each box's sparse record, so every listing carries it** (internals.md F6, open matter 14).
+  It changes what "sparse" means: a sparse record would carry data where a row now shows null (the Coach, 2026-11-19).
 * **The vaultDB should not return sparse tombstones.** A list sends each tombstone, and a gone parent, sparse
   (`classifyListThings`' `Thing.sparseOf`), and its types and docs promise them (`vault-db.ts`); a get's tombstone is always
   whole. Send every tombstone whole, so that "sparse" means live and not whole, and the minder's `gotgone` answers a
@@ -42,7 +69,8 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   and keep no userid in the value, since the bank's stamp carries one. `@noble/hashes` keeps it synchronous, which the
   first read needs; WebCrypto's HMAC is async. It hides the list from a look through storage, not from a test of a
   guessed userid, since the salt is on the device; and it gives up a list of past users to pick from. An entry in
-  `notes/security.md` once built (`whiteboard/20261116-react_backwards/internals.md`, open matter 13).
+  `notes/security.md` once built (`whiteboard/20261116-react_backwards/internals.md`, open matter 13). Waits until the
+  timing of the packet's first reads is worked out (the Coach, 2026-11-19).
 * **Confirm a bankKey against the gate.** Nothing proves that the bankKey a kept lease or a wayin yields is this bank's:
   a lease records the gate revision it was granted under, and nothing compares it with the gate fetched; a wayin is
   checked only by unwrapping it. Give each gate row one part sealed under the bankKey, through the lease's `seal` with a
