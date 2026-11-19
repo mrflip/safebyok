@@ -150,6 +150,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Watch a bank's Things ({@link VaultDB.watch}).
    * Each change a store passes to `receive` goes out as a notice of the changed Thing, as {@link ThingNotice} is shaped today.
    * The world beside it is not notified: a bank or main gate that changed is notified as a Thing of its own.
+   * Where a store passes the adapter several at once, each goes out as a notice of its own.
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {

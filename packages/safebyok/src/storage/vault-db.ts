@@ -93,8 +93,7 @@ export interface VaultDB {
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
-   * - Each notice carries one Thing, as `ThingNotice` is shaped today. Where a store passes the adapter several at once, each
-   *   goes out as a notice of its own.
+   * - Each notice carries one Thing, as `ThingNotice` is shaped today.
    * - A notice tells of a Thing that changed: one written, a tracked Thing found changed, or a refusal's `dbhas`. The vaultDB
    *   does not echo back what a verb's caller already has: a good answer's `val` is not notified, and neither is a bank's
    *   `world` as such; a bank or main gate that changed is notified as a Thing of its own.
