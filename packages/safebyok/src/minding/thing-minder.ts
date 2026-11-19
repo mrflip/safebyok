@@ -161,7 +161,8 @@ export class ThingMinder {
   }
 
   /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included.
-   * Each joins the Thing's listing ({@link listingAt}), which keeps every labelpath it had. Each record is cached sparse.
+   * Each Thing it answers joins the listing of the Thing at `labelpath` ({@link listingAt}). A list never drops a labelpath
+   * from that listing. Each record is cached sparse.
    * Where that leaves a car `behind` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
    * answers from the cache.
    */
@@ -237,7 +238,8 @@ export class ThingMinder {
     void this.#doGet(scoped, opts).catch(noop)
   }
 
-  /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. Its Thing joins its parent's listing. */
+  // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
+  /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
     let fetched: ThingCar<ThingRecord>
     try {
@@ -278,7 +280,7 @@ export class ThingMinder {
   }
 
   // Every record that lands but a get's comes through here: TanStack lands a get's in the car itself.
-  /** Send `record`'s car to TanStack, to merge into its cached car, and add it to its parent's listing, while minding. */
+  /** Land `record` in its car and its parent's listing, while minding. */
   #sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
     this.#tsq.setQueryData(this.queryKey(record), carOf(record))
