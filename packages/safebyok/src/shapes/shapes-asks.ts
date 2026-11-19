@@ -1,5 +1,6 @@
 /** The asks a vaultDB is given: their checks, their builders, and the loggable part of each. */
 
+import { isUndefined, omitBy } from 'es-toolkit'
 import type * as Z from 'zod'
 import { CX, EX, SX, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
@@ -10,7 +11,7 @@ import {
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [Asks]: RawChecks, loggableAsk, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
+// == [Asks]: RawChecks, loggableAsk, soundOrAbsent, AskChecks, Track, GetAsk, ListAsk, WriteAsk, BirthBankAsk, BankRoots, ThingWatchScope, WorldRecord, checkedWriteAsk, checkedBirthBankAsk, birthPutsOf, checkWriteInvariants
 
 type Kinded   = { modelkind: Thingkind, labelpath: Labelpath }
 type Flagged  = Kinded & { op: string, ifAbsent: string, ifPresent: string, options?: { policies: readonly EX.StoragePolicy[] } | undefined }
@@ -58,28 +59,32 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
 })
 
 /** The part of an ask that is safe to log: its scope, its flags, and what each record cites, never a gate's wayins.
- * Each field is optional, so a refusal of a malformed ask still carries the sound part of it.
+ * Each field is optional, and reads as absent where it is unsound, so a refusal of a malformed ask still carries the sound part of it.
  */
 const loggableAsk = Validator.objStrip(({ obj, arr, oneof, user_id, label }) => {
   const citedFields = ThingChecks.thingCited.partial()
   const trackFields = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).partial()
+  const options     = obj({ policies: arr(oneof(EX.storagePolicyVals)) })
   return {
-    op:        oneof(['get', 'list', 'put', 'del', 'birth']).optional(),
-    modelkind: oneof(ThingChecks.thingkindVals).optional(),
-    userid:    user_id.optional(),
-    banklabel: label.optional(),
-    labelpath: ThingChecks.thingScope.shape.labelpath.optional(),
-    ifAbsent:  SX.anyIfAbsent.optional(),
-    ifPresent: SX.ifPresent.optional(),
-    options:   obj({ policies: arr(oneof(EX.storagePolicyVals)) }).optional(),
-    cited:     citedFields.optional(),
-    record:    citedFields.optional(),
-    bank:      citedFields.optional(),
-    gate:      citedFields.optional(),
-    root:      citedFields.optional(),
-    track:     obj({ bank: trackFields, [Labelpath.MainGate]: trackFields, [Labelpath.RootBox]: trackFields }).partial().optional(),
+    op:        soundOrAbsent(oneof(['get', 'list', 'put', 'del', 'birth'])),
+    modelkind: soundOrAbsent(oneof(ThingChecks.thingkindVals)),
+    userid:    soundOrAbsent(user_id),
+    banklabel: soundOrAbsent(label),
+    labelpath: soundOrAbsent(ThingChecks.thingScope.shape.labelpath),
+    ifAbsent:  soundOrAbsent(SX.anyIfAbsent),
+    ifPresent: soundOrAbsent(SX.ifPresent),
+    options:   soundOrAbsent(options),
+    cited:     soundOrAbsent(citedFields),
+    record:    soundOrAbsent(citedFields),
+    bank:      soundOrAbsent(citedFields),
+    gate:      soundOrAbsent(citedFields),
+    root:      soundOrAbsent(citedFields),
+    track:     soundOrAbsent(obj({ bank: trackFields, [Labelpath.MainGate]: trackFields, [Labelpath.RootBox]: trackFields }).partial()),
   }
 }, 'bad_record')
+
+/** `schema` as a field of a loggable ask: optional, and undefined where its value fails. */
+function soundOrAbsent<SchemaT extends Z.ZodType>(schema: SchemaT): Z.ZodCatch<Z.ZodOptional<SchemaT>> { return schema.optional().catch(undefined) }
 
 /** The checks of a vaultDB ask, its records aside, of a watch's scope and handlers, and of the part of an ask that is safe to log.
  * A write or birth ask's records are checked by {@link checkedWriteAsk} and {@link checkedBirthBankAsk}.
@@ -250,9 +255,9 @@ function modelkindGiven(labelpath: unknown): Thingkind | undefined { return (typ
 /** The part of a vaultDB ask that is safe to log. */
 export type LoggableAsk = Readonly<Z.infer<typeof AskChecks.loggableAsk>>
 
-/** The loggable part of `ask`, or `{}` for an ask that does not parse. */
+/** The loggable part of `ask`: each of its fields that is sound, or `{}` for an ask that is not an object. */
 export function loggableAskOf(ask: unknown): LoggableAsk {
   const loggableReport = AskChecks.loggableAsk.safeParse(ask)
-  return loggableReport.success ? loggableReport.data : {}
+  return loggableReport.success ? omitBy(loggableReport.data, isUndefined) : {}
 }
 // --

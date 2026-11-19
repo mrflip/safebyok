@@ -468,9 +468,16 @@ describe("loggableAskOf(ask)", () => {
     expect(JSON.stringify(loggable)).to.not.include(TH.FakeSealed.codectag)
   })
 
-  it("gives nothing for an ask that will not parse", () => {
+  it("gives nothing for an ask that is not an object, or has no sound field", () => {
     expect(loggableAskOf(null)).to.deep.equal({})
     expect(loggableAskOf({ userid: 42 })).to.deep.equal({})
+  })
+
+  it("drops an unsound field alone, keeping the rest", () => {
+    const loggable = loggableAskOf({ ...TH.birthAskOf(), userid: 42, cited: { revseq: 'zero' } })
+    expect(loggable).to.not.have.any.keys('userid', 'cited')
+    expect(loggable).to.deep.include({ op: 'put', modelkind: 'gate', banklabel: TH.GateScope.banklabel, labelpath: TH.GateScope.labelpath })
+    expect(loggable.record).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })
   })
 })
 
