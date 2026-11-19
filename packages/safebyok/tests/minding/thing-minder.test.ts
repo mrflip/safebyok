@@ -820,6 +820,15 @@ describe("ThingMinder.listen", () => {
     expect(heard.mock.calls[0]?.[0]).to.have.property('car', cached)
   })
 
+  it("tells no car for a first get that is refused, as for a removed one", async () => {
+    const vaultDB = await bornOf(new DownVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    const heard = listenerOf()
+    minder.listen(heard)
+    await TH.expectRefusal(minder.get(TH.GateScope), 'storage_unavailable')
+    expect(toldOf(heard)).to.deep.equal([['gate', undefined]])
+  })
+
   it("tells no car for each car goodbye removes", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)

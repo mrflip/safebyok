@@ -173,14 +173,14 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 /** What a minder's `listen` tells, told apart by `carkind`: a car changed, a listing changed, or a listing went stale. */
 export type MinderEvent = ThingEvent | ListingEvent | InvalidationEvent
 
-/** A car changed: the car as now cached, or undefined once it is removed. Its `modelkind` types its car. */
+/** A car changed: the car as now cached, or undefined where none is cached (it is removed, or its first get was refused). Its `modelkind` types its car. */
 export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind ? Readonly<{
   carkind:   'thing'
   /** The modelkind of the Thing, which its labelpath starts with. */
   modelkind: KindT
   /** Where the Thing is stored in its bank. */
   labelpath: Labelpath
-  /** The car itself, as cached, so that it is the same object until it changes, or undefined once removed. */
+  /** The car itself, as cached, so that it is the same object until it changes, or undefined where none is cached. */
   car:       ThingCar<RecordOfKind<KindT>> | undefined
 }> : never
 
