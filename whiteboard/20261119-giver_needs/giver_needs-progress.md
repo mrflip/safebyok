@@ -45,7 +45,10 @@ writes it.
   - `{ carkind: 'thing', modelkind, labelpath, car }`: `car` is the cached car itself, identity kept; undefined when
     the car is removed. `listen` no longer carries `act`, `isTimely`, `lastErr` (`tryAt` still does).
   - `{ carkind: 'listing', modelkind, labelpaths, tag: 'kids', of: { parentpath } }`: "Chosen to not restrict listings
-    to always be child listings." *Orchestrator:* read as `of: { parentpath: <the parent's labelpath> }`.
+    to always be child listings." `of` is an object, `{ parentpath: <the parent's labelpath> }` (the Coach
+    confirmed). Their bluesky, direction only: `{ carkind: 'listing', tag: 'livekids_ci', of: { parentpath:
+    'box/anthropic', tombstones: false, sidecar: { stage: { eq: 'ci' } } } }`: `tag` names the listing, `of` says what
+    it selects. Only `tag: 'kids'` and `of: { parentpath }` are built.
   - `{ carkind: 'invalidation', modelkind, labelpath, card: 'list', tags: 'all' }`: "card being (not yet, but later)
     'list', 'self', 'kids' (#, !, /); tags hold the string 'all' or later a list of labels." Only `card: 'list'` and
     `tags: 'all'` exist now.
