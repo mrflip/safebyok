@@ -119,3 +119,7 @@ writes it.
   first-list race: "seed the root box listing as bare wherever it is that the root box is seeded. have hello fetch the
   listing if that's not a can of worms" (thread 6). `tracked` landing: explained (the vaultDB's write acts on one
   subject and hands `world` and `tracked` back; `tryWrite` delivers them); back with the Coach.
+* **`tryWrite` lands only its record** (the Coach, 2026-11-19): "it's supposed to not happen in the verb but rather in
+  vaultDB -- sending them out as watch notices. the minder just pays attention to the record." The minder's `tryWrite`
+  lands `val` or a refusal's `dbhas`, never `world` or `tracked` (reverses thread 4's addition and M3's world line);
+  done in thread 6, which also reports whether the vaultDB's watch sends those out.

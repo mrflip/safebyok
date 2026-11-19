@@ -5,7 +5,7 @@
 * **Mode:** normal.
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
-* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1650), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
+* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1653), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
 * **Status:** threads 1–5 filed (#753, #756, #757, #758, #759, drafts); thread 6 building. The restack onto main waits on #751 (still an open draft on GitHub).
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
@@ -209,7 +209,8 @@ and VOCABULARY.md. "Bare" is the car's word for "known incomplete; the vaultDB h
 every child that lands, and reads as incomplete until a `list` sets it. The worker designs how a listing says so with
 TanStack's grain (its invalid mark is one candidate) and reports. `hello` fetching the root listing is new: until now
 the minder fetched nothing itself; the worker judges whether it is "a can of worms" (`hello` is synchronous; a refused
-list) and reports either way. **Depends on:** thread 5. **Size:** small to medium. **Levels:** defaults.
+list) and reports either way. **Depends on:** thread 5. **Size:** small to medium. **Levels:** defaults. *Orchestrator:* also carries the
+Coach's ruling that `tryWrite` lands only its record, never `world` or `tracked` (a directive, mid-build).
 
 ## For the Coach
 
