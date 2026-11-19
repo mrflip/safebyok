@@ -1,4 +1,4 @@
-import { Crypto, EX, Errors, GX, Helpers, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { Consts, Crypto, EX, Errors, GX, Helpers, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Device } from './device'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
@@ -224,7 +224,7 @@ function spendCleartexts(cleartexts: unknown): void {
 const Checks = Validator.Checkers('bad_record', ({ obj, fn, custom, oneof }) => ({
   gatingMakeArgs: obj({
     record: obj({ gatingkind: oneof(gatingkindVals) }),
-    opts:   obj({ device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected), bank: custom<Bank | null>(), attempt: fn<GatingAttempt>(), askUser: fn<AskUser>().nullable() }),
+    opts:   obj({ device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected), bank: custom<Bank | null>(), attempt: fn<GatingAttempt>(), askUser: custom<AskUser>(Consts.isGuarded, BigPhrases.GuardedExpected).nullable() }),
   }),
 }))
 // --
