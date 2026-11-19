@@ -24,12 +24,12 @@ import { bestCarOf, carOf, dbHasNewer } from './thing-car'
 import * as Throwers from '../refusals/throwers'
 
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
- * the children of each Thing listed.
+ * the children of the root box and of each Thing listed.
  * Four sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
  * Thing's shell where nothing is stored), the watch's notice of each write, a list's sparse record, and the record a
  * write's answer carries. Each lands in the Thing's car through one merge, and adds the Thing to its parent's listing,
  * where one is cached. A list sets the parent's listing. It caches only from `hello` until `goodbye`, and `goodbye`
- * empties its cache.
+ * empties its cache. `hello` caches the root box's listing, empty and bare: bare until a list sets it.
  *
  * ## Invariants
  * - For a caller or listener using the library as documented, what it shows depends only on which records the minder
@@ -42,10 +42,16 @@ import * as Throwers from '../refusals/throwers'
  * - A get answered with a revision older than the car it began with changes nothing in the cache, and refuses `stale_read`.
  * - A listing never drops a labelpath: a list adds what it answers, and each record that lands adds its own. So once a
  *   listing is cached, what it lists depends only on which records arrived, never on their order.
+ * - The root box's listing is cached from `hello` until `goodbye`, whatever the host's gcTime. So each box that lands
+ *   joins it, before its first list or after: what it lists depends only on which records arrived since `hello`, never
+ *   on whether they came before the answer of its first list.
+ * - A listing is bare from `hello` until a list sets it, even a list that answers nothing. A record joining it, or an
+ *   `invalidate`, leaves it bare. Only the root box's listing is ever bare.
  * - A listing is the same array until a labelpath joins it.
  * - A listing lists only Things the vaultDB has stored, tombstones included, never a shell. It lists by labelpath alone:
  *   when the parent's life changes, it keeps the earlier life's children beside the new life's.
- * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it.
+ * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it. The root
+ *   box always has one cached.
  * - Nothing of a write's ask is cached: the minder hears of a write only from its answer, or from the watch's notice.
  * - While the minder is minding, a write's own record has landed before the write resolves: the record written, or the
  *   refusal's `dbhas`. So a listener has heard of its car first. The other records the answer carries, its `world` and
@@ -95,18 +101,23 @@ export class ThingMinder {
       queryFn:           ({ queryKey }) => this.#fetchCar(this.#askAt(this.#scopeOfQueryKey(queryKey))),
       structuralSharing: bestCarOf,
     } } })
-    // The root box's car stays, whatever the host's gcTime: its own query key's defaults reach no box under it.
+    // The root box's car and listing stay, whatever the host's gcTime: their keys' defaults reach no box under it. The
+    // listing's are set on '#', its mark without its tag, so that the defaults each list sets at its whole key keep them.
     tsq.setQueryDefaults(this.queryKey(this.#rootBoxScope), { gcTime: Infinity })
+    tsq.setQueryDefaults([...this.#keyHeadOf(this.#rootBoxScope), '#'], { gcTime: Infinity })
     return tsq
   }
   // --
 
   // == [Starting and ending]: hello, goodbye
 
-  /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB tells of. A second call does nothing. */
+  /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB tells of. A second call does nothing.
+   * It caches the root box's listing empty and bare: each box heard of joins it, and it is bare until a list sets it.
+   */
   hello(): void {
     if (this.#isReady) { return }
     this.#isReady = true
+    this.#seedListing(this.#rootBoxScope)
     this.#unwatch = this.#vaultDB.watch(
       this.scope,
       (notice: ThingNotice) => { this.#sendToTSQ(notice.val) },
@@ -123,16 +134,23 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, tryAt, get, list, isStaleAt, listen
+  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, list, isStaleAt, listen
 
   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
     return this.#cachedAt(this.#demandOwnScope(scoped)) as CarAt<LabelpathT> | undefined
   }
 
-  /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB. */
+  /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
+   * A bare listing lists only the children heard of since `hello` ({@link isListingBareAt}).
+   */
   listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
     return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(scoped)))
+  }
+
+  /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
+  isListingBareAt(scoped: ThingScope): boolean {
+    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(scoped)))?.dataUpdatedAt === BareListedAt
   }
 
   /** The cache's answer for `scoped`, without waiting on the vaultDB.
@@ -190,7 +208,7 @@ export class ThingMinder {
   /** Call `listener` with each change the cache tells of, as a {@link MinderEvent}. Returns the function that stops it.
    * It tells a `thing` event each time a record arrives in a car (even one that changes nothing), a get of it is refused,
    * or it is removed; a `listing` event each time a list sets a listing (even to the labelpaths it had), a labelpath
-   * joins it, or it is removed; and an `invalidation` event each time `invalidate` marks a listing stale.
+   * joins it, `hello` caches the root box's, or it is removed; and an `invalidation` event each time `invalidate` marks a listing stale.
    * Nothing is called when a car ages past `staleTime`, and listening caches no car.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
@@ -247,7 +265,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #sendListingToTSQ, #joinParentListing
+  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #seedListing, #sendListingToTSQ, #setListingDefaults, #joinParentListing
 
   // Its refusal is cached beside the car, where the next tryAt finds it as `lastErr`.
   /** Fetch `scoped`'s car in the background, if it is stale. */
@@ -304,26 +322,38 @@ export class ThingMinder {
     this.#joinParentListing(record)
   }
 
-  // TanStack matches query defaults by key prefix, and no prefix starts every listing's key and no car's, so each listing's
-  // key gets defaults of its own: without them a listing would take the cars', and be fetched and merged as a car.
-  // Under skipToken, TanStack never fetches the listing, and invalidating it only marks it stale.
+  // Its time is TanStack's for a query never fetched, so the listing reads as bare until a list sets it.
+  /** Cache `scoped`'s listing empty and bare. */
+  #seedListing(scoped: ThingScope): void {
+    this.#tsq.setQueryData<readonly Labelpath[]>(this.#setListingDefaults(scoped), [], { updatedAt: BareListedAt })
+  }
+
   /** Set `scoped`'s listing to the labelpaths it had and `labelpaths`, while minding. */
   #sendListingToTSQ(scoped: ThingScope, labelpaths: readonly Labelpath[]): void {
     if (! this.#isReady) { return }
-    const listingKey = this.listingQueryKey(scoped)
-    this.#tsq.setQueryDefaults(listingKey, { queryFn: TSQ.skipToken, structuralSharing: stableListingOf, staleTime: this.#queryCacheOpts.staleTime })
-    this.#tsq.setQueryData<readonly Labelpath[]>(listingKey, (prior) => listingOf(prior ?? [], labelpaths))
+    this.#tsq.setQueryData<readonly Labelpath[]>(this.#setListingDefaults(scoped), (prior) => listingOf(prior ?? [], labelpaths))
   }
 
-  // Each record that lands joins its parent's listing here, whatever its source. An updater that answers undefined leaves
-  // the cache as it was. A shell is stored nowhere, so it is no one's child; and a root's parent, '', is never listed.
+  // TanStack matches query defaults by key prefix, and no prefix starts every listing's key and no car's, so each listing's
+  // key gets defaults of its own: without them a listing would take the cars', and be fetched and merged as a car.
+  // Under skipToken, TanStack never fetches the listing, and invalidating it only marks it stale.
+  /** Set the query defaults of `scoped`'s listing, and answer its query key. */
+  #setListingDefaults(scoped: ThingScope): TSQ.QueryKey {
+    const listingKey = this.listingQueryKey(scoped)
+    this.#tsq.setQueryDefaults(listingKey, { queryFn: TSQ.skipToken, structuralSharing: stableListingOf, staleTime: this.#queryCacheOpts.staleTime })
+    return listingKey
+  }
+
+  // Each record that lands joins its parent's listing here, whatever its source. A shell is stored nowhere, so it is no
+  // one's child; and a root's parent, '', is never listed. A join is not a list, so the listing keeps the time a list
+  // last set it, as TanStack keeps data derived from another query at that query's time: a bare listing stays bare.
   /** Add `record`'s labelpath to its parent's listing, where one is cached that lacks it. */
   #joinParentListing(record: DeliverableThing): void {
     if (Thing.isVoidSentinel(record)) { return }
     const parentKey = this.listingQueryKey({ ...record, labelpath: Labelpath.parentOf(record.labelpath) })
-    this.#tsq.setQueryData<readonly Labelpath[]>(parentKey, (prior) => (
-      ((prior === undefined) || prior.includes(record.labelpath)) ? undefined : listingOf(prior, [record.labelpath])
-    ))
+    const listing   = this.#tsq.getQueryState<readonly Labelpath[]>(parentKey)
+    if ((listing?.data === undefined) || listing.data.includes(record.labelpath)) { return }
+    this.#tsq.setQueryData<readonly Labelpath[]>(parentKey, listingOf(listing.data, [record.labelpath]), { updatedAt: listing.dataUpdatedAt })
   }
   // --
 
@@ -442,7 +472,10 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+// == [Helpers]: BareListedAt, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+
+/** The time a bare listing was last listed: TanStack's `dataUpdatedAt` for a query no fetch has set. */
+const BareListedAt = 0
 
 // A record arrives (success), a get is refused (which leaves the car untimely), the car is removed, or a listing is
 // invalidated. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.

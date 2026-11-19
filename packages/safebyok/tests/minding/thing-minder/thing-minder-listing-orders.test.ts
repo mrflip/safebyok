@@ -19,16 +19,17 @@ const OrdersWithoutWrite: readonly (readonly ListingStep[])[] = [
 const ListingOrders = OrdersWithoutWrite.flatMap((steps) => [0, 1, 2, 3].map((ii) => steps.toSpliced(ii, 0, 'write')))
 
 /** The root box's listing after `steps`, in order, over a store holding the boxes openai, anthropic and mistral.
- * The get is of anthropic, the notice of mistral, and the write births cohere. Listed before, the root box's listing
- * has openai alone before the steps, and the list step answers what the store held then: only the get, the write and
- * the notice tell of the other three. Its watch tells nothing: the notice step hands the minder its one notice.
+ * The get is of anthropic, the notice of mistral, and the write births cohere. Under `isListStale`, the list step answers
+ * what the store held before the steps, openai alone: only the get, the write and the notice tell of the other three.
+ * Listed before, the root box's listing has openai alone before the steps. Its watch tells nothing: the notice step
+ * hands the minder its one notice.
  */
-async function listingAfter(steps: readonly ListingStep[], { isListedBefore }: Readonly<{ isListedBefore: boolean }>) {
+async function listingAfter(steps: readonly ListingStep[], { isListedBefore, isListStale }: Readonly<{ isListedBefore: boolean, isListStale: boolean }>) {
   const vaultDB = new QuietVaultDB()
   await storedBoxOf(vaultDB)
   const { minder, bank, receive } = minderWorldOf(vaultDB)
-  if (isListedBefore) {
-    await minder.list('box')
+  if (isListedBefore) { await minder.list('box') }
+  if (isListStale) {
     const answered = await vaultDB.tryListThings(bank.makeListAsk({ labelpath: 'box', ifAbsent: 'nil' }))
     vi.spyOn(vaultDB, 'tryListThings').mockResolvedValueOnce(answered)
   }
@@ -49,7 +50,7 @@ describe("a ThingMinder's listing is the same, in any order", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')
       it(blurb, async () => {
-        expect(await listingAfter(steps, { isListedBefore: false })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
+        expect(await listingAfter(steps, { isListedBefore: false, isListStale: false })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
       })
     }
   })
@@ -58,7 +59,16 @@ describe("a ThingMinder's listing is the same, in any order", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')
       it(blurb, async () => {
-        expect(await listingAfter(steps, { isListedBefore: true })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
+        expect(await listingAfter(steps, { isListedBefore: true, isListStale: true })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
+      })
+    }
+  })
+
+  describe("of a first list answered before the get's, the write's and the notice's boxes were born, a get, a write and a notice", () => {
+    for (const steps of ListingOrders) {
+      const blurb = steps.join(', ')
+      it(blurb, async () => {
+        expect(await listingAfter(steps, { isListedBefore: false, isListStale: true })).to.deep.equal(['box/anthropic', 'box/cohere', 'box/mistral', 'box/openai'])
       })
     }
   })

@@ -18,8 +18,8 @@ export interface QueryCacheOpts {
   /** How long a car stays timely, in milliseconds up to {@link MaxTimerMillis}, or `Infinity` for one that never ages. A `behind` or `bare` car is never timely. */
   staleTime: number
   /** How long a car stays in the cache after it was first cached or last fetched from the vaultDB, in milliseconds up to {@link MaxTimerMillis}. `Infinity` means until `goodbye`.
-   * A record that arrives by a notice or a list does not extend it, and nor does a get answered from the cache. The root box's car stays until `goodbye`, whatever the gcTime.
-   * A listing stays as long after it was first listed, the root box's too: a later list does not extend it, and restores it once collected.
+   * A record that arrives by a notice or a list does not extend it, and nor does a get answered from the cache. The root box's car and listing stay until `goodbye`, whatever the gcTime.
+   * Any other listing stays as long after it was first listed: a later list does not extend it, and restores it once collected.
    */
   gcTime:    number
 }
