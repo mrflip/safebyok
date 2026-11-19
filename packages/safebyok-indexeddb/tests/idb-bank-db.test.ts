@@ -172,6 +172,43 @@ describe("IdbBankDB's databases", () => {
   })
 })
 
+describe("IdbBankDB's tidyGone over damaged rows", () => {
+  const { BW } = TH
+  const endedScope = BW.vaultScopeOf('ended')
+  const ended = BW.vaultAt(0, 'bank0', 'life1', { vaultlabel: 'ended' })
+
+  /** A bankDB with a live vault and box, and a vault of an ended bank life with a box under it. */
+  async function plantedBankDB(): Promise<IdbBankDB> {
+    const bankDB = makeBankDB()
+    await bankDB.buildBank(BW.bankBuildAskOf())
+    await bankDB.putVault(BW.vaultPutAskOf(BW.vaultAt()))
+    await bankDB.putBox(BW.boxPutAskOf(BW.boxAt()))
+    await idbRowsOf(bankDB).plantVaultRow(endedScope, ended)
+    await idbRowsOf(bankDB).plantBoxRow({ ...endedScope, boxlabel: 'openai' }, 'bank0', 'life1', BW.boxAt(0, 'bank0', 'life1', { vaultlabel: 'ended' }))
+    return bankDB
+  }
+
+  it("refuses damaged_row, and deletes nothing, where the bank row fails its checks", async () => {
+    const bankDB = await plantedBankDB()
+    const rows = idbRowsOf(bankDB)
+    await rows.plantBankRow(TH.bankScope, { ...BW.bankAt(), smuggled: 'field' })
+    await TH.expectRefusal(bankDB.tidyGone(TH.boxTidyAsk), 'damaged_row')
+    expect(await rows.vaultRowOf(endedScope)).to.deep.equal(ended)
+    expect(await rows.boxRowsOf(endedScope, 'bank0', 'life1')).to.have.property('size', 1)
+    expect(await rows.boxRowsOf(BW.vaultScope, 'bank1', 'life1')).to.have.property('size', 1)
+  })
+
+  it("keeps a vault row that fails its checks, with its box rows, and counts them", async () => {
+    const bankDB = await plantedBankDB()
+    const rows = idbRowsOf(bankDB)
+    const damaged = { ...ended, smuggled: 'field' }
+    await rows.plantVaultRow(endedScope, damaged)
+    expect(await bankDB.tidyGone(TH.boxTidyAsk)).to.deep.include({ val: { totalCount: 2, leftover: 'none' } })
+    expect(await rows.vaultRowOf(endedScope)).to.deep.equal(damaged)
+    expect(await rows.boxRowsOf(endedScope, 'bank0', 'life1')).to.have.property('size', 1)
+  })
+})
+
 describe("IdbBankDB's watch", () => {
   it("rings on `safebyok-<dbName>:bank`, or `safebyok:bank` with no dbName", async () => {
     const bankDB = makeBankDB()
