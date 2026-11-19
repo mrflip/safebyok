@@ -1,6 +1,6 @@
 # Thread 4: exports (2026-11-19)
 
-Branch `20261119-exports` (the handoff named it `20261118-exports`; `scripts/cut-thread` cut it on the 19th), PR #TBD, stacked on #747. Proved: see the PR's **Tests:** line.
+Branch `20261119-exports` (the handoff named it `20261118-exports`; `scripts/cut-thread` cut it on the 19th), PR #748, stacked on #747. Proved: see the PR's **Tests:** line.
 
 * **Built**:
   - `src/index.ts`, the front door: `export * from './core'` and `export * from './storage'`, then the minder (`ThingMinder`, `carOf`, `dbHasNewer`, shapes-minder), `DefaultStrengthChecker`, `guardStrengthChecker`, and from big `correctablekindVals`, `Modelkind`, the time, salt and label constants, `Patterns`, `UserID`, and `safebyok-big/utils`' `toB64`, `fromB64`, `mask`, `mash`, `WhisperFieldAttributes`. The six-name prohibition is gone.
