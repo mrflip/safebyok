@@ -1,6 +1,6 @@
 # Thread 4: exports (2026-11-19)
 
-Branch `20261119-exports` (the handoff named it `20261118-exports`; `scripts/cut-thread` cut it on the 19th), PR #748, stacked on #747. Proved: see the PR's **Tests:** line.
+Branch `20261119-exports` (the handoff named it `20261118-exports`; `scripts/cut-thread` cut it on the 19th), PR #748, stacked on #747. Proved: `pnpm justify` green at dc9b88061 (safebyok 1056, safebyok-big 2941, safebyok-react 287, postgres 331, convex 329, indexeddb 213, fastkey 43, graphql 445, demo 99, e2e 576, scripts 287; attw and publint clean).
 
 * **Built**:
   - `src/index.ts`, the front door: `export * from './core'` and `export * from './storage'`, then the minder (`ThingMinder`, `carOf`, `dbHasNewer`, shapes-minder), `DefaultStrengthChecker`, `guardStrengthChecker`, and from big `correctablekindVals`, `Modelkind`, the time, salt and label constants, `Patterns`, `UserID`, and `safebyok-big/utils`' `toB64`, `fromB64`, `mask`, `mash`, `WhisperFieldAttributes`. The six-name prohibition is gone.
