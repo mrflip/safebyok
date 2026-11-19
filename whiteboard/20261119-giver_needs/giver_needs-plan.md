@@ -212,6 +212,24 @@ the minder fetched nothing itself; the worker judges whether it is "a can of wor
 list) and reports either way. **Depends on:** thread 5. **Size:** small to medium. **Levels:** defaults. *Orchestrator:* also carries the
 Coach's ruling that `tryWrite` lands only its record, never `world` or `tracked` (a directive, mid-build).
 
+### 7. notice_split: a notice carries one Thing; the wrapper splits what the adapter sends
+
+> this would be best to also apply to notify, which might need alterations. we want the adapter sending along the shape
+> it does now, and then the vaultdbAdapter wrapper making them into individual answers.
+
+(the Coach, 2026-11-19, after ruling that the minder's `tryWrite` lands only its record: "it's supposed to not happen
+in the verb but rather in vaultDB -- sending them out as watch notices. the minder just pays attention to the
+record.")
+
+*Gloss.* The adapter keeps sending `Received = { record, world }`; `AdapterVaultDB`'s `watch` makes it into individual
+`ThingNotice`s, one for the record and one each for the bank and main gate in `world`, and `ThingNotice` drops
+`world`. `notifyTrackedRecords` already sends each non-`'same'` tracked Thing as its own notice; it keeps doing so,
+one Thing per notice. Touches `storage/vault-db.ts` (`ThingNotice`, `watch`'s doc), `storage/adapter-vault-db.ts`
+(`watch`, `notifyTrackedRecords`), `MemoryVaultDB` (inherits), the minder's watch callback, their tests. The worker
+reports the cost (every box notice brings a bank and a main-gate notice; the merge makes them no-ops, but each tells
+a listener an event) and whether a verb answer's `world` should go out as notices too, rather than deciding either.
+**Depends on:** thread 6. **Size:** small to medium. **Levels:** defaults.
+
 ## For the Coach
 
 The questions are rows in *Open Matters* of the sprint doc. Thread 1 needs none of them; threads 2–5 wait on the rows
