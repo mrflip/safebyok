@@ -8,7 +8,7 @@ import { carOf } from '../../src/minding/thing-car'
 import { ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../src/shapes/primitives'
-import { type GateThing, type Thing, VoidLifeseq, boxSealable, isVoidSentinel, shellOf, sparseOf } from '../../src/shapes/shapes-thing'
+import { type GateThing, type Thing, BoxChecks, Shell, isVoidSentinel, sparseOf } from '../../src/shapes/shapes-thing'
 import { type GetAsk, getAskOf, listAskOf } from '../../src/shapes/shapes-asks'
 import type { GetThingAnswer, ThingNotice } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -102,7 +102,7 @@ async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<Gat
 async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['val']> {
   await bornOf(vaultDB)
   const box   = TH.boxThingOf()
-  const shell = shellOf(TH.BoxScope, TH.rootBoxOf())
+  const shell = Shell.of(TH.BoxScope, TH.rootBoxOf())
   await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(box, shell)))
   return box
 }
@@ -220,7 +220,7 @@ describe("ThingMinder.hello", () => {
     await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     receive(noticeOf(TH.rootBoxOf()))
-    const shell = shellOf(TH.BoxScope, TH.rootBoxOf())
+    const shell = Shell.of(TH.BoxScope, TH.rootBoxOf())
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(shell))
   })
 
@@ -517,9 +517,9 @@ describe("ThingMinder.get", () => {
     const { minder } = minderWorldOf(vaultDB)
     const { liveness, newest: shell } = await minder.get(TH.BoxScope)
     expect(liveness).to.eq('void')
-    expect(shell).to.deep.equal(shellOf(TH.BoxScope, TH.rootBoxOf()))
-    expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/${VoidLifeseq}` })
-    expect(boxSealable.safeParse(shell).success).to.be.true
+    expect(shell).to.deep.equal(Shell.of(TH.BoxScope, TH.rootBoxOf()))
+    expect(shell).to.deep.include({ ...TH.BoxScope, label: 'openai', revseq: -1, am: 'x', lifepath: `${TH.Life0}/${Shell.VoidLifeseq}` })
+    expect(BoxChecks.sealable.safeParse(shell).success).to.be.true
     const birth = TH.birthAskOf(TH.boxThingOf(), shell)
     await TH.expectGood(vaultDB.tryWriteThing(birth))
   })
@@ -529,7 +529,7 @@ describe("ThingMinder.get", () => {
     const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
     const { liveness, newest } = await minder.get(TH.BoxScope)
     expect(liveness).to.eq('void')
-    expect(newest).to.deep.equal(shellOf(TH.BoxScope, TH.rootBoxOf()))
+    expect(newest).to.deep.equal(Shell.of(TH.BoxScope, TH.rootBoxOf()))
   })
 
   it("asks the vaultDB once for two gets under way together", async () => {
@@ -582,7 +582,7 @@ describe("ThingMinder.get", () => {
     const getting = minder.get(TH.BoxScope)
     await TH.eventually(() => vaultDB.isHolding)
     const box   = TH.boxThingOf()
-    const shell = shellOf(TH.BoxScope, TH.rootBoxOf())
+    const shell = Shell.of(TH.BoxScope, TH.rootBoxOf())
     await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf(box, shell)))
     await TH.eventually(() => minder.at(TH.BoxScope)?.newest.revtok === box.revtok)
     vaultDB.release()
@@ -701,7 +701,7 @@ describe("ThingMinder.list", () => {
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
     await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(box0, box1)))
-    const otherShell = shellOf({ ...TH.ThingBank, labelpath: 'box/anthropic' }, TH.rootBoxOf())
+    const otherShell = Shell.of({ ...TH.ThingBank, labelpath: 'box/anthropic' }, TH.rootBoxOf())
     const otherBirth = TH.birthAskOf(TH.boxThingOf('anthropic'), otherShell)
     await TH.expectGood(vaultDB.tryWriteThing(otherBirth))
     const { minder, receive } = minderWorldOf(vaultDB)

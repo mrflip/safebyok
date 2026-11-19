@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { bestCarOf, carOf, dbHasNewer, isThingCar } from '../../src/minding/thing-car'
 import type { ThingCar } from '../../src/shapes/shapes-minder'
-import { type BoxThing, type Thing, shellOf, sparseOf } from '../../src/shapes/shapes-thing'
+import { type BoxThing, type Thing, Shell, sparseOf } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 const Box0      = TH.boxThingOf()
@@ -9,7 +9,7 @@ const Box1      = TH.nextOf(Box0)
 const Box2      = TH.nextOf(Box1)
 const BoxGone   = TH.boxTombOf(Box2)
 const BoxReborn = TH.boxRebornOf(BoxGone)
-const BoxShell  = shellOf(TH.BoxScope, TH.rootBoxOf())
+const BoxShell  = Shell.of(TH.BoxScope, TH.rootBoxOf())
 
 /** The car `behind`, of the sparse `newest` and the older whole `fullest`, as a merge leaves it. */
 function behindOf(newest: Thing, fullest: Thing): ThingCar<Thing> {

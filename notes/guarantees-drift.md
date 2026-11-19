@@ -16,3 +16,11 @@ what differs from big, in a sentence or two.
   notifies by itself.
 
 ## Drifted
+
+* 2026-11-18 (namespaces, PR #740; found by an export survey, the method itself predates it), G9: **A public Bank
+  method accepts a proving.** `Bank.unlockByProving(proved, cited?)` is public
+  (`packages/safebyok/src/models/bank.ts`), and so is `Proving.buildLease` (`src/models/proving.ts`), where big has no
+  public `Device`, `Bank` or `Gate` method that accepts one. A host still cannot hold a proving: they are built only
+  inside a gating's attempt (`src/models/gating.ts`) and handed straight to `Bank.birth` or `unlockByProving`, and the
+  Proving classes are exported from no entry point but as types (`safebyok/core`). G9 now rests on that export, not on
+  the method's visibility.

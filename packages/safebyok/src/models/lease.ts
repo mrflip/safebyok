@@ -1,14 +1,14 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
 import type { Consts, EX } from 'safebyok-big/internals'
-import { Crypto, Helpers, Throwers, Validator } from 'safebyok-big/internals'
+import { Crypto, Helpers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import { tombstoneSecretsGiven } from '../refusals/throwers'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
 import type { ThingRecord } from '../shapes/shapes-thing'
-import { type LeaseBank, type LeaseOpts, type SecretFieldname, leaseBank } from '../shapes/shapes-gateish'
+import { type LeaseBank, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
-import { type LeaseRecord, type LeaseSparse, type LeaseStamp, bankStamp, leaseRecord, leaseStamp } from '../shapes/shapes-stamps'
+import { type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
+import * as Throwers from '../refusals/throwers'
 
 /** Any sealer, whatever it seals. */
 type AnySealer = Sealers.Sealer<never, never>
@@ -45,7 +45,7 @@ export class Lease implements LeaseStamp {
   #record: LeaseRecord | null
 
   /** This lease's stamp: its record without the key material. Every ctx under the lease binds it after the bank's. */
-  get stamp(): LeaseStamp { return leaseStamp.parse(this) }
+  get stamp(): LeaseStamp { return StampChecks.leaseStamp.parse(this) }
 
   /** This lease's {@link LeaseSparse}, which has no key material. */
   toJSON(): LeaseSparse { return this.stamp }
@@ -54,13 +54,13 @@ export class Lease implements LeaseStamp {
   // == [Construction]: make, constructor
 
   /** Make the lease of `record`, granted to `opts.bank`, which must be the bank `record` is stamped with. */
-  static make(record: Z.input<typeof leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
+  static make(record: Z.input<typeof StampChecks.leaseRecord>, opts: LeaseOpts): Lease { return new Lease(record, opts) }
 
-  private constructor(record: Z.input<typeof leaseRecord>, opts: LeaseOpts) {
+  private constructor(record: Z.input<typeof StampChecks.leaseRecord>, opts: LeaseOpts) {
     const { record: recordChecked, opts: { bank } } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(bankStamp.parse(recordChecked), bank.stamp, { kind: 'damaged_lease' })
+    Validator.checkedConsistent(StampChecks.bankStamp.parse(recordChecked), bank.stamp, { kind: 'damaged_lease' })
     this.#record = recordChecked
-    Helpers.tattoo(this, leaseStamp.parse(recordChecked), { configurable: false })
+    Helpers.tattoo(this, StampChecks.leaseStamp.parse(recordChecked), { configurable: false })
     this.#bank = opts.bank
     Object.freeze(this)
   }
@@ -98,7 +98,7 @@ export class Lease implements LeaseStamp {
     const kept = withoutSecrets(sealer.donorPropsOf(donorProps))
     const given = sealer.publicPropsOf(publicProps)
     const isGone = (given.am === 'x')
-    if (isGone && (secretProps !== undefined)) { throw tombstoneSecretsGiven() }
+    if (isGone && (secretProps !== undefined)) { throw Throwers.tombstoneSecretsGiven() }
     const revision   = isGone ? sealer.tombstoneOf(kept, given) : sealer.nextRevisionOf(kept, given)
     const cleartexts = isGone ? sealer.tombstoneSecrets         : sealer.secretPropsOf(secretProps)
     const sealed = await this.#sealText(sealer, revision, sealer.encode(cleartexts))
@@ -161,7 +161,7 @@ export class Lease implements LeaseStamp {
 
   /** The ctx for `purpose`: the bank's stamp, then `stamp`, with `tags` as its visible header. */
   #ctxOf(stamp: Crypto.CipherCtxRecord, purpose: string, tags: Sealers.SealTags): Uint8Array {
-    return Crypto.cipherCtx([bankStamp.parse(this.#bank.stamp), stamp], purpose, tags)
+    return Crypto.cipherCtx([StampChecks.bankStamp.parse(this.#bank.stamp), stamp], purpose, tags)
   }
 
   /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing keeps it between calls. */
@@ -169,7 +169,7 @@ export class Lease implements LeaseStamp {
     this.demandEnabled()
     // demandEnabled refuses an evicted lease, whose record is null.
     const { lease_key, bank_key_lease_wrapped } = this.#record!
-    const ctx = Crypto.cipherCtx([bankStamp.parse(this.#bank.stamp), this.stamp], 'bank_key_lease_wrapped')
+    const ctx = Crypto.cipherCtx([StampChecks.bankStamp.parse(this.#bank.stamp), this.stamp], 'bank_key_lease_wrapped')
     // Only this WebCrypto call is trapped: its rejection is how a damaged lease is learned.
     try {
       return await Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
@@ -245,7 +245,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, str, fn, custom }) => {
     recordOf:         fn(),
   })
   return {
-    leaseMakeArgs: obj({ record: leaseRecord, opts: obj({ bank: leaseBank }) }),
+    leaseMakeArgs: obj({ record: StampChecks.leaseRecord, opts: obj({ bank: GateishChecks.leaseBank }) }),
     sealer:        custom<AnySealer>((val) => sealerMembers.safeParse(sealerMembersOf(val)).success, Phrases.SealerExpected),
   }
 })

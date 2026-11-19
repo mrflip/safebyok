@@ -3,7 +3,7 @@
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import { type BoxCar, ThingMinder } from 'safebyok'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- as above
-import { isLabelpathOfKind } from 'safebyok/storage'
+import { Labelpath } from 'safebyok/storage'
 import { Checkers } from 'safebyok-big/storage'
 import type { GiverBank } from './react-giver'
 
@@ -18,7 +18,7 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 type BoxLabelpath = 'box' | `box/${string}`
 
 /** True when `labelpath` is a box's. */
-function isBoxLabelpath(labelpath: string): labelpath is BoxLabelpath { return isLabelpathOfKind(labelpath, 'box') }
+function isBoxLabelpath(labelpath: string): labelpath is BoxLabelpath { return Labelpath.isOfModelkind(labelpath, 'box') }
 // --
 
 // == [The bank]: giverBankOfMinder

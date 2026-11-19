@@ -9,18 +9,18 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop } from 'es-toolkit'
-import { Outcome, Throwers, Validator } from 'safebyok-big/internals'
-import { minderNotStarted, staleRead } from '../refusals/throwers'
-import type { Banklabel, Labelpath, Userid } from '../shapes/primitives'
-import { type Thing, type ThingScope, type VoidSentinel, RootBoxLabelpath, cmpThings, shellOf, thingScope, vaultDBShape } from '../shapes/shapes-thing'
+import { Outcome, Validator } from 'safebyok-big/internals'
+import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
+import { type Thing, type ThingScope, type VoidSentinel, Shell, ThingChecks, cmpThings } from '../shapes/shapes-thing'
 import { type GetAsk, type ThingWatchScope, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../storage/vault-db'
 import {
   type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts, type QueryCacheOpts,
   type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type TsqStaleTime,
-  FixedQueryCacheOpts, minderFriend, minderGetOpts, minderLabelpath, minderListener, minderTryAtOpts, queryCacheOptsOrDefault,
+  FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
+import * as Throwers from '../refusals/throwers'
 
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them.
  * Three sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
@@ -114,7 +114,7 @@ export class ThingMinder {
    */
   tryAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderTryAtOpts = {}): TSQAnswer<ThingAt<LabelpathT>> {
     try {
-      minderTryAtOpts.parse(opts)
+      MinderChecks.minderTryAtOpts.parse(opts)
       this.#demandReady()
       const scope = this.#demandOwnScope(scoped)
       if (opts.ifStale === 'refresh') { this.#backgroundRefresh(scope, opts) }
@@ -129,7 +129,7 @@ export class ThingMinder {
    * With no root car cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
    */
   async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<CarAt<LabelpathT>> {
-    minderGetOpts.parse(opts)
+    MinderChecks.minderGetOpts.parse(opts)
     this.#demandReady()
     return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
   }
@@ -139,7 +139,7 @@ export class ThingMinder {
    * Thing's car is `gone`, and answers from the cache.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
-    minderLabelpath.parse(labelpath)
+    MinderChecks.minderLabelpath.parse(labelpath)
     this.#demandReady()
     const answer = await this.#vaultDB.tryListThings(this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' }))
     if (! answer.ok) { throw answer.err }
@@ -151,7 +151,7 @@ export class ThingMinder {
 
   /** True when `scoped`'s car is missing or not timely. */
   isStaleAt(scoped: ThingScope, opts: MinderGetOpts = {}): boolean {
-    minderGetOpts.parse(opts)
+    MinderChecks.minderGetOpts.parse(opts)
     const carQuery = this.#tsqFind(this.#demandOwnScope(scoped))
     return (! isTimelyQuery(carQuery, opts.staleTime ?? this.#queryCacheOpts.staleTime))
   }
@@ -163,7 +163,7 @@ export class ThingMinder {
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
   listen(listener: (answer: TSQGotAnswer) => void): () => void {
-    minderListener.parse(listener)
+    MinderChecks.minderListener.parse(listener)
     return this.#tsq.getQueryCache().subscribe((event: unknown) => {
       if (! isUsefulTSQEvent(event)) { return }
       const answer = this.#answerOfTSQ(this.#askAt(this.#scopeOfQueryKey(event.query.queryKey)), {})
@@ -191,7 +191,7 @@ export class ThingMinder {
       fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
     } catch (err) {
       // TanStack cancels a get under way when goodbye empties the cache.
-      throw (err instanceof TSQ.CancelledError) ? minderNotStarted() : err
+      throw (err instanceof TSQ.CancelledError) ? Throwers.minderNotStarted() : err
     }
     // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
     // get may have left the cache a later record.
@@ -208,7 +208,7 @@ export class ThingMinder {
     if (! answer.ok) { throw answer.err }
     const record = answer.val ?? this.#shellAt(ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
-    if ((prior !== undefined) && (cmpThings(prior.newest, record) < 0)) { throw staleRead(ask) }
+    if ((prior !== undefined) && (cmpThings(prior.newest, record) < 0)) { throw Throwers.staleRead(ask) }
     return carOf(record)
   }
 
@@ -254,7 +254,7 @@ export class ThingMinder {
   // Boxes are the only Things under a root, for now: one label under the root box.
   /** The shell at `scoped`. Below a root, it lives in the life of the bank's root box. */
   #shellAt(scoped: ThingScope): VoidSentinel {
-    return scoped.labelpath.includes('/') ? shellOf(scoped, this.rootBox) : shellOf(scoped)
+    return scoped.labelpath.includes('/') ? Shell.of(scoped, this.rootBox) : Shell.of(scoped)
   }
   // --
 
@@ -267,17 +267,17 @@ export class ThingMinder {
   get rootBox(): MinderFriend['rootBox'] { return this.#bank.rootBox }
 
   /** The scope of the bank's root box. */
-  get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: RootBoxLabelpath } }
+  get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: Labelpath.RootBox } }
 
   /** The scope of `scoped`, demanding that it is in this minder's bank. */
   #demandOwnScope(scoped: ThingScope): ThingScope {
     // Its fields alone: an ask or a record passes, and is read as its scope.
-    return thingScope.parseConsistent(scoped, this.scope)
+    return ThingChecks.thingScope.parseConsistent(scoped, this.scope)
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
   #demandReady(): void {
-    if (! this.#isReady) { throw minderNotStarted() }
+    if (! this.#isReady) { throw Throwers.minderNotStarted() }
   }
 
   /** The scope whose car is cached under `queryKey`, one of this minder's query keys. */
@@ -354,10 +354,10 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
 const Checks = Validator.Checkers('bad_record', ({ obj }) => ({
   minderMakeArgs: obj({
     opts: obj({
-      vaultDB:        vaultDBShape,
-      queryCacheOpts: queryCacheOptsOrDefault,
+      vaultDB:        ThingChecks.vaultDBShape,
+      queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
     }),
-    bank: minderFriend,
+    bank: MinderChecks.minderFriend,
   }),
 }))
 // --

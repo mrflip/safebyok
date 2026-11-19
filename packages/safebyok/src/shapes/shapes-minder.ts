@@ -7,8 +7,8 @@ import type { Bank } from '../models/bank'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
 import type { EpochMillis, Labelpath } from './primitives'
-import { type BankThing, type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, thingCited, thingScope } from './shapes-thing'
-import { type GetAsk, type LoggableAsk, thingWatchScope } from './shapes-asks'
+import { type BankThing, type BoxThing, type GateThing, type Sparse, type Thing, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, ThingChecks } from './shapes-thing'
+import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 
@@ -39,12 +39,10 @@ export const MaxTimerHours = 588
 export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 // --
 
-// == [Checks]: queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, minderLabelpath, minderTryAtOpts, minderGetOpts
+// == [Checks]: RawChecks, MinderChecks
 
-/** The checks of a ThingMinder's arguments and options. */
-export const {
-  queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, minderLabelpath, minderTryAtOpts, minderGetOpts,
-} = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
+/** The checks of a minder's arguments and options. */
+const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
   const gcTime           = union([uint.max(MaxTimerMillis, Phrases.GcTimeShape), lit(Infinity)])
   const staleMillis      = uint.max(MaxTimerMillis, Phrases.StaleTimeShape)
   const staleTime        = union([staleMillis, lit(Infinity)])
@@ -55,10 +53,10 @@ export const {
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
   // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
-  const friendFields     = obj({ scope: thingWatchScope, rootBox: obj({ ...thingScope.shape, lifepath: thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
+  const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const minderListener   = fn<(answer: TSQGotAnswer) => void>()
-  const minderLabelpath  = thingScope.shape.labelpath
+  const minderLabelpath  = ThingChecks.thingScope.shape.labelpath
   const tsqStaleTime     = union([staleMillis, lit(Infinity), lit('static')])
   // Each option may be left out, or given as undefined, for no opinion.
   const minderGetOpts    = obj({ staleTime: tsqStaleTime.optional() }).strict()
@@ -66,19 +64,24 @@ export const {
   return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, minderLabelpath, minderTryAtOpts, minderGetOpts }
 })
 
+/** The checks of a ThingMinder's arguments and options.
+ * Also `DefaultQueryCacheOpts` and `MaxTimerMillis`, the bounds of the cache options a host may choose.
+ */
+export const MinderChecks = Object.freeze({ ...RawChecks, DefaultQueryCacheOpts, MaxTimerMillis })
+
 /** How long a minder's get or read counts a car timely: milliseconds up to {@link MaxTimerMillis}, or `Infinity` or `'static'` for a car that never ages.
  * A `behind` or `bare` car is never timely, whatever the staleTime. A car whose last get was refused is not timely under `Infinity`, and is under `'static'`, as TanStack Query counts it.
  */
-export type TsqStaleTime = Z.input<typeof tsqStaleTime>
+export type TsqStaleTime = Z.input<typeof MinderChecks.tsqStaleTime>
 
 /** The options of `get` and `isStaleAt`: `staleTime` overrides the minder's own, unless it is undefined. */
-export type MinderGetOpts    = Z.input<typeof minderGetOpts>
+export type MinderGetOpts    = Z.input<typeof MinderChecks.minderGetOpts>
 /** `tryAt`'s options, each of which may be undefined for no opinion:
  * - `staleTime`          -- overrides the minder's own
  * - `ifStale: 'get'`     -- read the cache alone (default)
  * - `ifStale: 'refresh'` -- also fetch a stale or missing car in the background
  */
-export type MinderTryAtOpts  = Z.input<typeof minderTryAtOpts>
+export type MinderTryAtOpts  = Z.input<typeof MinderChecks.minderTryAtOpts>
 /** The parts of a {@link Bank} a minder uses: its scope, its ask builders, and where trouble no caller waits on goes. */
 export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
 // --

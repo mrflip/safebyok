@@ -1,16 +1,18 @@
 /** The `AdapterVaultDB` base class: a store extends it by writing the `do*` calls. */
 
 import { noop } from 'es-toolkit'
-import { EX, Errors, Outcome, Throwers, type Helpers } from 'safebyok-big/internals'
-import { answerNotMade } from '../refusals/throwers'
-import { type Thing, type AdapterVaultDBOpts, adapterVaultDBOpts, isGone } from '../shapes/shapes-thing'
+import type * as Z from 'zod'
+import { EX, Errors, Outcome, Validator, type Helpers } from 'safebyok-big/internals'
+import { type Thing, isGone } from '../shapes/shapes-thing'
 import {
-  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf, watchArgs,
+  type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WorldRecord, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
 } from '../shapes/shapes-asks'
-import { type BankRootsFetched, type ThingsFetched, type WorldFetched, classifyBirthBank, classifyGetThing, classifyListThings, classifyWriteThing, watchedThingOf } from './thing-classifier'
+import type { BankRootsFetched, ThingsFetched, WorldFetched } from './thing-classifier'
+import * as Classifier from './thing-classifier'
 import type {
   Actual, Answer, BadAnswer, BirthBankActual, BirthBankAnswer, GetThingAnswer, ListThingsActual, ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer,
 } from './vault-db'
+import * as Throwers from '../refusals/throwers'
 
 // == [Answers]: Received, answerOf
 
@@ -53,7 +55,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   /** Throws `bad_record` for opts it does not know. */
   constructor(opts: AdapterVaultDBOpts = {}) {
-    const { doNotifyTracked = true } = adapterVaultDBOpts.parse(opts)
+    const { doNotifyTracked = true } = Checks.adapterVaultDBOpts.parse(opts)
     this.#doNotifyTracked = doNotifyTracked
   }
   // --
@@ -63,16 +65,16 @@ export abstract class AdapterVaultDB implements VaultDB {
   // takes the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
-  protected classifyGetThing(ask: GetAsk, raw: unknown, world: WorldFetched): Actual<EX.GotAct> { return classifyGetThing(ask, raw, world) }
+  protected classifyGetThing(ask: GetAsk, raw: unknown, world: WorldFetched): Actual<EX.GotAct> { return Classifier.classifyGetThing(ask, raw, world) }
 
   /** Classify a write against the raw Thing fetched at its scope, null for none, checking the born_at and storage policies of a replace. */
-  protected classifyWriteThing(ask: WriteAsk, raw: unknown, world: WorldFetched): Actual<EX.PutAct | EX.DelAct> { return classifyWriteThing(ask, raw, world) }
+  protected classifyWriteThing(ask: WriteAsk, raw: unknown, world: WorldFetched): Actual<EX.PutAct | EX.DelAct> { return Classifier.classifyWriteThing(ask, raw, world) }
 
   /** Classify a listing against the raw parent and the raw Things one label under it. */
-  protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, world: WorldFetched): ListThingsActual { return classifyListThings(ask, fetched, world) }
+  protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, world: WorldFetched): ListThingsActual { return Classifier.classifyListThings(ask, fetched, world) }
 
   /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
-  protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return classifyBirthBank(puts, fetched) }
+  protected classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): BirthBankActual { return Classifier.classifyBirthBank(puts, fetched) }
   // --
 
 
@@ -137,10 +139,10 @@ export abstract class AdapterVaultDB implements VaultDB {
    * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
-    const { scope: bankScope } = watchArgs.parse({ scope, onNotice, onBadNews })
+    const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
     const feed: Feed = { scope: bankScope, receive: ({ record, world }) => {
       let val: Thing
-      try { val = watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+      try { val = Classifier.watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
       try { onNotice({ ok: true, act: isGone(val) ? 'gotgone' : 'gotlive', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     } }
@@ -186,7 +188,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       const dbhas = (Errors.rowsOfRefusal(err).dbhas ?? null) as Thing | null
       return { ok: false, ask: loggableAsk, act: err.meta?.act ?? 'unclassified_storing', world: null, dbhas, err }
     } catch {
-      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: answerNotMade() }
+      return { ok: false, ask: {}, act: 'unclassified_storing', world: null, dbhas: null, err: Throwers.answerNotMade() }
     }
   }
   // --
@@ -227,3 +229,17 @@ export abstract class AdapterVaultDB implements VaultDB {
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }
   // --
 }
+
+// == [Checks]: Checks
+
+/** The checks of the options of a vaultDB that extends {@link AdapterVaultDB}. */
+const Checks = Validator.Checkers('bad_record', ({ obj, bool }) => ({
+  adapterVaultDBOpts: obj({
+    /** False to notify no watch of the Things in an answer's `tracked` ({@link AdapterVaultDB.notifyTrackedRecords}). Default true. */
+    doNotifyTracked: bool.optional(),
+  }).strict(),
+}))
+
+/** The options of a vaultDB that extends {@link AdapterVaultDB}. */
+export type AdapterVaultDBOpts = Readonly<Z.infer<typeof Checks.adapterVaultDBOpts>>
+// --

@@ -1,6 +1,6 @@
 import type { Consts } from 'safebyok-big/internals'
-import { Clock, Crypto, Errors, Phrases as BigPhrases, Throwers, Validator } from 'safebyok-big/internals'
-import { type QueryCacheOpts, queryCacheOptsOrDefault } from '../shapes/shapes-minder'
+import { Clock, Crypto, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
 import { BaseThing } from './base-thing'
 import { CoreBox } from './core-box'
 import { Device } from './device'
@@ -10,15 +10,13 @@ import { Proving } from './proving'
 import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxShell, BoxUnsealed, GetBoxAnswer, GetBoxAskDraft } from '../shapes/shapes-bankish'
 import type { GateRevisionedStamp } from '../shapes/shapes-gateish'
 import type { BoxCleartexts, BoxPublicProps, BoxRecord, BoxTombstone, LivePublicPropsOf, Sealable, TombstonePublicProps } from '../shapes/shapes-sealers'
-import { type BankScope, type BankStamp, type GateStamp, bankScope, bankStamp, gateStamp } from '../shapes/shapes-stamps'
+import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
-import { boxOfOtherRoot, otherThanBox } from '../refusals/throwers'
-import type { DeviceTok } from '../shapes/primitives'
-import {
-  type BankThing, type BoxThing, type Thing, BankThingFormat, BoxThingFormat, MainGateLabelpath, RootBoxLabelpath, bankThing, boxRecord, boxRecordOrShell, boxSealable, gateThing, lifeseqOfLifenum, shellOf, vaultDBShape,
-} from '../shapes/shapes-thing'
+import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
+import { type BankThing, type BoxThing, type Thing, BankChecks, BankThingFormat, BoxChecks, BoxThingFormat, GateChecks, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
+import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
@@ -48,10 +46,10 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
   get device_tok(): DeviceTok { return this.#device.device_tok }
 
   /** This bank's scope: its user and its `banklabel`. */
-  get scope(): BankScope { return bankScope.parse(this) }
+  get scope(): BankScope { return StampChecks.bankScope.parse(this) }
 
   /** This bank's {@link BankStamp}, which every ctx under it binds first. */
-  get stamp(): BankStamp { return bankStamp.parse(this) }
+  get stamp(): BankStamp { return StampChecks.bankStamp.parse(this) }
 
   /** The bank's main gate: the wayins a user unlocks with. */
   get maingate(): Gate { return this.#maingate }
@@ -61,7 +59,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** The revseq and lifepath this object holds of the bank, its main gate and its root box, which every ask it makes tracks. */
   get track(): Track {
-    return { bank: trackPairOf(this), [MainGateLabelpath]: trackPairOf(this.#maingate), [RootBoxLabelpath]: trackPairOf(this.#rootBox) }
+    return { bank: trackPairOf(this), [Labelpath.MainGate]: trackPairOf(this.#maingate), [Labelpath.RootBox]: trackPairOf(this.#rootBox) }
   }
 
   /** The defaults this bank's minders set on their TanStack Query cache entries. */
@@ -88,9 +86,9 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
     const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB, queryCacheOpts } } = Checks.bankMakeArgs.parse({ record, opts })
-    const bankRecord = bankThing.parse(rest)
-    Validator.checkedConsistent(bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
-    Validator.checkedConsistent(rootBox, { ...bankScope.parse(bankRecord), labelpath: 'box' }, { kind: 'record_conflict' })
+    const bankRecord = BankChecks.record.parse(rest)
+    Validator.checkedConsistent(StampChecks.bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
+    Validator.checkedConsistent(rootBox, { ...StampChecks.bankScope.parse(bankRecord), labelpath: 'box' }, { kind: 'record_conflict' })
     super(bankRecord)
     this.#device = device
     this.#vaultDB = vaultDB
@@ -102,21 +100,21 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life. Mint one pair per attempt to birth a bank. */
   static mintStamps(scope: BankScope): { bankStamp: BankStamp, gateStamp: GateStamp } {
-    const { userid, banklabel } = bankScope.parse(scope)
+    const { userid, banklabel } = StampChecks.bankScope.parse(scope)
     const born_at = Clock.nowMillis()
     return {
-      bankStamp: bankStamp.parse({ userid, banklabel, lifeseq: lifeseqOfLifenum(0), born_at }),
-      gateStamp: gateStamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: lifeseqOfLifenum(0), born_at }),
+      bankStamp: StampChecks.bankStamp.parse({ userid, banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at }),
+      gateStamp: StampChecks.gateStamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: Lifeseq.ofLifenum(0), born_at }),
     }
   }
 
   /** The first record of a new bank, made from `dna`, with its main gate and its root box's shell. `Bank.birth` seals the root box over the shell. */
   static makeRecord(dna: BankDna): BankMakeRecord {
-    const { userid, banklabel, lifeseq, born_at } = bankStamp.parse(dna)
-    const bank = bankThing.parse({
+    const { userid, banklabel, lifeseq, born_at } = StampChecks.bankStamp.parse(dna)
+    const bank = BankChecks.record.parse({
       userid, banklabel, labelpath: 'bank', label: 'bank', fmt: BankThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
     })
-    const rootBox = boxRecordOrShell.parse(shellOf({ userid, banklabel, labelpath: RootBoxLabelpath }))
+    const rootBox = BoxChecks.liveOrShell.parse(Shell.of({ userid, banklabel, labelpath: Labelpath.RootBox }))
     return { ...bank, maingate: Gate.makeRecord(dna.maingate), rootBox }
   }
   // --
@@ -170,7 +168,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     const ask    = { ...baseAsk, bank: this.pickle(), gate: this.#maingate.pickle(), root }
     const answer = await this.#vaultDB.tryBirthBank(ask)
     if (answer.ok && (answer.val.bank.revtok === this.revtok) && lease.isEnabled) {
-      this.#rootBox = Object.freeze(boxRecord.parse(answer.val.root))
+      this.#rootBox = Object.freeze(BoxChecks.live.parse(answer.val.root))
       this.#attachLease(lease)
     } else {
       lease.evict()
@@ -248,7 +246,7 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** The boxes directly under the root box, tombstones included, with the root box as `parent`. */
   tryListBoxes(): Promise<ListThingsAnswer> {
-    const ask = this.makeListAsk({ labelpath: RootBoxLabelpath })
+    const ask = this.makeListAsk({ labelpath: Labelpath.RootBox })
     const { endCause } = this.#device
     if (endCause !== null) { return Promise.resolve({ ...disabledAnswerOf(ask, endCause), parent: null, damaged_rows: [] }) }
     return this.#vaultDB.tryListThings(ask)
@@ -271,10 +269,10 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
     if (answer.act === 'gotvoid') {
       if (ifAbsent !== 'shell') { return answer }
       // A box's labelpath, so its shell is a box's.
-      return { ...answer, val: shellOf({ ...this.scope, labelpath }, this.#rootBox) as BoxShell }
+      return { ...answer, val: Shell.of({ ...this.scope, labelpath }, this.#rootBox) as BoxShell }
     }
     const { val } = answer
-    if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: otherThanBox(answer) } }
+    if (val.fmt !== BoxThingFormat) { return { ...answer, ok: false, act: 'unclassified_storing', dbhas: null, err: Throwers.otherThanBox(answer) } }
     return { ...answer, val }
   }
 
@@ -314,8 +312,8 @@ export class Bank extends BaseThing<BankThing, BankScope, BankStamp> implements 
 
   /** Demand that `box` is a box of this bank, under its current root box. */
   #demandOwnBox(box: unknown): void {
-    const { lifepath } = boxSealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
-    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw boxOfOtherRoot() }
+    const { lifepath } = BoxChecks.sealable.parseConsistent(box, this.scope, { kind: 'record_conflict' })
+    if (lifepath.split('/', 1)[0] !== this.#rootBox.lifeseq) { throw Throwers.boxOfOtherRoot() }
   }
 
   /** The attached lease. Demands that the bank is enabled and unlocked. */
@@ -348,11 +346,11 @@ function disabledAnswerOf(ask: unknown, endCause: Errors.VaultError): BadAnswer<
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
-    record: obj({ maingate: gateThing, rootBox: boxRecordOrShell }).loose(),
+    record: obj({ maingate: GateChecks.record, rootBox: BoxChecks.liveOrShell }).loose(),
     opts:   obj({
       device:         custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
-      vaultDB:        vaultDBShape,
-      queryCacheOpts: queryCacheOptsOrDefault,
+      vaultDB:        ThingChecks.vaultDBShape,
+      queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
     }),
   }),
   proving: custom<Proving>((val) => val instanceof Proving, Phrases.ProvingExpected),

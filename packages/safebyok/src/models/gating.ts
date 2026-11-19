@@ -1,11 +1,12 @@
 import type { Consts } from 'safebyok-big/internals'
-import { Crypto, EX, Errors, GX, Helpers, Outcome, Phrases as BigPhrases, Throwers, Validator } from 'safebyok-big/internals'
+import { Crypto, EX, Errors, GX, Helpers, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Device } from './device'
 import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Banklabel, Userid } from '../shapes/primitives'
 import { type AskUser, type CleartextsForGatingkind, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, gatingkindVals } from '../shapes/shapes-gateish'
-import { type BankScope, bankScope } from '../shapes/shapes-stamps'
+import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
+import * as Throwers from '../refusals/throwers'
 
 /** A request to the user for their passphrase or passkey, for the change `gatingkind` names.
  * A device has one open at a time. The dialog hands what the user typed to `attempt`, and closes when `whenConcluded` resolves.
@@ -48,7 +49,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   get whenConcluded(): Promise<Outcome.Outcome<Bank>> { return this.#concluded }
 
   /** This gating's bank scope. */
-  get scope(): BankScope { return bankScope.parse(this) }
+  get scope(): BankScope { return StampChecks.bankScope.parse(this) }
 
   /** This gating's {@link GatingSnapshot}. It never shows a cleartext. */
   toJSON(): GatingSnapshot {

@@ -1,7 +1,7 @@
 /** A Device for the giver's tests over the new core's minder: one bank, born in a memory vaultDB, already started. */
 
 import { type BoxCar, type MinderFriend, ThingMinder } from 'safebyok'
-import { type BoxThing, type GetAsk, type Thing, MemoryVaultDB, getAskOf, listAskOf, shellOf } from 'safebyok/storage'
+import { type BoxThing, type GetAsk, type Thing, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { giverBankOfMinder } from '../../src/giver/minder-bank'
 import type { DeviceSnapshot, GiverBank, GiverDevice } from '../../src/giver/react-giver'
@@ -69,7 +69,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
     counts,
     holdGets,
     _cheat_birthBox: async (box) => {
-      const shell = shellOf({ ...LeanTH.ThingBank, labelpath: box.labelpath }, LeanTH.rootBoxOf())
+      const shell = Shell.of({ ...LeanTH.ThingBank, labelpath: box.labelpath }, LeanTH.rootBoxOf())
       await LeanTH.expectGood(vaultDB.tryWriteThing(LeanTH.birthAskOf(box, shell)))
     },
     _cheat_replace:  async (prior, next) => { await LeanTH.expectGood(vaultDB.tryWriteThing(LeanTH.replaceAskOf(prior, next))) },

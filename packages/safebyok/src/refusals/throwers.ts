@@ -1,4 +1,4 @@
-/** The throwers of the refusals this package makes itself, each from a phrase in phrases.ts. The rest are `safebyok-big`'s, through its Throwers. */
+/** The throwers of the refusals this package makes itself, each from a phrase in phrases.ts, and every thrower of `safebyok-big`, re-exported. */
 
 // The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
 
@@ -8,6 +8,12 @@ import * as Phrases from '../phrases'
 import { type Thing } from '../shapes/shapes-thing'
 import { type GetAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { GoodAnswer } from '../storage/vault-db'
+
+// == [Big's Throwers]: every thrower of safebyok-big, re-exported
+
+// Re-exported, never redefined: a refusal is one class in both packages (notes/transition.md).
+export * from 'safebyok-big/refusals/throwers'
+// --
 
 // == [Model Throwers]: tombstoneSecretsGiven, sidecarMissing, tombstoneSidecarGiven, boxOfOtherRoot, otherThanBox
 

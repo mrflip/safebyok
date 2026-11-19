@@ -51,3 +51,11 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   the bankKey; an unlock checked the same way refuses a wayin storage swapped in, before anything is sealed under the
   wrong key. Agreed in principle (the Coach, 2026-11-17); an entry in `notes/security.md` once built
   (`whiteboard/20261116-react_backwards/internals.md`, F15).
+* **Give `AskChecks` a `world` check.** Nothing checks an answer's world as one object: `worldOf` builds it from the
+  bank's and the main gate's stored checks, and both are strict, so neither `.extend` nor an intersection takes the
+  `maingate` field. A check of the whole world is a new rule: decide its shape (the bank's record with `maingate`
+  beside it, each part checked as stored) and where a world is checked once it exists (the Coach, 2026-11-18; PR #740).
+* **Consider one module for the duck checks of host interfaces.** `vaultDBShape` (in `ThingChecks`) and the like check
+  that a host's object is a `VaultDB`, a device store or a query client by sampling its member names. Gathered in one
+  module they would leave the files that hold them now, if the imports allow it without a cycle. Optional: one sitting
+  alone in `ThingChecks` is fine (the Coach, 2026-11-18).

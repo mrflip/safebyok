@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { BW, expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { ShellCited, childShellCited, lifeseqOfLifenum, sparseOf } from '../../src/shapes/shapes-thing'
+import { Shell, sparseOf } from '../../src/shapes/shapes-thing'
 import { delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
   GateScope, Life0, RootScope, ThingBank, WithPasskey, birthAskOf, boxRebornOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, getGateAskOf,
@@ -10,6 +10,7 @@ import {
 } from './vaultdb-world'
 import { FirstRevtok, OtherRevtok, T0, revtokOf } from './models-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
+import { Lifeseq } from '../../src/shapes/primitives'
 
 /** Register the battery's cases of a Thing's get and write. */
 export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, gotAt, rowsOf }: VaultDBBatteryWorld): void {
@@ -87,7 +88,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     const stored = gateThingOf()
     const next   = nextGateOf(stored)
     const later  = nextGateOf(next)
-    const lifeseq2 = lifeseqOfLifenum(2)
+    const lifeseq2 = Lifeseq.ofLifenum(2)
     const otherLife = { lifeseq: lifeseq2, lifepath: lifeseq2 }
     const ActCases = [
       // the store moved on:
@@ -126,7 +127,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("refuses the main gate's deletion, writing nothing", async () => {
       const vaultDB = await withGate(stored)
-      const life1 = lifeseqOfLifenum(1)
+      const life1 = Lifeseq.ofLifenum(1)
       const gone = nextOf(stored, { am: 'x', lifeseq: life1, lifepath: life1 })
       await expectBad(vaultDB.tryWriteThing(delAskFor(stored, gone)), 'bad_record')
       expect(await gotAt(vaultDB, 'gate')).to.deep.equal(stored)
@@ -219,7 +220,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("births a box under its parent's life, deletes it, and gives it a new life", async () => {
       const vaultDB = await fresh()
-      const birth = birthAskOf(box, childShellCited(Life0))
+      const birth = birthAskOf(box, Shell.childCited(Life0))
       expect(await vaultDB.tryWriteThing(birth)).to.deep.include({ ok: true, act: 'born', val: box })
       expect(await vaultDB.tryWriteThing(delAskFor(box, tomb))).to.deep.include({ ok: true, act: 'deleted', val: tomb })
       expect(await vaultDB.tryGetThing(getAskAt(box.labelpath))).to.deep.include({ ok: true, act: 'gotgone', val: tomb })
@@ -261,7 +262,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     it("refuses a box past its kind's depth", async () => {
       const deep = boxThingOf('deep', { labelpath: 'box/aa/deep', lifepath: `${Life0}/${Life0}/${Life0}` })
       const vaultDB = await fresh()
-      const ask = birthAskOf(deep, childShellCited(`${Life0}/${Life0}`))
+      const ask = birthAskOf(deep, Shell.childCited(`${Life0}/${Life0}`))
       await expectBad(vaultDB.tryWriteThing(ask), 'bad_record')
     })
 
@@ -273,7 +274,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     })
 
     it("keeps the kinds apart: a gate's ask names no box", async () => {
-      const ask = { ...birthAskOf(box, childShellCited(Life0)), modelkind: 'gate' }
+      const ask = { ...birthAskOf(box, Shell.childCited(Life0)), modelkind: 'gate' }
       const vaultDB = await fresh()
       await expectBad(vaultDB.tryWriteThing(ask as never), 'bad_record')
     })
@@ -297,7 +298,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
     it("build asks its verbs accept", async () => {
       const vaultDB = await bornBank()
       const box = boxThingOf()
-      const putAsk = putAskOf({ cited: childShellCited(Life0), record: box })
+      const putAsk = putAskOf({ cited: Shell.childCited(Life0), record: box })
       expect(await vaultDB.tryWriteThing(putAsk)).to.deep.include({ ok: true, act: 'born' })
       expect(await vaultDB.tryGetThing(getAskOf(box))).to.deep.include({ ok: true, act: 'gotlive', val: box })
       const delAsk = delAskOf({ cited: box, record: boxTombOf(box) })
@@ -307,7 +308,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
 
     it("leave every refusal to the verb, which answers it", async () => {
       const vaultDB = await fresh()
-      await expectBad(vaultDB.tryWriteThing(putAskOf({ cited: ShellCited, record: { revtok: FirstRevtok } } as never)), 'bad_record')
+      await expectBad(vaultDB.tryWriteThing(putAskOf({ cited: Shell.Cited, record: { revtok: FirstRevtok } } as never)), 'bad_record')
       await expectBad(vaultDB.tryGetThing(getAskOf(null as never)), 'bad_record')
     })
   })

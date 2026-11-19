@@ -3,8 +3,8 @@ import { describe } from 'vitest'
 import { type Helpers, Validator } from 'safebyok-big/internals'
 import { expectGood } from 'safebyok-big/testing'
 import type { Labelpath, Lifepath } from '../../src/shapes/primitives'
-import type { BoxThing, GateThing, Thing, ThingScope } from '../../src/shapes/shapes-thing'
-import { childShellCited } from '../../src/shapes/shapes-thing'
+import { type BoxThing, type GateThing, type Thing, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
+
 import type { VaultDB } from '../../src/storage/vault-db'
 import { Life0, birthAskOf, birthBankAskOf, gateThingOf, getAskAt } from './vaultdb-world'
 import { describeVaultDBWrites } from './vaultdb-battery-writes'
@@ -77,7 +77,7 @@ function worldOf<DBT extends VaultDB>({ makeVaultDB, _cheat_rowsOf, watches = tr
     return vaultDB
   }
   async function bornUnder(vaultDB: VaultDB, thing: Thing, parentLifepath: Lifepath): Promise<void> {
-    const ask = birthAskOf(thing, childShellCited(parentLifepath))
+    const ask = birthAskOf(thing, Shell.childCited(parentLifepath))
     await expectGood(vaultDB.tryWriteThing(ask))
   }
   async function boxesBorn(vaultDB: VaultDB, ...boxes: BoxThing[]): Promise<BoxThing[]> {

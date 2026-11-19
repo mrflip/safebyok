@@ -1,12 +1,13 @@
 /** The battery's cases of `tracked`: what an answer says of the bank, main gate and root box its ask tracks. */
 import { describe, expect, it } from 'vitest'
 import { expectBad } from 'safebyok-big/testing'
-import { lifeseqOfLifenum } from '../../src/shapes/shapes-thing'
+
 import {
   BankStaleTrack, GateStaleTrack, RootStaleTrack, bankThingOf, birthAskOf, birthBankAskOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
+import { Lifeseq } from '../../src/shapes/primitives'
 
 /** Register the battery's cases of `tracked`. */
 export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld): void {
@@ -57,7 +58,7 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       const { bank, gate, box } = trackOf()
       await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate } } as never), 'bad_record')
       await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank, gate, box, vault: box } } as never), 'bad_record')
-      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank: { ...bank, lifeseq: lifeseqOfLifenum(0) }, gate, box } } as never), 'bad_record')
+      await expectBad(vaultDB.tryGetThing({ ...getAskAt('box'), track: { bank: { ...bank, lifeseq: Lifeseq.ofLifenum(0) }, gate, box } } as never), 'bad_record')
     })
   })
 }

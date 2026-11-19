@@ -4,7 +4,7 @@ import type { Errors } from 'safebyok-big/internals'
 import { aWhile, eventually, expectSyncRefusal } from 'safebyok-big/testing'
 import type { ThingWatchScope, WorldRecord } from '../../src/shapes/shapes-asks'
 import type { ThingNotice, VaultDB } from '../../src/storage/vault-db'
-import { childShellCited } from '../../src/shapes/shapes-thing'
+import { Shell } from '../../src/shapes/shapes-thing'
 import {
   BankStaleTrack, GateStaleTrack, Life0, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
@@ -46,7 +46,7 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
       const vaultDB = await bornBank()
       const { notices } = heardOf(vaultDB)
       const box = boxThingOf()
-      await vaultDB.tryWriteThing(birthAskOf(box, childShellCited(Life0)))
+      await vaultDB.tryWriteThing(birthAskOf(box, Shell.childCited(Life0)))
       await eventually(() => notices.length === 1)
       await aWhile()
       expect(notices).to.deep.equal([{ ok: true, act: 'gotlive', val: box, world: { ...bankThingOf(), maingate: gateThingOf() } }])

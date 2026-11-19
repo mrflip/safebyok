@@ -2,7 +2,7 @@
 
 import { PGlite } from '@electric-sql/pglite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { type ThingScope, type Thingkind, lifeseqOfLifenum, modelkindOf } from 'safebyok/storage'
+import { type ThingScope, type Thingkind, Labelpath, Lifeseq } from 'safebyok/storage'
 import * as VT from 'safebyok/testing'
 import { PostgresVaultDB, thingsChannelOf } from '../src/postgres-vault-db'
 import type { PostgresListen } from '../src/postgres-bank-db'
@@ -54,7 +54,7 @@ async function makeVaultDB(): Promise<PostgresVaultDB> {
 }
 
 /** The table that keeps the Thing at `labelpath`. */
-function tableOf(labelpath: string): string { return ThingTables[modelkindOf(labelpath)] }
+function tableOf(labelpath: string): string { return ThingTables[Labelpath.modelkindOf(labelpath)] }
 
 /** Take away the Thing at a scope. */
 async function remove({ userid, banklabel, labelpath }: ThingScope): Promise<void> {
@@ -118,7 +118,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     await plant({ ...VT.ThingBank, labelpath: box.labelpath }, box)
     const write = `SELECT ok, thing FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`
     const stale = { ...box, revtok: VT.OtherRevtok }
-    const skips = VT.nextOf(box, { lifeseq: lifeseqOfLifenum(2), lifepath: lifeseqOfLifenum(2) })
+    const skips = VT.nextOf(box, { lifeseq: Lifeseq.ofLifenum(2), lifepath: Lifeseq.ofLifenum(2) })
     for (const [record, cited] of [[VT.nextOf(box), stale], [skips, box]]) {
       const { rows } = await db.query(write, [JSON.stringify(record), JSON.stringify(cited)])
       expect(rows).to.deep.equal([{ ok: false, thing: box }])
