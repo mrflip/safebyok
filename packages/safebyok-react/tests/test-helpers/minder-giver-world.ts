@@ -23,11 +23,13 @@ export interface MinderGiverWorld {
   minder:    ThingMinder
   /** How many gets the vaultDB has answered. */
   counts:    { gets: number }
-  /** Hold every get the vaultDB is asked from now on, until the function returned is called. */
-  holdGets(): () => void
-  /** Store `box` under the root box, as its first revision. */
+  /** Pause every get the vaultDB is asked from now on before it reads, until the function returned is called. */
+  pauseGets(): () => void
+  /** Pause every get the vaultDB is asked from now on after it reads, until the function returned is called: it answers what it read. */
+  pauseAnswers(): () => void
+  /** Put `box` under the root box, as its first revision. */
   _cheat_birthBox(box: BoxRecord): Promise<void>
-  /** Store `next` over `prior`. */
+  /** Put `next` over `prior`. */
   _cheat_replace(prior: ThingRecord, next: ThingRecord): Promise<void>
 }
 
@@ -38,17 +40,25 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
   const vaultDB = new MemoryVaultDB()
   if (! isWatching) { vaultDB.watch = () => unsubscribeNothing }
   const counts  = { gets: 0 }
-  let held: Promise<void> | null = null
+  let askPause:    Promise<void> | null = null
+  let answerPause: Promise<void> | null = null
   const tryGetThing = vaultDB.tryGetThing.bind(vaultDB)
   vaultDB.tryGetThing = async (ask) => {
     counts.gets += 1
-    if (held !== null) { await held }
-    return tryGetThing(ask)
+    if (askPause !== null) { await askPause }
+    const answering = tryGetThing(ask)
+    if (answerPause !== null) { await answerPause }
+    return answering
   }
-  function holdGets(): () => void {
+  function pauseGets(): () => void {
     let release!: () => void
-    held = new Promise<void>((resolve) => { release = resolve })
-    return () => { held = null; release() }
+    askPause = new Promise<void>((resolve) => { release = resolve })
+    return () => { askPause = null; release() }
+  }
+  function pauseAnswers(): () => void {
+    let release!: () => void
+    answerPause = new Promise<void>((resolve) => { release = resolve })
+    return () => { answerPause = null; release() }
   }
   await LeanTH.expectGood(vaultDB.tryBirthBank(LeanTH.birthBankAskOf()))
 
@@ -67,7 +77,8 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
     vaultDB,
     minder,
     counts,
-    holdGets,
+    pauseGets,
+    pauseAnswers,
     _cheat_birthBox: async (box) => {
       const shell = Shell.of({ ...LeanTH.ThingBank, labelpath: box.labelpath }, LeanTH.rootBoxOf())
       await LeanTH.expectGood(vaultDB.tryWriteThing(LeanTH.birthAskOf(box, shell)))

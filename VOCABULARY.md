@@ -231,6 +231,10 @@ is a plain object's type, always and only.
 | **shell**     | The tombstone that stands for a void row, never stored: its revision is seq -1 under the void tokens, and its lifeseq `-000000001` (`Shell.of`, typed `ShellOf<BoxRecord>` for a box; in safebyok-big, `shellVaultOf` and `shellBoxOf`). A request that expects no row cites the shell. |
 | **Void Sentinel** | What a ThingMinder's cache holds for a scope the vaultDB last said stores nothing (`VoidSentinel`, made by `Shell.of`): the shell of that scope, a whole tombstone made fresh for it, with every field a stored Thing has but no body. It carries its scope, and the life of its parent: a root's lifepath is `-000000001`, and a box under the root box lives in the root box's life. A caller reads it off a get's act, `gotvoid`, or off its revseq, -1 (`Thing.isVoidSentinel`); never by identity. A write cites it to make the Thing's first revision. |
 | **car**       | What a ThingMinder's cache holds for one scope, frozen: the newest revision heard of (`newest`, perhaps sparse) and the fullest record known (`fullest`: null when gone or void, undefined when never fetched whole), kept apart so that a host shows the fullest and writes against the newest (`ThingCar`; by kind `BankCar`, `BoxCar`, `GateCar`, or by labelpath `CarAt`). Its `liveness` is `full`, `behind`, `bare`, `gone` or `void`. A record is one Thing as stored and sent over a wire; a car carries two. |
+| **fullest**   | A car's whole record to show (`car.fullest`): slow to change, and once whole, whole for the rest of its life. It is null when the Thing is gone or void, and undefined when never fetched whole, never a tombstone. A record hook's `data` is the fullest; a `behind` car's older fullest shows while the newer one is fetched. Say "fullest", not "whole" or "full", of what a host shows. |
+| **newest**    | A car's newest revision heard of, from any source (`car.newest`): perhaps sparse, perhaps a tombstone or the Void Sentinel. A write cites it, and a listing's row shows it, never asking for a whole record. Say "newest", not "latest" or "sparse", of what a write cites or a row shows. |
+| **minded**    | Said of a car or listing in a ThingMinder's own cache: "the minded car". It is the ground truth on this device, as best known. |
+| **givable**   | Said of a car or listing in the host's React Query, where the giver's bridge copies it for the hooks to serve: "the givable car". It may lag the minded one until the bridge copies it. Never "given", which means passed as an argument. |
 | **cited**     | What a write cites of the record it expects to find, for storage to compare with the one stored: its revision, its life and its liveness, or the shell's (a write ask's `cited`, a `ThingCited`, by kind `GateChecks.cited` and the rest; the shell's is `Shell.Cited`). It may carry other fields of the record, each checked, which only a storage policy reads, as testimony. |
 | **sealable**  | What a seal takes its next revision's fields from (`Sealable<BoxRecord>`, passed as `donorProps`): a whole, sparse or unsealed record, a tombstone or the shell. The seal keeps its Thing fields and its body, and never its secrets: the sealer's approvelist, then the lease's banlist (`withoutSecrets`). |
 | **dated**     | A row's scope, the token of its life and the time it is judged by, without the rest of the row. For a cached lease these are its bank's scope, `bank_tok` and `proved_at` (`LeaseDated`), and this is the shape the deviceDB's `listLeases` returns. |
@@ -273,7 +277,8 @@ Use these. Each names one thing:
 Avoid these. Each means several things:
 
 * **hold**, **held**, **keep**, **kept**: wait, adopt, enlist, attach, stow, cache, carry over or leave unchanged. For what a
-  thing contains, say has, contains or stored, or use the possessive ("this proving's wayin").
+  thing contains, say has, contains or stored, or use the possessive ("this proving's wayin"). For a car or listing in a
+  cache, say minded (the minder's) or givable (the host's React Query's).
 * **take**: enlist, adopt, get or peek.
 * **store**: put, stow or storage.
 * **save**: put or stow.

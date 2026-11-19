@@ -77,7 +77,7 @@ describe("the giver over a minder", () => {
     await act(() => world._cheat_replace(box, next))
     const { gets } = world.counts
     // The get of the newer revision waits until released, so the older record is still what shows.
-    const releaseGets = world.holdGets()
+    const releaseGets = world.pauseGets()
     await act(() => world.minder.list('box'))
     expect(result.current.data).to.deep.equal(box)
     releaseGets()
@@ -85,3 +85,84 @@ describe("the giver over a minder", () => {
     expect(world.counts.gets).to.eq(gets + 1)
   })
 })
+
+// == [In any order]: OrderStep, settleInOrder, WatchedOrders, UnwatchedOrders
+
+/** One thing that happens to the host's entry: its fetch answers, the minder hears the next revision by the watch or a list, or the bridge starts. */
+type OrderStep = 'fetch' | 'notice' | 'list' | 'bridge'
+
+/** A world over a real minder with the box at revision 1, a hook showing it whose fetch has read revision 1 and waits, then `steps` in order.
+ * Watched, the `notice` step puts revision 2; unwatched, revision 2 is put before the steps, and only a list tells the minder of it.
+ * Returns the hook's result, and revision 2.
+ */
+async function settleInOrder(steps: readonly OrderStep[], { isWatching }: Readonly<{ isWatching: boolean }>) {
+  const world  = await TH.makeMinderGiverWorld({ isWatching })
+  const box    = LeanTH.boxThingOf('openai')
+  await world._cheat_birthBox(box)
+  // Empty the minder's cache, so that the host's fetch asks the vaultDB.
+  world.minder.goodbye()
+  world.minder.hello()
+  const answer = world.pauseAnswers()
+  const Giver  = makeReactGiver(world.device)
+  const Bank   = Giver.forBank(LeanTH.ThingBank.banklabel)
+  const client = new QueryClient()
+  onTestFinished(() => { client.clear() })
+  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
+  const { result } = renderHook(() => Bank.useBoxRecord(OpenaiPath), { wrapper: Wrapper })
+  await waitFor(() => { expect(world.counts.gets).to.eq(1) })
+  const next = LeanTH.nextOf(box, { sidecar: { account: 'home' } })
+  if (! isWatching) { await act(() => world._cheat_replace(box, next)) }
+  const stepRunners: Readonly<Record<OrderStep, () => Promise<void> | void>> = {
+    fetch:  async () => {
+      act(() => { answer() })
+      // The next step waits until the fetch's answer reaches the host.
+      await waitFor(() => { expect(result.current.data).to.not.be.undefined })
+    },
+    notice: async () => { await act(() => world._cheat_replace(box, next)) },
+    list:   async () => { await act(async () => { await world.minder.list('box') }) },
+    bridge: () => { renderHook(() => { Giver.useBridge() }, { wrapper: Wrapper }) },
+  }
+  for (const step of steps) { await stepRunners[step]() }
+  return { result, next }
+}
+
+// Each order of three steps: the host's fetch answering what it read before revision 2, the minder hearing of revision 2,
+// and the bridge starting.
+const WatchedOrders = [
+  ["fetch",  "notice", "bridge"],
+  ["fetch",  "bridge", "notice"],
+  ["notice", "fetch",  "bridge"],
+  ["notice", "bridge", "fetch"],
+  ["bridge", "fetch",  "notice"],
+  ["bridge", "notice", "fetch"],
+] as const
+
+const UnwatchedOrders = [
+  ["fetch",  "list",   "bridge"],
+  ["fetch",  "bridge", "list"],
+  ["list",   "fetch",  "bridge"],
+  ["list",   "bridge", "fetch"],
+  ["bridge", "fetch",  "list"],
+  ["bridge", "list",   "fetch"],
+] as const
+
+describe("the giver over a minder shows the newest record, in any order", () => {
+  describe("of the fetch's late answer, a watch notice and the bridge's start", () => {
+    for (const steps of WatchedOrders) {
+      it(steps.join(', '), async () => {
+        const { result, next } = await settleInOrder(steps, { isWatching: true })
+        await waitFor(() => { expect(result.current.data).to.deep.equal(next) })
+      })
+    }
+  })
+
+  describe("of the fetch's late answer, a list and the bridge's start, unwatched", () => {
+    for (const steps of UnwatchedOrders) {
+      it(steps.join(', '), async () => {
+        const { result, next } = await settleInOrder(steps, { isWatching: false })
+        await waitFor(() => { expect(result.current.data).to.deep.equal(next) })
+      })
+    }
+  })
+})
+// --

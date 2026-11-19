@@ -5,7 +5,7 @@ import type { BankSnapshot, CarFields, DeviceSnapshot, GiverBank, GiverDevice } 
 /** A box record as the fake vaultDB stores it: enough to tell revisions apart. */
 export type FakeBoxRecord = Readonly<{ labelpath: string, revseq: number, sidecar: Readonly<{ mask: string }> }>
 
-/** A car of fake box records, as a bank's minders would cache it. */
+/** A car of fake box records, as a bank's minder would cache it. */
 export type FakeBoxCar = Readonly<{ liveness: CarFields['liveness'], newest: FakeBoxRecord, fullest: FakeBoxRecord | null | undefined }>
 
 /** A fake box record at `labelpath`, of revision `revseq`. */
@@ -35,7 +35,7 @@ export interface FakeGiverWorld {
   _cheat_signIn(userid: string | null): void
   /** Replace the Device's snapshot of the bank at `banklabel`. */
   _cheat_setBank(banklabel: string, snapshot: BankSnapshot): void
-  /** Announce `car` to every bank object's listeners, as its minders would on caching it. */
+  /** Announce `car` to every bank object's listeners, as its minder would on caching it. */
   _cheat_hear(labelpath: string, car: FakeBoxCar): void
   /** End the bank object at `banklabel`: the next ensureBank starts another. */
   _cheat_endBank(banklabel: string): void
@@ -51,6 +51,8 @@ export function makeFakeGiverWorld(userid: string | null = 'u1'): FakeGiverWorld
   // For each starter, the function it returned for each bank object it was handed, by banklabel.
   const endings         = new Map<Starter, Map<string, () => void>>()
   const stored          = new Map<string, FakeBoxCar>()
+  // Each labelpath's car as the minder last cached it: by a get, or heard.
+  const cached          = new Map<string, FakeBoxCar>()
   const counts          = { gets: 0 }
 
   function publish(next: DeviceSnapshot): void {
@@ -64,8 +66,11 @@ export function makeFakeGiverWorld(userid: string | null = 'u1'): FakeGiverWorld
       banklabel,
       getBoxCar:     (labelpath: string) => {
         counts.gets += 1
-        return Promise.resolve(stored.get(labelpath) ?? voidCarOf(labelpath))
+        const car = stored.get(labelpath) ?? voidCarOf(labelpath)
+        cached.set(labelpath, car)
+        return Promise.resolve(car)
       },
+      peekBoxCar:    (labelpath: string) => cached.get(labelpath),
       listenBoxCars: (listener: (labelpath: string, car: FakeBoxCar) => void) => {
         carListeners.add(listener)
         return () => { carListeners.delete(listener) }
@@ -102,6 +107,7 @@ export function makeFakeGiverWorld(userid: string | null = 'u1'): FakeGiverWorld
     _cheat_signIn:  (signedIn) => { publish({ ...snapshot, userid: signedIn }) },
     _cheat_setBank: (banklabel, bankSnapshot) => { publish({ ...snapshot, banks: Object.freeze({ ...snapshot.banks, [banklabel]: bankSnapshot }) }) },
     _cheat_hear:    (labelpath, car) => {
+      cached.set(labelpath, car)
       for (const listener of carListeners) { listener(labelpath, car) }
     },
     _cheat_endBank: (banklabel) => {
