@@ -26,12 +26,17 @@ import * as Throwers from '../refusals/throwers'
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them.
  * Three sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
  * Thing's shell where nothing is stored), the watch's notice of each write, and a list's sparse record. Each lands
- * in the Thing's car through one merge, which holds:
+ * in the Thing's car through one merge. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
+ *
+ * ## Invariants
+ * - For a caller or listener using the library as documented, what it shows depends only on which records the minder
+ *   has heard of, never on the order they arrived in.
+ * - The order records arrive in never changes a car's liveness, or the revisions it carries.
  * - A car never goes back: it carries the newest revision any source has told of, and a newer life replaces an older one whole.
- * - The order things arrive in never changes the car's liveness, or the revisions it carries.
- * - A sparse record never displaces a whole one: it leaves the car `behind` (or `bare`), and the next get fetches the newest whole.
- * - A get answered with a revision older than the car it began with changes nothing.
- * It caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
+ * - A sparse live record never displaces a whole live record of the same life: it leaves the car `behind`, its fullest
+ *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
+ *   get fetches the newest whole.
+ * - A get answered with a revision older than the car it began with changes nothing in the cache, and refuses `stale_read`.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
