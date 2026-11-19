@@ -1,6 +1,6 @@
 # Thread 4: minder_writes (2026-11-19)
 
-Branch `20261119-minder_writes`, PR #TBD, stacked on #757. Proved: `safebyok` lint and typecheck clean; `tests/minding` 245 tests green (thing-minder 179). `pnpm justify` not yet run.
+Branch `20261119-minder_writes`, PR #758, stacked on #757. Proved: `safebyok` lint and typecheck clean; `tests/minding` 245 tests green (thing-minder 179). `pnpm justify` not yet run.
 
 * **Built**
   * `ThingMinder.tryWrite(ask: WriteAsk): Promise<WriteThingAnswer>` (`packages/safebyok/src/minding/thing-minder.ts`, section `Writing`). It sends the ask, sealed and made by the bank (`Bank.makePutAsk`, `makeDelAsk`), to the vaultDB's `tryWriteThing`, lands every record the answer carries, then resolves the answer as it came: good or refused, never thrown.
