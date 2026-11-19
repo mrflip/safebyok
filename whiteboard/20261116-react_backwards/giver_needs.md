@@ -11,7 +11,8 @@ puts), the class doc block of `ThingMinder` with its `## Invariants`, VOCABULARY
 This file has some modifications that supersede internals.md
 
 **Only as needed:** startup and shutdown (who makes the Device, the bank object and the minder, and when: sign-in, birth,
-start, `hello`, `goodbye`, vacate, waking from a lapse); a box nested more than one level below the root box; and
+start, `hello`, `goodbye`, vacate, waking from a lapse); deleting a box, and dropping a gone subtree (M5); a box nested
+more than one level below the root box; and
 everything marked not yet: the pouch, kit recipes, the per-user packet (`lastSeen`, `keepOnDevice`), the salted userid,
 autolock, locking across tabs, a customer's own view, the sealed check on the gate, and stable promises for Suspense
 (F14).
@@ -67,7 +68,8 @@ through the merge, and only then answers.
 
 * Every record an answer carries lands: the stored record, a refusal's `dbhas` (a `stale_write` reports the newer
   record, so the car's newest is what the next write must cite), and the bank and main gate in its `world`.
-* A delete is a write of the tombstone. A birth adds to the parent's listing (M2).
+* A birth adds to the parent's listing (M2). No delete verb, and no test of a delete through the minder: deletes are
+  out of scope (the Coach, 2026-11-19).
 * Nothing of the record enters the cache before the answer: no optimistic update.
 * Listeners hear the new car synchronously, inside the merge, before the write's promise resolves (TanStack calls cache
   listeners at once, even inside `notifyManager.batch`). So the giver's entry shows the new record by the time a
@@ -115,15 +117,14 @@ Export `BoxLabelpath` (`'box' | \`box/${string}\``) and its guard from the core,
 
 What the goal needs beyond the minder. Each item names what exists today.
 
-### W. Writes from a host: `putBox`, its revisor, `delBox`
+### W. Writes from a host: `putBox` and its revisor
 
-Goal: `usePutBoxAction`, `Giver.putBox({ labelpath, whisper }, bump)`, deletes from the kit.
+Goal: `usePutBoxAction`, `Giver.putBox({ labelpath, whisper }, bump)`.
 
 * **`putBoxOnce`** (the primitive): seal the next revision against the car's newest (`Bank.sealBox` exists), write it
   through the minder (M3), and answer the stored record or refuse `stale_write`. One attempt.
 * **`putBox(draft, revisor)`** (orchestration, F12): on `stale_write`, call the revisor with the car's new newest and
   write again, until it lands or the revisor gives up. It lives in the instance layer, never in the primitive.
-* **`delBox`**: `Bank.tombstoneBox` exists; write it through the minder.
 * **`mask`**: the goal's `sidecarOf: (whisper) => ({ mask: mask(whisper.apiKey) })` needs `mask` and the mask schedule
   (#727, in `safebyok-big`) exported from `safebyok`.
 
@@ -213,5 +214,4 @@ each; a get under way refuses with the new kind.
 ## Open for the Coach
 
 * M2: the small list answer's shape, before any adapter changes.
-* M5: the refusal kind for a get cancelled by a subtree drop, or whether it asks again.
 * L: whether one level of nesting is in scope now, or waits with nesting as a whole.

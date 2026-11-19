@@ -135,7 +135,8 @@ queries. **Size:** medium. **Levels:** defaults.
 >
 > * Every record an answer carries lands: the stored record, a refusal's `dbhas` (a `stale_write` reports the newer
 >   record, so the car's newest is what the next write must cite), and the bank and main gate in its `world`.
-> * A delete is a write of the tombstone. A birth adds to the parent's listing (M2).
+> * A birth adds to the parent's listing (M2). No delete verb, and no test of a delete through the minder: deletes are
+>   out of scope (the Coach, 2026-11-19).
 > * Nothing of the record enters the cache before the answer: no optimistic update.
 > * Listeners hear the new car synchronously, inside the merge, before the write's promise resolves (TanStack calls cache
 >   listeners at once, even inside `notifyManager.batch`). So the giver's entry shows the new record by the time a
@@ -145,8 +146,9 @@ queries. **Size:** medium. **Levels:** defaults.
 > newest at the record the vaultDB reported; the watch's later notice of the same write changes nothing.
 
 *Gloss.* Touches the minder (a new write verb), `MinderFriend` only if it must, and order tests. The bank already makes
-the write ask (`Bank.makePutAsk`, `makeDelAsk`, sealed by `sealBox`, `tombstoneBox`); `Bank.tryPutBox` and `tryDelBox`
-write around the minder today and stay as they are. The verb's name and answer wait on *Open Matters*. **Depends on:**
+the write ask (`Bank.makePutAsk`, sealed by `sealBox`); `Bank.tryPutBox` and `tryDelBox` write around the minder today
+and stay as they are. *Orchestrator:* the Coach's later edit of giver_needs.md (2026-11-19) takes deletes out of scope:
+the verb is not refused a tombstone, but nothing here adds, tests or documents a delete through the minder. The verb's name and answer wait on *Open Matters*. **Depends on:**
 thread 3. **Look-ahead:** Part 2's `putBoxOnce` and `delBox` write through this verb. **Size:** medium. **Levels:**
 defaults.
 
