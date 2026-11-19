@@ -65,6 +65,16 @@ writes it.
 * Order tests: `ListingOrders` in `thing-minder.test.ts`, all 6 orders of a list, a get and a notice, twice; its
   comment says where thread 4 adds a write step.
 
+## Thread 5, ahead (*Orchestrator:*)
+
+* TanStack's `invalidateQueries` calls `query.invalidate()` on each match, which dispatches `{ type: 'invalidate' }`
+  only if `!state.isInvalidated`; the cache tells `{ type: 'updated', query, action: { type: 'invalidate' } }`, one per
+  query, synchronously. Data stays; `isInvalidated` turns true; the next `setQueryData` clears it with a `success`
+  event. It then refetches active matches: pass `refetchType: 'none'`. (query-core 5.107.1, `queryClient.js`,
+  `query.js`.)
+* The invalidation event's shape is before the Coach again (one event per query: `tag: 'kids'` rather than
+  `tags: 'all'`; and `tags` or `labels`).
+
 ## Rulings
 
 * **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk

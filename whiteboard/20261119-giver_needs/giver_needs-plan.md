@@ -5,8 +5,8 @@
 * **Mode:** normal.
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
-* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1143), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
-* **Status:** threads 1 and 2 filed, PRs #753 and #756 (drafts until #751 leaves draft); thread 3 ready, PR #757, in review (one compaction, mid-proving, before its readiness check); thread 4 building.
+* **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1149), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
+* **Status:** threads 1–3 filed, PRs #753, #756 (green) and #757 (drafts until #751 leaves draft); thread 4 building; thread 5 waits on thread 4 and the invalidation-event row.
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
 on 2026-11-19 with `dream-hooks.ts.md` and the Coach's edits to `internals.md`. This sprint is its **Part 1, the minder**:
@@ -133,6 +133,11 @@ with thread 4; this thread exposes the one place a landing feeds the listing, so
 answer is **not built here**: it waits on *Open Matters*. internals.md F6 is the older form of this. **Depends on:**
 thread 2. **Look-ahead:** thread 4's birth joins the listing through the same landing; thread 5 invalidates these
 queries. **Size:** medium. **Levels:** defaults.
+
+*Review:* fixed two (`stableListingOf` an arrow const, as a callback; `listingAt` tested with all three foreign
+scopes); no significant findings. Confirmed per-key `setQueryDefaults` is TanStack's tool, the order tests, and no
+listing key in the car paths. Left: three doc blocks narrating the body (`#doGet`, `#sendToTSQ`, `list`), handed to
+thread 4; a VOCABULARY.md *listing* row (before the Coach); query defaults never removed (accepted, *Your calls*).
 
 ### 4. minder_writes: M3, the answer lands before the write resolves
 
