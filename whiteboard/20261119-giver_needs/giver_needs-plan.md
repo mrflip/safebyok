@@ -6,7 +6,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
 * **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87 (bookmark rev 1667), body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
-* **Status:** threads 1–6 out of draft on main (#753, #756, #757, #758, #759, #765); thread 7 ready, PR #766, in review (no compactions).
+* **Status:** done. Every thread filed, restacked onto main and out of draft: main → #753 → #756 → #757 → #758 → #759 → #765 → #766, with this sprint PR (#752) on top. The done note is `human/20261119-sprint_giver_needs_done.md`.
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
 on 2026-11-19 with `dream-hooks.ts.md` and the Coach's edits to `internals.md`. This sprint is its **Part 1, the minder**:
@@ -234,6 +234,11 @@ one Thing per notice. Touches `storage/vault-db.ts` (`ThingNotice`, `watch`'s do
 reports the cost (every box notice brings a bank and a main-gate notice; the merge makes them no-ops, but each tells
 a listener an event) and whether a verb answer's `world` should go out as notices too, rather than deciding either.
 **Depends on:** thread 6. **Size:** small to medium. **Levels:** defaults.
+
+*Review (thread 7):* fixed one (the comment above `receive`, `notifyTrackedRecords`'s first doc line, the class doc
+re-wrapped). The split holds: each notice checked on its own, a null world brings none, Thing then bank then gate,
+handlers on a later microtask. Left: repeat cost (before the Coach); `worldThingsOf`'s destructure; `watch`'s doc on
+half a pair.
 
 ## For the Coach
 
