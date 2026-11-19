@@ -18,11 +18,14 @@ TH.bootDatabaseFirst()
 
 const { BW } = TH
 
-/** A bankDB whose database is unreachable. Its driver's error contains text that must never reach a browser. */
+/** A driver's error for a database that refused the connection. Its message contains text that must never reach a browser. */
+function refusedConnection(): Error { return Object.assign(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2'), { code: 'ECONNREFUSED' }) }
+
+/** A bankDB whose database is unreachable. */
 function unreachable() {
   return new PostgresBankDB({ client: {
-    query:       () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
-    transaction: () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
+    query:       () => Promise.reject(refusedConnection()),
+    transaction: () => Promise.reject(refusedConnection()),
   } })
 }
 
@@ -317,6 +320,15 @@ describe("bankResolvers' watch", () => {
     expect(BX.crossedNotice.parse(overTheWire(last.value?.data?.['safebyokWatch']))).to.have.nested.property('err.refusalkind', 'unexpected_error')
     expect(await stream.next()).to.have.property('done', true)
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
+  })
+
+  it("ends with the refusal that ended the bankDB's watch", async () => {
+    const schema = TH.schemaOver(await TH.serverOver({ listen: () => Promise.reject(refusedConnection()) }))
+    const { nextNotice } = await watching(schema, { user_id: 'u1' })
+    const last = await nextNotice()
+    expect(last).to.have.nested.property('err.refusalkind', 'storage_unavailable')
+    expect(JSON.stringify(last)).not.to.include('hunter2')
+    expect(await nextNotice()).to.be.null
   })
 
   it("ends a refused watch after one notice", async () => {

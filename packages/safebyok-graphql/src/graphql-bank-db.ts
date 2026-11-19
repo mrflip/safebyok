@@ -4,6 +4,7 @@ import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
 import type { BankScope, BoxTidyAsk, GoodAct, GotAct, ListAct, OkAct, Tidied, WatchScope } from 'safebyok-big/storage'
 import { BankOperations } from './bank-operations'
+import * as Phrases from './phrases'
 
 // == [Options]: GraphQLBankClient, GraphQLBankDBOpts, graphQLBankDBOpts
 
@@ -267,7 +268,7 @@ export class GraphQLBankDB implements BX.BankDB {
 }
 // --
 
-// == [Asks and answers]: answerForRefusal, goodAnswerOf, fieldOf, troubleOf, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
+// == [Asks and answers]: answerForRefusal, goodAnswerOf, fieldOf, troubleOf, serverErred, schemaNotServed, networkTroubleOf, statusOf, codeOf, hearNotice
 
 // Every throw in a verb ends up here: an ask that fails its check, a server out of reach, or an answer that fails its own.
 /** The bad answer for a verb that threw: its refusal, or `unexpected_error` for anything else.
@@ -293,12 +294,15 @@ function fieldOf({ error: err, data }: OperationResult<unknown>, fieldname: stri
   return (data as Record<string, unknown>)[fieldname]
 }
 
-/** The refusal for a failed operation: {@link networkTroubleOf} for a network failure, else {@link schemaNotServed}. */
-function troubleOf(err: CombinedError): DB.VaultError { return (err.networkError === undefined) ? schemaNotServed() : networkTroubleOf(err) }
+/** The refusal for a failed operation: {@link networkTroubleOf} for a network failure, else {@link serverErred}. */
+function troubleOf(err: CombinedError): DB.VaultError { return (err.networkError === undefined) ? serverErred() : networkTroubleOf(err) }
 
-// A GraphQL error means the client and server disagree about the schema. A retry will not fix that, so it is never
-// reported as a storage condition. The refusal carries no cause, so the server's error text never reaches the caller:
-// a variable-coercion error can quote the variable sent, which is the record.
+// A GraphQL error means the client and server disagree about the schema, or the server's resolver failed. A retry will not
+// fix either, so it is never reported as a storage condition. The refusal carries no cause, so the server's error text never
+// reaches the caller: a variable-coercion error can quote the variable sent, which is the record.
+/** Make the `unexpected_error` for a server that answered with a GraphQL error. */
+function serverErred(): DB.VaultError { return new DB.VaultError('unexpected_error', Phrases.ServerErred) }
+
 /** Make the `unexpected_error` for a server response that lacks what was asked for. */
 function schemaNotServed(): DB.VaultError { return new DB.VaultError('unexpected_error', DB.SchemaNotServed) }
 

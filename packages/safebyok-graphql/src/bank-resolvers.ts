@@ -133,6 +133,8 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
       next: async () => {
         const read = await reader.read()
         if (read.done) { return read }
+        // A watch that ended on bad news has closed the stream behind it, so the read after this one is done.
+        if (DB.isVaultError(read.value)) { return { done: false, value: badNoticeOf(read.value) } }
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice
         // carrying the refusal. The stream is cancelled, so the read after that is done.
         const revoked = await signInRefusalOf(context, scope.user_id)
@@ -237,12 +239,11 @@ function crossingOf(answer: BX.Answer<unknown, DB.GoodAct, unknown>): CrossingAn
 /** Convert a refusal to wire form. Its `cause` is never sent. */
 function crossedErrOf({ refusalkind, message, meta }: DB.VaultError): BX.CrossedErr {
   // Parse the capacity before sending it: JSON cannot carry Infinity, so the check turns an infinite limit into the largest safe integer.
-  const capacityReport = DB.capacity.safeParse(meta?.capacity)
   return {
     refusalkind,
     message,
     meta: {
-      capacity:   capacityReport.success ? capacityReport.data : null,
+      capacity:   (meta?.capacity === undefined) ? null : DB.capacity.parse(meta.capacity),
       fieldnames: (meta?.fieldnames === undefined) ? null : [...meta.fieldnames],
       oplabel:    meta?.oplabel ?? null,
     },
@@ -263,18 +264,26 @@ function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
   return iterator
 }
 
-/** Start watching `scope` on `bankDB` and return a stream reader. Cancelling the reader stops the watch. */
-function openWatch(bankDB: DB.AdapterBankDB, scope: DB.WatchScope): ReadableStreamDefaultReader<BX.Notice> {
+/** Start watching `scope` on `bankDB` and return a stream reader of its notices, and of the refusal that ends it, if one does.
+ * Cancelling the reader stops the watch.
+ */
+function openWatch(bankDB: DB.AdapterBankDB, scope: DB.WatchScope): ReadableStreamDefaultReader<BX.Notice | DB.VaultError> {
   // Use a reader, not the stream's own async iterator. The iterator's `return` waits for a pending
   // `next`, which on a quiet bank never resolves, so a subscriber that left would keep the watch
   // open. A reader's `cancel` ends the pending read immediately.
   let unwatch = noUnwatching
-  const notices = new ReadableStream<BX.Notice>({
+  const notices = new ReadableStream<BX.Notice | DB.VaultError>({
     start: (controller) => {
-      unwatch = bankDB.watch(scope, (notice) => {
-        // Enqueue every notice while the stream is open, however many are unread. Drop notices once it has closed.
-        if ((controller.desiredSize ?? 0) > 0) { controller.enqueue(notice) }
-      })
+      // Enqueue every notice while the stream is open, however many are unread. Drop notices once it has closed.
+      const isOpen = (): boolean => ((controller.desiredSize ?? 0) > 0)
+      const onNotice = (notice: BX.Notice): void => { if (isOpen()) { controller.enqueue(notice) } }
+      // Bad news ends the watch: the subscriber reads the refusal, then the end of the stream.
+      const onBadNews = (news: DB.VaultError): void => {
+        if (! isOpen()) { return }
+        controller.enqueue(news)
+        controller.close()
+      }
+      unwatch = bankDB.watch(scope, onNotice, onBadNews)
     },
     cancel: () => { unwatch() },
   }, { highWaterMark: Infinity })
