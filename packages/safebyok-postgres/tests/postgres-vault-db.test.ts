@@ -161,7 +161,7 @@ describe("PostgresVaultDB, what only Postgres can show", () => {
     const db = await database()
     const { rows } = await db.query<{ proname: string }>("SELECT DISTINCT proname FROM pg_proc WHERE proname LIKE 'safebyok\\_%'")
     expect(new Set(rows.map((row) => row.proname))).to.deep.equal(new Set(Object.values(VaultFunctionNames)))
-    expect(VaultFunctionNames.write_box).to.equal('safebyok_t01_r000_write_box')
+    expect(VaultFunctionNames.write_box).to.equal('safebyok_a010501_r000_write_box')
   })
 
   it("keeps its tables and writing functions from every role but their owner", async () => {

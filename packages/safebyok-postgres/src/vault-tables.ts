@@ -5,7 +5,7 @@ const ThingColumns = `
   banklabel  text    COLLATE "C" NOT NULL,
   labelpath  text    COLLATE "C" NOT NULL,
   label      text    COLLATE "C" NOT NULL,
-  fmt        integer NOT NULL,
+  fmt        text    COLLATE "C" NOT NULL,
   am         text    COLLATE "C" NOT NULL,
   lifepath   text    COLLATE "C" NOT NULL,
   lifeseq    text    COLLATE "C" NOT NULL,
