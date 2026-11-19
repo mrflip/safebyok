@@ -4,7 +4,7 @@ import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type ThingRecord, Shell } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
-import { GateGetAsk, DownVaultDB, QuietVaultDB, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
+import { GateGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
 
 describe("ThingMinder.at", () => {
   it("holds nothing before any get", () => {
@@ -379,6 +379,15 @@ describe("ThingMinder.tryAt", () => {
     const answer = minder.tryAt(TH.GateScope)
     expect(answer).to.deep.include({ ok: true, act: 'vacant', isFetching: false })
     expect(answer).to.have.nested.property('lastErr.refusalkind', 'storage_unavailable')
+  })
+
+  it("answers unexpected_error, not a storage refusal, for anything else its own code throws", () => {
+    const bank = { ...fakeBankOf(), makeGetAsk: () => { throw new Error('ask broke') } }
+    const minder = minderOf(new MemoryVaultDB(), {}, bank)
+    minder.hello()
+    const answer = minder.tryAt(TH.GateScope)
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
+    expect(answer).to.have.nested.property('err.refusalkind', 'unexpected_error')
   })
 
   const RefusedScopes = [

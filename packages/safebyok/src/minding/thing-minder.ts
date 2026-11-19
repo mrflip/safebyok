@@ -9,7 +9,7 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { noop, union } from 'es-toolkit'
-import { Outcome, Validator } from 'safebyok-big/internals'
+import { Errors, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
@@ -21,6 +21,7 @@ import {
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
+import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
@@ -169,7 +170,8 @@ export class ThingMinder {
       if (opts.ifStale === 'refresh') { this.#backgroundRefresh(scope, opts) }
       return this.#answerOfTSQ(this.#askAt(scope), opts) as TSQGotAnswer<ThingAt<LabelpathT>>
     } catch (err) {
-      return { ok: false, ask: loggableAskOf({ ...scoped, op: 'get', ifAbsent: 'nil' }), act: 'unclassified_storing', world: null, dbhas: null, err: Outcome.storageRefusalOf(err) }
+      // The try asks the vaultDB nothing: what it throws that is no refusal is a bug.
+      return { ok: false, ask: loggableAskOf({ ...scoped, op: 'get', ifAbsent: 'nil' }), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
     }
   }
 
@@ -188,12 +190,15 @@ export class ThingMinder {
    * from that listing. Each record is cached sparse.
    * Where that leaves a car `behind` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
    * answers from the cache.
+   * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
     MinderChecks.minderLabelpath.parse(labelpath)
     this.#demandReady()
-    const answer = await this.#vaultDB.tryListThings(this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' }))
+    const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
+    const answer = await this.#vaultDB.tryListThings(ask)
     if (! answer.ok) { throw answer.err }
+    if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
     const labelpaths = answer.val.map((record) => record.labelpath)
     TSQ.notifyManager.batch(() => {
       this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
@@ -254,13 +259,14 @@ export class ThingMinder {
    * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
    * A write answered after `goodbye` caches nothing.
+   * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
       this.#demandReady()
       this.#demandOwnScope(ask)
     } catch (err) {
-      return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Outcome.storageRefusalOf(err) }
+      return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
     }
     const answer = await this.#vaultDB.tryWriteThing(ask)
     // Only the record written lands here. A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
@@ -295,7 +301,8 @@ export class ThingMinder {
   }
 
   /** Fetch `ask`'s car from the vaultDB, made of its shell where storage has nothing.
-   * Refuses `stale_read` for an answer older than the revision cached when it began.
+   * Refuses an answer older than the revision cached when it began.
+   * Refuses a record of another Thing than `ask`'s.
    */
   async #fetchCar(ask: GetAsk): Promise<ThingCar<ThingRecord>> {
     // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
@@ -303,7 +310,7 @@ export class ThingMinder {
     const answer = await this.#vaultDB.tryGetThing(ask)
     // Thrown as it came. The `dbhas` is delivered through the watch, never from here.
     if (! answer.ok) { throw answer.err }
-    const record = answer.val ?? this.#shellAt(ask)
+    const record = (answer.act === 'gotvoid') ? this.#shellAt(ask) : this.#checkedDelivered(answer.val, ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
     if ((prior !== undefined) && (Thing.cmp(prior.newest, record) < 0)) { throw Throwers.staleRead(ask) }
     return carOf(record)
@@ -320,9 +327,10 @@ export class ThingMinder {
   }
 
   // Every record that lands but a get's comes through here: TanStack lands a get's in the car itself.
-  /** Land `record` in its car and its parent's listing, while minding. */
+  /** Land `record` in its car and its parent's listing, while minding. A record of another bank refuses. */
   #sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
+    this.#checkedDelivered(record, this.scope)
     this.#tsq.setQueryData(this.queryKey(record), carOf(record))
     this.#joinParentListing(record)
   }
@@ -407,7 +415,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Checks]: scope, rootBox, #rootBoxScope, #demandOwnScope, #demandReady, #scopeOfQueryKey
+  // == [Checks]: scope, rootBox, #rootBoxScope, #demandOwnScope, #checkedDelivered, #demandReady, #scopeOfQueryKey
 
   /** The scope of this minder's bank. */
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
@@ -422,6 +430,12 @@ export class ThingMinder {
   #demandOwnScope(scoped: ThingScope): ThingScope {
     // Its fields alone: an ask or a record passes, and is read as its scope.
     return ThingChecks.thingScope.parseConsistent(scoped, this.scope)
+  }
+
+  /** `record`, refused where the vaultDB delivered it of another bank, or of another labelpath than `scoped` names. */
+  #checkedDelivered<RecordT extends DeliverableThing>(record: RecordT, scoped: ThingWatchScope): RecordT {
+    DeliveredChecks.thingScope.parseConsistent(record, scoped, { message: Phrases.DeliveredOfOtherScope })
+    return record
   }
 
   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
@@ -534,7 +548,7 @@ function listingOf(prior: readonly Labelpath[], labelpaths: readonly Labelpath[]
 const stableListingOf = (prior: unknown, next: unknown): unknown => Object.freeze(TSQ.replaceEqualDeep(prior, next))
 // --
 
-// == [Checks]: Checks
+// == [Checks]: Checks, DeliveredChecks
 
 /** The checks of {@link ThingMinder.make}'s arguments. */
 const Checks = Validator.Checkers('bad_record', ({ obj }) => ({
@@ -546,4 +560,9 @@ const Checks = Validator.Checkers('bad_record', ({ obj }) => ({
     bank: MinderChecks.minderFriend,
   }),
 }))
+
+/** The check of a record the vaultDB delivers, refusing `unexpected_error`: a record of another scope is a bug in the vaultDB. */
+const DeliveredChecks = {
+  thingScope: ThingChecks.thingScope.refusingAs('unexpected_error'),
+}
 // --

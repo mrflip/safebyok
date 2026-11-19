@@ -177,6 +177,15 @@ describe("ThingMinder.tryWrite", () => {
     expect(minder.at(TH.BoxScope)).to.be.undefined
   })
 
+  it("rejects an answer that carries a record of another bank, and caches that record nowhere", async () => {
+    const vaultDB = await bornOf(new QuietVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    const theirs  = { ...TH.boxThingOf(), userid: 'u2' }
+    vi.spyOn(vaultDB, 'tryWriteThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'born', ask, world: null, val: theirs }))
+    await TH.expectRefusal(minder.tryWrite(boxBirthAskOf()), 'unexpected_error')
+    expect(minder.at(TH.BoxScope)).to.be.undefined
+  })
+
   const RefusedAsks = [
     [{ ...boxBirthAskOf(), userid: 'u2' }, 'refuses an ask of another bank'],
     ["box/openai",                         'refuses an ask that is not a bag'],

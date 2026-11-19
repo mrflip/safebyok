@@ -2,6 +2,7 @@
 import * as TSQ from '@tanstack/query-core'
 import { Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
+import * as Throwers from '../refusals/throwers'
 import { type Sparse, type ThingRecord, ThingChecks } from '../shapes/shapes-thing'
 import { ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
@@ -24,14 +25,14 @@ export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar
 
 // TanStack Query types the values it hands structural sharing as unknown, so both are checked as cars.
 /** The car of the newest record of `prior` and `delivered`, and the fullest of its life, from either car, with `prior`'s on a tie.
- * It serves as a minder query's structural sharing: it is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined or of another scope.
- * Anything but a car refuses `unexpected_error`; `prior` may also be undefined.
+ * It serves as a minder query's structural sharing: it is `prior` itself where `delivered` adds nothing, and `delivered` where `prior` is undefined.
+ * Refuses anything but a car, and two cars of different Things; `prior` may also be undefined.
  */
 export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<ThingRecord> {
   demandCar(delivered, Phrases.NotACar)
   if (prior === undefined) { return delivered }
   demandCar(prior, Phrases.NotACar)
-  if (! Thing.haveSameScope(prior.newest, delivered.newest))     { return delivered }
+  if (! Thing.haveSameScope(prior.newest, delivered.newest))     { throw Throwers.carsOfOtherThings() }
   if (prior.newest.lifepath !== delivered.newest.lifepath) { return (Thing.cmp(prior.newest, delivered.newest) > 0) ? delivered : prior }
   const [newestTag,  newest]  = tagBestNewestSL(prior,  delivered)
   const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)

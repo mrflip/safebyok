@@ -7,7 +7,7 @@ import { Shell } from '../../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf } from './world'
+import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf } from './world'
 
 describe("ThingMinder.get", () => {
   it("refuses bad_record for a scope of another bank", async () => {
@@ -158,6 +158,16 @@ describe("ThingMinder.get", () => {
     } finally { TSQ.onlineManager.setOnline(true) }
   })
 
+  it("refuses a record the vaultDB answers of another Thing than asked, and caches no car", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    const theirs = TH.boxThingOf('anthropic')
+    vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'gotlive', ask, world: null, val: theirs }))
+    await TH.expectRefusal(minder.get(TH.BoxScope), 'unexpected_error')
+    expect(minder.at(TH.BoxScope)).to.be.undefined
+  })
+
   it("throws the vaultDB's refusal, without trying again", async () => {
     const vaultDB = await bornOf(new DownVaultDB())
     const { minder } = minderWorldOf(vaultDB)
@@ -233,6 +243,19 @@ describe("ThingMinder.list", () => {
     minder.listen(heard)
     await minder.list('box')
     expect(toldOf(heard)).to.deep.equal([['listing'], ['box/anthropic', 'bare'], ['box/openai', 'behind']])
+  })
+
+  it("leaves out a box stored damaged, and tells the bank's tellBadNews its labelpath", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { minder, bank } = minderWorldOf(vaultDB)
+    await minder.list('box')
+    expect(badnewsOf(bank)).to.deep.equal([])
+    vaultDB._cheat_things(TH.ThingBank).set('box/bad', { ...TH.boxThingOf('bad'), whisper_sealed: {} })
+    expect(await minder.list('box')).to.deep.equal([TH.BoxScope.labelpath])
+    expect(minder.listingAt(TH.RootScope)).to.deep.equal([TH.BoxScope.labelpath])
+    expect(badnewsOf(bank)).to.deep.equal(['damaged_row'])
+    expect(bank.tellBadNews.mock.calls[0]?.[0][0]).to.have.nested.property('meta.labelpaths').that.deep.equals(['box/bad'])
   })
 
   it("lists nothing under a root box with no boxes under it", async () => {
