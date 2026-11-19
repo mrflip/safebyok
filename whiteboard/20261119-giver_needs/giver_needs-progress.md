@@ -72,8 +72,11 @@ writes it.
   query, synchronously. Data stays; `isInvalidated` turns true; the next `setQueryData` clears it with a `success`
   event. It then refetches active matches: pass `refetchType: 'none'`. (query-core 5.107.1, `queryClient.js`,
   `query.js`.)
-* The invalidation event's shape is before the Coach again (one event per query: `tag: 'kids'` rather than
-  `tags: 'all'`; and `tags` or `labels`).
+* **The invalidation event is ruled again** (the Coach, 2026-11-19): one per query invalidated,
+  `{ carkind: 'invalidation', modelkind, labelpath, card: 'list', tag: 'kids' }`, `labelpath` the listing's parent.
+  Later, not built: for `card: 'get'` the tag is the label, for self it is `'full'`. Names are `tag` and `tags`, never
+  `labels` ("they may not be constrained to the tight string formal label requires"). Thread 5 changes thread 2's
+  `InvalidationEvent` (`tags: 'all'` → `tag: 'kids'`). The ask stays `invalidate(labelpath?, { list: 'all' })`.
 
 ## Rulings
 
@@ -89,9 +92,7 @@ writes it.
     confirmed). Their bluesky, direction only: `{ carkind: 'listing', tag: 'livekids_ci', of: { parentpath:
     'box/anthropic', tombstones: false, sidecar: { stage: { eq: 'ci' } } } }`: `tag` names the listing, `of` says what
     it selects. Only `tag: 'kids'` and `of: { parentpath }` are built.
-  - `{ carkind: 'invalidation', modelkind, labelpath, card: 'list', tags: 'all' }`: "card being (not yet, but later)
-    'list', 'self', 'kids' (#, !, /); tags hold the string 'all' or later a list of labels." Only `card: 'list'` and
-    `tags: 'all'` exist now.
+  - The invalidation event: superseded, see *Thread 5, ahead* (one per query, `tag: 'kids'`).
 * **The small list answer** is not for this sprint (the Coach): no proposal; thread 3 adds a TODO.md entry for it.
 * **The write verb** is `tryWrite(ask)`, answering the vaultDB's `WriteThingAnswer` as it came, once every record it
   carries has landed (the Coach: "we want both eventually ... carry on with what goes with the grain"). A throwing verb
