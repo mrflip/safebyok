@@ -5,7 +5,8 @@ import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/inter
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
-import { type StoredCited, type ThingCited, type ThingRecord, type ThingScope, BankChecks, BoxChecks, GateChecks, ThingChecks } from '../shapes/shapes-thing'
+import { type StoredCited, type ThingCited, type ThingRecord, type ThingScope, ThingChecks } from '../shapes/shapes-thing'
+import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../shapes/shapes-thingkinds'
 import { Thing } from '../models/thing'
 import { type AnyAsk, type BankRoots, type BirthPuts, type GetAsk, type ListAsk, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
 import * as Throwers from '../refusals/throwers'
@@ -124,7 +125,7 @@ export function isWriteAct(act: string): act is EX.WriteAct { return (EX.writeAc
 
 const RowOfOtherScope = { kind: 'storage_issue', message: BigPhrases.rowOfOtherAddress } as const
 
-/** A check of a Thing stored: a kind's, from {@link ThingChecks}, or a write's of its preconditions. */
+/** A check of a Thing stored: a kind's, from {@link ThingkindChecks}, or a write's of its preconditions. */
 type StoredCheck<RecordT extends object> = Readonly<{ parseConsistent: (raw: unknown, other: object, refusal: typeof RowOfOtherScope) => RecordT }>
 
 /** The Thing stored at `scope`, checked by `check`, or null for none. */
@@ -143,10 +144,10 @@ export function storedCitedOf(scope: ThingScope, raw: unknown): StoredCited | nu
 const storedCitedChecker = ThingChecks.storedCited.refusingAs('damaged_row')
 
 /** The Thing stored at `scope`, checked, or null for none. */
-export function storedThingOf(scope: ThingScope, raw: unknown): ThingRecord | null { return storedOf<ThingRecord>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
+export function storedThingOf(scope: ThingScope, raw: unknown): ThingRecord | null { return storedOf<ThingRecord>(ThingkindChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
 /** The Thing the store reports writing at `scope`, checked. */
-export function writtenThingOf(scope: ThingScope, raw: unknown): ThingRecord { return writtenOf<ThingRecord>(ThingChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
+export function writtenThingOf(scope: ThingScope, raw: unknown): ThingRecord { return writtenOf<ThingRecord>(ThingkindChecks.ofLabelpath(scope.labelpath).stored, scope, raw) }
 
 /** The three roots the store reports writing for a birth's `puts`, checked. */
 export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: BankRootsFetched): BankRoots {
@@ -160,7 +161,7 @@ export function writtenRootsOf([bankPut, gatePut, rootPut]: BirthPuts, written: 
 /** The Thing listed at `scope`, checked, or null when it fails its checks: a damaged child is set aside, not thrown. */
 function listedThingOf(scope: ThingScope, raw: unknown): ThingRecord | null {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
-  const thingReport = ThingChecks.ofLabelpath(scope.labelpath).stored.safeParse(raw)
+  const thingReport = ThingkindChecks.ofLabelpath(scope.labelpath).stored.safeParse(raw)
   return thingReport.success ? Validator.checkedConsistent(thingReport.data, scope, RowOfOtherScope) : null
 }
 

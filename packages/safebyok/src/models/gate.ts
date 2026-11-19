@@ -5,7 +5,8 @@ import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
 import { type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
-import { type GateRecord, type ThingScope, type Wayins, GateChecks, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type GateRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
 /** One revision of a bank's gate: its passphrase wayin, and its passkey wayin if it has one.
@@ -34,7 +35,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   get scope(): ThingScope { return ThingChecks.thingScope.parse(this) }
 
   /** This gate's stamp, fixed for its life. A wayin's wrapped bankKey is bound to it. */
-  get stamp(): GateStamp { return StampChecks.gateStamp.parse(this) }
+  get stamp(): GateStamp { return GateChecks.stamp.parse(this) }
 
   /** The stamp of this gate's bank. A wayin's wrapped bankKey is bound to it, and to the gate's own `stamp`. */
   get bankStamp(): BankStamp { return this.#bank.stamp }
@@ -101,8 +102,8 @@ function wayinsOf({ main, passkey0 }: GateDna['wayins']): Wayins {
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => {
   const wayin = custom<Wayin>((val) => val instanceof Wayin, Phrases.WayinExpected)
   return {
-    gateMakeArgs:   obj({ record: GateChecks.record, opts: obj({ bank: obj({ stamp: StampChecks.bankStamp }) }) }),
-    makeRecordArgs: StampChecks.gateStamp.extend({ wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),
+    gateMakeArgs:   obj({ record: GateChecks.record, opts: obj({ bank: obj({ stamp: BankChecks.stamp }) }) }),
+    makeRecordArgs: GateChecks.stamp.extend({ wayins: obj({ main: wayin, passkey0: wayin.nullable() }) }),
   }
 })
 // --

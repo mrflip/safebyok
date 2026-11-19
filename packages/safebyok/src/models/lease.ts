@@ -8,6 +8,7 @@ import type { Sparse, ThingRecord } from '../shapes/shapes-thing'
 import { type LeaseBank, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
+import { BankChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
 /** Any sealer, whatever it seals. */
@@ -58,7 +59,7 @@ export class Lease implements LeaseStamp {
 
   private constructor(record: Z.input<typeof StampChecks.leaseRecord>, opts: LeaseOpts) {
     const { record: recordChecked, opts: { bank } } = Checks.leaseMakeArgs.parse({ record, opts })
-    Validator.checkedConsistent(StampChecks.bankStamp.parse(recordChecked), bank.stamp, { kind: 'damaged_lease' })
+    Validator.checkedConsistent(BankChecks.stamp.parse(recordChecked), bank.stamp, { kind: 'damaged_lease' })
     this.#record = recordChecked
     Helpers.tattoo(this, StampChecks.leaseStamp.parse(recordChecked), { configurable: false })
     this.#bank = opts.bank
@@ -161,7 +162,7 @@ export class Lease implements LeaseStamp {
 
   /** The ctx for `purpose`: the bank's stamp, then `stamp`, with `tags` as its visible header. */
   #ctxOf(stamp: Crypto.CipherCtxRecord, purpose: string, tags: Sealers.SealTags): Uint8Array {
-    return Crypto.cipherCtx([StampChecks.bankStamp.parse(this.#bank.stamp), stamp], purpose, tags)
+    return Crypto.cipherCtx([BankChecks.stamp.parse(this.#bank.stamp), stamp], purpose, tags)
   }
 
   /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing keeps it between calls. */
@@ -169,7 +170,7 @@ export class Lease implements LeaseStamp {
     this.demandEnabled()
     // demandEnabled refuses an evicted lease, whose record is null.
     const { lease_key, bank_key_lease_wrapped } = this.#record!
-    const ctx = Crypto.cipherCtx([StampChecks.bankStamp.parse(this.#bank.stamp), this.stamp], 'bank_key_lease_wrapped')
+    const ctx = Crypto.cipherCtx([BankChecks.stamp.parse(this.#bank.stamp), this.stamp], 'bank_key_lease_wrapped')
     // Only this WebCrypto call is trapped: its rejection is how a damaged lease is learned.
     try {
       return await Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })

@@ -6,7 +6,7 @@ import * as Phrases from '../phrases'
 import { Labelpath, Lifeseq } from './primitives'
 import {
   type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord, type ThingScope, type Thingkind,
-  BankChecks, BoxChecks, GateChecks, Shell, ThingChecks,
+  PerKindChecks, Shell, ThingChecks, policiesByModelkind,
 } from './shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
@@ -23,7 +23,7 @@ function isDelFixed({ op, ifAbsent, ifPresent, options }: Flagged): boolean {
 }
 /** True when each storage policy an ask names is one its kind has. */
 function isPolicyOwn({ modelkind, options }: Flagged): boolean {
-  const owned: readonly string[] = ThingChecks.byModelkind[modelkind].policies
+  const owned: readonly string[] = policiesByModelkind[modelkind]
   return (options?.policies ?? []).every((policy) => owned.includes(policy))
 }
 
@@ -133,15 +133,15 @@ export function checkedWriteAsk(ask: unknown): WriteAsk {
 
 /** Check the records of `ask` by the kind its modelkind names. Its flags are already checked. */
 function withRecordsChecked({ cited, record, ...flags }: Z.infer<typeof AskChecks.writeAsk>): WriteAsk {
-  if (flags.modelkind === 'bank') { return { ...flags, modelkind: 'bank', cited: BankChecks.cited.parse(cited), record: BankChecks.record.parse(record) } }
-  if (flags.modelkind === 'gate') { return { ...flags, modelkind: 'gate', cited: GateChecks.cited.parse(cited), record: GateChecks.record.parse(record) } }
-  return { ...flags, modelkind: 'box', cited: BoxChecks.cited.parse(cited), record: BoxChecks.record.parse(record) }
+  if (flags.modelkind === 'bank') { return { ...flags, modelkind: 'bank', cited: PerKindChecks.bankCited.parse(cited), record: PerKindChecks.bankThing.parse(record) } }
+  if (flags.modelkind === 'gate') { return { ...flags, modelkind: 'gate', cited: PerKindChecks.gateCited.parse(cited), record: PerKindChecks.gateThing.parse(record) } }
+  return { ...flags, modelkind: 'box', cited: PerKindChecks.boxCited.parse(cited), record: PerKindChecks.boxThing.parse(record) }
 }
 
 /** Check a birth `ask`: each of its three records, as the put {@link birthPutsOf} makes of it. Throws `bad_record`, and returns it typed. */
 export function checkedBirthBankAsk(ask: unknown): BirthBankAsk {
   const { bank, gate, root, ...flags } = AskChecks.birthBankAsk.parse(ask)
-  const birthBankAsk = { ...flags, bank: BankChecks.record.parse(bank), gate: GateChecks.record.parse(gate), root: BoxChecks.record.parse(root) }
+  const birthBankAsk = { ...flags, bank: PerKindChecks.bankThing.parse(bank), gate: PerKindChecks.gateThing.parse(gate), root: PerKindChecks.boxThing.parse(root) }
   for (const put of birthPutsOf(birthBankAsk)) { checkedWriteAsk(put) }
   return birthBankAsk
 }

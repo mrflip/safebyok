@@ -13,7 +13,8 @@ import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, Li
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type ThingRecord, BankChecks, BoxChecks, GateChecks, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type ThingRecord, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
 import * as Throwers from '../refusals/throwers'
@@ -49,7 +50,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
 
   /** This bank's {@link BankStamp}, which every ctx under it binds first. */
-  get stamp(): BankStamp { return StampChecks.bankStamp.parse(this) }
+  get stamp(): BankStamp { return BankChecks.stamp.parse(this) }
 
   /** The bank's main gate: the wayins a user unlocks with. */
   get maingate(): Gate { return this.#maingate }
@@ -103,14 +104,14 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     const { userid, banklabel } = StampChecks.bankScope.parse(scope)
     const born_at = Clock.nowMillis()
     return {
-      bankStamp: StampChecks.bankStamp.parse({ userid, banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at }),
-      gateStamp: StampChecks.gateStamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: Lifeseq.ofLifenum(0), born_at }),
+      bankStamp: BankChecks.stamp.parse({ userid, banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at }),
+      gateStamp: GateChecks.stamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: Lifeseq.ofLifenum(0), born_at }),
     }
   }
 
   /** The first record of a new bank, made from `dna`, with its main gate and its root box's shell. `Bank.birth` seals the root box over the shell. */
   static makeRecord(dna: BankDna): BankMakeRecord {
-    const { userid, banklabel, lifeseq, born_at } = StampChecks.bankStamp.parse(dna)
+    const { userid, banklabel, lifeseq, born_at } = BankChecks.stamp.parse(dna)
     const bank = BankChecks.record.parse({
       userid, banklabel, labelpath: 'bank', label: 'bank', fmt: ThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
     })

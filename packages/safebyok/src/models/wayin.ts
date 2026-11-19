@@ -1,8 +1,9 @@
 import type * as Z from 'zod'
 import type { Consts, CX, EX } from 'safebyok-big/internals'
 import { Crypto, GX, Helpers } from 'safebyok-big/internals'
-import * as Stamps from '../shapes/shapes-stamps'
+import type * as Stamps from '../shapes/shapes-stamps'
 import type { DeviceTok, EpochMillis } from '../shapes/primitives'
+import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
 
@@ -17,7 +18,7 @@ export const PurposeForWayinkind = Object.freeze({
  */
 export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateStamp, header: GX.WayinHeader): Uint8Array {
   const headerChecked = GX.wayinHeader.parse(header)
-  return Crypto.cipherCtx([Stamps.StampChecks.bankStamp.parse(bankStamp), Stamps.StampChecks.gateStamp.parse(gateStamp)], PurposeForWayinkind[headerChecked.wayinkind], headerChecked)
+  return Crypto.cipherCtx([BankChecks.stamp.parse(bankStamp), GateChecks.stamp.parse(gateStamp)], PurposeForWayinkind[headerChecked.wayinkind], headerChecked)
 }
 // --
 
