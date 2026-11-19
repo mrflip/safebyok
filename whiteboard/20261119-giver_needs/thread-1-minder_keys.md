@@ -1,6 +1,6 @@
 # Thread 1: minder_keys (2026-11-19)
 
-Branch `20261119-minder_keys`, PR pending, stacked on #751. Proved: `pnpm --filter safebyok exec vitest run tests/minding tests/shapes tests/index.test.ts` (304 pass), eslint on `safebyok` src and tests and on `safebyok-react` src, `tsc --noEmit` on `safebyok`. `pnpm justify` not yet run.
+Branch `20261119-minder_keys`, PR #753, stacked on #751. Proved: `pnpm --filter safebyok exec vitest run tests/minding tests/shapes tests/index.test.ts` (304 pass), eslint on `safebyok` src and tests and on `safebyok-react` src, `tsc --noEmit` on `safebyok`. `pnpm justify` not yet run.
 
 * **Built**
   * M1, in `packages/safebyok/src/minding/thing-minder.ts`: `queryKey(scoped)` is `['safebyok', userid, banklabel, ...labels with '/' between, '!']`. New public siblings `listingQueryKey(scoped)` (`..., '#', 'kids'`) and `subtreeQueryKey(scoped)` (`..., '/'`), both over a private `#keyHeadOf`. `#scopeOfQueryKey` reads the labels up to the first `'!'` or `'#'` and drops the `'/'` segments, so it reads a car's key and a listing's key alike. The root box's `gcTime: Infinity` default is still set on `queryKey(root)`, and no other key starts with it.
