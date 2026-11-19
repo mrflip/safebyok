@@ -1,7 +1,7 @@
 /** Classify a vaultDB ask against the Thing stored, by big's act tables in `notes/answer-contract.md`. */
 
 import { sortBy } from 'es-toolkit'
-import { CX, EX, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
+import { CX, EX, Errors, Phrases as BigPhrases, SX, Validator } from 'safebyok-big/internals'
 import { policyRefusalOf } from './policies'
 import { Labelpath } from '../shapes/primitives'
 import type { Actual, BirthBankActual, DamagedThing, ListThingsActual } from './vault-db'
@@ -169,10 +169,10 @@ function listedThingOf(scope: ThingScope, raw: unknown): ThingRecord | null {
 export function watchedThingOf(bankScope: ThingWatchScope, raw: unknown): ThingRecord {
   if (! CX.isPlainBag(raw)) { throw Throwers.storageIssue() }
   // The labelpath is the record's own; the bank is the watch's, so that a Thing of another bank refuses.
-  const scopeReport = ThingChecks.thingScope.safeParse({ ...bankScope, labelpath: raw['labelpath'] })
-  if (! scopeReport.success) { throw Throwers.storageIssue() }
-  return writtenThingOf(scopeReport.data, raw)
+  const scope = watchedScopeChecker.parse({ ...bankScope, labelpath: raw['labelpath'] })
+  return writtenThingOf(scope, raw)
 }
+const watchedScopeChecker = ThingChecks.thingScope.refusingAs('damaged_row')
 
 /** The raw bank, main gate and root box a store fetched for a bank's birth, each null for none, and its {@link TrackedFetched}. */
 export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: unknown, tracked?: TrackedFetched }>
@@ -181,13 +181,18 @@ export type BankRootsFetched = Readonly<{ bank: unknown, gate: unknown, root: un
 export type WorldFetched = Readonly<{ bank: unknown, maingate: unknown, tracked?: TrackedFetched }>
 
 // A world is news, never the verdict: a bank or main gate that fails its checks leaves it null, and the step's answer stands.
-/** The world of the bank at `bankScope`, from its raw `fetched` bank and main gate; null where either is missing or fails its checks. */
+/** The world of the bank at `bankScope`, from its raw `fetched` bank and main gate; null where either is missing or fails its checks.
+ * Refuses `storage_issue` where either is not an object, or is filed at another scope.
+ */
 export function worldOf({ userid, banklabel }: ThingWatchScope, fetched: WorldFetched): WorldRecord | null {
   try {
     const bank     = storedOf(BankChecks.stored, { userid, banklabel, labelpath: 'bank' }, fetched.bank)
     const maingate = storedOf(GateChecks.stored, { userid, banklabel, labelpath: Labelpath.MainGate }, fetched.maingate)
     return ((bank === null) || (maingate === null)) ? null : { ...bank, maingate }
-  } catch { return null }
+  } catch (err) {
+    if (Errors.isVaultError(err, 'damaged_row')) { return null }
+    throw err
+  }
 }
 // --
 

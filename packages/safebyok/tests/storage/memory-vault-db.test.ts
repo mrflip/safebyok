@@ -57,3 +57,41 @@ describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
     TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [child] }, { bank: null, maingate: null }), 'storage_issue')
   })
 })
+
+describe("Classifier.worldOf(bankScope, fetched)", () => {
+  it("is the bank and its main gate, for sound rows", () => {
+    expect(Classifier.worldOf(TH.ThingBank, { bank: TH.bankThingOf(), maingate: TH.gateThingOf() })).to.deep.equal({ ...TH.bankThingOf(), maingate: TH.gateThingOf() })
+  })
+
+  it("is null where the bank or main gate fails its checks", () => {
+    expect(Classifier.worldOf(TH.ThingBank, { bank: { ...TH.bankThingOf(), note: 'hi' }, maingate: TH.gateThingOf() })).to.be.null
+    expect(Classifier.worldOf(TH.ThingBank, { bank: TH.bankThingOf(), maingate: { ...TH.gateThingOf(), note: 'hi' } })).to.be.null
+  })
+
+  const BrokenCases = [
+    [{ bank: 'not a Thing', maingate: TH.gateThingOf() },                             'refuses, as a broken store, a bank that is not an object'],
+    [{ bank: TH.bankThingOf(), maingate: { ...TH.gateThingOf(), banklabel: 'other' } }, 'refuses, as a broken store, a main gate filed at another scope'],
+  ] as const
+
+  for (const [fetched, blurb] of BrokenCases) {
+    it(blurb, () => {
+      TH.expectSyncRefusal(() => Classifier.worldOf(TH.ThingBank, fetched), 'storage_issue')
+    })
+  }
+
+  it("lets a failure that is not a refusal pass through", () => {
+    const fetched = { get bank(): never { throw new TypeError('a bug') }, maingate: null }
+    expect(() => Classifier.worldOf(TH.ThingBank, fetched)).to.throw(TypeError, 'a bug')
+  })
+})
+
+describe("Classifier.watchedThingOf(bankScope, raw)", () => {
+  it("refuses damaged_row, naming the field, for a Thing whose labelpath is unsound", () => {
+    const err = TH.expectSyncRefusal(() => Classifier.watchedThingOf(TH.ThingBank, { ...TH.gateThingOf(), labelpath: 42 }), 'damaged_row')
+    expect(err.message).to.include('labelpath')
+  })
+
+  it("refuses, as a broken store, a Thing of another bank", () => {
+    TH.expectSyncRefusal(() => Classifier.watchedThingOf(TH.ThingBank, { ...TH.gateThingOf(), banklabel: 'other' }), 'storage_issue')
+  })
+})
