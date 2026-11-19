@@ -202,12 +202,12 @@ export class PostgresVaultDB extends AdapterVaultDB {
 
   // == [Hearing]: #receivedOrNull
 
-  /** The Thing and world a notice carried, or fetched now if it carried less. Null if that fetch finds no Thing, or fails.
+  /** The Thing and world a notice carried, or fetched now if it carried less. Null if it finds no Thing, or its world or fetch fails.
    * A failure a retry would not mend also hands `onFailed` its refusal.
    */
   async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, world }: Told, onFailed: (news: VaultError) => void): Promise<Received | null> {
-    if ((thing !== undefined) && (world !== undefined)) { return { record: thing, world: Classifier.worldOf(scope, world as Classifier.WorldFetched) } }
     try {
+      if ((thing !== undefined) && (world !== undefined)) { return { record: thing, world: Classifier.worldOf(scope, world as Classifier.WorldFetched) } }
       const fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath }))
       return (fetched.thing === null) ? null : { record: fetched.thing, world: Classifier.worldOf(scope, fetched.world) }
     } catch (err) {

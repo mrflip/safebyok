@@ -120,6 +120,20 @@ afterAll(async () => {
 VT.describeVaultDBBattery('PostgresVaultDB', { makeVaultDB, _cheat_rowsOf: rowsOf })
 
 describe("PostgresVaultDB, what only Postgres can show", () => {
+  it("ends a watch, telling its onBadNews storage_issue, where a notice carries a world that is no object, with no rejection left unhandled", async () => {
+    await makeVaultDB()
+    const db = await database()
+    const vaultDB = await vaultDBOver()
+    const notices: unknown[] = []
+    const badnews: VaultError[] = []
+    vaultDB.watch(VT.ThingBank, (notice) => { notices.push(notice) }, (news) => { badnews.push(news) })
+    const forged = JSON.stringify({ at: { ...VT.ThingBank, labelpath: 'bank' }, thing: VT.bankThingOf(), world: 'x' })
+    await db.query('SELECT pg_notify($1, $2)', [thingsChannelOf(VT.ThingBank.userid), forged])
+    await VT.aWhile()
+    expect(notices).to.deep.equal([])
+    expect(badnews.map(({ refusalkind }) => refusalkind)).to.deep.equal(['storage_issue'])
+  })
+
   it("reports, called past the adapter, the verdict of each check of the gate stored that refused its write", async () => {
     await makeVaultDB()
     const db = await database()
