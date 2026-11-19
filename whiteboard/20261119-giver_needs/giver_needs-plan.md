@@ -6,7 +6,7 @@
 * **Default levels:** review `medium`; worker `thread-worker` (its own model and effort); reviewer `thread-reviewer`
   (`sonnet`); style pass `style-reviewer` (`sonnet`). Up to 3 threads at once.
 * **Sprint doc:** https://claude.ai/artifact/9wf4Ryn23X4M3jppvH77yP (doc 486aba46-e2f8-4d69-9ee8-4fdd8166fcee; Open Matters tab c4a2702e-8b87, body ecf3fd4c-02c4, State enum c52d912d-4d90; Cleanup body 132c11d2-980a; Progress body 250e3266-4db9; Resolved body c12d7106-6d17).
-* **Status:** thread 1 building; threads 2–5 wait on thread 1, and on rows in *Open Matters*.
+* **Status:** thread 1 filed, PR #753 (draft until #751 leaves draft); threads 2–5 wait on rows in *Open Matters*.
 
 The source is `whiteboard/20261116-react_backwards/giver_needs.md`, snapshotted onto this branch from the base checkout
 on 2026-11-19 with `dream-hooks.ts.md` and the Coach's edits to `internals.md`. This sprint is its **Part 1, the minder**:
@@ -71,6 +71,12 @@ checks whether modelkind already gives the giver what it needs; if so, it says s
 #751. **Look-ahead:** thread 3 builds listings on the `'#'` key and thread 5 invalidates by prefix, so the key builders
 take the shape both need (a car key, a listing key, a subtree prefix). **Size:** small. **Levels:** worker `sonnet`,
 review `low`.
+
+*Review:* fixed three style points (a blank line, `rootKeys` → `queryKeys`, a two-clause test title); no significant
+findings. Left, as look-ahead: listing keys must stay out of the car-only paths of `#scopeOfQueryKey`'s callers
+(thread 3); the root's listing is not under the root car's `gcTime: Infinity` (thread 3 decides); `subtreeQueryKey`
+excludes the Thing's own keys (thread 5). Filing met a conflict when #751 was rebased onto the namespaces main; a fresh
+worker resolved it: `BoxLabelpath` is in `shapes/primitives.ts`, its guard `Labelpath.isBox`.
 
 ### 2. minder_events: M6, what `listen` tells, as a tagged union
 

@@ -14,6 +14,27 @@ writes it.
 * The bank makes write asks (`Bank.makePutAsk`, `makeDelAsk`); `Bank.tryPutBox` and `tryDelBox` call `tryWriteThing`
   directly, around the minder.
 
+## Thread 1, minder_keys (#753)
+
+*Orchestrator:*
+* Keys are public methods on `ThingMinder`: `queryKey(scope)` (a car, ending `'!'`), `listingQueryKey(scope)`
+  (`'#', 'kids'`), `subtreeQueryKey(scope)` (ending `'/'`: every car and listing under the Thing, neither of its own),
+  over a private `#keyHeadOf`. Nothing caches a listing yet.
+* `#scopeOfQueryKey` reads a car key and a listing key alike (labels up to the first `'!'` or `'#'`); tell them apart
+  by the mark.
+* The listings under a labelpath, for thread 5: `subtreeQueryKey(scope)` plus the Thing's own `listingQueryKey(scope)`.
+* `BoxLabelpath` lives in `shapes/primitives.ts` beside `Labelpath`, exported from `safebyok`; its guard is
+  `Labelpath.isBox` (beside `Labelpath.isOfModelkind`); `ThingAt` reads `BoxLabelpath`; the giver uses both.
+* **Main moved under the sprint** (#740, #747–#750: namespaces, classes, exports): `shellOf` is `Shell.of`,
+  `isVoidSentinel` is `Thing.isVoidSentinel`, `Checkers` comes from `safebyok`. #751 is rebased onto it. Names in the
+  plan's glosses predate it; trust the code.
+* From its review, for thread 3: `#scopeOfQueryKey`'s callers (the default `queryFn`, `listen`) treat every query as a
+  car, and a listing key decodes to its parent's scope. Listing queries must stay out of those paths, or take a branch
+  of their own there. The root box's `gcTime: Infinity` sits on its car key alone, so its listing falls under the
+  host's `gcTime` (a test pins it): thread 3 decides whether that is right.
+* A fresh worktree needs `pnpm --filter safebyok-big build` before the `safebyok` tests resolve
+  `safebyok-big/internals`.
+
 ## Rulings
 
 None yet.
