@@ -939,6 +939,9 @@ importers:
       eslint-plugin-unicorn:
         specifier: ^79.0.0
         version: 79.0.0(eslint@10.14.0)(typescript@6.0.3)
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
       publint:
         specifier: ^0.3.25
         version: 0.3.25

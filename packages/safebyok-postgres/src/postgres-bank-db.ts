@@ -8,6 +8,7 @@ import {
   BirthBankSql, BirthBoxSql, BirthVaultSql, CountBoxesSql, DeleteEndedBoxesSql, DeleteEndedVaultsSql, EnsureBankSql, GetBankSql, GetBoxWithVaultSql,
   GetGateWithBankSql, GetVaultWithBankSql, ListBoxesWithVaultSql, PutGateSql, ReviseBankSql, ReviseBoxSql, ReviseVaultSql,
 } from './bank-queries'
+import * as Phrases from './phrases'
 
 // == [The driver]: PostgresQueryable, PostgresClient, PostgresListen, isPostgresClient, PostgresBankDBOpts
 
@@ -94,13 +95,21 @@ function isHeardIn(scope: WatchScope, told: Told): boolean {
 }
 // --
 
-// == [Refusals]: refusalOf, causeOf, codeOf
+// == [Refusals]: refusalOf, isTransient, causeOf, codeOf, TransientSqlstate, TransientSystemCodes, PgConnectionLost
 
-/** The VaultError for `thrown`: `unexpected_error` for a setup fault (SQLSTATE class 42), else `storage_unavailable`. */
+/** The VaultError for what a driver threw: `storage_unavailable` where a retry may mend it, else `unexpected_error`. A VaultError is kept as it is.
+ * A lost connection, a conflict between transactions, a busy or read-only server: anything else fails the same way again.
+ */
 export function refusalOf(thrown: unknown): VaultError {
   if (DB.isVaultError(thrown)) { return thrown }
-  if (codeOf(thrown)?.startsWith('42')) { return DB.unexpectedError(causeOf(thrown)) }
-  return DB.storageUnavailable(causeOf(thrown))
+  return isTransient(thrown) ? DB.storageUnavailable(causeOf(thrown)) : DB.unexpectedError(causeOf(thrown))
+}
+
+/** True for a failure a retry may mend: a transient SQLSTATE, a socket's system error, or one of pg's own connection failures. */
+function isTransient(thrown: unknown): boolean {
+  const code = codeOf(thrown)
+  if (code !== undefined) { return TransientSqlstate.test(code) || TransientSystemCodes.has(code) }
+  return (thrown instanceof Error) && PgConnectionLost.has(thrown.message)
 }
 
 // A driver's error can include the statement's parameters, which may include a row. Keep only its message and code.
@@ -109,12 +118,34 @@ function causeOf(thrown: unknown): Error {
   return Object.assign(new Error(DB.sanitizeForeignError(thrown).message), (code === undefined) ? {} : { code })
 }
 
+/** The error code on `thrown`, a SQLSTATE such as 40001 or a system error such as ECONNRESET. Only capitals, digits and underbars are kept, so it cannot quote a row. */
 function codeOf(thrown: unknown): string | undefined {
-  return ((typeof thrown === 'object') && (thrown !== null) && ('code' in thrown) && (typeof thrown.code === 'string')) ? thrown.code : undefined
+  const code: unknown = ((typeof thrown === 'object') && (thrown !== null) && ('code' in thrown)) ? thrown.code : undefined
+  return ((typeof code === 'string') && /^[0-9A-Z][0-9A-Z_]{0,39}$/.test(code)) ? code : undefined
 }
+
+// SQLSTATE classes 08 (connection exception), 40 (transaction rollback: a serialization failure or deadlock), 53 (insufficient
+// resources) and 57 (operator intervention: a cancelled statement, a server shutting down), 55P03 (lock not available), and
+// 25006 (read-only SQL transaction: a write sent to a standby, as during a failover).
+const TransientSqlstate = /^(?:(?:08|40|53|57)[0-9A-Z]{3}|55P03|25006)$/
+
+// Node's system errors for a socket that could not connect, or that dropped, and a host name that could not be looked up for now.
+const TransientSystemCodes = new Set(['ECONNREFUSED', 'ECONNRESET', 'ECONNABORTED', 'ETIMEDOUT', 'EPIPE', 'EHOSTUNREACH', 'ENETUNREACH', 'ENETDOWN', 'EAI_AGAIN'])
+
+// pg 8 throws these as plain Errors, with no code, so only the message tells them apart. A test checks each against the installed pg.
+// A connection dropped or timed out is in `pg/lib/client.js`, a pool that found no connection in time in `pg-pool/index.js`.
+/** The messages of pg's connection failures a retry may mend; a client the host ended itself is left out. */
+export const PgConnectionLost: ReadonlySet<string> = new Set([
+  'Connection terminated unexpectedly',
+  'Client has encountered a connection error and is not queryable',
+  'Query read timeout',
+  'timeout expired',
+  'timeout exceeded when trying to connect',
+  'Connection terminated due to connection timeout',
+])
 // --
 
-// == [What the database returns]: Verdict, GateAnswered, BankAnswered, VaultAnswered, BoxAnswered, storedVerdict, parentVaultRow, RowOfOtherAddress, StoredNothing
+// == [What the database returns]: Verdict, GateAnswered, BankAnswered, VaultAnswered, BoxAnswered, storedVerdict, parentVaultRow, RowOfOtherAddress, checkedWrote, storedNothing
 // A fetch returns rows alone. A write function also returns whether it wrote the record (`ok`), and if it did,
 // the `act` and the `presence` of what was stored before.
 
@@ -141,7 +172,15 @@ const parentVaultRow = BX.storedVaultRow.refusingAs('damaged_vault')
 
 const RowOfOtherAddress = { kind: 'storage_issue', message: DB.rowOfOtherAddress } as const
 
-const StoredNothing = 'The database stored nothing for a write its rows allow.'
+// The classifier checked the rows, so a disagreement is our SQL function out of step with our classifier, never a damaged row.
+/** Check that the write function wrote where the classifier finds a write, and return `stored` typed. */
+function checkedWrote<StoredT extends { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct }>(answered: Verdict, stored: StoredT): StoredT {
+  if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw storedNothing() }
+  return stored
+}
+
+/** The `unexpected_error` for a write function that stored nothing where the classifier finds a write. */
+export function storedNothing(): VaultError { return DB.unexpectedError(new Error(Phrases.StoredNothing)) }
 // --
 
 /** A bankDB that keeps its rows in your Postgres: `new PostgresBankDB({ client: pgClientOf(pool) })`. */
@@ -213,17 +252,13 @@ export class PostgresBankDB extends DB.AdapterBankDB {
   /** Run a vault's write function `text` for the ask's record and the row it expects. */
   async #writeVault(ask: BX.VaultPutAsk | BX.VaultDelAsk, text: string): Promise<BX.VaultStored> {
     const answered = await this.#firstRow<VaultAnswered>(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected)])
-    const stored = this.classifyStoredVault(ask, answered)
-    if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-    return stored
+    return checkedWrote(answered, this.classifyStoredVault(ask, answered))
   }
 
   /** Run a box's write function `text` for the ask's record and the row it expects. */
   async #writeBox(ask: BX.BoxPutAsk | BX.BoxDelAsk, text: string): Promise<BX.BoxStored> {
     const answered = await this.#firstRow<BoxAnswered>(text, [JSON.stringify(ask.record), JSON.stringify(ask.expected), this.#maxBoxes])
-    const stored = this.classifyStoredBox(ask, answered)
-    if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-    return stored
+    return checkedWrote(answered, this.classifyStoredBox(ask, answered))
   }
   // --
 
@@ -278,18 +313,14 @@ export class PostgresBankDB extends DB.AdapterBankDB {
   protected async doBuildBank(ask: BX.BankBuildAsk): Promise<BX.BankBuildStored> {
     const text     = (ask.expected.revision_seq === DB.VoidRevisionSeq) ? BirthBankSql : ReviseBankSql
     const answered = await this.#firstRow<GateAnswered>(text, [JSON.stringify(ask.record), JSON.stringify(ask.gate), JSON.stringify(ask.expected)])
-    const stored   = this.classifyBuildBank(ask, answered)
-    if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-    return stored
+    return checkedWrote(answered, this.classifyBuildBank(ask, answered))
   }
 
   // The function checks the bank row as it puts, so putGate always calls it: when nothing is stored, the
   // classifier answers from the rows it returns.
   protected async doPutGate(ask: BX.GatePutAsk): Promise<BX.GateStored> {
     const answered = await this.#firstRow<GateAnswered>(PutGateSql, [JSON.stringify(ask.record), JSON.stringify(ask.expected), ask.options.policies])
-    const stored   = this.classifyStoredGate(ask, answered)
-    if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-    return stored
+    return checkedWrote(answered, this.classifyStoredGate(ask, answered))
   }
 
   protected async doDelBank(ask: BX.BankDelAsk): Promise<BX.BankDelStored> {
@@ -298,9 +329,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       return this.classifyDelBank(ask, fetched)
     }
     const answered = await this.#firstRow<BankAnswered>(ReviseBankSql, [JSON.stringify(ask.record), null, JSON.stringify(ask.expected)])
-    const stored   = this.classifyDelBank(ask, answered)
-    if ((! answered.ok) && BX.isWriteAct(stored.act)) { throw DB.unexpectedError(new Error(StoredNothing)) }
-    return stored
+    return checkedWrote(answered, this.classifyDelBank(ask, answered))
   }
 
   protected async doGetVault(ask: BX.VaultGetAsk): Promise<BX.VaultStored> {
@@ -373,7 +402,7 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       void hearTold(told)
     }
     const hearTold = async (told: Told): Promise<void> => {
-      const heard = await this.#heardOrNull(told)
+      const heard = await this.#heardOrNull(told, onFetchFailed)
       if ((heard !== null) && isListening) { hear(heard) }
     }
     // A listen that fails ends the watch before it heard anything.
@@ -382,19 +411,29 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       isListening = false
       onBadNews(news)
     }
-    const listening = listenOrNull(listen, channelOf(scope.user_id), onNotify, onListenFailed)
-    return () => {
+    const unwatch = (): void => {
       if (! isListening) { return }
       isListening = false
       void unlistenOnceListening(listening)
     }
+    // A notice's fetch that would fail the same way again ends the watch.
+    const onFetchFailed = (news: VaultError): void => {
+      if (! isListening) { return }
+      unwatch()
+      onBadNews(news)
+    }
+    // Listen last, so a notice heard while `listen` runs finds every handler above.
+    const listening = listenOrNull(listen, channelOf(scope.user_id), onNotify, onListenFailed)
+    return unwatch
   }
   // --
 
   // == [Hearing]: #heardOrNull
 
-  /** Return the rows a notice carried, or fetch them now if it carried none. Returns null if that fetch fails. */
-  async #heardOrNull({ heard, gatelabel, vaultlabel, bank_tok, vault_tok, boxlabel, ...scope }: Told): Promise<BX.Heard | null> {
+  /** Return the rows a notice carried, or fetch them now if it carried none.
+   * Returns null if that fetch fails, and hands `onFailed` its refusal where a retry would not mend it.
+   */
+  async #heardOrNull({ heard, gatelabel, vaultlabel, bank_tok, vault_tok, boxlabel, ...scope }: Told, onFailed: (news: VaultError) => void): Promise<BX.Heard | null> {
     if (heard !== undefined) { return heard }
     try {
       if ((vaultlabel !== undefined) && (bank_tok !== undefined) && (vault_tok !== undefined) && (boxlabel !== undefined)) {
@@ -411,8 +450,11 @@ export class PostgresBankDB extends DB.AdapterBankDB {
       }
       const { bank } = await this.#fetchBank(scope)
       return { row: bank }
-    } catch {
-      return null  // a notice is only a hint: if its rows cannot be fetched, drop it
+    } catch (err) {
+      // A notice is only a hint: if its rows cannot be fetched for now, drop it.
+      const refusal = refusalOf(err)
+      if (! DB.isVaultError(refusal, 'storage_unavailable')) { onFailed(refusal) }
+      return null
     }
   }
   // --

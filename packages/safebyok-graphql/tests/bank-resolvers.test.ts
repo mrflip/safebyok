@@ -5,7 +5,8 @@ import { Client } from '@urql/core'
 import { buildSchema, graphql, isObjectType, parse, subscribe, validate } from 'graphql'
 import type { GraphQLSchema } from 'graphql'
 import { makeExecutableSchema } from '@graphql-tools/schema'
-import { BX } from 'safebyok-big/storage'
+import { BX, VaultError } from 'safebyok-big/storage'
+import type { WatchScope } from 'safebyok-big/storage'
 import type { UserID } from 'safebyok-big'
 import { PostgresBankDB } from 'safebyok-postgres'
 import type { PostgresListen } from 'safebyok-postgres'
@@ -18,12 +19,28 @@ TH.bootDatabaseFirst()
 
 const { BW } = TH
 
-/** A bankDB whose database is unreachable. Its driver's error contains text that must never reach a browser. */
+/** A driver's error for a database that refused the connection. Its message contains text that must never reach a browser. */
+function refusedConnection(): Error { return Object.assign(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2'), { code: 'ECONNREFUSED' }) }
+
+/** A bankDB whose database is unreachable. */
 function unreachable() {
   return new PostgresBankDB({ client: {
-    query:       () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
-    transaction: () => Promise.reject(new Error('connect ECONNREFUSED db.internal:5432 password=hunter2')),
+    query:       () => Promise.reject(refusedConnection()),
+    transaction: () => Promise.reject(refusedConnection()),
   } })
+}
+
+/** A bankDB whose watch tells two pieces of bad news, then goes on until it is stopped. It counts each stop in `stops`. */
+class GoingOnBankDB extends PostgresBankDB {
+  stops = 0
+
+  protected override doWatch(_scope: WatchScope, _hear: unknown, onBadNews: (news: VaultError) => void): () => void {
+    queueMicrotask(() => {
+      onBadNews(new VaultError('storage_unavailable', 'The first bad news.'))
+      onBadNews(new VaultError('storage_unavailable', 'The second bad news.'))
+    })
+    return () => { this.stops += 1 }
+  }
 }
 
 /** Round-trip `val` through JSON, as the wire would, then leave out a null `passkey0`, as GraphQLBankDB does: a gate without a passkey wayin has none. */
@@ -317,6 +334,32 @@ describe("bankResolvers' watch", () => {
     expect(BX.crossedNotice.parse(overTheWire(last.value?.data?.['safebyokWatch']))).to.have.nested.property('err.refusalkind', 'unexpected_error')
     expect(await stream.next()).to.have.property('done', true)
     await vi.waitFor(() => { expect(listening.size).to.eq(0) })
+  })
+
+  it("ends with the refusal that ended the bankDB's watch", async () => {
+    const schema = TH.schemaOver(await TH.serverOver({ listen: () => Promise.reject(refusedConnection()) }))
+    const { nextNotice } = await watching(schema, { user_id: 'u1' })
+    const last = await nextNotice()
+    expect(last).to.have.nested.property('err.refusalkind', 'storage_unavailable')
+    expect(JSON.stringify(last)).not.to.include('hunter2')
+    expect(await nextNotice()).to.be.null
+  })
+
+  it("stops a bankDB's watch that goes on after its bad news", async () => {
+    const bankDB = new GoingOnBankDB({ client: await TH.database() })
+    const { nextNotice } = await watching(TH.schemaOver(bankDB), { user_id: 'u1' })
+    expect(await nextNotice()).to.have.nested.property('err.message', 'The first bad news.')
+    expect(await nextNotice()).to.be.null
+    expect(bankDB.stops).to.eq(1)
+  })
+
+  it("ends with the sign-in's refusal when bad news reaches a session signed out since", async () => {
+    const bankDB = new GoingOnBankDB({ client: await TH.database() })
+    const session: TH.TestContext = { user_id: 'u1' }
+    const { nextNotice } = await watching(TH.schemaOver(bankDB), session)
+    session.user_id = null
+    expect(await nextNotice()).to.have.nested.property('err.refusalkind', 'identity_revoked')
+    expect(await nextNotice()).to.be.null
   })
 
   it("ends a refused watch after one notice", async () => {

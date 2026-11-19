@@ -74,8 +74,14 @@ const bankDB = new PostgresBankDB({ client: pgClientOf(pool) })
 may reach which bank**: check the signed-in user before a request reaches the bankDB, and build
 each scope's `user_id` from that check, never from the request.
 
-A failed statement is refused with `storage_unavailable`, its cause the driver's message and code.
-A missing table or privilege (SQLSTATE class `42`) is a setup fault, refused with `unexpected_error`.
+A failed statement that a retry may mend is refused with `storage_unavailable`: a lost or refused
+connection, a serialization failure or deadlock, a server short of resources or shutting down, a
+lock not granted in time, a write sent to a server that is read-only for now, as during a failover
+(SQLSTATE classes `08`, `40`, `53`, `57`, and `55P03` and `25006`). A lost or refused
+connection is also told by a Node system error code such as `ECONNRESET`, or by `pg`'s own message
+for one; a wrapper for another driver passes it on with a SQLSTATE or a Node code as the error's
+`code`. Every other failed statement, a missing table or privilege among them, is refused with
+`unexpected_error`. Either way its cause is the driver's message and code.
 
 ## Hearing other writes
 
@@ -85,7 +91,8 @@ a JSON object with the written row's address under `at`, the row under `row`, an
 under `parent`: a gate's or a vault's bank row, a box's vault row. A box's address carries its
 vault's life, `bank_tok` and `vault_tok`. Postgres refuses a notification of 8,000 bytes or more.
 A notification that is too large drops the row above first, then the row, and the listener fetches
-what is stored at the address. Deleting a bank notifies once, of its tombstone: the gate,
+what is stored at the address. A fetch that fails in a way a retry may mend drops the notice; any
+other failure ends the watch and is handed to its `onBadNews`. Deleting a bank notifies once, of its tombstone: the gate,
 vault and box rows deleted with it notify none. `listen(channel, onNotify)` passes the text of each
 notification on that channel to `onNotify`, unchanged, and returns a function that stops listening.
 A watch hears a box with its vault's row as its parent, or with a null parent when the vault row did
@@ -137,7 +144,7 @@ but takes its turn behind the statements already queued.
 **A user_id whose channel passes 63 bytes cannot write.** A channel is a Postgres identifier, at
 most 63 bytes, so a user_id of more than 54 characters (a user_id is ASCII, a byte a character, and
 a percent-encoded character is three) makes every write that would notify fail with
-`storage_unavailable`, its cause Postgres's `channel name too long`. Keep user_ids to 54 characters
+`unexpected_error`, its cause Postgres's `channel name too long`. Keep user_ids to 54 characters
 with this package for now.
 
 ## What is stored

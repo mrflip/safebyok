@@ -3,9 +3,9 @@
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- a devDependency while PostgresVaultDB is not exported
 import {
   type Actual, type AnyAsk, type AdapterVaultDBOpts, type BirthBankActual, type BirthBankAsk, type BirthPuts, type DelAct, type GetAsk, type GotAct, type ListThingsActual, type ListAsk, type PutAct,
-  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, AdapterVaultDB, Classifier, Shell, getAskOf, objCheck, storageIssue,
+  type Received, type ThingWatchScope, type VaultError, type WriteAct, type WriteAsk, AdapterVaultDB, Classifier, Shell, getAskOf, isVaultError, objCheck,
 } from 'safebyok/storage'
-import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, unlistenOnceListening } from './postgres-bank-db'
+import { type PostgresListen, type PostgresQueryable, jsonOrNull, listenOrNull, refusalOf, storedNothing, unlistenOnceListening } from './postgres-bank-db'
 import { BirthRootsSql, GetThingSql, ListThingsSql, WriteThingSql } from './vault-queries'
 
 // == [The driver]: PostgresVaultDBOpts, isPostgresQueryable
@@ -145,7 +145,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     if (! written.born_at_ok)          { Classifier.demandBornAtKept(ask, written.thing) }
     if (written.policies_ok === false) { Classifier.demandPolicies(ask, written.thing) }
     // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.
-    throw storageIssue()
+    throw storedNothing()
   }
 
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
@@ -165,7 +165,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     }
     // The store refused. The act tables name why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
     const unwritten = Classifier.unwrittenBirthOf(puts, written)
-    if (unwritten === null) { throw storageIssue() }
+    if (unwritten === null) { throw storedNothing() }
     return unwritten
   }
 
@@ -176,32 +176,45 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const onNotify = (text: string): void => {
       const told = toldOf(scope, text)
       if ((told === null) || (! isListening)) { return }
-      void this.#receivedOrNull(scope, told).then((received) => { if ((received !== null) && isListening) { receive(received) } })
+      void this.#receivedOrNull(scope, told, onFetchFailed).then((received) => { if ((received !== null) && isListening) { receive(received) } })
     }
     const onListenFailed = (news: VaultError): void => {
       if (! isListening) { return }
       isListening = false
       onBadNews(news)
     }
-    const listening = listenOrNull(listen, thingsChannelOf(scope.userid), onNotify, onListenFailed)
-    return () => {
+    const unwatch = (): void => {
       if (! isListening) { return }
       isListening = false
       void unlistenOnceListening(listening)
     }
+    // A notice's fetch that would fail the same way again ends the watch.
+    const onFetchFailed = (news: VaultError): void => {
+      if (! isListening) { return }
+      unwatch()
+      onBadNews(news)
+    }
+    // Listen last, so a notice heard while `listen` runs finds every handler above.
+    const listening = listenOrNull(listen, thingsChannelOf(scope.userid), onNotify, onListenFailed)
+    return unwatch
   }
   // --
 
   // == [Hearing]: #receivedOrNull
 
-  /** The Thing and world a notice carried, or fetched now if it carried less. Null if that fetch fails, or finds no Thing. */
-  async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, world }: Told): Promise<Received | null> {
+  /** The Thing and world a notice carried, or fetched now if it carried less. Null if that fetch finds no Thing, or fails.
+   * A failure a retry would not mend also hands `onFailed` its refusal.
+   */
+  async #receivedOrNull(scope: ThingWatchScope, { labelpath, thing, world }: Told, onFailed: (news: VaultError) => void): Promise<Received | null> {
     if ((thing !== undefined) && (world !== undefined)) { return { record: thing, world: Classifier.worldOf(scope, world as Classifier.WorldFetched) } }
     try {
       const fetched = await this.#fetchThing(getAskOf({ ...scope, labelpath }))
       return (fetched.thing === null) ? null : { record: fetched.thing, world: Classifier.worldOf(scope, fetched.world) }
-    } catch {
-      return null  // a notice is only a hint: if its Thing cannot be fetched, drop it
+    } catch (err) {
+      // A notice is only a hint: if its Thing cannot be fetched for now, drop it.
+      const refusal = refusalOf(err)
+      if (! isVaultError(refusal, 'storage_unavailable')) { onFailed(refusal) }
+      return null
     }
   }
   // --

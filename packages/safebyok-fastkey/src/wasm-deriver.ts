@@ -1,6 +1,7 @@
 import { argon2id } from 'hash-wasm'
 import { VaultError } from 'safebyok-big'
 import { Argon2idWebV1, parseKeyDeriverSpec, type Argon2idKeyDeriver, type KeyDeriverSpec } from 'safebyok-big/browser'
+import * as Phrases from './phrases'
 
 /** Make a frozen key deriver from a spec that has already been validated. */
 function deriverOf(spec: KeyDeriverSpec): Argon2idKeyDeriver {
@@ -28,9 +29,9 @@ export const argon2idWasmWebV1Deriver = /* @__PURE__ */ deriverOf(Argon2idWebV1)
 /** Derive the key bytes with hash-wasm's Argon2id at `spec`. */
 async function deriveWithWasm(spec: KeyDeriverSpec, passphrase: string, saltBytes: Uint8Array): Promise<Uint8Array> {
   if (typeof WebAssembly === 'undefined') {
-    throw new VaultError('bad_record', "This platform has no WebAssembly (React Native's Hermes has none), so the WebAssembly key deriver cannot run here: use argon2idWebV1Deriver, or makeArgon2idDeriver, from safebyok-big/browser.")
+    throw new VaultError('bad_record', Phrases.NoWebAssembly)
   }
-  if (passphrase === '') { throw new VaultError('wrong_passphrase', "A passphrase can't be empty.") }
+  if (passphrase === '') { throw new VaultError('wrong_passphrase', Phrases.EmptyPassphrase) }
   try {
     return await argon2id({
       password:    passphrase,
@@ -43,7 +44,7 @@ async function deriveWithWasm(spec: KeyDeriverSpec, passphrase: string, saltByte
     })
   } catch (err) {
     if (err instanceof WebAssembly.CompileError) {
-      throw new VaultError('bad_record', "WebAssembly would not compile here, so Argon2id cannot run through it: a page's Content-Security-Policy must allow 'wasm-unsafe-eval' in script-src. Allow it, or use argon2idWebV1Deriver from safebyok-big/browser.", { cause: err })
+      throw new VaultError('bad_record', Phrases.WasmWouldNotCompile, { cause: err })
     }
     throw err
   }

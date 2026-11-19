@@ -158,7 +158,7 @@ describe("the README's Yoga recipe", () => {
   })
 
   it("never sends the driver's own error to the browser, not even in Yoga's development mode", async () => {
-    const driverError = new Error('password authentication failed for user "vault_owner"')
+    const driverError = Object.assign(new Error('password authentication failed for user "vault_owner"'), { code: '28P01' })
     const client: PostgresClient = { query: () => Promise.reject(driverError), transaction: () => Promise.reject(driverError) }
     const route = bankRoute(new PostgresBankDB({ client }), () => Promise.resolve('u1'), true)
     const variables = { ask: BX.vaultGet.parse(TH.BW.vaultGetAskOf()) }
@@ -168,7 +168,7 @@ describe("the README's Yoga recipe", () => {
       body:    JSON.stringify({ query: BankOperations.getVault, variables }),
     }))
     const sent = await response.text()
-    expect(sent).to.include('storage_unavailable')
+    expect(sent).to.include('unexpected_error')
     expect(sent).not.to.include('vault_owner')
   })
 })

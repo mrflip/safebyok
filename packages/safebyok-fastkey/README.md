@@ -82,8 +82,9 @@ own: choose one per platform yourself, as `keyDeriver`.
 ## Errors
 
 * `bad_record` -- from `makeArgon2idWasmDeriver(spec)`, for a spec it cannot run (the message names the
-  field). From `deriveKeyBytes` called directly, when the platform has no WebAssembly, or when a
-  Content-Security-Policy lacks `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
+  field). From `deriveKeyBytes` called directly, when the platform has no WebAssembly, or when its
+  WebAssembly will not compile, most likely under a Content-Security-Policy that lacks
+  `'wasm-unsafe-eval'` (the platform's `CompileError` is its `cause`).
   Through the bank, this arrives as `unexpected_error`, with no `cause`.
 * `wrong_passphrase` -- from `deriveKeyBytes` called directly with an empty passphrase. Through the
   bank, this too arrives as `unexpected_error`.
