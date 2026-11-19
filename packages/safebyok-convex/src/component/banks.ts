@@ -48,7 +48,7 @@ export const buildBank = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const gateDoc = await getGateDoc(ctx.db, ask, 'main')
     const fetched = { bank: bankDoc?.bank ?? null, gate: gateDoc?.gate ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyBuildBank(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyBuildBank(ask, fetched))) { return { ...fetched, written: null } }
     const bank = await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
     const gate = await writeGateDoc(ctx.db, gateDoc, ask.gate)
     return { ...fetched, written: { bank, gate } }
@@ -64,7 +64,7 @@ export const putGate = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const gateDoc = await getGateDoc(ctx.db, ask, ask.gatelabel)
     const fetched = { bank: bankDoc?.bank ?? null, gate: gateDoc?.gate ?? null }
-    if (! isWrite(storedOrNull(() => policedGateOf(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => policedGateOf(ask, fetched))) { return { ...fetched, written: null } }
     return { ...fetched, written: { gate: await writeGateDoc(ctx.db, gateDoc, ask.record) } }
   },
 })
@@ -81,7 +81,7 @@ export const delBank = mutation({
     const ask = askFor(() => BX.bankDel.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyDelBank(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyDelBank(ask, fetched))) { return { ...fetched, written: null } }
     const bank = await writeBankDoc(ctx.db, bankDoc, ask, ask.record)
     await deleteBank(ctx.db, ask)
     return { ...fetched, written: { bank } }
@@ -112,7 +112,7 @@ export const putVault = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null, vault: vaultDoc?.vault ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyStoredVault(ask, fetched))) { return { ...fetched, written: null } }
     return { ...fetched, written: { vault: await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record) } }
   },
 })
@@ -126,7 +126,7 @@ export const delVault = mutation({
     const bankDoc = await getBankDoc(ctx.db, ask)
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const fetched = { bank: bankDoc?.bank ?? null, vault: vaultDoc?.vault ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredVault(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyStoredVault(ask, fetched))) { return { ...fetched, written: null } }
     const vault = await writeVaultDoc(ctx.db, vaultDoc, ask, ask.record)
     // A vault's boxes end with its life, and the component's limits keep a life small enough to delete in this transaction.
     await deleteBoxes(ctx.db, lifeOf({ ...ask, vault_tok: ask.expected.vault_tok }))
@@ -179,12 +179,12 @@ export const putBox = mutation({
     const reckoning = await Tallies.reckon(ctx.db, life)
     // Convex accepts NaN as a number. Math.min would return it, and no count is greater than NaN, so the limit would never apply.
     const cap = Number.isNaN(maxBoxes) ? Tallies.MaxVaultBoxes : Math.min(maxBoxes, Tallies.MaxVaultBoxes)
-    const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity: Tallies.capacityOf(reckoning.tally, cap) }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))) { return { ...fetched, written: null, roomless: false } }
+    const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null, capacity: Tallies.capacityOf(reckoning, cap) }
+    if (! wouldWrite(() => BX.classifyStoredBox(ask, fetched))) { return { ...fetched, written: null, roomless: false } }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     // A put over a tombstone replaces that row, so only a new boxlabel adds to `all_count`.
     const growth = Tallies.growthOf(anteDoc, boxDoc)
-    if (Tallies.wouldPassLimit(reckoning.tally, growth, cap)) { return { ...fetched, written: null, roomless: true } }
+    if (Tallies.wouldPassLimit(reckoning, growth, cap)) { return { ...fetched, written: null, roomless: true } }
     const box = await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     await Tallies.record(ctx.db, life, reckoning, growth)
     return { ...fetched, written: { box }, roomless: false }
@@ -201,7 +201,7 @@ export const delBox = mutation({
     const vaultDoc = await getVaultDoc(ctx.db, ask)
     const anteDoc = await getBoxDoc(ctx.db, life, ask.boxlabel)
     const fetched = { parent: vaultDoc?.vault ?? null, box: anteDoc?.box ?? null }
-    if (! isWrite(storedOrNull(() => BX.classifyStoredBox(ask, fetched)))) { return { ...fetched, written: null } }
+    if (! wouldWrite(() => BX.classifyStoredBox(ask, fetched))) { return { ...fetched, written: null } }
     const boxDoc = { ...life, boxlabel: ask.boxlabel, box: ask.record }
     const box = await writeBoxDoc(ctx.db, anteDoc, boxDoc)
     // The tombstone replaces the row and still counts as one box row: of the `all_*` figures, only the size changes.
@@ -282,7 +282,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Asks and refusals]: askFor, crossingOf, policedGateOf, storedOrNull, isWrite
+// == [Asks and refusals]: askFor, crossingOf, policedGateOf, wouldWrite
 
 // Anyone signed in may call these functions with an ask of their own making, so each parses its ask again here, with the core's
 // own checker, before a row is read, and continues with what the parse returns.
@@ -314,18 +314,15 @@ function policedGateOf(ask: BX.GatePutAsk, fetched: BX.GateFetched): BX.GateStor
 }
 
 // The client classifies the same rows with the same classifier, and throws the refusal itself, with its rows.
-/** What `classify` returns, or null if it refuses. */
-function storedOrNull<StoredT>(classify: () => StoredT): StoredT | null {
+/** True when the outcome `classify` returns has a write for its act; false when it has another act, or refuses. */
+function wouldWrite(classify: () => { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct }): boolean {
   try {
-    return classify()
+    return BX.isWriteAct(classify().act)
   } catch (err) {
-    if (DB.isVaultError(err)) { return null }
+    if (DB.isVaultError(err)) { return false }
     throw err
   }
 }
-
-/** True when `stored` is the classifier's outcome and its act is a write. */
-function isWrite(stored: { act: DB.BoxAct | DB.VaultAct | DB.ParentBankAct } | null): boolean { return (stored !== null) && BX.isWriteAct(stored.act) }
 // --
 
 // == [Cascades]: deleteBank, deleteBoxes, deleteWithin, deleteEndedBoxes

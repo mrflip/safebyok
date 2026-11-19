@@ -77,8 +77,8 @@ export type Life = { user_id: UserID, banklabel: Banklabel, vaultlabel: Vaultlab
  */
 export type Tally = { all_count: number, live_count: number, all_size: number, live_size: number }
 
-/** A life's tally as read for a put. `kept` is the stored tally row, or null for none. `tally` is null when the life is past a limit. */
-export type Reckoning = { kept: Doc<'safebyok_tallies'> | null, tally: Tally | null }
+/** A life's tally as read for a put: `isPastLimit` when the life is past a limit, else its `tally`, with `kept`, the stored tally row or null for none. */
+export type Reckoning = { isPastLimit: true } | { isPastLimit: false, tally: Tally, kept: Doc<'safebyok_tallies'> | null }
 
 /** A box document, stored or about to be. Its `box` row is `unknown` until the core has checked it. */
 export type BoxDocGiven = Omit<WithoutSystemFields<Doc<'safebyok_boxes'>>, 'box'> & { box: unknown }
@@ -101,37 +101,39 @@ export function tallyOf(boxDoc: BoxDocGiven | null): Tally {
 /** The change to a life's tally when `boxDoc` replaces `anteDoc`, or is added where `anteDoc` is null. */
 export function growthOf(anteDoc: BoxDocGiven | null, boxDoc: BoxDocGiven): Tally { return plus(tallyOf(boxDoc), negated(tallyOf(anteDoc))) }
 
-/** How full a life is, against `maxBoxes` and the byte limit. A null tally, for a life past a limit, reads as full. */
-export function capacityOf(tally: Tally | null, maxBoxes: number) {
+/** How full a life is, against `maxBoxes` and the byte limit. A life past a limit reads as full. */
+export function capacityOf(reckoning: Reckoning, maxBoxes: number) {
+  const { all_count, all_size } = reckoning.isPastLimit ? { all_count: maxBoxes, all_size: MaxVaultBoxSize } : reckoning.tally
   return {
-    boxes: { used: tally?.all_count ?? maxBoxes, max: maxBoxes },
-    bytes: { used: tally?.all_size ?? MaxVaultBoxSize, max: MaxVaultBoxSize },
+    boxes: { used: all_count, max: maxBoxes },
+    bytes: { used: all_size, max: MaxVaultBoxSize },
   }
 }
 
 /** Read the life's tally for a put, counting its box rows when no tally row is stored. */
 export async function reckon(db: DatabaseReader, life: Life): Promise<Reckoning> {
   const kept = await getTallyRow(db, life)
-  if (kept) { return { kept, tally: { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size } } }
+  if (kept) { return { isPastLimit: false, kept, tally: { all_count: kept.all_count, live_count: kept.live_count, all_size: kept.all_size, live_size: kept.live_size } } }
   // A loop, not a reduce, so it can stop reading rows once a limit is passed.
   let tally = tallyOf(null)
   for await (const boxDoc of lifeBoxQuery(db, life)) {
     tally = plus(tally, tallyOf(boxDoc))
-    if ((tally.all_count > MaxVaultBoxes) || (tally.all_size > MaxVaultBoxSize)) { return { kept: null, tally: null } }
+    if ((tally.all_count > MaxVaultBoxes) || (tally.all_size > MaxVaultBoxSize)) { return { isPastLimit: true } }
   }
-  return { kept: null, tally }
+  return { isPastLimit: false, kept: null, tally }
 }
 
 /** True when a put that grows the life by `growth` would pass `maxBoxes` or the byte limit. Both limits count every box row, tombstones included. */
-export function wouldPassLimit(tally: Tally | null, growth: Tally, maxBoxes: number): boolean {
-  if (tally === null) { return (growth.all_count > 0) || (growth.all_size > 0) }
-  const after = plus(tally, growth)
+export function wouldPassLimit(reckoning: Reckoning, growth: Tally, maxBoxes: number): boolean {
+  if (reckoning.isPastLimit) { return (growth.all_count > 0) || (growth.all_size > 0) }
+  const after = plus(reckoning.tally, growth)
   return ((growth.all_count > 0) && (after.all_count > maxBoxes)) || ((growth.all_size > 0) && (after.all_size > MaxVaultBoxSize))
 }
 
 /** Add a put's `growth` to the life's stored tally, creating it if needed. A life past a limit gets none. */
-export async function record(db: DatabaseWriter, life: Life, { kept, tally }: Reckoning, growth: Tally): Promise<void> {
-  if (tally === null) { return }
+export async function record(db: DatabaseWriter, life: Life, reckoning: Reckoning, growth: Tally): Promise<void> {
+  if (reckoning.isPastLimit) { return }
+  const { kept, tally } = reckoning
   if (kept) { await db.patch('safebyok_tallies', kept._id, plus(tally, growth)) } else { await db.insert('safebyok_tallies', { ...life, ...plus(tally, growth) }) }
 }
 

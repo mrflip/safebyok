@@ -8,7 +8,8 @@ import { BX } from 'safebyok-big/storage'
 import type { BoxTidyAsk, Tidied, VaultError, WatchScope } from 'safebyok-big/storage'
 import type { Boxlabel, Vaultlabel } from 'safebyok-big'
 import * as Phrases from './phrases'
-import { isSafebyokRefusal, safebyokRefusal } from './refusals'
+import { safebyokRefusal } from './refusals'
+import type { SafebyokRefusal } from './refusals'
 import type { SafebyokBankApi } from './server'
 
 // == [Clients]: ConvexCalls, ConvexWatchingClient, ConvexReactWatchingClient, ConvexBankClient, ConvexBankDBOpts
@@ -239,13 +240,13 @@ async function runOrRefuse<ValT>(oplabel: string, thunk: () => Promise<ValT>): P
 // passed on. A refusal from the host's safebyok functions is recognized by its `data`, which only they make.
 /** The refusal for `thrown`: a refusal sent by the host's safebyok functions, else `storage_unavailable` naming `oplabel`. */
 function refusalOf(oplabel: string, thrown: unknown): VaultError {
-  if ((thrown instanceof ConvexError) && isSafebyokRefusal(thrown.data)) { return refusalOfCrossed(thrown.data) }
-  return DB.storageFailed(oplabel, thrown)
+  if (! (thrown instanceof ConvexError)) { return DB.storageFailed(oplabel, thrown) }
+  const refusalReport = safebyokRefusal.safeParse(thrown.data)
+  return refusalReport.success ? refusalOfCrossed(refusalReport.data) : DB.storageFailed(oplabel, thrown)
 }
 
-/** Rebuild the VaultError a `ConvexError`'s `data` describes, with the core's message. */
-function refusalOfCrossed(val: unknown): VaultError {
-  const crossed = safebyokRefusal.parse(val)
+/** Rebuild the VaultError that `crossed`, a `ConvexError`'s `data`, describes, with the core's message. */
+function refusalOfCrossed(crossed: SafebyokRefusal): VaultError {
   if (crossed.kind === 'identity_revoked') { return DB.identityRevoked() }
   return new DB.VaultError(crossed.kind, crossed.message)
 }
