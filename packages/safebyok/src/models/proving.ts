@@ -134,6 +134,7 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
   // == [Protected, for a subclass to call]: checkUnwraps
 
   /** Throw `wrongCleartext()` unless this proving's wayinKey unwraps its stored wayin.
+   * A damaged stored wayin reads the same as a wrong passphrase or passkey: the unwrap cannot tell one from the other.
    * The bankKey unwrapped is non-extractable, and dropped at once (G3).
    */
   protected async checkUnwraps(wrongCleartext: () => Errors.VaultError): Promise<void> {
