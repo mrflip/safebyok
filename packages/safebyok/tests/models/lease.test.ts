@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { Crypto, GX } from 'safebyok-big/internals'
 import { BaseBox } from '../../src/models/base-box'
 import { Lease, withoutSecrets } from '../../src/models/lease'
 import { NOVEL, PassphraseProving } from '../../src/models/proving'
-import type { BoxCleartexts, Sealer } from '../../src/shapes/shapes-sealers'
+import type { BoxCleartexts, Sealer, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { LeaseFormat, type LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type EpochMillis, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord } from '../../src/shapes/shapes-thing'
@@ -215,11 +215,17 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     await TH.expectRefusal(lease.unseal(BaseBox, { ...tombstone, written_at: TH.T0 + 8 }), 'damaged_whisper')
   })
 
-  it("refuses a tombstone given a sidecar other than `{}`, and takes one given `{}`, as BaseBox makes it", async () => {
+  it("refuses a tombstone given a sidecar other than `{}`, as BaseBox makes it", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await TH.expectRefusal(lease.seal(BaseBox, live, { am: 'x', sidecar: TH.Sidecar }), 'bad_record')
+  })
+
+  it("writes a tombstone given the sidecar `{}`, a tombstone's own, as BaseBox makes it", async () => {
+    const { lease } = await leaseWorld()
+    const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const tombstone = await lease.seal(BaseBox, live, { am: 'x', sidecar: {} })
+    expectTypeOf(tombstone).toEqualTypeOf<TombstoneOf<BoxRecord>>()
     expect(tombstone).to.deep.include({ am: 'x', sidecar: {} })
   })
 

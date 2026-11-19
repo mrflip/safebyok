@@ -76,14 +76,14 @@ export class Lease implements LeaseStamp {
 
   /** Seal and return the next revision after `donorProps`, with `publicProps` applied and `secretProps` encrypted.
    * The seal checks its arguments (`BaseBox` refuses an unknown key in `publicProps` or `secretProps`) and the record it returns, so pass `donorProps` as you have it: whole, sparse, sealed or unsealed. None of its secrets reaches the revision.
-   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live `donorProps` instead, and refuses any `secretProps`. The sealer may refuse body fields there too: `BaseBox` refuses a sidecar.
+   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live `donorProps` instead, and refuses any `secretProps`. The sealer may refuse body fields there too: `BaseBox` refuses any sidecar but `{}`.
    * The seal is bound to the bank's stamp, the revision's stamp and the sealer's tags. The cleartext's bytes are zeroed afterwards.
    * @example
    *   await lease.seal(BaseBox, box, { sidecar: { account: 'work' } }, { whisper })  // its next revision
    *   await lease.seal(BaseBox, box, { am: 'x' })                                     // its tombstone
    */
   seal<RecordT extends Sparse<ThingRecord>, CleartextsT>(
-    sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.TombstonePublicProps,
+    sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.TombstonePublicProps & Partial<Sealers.BodyOf<RecordT, CleartextsT>>,
   ): Promise<Sealers.TombstoneOf<RecordT>>
   seal<RecordT extends Sparse<ThingRecord>, CleartextsT>(
     sealer: Sealers.Sealer<RecordT, CleartextsT>, donorProps: Sealers.Sealable<RecordT>, publicProps: Sealers.LivePublicPropsOf<RecordT, CleartextsT>, secretProps: CleartextsT,
