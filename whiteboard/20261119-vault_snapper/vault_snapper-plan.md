@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** planned; threads 1, 3 and 4 starting.
+* **Status:** threads 1 and 4 building; thread 3 filed ([#768](https://github.com/mrflip/safebyok/pull/768)), CI running.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -124,7 +124,9 @@ minder's tests, `packages/safebyok-react/src/giver/minder-bank.ts`. *Depends on:
 *Gloss.* `ThingFormat` (`100_501` in `shapes/shapes-thing.ts`) becomes the string `'a010501'`, and so does every
 constant that serves with it: `fmt` in every Thing, safebyok-postgres's version, and (once thread 2 lands) `listen`'s
 version, which reads `ThingFormat`. A stored-shape change: a row written before fails today's checks and reads as
-damaged; the changeset says so. *Levels:* worker on `sonnet`; review `low`. *Touches:* `shapes/shapes-thing.ts`,
+damaged; the changeset says so. *Levels:* worker on `sonnet`; review `low`. *Status:* filed, #768.
+
+*Review:* fixed (low): realigned two test tables (whitespace). Left, minor: `TableVersion` now holds a format string, a loose name, kept (exported; my call, Cleanup); `ThingFormat`'s doc block describes big's numeric fmts, a sibling (STYLE `#three-questions`), for a documentarian pass (Cleanup). Not checked: the `fmt` column's `text` type against a real Postgres. *Touches:* `shapes/shapes-thing.ts`,
 `safebyok-postgres`, every adapter or test that spells the number. *Depends on:* nothing (origin/main). *Size:* S.
 
 ### 4. vault_writes
