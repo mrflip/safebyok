@@ -29,6 +29,7 @@ export function giverBankOfMinder(minder: ThingMinder): GiverBank<BoxCar> {
     userid:        minder.userid,
     banklabel:     minder.banklabel,
     getBoxCar:     async (labelpath: string) => minder.get({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
+    peekBoxCar:    (labelpath: string) => minder.at({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
     listenBoxCars: (listener: (labelpath: string, car: BoxCar) => void) => minder.listen((answer) => {
       const { labelpath } = answer.ask
       // A removed car has none: the bank object that removed it is ending, and the bridge resets its entries.

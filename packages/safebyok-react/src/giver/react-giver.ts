@@ -1,6 +1,6 @@
 /** The giver: React hooks over one Device's banks. This tab's state comes from the Device; stored records come through the host's React Query. */
 
-import { queryOptions, skipToken, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query'
+import { type QueryKey, queryOptions, skipToken, useQuery, useQueryClient, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query'
 import { useEffect, useSyncExternalStore } from 'react'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import { type Banklabel, type UserID, type carLivenessVals, Checkers } from 'safebyok'
@@ -32,7 +32,9 @@ export interface GiverBank<CarT extends CarFields> {
   readonly banklabel: Banklabel
   /** The car for the box at `labelpath`, asked of the vaultDB, never only the cache. An unborn bank answers the void car without asking. */
   getBoxCar(labelpath: string): Promise<CarT>
-  /** Call `listener` with each box car the bank's minders cache, as merged. Returns the function that stops it. */
+  /** The car the bank's minder has for the box at `labelpath`, however old, or undefined for none. Never asks the vaultDB. */
+  peekBoxCar(labelpath: string): CarT | undefined
+  /** Call `listener` with each box car the bank's minder caches, as merged. Returns the function that stops it. */
   listenBoxCars(listener: (labelpath: string, car: CarT) => void): () => void
 }
 
@@ -165,6 +167,12 @@ function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return 
 /** The host's React Query key for the car of the box at `labelpath`. */
 export function boxCarQueryKey({ userid, banklabel, labelpath }: Readonly<{ userid: string | null, banklabel: string, labelpath: string }>) {
   return ['safebyok', userid, banklabel, labelpath] as const
+}
+
+/** The labelpath in a key {@link boxCarQueryKey} made, or undefined for any other key. */
+export function labelpathOfBoxCarQueryKey(queryKey: QueryKey): string | undefined {
+  const labelpath = queryKey[3]
+  return (typeof labelpath === 'string') ? labelpath : undefined
 }
 
 /** The key every one of a bank's entries in the host's React Query starts with. */

@@ -26,7 +26,7 @@ async function setupShowing() {
 }
 
 describe("the bridge", () => {
-  it("shows a newer car the minders cache, without fetching again", async () => {
+  it("shows a newer car the minder caches, without fetching again", async () => {
     const { world, result } = await setupShowing()
     const second = TH.fakeBoxRecordOf(OpenaiPath, 2)
     act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(second)) })
@@ -65,5 +65,25 @@ describe("the bridge", () => {
     act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2))) })
     const car = client.getQueryData(boxCarQueryKey({ userid: 'u1', banklabel: 'acme', labelpath: OpenaiPath }))
     expect(car).to.deep.equal(TH.fullCarOf(first))
+  })
+
+  it("shows a revision the minder heard before the bridge mounted, without fetching again", async () => {
+    const world  = TH.makeFakeGiverWorld('u1')
+    const Giver  = makeReactGiver(world.device)
+    const Acme   = Giver.forBank('acme')
+    const client = new QueryClient()
+    onTestFinished(() => { client.clear() })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
+    world.stored.set(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 1)))
+    // A route loader fetches the box before any component mounts.
+    await client.query(Acme.boxCarQueryOptions(OpenaiPath))
+    const second = TH.fakeBoxRecordOf(OpenaiPath, 2)
+    world._cheat_hear(OpenaiPath, TH.fullCarOf(second))
+    const { result } = renderHook(() => {
+      Giver.useBridge()
+      return Acme.useBoxRecord(OpenaiPath)
+    }, { wrapper: Wrapper })
+    await waitFor(() => { expect(result.current.data).to.deep.equal(second) })
+    expect(world.counts.gets).to.eq(1)
   })
 })
