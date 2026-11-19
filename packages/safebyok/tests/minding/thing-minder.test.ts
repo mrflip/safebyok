@@ -1025,7 +1025,7 @@ describe("ThingMinder keys", () => {
 
   it("start no other key with the root box's car key, the one its gcTime default is set on", () => {
     const minder = minderWithoutStart()
-    const rootKeys = [minder.queryKey(TH.RootScope), minder.listingQueryKey(TH.RootScope), minder.queryKey(TH.BoxScope)]
-    expect(rootKeys.map((queryKey) => TSQ.partialMatchKey(queryKey, minder.queryKey(TH.RootScope)))).to.deep.equal([true, false, false])
+    const queryKeys = [minder.queryKey(TH.RootScope), minder.listingQueryKey(TH.RootScope), minder.queryKey(TH.BoxScope)]
+    expect(queryKeys.map((queryKey) => TSQ.partialMatchKey(queryKey, minder.queryKey(TH.RootScope)))).to.deep.equal([true, false, false])
   })
 })
