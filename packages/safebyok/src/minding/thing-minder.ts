@@ -27,9 +27,9 @@ import * as Throwers from '../refusals/throwers'
  * the children of the root box and of each Thing listed.
  * Four sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
  * Thing's shell where nothing is stored), the watch's notice of each write and of the bank and main gate beside it, a
- * list's sparse record, and the record a write's answer carries. Each lands in the Thing's car through one merge, and adds the Thing to its parent's listing,
- * where one is cached. A list sets the parent's listing. It caches only from `hello` until `goodbye`, and `goodbye`
- * empties its cache. `hello` caches the root box's listing, empty and bare: bare until a list sets it.
+ * list's sparse record, and the record a write's answer carries. Each lands in the Thing's car through one merge, and
+ * adds the Thing to its parent's listing, where one is cached. A list sets the parent's listing. It caches only from
+ * `hello` until `goodbye`, and `goodbye` empties its cache. `hello` caches the root box's listing, empty and bare: bare until a list sets it.
  *
  * ## Invariants
  * - For a caller or listener using the library as documented, what it shows depends only on which records the minder

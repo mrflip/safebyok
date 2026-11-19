@@ -159,8 +159,7 @@ export abstract class AdapterVaultDB implements VaultDB {
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
       try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
     }
-    // The changed Thing comes first: the store read its world in the same step or later, so the notices come in the order
-    // the store learned of them.
+    // The changed Thing comes first, as a write's own record lands before the world beside it.
     const feed: Feed = { scope: bankScope, receive: ({ record, world }) => {
       for (const raw of [record, ...worldThingsOf(world)]) { tell(raw) }
     } }
@@ -173,7 +172,8 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Tracked]: notifyTrackedRecords
 
   // Each verb calls it last, on the answer it returns. Each watch is called on a later microtask, so nothing it does runs inside the verb.
-  /** Notify each watch of `ask`'s bank of each Thing in `answer.tracked` that is not `'same'`, with `answer.world`, each as `receive` gets a change.
+  /** Notify each watch of `ask`'s bank of each Thing in `answer.tracked` that is not `'same'`, with `answer.world`.
+   * A watch hears of each as a changed Thing, followed by the bank and main gate ({@link VaultDB.watch}).
    * Does nothing for a vaultDB made with `doNotifyTracked: false`.
    */
   protected notifyTrackedRecords(ask: AnyAsk, { world, tracked }: { world: WorldRecord | null, tracked?: Tracked }): void {
