@@ -60,7 +60,7 @@ describe("ThingMinder.at", () => {
 })
 
 describe("ThingMinder.listingAt", () => {
-  it("holds the root box's listing from hello, with each box a get or a notice tells of before a list", async () => {
+  it("lists each box heard of before the root box's first list", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB, { isRootHeard: false })
@@ -143,7 +143,7 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
   })
 
-  it("holds the listing of a Thing other than the root box only once it is listed, empty where it has no children", async () => {
+  it("holds another Thing's listing only once it is listed", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
@@ -214,7 +214,7 @@ describe("ThingMinder.listingAt", () => {
 })
 
 describe("ThingMinder.isListingBareAt", () => {
-  it("is true of the root box's listing from hello, as each box a get, a write or a notice tells of joins it", async () => {
+  it("is true of the root box's listing while boxes join it", async () => {
     const vaultDB = new QuietVaultDB()
     await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB)
@@ -233,7 +233,7 @@ describe("ThingMinder.isListingBareAt", () => {
     expect(minder.isListingBareAt(TH.RootScope)).to.be.true
   })
 
-  it("is false once a list sets the listing, even one that answers nothing, and after a box joins it", async () => {
+  it("is false from the first list on, whatever it answers", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder, receive } = minderWorldOf(vaultDB)
     expect(await minder.list('box')).to.deep.equal([])
@@ -242,7 +242,7 @@ describe("ThingMinder.isListingBareAt", () => {
     expect(minder.isListingBareAt(TH.RootScope)).to.be.false
   })
 
-  it("is false of a listing not cached: another Thing's before a list, and the root box's after goodbye", async () => {
+  it("is false of a listing not cached or set by a list", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = minderWorldOf(vaultDB)
     expect(minder.isListingBareAt(TH.GateScope)).to.be.false
