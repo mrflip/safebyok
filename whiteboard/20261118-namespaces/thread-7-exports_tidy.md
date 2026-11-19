@@ -26,7 +26,7 @@ The ten items are the Coach's 2026-11-19 answers to thread 4's open questions.
 
 * **Deviations** (each is a contract change; the Coach's rulings cover all but the ones marked):
   - **`safebyok/browser`'s `BrowserOpts` is our own type now**, where it re-exported big's. Big's `strengthChecker` is typed against big's `StrengthChecker` (scope `user_id`), which the new core's `DeviceOpts` refuses (scope `userid`). `zxcvbnStrengthChecker` takes either scope at runtime. So `browserOpts` is re-exported under `as unknown as (opts?) => BrowserOpts`. **This is a safety hatch.** The other fix, broadening big's type, is a change to big beyond item 6, so I left it.
-  - **`isGone` changes as well as `isVoidSentinel`** (not directed). Its doc promised "any tombstone but the void sentinel". A tombstone at revseq -1 with a real revtok used to count as the void sentinel and not gone; it now counts as gone. The doc's words stand, and its reach moves with the sentinel's.
+  - **A half-shell is no Thing citation** (the Coach, 2026-11-19: "A tombstone at -1 must have also the void revtok. No -1 should be a valid tombstone, and every void must have that revtok and revseq"). `ThingChecks.scopedCited` refuses one, as the per-kind citations already did: the shell's revseq without its revtok and lifeseq, or either of those without it. So no guard accepts a half-shell, and thing-car refuses one as a record. Before, `isTombstone` and (after this thread's first cut) `isGone` answered true of one.
   - **isVoidSentinel checks the lifeseq too** (not directed: the Coach named revtok).
   - Gating.make refused nothing of a function before; it now refuses one that `guardRequestCleartext` did not make. A tombstone's `am: 'a'` was ignored before and is refused now. Both are as directed.
   - **Per-entry completeness is relaxed** (not directed). Thread 4 had core and storage each export every type they name. Under forgotten-exports' front-door rule, an entry may leave a name to the front door. I recommend keeping the rule: the check enforces what a host can reach.
@@ -36,4 +36,4 @@ The ten items are the Coach's 2026-11-19 answers to thread 4's open questions.
   - Tests in node that call `browserOpts()` need `fake-indexeddb/auto`.
   - Neither script can be told to ignore a name. The Coach ruled "over-export", so neither needs to.
 
-* **For the Coach**: the Open questions in the PR body: the BrowserOpts hatch; the isGone change; the lifeseq check; the front-door rule versus per-entry completeness; the identity check; `Watcher` exported under so generic a name.
+* **For the Coach**: the Open questions in the PR body: the BrowserOpts hatch (ok); the lifeseq check; the front-door rule versus per-entry completeness (ok); the identity check; `Watcher` exported under so generic a name.

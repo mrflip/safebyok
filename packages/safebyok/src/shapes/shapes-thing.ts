@@ -88,8 +88,9 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
     am,
     lifepath: anyLifepath,
   })
-  // A Thing's scope and citation: what every record and tombstone has, sparse or whole.
-  const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape })
+  // A Thing's scope and citation: what every record and tombstone has, sparse or whole. Its revseq is the shell's -1
+  // only beside the void revtok and lifeseq, and they only beside it.
+  const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape }).refine(isShellCitable, Phrases.CitedHalfShell)
   const sparse       = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })

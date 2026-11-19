@@ -167,7 +167,7 @@ function isWholeOfKind(modelkind: Thingkind | null, record: Sparse<ThingRecord>)
 
 /** What every live Thing and every tombstone has, sparse or whole: a Thing's scope and citation, marked live or deleted. */
 const Checks = Validator.Checkers('bad_record', ({ lit }) => ({
-  live:      ThingChecks.scopedCited.extend({ am: lit('a') }),
-  tombstone: ThingChecks.scopedCited.extend({ am: lit('x') }),
+  live:      ThingChecks.scopedCited.safeExtend({ am: lit('a') }),
+  tombstone: ThingChecks.scopedCited.safeExtend({ am: lit('x') }),
 }))
 // --
