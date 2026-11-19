@@ -207,8 +207,8 @@ export class ThingMinder {
 
   /** Call `listener` with each change the cache tells of, as a {@link MinderEvent}. Returns the function that stops it.
    * It tells a `thing` event each time a record arrives in a car (even one that changes nothing), a get of it is refused,
-   * or it is removed; a `listing` event each time a list sets a listing (even to the labelpaths it had), a labelpath
-   * joins it, `hello` caches the root box's, or it is removed; and an `invalidation` event each time `invalidate` marks a listing stale.
+   * or it is removed. It tells a `listing` event each time a list sets a listing (even to the labelpaths it had), a labelpath
+   * joins it, `hello` caches the root box's, or it is removed. It tells an `invalidation` event each time `invalidate` marks a listing stale.
    * Nothing is called when a car ages past `staleTime`, and listening caches no car.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
@@ -246,8 +246,8 @@ export class ThingMinder {
 
   // == [Writing]: tryWrite
 
-  /** Write `ask` through the vaultDB, and answer as it did, a refusal included, once the record written, or the refusal's `dbhas`, is cached.
-   * The bank, main gate and tracked Things its answer reports are cached only as the watch tells of them.
+  /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
+   * The record written, or a refusal's `dbhas`, is cached before it answers. The bank, main gate and tracked Things its answer reports are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
    * A write answered after `goodbye` caches nothing.
    */
