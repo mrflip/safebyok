@@ -16,7 +16,7 @@ import * as Throwers from '../refusals/throwers'
 // so where the ask's matches the stored one, the tables also check that the life and the liveness match.
 
 /** A write ask reduced to what the act tables read: its flags, and the citations in its `cited` and `record`. */
-type WriteCmpAsk = Pick<WriteAsk, 'op' | 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
+export type WriteCmpAsk = Pick<WriteAsk, 'op' | 'ifAbsent' | 'ifPresent'> & { cited: ThingCited, record: ThingCited }
 
 /** A scope's stored Thing, by liveness: none (`void`), a tombstone (`gone`), or a live Thing. */
 type Presence = 'void' | 'gone' | 'live'

@@ -8,7 +8,7 @@ import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestClearte
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
-import { ThingChecks } from '../shapes/shapes-thing'
+import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
 // == [Defaults]: DefaultLeaseMillis
@@ -147,8 +147,8 @@ export class Device {
   }
   // --
 
-  /** Always `'device'`: marks this model for a {@link Consts.Modelkind} check. */
-  get modelkind(): 'device' { return 'device' satisfies Consts.Modelkind }
+  /** Always `'device'`: this model's {@link Modelkind}. */
+  get modelkind(): 'device' { return 'device' satisfies Modelkind }
 }
 
 // == [Host functions]: DefaultOnBadNews, tellBadNewsTo
@@ -217,6 +217,8 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       autolockMinutes: VX.positiveMinutes.optional(),
       requestCleartext: custom<RequestCleartext>().optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
+      // Ignored: the new core keeps no device database. Taken so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
+      deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
   }),
   tellBadNewsToArgs: obj({

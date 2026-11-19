@@ -29,3 +29,4 @@ export type { PasskeyWayinRecord, PassphraseWayinRecord, WayinRecord } from './s
 export type { PassphraseSalt, PrfSalt } from './shapes/shapes-core'
 export type { CipherCtxRecord } from './helpers/crypto'
 export type { IfAbsent, IfPresent, PutIfAbsent, RefusedAct } from './shapes/shapes-enums'
+export type { RefusalRows } from './refusals/errors'

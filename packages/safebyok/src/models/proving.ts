@@ -1,10 +1,11 @@
-import type { Consts, Deriver } from 'safebyok-big/internals'
+import type { Deriver } from 'safebyok-big/internals'
 import { CX, Clock, Consts as ConstsX, Crypto, Errors, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { Lease } from './lease'
 import { type GateRevisionedStamp, type GuardedKeyDeriver, type LeaseBank, type ProvingDevice, type ProvingOpts, type ProvingParts, GateishChecks } from '../shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, StampedGate } from '../shapes/shapes-stamps'
 import * as Stamps from '../shapes/shapes-stamps'
+import type { Modelkind } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { Wayin, wayinCtxOf } from './wayin'
 import * as Throwers from '../refusals/throwers'
@@ -147,8 +148,8 @@ export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
   }
   // --
 
-  /** Always `'proving'`: marks this model for a {@link Consts.Modelkind} check. */
-  get modelkind(): 'proving' { return 'proving' satisfies Consts.Modelkind }
+  /** Always `'proving'`: this model's {@link Modelkind}. */
+  get modelkind(): 'proving' { return 'proving' satisfies Modelkind }
 }
 
 /** A passphrase made into a wayinKey for one gating. */

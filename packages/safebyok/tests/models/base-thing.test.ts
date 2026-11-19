@@ -25,6 +25,14 @@ describe("Thing.isVoidSentinel(val)", () => {
     for (const shell of [Shell.of(TH.GateScope), Shell.of(TH.BoxScope, TH.rootBoxOf())]) { expect(Thing.isVoidSentinel(shell)).to.be.true }
     for (const val of [box, TH.boxTombOf(box), Thing.sparseOf(box), null, undefined, 'x']) { expect(Thing.isVoidSentinel(val)).to.be.false }
   })
+
+  it("is false of a half-shell, which no guard accepts: the shell's revseq without its revtok or lifeseq, or its revtok at another revseq", () => {
+    const shell  = Shell.of(TH.GateScope)
+    const halves = [{ ...shell, revtok: crypto.randomUUID() }, { ...shell, lifeseq: TH.Life0, lifepath: TH.Life0 }, { ...shell, revseq: 3 }]
+    for (const val of halves) {
+      expect([Thing.isTombstone(val), Thing.isVoidSentinel(val), Thing.isGone(val), Thing.isLive({ ...val, am: 'a' })]).to.eql([false, false, false, false])
+    }
+  })
 })
 
 describe("Thing.isWhole(record)", () => {

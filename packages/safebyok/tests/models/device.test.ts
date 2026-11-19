@@ -1,7 +1,10 @@
 /** The device: its options, the host's functions it wraps, its sweep, and the birth of its bank through a gating, over its MemoryVaultDB. */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
+// fake-indexeddb installs IndexedDB's globals, for the device database browserOpts() opens: no browser.
+import 'fake-indexeddb/auto'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
+import { browserOpts } from '../../src/browser'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
@@ -51,6 +54,14 @@ describe("Device.make(record, opts)", () => {
     expect(device.demandEnabled()).to.equal(device)
     expect(device.openGating).to.be.null
     expect(device.modelkind).to.eq('device')
+  })
+
+  it("takes the bag of browserOpts() spread in, ignoring its device database", () => {
+    const vaultDB = new MemoryVaultDB()
+    const device = Device.make({ ...TH.WorldScope, device_tok: TH.DeviceTok }, { ...browserOpts({ dbName: 'device-test' }), vaultDB, logger: TH.quietLogger })
+    expect(device.isEnabled).to.be.true
+    expect(device.vaultDB).to.equal(vaultDB)
+    expect(device).to.not.have.property('deviceDB')
   })
 
   it("keeps the vaultDB it is given, for each bank made on it", () => {

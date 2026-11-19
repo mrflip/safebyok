@@ -474,6 +474,9 @@ importers:
       eslint-plugin-unicorn:
         specifier: ^79.0.0
         version: 79.0.0(eslint@10.14.0)(typescript@6.0.3)
+      fake-indexeddb:
+        specifier: ^6.2.8
+        version: 6.2.8
       publint:
         specifier: ^0.3.25
         version: 0.3.25

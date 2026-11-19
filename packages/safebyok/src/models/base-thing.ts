@@ -1,6 +1,6 @@
 import { pick } from 'es-toolkit'
 import { SX, Validator } from 'safebyok-big/internals'
-import { type Banklabel, type EpochMillis, type Lifepath, type Lifeseq, type Revtok, type Userid, Labelpath } from '../shapes/primitives'
+import { type Banklabel, type EpochMillis, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq, VoidLifeseq } from '../shapes/primitives'
 import type { ShellOf } from '../shapes/shapes-sealers'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Thingkind, ThingChecks } from '../shapes/shapes-thing'
 import { ThingkindChecks } from '../shapes/shapes-thingkinds'
@@ -91,10 +91,10 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   /** True when `val` is the tombstone of a deleted Thing of this class's kind, sparse or whole: any tombstone but the void sentinel. */
   static isGone<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is TombstoneOfKind<KindT, ValT> {
     const report = Checks.tombstone.safeParse(val)
-    return report.success && isOfKind(this.modelkind, report.data.labelpath) && (report.data.revseq !== SX.VoidRevisionSeq)
+    return report.success && isOfKind(this.modelkind, report.data.labelpath) && (! isVoidCited(report.data))
   }
 
-  /** True when `val` is a void sentinel of this class's kind: a tombstone whose revseq is the shell's -1. */
+  /** True when `val` is a void sentinel of this class's kind: a tombstone at the shell's revision, its revseq -1 and its revtok and lifeseq the void ones. */
   static isVoidSentinel<KindT extends Thingkind | null, ValT>(this: Kinded<KindT>, val: ValT): val is VoidSentinelOfKind<KindT, ValT> {
     return isVoidSentinelOfKind(this.modelkind, val)
   }
@@ -135,7 +135,7 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
   // --
 }
 
-// == [Helpers]: ThingFieldnames, isOfKind, isVoidSentinelOfKind, isWholeOfKind
+// == [Helpers]: ThingFieldnames, isOfKind, isVoidCited, isVoidSentinelOfKind, isWholeOfKind
 
 /** The name of each Thing field, which every kind of Thing has. */
 const ThingFieldnames = Object.keys(ThingChecks.sparse.shape) as (keyof Sparse<ThingRecord>)[]
@@ -145,10 +145,15 @@ function isOfKind(modelkind: Thingkind | null, labelpath: Labelpath): boolean {
   return (modelkind === null) || (Labelpath.modelkindOf(labelpath) === modelkind)
 }
 
-/** True when `val` is a tombstone of `modelkind` whose revseq is the shell's */
+/** True when the citation is the shell's in all three of its marks: the void revseq, revtok and lifeseq */
+function isVoidCited({ revseq, revtok, lifepath }: Pick<ThingCited, 'revseq' | 'revtok' | 'lifepath'>): boolean {
+  return (revseq === SX.VoidRevisionSeq) && (revtok === SX.VoidRevisionTok) && (Lifeseq.ofLifepath(lifepath) === VoidLifeseq)
+}
+
+/** True when `val` is a tombstone of `modelkind` at the shell's revision */
 function isVoidSentinelOfKind(modelkind: Thingkind | null, val: unknown): boolean {
   const report = Checks.tombstone.safeParse(val)
-  return report.success && isOfKind(modelkind, report.data.labelpath) && (report.data.revseq === SX.VoidRevisionSeq)
+  return report.success && isOfKind(modelkind, report.data.labelpath) && isVoidCited(report.data)
 }
 
 /** True when `record` is whole and of `modelkind`, or is its void sentinel */
@@ -162,7 +167,7 @@ function isWholeOfKind(modelkind: Thingkind | null, record: Sparse<ThingRecord>)
 
 /** What every live Thing and every tombstone has, sparse or whole: a Thing's scope and citation, marked live or deleted. */
 const Checks = Validator.Checkers('bad_record', ({ lit }) => ({
-  live:      ThingChecks.scopedCited.extend({ am: lit('a') }),
-  tombstone: ThingChecks.scopedCited.extend({ am: lit('x') }),
+  live:      ThingChecks.scopedCited.safeExtend({ am: lit('a') }),
+  tombstone: ThingChecks.scopedCited.safeExtend({ am: lit('x') }),
 }))
 // --

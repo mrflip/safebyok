@@ -49,7 +49,7 @@ export interface GatingOpts {
   bank:    Bank | null
   /** The work each attempt does on the cleartexts it is handed. */
   attempt: GatingAttempt
-  /** The host's dialog, guarded, or null to wait for the host's own `attempt` or `dismiss`. */
+  /** The host's dialog as `guardRequestCleartext` wraps it, or null to wait for the host's own `attempt` or `dismiss`. */
   askUser: AskUser | null
 }
 

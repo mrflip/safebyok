@@ -64,6 +64,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp> {
   /** The tombstone of the live box `donorProps`, without its sealed whisper.
    * Its `written_at` is `publicProps.written_at`, or now.
    * Its sidecar is `{}`, whatever the sidecar of `donorProps`. `publicProps` may give `sidecar: {}`, and any other sidecar refuses.
+   * `publicProps` may give `am: 'x'`, a tombstone's own, and `am: 'a'` refuses.
    */
   static tombstoneOf(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps = {}): RevisionOf<TombstoneOf<BoxRecord>, BoxCleartexts> {
     const thing                              = Checks.liveBoxSealable.parse(donorProps)
@@ -131,14 +132,14 @@ function deserializeWhisper(text: string): CX.Whisper {
 // == [Checks]: Checks
 
 /** Checks for what a box's seal takes: a live sealable for a tombstone, the public props of a revision and of a tombstone, and the secret props. */
-const Checks = Validator.Checkers('bad_record', ({ obj, oneof, epochMillis }) => ({
+const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
   liveBoxSealable:      BoxChecks.sealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
   // Strict, since a misspelt key in any of these bags would otherwise be dropped without a word.
   boxPublicProps:       obj({ sidecar: exactOptional(CX.sidecar), am: exactOptional(oneof(['a', 'x'])), written_at: exactOptional(epochMillis) }).strict(),
-  // A tombstone's sidecar is always `{}`: it may be given, so long as it is that.
+  // A tombstone's sidecar is always `{}`, and its am `'x'`: each may be given, so long as it is that.
   tombstonePublicProps: obj({
     sidecar:    exactOptional(CX.sidecar.refine(isEmptyObject, Phrases.TombstoneSidecarNotEmpty)),
-    am:         exactOptional(oneof(['a', 'x'])),
+    am:         exactOptional(lit('x')),
     written_at: exactOptional(epochMillis),
   }).strict(),
   boxCleartexts:        obj({ whisper: CX.whisper }).strict(),

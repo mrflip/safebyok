@@ -83,6 +83,7 @@ describe("Gating.make(record, opts)", () => {
     [{ gatingkind: 'birth_bank' },  { attempt: 'birth' },                      'an attempt that is not a function'],
     [{ gatingkind: 'birth_bank' },  { askUser: undefined },                    'an askUser left undefined'],
     [{ gatingkind: 'birth_bank' },  { askUser: 'ask' },                        'an askUser that is not a function'],
+    [{ gatingkind: 'birth_bank' },  { askUser: () => Promise.resolve(true) },  'an askUser that guardRequestCleartext did not make'],
   ] as const
 
   for (const [record, moved, blurb] of OptsCases) {

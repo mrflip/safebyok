@@ -1,8 +1,9 @@
 import type * as Z from 'zod'
-import type { Consts, CX, EX } from 'safebyok-big/internals'
+import type { CX, EX } from 'safebyok-big/internals'
 import { Crypto, GX, Helpers } from 'safebyok-big/internals'
 import type * as Stamps from '../shapes/shapes-stamps'
 import type { DeviceTok, EpochMillis } from '../shapes/primitives'
+import type { Modelkind } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 
 // == [The ctx]: PurposeForWayinkind, wayinCtxOf
@@ -69,6 +70,6 @@ export class Wayin {
   }
   // --
 
-  /** Always `'wayin'`: marks this model for a {@link Consts.Modelkind} check. */
-  get modelkind(): 'wayin' { return 'wayin' satisfies Consts.Modelkind }
+  /** Always `'wayin'`: this model's {@link Modelkind}. */
+  get modelkind(): 'wayin' { return 'wayin' satisfies Modelkind }
 }
