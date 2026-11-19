@@ -215,10 +215,12 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     await TH.expectRefusal(lease.unseal(BaseBox, { ...tombstone, written_at: TH.T0 + 8 }), 'damaged_whisper')
   })
 
-  it("refuses a tombstone given a sidecar, as BaseBox makes it", async () => {
+  it("refuses a tombstone given a sidecar other than `{}`, and takes one given `{}`, as BaseBox makes it", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await TH.expectRefusal(lease.seal(BaseBox, live, { am: 'x', sidecar: TH.Sidecar }), 'bad_record')
+    const tombstone = await lease.seal(BaseBox, live, { am: 'x', sidecar: {} })
+    expect(tombstone).to.deep.include({ am: 'x', sidecar: {} })
   })
 
   it("refuses a tombstone given secret props, sealing nothing", async () => {
