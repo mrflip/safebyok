@@ -35,6 +35,19 @@ writes it.
 * A fresh worktree needs `pnpm --filter safebyok-big build` before the `safebyok` tests resolve
   `safebyok-big/internals`.
 
+## Thread 2, minder_events (#756)
+
+*Orchestrator:*
+* `MinderEvent = ThingEvent | ListingEvent | InvalidationEvent` in `shapes/shapes-minder.ts`, exported from `safebyok`
+  (names before the Coach: the plan's `*Car` names fought VOCABULARY.md). `ThingEvent<KindT>` is split by kind, so
+  `modelkind: 'box'` types `car` as `BoxCar | undefined`.
+* `listen(listener: (event: MinderEvent) => void)`; one private dispatcher, `#minderEventOf`, filters with
+  `isUsefulTSQEvent` and reads the key's last segment: `'!'` gives a thing event, anything else undefined. Thread 3
+  adds the `'#'` branch; thread 5 widens `isUsefulTSQEvent` for `invalidate` and adds its branch.
+* The giver's `listenBoxCars` reads `carkind` and `modelkind === 'box'`, no cast.
+* A fresh worktree needs `pnpm --filter safebyok-big build`, then `pnpm --filter safebyok build`, before the
+  safebyok-react tests resolve.
+
 ## Rulings
 
 * **Scope** (the Coach, 2026-11-19): Part 1 as planned, five threads on origin/main plus #751. "Don't do bulk
