@@ -259,7 +259,7 @@ export class ThingMinder {
   /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
    * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
-   * A write answered after `goodbye` caches nothing. An answer carrying a record of another bank rejects `unexpected_error`.
+   * A write answered after `goodbye` caches nothing. An answer carrying a record of another bank rejects, whether or not the write was made.
    */
   async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
