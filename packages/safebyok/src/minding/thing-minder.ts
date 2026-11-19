@@ -47,9 +47,9 @@ import * as Throwers from '../refusals/throwers'
  *   when the parent's life changes, it keeps the earlier life's children beside the new life's.
  * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it.
  * - Nothing of a write's ask is cached: the minder hears of a write only from its answer, or from the watch's notice.
- * - Every record a write's answer carries has landed before the write resolves: the record written or the refusal's
- *   `dbhas`, the bank and main gate of its `world`, and each Thing its `tracked` reports stored. So a listener has
- *   heard of each car first.
+ * - While the minder is minding, every record a write's answer carries has landed before the write resolves: the record
+ *   written or the refusal's `dbhas`, the bank and main gate of its `world`, and each Thing its `tracked` reports stored.
+ *   So a listener has heard of each car first.
  * - A write's answer and the watch's notice of the same write leave the same car and listing, in either order: the
  *   later changes nothing.
  */
@@ -209,11 +209,9 @@ export class ThingMinder {
 
   // == [Writing]: tryWrite
 
-  /** Write `ask` through the vaultDB, and answer as it did once every record its answer carries is cached.
-   * The record written, or a refusal's `dbhas`, lands in its car, as do the bank and main gate of the answer's `world`
-   * and each Thing its `tracked` reports stored. Nothing of the ask itself is cached.
-   * A born Thing joins its parent's listing. A deleted Thing's car goes `gone`, and its tombstone stays listed.
+  /** Write `ask` through the vaultDB, and answer as it did, a refusal included, once every record its answer carries is cached.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
+   * A write answered after `goodbye` caches nothing.
    */
   async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
     try {
