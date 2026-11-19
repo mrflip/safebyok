@@ -7,6 +7,7 @@ import { Bank } from '../../src/models/bank'
 import type { Device } from '../../src/models/device'
 import { guardRequestCleartext } from '../../src/models/device'
 import { Gating } from '../../src/models/gating'
+import { Lease } from '../../src/models/lease'
 import type { GatingAttempt, GatingOpts } from '../../src/shapes/shapes-gateish'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
@@ -422,6 +423,21 @@ describe("birthBank(device, cleartexts, friend), the birth_bank attempt", () => 
     const err = await TH.expectRefusal(birthByPrompt(device, { passphraseClear: TH.TestPassphrase }))
     expect(err).to.eq(refusal)
     expect(births.banks[0]!.isLocked).to.be.true
+  })
+
+  it("throws the device's refusal where the device is swept while the vaultDB stores the bank, evicting the new lease and leaving the bank locked", async () => {
+    const device = TH.makeDevice()
+    const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
+    const births = TH.spyBirths(device, async (ask) => {
+      const born = await tryBirthBank(ask)
+      device.sweep()
+      return born
+    })
+    const evict = vi.spyOn(Lease.prototype, 'evict')
+    expect(await TH.expectRefusal(birthByPrompt(device, { passphraseClear: TH.TestPassphrase }), 'disabled')).to.equal(device.endCause)
+    expect(await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)).to.include({ ok: true, act: 'born' })
+    expect(births.banks[0]!.isLocked).to.be.true
+    expect(evict).toHaveBeenCalledTimes(1)
   })
 
   it("refuses 'weak_passphrase' before it makes a bank", async () => {
