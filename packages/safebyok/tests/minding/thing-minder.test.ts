@@ -485,10 +485,17 @@ describe("ThingMinder.listingAt", () => {
     }
   })
 
-  it("refuses bad_record for a scope of another bank", () => {
-    const { minder } = minderWorldOf(new MemoryVaultDB())
-    TH.expectSyncRefusal(() => minder.listingAt({ ...TH.RootScope, banklabel: 'other' }), 'bad_record')
-  })
+  const ForeignScopes = [
+    [{ ...TH.RootScope, userid: 'u2' },        "refuses bad_record for another user's scope"],
+    [{ ...TH.RootScope, banklabel: 'other' },  "refuses bad_record for another bank's scope"],
+    [{ ...TH.RootScope, labelpath: 'Box' },    "refuses bad_record for a labelpath that is no Thing's"],
+  ] as const
+  for (const [scoped, blurb] of ForeignScopes) {
+    it(blurb, () => {
+      const { minder } = minderWorldOf(new MemoryVaultDB())
+      TH.expectSyncRefusal(() => minder.listingAt(scoped), 'bad_record')
+    })
+  }
 })
 
 describe("ThingMinder.tryAt", () => {
