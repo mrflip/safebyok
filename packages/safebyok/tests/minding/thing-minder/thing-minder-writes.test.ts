@@ -83,9 +83,9 @@ describe("ThingMinder.tryWrite", () => {
     const vaultDB = await bornOf(new QuietVaultDB())
     const { minder, receive } = minderWorldOf(vaultDB)
     await minder.list('box')
-    const answer = await minder.tryWrite(boxBirthAskOf())
+    await minder.tryWrite(boxBirthAskOf())
     const [car, listing] = [minder.at(TH.BoxScope), minder.listingAt(TH.RootScope)]
-    receive(noticeOf(TH.boxThingOf(), answer.world))
+    receive(noticeOf(TH.boxThingOf()))
     expect(minder.at(TH.BoxScope)).to.eq(car)
     expect(minder.listingAt(TH.RootScope)).to.eq(listing)
     expect(car).to.deep.equal(carOf(TH.boxThingOf()))

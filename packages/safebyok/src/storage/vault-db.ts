@@ -44,8 +44,8 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 /** The answer to `tryBirthBank`: the three roots the store wrote (`born`), or found already stored (`passed`). */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
-/** A changed Thing that a watch reports, shaped like a get's answer, with its bank's world as the store last read it. */
-export type ThingNotice = Pick<GoodAnswer<ThingRecord, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val' | 'world'>
+/** A Thing that a watch reports, shaped like a get's answer: one Thing, without its bank's world. */
+export type ThingNotice = Pick<GoodAnswer<ThingRecord, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val'>
 // --
 
 // == [What a store reports]: Actual, ListThingsActual, BirthBankActual
@@ -92,7 +92,9 @@ export interface VaultDB {
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored. */
   tryBirthBank(ask: BirthBankAsk): Promise<BirthBankAnswer>
   /** Watch a bank's Things, returning a function that stops the watch.
-   * `onNotice` gets each changed Thing, and each Thing in a verb's answer's `tracked` that is not `'same'`.
+   * `onNotice` gets a notice for each changed Thing, and for each Thing in a verb's answer's `tracked` that is not `'same'`.
+   * Each is followed by a notice of the bank and one of its main gate, as the store last read them, where it found both
+   * sound. So a watcher may hear of a Thing again at a revision it has already heard of.
    * `onBadNews` gets any trouble the watch meets, including a Thing that fails its checks.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void

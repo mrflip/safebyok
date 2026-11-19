@@ -15,9 +15,11 @@ import type {
 } from './vault-db'
 import * as Throwers from '../refusals/throwers'
 
-// == [Answers]: Received, answerOf
+// == [Answers]: Received, answerOf, worldThingsOf
 
-/** A change a store's watch passes to `receive`: the changed Thing, raw, and its bank's world as the store last read it. */
+/** A change a store's watch passes to `receive`: the changed Thing, raw, and its bank's world as the store last read it.
+ * The watch tells each of the three as a notice of its own.
+ */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
 /** A watch the adapter keeps: its bank, and the function called with each Thing received. */
@@ -42,6 +44,13 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
 
 /** The `tracked` a store reports, as a field to spread into an answer: none where it reports none. */
 function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked } { return (tracked === undefined) ? {} : { tracked } }
+
+/** The bank and main gate of `world`, in that order: none for a null world. */
+function worldThingsOf(world: WorldRecord | null): ThingRecord[] {
+  if (world === null) { return [] }
+  const { maingate, ...bank } = world
+  return [bank, maingate]
+}
 // --
 
 /** The base class of a vaultDB that keeps its Things in a datastore. A subclass writes the `do*` calls, each one atomic step.
@@ -137,15 +146,23 @@ export abstract class AdapterVaultDB implements VaultDB {
   }
 
   /** Watch a bank's Things ({@link VaultDB.watch}).
-   * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error `onNotice` throws.
+   * Each change a store passes to `receive` becomes a notice of the changed Thing, then one of the bank and one of the main
+   * gate of its world, where the world is not null.
+   * A Thing that fails its checks, or belongs to another bank, goes to `onBadNews` instead of `onNotice`, and so does an error
+   * `onNotice` throws. Either way the watch tells of the rest.
    */
   watch(scope: ThingWatchScope, onNotice: (notice: ThingNotice) => void, onBadNews: (news: Errors.VaultError) => void): () => void {
     const { scope: bankScope } = AskChecks.watchArgs.parse({ scope, onNotice, onBadNews })
-    const feed: Feed = { scope: bankScope, receive: ({ record, world }) => {
+    function tell(raw: unknown): void {
       let val: ThingRecord
-      try { val = Classifier.watchedThingOf(bankScope, record) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
+      try { val = Classifier.watchedThingOf(bankScope, raw) } catch (err) { onBadNews(Outcome.storageRefusalOf(err)); return }
       // A notice handler that throws is a bug in the host's code, not trouble in storage.
-      try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val, world }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+      try { onNotice({ ok: true, act: Thing.isGone(val) ? 'gotgone' : 'gotlive', val }) } catch (err) { onBadNews(Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)) }
+    }
+    // The changed Thing comes first: the store read its world in the same step or later, so the notices come in the order
+    // the store learned of them.
+    const feed: Feed = { scope: bankScope, receive: ({ record, world }) => {
+      for (const raw of [record, ...worldThingsOf(world)]) { tell(raw) }
     } }
     this.#feeds.add(feed)
     const stop = this.doWatch(bankScope, feed.receive, onBadNews)
@@ -156,7 +173,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Tracked]: notifyTrackedRecords
 
   // Each verb calls it last, on the answer it returns. Each watch is called on a later microtask, so nothing it does runs inside the verb.
-  /** Notify each watch of `ask`'s bank of each Thing in `answer.tracked` that is not `'same'`, with `answer.world`.
+  /** Notify each watch of `ask`'s bank of each Thing in `answer.tracked` that is not `'same'`, with `answer.world`, each as `receive` gets a change.
    * Does nothing for a vaultDB made with `doNotifyTracked: false`.
    */
   protected notifyTrackedRecords(ask: AnyAsk, { world, tracked }: { world: WorldRecord | null, tracked?: Tracked }): void {

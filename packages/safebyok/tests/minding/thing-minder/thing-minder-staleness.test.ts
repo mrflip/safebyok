@@ -4,7 +4,7 @@ import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { badnewsOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt } from './world'
+import { badnewsOf, boxBirthAskOf, listenerOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, toldOf } from './world'
 
 describe("ThingMinder.isStaleAt", () => {
   it("is true before any get, false after, and true past staleTime", async () => {
@@ -97,15 +97,40 @@ describe("ThingMinder's watch", () => {
     expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate))
   })
 
-  it("caches the Thing a notice carries, of any kind, and drops the world beside it", () => {
+  it("caches the one Thing a notice carries, of any kind", () => {
     const { minder, receive } = minderWorldOf(new MemoryVaultDB())
-    const [bank, gate, box] = [TH.bankThingOf(), TH.gateThingOf(), TH.boxThingOf()]
-    receive(noticeOf(box, { ...bank, maingate: gate }))
+    const [gate, box] = [TH.gateThingOf(), TH.boxThingOf()]
+    receive(noticeOf(box))
     expect(minder.at(TH.BankScope)).to.be.undefined
     expect(minder.at(TH.GateScope)).to.be.undefined
     expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(box))
     receive(noticeOf(gate))
     expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate))
+  })
+
+  it("caches the bank and main gate the watch tells of beside a box written", async () => {
+    const vaultDB = await bornOf(new MemoryVaultDB())
+    const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
+    await TH.wakeupAtNextTick()
+    expect([minder.at(TH.BankScope), minder.at(TH.GateScope)]).to.deep.equal([undefined, undefined])
+    await TH.expectGood(vaultDB.tryWriteThing(boxBirthAskOf()))
+    await TH.eventually(() => minder.at(TH.GateScope) !== undefined)
+    expect(minder.at(TH.BankScope)).to.deep.equal(carOf(TH.bankThingOf()))
+    expect(minder.at(TH.GateScope)).to.deep.equal(carOf(TH.gateThingOf()))
+  })
+
+  it("keeps the bank's car when the watch tells of it again, and tells a listener each time", async () => {
+    const vaultDB = await bornOf(new MemoryVaultDB())
+    const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
+    await TH.expectGood(vaultDB.tryWriteThing(boxBirthAskOf('alpha')))
+    await TH.eventually(() => minder.at(TH.BankScope) !== undefined)
+    const car = minder.at(TH.BankScope)
+    const listener = listenerOf()
+    minder.listen(listener)
+    await TH.expectGood(vaultDB.tryWriteThing(boxBirthAskOf('beta')))
+    await TH.eventually(() => toldOf(listener).some(([labelpath]) => labelpath === 'gate'))
+    expect(minder.at(TH.BankScope)).to.eq(car)
+    expect(toldOf(listener).filter(([labelpath]) => labelpath === 'bank')).to.deep.equal([['bank', 'full']])
   })
 
   it("skips a Thing while the minder is not minding", () => {
