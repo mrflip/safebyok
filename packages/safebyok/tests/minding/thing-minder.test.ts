@@ -1168,7 +1168,7 @@ describe("ThingMinder.tryWrite", () => {
     expect(listing).to.deep.equal(['box/openai'])
   })
 
-  it("deletes a box: its car goes gone, and its tombstone stays in the root box's listing", async () => {
+  it("leaves a deleted box's car gone and its tombstone in the root box's listing", async () => {
     const vaultDB = new QuietVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
