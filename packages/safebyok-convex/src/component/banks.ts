@@ -226,8 +226,9 @@ export const tidyGone = mutation({
   handler: async (ctx, { ask: sent }) => {
     const ask = askFor(() => DB.boxTidy.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, ask)
+    const bank = (bankDoc === null) ? null : storedFor(() => BX.storedBankRow.parse(bankDoc.bank))
     const vaultDocs = await listVaultDocs(ctx.db, ask)
-    const lives = storedFor(() => BX.endedLivesOf(bankDoc?.bank ?? null, vaultDocs))
+    const lives = BX.endedLivesOf(bank, vaultDocs)
     for (const { _id } of lives.ended) { await ctx.db.delete('safebyok_vaults', _id) }
     const tallyDocs = await listTallyDocs(ctx.db, ask)
     for (const tallyDoc of tallyDocs) {

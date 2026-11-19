@@ -332,6 +332,15 @@ describe("ConvexBankDB over damaged rows", () => {
     expect(await tallyCountOf(deployment)).to.eq(1)
   })
 
+  it("refuses damaged_row in tidyGone, deleting nothing, where the bank document holds a null row", async () => {
+    const { deployment, bankDB, rows } = await plantedBankDB()
+    await rows.plantBankRow(BW.bankScope, null)
+    await TH.expectRefusal(bankDB.tidyGone(BW.boxTidyAsk), 'damaged_row')
+    expect(await rows.vaultRowOf(endedScope)).to.deep.equal(ended)
+    expect(await boxCountOf(deployment)).to.eq(2)
+    expect(await tallyCountOf(deployment)).to.eq(1)
+  })
+
   it("keeps a vault row that fails its checks in tidyGone, with its box rows and tally", async () => {
     const { deployment, bankDB, rows } = await plantedBankDB()
     const other = BW.vaultAt(0, 'bank1', 'life1', { vaultlabel: 'other' })
