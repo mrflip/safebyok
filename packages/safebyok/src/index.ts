@@ -11,7 +11,7 @@ export * from './storage'
 export {
   type BankCar, type BoxCar, type CarAt, type CarFreshness, type DeliverableThing, type GateCar, type GotAnswer, type MinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, carLivenessVals,
   type InvalidationEvent, type ListingEvent, type MinderEvent, type ThingEvent,
-  DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, MinderChecks, type MinderFriend, type MinderGetOpts, type MinderTryAtOpts, type TsqStaleTime,
+  DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, MinderChecks, type MinderFriend, type MinderGetOpts, type MinderInvalidateOpts, type MinderTryAtOpts, type TsqStaleTime,
 } from './shapes/shapes-minder'
 export { ThingMinder } from './minding/thing-minder'
 export { carOf, dbHasNewer } from './minding/thing-car'

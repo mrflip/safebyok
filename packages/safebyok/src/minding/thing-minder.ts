@@ -17,7 +17,7 @@ import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from 
 import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import {
   type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
-  type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
+  type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
@@ -52,6 +52,7 @@ import * as Throwers from '../refusals/throwers'
  *   So a listener has heard of each car first.
  * - A write's answer and the watch's notice of the same write leave the same car and listing, in either order: the
  *   later changes nothing.
+ * - `invalidate` asks the vaultDB nothing, and changes no car and no listing's labelpaths: it marks listings, never cars.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
@@ -188,8 +189,8 @@ export class ThingMinder {
 
   /** Call `listener` with each change the cache tells of, as a {@link MinderEvent}. Returns the function that stops it.
    * It tells a `thing` event each time a record arrives in a car (even one that changes nothing), a get of it is refused,
-   * or it is removed; and a `listing` event each time a list sets a listing (even to the labelpaths it had), a labelpath
-   * joins it, or it is removed.
+   * or it is removed; a `listing` event each time a list sets a listing (even to the labelpaths it had), a labelpath
+   * joins it, or it is removed; and an `invalidation` event each time `invalidate` marks a listing stale.
    * Nothing is called when a car ages past `staleTime`, and listening caches no car.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
@@ -203,6 +204,24 @@ export class ThingMinder {
       } catch (err) {
         this.#bank.tellBadNews([Throwers.unexpectedError(err)])
       }
+    })
+  }
+  // --
+
+  // == [Invalidating]: invalidate
+
+  /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
+   * Each listing marked tells an `invalidation` event, once until a list sets it again. It asks the vaultDB nothing, and
+   * leaves what each listing lists as it was.
+   */
+  invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
+    MinderChecks.minderInvalidateOpts.parse(opts)
+    const keyHead = (labelpath === undefined) ? this.#bankKeyHead() : this.#keyHeadOf({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
+    // refetchType 'none': TanStack would otherwise refetch each active match. A listing has no queryFn to run, and the minder fetches nothing here.
+    void this.#tsq.invalidateQueries({
+      queryKey:    keyHead,
+      predicate:   (tsqQuery) => tsqQuery.queryKey.at(-1) === 'kids',
+      refetchType: 'none',
     })
   }
   // --
@@ -308,7 +327,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: queryKey, listingQueryKey, subtreeQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: queryKey, listingQueryKey, subtreeQueryKey, #keyHeadOf, #bankKeyHead, #tsqQueryOptions, #askAt, #shellAt
 
   // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
   // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
@@ -327,8 +346,11 @@ export class ThingMinder {
   /** The part of a query key that `scoped` has in common with each of its keys. */
   #keyHeadOf(scoped: ThingScope): string[] {
     const labels = scoped.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
-    return ['safebyok', this.userid, this.banklabel, ...labels]
+    return [...this.#bankKeyHead(), ...labels]
   }
+
+  /** The part of a query key that every key of this bank has in common. */
+  #bankKeyHead(): string[] { return ['safebyok', this.userid, this.banklabel] }
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
   /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
@@ -396,7 +418,7 @@ export class ThingMinder {
   }
 
   // A key's mark says what its query caches: '!' a car, '#' and 'kids' a listing. A removed query keeps its last state, but
-  // no longer caches it.
+  // no longer caches it. A listing is told of when it is invalidated; a car's invalidation can't arise, as the minder invalidates none.
   /** What a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for one it is not told of. */
   #minderEventOf(tsqEvent: unknown): MinderEvent | undefined {
     if (! isUsefulTSQEvent(tsqEvent)) { return undefined }
@@ -409,6 +431,8 @@ export class ThingMinder {
       return { carkind: 'thing', modelkind, labelpath, car } as ThingEvent
     }
     if (queryKey.at(-1) === 'kids') {
+      // A listing event is told of the changes of `labelpaths`; an invalidation leaves them as they were.
+      if (tsqEvent.action?.type === 'invalidate') { return { carkind: 'invalidation', modelkind, labelpath, card: 'list', tag: 'kids' } }
       const labelpaths = (tsqEvent.type === 'removed') ? undefined : state.data
       // A listing lists Things of its parent's kind, as a labelpath starts with its parent's.
       return { carkind: 'listing', modelkind, labelpaths, tag: 'kids', of: { parentpath: labelpath } } as ListingEvent
@@ -429,14 +453,14 @@ function recordsOfWriteAnswer(answer: WriteThingAnswer): ThingRecord[] {
   return [...((found === null) ? [] : [found]), ...roots, ...tracked]
 }
 
-// A record arrives (success), a get is refused (which leaves the car untimely), or the car is removed. A fetch starting,
-// pausing or failing once, and the observers' bookkeeping change none.
-/** True for a cache event a listener may hear of: a query removed, or a query's success or error. */
-function isUsefulTSQEvent(event: unknown): event is Readonly<{ type: 'removed' | 'updated', query: TSQ.Query }> {
+// A record arrives (success), a get is refused (which leaves the car untimely), the car is removed, or a listing is
+// invalidated. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.
+/** True for a cache event a listener may hear of: a query removed, or a query's success, error or invalidation. */
+function isUsefulTSQEvent(event: unknown): event is Readonly<{ type: 'removed' | 'updated', query: TSQ.Query, action?: Readonly<{ type: string }> }> {
   if (! (event instanceof Object)) { return false }
   const qcne = event as TSQ.QueryCacheNotifyEvent
   if (qcne.type === 'removed') { return true }
-  return (qcne.type === 'updated') && ['success', 'error'].includes(qcne.action.type)
+  return (qcne.type === 'updated') && ['success', 'error', 'invalidate'].includes(qcne.action.type)
 }
 
 /** The {@link GotAnswer} for `carQuery`, the query of `ask`'s car, with the car and whether it is timely within `staleTime`. */
