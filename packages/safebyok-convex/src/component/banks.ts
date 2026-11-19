@@ -1,7 +1,7 @@
 import * as DB from 'safebyok-big/storage'
 import { BX } from 'safebyok-big/storage'
 import type { BankScope, VaultScope, WatchScope } from 'safebyok-big/storage'
-import type { BankTok, Boxlabel, Vaultlabel } from 'safebyok-big'
+import type { Boxlabel, Vaultlabel } from 'safebyok-big'
 import { ConvexError, getDocumentSize } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import type { DatabaseReader, DatabaseWriter } from './_generated/server'
@@ -213,12 +213,12 @@ export const delBox = mutation({
 
 // == [Upkeep]: tidyGone, watchRows
 
-// A vault row is of an ended life when its `bank_tok` is not the live bank row's, and a box row or a tally when its life pair is
-// not that of a live vault row. A vault row that fails its checks is left alone, with every box row and tally under its
-// vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one transaction can carry, so it
-// deletes a batch of them, and a host calls it again until it answers that none are left.
+// Which lives have ended is `BX.endedLivesOf`'s to say. A vault row that fails its checks is left alone, with every box row
+// and tally under its vaultlabel, and those box rows go uncounted. The box rows of ended lives may be more than one
+// transaction can carry, so it deletes a batch of them, and a host calls it again until it answers that none are left.
 /** Delete the vault rows and tallies of every ended life in a bank, and a batch of their box rows.
  * Returns how many box rows its live vaults have, and what is left of the box rows of ended lives.
+ * Refuses `damaged_row`, deleting nothing, when the bank row fails its checks.
  */
 export const tidyGone = mutation({
   args:    CVX.askArgs,
@@ -226,49 +226,37 @@ export const tidyGone = mutation({
   handler: async (ctx, { ask: sent }) => {
     const ask = askFor(() => DB.boxTidy.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, ask)
-    const bank_tok = liveBankTokOf(bankDoc?.bank ?? null)
     const vaultDocs = await listVaultDocs(ctx.db, ask)
-    const lives: Life[] = []
-    const damagedlabels: Vaultlabel[] = []
-    for (const vaultDoc of vaultDocs) {
-      const { vaultlabel } = vaultDoc
-      const vaultReport = BX.vaultRow.safeParse(vaultDoc.vault)
-      if (! vaultReport.success) {
-        damagedlabels.push(vaultlabel)
-      } else if (vaultReport.data.bank_tok !== bank_tok) {
-        await ctx.db.delete('safebyok_vaults', vaultDoc._id)
-      } else if (vaultReport.data.am === 'a') {
-        lives.push(lifeOf({ ...ask, vaultlabel, bank_tok: vaultReport.data.bank_tok, vault_tok: vaultReport.data.vault_tok }))
-      }
-    }
-    const liveCkeys = new Set(lives.map((life) => ckeyOfLife(life)))
-    const isEnded = (doc: Life) => (! damagedlabels.includes(doc.vaultlabel)) && (! liveCkeys.has(ckeyOfLife(doc)))
+    const lives = storedFor(() => BX.endedLivesOf(bankDoc?.bank ?? null, vaultDocs))
+    for (const { _id } of lives.ended) { await ctx.db.delete('safebyok_vaults', _id) }
     const tallyDocs = await listTallyDocs(ctx.db, ask)
     for (const tallyDoc of tallyDocs) {
-      if (isEnded(tallyDoc)) { await ctx.db.delete('safebyok_tallies', tallyDoc._id) }
+      if (lives.isEnded(tallyDoc)) { await ctx.db.delete('safebyok_tallies', tallyDoc._id) }
     }
-    const leftover = await deleteEndedBoxes(ctx.db, ask, isEnded)
+    const leftover = await deleteEndedBoxes(ctx.db, ask, lives.isEnded)
     let totalCount = 0
-    for (const life of lives) { totalCount += await Tallies.countBoxes(ctx.db, life) }
+    for (const { vaultlabel, bank_tok, vault_tok } of lives.live) { totalCount += await Tallies.countBoxes(ctx.db, lifeOf({ ...ask, vaultlabel, bank_tok, vault_tok })) }
     return { totalCount, leftover }
   },
 })
 
 // A Convex query reads whole documents, so a bank-wide watch reads every box row of the bank's live vaults each time it runs.
-/** List the bank row, every gate and vault row in `scope`, and the box rows of each live vault, for a client to subscribe to. */
+/** List the bank row, every gate and vault row in `scope`, and the box rows of each live vault, for a client to subscribe to.
+ * Refuses `damaged_row` when the bank row fails its checks.
+ */
 export const watchRows = query({
   args:    CVX.watchRowsArgs,
   returns: CVX.rowsWatched,
   handler: async (ctx, { scope: sent }) => {
     const scope = askFor(() => DB.watchScope.parse(sent))
     const bankDoc = await getBankDoc(ctx.db, scope)
-    const bank_tok = liveBankTokOf(bankDoc?.bank ?? null)
+    const bank = (bankDoc === null) ? null : storedFor(() => BX.storedBankRow.parse(bankDoc.bank))
     const gateDocs = (scope.vaultlabel === undefined) ? await listGateDocs(ctx.db, scope) : []
     const vaultDocs = await listVaultDocs(ctx.db, scope)
     const boxes: { vaultlabel: Vaultlabel, boxlabel: Boxlabel, box: unknown }[] = []
     for (const { vaultlabel, vault } of vaultDocs) {
       const vaultReport = BX.vaultRecord.safeParse(vault)
-      if ((! vaultReport.success) || (vaultReport.data.bank_tok !== bank_tok)) { continue }
+      if ((bank?.am !== 'a') || (! vaultReport.success) || (vaultReport.data.bank_tok !== bank.bank_tok)) { continue }
       const boxDocs: BoxDoc[] = await Tallies.lifeBoxQuery(ctx.db, lifeOf({ ...scope, vaultlabel, bank_tok: vaultReport.data.bank_tok, vault_tok: vaultReport.data.vault_tok })).collect()
       boxes.push(...boxDocs.map(({ boxlabel, box }) => ({ vaultlabel, boxlabel, box })))
     }
@@ -282,7 +270,7 @@ export const watchRows = query({
 })
 // --
 
-// == [Asks and refusals]: askFor, crossingOf, policedGateOf, wouldWrite
+// == [Asks and refusals]: askFor, storedFor, crossingOf, policedGateOf, wouldWrite
 
 // Anyone signed in may call these functions with an ask of their own making, so each parses its ask again here, with the core's
 // own checker, before a row is read, and continues with what the parse returns.
@@ -290,6 +278,16 @@ export const watchRows = query({
 function askFor<AskT>(parse: () => AskT): AskT {
   try {
     return parse()
+  } catch (err) {
+    throw crossingOf(err)
+  }
+}
+
+// A stored row a function cannot go on without, and that fails its checks, refuses where it is found, and the client hears why.
+/** Return what `check` returns, rethrowing a refusal of a stored row as a ConvexError the client sees. */
+function storedFor<ValT>(check: () => ValT): ValT {
+  try {
+    return check()
   } catch (err) {
     throw crossingOf(err)
   }
@@ -376,19 +374,10 @@ async function deleteEndedBoxes(db: DatabaseWriter, scope: BankScope, isEnded: (
 }
 // --
 
-// == [Helpers]: lifeOf, ckeyOfLife, liveBankTokOf, getBankDoc, getGateDoc, getVaultDoc, getBoxDoc, writeBankDoc, writeGateDoc, writeVaultDoc, writeBoxDoc, the list queries, BankDoc, GateDoc, VaultDoc, BoxDoc
+// == [Helpers]: lifeOf, getBankDoc, getGateDoc, getVaultDoc, getBoxDoc, writeBankDoc, writeGateDoc, writeVaultDoc, writeBoxDoc, the list queries, BankDoc, GateDoc, VaultDoc, BoxDoc
 
 /** The {@link Life} of an ask or a record, without its other fields. */
 function lifeOf({ user_id, banklabel, vaultlabel, bank_tok, vault_tok }: Life): Life { return { user_id, banklabel, vaultlabel, bank_tok, vault_tok } }
-
-/** The ckey of `life`, among the lives of one bank. */
-function ckeyOfLife({ vaultlabel, bank_tok, vault_tok }: Life): string { return DB.ckeyOf(vaultlabel, bank_tok, vault_tok) }
-
-/** The `bank_tok` of `bankRaw` when it is a live bank row, else null. */
-function liveBankTokOf(bankRaw: unknown): BankTok | null {
-  const bankReport = BX.bankRecord.safeParse(bankRaw)
-  return bankReport.success ? bankReport.data.bank_tok : null
-}
 
 // `.unique()` throws if it finds two documents. A document is inserted only when none was found in
 // the same transaction, so two would mean damage, and that should fail loudly.

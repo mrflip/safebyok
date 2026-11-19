@@ -142,7 +142,9 @@ of every ended life, those a `delBank` left included: every vault row and tally 
 1000 of their box rows, or 2 MiB of them, whichever comes first. Its `leftover` says what is left
 of those box rows: `none`; `some`, which the next call deletes; or `many`, which takes more calls
 than one. **Call `tidyGone` now and then**, as housekeeping, and again while it answers `some` or
-`many`. To find the box rows of ended lives, it reads the bank's box rows in order, live ones
+`many`. A row that fails the core's checks is never taken for one of an ended life: a vault row is
+left, with its box rows and tally, and a bank row makes `tidyGone` refuse `damaged_row`, deleting
+nothing, and a `watch` report the same to its `onBadNews`. To find the box rows of ended lives, it reads the bank's box rows in order, live ones
 among them, until it has counted what is left. The bank-wide `watch` reads every box row of the
 bank's live vaults each time a row changes, so a bank whose live vaults together pass 16 MiB makes
 it go quiet; `tidyGone` needs room for its batch beside them, and fails past about 12 MiB.
