@@ -133,16 +133,20 @@ export function bankResolvers<ContextT>(opts: BankResolversOpts<ContextT>): Bank
       next: async () => {
         const read = await reader.read()
         if (read.done) { return read }
-        // A watch that ended on bad news has closed the stream behind it, so the read after this one is done.
-        if (DB.isVaultError(read.value)) { return { done: false, value: badNoticeOf(read.value) } }
         // Check the sign-in again at every notice. A session revoked after it subscribed gets one last notice
-        // carrying the refusal. The stream is cancelled, so the read after that is done.
+        // carrying the refusal, and so does a watch's bad news. The stream is cancelled, so the read after that is done.
         const revoked = await signInRefusalOf(context, scope.user_id)
+        if (revoked !== null) {
+          await reader.cancel()
+          return { done: false, value: badNoticeOf(revoked) }
+        }
+        if (DB.isVaultError(read.value)) {
+          await reader.cancel()
+          return { done: false, value: badNoticeOf(read.value) }
+        }
         // A GraphQL union cannot contain the string `main`: a bank row's notice crosses with a null parent, and the client restores it.
         const { parent } = read.value
-        if (revoked === null) { return { done: false, value: { ok: true, ...read.value, parent: (parent === BX.BankTop) ? null : parent, err: null } } }
-        await reader.cancel()
-        return { done: false, value: badNoticeOf(revoked) }
+        return { done: false, value: { ok: true, ...read.value, parent: (parent === BX.BankTop) ? null : parent, err: null } }
       },
       return: async () => {
         await reader.cancel()
@@ -264,7 +268,7 @@ function endingWith(refusal: DB.VaultError): AsyncIterableIterator<CrossingNotic
   return iterator
 }
 
-/** Start watching `scope` on `bankDB` and return a stream reader of its notices, and of the refusal that ends it, if one does.
+/** Start watching `scope` on `bankDB` and return a stream reader of its notices and its bad news.
  * Cancelling the reader stops the watch.
  */
 function openWatch(bankDB: DB.AdapterBankDB, scope: DB.WatchScope): ReadableStreamDefaultReader<BX.Notice | DB.VaultError> {
@@ -274,16 +278,9 @@ function openWatch(bankDB: DB.AdapterBankDB, scope: DB.WatchScope): ReadableStre
   let unwatch = noUnwatching
   const notices = new ReadableStream<BX.Notice | DB.VaultError>({
     start: (controller) => {
-      // Enqueue every notice while the stream is open, however many are unread. Drop notices once it has closed.
-      const isOpen = (): boolean => ((controller.desiredSize ?? 0) > 0)
-      const onNotice = (notice: BX.Notice): void => { if (isOpen()) { controller.enqueue(notice) } }
-      // Bad news ends the watch: the subscriber reads the refusal, then the end of the stream.
-      const onBadNews = (news: DB.VaultError): void => {
-        if (! isOpen()) { return }
-        controller.enqueue(news)
-        controller.close()
-      }
-      unwatch = bankDB.watch(scope, onNotice, onBadNews)
+      // Enqueue every notice and bad news while the stream is open, however many are unread. Drop them once it has closed.
+      const enqueue = (noticeOrNews: BX.Notice | DB.VaultError): void => { if ((controller.desiredSize ?? 0) > 0) { controller.enqueue(noticeOrNews) } }
+      unwatch = bankDB.watch(scope, enqueue, enqueue)
     },
     cancel: () => { unwatch() },
   }, { highWaterMark: Infinity })
