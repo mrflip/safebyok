@@ -39,7 +39,7 @@ export {
   type ThingOptions, type ThingWatchScope, type Track, type Tracked, type WorldRecord, type WriteAsk, type WriteAskFlags, AskChecks,
 } from './shapes/shapes-asks'
 export {
-  type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind, type Tombstone,
+  type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind, type Tombstone,
   type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
@@ -49,9 +49,10 @@ export type { QueryCacheOpts } from './shapes/shapes-minder'
 // From safebyok-big, re-exported so that each stays one binding across both packages: its refusals and logger, what a
 // device is handed, what a gating's dialog, a wayin and a box carry, and the acts a vaultDB's answer reports.
 export { IsVaultError, VaultError, isVaultError, type Capacity, type RefusalFamily, type RefusalFamilyForKind, type RefusalMeta, type Refusalkind, type VaultErrorOpts } from 'safebyok-big'
+export { HostErrorSanitizer } from 'safebyok-big'
 export type { BadOutcome, GoodOutcome, Outcome } from 'safebyok-big'
 export { DefaultLogger, setDefaultLogger, type KeyDeriver, type VaultLogger } from 'safebyok-big'
 export { PrfAnswerSize, type PasskeyAnswer, type PassphraseCleartext, type PassphraseVerdict, type Sidecar, type Whisper } from 'safebyok-big'
 export type { PasskeyWayinHeader, PassphraseWayinHeader, WayinHeader, Wayinkind } from 'safebyok-big'
-export type { CipherCtxRecord, IfAbsent, IfPresent, KeyDeriverLabel, PasskeyWayinRecord, PassphraseSalt, PassphraseWayinRecord, PrfSalt, PutIfAbsent, WayinRecord } from 'safebyok-big/internals'
+export type { CipherCtxRecord, IfAbsent, IfPresent, KeyDeriverLabel, PasskeyWayinRecord, PassphraseSalt, PassphraseWayinRecord, PrfSalt, PutIfAbsent, RefusalRows, WayinRecord } from 'safebyok-big/internals'
 export { refusalkindVals, type DelAct, type GoodAct, type GotAct, type PutAct } from 'safebyok-big/storage'

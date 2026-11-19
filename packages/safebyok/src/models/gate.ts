@@ -1,11 +1,10 @@
-import type { Consts } from 'safebyok-big/internals'
 import { Crypto, Validator } from 'safebyok-big/internals'
 import { Thing } from './thing'
 import * as Phrases from '../phrases'
 import type { GateBank, GateDna, GateOpts } from '../shapes/shapes-gateish'
 import { type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { Wayin } from './wayin'
-import { type GateRecord, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type GateRecord, type Modelkind, type ThingScope, type Wayins, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
@@ -79,8 +78,8 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   }
   // --
 
-  /** Always `'gate'`: marks this model for a {@link Consts.Modelkind} check. */
-  get modelkind(): 'gate' { return 'gate' satisfies Consts.Modelkind }
+  /** Always `'gate'`: this model's {@link Modelkind}. */
+  get modelkind(): 'gate' { return 'gate' satisfies Modelkind }
 
   /** A gate's modelkind: the guards this class inherits answer for gates alone. */
   static override readonly modelkind = 'gate'

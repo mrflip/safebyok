@@ -1,10 +1,10 @@
 import { omit } from 'es-toolkit'
 import type * as Z from 'zod'
-import type { Consts, EX } from 'safebyok-big/internals'
+import type { EX } from 'safebyok-big/internals'
 import { Crypto, Helpers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
-import type { Sparse, ThingRecord } from '../shapes/shapes-thing'
+import type { Modelkind, Sparse, ThingRecord } from '../shapes/shapes-thing'
 import { type LeaseBank, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
 import { type LeaseRecord, type LeaseSparse, type LeaseStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -199,8 +199,8 @@ export class Lease implements LeaseStamp {
   }
   // --
 
-  /** Always `'lease'`: marks this model for a {@link Consts.Modelkind} check. */
-  get modelkind(): 'lease' { return 'lease' satisfies Consts.Modelkind }
+  /** Always `'lease'`: this model's {@link Modelkind}. */
+  get modelkind(): 'lease' { return 'lease' satisfies Modelkind }
 }
 
 // == [Helpers]: withoutSecrets, sealerMembersOf

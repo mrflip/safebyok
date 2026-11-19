@@ -1,4 +1,3 @@
-import type { Consts } from 'safebyok-big/internals'
 import { Clock, Crypto, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
 import { Thing } from './thing'
@@ -13,7 +12,7 @@ import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, Li
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import * as Phrases from '../phrases'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type ThingRecord, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, loggableAskOf, putAskOf } from '../shapes/shapes-asks'
 import { type BadAnswer, type BirthBankAnswer, type ListThingsAnswer, type VaultDB, type WriteThingAnswer } from '../storage/vault-db'
@@ -324,8 +323,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  /** Always `'bank'`: marks this model for a {@link Consts.Modelkind} check. */
-  get modelkind(): 'bank' { return 'bank' satisfies Consts.Modelkind }
+  /** Always `'bank'`: this model's {@link Modelkind}. */
+  get modelkind(): 'bank' { return 'bank' satisfies Modelkind }
 
   /** A bank's modelkind: the guards this class inherits answer for banks alone. */
   static override readonly modelkind = 'bank'

@@ -4,18 +4,21 @@ import { isEmptyObject } from 'es-toolkit'
 import type { AllUnionFields } from 'type-fest'
 import type * as Z from 'zod'
 import { exactOptional, uuid } from 'zod'
-import { BX, type Consts, CX, EX, SX, Validator } from 'safebyok-big/internals'
+import { BX, CX, EX, SX, Validator } from 'safebyok-big/internals'
 import type { ShellOf, TombstoneOf } from './shapes-sealers'
 import * as Phrases from '../phrases'
 import { type VaultDB, isVaultDB } from '../storage/vault-db'
 import { type Lifepath, type Revtok, Labelpath, Lifeseq, VoidLifeseq } from './primitives'
 
-// == [Kinds]: thingkindVals, Thingkind, ThingFormat
+// == [Kinds]: thingkindVals, Thingkind, Modelkind, ThingFormat
 
 /** The kinds of Thing: the modelkind at the base of each labelpath. */
-export const thingkindVals = ['bank', 'gate', 'box'] as const satisfies readonly Consts.Modelkind[]
+export const thingkindVals = ['bank', 'gate', 'box'] as const
 /** A kind of Thing, one of {@link thingkindVals}. */
 export type Thingkind = typeof thingkindVals[number]
+
+/** What a model's `modelkind` getter answers: a kind of Thing, or one of the models that are never stored. */
+export type Modelkind = Thingkind | 'device' | 'gating' | 'wayin' | 'lease' | 'proving'
 
 /** The `fmt` of every Thing, of every kind: the kind is in its labelpath. Distinct from big's rows' fmts (3001, 4001, 5003). */
 export const ThingFormat = 100_501

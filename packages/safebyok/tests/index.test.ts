@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { HostErrorSanitizer } from 'safebyok-big'
 import { Errors, Logger } from 'safebyok-big/internals'
 import * as BigThrowers from 'safebyok-big/refusals/throwers'
 import * as BigStorage from 'safebyok-big/storage'
@@ -21,10 +22,11 @@ describe("the front door, safebyok", () => {
     expect(Core).to.not.have.property('ThingMinder')
   })
 
-  it("re-exports safebyok-big's refusals and logger, the very ones the core throws and logs with", () => {
+  it("re-exports safebyok-big's refusals, its sanitizer and logger, the very ones the core throws and logs with", () => {
     expect(Front.VaultError).to.eq(Errors.VaultError)
     expect(Front.isVaultError).to.eq(Errors.isVaultError)
     expect(Front.setDefaultLogger).to.eq(Logger.setDefaultLogger)
+    expect(Front.HostErrorSanitizer.refusalFor).to.eq(HostErrorSanitizer.refusalFor)
   })
 
   // `Proving.buildLease` and `Bank.unlockByProving` are public, so a host holding a proving could unlock a bank outside any

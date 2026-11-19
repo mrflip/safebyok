@@ -18,7 +18,7 @@ export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphra
 
 // From safebyok-big, beside what core.ts and storage.ts re-export: the kinds, sizes and patterns a host checks its own input
 // against, and the small helpers of `safebyok-big/utils`.
-export { correctablekindVals, type Modelkind } from 'safebyok-big'
+export { correctablekindVals } from 'safebyok-big'
 export { ForeverMillis, MaxLabelChars, MaxUserIdChars, MinuteMillis, PasskeySaltSize, PassphraseSaltSize, Patterns } from 'safebyok-big'
 export type { UserID } from 'safebyok-big'
 export { WhisperFieldAttributes, fromB64, mask, mash, toB64, type MaskOpts } from 'safebyok-big/utils'

@@ -1,4 +1,3 @@
-import type { Consts } from 'safebyok-big/internals'
 import { Crypto, EX, Errors, GX, Helpers, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Device } from './device'
@@ -6,6 +5,7 @@ import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
 import type { Banklabel, Userid } from '../shapes/primitives'
 import { type AskUser, type CleartextsForGatingkind, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, gatingkindVals } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
+import type { Modelkind } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
 /** A request to the user for their passphrase or passkey, for the change `gatingkind` names.
@@ -160,8 +160,8 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   }
   // --
 
-  /** Always `'gating'`: marks this model for a {@link Consts.Modelkind} check. */
-  get modelkind(): 'gating' { return 'gating' satisfies Consts.Modelkind }
+  /** Always `'gating'`: this model's {@link Modelkind}. */
+  get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
 }
 
 // == [The attempts]: birthBank
