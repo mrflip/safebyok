@@ -532,12 +532,21 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("resolves the refusal of a swept bank, building no proving", async () => {
-    const { bank } = await TH.buildBornBank()
+  it("resolves the refusal of a swept bank, deriving no key from the passphrase", async () => {
+    const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }) })
     bank.sweep()
-    const buildLease = vi.spyOn(Proving.prototype, 'buildLease')
+    deriveKeyBytes.mockClear()
     await TH.expectBad(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }), 'disabled')
-    expect(buildLease).not.toHaveBeenCalled()
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+  })
+
+  it("resolves the refusal of a swept bank, zeroing a passkey answer's bytes", async () => {
+    const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
+    bank.sweep()
+    const passkeyClear = TH.passkeyAnswerOf()
+    await TH.expectBad(bank.attemptUnlock({ passkeyClear }), 'disabled')
+    expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
   })
 })
 
