@@ -68,7 +68,7 @@ export class Vault {
   // == [Using whispers]: withWhisper
 
   /** Call `fn` with the box at `labelpath` unsealed, once the bank is unlocked, and resolve what `fn` resolves.
-   * On a locked bank it first waits for the bank to be unlocked, asking the user where need be, as {@link Bank.ensureUnlocked} does, and rejects as that does. It gets the box from the vaultDB meanwhile.
+   * On a locked bank it first waits for the bank to be unlocked, asking the user where need be, as {@link Bank.ensureUnlocked} does, and rejects as that does.
    * `fn` gets the box's newest revision, whole, as the minder gets it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
    * It keeps nothing of the unsealed box, and rethrows what `fn` throws as it came: keep the whisper inside `fn`, and return only what is safe to hold.
    * @example

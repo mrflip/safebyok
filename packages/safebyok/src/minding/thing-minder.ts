@@ -198,8 +198,8 @@ export class ThingMinder {
     return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
   }
 
-  /** Get `scoped`'s car in the background, unless it is timely, and return at once. A get under way meanwhile shares the fetch.
-   * Its refusal goes to the bank's `tellBadNews`. Under `silenceErrors`, only an `unexpected_error` does: every other refusal is dropped.
+  /** Get `scoped`'s car in the background, unless it is timely, and return at once.
+   * A refusal is told to the bank's bad news, never thrown; under `silenceErrors`, only an `unexpected_error` is.
    */
   refresh(scoped: ThingScope, opts: MinderRefreshOpts = {}): void {
     const { silenceErrors, staleTime } = MinderChecks.minderRefreshOpts.parse(opts)
