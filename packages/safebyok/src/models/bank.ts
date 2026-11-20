@@ -7,6 +7,7 @@ import { Gate } from './gate'
 import { Gating, addPasskey, birthBank, replacePassphrase, revokePasskey, unlockBank } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
+import type { GatingAttempt, Gatingkind } from '../shapes/shapes-gateish'
 import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -150,8 +151,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt
-  // Each hands its gating's attempt a friend of this bank's private verbs: no public method accepts a proving (G9).
+  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt, launch
 
   /** Ask the user for a new passphrase and optional passkey, and birth the bank of `device`'s scope with them. Resolves the bank, unlocked.
    * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
@@ -169,13 +169,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Ask the user for the passphrase or the passkey, and unlock this bank with it. */
   async launchUnlockBankPrompt(): Promise<this> {
     this.demandEnabled()
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-    }
-    const gating = Gating.make({ gatingkind: 'unlock_bank' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => unlockBank(this, cleartexts, friend),
-    })
-    await gating.launch()
+    await this.#launch('unlock_bank', (cleartexts) => this.#unlockBankWith(cleartexts))
     return this
   }
 
@@ -184,14 +178,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
    */
   async launchReplacePassphrasePrompt(): Promise<this> {
     this.demandEnabled()
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
-    }
-    const gating = Gating.make({ gatingkind: 'replace_passphrase' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => replacePassphrase(this, cleartexts, friend),
-    })
-    await gating.launch()
+    await this.#launch('replace_passphrase', (cleartexts) => this.#replacePassphraseWith(cleartexts))
     return this
   }
 
@@ -201,14 +188,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   async launchAddPasskeyPrompt(): Promise<this> {
     this.demandEnabled()
     this.#maingate.demandPasskeyAddable()
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
-    }
-    const gating = Gating.make({ gatingkind: 'add_passkey' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => addPasskey(this, cleartexts, friend),
-    })
-    await gating.launch()
+    await this.#launch('add_passkey', (cleartexts) => this.#addPasskeyWith(cleartexts))
     return this
   }
 
@@ -218,15 +198,52 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   async launchRevokePasskeyPrompt(): Promise<this> {
     this.demandEnabled()
     if (this.#maingate.passkey0 === null) { return this }
+    await this.#launch('revoke_passkey', (cleartexts) => this.#revokePasskeyWith(cleartexts))
+    return this
+  }
+
+  /** Launch a gating of `gatingkind` on this bank, each attempt running `attempt`, and resolve the bank once one lands. */
+  #launch(gatingkind: Gatingkind, attempt: GatingAttempt): Promise<Bank> {
+    return Gating.make({ gatingkind }, { device: this.#device, bank: this, askUser: this.#device.askUser, attempt }).launch()
+  }
+  // --
+
+  // == [The gatings' attempts]: unlockBankWith, replacePassphraseWith, addPasskeyWith, revokePasskeyWith
+  // Each hands its attempt a friend of this bank's private verbs: no public method accepts a proving (G9).
+
+  /** Unlock this bank with `cleartexts`: its passphrase or its passkey. */
+  #unlockBankWith(cleartexts: unknown): Promise<Bank> {
+    const friend = {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+    }
+    return unlockBank(this, cleartexts, friend)
+  }
+
+  /** Replace the passphrase with `cleartexts`: the current one and the next. */
+  #replacePassphraseWith(cleartexts: unknown): Promise<Bank> {
     const friend = {
       unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
       putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
     }
-    const gating = Gating.make({ gatingkind: 'revoke_passkey' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => revokePasskey(this, cleartexts, friend),
-    })
-    await gating.launch()
-    return this
+    return replacePassphrase(this, cleartexts, friend)
+  }
+
+  /** Add the passkey in `cleartexts`, proved by the passphrase beside it. */
+  #addPasskeyWith(cleartexts: unknown): Promise<Bank> {
+    const friend = {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
+    }
+    return addPasskey(this, cleartexts, friend)
+  }
+
+  /** Revoke the passkey, proved by the passphrase in `cleartexts`. */
+  #revokePasskeyWith(cleartexts: unknown): Promise<Bank> {
+    const friend = {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
+    }
+    return revokePasskey(this, cleartexts, friend)
   }
   // --
 
