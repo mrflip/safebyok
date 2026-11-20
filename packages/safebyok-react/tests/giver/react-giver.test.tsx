@@ -140,6 +140,19 @@ describe("useBoxRecord", () => {
     await waitFor(() => { expect(result.current.data).to.eq(2) })
   })
 
+  it("shows the new box's car when the labelpath changes under a select that returns cars", async () => {
+    const { world, Acme, client, wrapper } = setup()
+    const AnthropicPath = 'box/anthropic'
+    world.stored.set(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 5)))
+    world.stored.set(AnthropicPath, TH.fullCarOf(TH.fakeBoxRecordOf(AnthropicPath, 1)))
+    await client.query(Acme.boxCarQueryOptions(AnthropicPath))
+    const { result, rerender } = renderHook(({ labelpath }) => Acme.useBoxRecord(labelpath, { select: (car) => ({ ...car }) }), { wrapper, initialProps: { labelpath: OpenaiPath } })
+    await waitFor(() => { expect(result.current.data?.newest.labelpath).to.eq(OpenaiPath) })
+    rerender({ labelpath: AnthropicPath })
+    await waitFor(() => { expect(result.current.isFetching).to.eq(false) })
+    expect(result.current.data?.newest.labelpath).to.eq(AnthropicPath)
+  })
+
   it("refuses a labelpath that is not a string", () => {
     const { Acme, wrapper } = setup()
     for (const labelpath of [42, null, '']) {

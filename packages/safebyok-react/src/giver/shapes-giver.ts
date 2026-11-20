@@ -6,11 +6,12 @@ import { type Banklabel, type DeviceSnapshot, type Userid, type carLivenessVals,
 
 // == [Types]: CarFields, GiverEvent, GiverBank, GiverDevice, BoxQueryOpts
 
-/** The fields of a minder's car that the giver reads: how current the car is, its age, and the fullest record known. */
+/** The fields of a minder's car that the giver reads: how current the car is, its age, the box it is of, and the fullest record known. */
 export type CarFields = Readonly<{
   liveness: (typeof carLivenessVals)[number]
   /** Of two cars of one box, the newer has the greater agerank, compared as strings. */
   agerank:  string
+  newest:   Readonly<{ labelpath: string }>
   fullest:  unknown
 }>
 

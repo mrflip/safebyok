@@ -41,18 +41,20 @@ function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>)
 }
 
 // TanStack shares structure through this both between a query's cars and between what `select` returns from them, so a
-// value that is not a car takes TanStack's own default. A box's cars never go back, so the newer car holds everything the
-// older one does, and nothing needs merging. Without this, a fetch that read an older car and resolved after the bridge
-// copied a newer one would put the older car back.
-/** Of `prior` and `next`, the car with the greater agerank, `prior` on a tie; anything else, as TanStack's `replaceEqualDeep`. */
+// value that is not a car takes TanStack's own default. When a hook's key changes, it shares the last key's selected value
+// with the new key's, so cars of two boxes take the default too: their agerank says nothing of which to show. A box's cars
+// never go back, so the newer car holds everything the older one does, and nothing needs merging. Without this, a fetch
+// that read an older car and resolved after the bridge copied a newer one would put the older car back.
+/** Of `prior` and `next`, cars of one box, the car with the greater agerank, `prior` on a tie; anything else, as TanStack's `replaceEqualDeep`. */
 function newerCarOf(prior: unknown, next: unknown): unknown {
-  if (! (isCar(prior) && isCar(next))) { return replaceEqualDeep(prior, next) }
+  if (! (isCar(prior) && isCar(next) && (prior.newest.labelpath === next.newest.labelpath))) { return replaceEqualDeep(prior, next) }
   return (next.agerank > prior.agerank) ? next : prior
 }
 
-/** True when `val` carries an agerank, as every car does. */
+/** True when `val` carries an agerank and its newest record's labelpath, as every car does. */
 function isCar(val: unknown): val is CarFields {
-  return (typeof val === 'object') && (val !== null) && (typeof (val as Partial<CarFields>).agerank === 'string')
+  const car = val as Partial<CarFields> | null
+  return (typeof car === 'object') && (car !== null) && (typeof car.agerank === 'string') && (typeof car.newest?.labelpath === 'string')
 }
 
 /** The fullest record a car holds */
