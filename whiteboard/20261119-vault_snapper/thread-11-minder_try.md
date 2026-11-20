@@ -1,6 +1,6 @@
 # Thread 11: minder_try (2026-11-20)
 
-Branch `20261120-minder_try`, PR #TBD, stacked on #777 (whisper_refresh). Proved: safebyok 1374 tests, safebyok-react 329,
+Branch `20261120-minder_try`, PR #778, stacked on #777 (whisper_refresh). Proved: safebyok 1374 tests, safebyok-react 329,
 typecheck and lint clean in both, before the catch-up.
 
 * **Built**:
