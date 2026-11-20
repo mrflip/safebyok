@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** thread 1 ready ([#769](https://github.com/mrflip/safebyok/pull/769)), in review; thread 2 building on it; thread 3 filed and out of draft ([#768](https://github.com/mrflip/safebyok/pull/768)); thread 4 building.
+* **Status:** threads 1 and 4 ready ([#769](https://github.com/mrflip/safebyok/pull/769), [#770](https://github.com/mrflip/safebyok/pull/770)), in review; threads 2 and 5 building on them; thread 3 filed and out of draft ([#768](https://github.com/mrflip/safebyok/pull/768)).
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -152,7 +152,7 @@ damaged; the changeset says so. *Levels:* worker on `sonnet`; review `low`. *Sta
 
 *Touches:* `models/bank.ts` (its boxes sections), a new `models/vault.ts`, its tests, VOCABULARY.md. *Depends on:*
 nothing (origin/main). *Look-ahead:* thread 7 puts `withWhisper` on the Vault; thread 5 edits `bank.ts`'s prompts,
-stacked on this. *Size:* M to L.
+stacked on this. *Size:* M to L. *Status:* ready, #770; in review (one compaction before ready).
 
 ### 5. bank_gatings
 
@@ -175,7 +175,7 @@ refactored (or is, in commits that diff cleanly), and the four born-bank gatings
 
 *Touches:* `models/bank.ts` (prompts), `models/gating.ts`, `models/device.ts`, their tests. *Depends on:* thread 4
 (same file, stacked). *Look-ahead:* thread 6's snapshots tell of the gating; thread 9 drives `attemptUnlock` from a
-form. *Size:* M.
+form. *Size:* M. *Status:* building, stacked on #770.
 
 ### 6. snapshots
 
