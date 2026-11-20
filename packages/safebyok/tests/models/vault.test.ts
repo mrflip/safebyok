@@ -340,8 +340,10 @@ function carsOnAnswer(bank: Bank, minder: ThingMinder, labelpath: string): (stri
   return seen
 }
 
-// Bank.put and the gate verbs write through the vaultDB, not the minder. The MemoryVaultDB tells each watch of a write
-// on a microtask it queues before the write answers, so a minder of the bank holds the record before the verb resumes.
+// Bank.put and the gate verbs write through the vaultDB, not the minder. Every adapter built on AdapterVaultDB (the
+// MemoryVaultDB here, and Postgres's) tells each watch of the bank of the bank, main gate and root box records a write
+// answers with, before the write's answer reaches its caller (VaultDB.watch): so a minder of the bank holds the bank or
+// gate record a verb wrote before the verb resumes. A box's good write is no tracked record: the caller lands it.
 describe("a vault's minder, beside the bank's own writes", () => {
   it("holds the bank's Thing that bank.put wrote before it resolves", async () => {
     const { bank, minder } = await TH.buildBornVault()
