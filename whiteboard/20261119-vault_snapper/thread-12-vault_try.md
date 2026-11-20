@@ -1,6 +1,6 @@
 # Thread 12: vault_try (2026-11-20)
 
-Branch `20261120-vault_try`, PR #TBD, stacked on #778 (minder_try). Proved: `pnpm --filter safebyok test` (1382 pass),
+Branch `20261120-vault_try`, PR #779, stacked on #778 (minder_try). Proved: `pnpm --filter safebyok test` (1382 pass),
 typecheck and lint; safebyok-react's knock-knock test (4 pass); `pnpm justify` pending.
 
 * **Built**:
