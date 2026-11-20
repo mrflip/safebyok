@@ -178,6 +178,31 @@ describe("ThingMinder.get", () => {
 
 })
 
+describe("ThingMinder.tryGet", () => {
+  it("resolves the car of the record stored as a good outcome", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 1)
+    const { minder } = minderWorldOf(vaultDB)
+    expect(await TH.expectGood(minder.tryGet(TH.GateScope))).to.deep.equal(carOf(gate))
+  })
+
+  it("resolves the vaultDB's refusal as a bad outcome", async () => {
+    const { minder } = minderWorldOf(await bornOf(new DownVaultDB()))
+    await TH.expectBad(minder.tryGet(TH.GateScope), 'storage_unavailable')
+  })
+
+  it("resolves a get after goodbye as a bad outcome", async () => {
+    const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
+    minder.goodbye()
+    await TH.expectBad(minder.tryGet(TH.GateScope), 'disabled')
+  })
+
+  it("resolves a scope of another bank as a bad outcome", async () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    await TH.expectBad(minder.tryGet({ ...TH.GateScope, banklabel: 'zz' }), 'bad_record')
+  })
+})
+
 describe("ThingMinder.refresh", () => {
   it("returns at once, and caches the car the vaultDB answers", async () => {
     const vaultDB = new MemoryVaultDB()
@@ -372,5 +397,30 @@ describe("ThingMinder.list", () => {
   it("refuses bad_record for a labelpath that is no Thing's", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     await TH.expectRefusal(minder.list('vault'), 'bad_record')
+  })
+})
+
+describe("ThingMinder.tryList", () => {
+  it("resolves the labelpaths listed as a good outcome", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    expect(await TH.expectGood(minder.tryList('box'))).to.deep.equal([TH.BoxScope.labelpath])
+  })
+
+  it("resolves the vaultDB's refusal as a bad outcome", async () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    await TH.expectBad(minder.tryList('box'), 'storage_issue')
+  })
+
+  it("resolves a labelpath that is no Thing's as a bad outcome", async () => {
+    const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
+    await TH.expectBad(minder.tryList('vault'), 'bad_record')
+  })
+
+  it("resolves a list after goodbye as a bad outcome", async () => {
+    const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
+    minder.goodbye()
+    await TH.expectBad(minder.tryList('box'), 'disabled')
   })
 })

@@ -104,10 +104,8 @@ export class Vault {
 
   /** Write `ask` through the minder, resolving the record stored and throwing its refusal. */
   async #writeOnce(ask: SealedBoxAsk): Promise<BoxRecord> {
-    const answer = await this.#minder.tryWrite(ask)
-    if (! answer.ok) { throw answer.err }
     // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
-    return answer.val as BoxRecord
+    return await this.#minder.write(ask) as BoxRecord
   }
   // --
 }

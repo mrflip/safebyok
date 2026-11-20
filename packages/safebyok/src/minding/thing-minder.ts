@@ -149,7 +149,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, refresh, list, isStaleAt, listen
+  // == [Reading]: at, listingAt, isListingBareAt, tryAt, tryGet, get, refresh, tryList, list, isStaleAt, listen
 
   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
@@ -190,9 +190,16 @@ export class ThingMinder {
    * With no root car cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
    */
   async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<CarAt<LabelpathT>> {
-    MinderChecks.minderGetOpts.parse(opts)
-    this.#demandReady()
-    return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
+    return Outcome.valOf(await this.tryGet(scoped, opts))
+  }
+
+  /** {@link get}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
+  async tryGet<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<Outcome.Outcome<CarAt<LabelpathT>>> {
+    return await Outcome.outcomeOf(async () => {
+      MinderChecks.minderGetOpts.parse(opts)
+      this.#demandReady()
+      return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
+    })
   }
 
   /** Get `scoped`'s car in the background, unless it is timely, and return at once.
@@ -216,18 +223,25 @@ export class ThingMinder {
    * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
-    MinderChecks.minderLabelpath.parse(labelpath)
-    this.#demandReady()
-    const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
-    const answer = await this.#vaultDB.tryListThings(ask)
-    if (! answer.ok) { throw answer.err }
-    if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
-    const labelpaths = answer.val.map((record) => record.labelpath)
-    TSQ.notifyManager.batch(() => {
-      this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
-      for (const record of answer.val) { this.#sendToTSQ(record) }
+    return Outcome.valOf(await this.tryList(labelpath))
+  }
+
+  /** {@link list}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
+  async tryList(labelpath: Labelpath): Promise<Outcome.Outcome<Labelpath[]>> {
+    return await Outcome.outcomeOf(async () => {
+      MinderChecks.minderLabelpath.parse(labelpath)
+      this.#demandReady()
+      const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
+      const answer = await this.#vaultDB.tryListThings(ask)
+      if (! answer.ok) { throw answer.err }
+      if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
+      const labelpaths = answer.val.map((record) => record.labelpath)
+      TSQ.notifyManager.batch(() => {
+        this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
+        for (const record of answer.val) { this.#sendToTSQ(record) }
+      })
+      return labelpaths
     })
-    return labelpaths
   }
 
   /** True when `scoped`'s car is missing or not timely. */
@@ -278,7 +292,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Writing]: tryWrite
+  // == [Writing]: tryWrite, write
 
   /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
    * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
@@ -296,6 +310,11 @@ export class ThingMinder {
     // Only the record written lands here. A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
     if (answer.ok) { this.#sendToTSQ(answer.val) }
     return answer
+  }
+
+  /** {@link tryWrite}, throwing its refusal instead of answering it: the record written, on success. */
+  async write(ask: WriteAsk): Promise<ThingRecord> {
+    return Outcome.valOf(await this.tryWrite(ask))
   }
   // --
 

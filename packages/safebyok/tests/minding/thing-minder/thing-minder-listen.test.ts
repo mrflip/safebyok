@@ -46,8 +46,7 @@ describe("ThingMinder.listen", () => {
   })
 
   it("narrows a minder's event to a car's by isThingEvent", () => {
-    const narrowed = (event: MinderEvent) => (ThingMinder.isThingEvent(event) ? event : undefined)
-    expectTypeOf<ReturnType<typeof narrowed>>().toEqualTypeOf<ThingEvent | undefined>()
+    expectTypeOf<typeof ThingMinder.isThingEvent>().guards.toEqualTypeOf<ThingEvent>()
   })
 
   it("tells TanStack's state as it stands, in a frozen copy, and never the query itself", async () => {
