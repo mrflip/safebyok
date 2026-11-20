@@ -11,8 +11,9 @@ import * as TSQ from '@tanstack/query-core'
 import { noop, union } from 'es-toolkit'
 import { Errors, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
-import { type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { type ThingFormat, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
+import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import {
@@ -23,6 +24,9 @@ import {
 import { bestCarOf, carOf, dbHasNewer } from './thing-car'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
+
+/** Anything naming a labelpath: a scope, an ask or a record. */
+export type Labelpathed = { labelpath: Labelpath }
 
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
  * the children of the root box and of each Thing listed.
@@ -38,6 +42,11 @@ import * as Throwers from '../refusals/throwers'
  *   has heard of, never on the order they arrived in.
  * - The order records arrive in never changes a car's liveness, or the revisions it carries.
  * - A car never goes back: it carries the newest revision any source has told of, and a newer life replaces an older one whole.
+ * - A listener is told of each car and listing in the order the cache changes, so what it is told never goes back either.
+ *   Each car told of a Thing has a newest no older than the last, and within one life it never loses its fullest record or
+ *   takes an older one. A refused get tells the car unchanged. Each listing told lists every labelpath the last one did.
+ *   Only a removal breaks the run: its event carries no car or listing, and what is told after it starts over. The cache
+ *   removes a query at `goodbye`, or once a finite gcTime passes.
  * - A sparse live record never displaces a whole live record of the same life: it leaves the car `bhnd`, its fullest
  *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
  *   get fetches the newest whole.
@@ -215,14 +224,16 @@ export class ThingMinder {
   }
 
   /** Call `listener` with each change the cache tells of, as a {@link MinderEvent}. Returns the function that stops it.
-   * It tells a `thing` event each time a record arrives in a car (even one that changes nothing), a get of it is refused,
-   * or it is removed. It tells a `listing` event each time a list sets a listing (even to the labelpaths it had), a labelpath
-   * joins it, `hello` caches the root box's, or it is removed. It tells an `invalidation` event each time `invalidate` marks a listing stale.
+   * Pass `ThingFormat` as `version`, the version of the event shape `listener` was written for; any other refuses.
+   * It tells a {@link ThingEvent} each time a record arrives in a car (even one that changes nothing), a get of it is refused,
+   * or it is removed. It tells a {@link ListingEvent} each time a list sets a listing (even to the labelpaths it had), a labelpath
+   * joins it, `hello` caches the root box's, `invalidate` marks it stale, or it is removed.
    * Nothing is called when a car ages past `staleTime`, and listening caches no car.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
-  listen(listener: (event: MinderEvent) => void): () => void {
+  listen(listener: (event: MinderEvent) => void, version: typeof ThingFormat): () => void {
     MinderChecks.minderListener.parse(listener)
+    MinderChecks.feedVersion.parse(version)
     return this.#tsq.getQueryCache().subscribe((tsqEvent: unknown) => {
       const event = this.#minderEventOf(tsqEvent)
       if (event === undefined) { return }
@@ -238,12 +249,12 @@ export class ThingMinder {
   // == [Invalidating]: invalidate
 
   /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
-   * Each listing marked tells an `invalidation` event, once until the listing is next set, by a list or by a record joining it. It asks the vaultDB nothing, and
-   * leaves what each listing lists as it was.
+   * Each listing marked tells one {@link ListingEvent} with `state.isInvalidated` true, and no more until a list or a joining record sets it again.
+   * It asks the vaultDB nothing, and leaves what each listing lists as it was.
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
-    const keyHead = (labelpath === undefined) ? this.#bankKeyHead() : this.#keyHeadOf({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
+    const keyHead = (labelpath === undefined) ? bankKeyHeadOf(this.scope) : this.#keyHeadOf({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
     // refetchType 'none': TanStack would otherwise refetch each active match. A listing has no queryFn to run, and the minder fetches nothing here.
     void this.#tsq.invalidateQueries({
       queryKey:    keyHead,
@@ -370,48 +381,58 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: queryKey, listingQueryKey, subtreeQueryKey, #keyHeadOf, #bankKeyHead, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: queryKeyOf, isThingEvent, bankQueryKeyOf, queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
 
   // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
   // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
   // under the Thing and neither of its own keys. No label is '!', '/' or '#', so no mark is mistaken for one. TanStack matches
   // query defaults by key prefix too, so without a mark the root box's key would start every box's key, and no defaults
   // could single out the root box. A labelpath starts with its modelkind, so the key does too.
-  /** The query key `scoped`'s car is cached under. */
-  queryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '!'] }
-
-  /** The query key the list of `scoped`'s children is cached under. */
-  listingQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '#', 'kids'] }
-
-  /** The key prefix of everything cached under `scoped`, a car or a listing, and of neither of its own. */
-  subtreeQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '/'] }
-
-  /** The part of a query key that `scoped` has in common with each of its keys. */
-  #keyHeadOf(scoped: ThingScope): string[] {
-    const labels = scoped.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
-    return [...this.#bankKeyHead(), ...labels]
+  /** The query key a minder caches `scope`'s car under. A host caching the same car may use the same key. */
+  static queryKeyOf(scope: ThingScope): TSQ.QueryKey {
+    const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
+    return [...keyHeadOf({ userid, banklabel }, labelpath), '!']
   }
 
-  /** The part of a query key that every key of this bank has in common. */
-  #bankKeyHead(): string[] { return ['safebyok', this.userid, this.banklabel] }
+  /** True when `event` is about a car's query, not a listing's. */
+  static isThingEvent(event: MinderEvent): event is ThingEvent {
+    return event.queryKey.at(-1) === '!'
+  }
+
+  /** The key prefix of everything a minder of `scope`'s bank caches. */
+  static bankQueryKeyOf(scope: BankScope): TSQ.QueryKey {
+    return bankKeyHeadOf(ThingChecks.bankScope.parse(scope))
+  }
+
+  /** The query key `labelpathed`'s car is cached under. */
+  queryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '!'] }
+
+  /** The query key the list of `labelpathed`'s children is cached under. */
+  listingQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '#', 'kids'] }
+
+  /** The key prefix of every car and listing cached under `labelpathed`, but not of its own. */
+  childrenQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
+
+  /** The part of a query key that `labelpathed` has in common with each of its keys. */
+  #keyHeadOf(labelpathed: Labelpathed): string[] { return keyHeadOf(this.scope, labelpathed.labelpath) }
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
-  /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
-  #tsqQueryOptions(scoped: ThingScope, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
-    const queryOpts = { queryKey: this.queryKey(scoped) }
+  /** TanStack's query options for a get of `labelpathed`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
+  #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
+    const queryOpts = { queryKey: this.queryKey(labelpathed) }
     if (opts.staleTime === undefined) { return queryOpts }
     return { ...queryOpts, staleTime: staleTimeFnOf(opts.staleTime) }
   }
 
-  /** The get ask the minder sends the vaultDB for `scoped`, a scope in this minder's bank. */
-  #askAt(scoped: ThingScope): GetAsk {
-    return this.#bank.makeGetAsk({ labelpath: scoped.labelpath, ifAbsent: 'nil' })
+  /** The get ask the minder sends the vaultDB for `labelpathed`, in this minder's bank. */
+  #askAt(labelpathed: Labelpathed): GetAsk {
+    return this.#bank.makeGetAsk({ labelpath: labelpathed.labelpath, ifAbsent: 'nil' })
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The shell at `scoped`. Below a root, it lives in the life of the bank's root box. */
-  #shellAt(scoped: ThingScope): VoidSentinel {
-    return scoped.labelpath.includes('/') ? Shell.of(scoped, this.rootBox) : Shell.of(scoped)
+  /** The shell at `labelpathed`. Below a root, it lives in the life of the bank's root box. */
+  #shellAt(labelpathed: Labelpathed): VoidSentinel {
+    return labelpathed.labelpath.includes('/') ? Shell.of(labelpathed, this.rootBox) : Shell.of(labelpathed)
   }
   // --
 
@@ -426,10 +447,10 @@ export class ThingMinder {
   /** The scope of the bank's root box. */
   get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: Labelpath.RootBox } }
 
-  /** The scope of `scoped`, demanding that it is in this minder's bank. */
-  #demandOwnScope(scoped: ThingScope): ThingScope {
+  /** The scope of `labelpathed`, demanding that it is in this minder's bank. */
+  #demandOwnScope(labelpathed: Labelpathed): ThingScope {
     // Its fields alone: an ask or a record passes, and is read as its scope.
-    return ThingChecks.thingScope.parseConsistent(scoped, this.scope)
+    return ThingChecks.thingScope.parseConsistent(labelpathed, this.scope)
   }
 
   /** `record`, refused where the vaultDB delivered it of another bank, or of another labelpath than `scoped` names. */
@@ -467,39 +488,62 @@ export class ThingMinder {
   }
 
   // A key's mark says what its query caches: '!' a car, '#' and 'kids' a listing. A removed query keeps its last state, but
-  // no longer caches it. A listing is told of when it is invalidated; a car's invalidation can't arise, as the minder invalidates none.
+  // no longer caches it, so its event tells no data. A car's invalidation can't arise, as the minder invalidates none.
   /** What a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for one it is not told of. */
   #minderEventOf(tsqEvent: unknown): MinderEvent | undefined {
     if (! isUsefulTSQEvent(tsqEvent)) { return undefined }
-    const { queryKey, state } = tsqEvent.query
-    const { labelpath }       = this.#scopeOfQueryKey(queryKey)
-    const modelkind           = Labelpath.modelkindOf(labelpath)
+    const { queryKey }  = tsqEvent.query
+    const { labelpath } = this.#scopeOfQueryKey(queryKey)
+    const isRemoved     = (tsqEvent.type === 'removed')
+    const told = {
+      type:      tsqEvent.type,
+      action:    isRemoved ? undefined : Object.freeze({ type: tsqEvent.action.type }),
+      queryKey:  Object.freeze([...queryKey]),
+      state:     Object.freeze(isRemoved ? { ...tsqEvent.query.state, data: undefined } : { ...tsqEvent.query.state }),
+      ...this.scope,
+      labelpath,
+      modelkind: Labelpath.modelkindOf(labelpath),
+    }
     if (queryKey.at(-1) === '!') {
-      const car = (tsqEvent.type === 'removed') ? undefined : state.data
+      const car    = told.state.data as ThingCar<ThingRecord> | undefined
+      const newest = car?.newest
       // The car at a labelpath is of the kind its labelpath starts with.
-      return { carkind: 'thing', modelkind, labelpath, car } as ThingEvent
+      return Object.freeze({
+        ...told, agerank: car?.agerank,
+        revtok: newest?.revtok, revseq: newest?.revseq, am: newest?.am, lifeseq: newest?.lifeseq, lifepath: newest?.lifepath,
+      }) as ThingEvent
     }
-    if (queryKey.at(-1) === 'kids') {
-      // A listing event is told of the changes of `labelpaths`; an invalidation leaves them as they were.
-      if (tsqEvent.action?.type === 'invalidate') { return { carkind: 'invalidation', modelkind, labelpath, card: 'list', tag: 'kids' } }
-      const labelpaths = (tsqEvent.type === 'removed') ? undefined : state.data
-      // A listing lists Things of its parent's kind, as a labelpath starts with its parent's.
-      return { carkind: 'listing', modelkind, labelpaths, tag: 'kids', of: { parentpath: labelpath } } as ListingEvent
-    }
+    // A listing lists Things of its parent's kind, as a labelpath starts with its parent's.
+    if (queryKey.at(-1) === 'kids') { return Object.freeze(told) as ListingEvent }
     return undefined
   }
   // --
 }
 
-// == [Helpers]: BareListedAt, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+// == [Helpers]: keyHeadOf, bankKeyHeadOf, BareListedAt, UsefulTSQEvent, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+
+/** The part of a query key that the Thing at `labelpath` in `scope`'s bank has in common with each of its keys. */
+function keyHeadOf(scope: BankScope, labelpath: Labelpath): string[] {
+  const labels = labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
+  return [...bankKeyHeadOf(scope), ...labels]
+}
+
+/** The part of a query key that every key of `scope`'s bank has in common. */
+function bankKeyHeadOf({ userid, banklabel }: BankScope): string[] { return ['sok', userid, banklabel] }
 
 /** The time a bare listing was last listed: TanStack's `dataUpdatedAt` for a query no fetch has set. */
 const BareListedAt = 0
 
+/** A cache event a listener may hear of, as {@link isUsefulTSQEvent} narrows it. */
+type UsefulTSQEvent = Readonly<
+  | { type: 'removed', query: TSQ.Query }
+  | { type: 'updated', query: TSQ.Query, action: Readonly<{ type: 'success' | 'error' | 'invalidate' }> }
+>
+
 // A record arrives (success), a get is refused (which leaves the car untimely), the car is removed, or a listing is
 // invalidated. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.
 /** True for a cache event a listener may hear of: a query removed, or a query's success, error or invalidation. */
-function isUsefulTSQEvent(event: unknown): event is Readonly<{ type: 'removed' | 'updated', query: TSQ.Query, action?: Readonly<{ type: string }> }> {
+function isUsefulTSQEvent(event: unknown): event is UsefulTSQEvent {
   if (! (event instanceof Object)) { return false }
   const qcne = event as TSQ.QueryCacheNotifyEvent
   if (qcne.type === 'removed') { return true }
@@ -541,7 +585,7 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
 /** A listing of every labelpath in `prior` and in `labelpaths`, once each, in labelpath order. */
 function listingOf(prior: readonly Labelpath[], labelpaths: readonly Labelpath[]): Labelpath[] {
   // Labelpaths sort by code unit, as the vaultDB lists them; the union holds no two alike. The rule's `one - other` is for numbers.
-  return union(prior, labelpaths).toSorted((one, other) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
+  return union(prior, labelpaths).toSorted((one: Labelpath, other: Labelpath) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
 }
 
 /** TanStack's structural sharing for a listing: `prior` where `next` lists the same labelpaths, else `next`, frozen. */

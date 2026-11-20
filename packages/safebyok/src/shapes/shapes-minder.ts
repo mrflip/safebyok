@@ -1,5 +1,6 @@
 /** The shapes of a ThingMinder's arguments, options and answers, and of the cars it caches, with their checks. */
 
+import type * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
 import type { ThingMinder } from '../minding/thing-minder'
@@ -7,8 +8,8 @@ import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
-import type { BoxLabelpath, EpochMillis, Labelpath } from './primitives'
-import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel, ThingChecks } from './shapes-thing'
+import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
+import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel, ThingChecks, ThingFormat } from './shapes-thing'
 import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
@@ -58,13 +59,14 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
+  const feedVersion      = lit(ThingFormat, Phrases.FeedVersionOther)
   const minderLabelpath  = ThingChecks.thingScope.shape.labelpath
   const tsqStaleTime     = union([staleMillis, lit(Infinity), lit('static')])
   // Each option may be left out, or given as undefined, for no opinion.
   const minderGetOpts    = obj({ staleTime: tsqStaleTime.optional() }).strict()
   const minderTryAtOpts  = minderGetOpts.extend({ ifStale: oneof(['get', 'refresh']).optional() }).strict()
   const minderInvalidateOpts = obj({ list: lit('all') }).strict()
-  return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, minderLabelpath, minderTryAtOpts, minderGetOpts, minderInvalidateOpts }
+  return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, feedVersion, minderLabelpath, minderTryAtOpts, minderGetOpts, minderInvalidateOpts }
 })
 
 /** The checks of a ThingMinder's arguments and options.
@@ -177,46 +179,63 @@ export type TSQAnswer<RecordT extends ThingRecord = ThingRecord> = TSQGotAnswer<
 export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labelpath: LabelpathT }>
 // --
 
-// == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, InvalidationEvent
+// == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, MinderEventOf
 
-/** What a minder's `listen` tells, told apart by `carkind`: a car changed, a listing changed, or a listing was marked stale. */
-export type MinderEvent = ThingEvent | ListingEvent | InvalidationEvent
+// Each event spreads TanStack Query's cache event into our own, and keeps TanStack's field names (`type`, `action.type`,
+// `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` takes.
+/** An event a minder's `listen` tells: a car's query changed, or a listing's. {@link ThingMinder.isThingEvent} tells them apart. */
+export type MinderEvent = ThingEvent | ListingEvent
 
-/** A car changed: the car as now cached, or undefined where none is cached (it is removed, or its first get was refused). Its `modelkind` types its car. */
-export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind ? Readonly<{
-  carkind:   'thing'
-  /** The modelkind of the Thing, which its labelpath starts with. */
-  modelkind: KindT
-  /** Where the Thing is stored in its bank. */
+/** The fields every minder event carries: TanStack Query's cache event, less its live query, and the scope of the Thing it is about. */
+export type MinderEventOf<DataT> = Readonly<{
+  /** `'updated'` when the query's state changed, `'removed'` when the cache dropped the query. */
+  type:      'updated' | 'removed'
+  /** What changed the state, by TanStack's name for the action, or undefined for a removal:
+   * - `'success'`    -- a record arrived
+   * - `'error'`      -- a get was refused
+   * - `'invalidate'` -- a listing was marked stale
+   */
+  action:    Readonly<{ type: 'success' | 'error' | 'invalidate' }> | undefined
+  /** The key the query is cached under, frozen. A host caching the same value may use the same key. */
+  queryKey:  TSQ.QueryKey
+  /** A frozen shallow copy of the query's state: `data`, `dataUpdatedAt`, `error`, `isInvalidated`, `status` and the rest.
+   * `data` is the same object until it changes, and undefined after a removal.
+   */
+  state:     Readonly<TSQ.QueryState<DataT>>
+  /** The user of the bank. */
+  userid:    Userid
+  /** The bank. */
+  banklabel: Banklabel
+  /** Where the Thing is stored in its bank: the Thing a car is of, or whose children a listing lists. */
   labelpath: Labelpath
-  /** The car itself, as cached, so that it is the same object until it changes, or undefined where none is cached. */
-  car:       ThingCar<RecordOfKind<KindT>> | undefined
-}> : never
-
-/** A listing changed: the labelpaths it now lists, or undefined once it is removed. */
-export type ListingEvent = Readonly<{
-  carkind:    'listing'
-  /** The modelkind of the parent and of every Thing listed, which is the same: a labelpath starts with its parent's. */
-  modelkind:  Thingkind
-  /** The labelpaths listed, in labelpath order, as cached, so that it is the same array until one joins, or undefined once removed. */
-  labelpaths: readonly Labelpath[] | undefined
-  /** The listing's name: `'kids'`, the Things directly under `of.parentpath`. */
-  tag:        'kids'
-  /** What the listing selects: the Things under the Thing at `parentpath`. */
-  of:         Readonly<{ parentpath: Labelpath }>
 }>
 
-/** A Thing's listing was marked stale. It still lists what it did, until a list sets it again. */
-export type InvalidationEvent = Readonly<{
-  carkind:   'invalidation'
-  /** The modelkind of the Thing. */
+/** A car's query changed. `state.data` is the car as now cached, or undefined where none is (it is removed, or its first get was refused). Its `modelkind` types its car.
+ * It also carries the car's `agerank` and its newest record's revision and life, each undefined where no car is cached.
+ */
+export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind ? MinderEventOf<ThingCar<RecordOfKind<KindT>>> & Readonly<{
+  /** The modelkind of the Thing, which its labelpath starts with. */
+  modelkind: KindT
+  /** The car's agerank: of two events of one Thing, the greater agerank tells the newer car. */
+  agerank:   string | undefined
+  /** The revtok of the car's newest record. */
+  revtok:    Revtok | undefined
+  /** The revseq of the car's newest record. */
+  revseq:    number | undefined
+  /** The am of the car's newest record: `'x'` where the Thing is deleted or void. */
+  am:        DeliverableThing['am'] | undefined
+  /** The lifeseq of the car's newest record. */
+  lifeseq:   Lifeseq | undefined
+  /** The lifepath of the car's newest record. */
+  lifepath:  Lifepath | undefined
+}> : never
+
+/** A listing's query changed. `state.data` is the labelpaths it now lists, in labelpath order, or undefined once removed.
+ * The array stays the same object until a labelpath joins. A listing marked stale has `state.isInvalidated` true, and still lists what it did.
+ */
+export type ListingEvent = MinderEventOf<readonly Labelpath[]> & Readonly<{
+  /** The modelkind of the Thing at `labelpath` and of every Thing listed, which is the same: a labelpath starts with its parent's. */
   modelkind: Thingkind
-  /** Where the Thing is stored in its bank. */
-  labelpath: Labelpath
-  /** Which of the Thing's caches went stale: `'list'`, its listing. */
-  card:      'list'
-  /** The listing's own tag, as in its {@link ListingEvent}: `'kids'`, the Things directly under `labelpath`. */
-  tag:       ListingEvent['tag']
 }>
 // --
 

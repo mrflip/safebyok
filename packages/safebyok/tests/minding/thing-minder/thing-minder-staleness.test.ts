@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { ThingFormat } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { badnewsOf, listenerOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, toldOf } from './world'
 
@@ -116,7 +117,7 @@ describe("ThingMinder's watch", () => {
     const car = minder.at(TH.GateScope)
     expect(car).to.deep.equal(carOf(TH.gateThingOf()))
     const listener = listenerOf()
-    minder.listen(listener)
+    minder.listen(listener, ThingFormat)
     await TH.expectGood(vaultDB.tryGetThing(staleGet))
     expect(minder.at(TH.GateScope)).to.eq(car)
     expect(toldOf(listener)).to.deep.equal([['gate', 'full']])
