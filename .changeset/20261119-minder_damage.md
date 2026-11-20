@@ -1,4 +1,0 @@
----
----
-
-Empty: the new `safebyok` is private and the giver is not yet exported, and `safebyok-big` is private. What a caller of `ThingMinder` will see: `list` still answers the labelpaths of the Things it could read, and now tells the bank's `tellBadNews` one `damaged_row` refusal naming, in `meta.labelpaths`, each child it found stored damaged and left out. A record the vaultDB delivers of another bank (by notice, by a write's answer) or of another Thing than asked (by a get) refuses `unexpected_error` and is cached nowhere: a notice's refusal goes to `tellBadNews`, a write's rejects `tryWrite`, a get's rejects the get. `bestCarOf` refuses `unexpected_error` for two cars of different Things, where it answered the delivered car. `tryAt` and `tryWrite` answer `unexpected_error`, not a storage refusal, for anything their own code throws that is no refusal. `safebyok-big`'s `RefusalMeta` gains `labelpaths`.
