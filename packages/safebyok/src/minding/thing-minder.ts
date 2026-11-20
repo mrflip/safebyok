@@ -203,7 +203,7 @@ export class ThingMinder {
   }
 
   /** Get `scoped`'s car in the background, unless it is timely, and return at once.
-   * It throws nothing and tells no one of a refusal, misuse included. A refusal shows as `lastErr` in the next {@link tryAt}.
+   * It throws nothing and tells no one of a refusal, misuse included. A refusal from the vaultDB shows as `lastErr` in the next {@link tryAt}.
    */
   backgroundRefresh(scoped: ThingScope, opts: MinderGetOpts = {}): void {
     void this.tryGet(scoped, opts)
