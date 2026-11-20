@@ -1,5 +1,0 @@
----
-"safebyok-react": minor
----
-
-**`safebyok-react/devmode` is a new entry**, holding three panels for a developer, each named only by importing it: `DevVaultDBInspector` (`vaultDB`) lists the signed-in user's vault and box rows as `listVaults` and `listBoxes` answer them, watching for changes, with raw `getVault`, `getBox`, `delBox` (damaged rows too) and `tidyGone` buttons; `DevBoxInspector` (`defaultVaultlabel`, `defaultBoxlabel`) acts on the shared Box through `useBox`, with buttons for `ensureUnlocked`, `lock`, `putBox`, `delBox`, `expose`, `unexpose`, `veil`, `unveil` and `extractWhisper`, every whisper masked behind its own Show; `DevDeviceDBInspector` (`deviceDB`) lists the leases on this device by `listLeases`, or `listRawLeases` with damaged rows, naming a key field's kind but never its content, each with `forget` or `delRawLease`. Nothing in them asks the user on its own. **`useBoxIsShowing(box)` is a new hook** on the front door: whether the box shows its whisper, read live, false for no box. **Stored format:** unchanged.

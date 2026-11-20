@@ -1,4 +1,0 @@
----
----
-
-Empty: the new `safebyok` is private and the giver is not yet exported. What a caller of `ThingMinder` will see: `listingAt(scope)` reads the cached listing of a Thing's children synchronously, as `at` reads a car: the labelpaths of every child the minder has heard of, tombstones included, in labelpath order, frozen, and the same array until a labelpath joins it; undefined until the Thing is first listed. `list` still answers labelpaths and lands each record in its car; it also sets the Thing's listing, adding to what it had, never removing. A get, a notice and a list each add a Thing to its parent's listing, where one is cached. `listen` now tells a `ListingEvent` when a list sets a listing, a labelpath joins it, or it is removed; its `labelpaths` is the cached array itself, and is undefined once the listing is removed (`ListingEvent.labelpaths` is now `readonly Labelpath[] | undefined`). A listing falls under the host's `gcTime`, the root box's too.
