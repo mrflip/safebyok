@@ -14,6 +14,12 @@ import * as Throwers from '../refusals/throwers'
 // A cleartext goes only to checkedCleartexts, a strength check and a Proving builder, and a proving never leaves the gating
 // that built it but for those verbs (G9). Each vacates its cleartexts whatever its outcome (G2), and changes nothing where it
 // refuses: a gate change writes the gate before it unlocks, so a refused write never unlocks.
+//
+// Two invariants hold of every gating:
+// * Gatings are pragmatically idempotent: a gating whose intent is demonstrably satisfied may resolve with success. It is not
+//   required to check that at every, or any, opportunity.
+// * A gating's contract is in its name: a gating whose intent is met may succeed even where its inputs would otherwise have
+//   been refused. (`revokePasskey` on a gate with no passkey proves, unlocks and writes nothing.)
 
 /** Birth a bank of `device`'s scope from the user's new passphrase and optional passkey: write it, and unlock it.
  * Refuses `gate_made_elsewhere` if a live bank is already stored there.
