@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 and 4 building; thread 3 filed ([#768](https://github.com/mrflip/safebyok/pull/768)), CI running.
+* **Status:** thread 1 ready ([#769](https://github.com/mrflip/safebyok/pull/769)), in review; thread 2 building on it; thread 3 filed and out of draft ([#768](https://github.com/mrflip/safebyok/pull/768)); thread 4 building.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -96,7 +96,7 @@ not frozen*, and *A get resuming after `goodbye` and `hello` joins the new listi
 
 *Touches:* `minding/thing-car.ts`, `shapes/shapes-minder.ts`, `minding/thing-minder.ts`, their tests, the giver's
 reads of `liveness`, VOCABULARY.md. *Depends on:* nothing (origin/main). *Look-ahead:* thread 2 decorates each event
-with the car's `agerank`; thread 8 uses it as the host's structural sharing. *Size:* M.
+with the car's `agerank`; thread 8 uses it as the host's structural sharing. *Size:* M. *Status:* ready, #769; in review.
 
 ### 2. minder_feed
 
@@ -114,7 +114,7 @@ new event, so its tests pass; nothing else in the giver (thread 8).
 
 *Touches:* `shapes/shapes-minder.ts`, `minding/thing-minder.ts` (`listen`, `#minderEventOf`, `#bankKeyHead`), the
 minder's tests, `packages/safebyok-react/src/giver/minder-bank.ts`. *Depends on:* thread 1 (`agerank`; same files).
-*Look-ahead:* thread 8's bridge copies `state`. *Size:* M.
+*Look-ahead:* thread 8's bridge copies `state`. *Size:* M. *Status:* building, stacked on #769. *Orchestrator:* given, in YOLO, the same per-stretch check for `list` and `tryWrite` that thread 1 gave `#doGet`.
 
 ### 3. format_string
 
