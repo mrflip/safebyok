@@ -42,7 +42,9 @@ export class Device {
   #openGating: Gating | null = null
   /** The count of gatings opened and ended on this device, which names the open one in the snapshot. */
   #gatingseq = 0
-  /** The bank {@link lock} locks and {@link sweep} sweeps, whose snapshot this device's forwards: the last made on this device, or null for none, when the snapshot is {@link PendingBank}. */
+  /** The bank {@link lock} locks and {@link sweep} sweeps, whose snapshot this device forwards: the last made on this device.
+   * Null for none, and the snapshot is then {@link PendingBank}.
+   */
   #thisIsTemporaryBank: Bank | null = null
   /** Ends this device's subscription to the bank it holds. */
   #unsubscribeBank: () => void = () => undefined
