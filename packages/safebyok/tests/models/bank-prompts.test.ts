@@ -597,7 +597,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     })
   }
 
-  it("waits for a gate change open on the bank to land, then resolves without using its cleartexts, zeroing a passkey answer's bytes", async () => {
+  it("waits for a gate change open on the bank to land, then resolves without using its cleartexts", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const replacing = bank.launchReplacePassphrasePrompt()
@@ -642,7 +642,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     expect(device.openGating).to.be.null
   })
 
-  it("answers the unlock gating a prompt that waited out the same gate change opens, and the prompt resumes", async () => {
+  it("answers the unlock gating opened by a prompt that waited out the same gate change", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
