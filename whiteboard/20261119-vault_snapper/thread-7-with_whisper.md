@@ -1,6 +1,6 @@
 # Thread 7: with_whisper (2026-11-20)
 
-Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `safebyok` 1299
+Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `safebyok` 1302
 tests, typecheck and lint green before the catch-up; `pnpm justify` after it, below.
 
 * **Built** (`packages/safebyok/src/models/vault.ts`, tests in `tests/models/vault.test.ts`):
@@ -22,6 +22,19 @@ tests, typecheck and lint green before the catch-up; `pnpm justify` after it, be
   * Item 4: the comment above "a vault's minder, beside the bank's own writes" now credits `AdapterVaultDB` (every
     adapter built on it: memory, Postgres) with telling each watch of the bank, main gate and root box records a write
     answers with, before the answer reaches its caller (`VaultDB.watch`'s bullet).
+  * From thread 6's review (orchestrator): `bankStageVals` and `bankEndCauseVals` (`shapes/shapes-bankish.ts`,
+    exported from `safebyok/core`), `as const` lists `BankStage` and `BankEndCause` derive from; a test in
+    `bank.test.ts` checks every stage and end cause a bank shows is listed. The Bank's and the Device's `subscribe` doc
+    blocks say a throwing listener is reported through `tellBadNews`.
+  * The Coach's ruling (2026-11-20, "It waits and checks unlocked again before starting; the prior usually unlocks or
+    deletes"), in `models/bank.ts` *Prompts*: `launchUnlockBankPrompt` (so `ensureUnlocked` and `withWhisper`), finding a
+    gating of another kind open on its bank, awaits that gating's `whenConcluded` (an outcome, never a rejection), then
+    `demandEnabled()` and resolves if the bank is unlocked; otherwise it launches or joins an `unlock_bank` gating as
+    before. `#launchOrJoin` now joins only a gating of its own kind. No loop: should yet another gating of another kind
+    open meanwhile, the launch refuses `already_asking`, as any launch does. Tests in `bank-prompts.test.ts`: a gate
+    change that lands (resolves, no second gating), one dismissed (an `unlock_bank` gating of its own opens, both
+    waiters resume on one `attemptUnlock`), and the device swept meanwhile (`disabled`). A `bank.sweep()` alone leaves
+    the device's gating open, so that test sweeps the device.
 * **Decisions made**:
   * Unlock first, then get: the gloss's order, and a get after a long prompt is fresher than one before it. A box that
     is absent therefore prompts, then refuses `absent_box`; a host usually knows beforehand (its record hook's data is
@@ -36,3 +49,5 @@ tests, typecheck and lint green before the catch-up; `pnpm justify` after it, be
   * A local `rejectionOf(promise)` helper in vault.test.ts checks `fn`'s throw by identity, chai-style;
     `Outcome.outcomeOf` would wrap a non-VaultError.
 * **For the Coach**: the Wh1 recommendation (`absent_box` for never stored and for deleted) is built, taken in YOLO.
+* **Discoveries**: `bank.sweep()` does not dismiss the device's open gating (only `device.sweep()` does), so prompts
+  waiting on a gating of a swept bank wait until someone dismisses it or an attempt refuses `disabled`. Unchanged here.
