@@ -105,37 +105,32 @@ Reasoning for wontfix: every revision is sealed under the lease, so a put needs 
 and a seal keeps none of the cited whisper; carrying it across would mean a new construction or an unseal hidden in a
 write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock anyway. Document as won't fix".
 
-### A direct gate change, a lock or a sweep beside an open gating
+### A lock, a sweep or a second form verb while a form verb runs
 
 * current outcome, as built, and promised nowhere:
-  - `tryAttemptReplacePassphrase`, `tryAttemptAddPasskey` or `tryAttemptRevokePasskey`, or its throwing twin, while
-    an `unlock_bank` gating or a gating of another kind is open on the bank, makes its change directly, as with no
-    gating open. The open gating stays open, and the prompts waiting on it keep waiting, the bank unlocked or not,
-    until an attempt of its own kind or a dismiss concludes it.
-  - `bank.lock()` or `bank.sweep()`, while a gating is open on the bank, leaves that gating open: an attempt still runs
-    after a lock, and refuses `disabled` after a sweep, which ends the gating. `device.sweep()` dismisses it.
-  - A lock or a sweep while an attempt is in flight lands wherever the attempt's steps have reached: an unlock that
-    attaches its lease after a lock leaves the bank unlocked; after a sweep, it evicts that lease and refuses.
+  - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an unlock or a gate
+    change that attaches its lease after the lock leaves the bank unlocked.
+  - A sweep while an attempt is in flight: the attempt's write, if it has not yet begun, refuses `disabled`; one already
+    sent lands in storage, and the lease the attempt then builds is evicted and the verb refuses `disabled`.
+  - Two gate changes on one bank at once each cite the gate they proved against: the first to reach the vaultDB is
+    written, and the second refuses `stale_write`, changes nothing and unlocks nothing. Until the bank observes itself,
+    its main gate stays the one it last wrote, so a gate change made on another device refuses `stale_write` here too.
 * alternatives:
-  - route a direct gate change into the open gating, or have it wait one out, as an unlock does: a gate change answers
-    with different cleartexts from the gating's kind, so it cannot answer the gating, and a wait changes when a call
-    the host made directly returns, for a case a host's own dialog makes.
-  - have a lock or a bank's sweep dismiss the open gating, or have an attempt check the lock state between its steps:
-    a lifecycle call reaching into the gating, or new checks in a primitive's critical path, for a crossing.
-  - a lock across the gating and its attempts: a lock is a last resort.
-* workaround: the host asks for one gate change at a time, through the prompt of its kind or its re-entry point, and
-  dismisses its open gating (`gating.dismiss()`) before locking or sweeping the bank.
+  - have a lock or a sweep wait for, or reach into, an attempt in flight, or have an attempt check the lock state between
+    its steps: a lifecycle call reaching across an attempt, or new checks in a primitive's critical path, for a crossing.
+  - a lock across the form verbs: a lock is a last resort.
+  - take the gate stored from a `stale_write`'s answer and prove against it: the bank observing itself, which is later
+    work, and which would still not let a proof made against one gate write over another.
+* workaround: the host's form submits one verb at a time and awaits it before locking or sweeping the bank; after
+  `stale_write`, the host makes the bank again from what is stored.
 
-Steps to reproduce: open an unlock prompt (`bank.ensureUnlocked()` on a locked bank) and, with its gating open, call
-`bank.tryAttemptReplacePassphrase(...)`: the passphrase changes and the bank unlocks, and the unlock prompt still waits.
-Or open any prompt and call `bank.lock()` or `bank.sweep()` while it is open, or while its attempt runs.
+Steps to reproduce: call `bank.unlock(...)` and, before it resolves, `bank.lock()`: the bank ends unlocked. Or call
+`bank.replacePassphrase(...)` twice without awaiting the first: the second refuses `stale_write`.
 
 Reasoning for wontfix: each case is two of the host's own calls crossing over one bank, which the host sequences; what
-lands is what the calls amount to in the order they ran, and nothing is left inconsistent in storage. Specifying them
-would mean waits, dismissals or checks reaching across the gating and the bank's lifecycle: new machinery in a
-primitive's critical path, for crossings the host avoids by sequencing its own calls. A `tryAttemptUnlock` beside a gating of another
-kind is not among them: it waits that gating out, then resolves at once if the bank is unlocked. Ruled by the Coach,
-2026-11-20, vault_snapper, on thread 5's overlapping gatings.
+lands is what the calls amount to in the order they ran, nothing is left inconsistent in storage, and a refused gate
+change never unlocks. Specifying them would mean waits, dismissals or checks reaching across an attempt and the bank's
+lifecycle: new machinery in a primitive's critical path, for crossings the host avoids by awaiting its own calls.
 
 ### A minder's answer that crosses a `goodbye` and a fresh `hello`
 
