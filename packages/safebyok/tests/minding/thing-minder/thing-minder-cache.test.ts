@@ -19,9 +19,9 @@ describe("ThingMinder.at", () => {
     await minder.get(TH.GateScope)
     expect(minder.isStaleAt(TH.GateScope, { staleTime: 0 })).to.be.true
     const car = minder.at(TH.GateScope)
-    expect(car).to.deep.equal({ liveness: 'full', newest: gate, fullest: gate })
+    expect(car).to.deep.include({ liveness: 'full', newest: gate, fullest: gate })
     expect(car?.newest).to.eq(car?.fullest)
-    expect(Object.isFrozen(car)).to.be.true
+    expect([Object.isFrozen(car), Object.isFrozen(car?.newest)]).to.deep.equal([true, true])
   })
 
   const ForeignScopes = [
@@ -307,7 +307,7 @@ describe("ThingMinder.tryAt", () => {
     }
   })
 
-  it("answers untimely for a bare or behind car, even under a staleTime of Infinity", async () => {
+  it("answers untimely for a bare or bhnd car, even under a staleTime of Infinity", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)

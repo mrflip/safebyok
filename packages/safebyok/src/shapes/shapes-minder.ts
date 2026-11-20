@@ -15,7 +15,7 @@ import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 
 /** The TanStack Query options a host may choose for the cars a minder caches. */
 export interface QueryCacheOpts {
-  /** How long a car stays timely, in milliseconds up to {@link MaxTimerMillis}, or `Infinity` for one that never ages. A `behind` or `bare` car is never timely. */
+  /** How long a car stays timely, in milliseconds up to {@link MaxTimerMillis}, or `Infinity` for one that never ages. A `bhnd` or `bare` car is never timely. */
   staleTime: number
   /** How long a car stays in the cache after it was first cached or last fetched from the vaultDB, in milliseconds up to {@link MaxTimerMillis}. `Infinity` means until `goodbye`.
    * A record that arrives by a notice or a list does not extend it, and nor does a get answered from the cache. The root box's car and listing stay until `goodbye`, whatever the gcTime.
@@ -73,7 +73,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
 export const MinderChecks = Object.freeze({ ...RawChecks, DefaultQueryCacheOpts, MaxTimerMillis })
 
 /** How long a minder's get or read counts a car timely: milliseconds up to {@link MaxTimerMillis}, or `Infinity` or `'static'` for a car that never ages.
- * A `behind` or `bare` car is never timely, whatever the staleTime. A car whose last get was refused is not timely under `Infinity`, and is under `'static'`, as TanStack Query counts it.
+ * A `bhnd` or `bare` car is never timely, whatever the staleTime. A car whose last get was refused is not timely under `Infinity`, and is under `'static'`, as TanStack Query counts it.
  */
 export type TsqStaleTime = Z.input<typeof MinderChecks.tsqStaleTime>
 
@@ -93,21 +93,26 @@ export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | '
 
 // == [The car]: ThingCar, BankCar, BoxCar, GateCar, ThingAt, CarAt, DeliverableThing, carLivenessVals
 
-// The vaultDB has a newer whole record when liveness is 'behind' or 'bare' (dbHasNewer).
-/** A ThingMinder's frozen cache value for a Thing: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
+// The vaultDB has a newer whole record when liveness is 'bhnd' or 'bare' (dbHasNewer).
+/** A ThingMinder's cache value for a Thing, deeply frozen: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
  * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
  * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
  * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
  * - On `full`, the two are *identical* (`newest === fullest`): the same object, not just the same content.
- * - When `behind`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
+ * - When `bhnd`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
  */
-export type ThingCar<RecordT extends Sparse<ThingRecord>> = Readonly<
-  | { liveness: 'full',   newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
-  | { liveness: 'behind', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
-  | { liveness: 'bare',   newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
-  | { liveness: 'gone',   newest: Tombstone<RecordT>, fullest: null      } // a deleted Thing's tombstone: known to be gone. dbHasNewer: false
-  | { liveness: 'void',   newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
->
+export type ThingCar<RecordT extends Sparse<ThingRecord>> = Readonly<(
+  | { liveness: 'full', newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
+  | { liveness: 'bhnd', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
+  | { liveness: 'bare', newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
+  | { liveness: 'gone', newest: Tombstone<RecordT>, fullest: null      } // a deleted Thing's tombstone: known to be gone. dbHasNewer: false
+  | { liveness: 'void', newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
+) & {
+  /** A string that compares as the car's age: of two cars of one Thing, the newer has the greater agerank.
+   * Two cars with the same revisions and liveness have equal ageranks.
+   */
+  agerank: string
+}>
 
 /** The car of the bank's Thing. */
 export type BankCar = ThingCar<BankRecord>
@@ -130,16 +135,16 @@ export type CarAt<LabelpathT extends Labelpath> = ThingCar<ThingAt<LabelpathT>>
 export type DeliverableThing = ThingRecord | Sparse<ThingRecord> | VoidSentinel
 
 /** Each `liveness` a car may have. */
-export const carLivenessVals = ['full', 'behind', 'bare', 'gone', 'void'] as const
+export const carLivenessVals = ['full', 'bhnd', 'bare', 'gone', 'void'] as const
 // --
 
 // == [A minder's answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer, ScopeAt
 
 // `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
-// A timely car is full, gone or void: a behind or bare car is never timely.
+// A timely car is full, gone or void: a bhnd or bare car is never timely.
 /** A get's answer, read from the cache. Beside a get's own acts:
  * - `vacant`   -- nothing is cached
- * - `untimely` -- the car is `behind` or `bare`, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
+ * - `untimely` -- the car is `bhnd` or `bare`, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
  */
 export type GotAnswer<RecordT extends ThingRecord = ThingRecord> = (
   | GoodAnswer<RecordT, 'gotlive'>
