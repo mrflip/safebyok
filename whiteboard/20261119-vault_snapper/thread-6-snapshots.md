@@ -1,6 +1,6 @@
 # Thread 6: snapshots (2026-11-20)
 
-Branch `20261120-snapshots`, PR (see below), stacked on #772 (thread 5, `20261120-bank_gatings`). Proved: `safebyok`
+Branch `20261120-snapshots`, PR #773, stacked on #772 (thread 5, `20261120-bank_gatings`). Proved: `safebyok`
 lint, typecheck and tests green (1281 tests) before catch-up; `pnpm justify` after catch-up is in the PR's **Tests:** line.
 
 * **Built** (`packages/safebyok/src/`):
@@ -23,6 +23,9 @@ lint, typecheck and tests green (1281 tests) before catch-up; `pnpm justify` aft
   * `VOCABULARY.md` **stage**: a sentence for the new core's `BankStage`.
   * `notes/security.md`: a snapshots entry, and an amendment line on the lean_gate entry (its "device.sweep() does not
     reach its banks yet" is no longer true).
+  * `notes/guarantees-drift.md`: by the orchestrator's directive from #772's review, an entry recording that the
+    Bank's four re-entry points take cleartexts and pass them unread to `gating.ts` (G1 and G9 hold in substance); and
+    an amendment to the bank_gatings device-sweep entry, since `device.sweep()` now sweeps the last Bank made.
 
 * **Decisions made**:
   * **The device's snapshot nests the bank's** rather than copying its fields, so the Bank alone carries stage and
