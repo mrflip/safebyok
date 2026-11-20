@@ -70,7 +70,7 @@ export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGive
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
 /** React hooks for `device`. Make them once, at module scope, beside the Device.
- * Records arrive frozen, as do the objects the host's vaultDB answered with: a vaultDB must never change an object it has answered with.
+ * The objects the host's vaultDB answers with are frozen as they land, so a vaultDB must never change an object once it has answered with it.
  * @example export const Giver = makeReactGiver(device)
  */
 export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
