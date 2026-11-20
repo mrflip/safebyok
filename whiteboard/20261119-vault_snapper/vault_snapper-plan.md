@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1, 3 and 4 filed ([#769](https://github.com/mrflip/safebyok/pull/769), [#768](https://github.com/mrflip/safebyok/pull/768), [#770](https://github.com/mrflip/safebyok/pull/770)); #769 and #770 out of draft; thread 2 ready ([#771](https://github.com/mrflip/safebyok/pull/771)), in review; thread 5 building on #770.
+* **Status:** threads 1, 3 and 4 filed ([#769](https://github.com/mrflip/safebyok/pull/769), [#768](https://github.com/mrflip/safebyok/pull/768), [#770](https://github.com/mrflip/safebyok/pull/770)); #769 and #770 out of draft; threads 2 and 5 ready ([#771](https://github.com/mrflip/safebyok/pull/771), [#772](https://github.com/mrflip/safebyok/pull/772)), in review; thread 6 building on thread 5.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -189,7 +189,8 @@ refactored (or is, in commits that diff cleanly), and the four born-bank gatings
 
 *Touches:* `models/bank.ts` (prompts), `models/gating.ts`, `models/device.ts`, their tests. *Depends on:* thread 4
 (same file, stacked). *Look-ahead:* thread 6's snapshots tell of the gating; thread 9 drives `attemptUnlock` from a
-form. *Size:* M. *Status:* building, stacked on #770.
+form. *Size:* M. *Status:* ready, #772 (branch `20261120-bank_gatings`); in review, `high` on `opus` (cleartexts now enter
+outside a gating).
 
 ### 6. snapshots
 
@@ -205,7 +206,8 @@ The Bank alone carries `stage`, `isLocked`, `isEnded`, `endCause`, `leaseEndsAt`
 current bank's snapshot and adds the open gating, `{ gatingkind, isAttempting, lastRefusal }` or null. The stages
 reachable without startup (`locked`, `unlocked`, `swept`) are built; the type holds the rest. `isWatching` and
 `heardAt` wait until the vaultDB can tell them. *Touches:* `models/bank.ts`, `models/device.ts`, `models/gating.ts`.
-*Depends on:* thread 5 (stacked). *Size:* M.
+*Depends on:* thread 5 (stacked). *Size:* M. *Orchestrator:* `gatingseq` handed here from thread 5, only if it lines
+up with one-at-a-time. *Status:* building, branch `20261120-snapshots`, cut from thread 5's tip f7091958a.
 
 ### 7. with_whisper
 

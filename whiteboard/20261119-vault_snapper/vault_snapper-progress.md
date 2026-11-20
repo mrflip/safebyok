@@ -45,8 +45,21 @@ orchestrator writes it.
   host keys still spell `'safebyok'` (thread 8's).
 * `list`/`tryWrite` answered after goodbye then hello cache nothing; each still answers.
 
+## Thread 5, bank_gatings (#772) (*Orchestrator:*)
+
+* Branch `20261120-bank_gatings`, stacked on #770. Commit 27b16b2a9 is a pure move (each prompt's helper a private
+  method, one launch helper); behaviour is a66cc7fe4.
+* An unlock prompt joins an open gating of any kind; a gate-change prompt joins only its own kind, else refuses
+  `already_asking`. `ensureUnlocked()` resolves at once when unlocked, else prompts.
+* `attemptUnlock`, `attemptReplacePassphrase`, `attemptAddPasskey`, `attemptRevokePasskey` resolve an `Outcome`: to the
+  open gating of their kind, or once through `attemptWithoutGating` (`gating.ts`), which refuses a disabled bank first
+  and zeroes a passkey answer's bytes on every outcome.
+* `device.lock()` locks the device's bank, learned through `device.cheatHoldBank` (each Bank's constructor; last made
+  wins): the sprint's one cheat. `device.openGating` exposes `gatingkind`, `isOpen`; `#isAttempting` is private; no
+  last refusal is kept (thread 6 adds it). `gatingseq` deferred to thread 6.
+
 ## The sprint doc (*Orchestrator:*)
 
 * https://claude.ai/artifact/HHcmx1GE3oZyh6rQMWjgv3 — doc `83e42a7e-4892-49d9-b45e-585ca636e9a0`; State enum `b9b89cb1-c517`.
-* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 7);
+* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 8);
   Cleanup `6077489e-8954` / `14b54849-af59`; Progress `51ab4975-ceed` / `26336557-6583`; Resolved `a912f3b9-5db8` / `c14689aa-a452`.
