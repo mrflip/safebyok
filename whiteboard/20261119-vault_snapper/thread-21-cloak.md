@@ -1,6 +1,6 @@
 # Thread 21: cloak (2026-11-20)
 
-Branch `20261120-cloak`, PR #789 (draft), stacked on #786 (thread 18, giver_forms). Proved so far: safebyok 1330/1330 tests, safebyok-react 347/347; lint and typecheck clean in both. `pnpm justify` after the catch-up: see the PR's **Tests:** line.
+Branch `20261120-cloak`, PR #789 (draft), stacked on #786 (thread 18, giver_forms). Proved: `pnpm justify` green after the catch-up onto #786 (sprintbase 173338ec8): safebyok 1330, safebyok-big 2946, safebyok-react 347, e2e 576, scripts 328, postgres 341, graphql 448, convex 334, indexeddb 215, fastkey 43, demo 99; lint, typecheck and build clean in every package.
 
 * **Built**:
   * `packages/safebyok/src/helpers/cloak.ts`: `cloak(cleartexts)` and `class Cloak`, exported from the core's entry (`core.ts`), with the type `CloakCleartexts` (in `shapes-gateish.ts`, beside the checker `CleartextChecks.cloakArgs`).
