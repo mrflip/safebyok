@@ -453,10 +453,10 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandOwnBox, demandLease
 
-  /** True until this bank or its device is swept. */
+  /** True until this bank is swept or its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
 
-  /** The refusal every call on this bank meets once it or its device is swept, or null while it is enabled. */
+  /** The refusal every call on this bank meets once it is swept or its device ends, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#endCause ?? this.#device.endCause }
 
   /** True when no lease is attached to this bank. */
