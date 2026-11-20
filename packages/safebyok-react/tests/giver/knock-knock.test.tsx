@@ -59,7 +59,7 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   /** The unlock dialog, open while a call waits for the bank to be unlocked. */
   function UnlockDialog() {
     const unlockWanted = Acme.useBankSnapshot((snap) => snap.unlockWanted)
-    if (!unlockWanted) { return null }
+    if (! unlockWanted) { return null }
     return <dialog open aria-label="Unlock"><UnlockForm /></dialog>
   }
 
@@ -83,7 +83,7 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
 
 /** What the unlock form says of `err`, its last refusal: a condition the user can mend at the field, anything else as a banner. */
 function unlockAlertOf(err: unknown): string {
-  if (!isVaultError(err) || (err.family !== 'condition')) { return 'Something went wrong. Please try again later.' }
+  if (! isVaultError(err) || (err.family !== 'condition')) { return 'Something went wrong. Please try again later.' }
   return (err.refusalkind === 'wrong_passphrase') ? 'That is not the passphrase.' : err.message
 }
 
@@ -133,7 +133,7 @@ function unlockAsksOf(world: TH.KnockKnockWorld): number {
   let asks = 0
   let wasWanted = false
   for (const snap of world.snapshots) {
-    if (!wasWanted && snap.bank.unlockWanted) { asks += 1 }
+    if (! wasWanted && snap.bank.unlockWanted) { asks += 1 }
     wasWanted = snap.bank.unlockWanted
   }
   return asks
