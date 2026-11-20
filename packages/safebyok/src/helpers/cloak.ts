@@ -16,10 +16,10 @@ export function cloak(cleartexts: CloakCleartexts): Cloak { return new Cloak(cle
 const CloakedMarker = '[cloaked]'
 
 // A form mutation's variables stay in React Query's mutation cache, its devtools and the `useMutation` hook's state; a
-// cloak there shows none of its cleartexts, and is vacated once the mutation settles.
+// cloak there shows none of its cleartexts, and is vacated once the mutation settles. A passkey answer's getter hands out
+// a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own for a retry.
 /** A form's cleartexts, each read through its getter, until {@link Cloak.vacate} empties the cloak.
  * It has no enumerable field, and JSON, `String()` and Node's inspect show it as `'[cloaked]'`.
- * A passkey answer's getter hands out a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own for a retry.
  */
 export class Cloak {
   #passphraseCleartext:     string | undefined
@@ -36,10 +36,10 @@ export class Cloak {
     Object.freeze(this)
   }
 
-  /** The passphrase, or the proof's. */
+  /** The passphrase: a new bank's, an unlock's, or a gate change's proof. */
   get passphraseClear(): string | undefined { return this.#passphraseCleartext }
 
-  /** A copy of the passkey's answer, or of the proof's. */
+  /** A copy of the passkey's answer: a new bank's, an unlock's, or a gate change's proof. */
   get passkeyClear(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#passkeyCleartext) }
 
   /** The new passphrase. */
