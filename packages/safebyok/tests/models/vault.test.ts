@@ -248,7 +248,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(bank.isUnlocked).to.be.true
   })
 
-  it("on a locked bank, gets the box from the vaultDB while the user is asked, and not again once unlocked", async () => {
+  it("on a locked bank, gets the box once, while the user is asked", async () => {
     const onBadNews = vi.fn()
     const { bank, device, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -266,7 +266,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(onBadNews).not.toHaveBeenCalled()
   })
 
-  it("on a locked bank, tells no bad news of a storage refusal met while the user is asked, and gets the box again once unlocked", async () => {
+  it("on a locked bank, tells no bad news of a storage refusal met during the unlock", async () => {
     const onBadNews = vi.fn()
     const { bank, device, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
