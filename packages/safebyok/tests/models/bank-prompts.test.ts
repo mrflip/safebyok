@@ -411,7 +411,7 @@ describe("bank.ensureUnlocked()", () => {
 })
 
 describe("a prompt on a bank whose gating is open", () => {
-  it("joins it: two ensureUnlocked on a locked bank open one gating, and both resume after one attemptUnlock", async () => {
+  it("joins it, and every waiter resumes after one attemptUnlock", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const make = vi.spyOn(Lease, 'make')
@@ -461,7 +461,7 @@ describe("a prompt on a bank whose gating is open", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("joins a gate change of its own kind: two replace-passphrase prompts resume after one attempt, writing the gate once", async () => {
+  it("joins a gate change of its own kind, writing the gate once", async () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.maingate
     const prompts = [bank.launchReplacePassphrasePrompt(), bank.launchReplacePassphrasePrompt()]
