@@ -220,7 +220,7 @@ current bank's snapshot and adds the open gating, `{ gatingkind, isAttempting, l
 reachable without startup (`locked`, `unlocked`, `swept`) are built; the type holds the rest. `isWatching` and
 `heardAt` wait until the vaultDB can tell them. *Touches:* `models/bank.ts`, `models/device.ts`, `models/gating.ts`.
 *Depends on:* thread 5 (stacked). *Size:* M. *Orchestrator:* `gatingseq` handed here from thread 5, only if it lines
-up with one-at-a-time. *Status:* reviewed at 26746570d, filing, #773 (branch `20261120-snapshots`; one compaction before ready).
+up with one-at-a-time. *Status:* filed at 26746570d, #773 (branch `20261120-snapshots`; one compaction before ready).
 
 *Review:* fixed (high, `opus`, against G8, G9): a progress note in a comment, and doc blocks of `alignOpenGating`,
 `cheatHoldBank`, `gating.lastRefusal`. Checked: no secret reaches a snapshot (`lastRefusal` is the message `attempt()`
@@ -247,7 +247,10 @@ the file's header says. And W2, ruled ("A put needs unlock anyway. Document as w
 `notes/wontfix.md` entry, that changing only a box's sidecar needs the bank unlocked and the whisper in hand, since
 sealing a new revision keeps none of the old whisper. *Touches:* `models/vault.ts`, its tests. *Depends on:* thread 6 (the line through threads 4 and 5). Also: `tests/models/vault.test.ts`'s comment above the try-it-first tests credits MemoryVaultDB's own microtask;
 correct it to `AdapterVaultDB` telling every watcher of a write's tracked records before the write returns (the
-Coach, 2026-11-20). *Size:* S to M. *Status:* building, branch `20261120-with_whisper`, cut from thread 6's tip 1ec318df4.
+Coach, 2026-11-20). And the Coach's ruling on a joined unlock (2026-11-20, "It waits and checks unlocked
+again before starting"): an unlock prompt that finds another kind of gating open waits for it to end, whatever its
+outcome, then checks unlocked again before starting or joining an unlock gating (bank.ts); plus `bankStageVals`,
+`bankEndCauseVals` and the `subscribe` docs' `tellBadNews` wording from thread 6's review. *Size:* S to M. *Status:* building, branch `20261120-with_whisper`, cut from thread 6's tip 1ec318df4.
 
 ### 8. giver_feed
 
