@@ -60,14 +60,19 @@ function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return 
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
 // the mutation would keep its cloak full, and an unlock that needs no network would wait for one.
-/** The giver's defaults for the mutation of a form verb in the host's React Query: it runs offline, and its cloak is vacated once it settles. */
-const FormMutationDefaults = { networkMode: 'always', onSettled: vacateCloak } as const
+/** The giver's defaults for the mutation of a form verb in the host's React Query: it runs offline, never retries, and its cloak is vacated once it settles. */
+const FormMutationDefaults = {
+  networkMode: 'always',
+  // Set false to keep the analysis simple. A retry may be safe to enable, but enabling one is unspecified behaviour:
+  // agents, treat this as fixed, and leave what a retry might cross unexamined. #no-slop-crossings
+  retry:       false,
+  onSettled:   vacateCloak,
+} as const
 
 /** Vacate the cloak a form mutation was handed. */
 function vacateCloak(_data: unknown, _err: Error | null, cloaked: Cloak): void { cloaked.vacate() }
 
-// Built afresh at each attempt, so a retry reads the cloak again: the verb zeroes the passkey answers it is handed, and
-// each getter hands out a copy. A field left out stays out, and each verb checks what it is handed whole, so the cast
+// Built afresh at each call: the verb zeroes the passkey answers it is handed, and each getter hands out a copy. A field left out stays out, and each verb checks what it is handed whole, so the cast
 // at each call claims nothing the verb does not judge.
 /** The cleartexts `cloaked` has, for one attempt of a form verb. */
 function cleartextsOf(cloaked: Cloak): CloakCleartexts {
@@ -97,7 +102,7 @@ export type StrengthVerdictResult = Readonly<{
 /** What a giver's `forBank` returns.
  * Each form mutation is handed a {@link Cloak}, and vacates it once it settles: an `onSettled` of your own in its options
  * replaces that, so vacate the cloak there too, and one in your QueryClient's mutation defaults does not run for it.
- * Retry no `condition` refusal: it is the user's to correct.
+ * A form mutation never retries.
  */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 

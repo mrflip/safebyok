@@ -121,7 +121,7 @@ describe("the form mutations", () => {
     expect([refusal.family, isVacated(cloaked)]).to.deep.equal(['condition', true])
   })
 
-  it("hands each retry the cloak's cleartexts whole, under a host's default of retrying mutations, and vacates it once settled", async () => {
+  it("runs the verb once under a host's default of retrying mutations, and vacates the cloak once settled", async () => {
     const { world, Acme } = setup()
     const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
     onTestFinished(() => { client.clear() })
@@ -133,7 +133,7 @@ describe("the form mutations", () => {
     act(() => { result.current.mutate(cloaked) })
     await waitFor(() => { expect(result.current.error).to.eq(refusal) })
     const handed = { verb: 'revokePasskey', cleartexts: { passkeyClear: fakePasskeyAnswer() } }
-    expect(world.formCalls).to.deep.equal([handed, handed])
+    expect(world.formCalls).to.deep.equal([handed])
     expect(isVacated(cloaked)).to.eq(true)
   })
 
