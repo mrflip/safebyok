@@ -671,6 +671,24 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     expect(device.openGating).to.be.null
   })
 
+  it("resolves 'disabled' at once on a swept bank, without waiting out the gate change still open on it", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
+    const gating = device.openGating!
+    bank.sweep()
+    const passkeyClear = TH.passkeyAnswerOf()
+    const attempting = bank.attemptUnlock({ passkeyClear })
+    const settled = settledFlag(attempting)
+    await TH.wakeupAtNextTick()
+    expect(settled.isSettled).to.be.true
+    expect(device.openGating).to.equal(gating)
+    await TH.expectBad(attempting, 'disabled')
+    expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
+    gating.dismiss()
+    await replacing
+  })
+
   it("resolves a refusal quoting nothing of what a throwing getter threw", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()

@@ -265,7 +265,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
    */
   async attemptUnlock(cleartexts: CleartextsForGatingkind['unlock_bank']): Promise<Outcome.Outcome<Bank>> {
     const open = this.#device.openGating
-    if ((open?.bank === this) && (open.gatingkind !== 'unlock_bank')) {
+    // A disabled bank waits on nothing: #handIn refuses it at once, as a bank's sweep leaves the device's open gating open.
+    if (this.isEnabled && (open?.bank === this) && (open.gatingkind !== 'unlock_bank')) {
       // Its outcome is not the unlock's: whenConcluded resolves a refusal as an outcome, and the bank is checked afresh.
       await open.whenConcluded
       if (this.isUnlocked) { return attemptWithoutGating(this, cleartexts, () => Promise.resolve(this)) }
