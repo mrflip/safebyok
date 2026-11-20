@@ -1,8 +1,8 @@
 /** A giver's bank over a bank's minder in the new core, for a Device to hand the giver. */
 
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
-import { type BoxCar, type BoxLabelpath, Checkers, Labelpath, ThingMinder } from 'safebyok'
-import type { GiverBank } from './react-giver'
+import { type BoxCar, type BoxLabelpath, Checkers, Labelpath, ThingFormat, ThingMinder } from 'safebyok'
+import type { GiverBank, GiverEvent } from './shapes-giver'
 
 // == [Checks]: Checks
 
@@ -20,15 +20,10 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 export function giverBankOfMinder(minder: ThingMinder): GiverBank<BoxCar> {
   Checks.minder.parse(minder)
   return Object.freeze({
-    userid:        minder.userid,
-    banklabel:     minder.banklabel,
     getBoxCar:     async (labelpath: string) => minder.get({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
-    peekBoxCar:    (labelpath: string) => minder.at({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
-    listenBoxCars: (listener: (labelpath: string, car: BoxCar) => void) => minder.listen((event) => {
-      // A removed car has none: the bank object that removed it is ending, and the bridge resets its entries.
-      if ((event.carkind !== 'thing') || (event.modelkind !== 'box') || (event.car === undefined)) { return }
-      listener(event.labelpath, event.car)
-    }),
+    listenBoxCars: (listener: (event: GiverEvent<BoxCar>) => void) => minder.listen((event) => {
+      if (ThingMinder.isThingEvent(event) && (event.modelkind === 'box')) { listener(event) }
+    }, ThingFormat),
   })
 }
 // --

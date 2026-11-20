@@ -1,55 +1,80 @@
-/** A fake Device for the giver's tests: banks started on demand, and box cars the test stores and announces. */
+/** A fake Device for the giver's tests: its bank started on demand, and box cars the test stores and announces. */
 
-import type { BankSnapshot, CarFields, DeviceSnapshot, GiverBank, GiverDevice } from '../../src/giver/react-giver'
+import { type BankSnapshot, type DeviceSnapshot, PendingBank } from 'safebyok'
+import { boxCarQueryKey } from '../../src/giver/react-giver'
+import type { CarFields, GiverBank, GiverDevice, GiverEvent } from '../../src/giver/shapes-giver'
 
 /** A box record as the fake vaultDB stores it: enough to tell revisions apart. */
 export type FakeBoxRecord = Readonly<{ labelpath: string, revseq: number, sidecar: Readonly<{ mask: string }> }>
 
 /** A car of fake box records, as a bank's minder would cache it. */
-export type FakeBoxCar = Readonly<{ liveness: CarFields['liveness'], newest: FakeBoxRecord, fullest: FakeBoxRecord | null | undefined }>
+export type FakeBoxCar = Readonly<{ liveness: CarFields['liveness'], agerank: string, newest: FakeBoxRecord, fullest: FakeBoxRecord | null | undefined }>
 
 /** A fake box record at `labelpath`, of revision `revseq`. */
 export function fakeBoxRecordOf(labelpath: string, revseq: number): FakeBoxRecord {
   return Object.freeze({ labelpath, revseq, sidecar: Object.freeze({ mask: `****${String(revseq)}` }) })
 }
 
+// A fake agerank, ordered as the minder's is for one box: by the newest's revseq, then liveness, then the fullest's revseq.
+/** `revseq` padded so that two compare as strings as they do as numbers */
+function padded(revseq: number): string { return String(revseq).padStart(10, '0') }
+
 /** The car of a box whose whole newest revision is in hand. */
-export function fullCarOf(record: FakeBoxRecord): FakeBoxCar { return Object.freeze({ liveness: 'full', newest: record, fullest: record }) }
+export function fullCarOf(record: FakeBoxRecord): FakeBoxCar {
+  return Object.freeze({ liveness: 'full', agerank: `${padded(record.revseq)}~full~${padded(record.revseq)}`, newest: record, fullest: record })
+}
 
 /** The car of a box whose newest revision is known only sparse, beside an older whole one. */
-export function behindCarOf(newest: FakeBoxRecord, fullest: FakeBoxRecord): FakeBoxCar { return Object.freeze({ liveness: 'behind', newest, fullest }) }
+export function bhndCarOf(newest: FakeBoxRecord, fullest: FakeBoxRecord): FakeBoxCar {
+  return Object.freeze({ liveness: 'bhnd', agerank: `${padded(newest.revseq)}~bhnd~${padded(fullest.revseq)}`, newest, fullest })
+}
+
+/** The car of a box whose newest revision is known only sparse, with no whole one in hand. */
+export function bareCarOf(newest: FakeBoxRecord): FakeBoxCar {
+  return Object.freeze({ liveness: 'bare', agerank: `${padded(newest.revseq)}~bare~-`, newest, fullest: undefined })
+}
 
 /** The car of a box none is stored at. */
-export function voidCarOf(labelpath: string): FakeBoxCar { return Object.freeze({ liveness: 'void', newest: fakeBoxRecordOf(labelpath, -1), fullest: null }) }
+export function voidCarOf(labelpath: string): FakeBoxCar {
+  return Object.freeze({ liveness: 'void', agerank: '-~void', newest: fakeBoxRecordOf(labelpath, -1), fullest: null })
+}
 
-const ServerSnapshot: DeviceSnapshot = Object.freeze({ userid: null, banks: Object.freeze({}) })
+/** The snapshot of an unlocked bank whose lease runs a while yet. */
+export const UnlockedBank: BankSnapshot = Object.freeze({
+  stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: 1_800_000_000_000, lastErr: null,
+})
 
 /** A fake Device, and the test's ways past it. */
 export interface FakeGiverWorld {
   device:  GiverDevice<FakeBoxCar>
   /** Each labelpath's car as the vaultDB would answer it now. A labelpath left out answers the void car. */
   stored:  Map<string, FakeBoxCar>
-  /** How many cars the bank objects have been asked for. */
+  /** How many cars the bank objects have asked the vaultDB for. */
   counts:  { gets: number }
-  /** Sign `userid` in, or nobody, as a host's provider would. */
-  _cheat_signIn(userid: string | null): void
-  /** Replace the Device's snapshot of the bank at `banklabel`. */
-  _cheat_setBank(banklabel: string, snapshot: BankSnapshot): void
-  /** Announce `car` to every bank object's listeners, as its minder would on caching it. */
-  _cheat_hear(labelpath: string, car: FakeBoxCar): void
-  /** End the bank object at `banklabel`: the next ensureBank starts another. */
-  _cheat_endBank(banklabel: string): void
+  /** Hold each car the vaultDB reads from now on until the function returned is called: it then answers what it read. */
+  pauseAnswers(): () => void
+  /** Replace the Device's snapshot of its bank. */
+  _cheat_setBank(snapshot: BankSnapshot): void
+  /** Announce `car` to the bank object's listeners, as its minder would on caching it at `dataUpdatedAt`. */
+  _cheat_hear(labelpath: string, car: FakeBoxCar, dataUpdatedAt?: number): void
+  /** Announce that the minder let go of the car at `labelpath`. */
+  _cheat_hearRemoved(labelpath: string): void
+  /** End the bank object: the next ensureBank starts another, with nothing cached. */
+  _cheat_endBank(): void
 }
 
-/** A fake Device with `userid` signed in, no bank started, and nothing stored. */
-export function makeFakeGiverWorld(userid: string | null = 'u1'): FakeGiverWorld {
+/** A fake Device for user `u1` and bank `acme`, no bank object started, and nothing stored. */
+export function makeFakeGiverWorld(): FakeGiverWorld {
   type Starter = (bank: GiverBank<FakeBoxCar>) => () => void
-  let snapshot: DeviceSnapshot = Object.freeze({ userid, banks: Object.freeze({}) })
+  const userid    = 'u1'
+  const banklabel = 'acme'
+  let snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank })
+  let answerPause: Promise<void> | null = null
+  let bank: GiverBank<FakeBoxCar> | null = null
   const deviceListeners = new Set<() => void>()
-  const carListeners    = new Set<(labelpath: string, car: FakeBoxCar) => void>()
-  const banks           = new Map<string, GiverBank<FakeBoxCar>>()
-  // For each starter, the function it returned for each bank object it was handed, by banklabel.
-  const endings         = new Map<Starter, Map<string, () => void>>()
+  const carListeners    = new Set<(event: GiverEvent<FakeBoxCar>) => void>()
+  // For each starter, the function it returned for the bank object it was handed, or null for none.
+  const endings         = new Map<Starter, (() => void) | null>()
   const stored          = new Map<string, FakeBoxCar>()
   // Each labelpath's car as the minder last cached it: by a get, or heard.
   const cached          = new Map<string, FakeBoxCar>()
@@ -60,42 +85,45 @@ export function makeFakeGiverWorld(userid: string | null = 'u1'): FakeGiverWorld
     for (const listener of deviceListeners) { listener() }
   }
 
-  function startBank(banklabel: string, signedIn: string): GiverBank<FakeBoxCar> {
-    const bank: GiverBank<FakeBoxCar> = Object.freeze({
-      userid:        signedIn,
-      banklabel,
-      getBoxCar:     (labelpath: string) => {
-        counts.gets += 1
-        const car = stored.get(labelpath) ?? voidCarOf(labelpath)
-        cached.set(labelpath, car)
-        return Promise.resolve(car)
-      },
-      peekBoxCar:    (labelpath: string) => cached.get(labelpath),
-      listenBoxCars: (listener: (labelpath: string, car: FakeBoxCar) => void) => {
+  function emit(event: GiverEvent<FakeBoxCar>): void {
+    for (const listener of carListeners) { listener(event) }
+  }
+
+  // As the minder's get does, a car in hand that the vaultDB is not known to hold newer than answers at once.
+  async function getBoxCar(labelpath: string): Promise<FakeBoxCar> {
+    const held = cached.get(labelpath)
+    if ((held !== undefined) && (held.liveness !== 'bhnd') && (held.liveness !== 'bare')) { return held }
+    counts.gets += 1
+    const car = stored.get(labelpath) ?? voidCarOf(labelpath)
+    if (answerPause !== null) { await answerPause }
+    cached.set(labelpath, car)
+    return car
+  }
+
+  function startBank(): GiverBank<FakeBoxCar> {
+    const started: GiverBank<FakeBoxCar> = Object.freeze({
+      getBoxCar,
+      listenBoxCars: (listener: (event: GiverEvent<FakeBoxCar>) => void) => {
         carListeners.add(listener)
         return () => { carListeners.delete(listener) }
       },
     })
-    banks.set(banklabel, bank)
-    for (const [starter, ends] of endings) { ends.set(banklabel, starter(bank)) }
-    return bank
+    bank = started
+    for (const starter of endings.keys()) { endings.set(starter, starter(started)) }
+    return started
   }
 
   const device: GiverDevice<FakeBoxCar> = Object.freeze({
+    userid,
+    banklabel,
     subscribe: (listener: () => void) => {
       deviceListeners.add(listener)
       return () => { deviceListeners.delete(listener) }
     },
-    getSnapshot:       () => snapshot,
-    getServerSnapshot: () => ServerSnapshot,
-    ensureBank:        ({ userid: asking, banklabel }: Readonly<{ userid: string, banklabel: string }>) => {
-      if (asking !== snapshot.userid) { return Promise.reject(new Error('That user is no longer signed in.')) }
-      return Promise.resolve(banks.get(banklabel) ?? startBank(banklabel, asking))
-    },
+    getSnapshot: () => snapshot,
+    ensureBank:  () => Promise.resolve(bank ?? startBank()),
     onBankStart: (starter: Starter) => {
-      const ends = new Map<string, () => void>()
-      endings.set(starter, ends)
-      for (const [banklabel, bank] of banks) { ends.set(banklabel, starter(bank)) }
+      endings.set(starter, (bank === null) ? null : starter(bank))
       return () => { endings.delete(starter) }
     },
   })
@@ -104,17 +132,26 @@ export function makeFakeGiverWorld(userid: string | null = 'u1'): FakeGiverWorld
     device,
     stored,
     counts,
-    _cheat_signIn:  (signedIn) => { publish({ ...snapshot, userid: signedIn }) },
-    _cheat_setBank: (banklabel, bankSnapshot) => { publish({ ...snapshot, banks: Object.freeze({ ...snapshot.banks, [banklabel]: bankSnapshot }) }) },
-    _cheat_hear:    (labelpath, car) => {
-      cached.set(labelpath, car)
-      for (const listener of carListeners) { listener(labelpath, car) }
+    pauseAnswers: () => {
+      let release!: () => void
+      answerPause = new Promise<void>((resolve) => { release = resolve })
+      return () => { answerPause = null; release() }
     },
-    _cheat_endBank: (banklabel) => {
-      banks.delete(banklabel)
-      for (const ends of endings.values()) {
-        ends.get(banklabel)?.()
-        ends.delete(banklabel)
+    _cheat_setBank: (bankSnapshot) => { publish({ ...snapshot, bank: bankSnapshot }) },
+    _cheat_hear:      (labelpath, car, dataUpdatedAt = Date.now()) => {
+      cached.set(labelpath, car)
+      emit({ type: 'updated', queryKey: boxCarQueryKey({ userid, banklabel, labelpath }), state: { data: car, dataUpdatedAt } })
+    },
+    _cheat_hearRemoved: (labelpath) => {
+      cached.delete(labelpath)
+      emit({ type: 'removed', queryKey: boxCarQueryKey({ userid, banklabel, labelpath }), state: { data: undefined, dataUpdatedAt: 0 } })
+    },
+    _cheat_endBank: () => {
+      bank = null
+      cached.clear()
+      for (const [starter, ending] of endings) {
+        ending?.()
+        endings.set(starter, null)
       }
     },
   }
