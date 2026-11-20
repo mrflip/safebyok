@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 to 6 in one line, main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 (#771's changeset check clears on its next push); thread 7 filed (#774), in rework for the overlap ruling; thread 8 ready (#775), in review; thread 9 waits on 7 and 8 restacked.
+* **Status:** threads 1 to 8 filed, in one line: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 -> #774 -> #775 (justify green at the tip; #771's changeset check clears on its next push); thread 9 building on #775.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -252,8 +252,8 @@ again before starting"): an unlock prompt that finds another kind of gating open
 outcome, then checks unlocked again before starting or joining an unlock gating (bank.ts); plus `bankStageVals`,
 `bankEndCauseVals` and the `subscribe` docs' `tellBadNews` wording from thread 6's review. *Size:* S to M. *Status:* ready, #774 (branch `20261120-with_whisper`; one compaction), reworked for the Coach's two
 snapshot rulings (`lastRefusal` ripped out until v1; the bank snapshot's `endCause` holds the error, 2026-11-20) at
-192a39d07; reviewed at a1cbd3424; filed at 8dc00e05d, rebased onto the restacked #773 (one conflict, the `bhnd`
-spelling in vault.test.ts); in rework for the queued ruling below.
+192a39d07; reviewed at a1cbd3424; rebased onto the restacked #773 (one conflict, the `bhnd` spelling in vault.test.ts);
+reworked for the queued ruling below, second review fixed a swept-bank hang (1999956ba); filed at 46e2e19ea.
 
 *Review:* fixed (high, `opus`, against G6–G9): the rethrow test checks `fn`'s throw by identity. Checked: the unsealed
 box stays inside `fn`; `fn`'s throw is rethrown unwrapped; every refusal of `withWhisper`'s own comes before the
@@ -286,8 +286,14 @@ event keeps TanStack's `status` with `data` undefined, so the bridge branches on
 `subtreeQueryKey` to `childrenQueryKey`, takes a `Labelpathed` where a `ThingScope` was, and makes `react-giver.ts`
 easier to read; its invariant hunks are already on #769 and merge away. Where it meets thread 2's `'sok'` and event
 rewrite, keep the threads' behaviour and the Coach's names. *Touches:* `packages/safebyok-react/src/giver/`.
-*Depends on:* threads 2 and 6, restacked into one line. *Size:* M. *Status:* ready, #775 (branch
-`20261120-giver_feed`, at 08710c644; one compaction); in review, `medium` on `opus`.
+*Depends on:* threads 2 and 6, restacked into one line. *Size:* M. *Status:* filed, #775 (branch
+`20261120-giver_feed`; one compaction), restacked onto #774 at 26ba2bb99 (one fix: a test cast `lastRefusal`'s removal made needless).
+
+*Review:* fixed (medium, `opus`): agerank compared only within one box (a hook switching boxes kept the old car); the
+freeze doc corrected; a comment cited a ruling; the `@example` marker; ten minder doc blocks follow the Coach's rename.
+Checked: the race is closed (three tests fail with TanStack's default sharing); the React is sound. Left:
+`listingAt` takes a bare `{ labelpath }` but refuses one (Open Matters); doc lines and a VOCABULARY row (Cleanup); the
+sign-in loosening changes no working-case answer within a Device's life.
 
 ### 9. knock_knock
 
@@ -299,7 +305,7 @@ rewrite, keep the threads' behaviour and the Coach's names. *Touches:* `packages
 reads the Device's snapshot and, in a form action, calls `bank.attemptUnlock` with the passphrase from `FormData`;
 the mutation resumes with the whisper. A second submission while the dialog is open joins it. The test asserts the
 passphrase is never in React state or a snapshot. Any wiring the core lacks is one explicit `cheat…` method. *Depends
-on:* threads 7 and 8, restacked into one line. *Size:* M. *Orchestrator:* from thread 8 (#775): use `Giver.useGating()`,
+on:* threads 7 and 8, restacked into one line. *Size:* M. *Status:* building, branch `20261120-knock_knock`, cut from 26ba2bb99. *Orchestrator:* from thread 8 (#775): use `Giver.useGating()`,
 `Giver.forBank(label).useBankSnapshot()` and `useBoxRecord(labelpath)`; the real Device has no `ensureBank` or
 `onBankStart`, so the giver's bank wiring needs them on the Device or a wrapper (`minderDeviceOf` in
 `tests/test-helpers/minder-giver-world.ts` shows the shape): the one cheat goes there. The test brings its own

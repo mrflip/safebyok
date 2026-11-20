@@ -93,12 +93,13 @@ orchestrator writes it.
 
 ## The line (*Orchestrator:*)
 
-* Restacked 2026-11-20: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773, every base `main`. Two mechanical fixes
+* Restacked 2026-11-20: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773, every base `main`; then #774 and #775
+  on top (#775 rebased onto #774, a needless test cast dropped). Two mechanical fixes
   at the restack: the feed-version test table now uses strings (`ThingFormat` is one), on #771; the vault's
   sparse-newest test expects `bhnd`, on #770. Rollback tags `*-prerestack-20261120004904` in the main repo.
 
 ## The sprint doc (*Orchestrator:*)
 
 * https://claude.ai/artifact/HHcmx1GE3oZyh6rQMWjgv3 — doc `83e42a7e-4892-49d9-b45e-585ca636e9a0`; State enum `b9b89cb1-c517`.
-* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 717);
+* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 718);
   Cleanup `6077489e-8954` / `14b54849-af59`; Progress `51ab4975-ceed` / `26336557-6583`; Resolved `a912f3b9-5db8` / `c14689aa-a452`.
