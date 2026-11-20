@@ -29,16 +29,6 @@ async function unsealedAt(vault: Vault): Promise<BoxUnsealed> {
   return vault.bank.unsealBox(car.newest as BoxRecord)
 }
 
-/** What `promise` rejects with. */
-async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
-  try {
-    await promise
-  } catch (err) {
-    return err
-  }
-  throw new Error('it resolved')
-}
-
 /** The design's put flow: get the box or its shell, add one to its count of apicalls, seal and put it over what it got. */
 async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
   const { newest } = await vault.minder.get(scopeAt(vault.bank, Openai))
@@ -303,8 +293,8 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const { vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const thrown = new Error('the host could not reach the model')
-    expect(await rejectionOf(vault.withWhisper(Openai, () => { throw thrown }))).to.equal(thrown)
-    expect(await rejectionOf(vault.withWhisper(Openai, () => Promise.reject(thrown)))).to.equal(thrown)
+    await expect(vault.withWhisper(Openai, () => { throw thrown })).rejects.to.equal(thrown)
+    await expect(vault.withWhisper(Openai, () => Promise.reject(thrown))).rejects.to.equal(thrown)
   })
 
   it("leaves no trace of the whisper in the minder's cache or a snapshot", async () => {
