@@ -102,7 +102,7 @@ export type StrengthVerdictResult = Readonly<{
 /** What a giver's `forBank` returns.
  * Each form mutation is handed a {@link Cloak}, and vacates it once it settles: an `onSettled` of your own in its options
  * replaces that, so vacate the cloak there too, and one in your QueryClient's mutation defaults does not run for it.
- * A form mutation never retries.
+ * A form mutation never retries. Hold a form's submit while its mutation is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
  */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
