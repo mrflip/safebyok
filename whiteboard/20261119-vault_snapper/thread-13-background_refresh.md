@@ -1,6 +1,6 @@
 # Thread 13: background_refresh (2026-11-20)
 
-Branch `20261120-background_refresh`, PR to be named below, stacked on #779 (vault_try). Proved: `pnpm --filter safebyok` vitest 1377, tsc and eslint clean; `pnpm justify` below.
+Branch `20261120-background_refresh`, PR #780, stacked on #779 (vault_try). Proved: `pnpm --filter safebyok` vitest 1377, tsc and eslint clean; `pnpm justify` below.
 
 * **Built**:
   * `ThingMinder.backgroundRefresh(scoped, opts = {})` (`packages/safebyok/src/minding/thing-minder.ts`) is the one public background get: `void this.tryGet(scoped, opts)`. `tryGet` validates, checks readiness and scope, and resolves an outcome that never rejects, so it throws nothing and tells nothing. A refusal stays in TanStack's query state, which `#answerOfTSQ` reads as `lastErr`.
