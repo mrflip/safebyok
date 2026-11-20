@@ -50,7 +50,7 @@ function settledFlag(promise: Promise<unknown>): { readonly isSettled: boolean }
 /** Cleartexts an unlock must refuse, by what is wrong with them. */
 const SloppyUnlockCleartexts = [
   [null,                    'null'],
-  ['a bare passphrase',     'a bare string'],
+  ["a bare passphrase",     'a bare string'],
   [{},                      'no field'],
   [{ passphraseClear: 42 }, 'a passphrase that is not text'],
 ] as const
