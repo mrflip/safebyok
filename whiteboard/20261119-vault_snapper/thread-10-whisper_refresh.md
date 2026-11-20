@@ -1,6 +1,6 @@
 # Thread 10: whisper_refresh (2026-11-20)
 
-Branch `20261120-whisper_refresh`, PR #PRNUM, stacked on #776. Proved: `pnpm --filter safebyok test` (29 files, 1364 tests), lint and typecheck; `pnpm --filter safebyok-react test` (25 files, 314 tests) and lint.
+Branch `20261120-whisper_refresh`, PR #777, stacked on #776. Proved: `pnpm --filter safebyok test` (29 files, 1364 tests), lint and typecheck; `pnpm --filter safebyok-react test` (25 files, 314 tests) and lint.
 
 * **Built**:
   * `ThingMinder.refresh(scoped, opts)` (`packages/safebyok/src/minding/thing-minder.ts`, *Reading*): a get in the background,
