@@ -179,7 +179,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Ask the user for the current passphrase and a new one, and replace the passphrase. Leaves the bank unlocked.
-   * The passkey stays, and the bankKey does not change. While a `replace_passphrase` gating is open on this bank, it joins that gating instead.
+   * The passkey stays, and the bankKey does not change.
+   * While a `replace_passphrase` gating is open on this bank, it joins that gating instead.
    */
   async launchReplacePassphrasePrompt(): Promise<this> {
     this.demandEnabled()
@@ -188,7 +189,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Ask the user for the passphrase and a new passkey, and add the passkey. Leaves the bank unlocked.
-   * A gate has one passkey at most: this refuses, asking nobody, while it has one. While an `add_passkey` gating is open on this bank, it joins that gating instead.
+   * A gate has one passkey at most: this refuses, asking nobody, while it has one.
+   * While an `add_passkey` gating is open on this bank, it joins that gating instead.
    */
   async launchAddPasskeyPrompt(): Promise<this> {
     this.demandEnabled()
@@ -198,7 +200,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Ask the user for the passphrase, and revoke the passkey. Leaves the bank unlocked.
-   * With no passkey, it returns at once and asks nobody. The bankKey does not change. While a `revoke_passkey` gating is open on this bank, it joins that gating instead.
+   * With no passkey, it returns at once and asks nobody. The bankKey does not change.
+   * While a `revoke_passkey` gating is open on this bank, it joins that gating instead.
    */
   async launchRevokePasskeyPrompt(): Promise<this> {
     this.demandEnabled()
@@ -214,9 +217,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this.launchUnlockBankPrompt()
   }
 
-  /** Join the gating open on this bank that a prompt for `gatingkind` may join, or launch one of `gatingkind`, each attempt running `attempt`. Resolves the bank once the gating lands.
-   * Refuses `already_asking` while a gating it may not join is open on the device.
-   */
+  /** Join the open gating on this bank that a `gatingkind` prompt may join, or else launch one whose attempts run `attempt` */
   async #launchOrJoin(gatingkind: Gatingkind, attempt: GatingAttempt): Promise<Bank> {
     const open = this.#device.openGating
     if (open?.bank === this && (gatingkind === 'unlock_bank' || open.gatingkind === gatingkind)) { return Outcome.valOf(await open.whenConcluded) }
@@ -259,7 +260,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this.#handIn('revoke_passkey', cleartexts, async (cleartexts) => (this.#maingate.passkey0 === null ? this : this.#revokePasskeyWith(cleartexts)))
   }
 
-  /** Attempt the gating of `gatingkind` open on this bank with `cleartexts`, or with none open, run `attempt` on them once, without a gating. */
+  /** Hand `cleartexts` to this bank's open gating of `gatingkind`, or with none open, to `attempt` once */
   #handIn<KindT extends Gatingkind>(gatingkind: KindT, cleartexts: CleartextsForGatingkind[KindT], attempt: GatingAttempt): Promise<Outcome.Outcome<Bank>> {
     const open = this.#device.openGating
     if (open?.bank === this && open.gatingkind === gatingkind) { return open.attempt(cleartexts) }
