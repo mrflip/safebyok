@@ -140,9 +140,9 @@ kind is not among them: it waits that gating out, then resolves at once if the b
 ### A minder's answer that crosses a `goodbye` and a fresh `hello`
 
 * current outcome, as built, and promised nowhere: a `get`, `list` or `write` the ThingMinder began before `goodbye`,
-  answered after `goodbye` and a fresh `hello`, may land in the new cache. A get whose fetch was still waiting at
-  `goodbye` refuses `disabled` and caches nothing; one whose fetch had settled may join its Thing to the new root box's
-  listing. A list sets its listing and caches its sparse records, and a good write caches the record written, as though
+  answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may join its Thing
+  to the new root box's listing. What a get still waiting at `goodbye` refuses, even with no `hello`, is unspecified.
+  A list sets its listing and caches its sparse records, and a good write caches the record written, as though
   begun after the `hello`. Each answers its caller as the vaultDB answered it.
 * alternatives:
   - a token for each stretch of minding, compared as each answer lands: a new state, and a check in the critical path

@@ -140,7 +140,7 @@ export class ThingMinder {
     )
   }
 
-  /** Stop minding, and empty the cache. A get still waiting refuses `disabled`. A later `hello` starts minding again. */
+  /** Stop minding, and empty the cache. A later `hello` starts minding again. */
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
@@ -317,13 +317,7 @@ export class ThingMinder {
   // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
   /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
-    let fetched: ThingCar<ThingRecord>
-    try {
-      fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
-    } catch (err) {
-      // TanStack cancels a get under way when goodbye empties the cache.
-      throw (err instanceof TSQ.CancelledError) ? Throwers.minderNotStarted() : err
-    }
+    const fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
     // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
     // get may have left the cache a later record.
     const car = this.#cachedAt(scoped) ?? fetched
