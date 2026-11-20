@@ -1,8 +1,8 @@
 # Thread 7: with_whisper (2026-11-20)
 
 Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `pnpm justify`
-green after the rebase onto #773's restacked tip 872a14819 (before the overlapping-gatings rework) (`safebyok` 1342 tests, graphql 448, e2e 576, every package
-green). The rebase's one conflict, in vault.test.ts's sparse-box `putBoxOnce` test, kept this thread's behaviour (the
+green after the overlapping-gatings rework, caught up as cut at fed1e8dc9 (`safebyok` 1347 tests, big 2946, graphql
+448, e2e 576, every package green). The rebase's one conflict, in vault.test.ts's sparse-box `putBoxOnce` test, kept this thread's behaviour (the
 box gotten whole, no `bad_record`) with #769's `bhnd` for a behind car; a second test of this thread's takes `bhnd` too.
 
 * **Built** (`packages/safebyok/src/models/vault.ts`, tests in `tests/models/vault.test.ts`):
