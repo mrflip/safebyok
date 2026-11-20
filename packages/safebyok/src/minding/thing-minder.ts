@@ -8,7 +8,7 @@
 /** `ThingMinder`, which minds every Thing in one bank in a TanStack Query cache of its own. */
 
 import * as TSQ from '@tanstack/query-core'
-import { noop, union } from 'es-toolkit'
+import { union } from 'es-toolkit'
 import { Errors, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type ThingFormat, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
@@ -17,7 +17,7 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import {
-  type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderRefreshOpts, type MinderTryAtOpts,
+  type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
   type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
@@ -149,7 +149,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, isListingBareAt, tryAt, tryGet, get, refresh, tryList, list, isStaleAt, listen
+  // == [Reading]: at, listingAt, isListingBareAt, tryAt, tryGet, get, backgroundRefresh, tryList, list, isStaleAt, listen
 
   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
@@ -177,7 +177,7 @@ export class ThingMinder {
       MinderChecks.minderTryAtOpts.parse(opts)
       this.#demandReady()
       const scope = this.#demandOwnScope(scoped)
-      if (opts.ifStale === 'refresh') { this.#backgroundRefresh(scope, opts) }
+      if (opts.ifStale === 'refresh') { this.backgroundRefresh(scope, { staleTime: opts.staleTime }) }
       return this.#answerOfTSQ(this.#askAt(scope), opts) as TSQGotAnswer<ThingAt<LabelpathT>>
     } catch (err) {
       // The try asks the vaultDB nothing: what it throws that is no refusal is a bug.
@@ -203,16 +203,10 @@ export class ThingMinder {
   }
 
   /** Get `scoped`'s car in the background, unless it is timely, and return at once.
-   * A refusal is told to the bank's bad news, never thrown; under `silenceErrors`, only an `unexpected_error` is.
+   * It throws nothing and tells no one of a refusal, misuse included. A refusal shows as `lastErr` in the next {@link tryAt}.
    */
-  refresh(scoped: ThingScope, opts: MinderRefreshOpts = {}): void {
-    const { silenceErrors, staleTime } = MinderChecks.minderRefreshOpts.parse(opts)
-    const scope = this.#demandOwnScope(scoped)
-    void this.get(scope, { staleTime }).catch((err: unknown) => {
-      const refusal = Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)
-      if (silenceErrors && (refusal.refusalkind !== 'unexpected_error')) { return }
-      this.#bank.tellBadNews([refusal])
-    })
+  backgroundRefresh(scoped: ThingScope, opts: MinderGetOpts = {}): void {
+    void this.tryGet(scoped, opts)
   }
 
   /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included.
@@ -318,13 +312,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #seedListing, #sendListingToTSQ, #setListingDefaults, #joinParentListing
-
-  // Its refusal is cached beside the car, where the next tryAt finds it as `lastErr`.
-  /** Fetch `scoped`'s car in the background, if it is stale. */
-  #backgroundRefresh(scoped: ThingScope, opts: MinderGetOpts): void {
-    void this.#doGet(scoped, opts).catch(noop)
-  }
+  // == [TSQ Direct Cache Calls]: #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #seedListing, #sendListingToTSQ, #setListingDefaults, #joinParentListing
 
   // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
   /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */

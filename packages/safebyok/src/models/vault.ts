@@ -101,7 +101,7 @@ export class Vault {
     const scope = this.#scopeAt(labelpath)
     Checks.fn.parse(fn)
     // Asked before the unlock, so the vaultDB answers while the user types, and the get below finds the car timely or shares the fetch.
-    this.#minder.refresh(scope, { silenceErrors: true })
+    this.#minder.backgroundRefresh(scope)
     await this.#bank.ensureUnlocked()
     const car = await this.#minder.get(scope)
     if ((car.liveness === 'gone') || (car.liveness === 'void')) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }

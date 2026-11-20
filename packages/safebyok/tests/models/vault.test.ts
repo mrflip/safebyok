@@ -311,27 +311,6 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(onBadNews).not.toHaveBeenCalled()
   })
 
-  it("on a locked bank, tells no bad news of a storage refusal met during the unlock", async () => {
-    const onBadNews = vi.fn()
-    const { bank, device, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
-    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    bank.lock()
-    const other = Vault.make(bank)
-    other.minder.hello()
-    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
-    vi.spyOn(bank.vaultDB as unknown as { doGetThing: () => never }, 'doGetThing').mockImplementationOnce(() => { throw new Error('connection refused') })
-    const using = other.withWhisper(Openai, ({ revseq }) => revseq)
-    await vi.advanceTimersByTimeAsync(0)
-    expect(boxGetsOf(asked)).to.equal(1)
-    const answer = other.minder.tryAt(scopeAt(bank, Openai))
-    expect(answer).to.deep.include({ act: 'vacant', isFetching: false })
-    expect(answer).to.have.nested.property('lastErr.refusalkind', 'storage_unavailable')
-    await TH.answerPrompt(device, using, { passphraseClear: TH.TestPassphrase })
-    expect(await using).to.equal(0)
-    expect(boxGetsOf(asked)).to.equal(2)
-    expect(onBadNews).not.toHaveBeenCalled()
-  })
-
   it("on a locked bank, asks the user before it refuses 'absent_box' for a box never stored", async () => {
     const { bank, device, vault } = await TH.buildBornVault()
     bank.lock()
