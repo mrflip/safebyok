@@ -6,7 +6,7 @@ import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { Proving } from '../models/proving'
 import type { VaultDB } from '../storage/vault-db'
-import type { GateDna, RequestCleartext, StrengthChecker } from './shapes-gateish'
+import type { GateDna, StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealers'
 import type { BankStamp } from './shapes-stamps'
@@ -51,7 +51,7 @@ export interface BankOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
-/** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the `birth_bank` attempt underway. */
+/** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the birth's attempt underway. */
 export interface BirthOpts extends BankOpts {
   proving: Proving
 }
@@ -88,8 +88,6 @@ export interface DeviceOpts {
   logger?:          Logger.VaultLogger | undefined
   /** How long a lease lasts on this device, in minutes. `Infinity` lasts until locked. Default: 14 days. */
   autolockMinutes?: number | undefined
-  /** Shows the host's dialog for each gating. Without one, the host renders the device's `openGating` itself. */
-  requestCleartext?: RequestCleartext | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:       BadNewsHandler | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
@@ -132,12 +130,16 @@ export interface BankSnapshot {
   readonly leaseEndsAt: EpochMillis | null
   /** Why the bank failed to come up, at stage `'failed'`, or null at every other stage. */
   readonly lastErr:     RefusalSnapshot | null
+  /** True while a call waits for the bank to be unlocked ({@link Bank.ensureUnlocked}): render the unlock form.
+   * It goes false once the bank is unlocked, the wait is dismissed ({@link Bank.dismissUnlock}), or the bank ends.
+   */
+  readonly unlockWanted: boolean
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
 /** The bank snapshot a device shows before it holds a bank object. */
 export const PendingBank: BankSnapshot = Object.freeze({
-  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
+  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, unlockWanted: false,
 })
 
 /** A device's state, for a host to render. */

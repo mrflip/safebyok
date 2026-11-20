@@ -1,13 +1,14 @@
 import { isEqual } from 'es-toolkit'
-import { Clock, Crypto, Errors, Phrases as BigPhrases, VX, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, Errors, Outcome, Phrases as BigPhrases, VX, Validator } from 'safebyok-big/internals'
 import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
 import { Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
-import { Gating, addPasskey, birthBank, replacePassphrase, revokePasskey, unlockBank } from './gating'
+import * as Attempts from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
+import type { BankGatingFriend, BirthCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts } from '../shapes/shapes-gateish'
 import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BirthOpts, BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -22,7 +23,7 @@ import * as Throwers from '../refusals/throwers'
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
+  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #unlockWait, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
 
   readonly #device:   Device
   readonly #vaultDB:  VaultDB
@@ -38,6 +39,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** The attached lease, null while locked. */
   #lease: Lease | null = null
+
+  /** The wait every call in {@link ensureUnlocked} shares, or null while none waits. The snapshot's `unlockWanted` is whether there is one. */
+  #unlockWait: Wait | null = null
 
   /** Why a sweep disabled the bank, or null until then. */
   #endCause: Errors.VaultError | null = null
@@ -170,99 +174,114 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt, ensureUnlocked
-  // Each hands its gating's attempt a friend of this bank's private verbs: no public method accepts a proving (G9).
+  // == [Form verbs]: birth, tryBirth, unlock, tryUnlock, replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, gatingFriend
+  // Each hands the cleartexts a form collected, unread, to its attempt in gating.ts, with a friend of this bank's private
+  // verbs: no public method accepts a proving (G9). Each vacates the cleartexts whatever its outcome, and changes nothing where it refuses.
 
-  /** Ask the user for a new passphrase and optional passkey, and birth the bank of `device`'s scope with them. Resolves the bank, unlocked.
-   * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
+  /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked.
+   * Refuses `weak_passphrase` before any key is derived, and `gate_made_elsewhere` where a live bank is already stored.
    */
-  static async launchBirthBankPrompt(device: Device): Promise<Bank> {
+  static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> {
     const friend = {
-      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birth(record, { device, vaultDB: device.vaultDB, proving }),
+      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving }),
     }
-    const gating = Gating.make({ gatingkind: 'birth_bank' }, {
-      device, bank: null, askUser: device.askUser, attempt: (cleartexts) => birthBank(device, cleartexts, friend),
-    })
-    return gating.launch()
+    return Attempts.birthBank(device, cleartexts, friend)
   }
 
-  /** Ask the user for the passphrase or the passkey, and unlock this bank with it. */
-  async launchUnlockBankPrompt(): Promise<this> {
-    this.demandEnabled()
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-    }
-    const gating = Gating.make({ gatingkind: 'unlock_bank' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => unlockBank(this, cleartexts, friend),
-    })
-    await gating.launch()
+  /** {@link birth}, resolving an `Outcome` instead of throwing. */
+  static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
+
+  /** Unlock this bank by its passphrase or its passkey, under a lease citing its main gate.
+   * Every call waiting in {@link ensureUnlocked} resumes. A wrong passphrase or passkey refuses, and leaves the bank as it was.
+   */
+  async unlock(cleartexts: UnlockCleartexts): Promise<this> {
+    await Attempts.unlockBank(this, cleartexts, this.#gatingFriend())
     return this
   }
 
-  /** Ask the user for the current passphrase and a new one, and replace the passphrase. Leaves the bank unlocked.
-   * The passkey stays, and the bankKey does not change.
+  /** {@link unlock}, resolving an `Outcome` instead of throwing. */
+  tryUnlock(cleartexts: UnlockCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.unlock(cleartexts)) }
+
+  /** Replace the passphrase, proved by the current passphrase or the passkey, and unlock under a lease citing the gate written.
+   * The passkey stays, and the bankKey does not change. Refuses `same_passphrase`, and `weak_passphrase`, before any key is derived.
    */
-  async launchReplacePassphrasePrompt(): Promise<this> {
-    this.demandEnabled()
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
-    }
-    const gating = Gating.make({ gatingkind: 'replace_passphrase' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => replacePassphrase(this, cleartexts, friend),
-    })
-    await gating.launch()
+  async replacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<this> {
+    await Attempts.replacePassphrase(this, cleartexts, this.#gatingFriend())
     return this
   }
 
-  /** Ask the user for the passphrase and a new passkey, and add the passkey. Leaves the bank unlocked.
-   * A gate has one passkey at most: this refuses, asking nobody, while it has one.
+  /** {@link replacePassphrase}, resolving an `Outcome` instead of throwing. */
+  tryReplacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.replacePassphrase(cleartexts)) }
+
+  /** Add a passkey, proved by the passphrase, and unlock under a lease citing the gate written.
+   * A gate has one passkey at most: this refuses while it has one.
    */
-  async launchAddPasskeyPrompt(): Promise<this> {
-    this.demandEnabled()
-    this.#maingate.demandPasskeyAddable()
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
-    }
-    const gating = Gating.make({ gatingkind: 'add_passkey' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => addPasskey(this, cleartexts, friend),
-    })
-    await gating.launch()
+  async addPasskey(cleartexts: PasskeyAddCleartexts): Promise<this> {
+    await Attempts.addPasskey(this, cleartexts, this.#gatingFriend())
     return this
   }
 
-  /** Ask the user for the passphrase, and revoke the passkey. Leaves the bank unlocked.
-   * With no passkey, it returns at once and asks nobody. The bankKey does not change.
+  /** {@link addPasskey}, resolving an `Outcome` instead of throwing. */
+  tryAddPasskey(cleartexts: PasskeyAddCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.addPasskey(cleartexts)) }
+
+  /** Revoke the passkey, proved by the passphrase or the passkey itself, and unlock under a lease citing the gate written.
+   * With no passkey, the proof unlocks the bank and nothing is written. The bankKey does not change.
    */
-  async launchRevokePasskeyPrompt(): Promise<this> {
-    this.demandEnabled()
-    if (this.#maingate.passkey0 === null) { return this }
-    const friend = {
+  async revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<this> {
+    await Attempts.revokePasskey(this, cleartexts, this.#gatingFriend())
+    return this
+  }
+
+  /** {@link revokePasskey}, resolving an `Outcome` instead of throwing. */
+  tryRevokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.revokePasskey(cleartexts)) }
+
+  /** The friend of this bank's private verbs an attempt is handed. */
+  #gatingFriend(): BankGatingFriend {
+    return {
       unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
       putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
     }
-    const gating = Gating.make({ gatingkind: 'revoke_passkey' }, {
-      device: this.#device, bank: this, askUser: this.#device.askUser, attempt: (cleartexts) => revokePasskey(this, cleartexts, friend),
-    })
-    await gating.launch()
-    return this
-  }
-
-  /** Unlock this bank by asking the user, unless it is already unlocked. */
-  async ensureUnlocked(): Promise<this> {
-    this.demandEnabled()
-    if (this.isUnlocked) { return this }
-    return this.launchUnlockBankPrompt()
   }
   // --
 
-  // == [The gatings' private verbs]: birth, unlockByProving, putGate
+  // == [The awaited unlock]: ensureUnlocked, dismissUnlock, settleUnlockWait
+  // One wait is shared by every caller, opened by the first and settled once: by any unlock, a dismissal or the bank's end.
+
+  /** Resolve this bank once it is unlocked: at once if it is, or else once any unlock lands, by {@link unlock} or a gate change.
+   * While it waits, the snapshot's `unlockWanted` is true: render the unlock form, and call {@link unlock} from it.
+   * Rejects `dismissed` once {@link dismissUnlock} is called, and with the bank's `endCause` once it ends.
+   */
+  async ensureUnlocked(): Promise<this> {
+    this.demandEnabled()
+    if (this.isUnlocked) { return this }
+    // Held here: a subscriber told by the align may dismiss the wait or sweep the bank, which clears #unlockWait.
+    const wait = (this.#unlockWait ??= makeWait())
+    this.#align()
+    await wait.promise
+    return this
+  }
+
+  /** Reject every call waiting in {@link ensureUnlocked} with `dismissed`, as when the user closes the unlock form. The bank stays locked. */
+  dismissUnlock(): this {
+    this.#settleUnlockWait(Throwers.unlockDismissed())
+    this.#align()
+    return this
+  }
+
+  /** Settle the wait for an unlock, if one is open: resolve it for null, or reject it with `refusal`. */
+  #settleUnlockWait(refusal: Errors.VaultError | null): void {
+    const wait = this.#unlockWait
+    this.#unlockWait = null
+    if (refusal === null) { wait?.resolve() } else { wait?.reject(refusal) }
+  }
+  // --
+
+  // == [The attempts' private verbs]: birthByProving, unlockByProving, putGate
 
   /** Write a new bank of `record`, with its main gate and its root box sealed under a lease `opts.proving` builds, and resolve it unlocked under that lease.
    * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.
    */
-  static async #birth(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
+  static async #birthByProving(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
     const { proving, ...bankOpts } = opts
     const bank   = this.make(record, bankOpts)
     bank.demandEnabled()
@@ -298,7 +317,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Unlocking, locking and sweeping]: attachLease, lock, sweep
 
-  /** Attach `lease`, evicting the one it replaces. Once this bank is disabled, it evicts `lease` instead, and refuses. */
+  /** Attach `lease`, evicting the one it replaces, and resume every call waiting for an unlock. Once this bank is disabled, it evicts `lease` instead, and refuses. */
   #attachLease(lease: Lease): void {
     if (! this.isEnabled) {
       lease.evict()
@@ -306,6 +325,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     }
     this.#lease?.evict()
     this.#lease = lease
+    this.#settleUnlockWait(null)
     this.#align()
   }
 
@@ -317,7 +337,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Disable this bank for good, and sweep its lease. Never throws.
+  /** Disable this bank for good, sweep its lease, and reject every call waiting for an unlock with its `endCause`. Never throws.
    * On a swept device, its `endCause` is the device's.
    */
   sweep(): this {
@@ -325,6 +345,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     this.#endCause = this.#device.endCause ?? Throwers.bankSwept()
     this.#lease?.sweep()
     this.#lease = null
+    this.#settleUnlockWait(this.#endCause)
     this.#align()
     return this
   }
@@ -359,8 +380,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
       isLocked:    lease === null,
       isEnded,
       endCause,
-      leaseEndsAt: lease === null ? null : lease.proved_at + this.#device.leaseMillis,
-      lastErr:     null,
+      leaseEndsAt:  lease === null ? null : lease.proved_at + this.#device.leaseMillis,
+      lastErr:      null,
+      unlockWanted: this.#unlockWait !== null,
     })
   }
   // --
@@ -448,10 +470,29 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   static override readonly modelkind = 'bank'
 }
 
-// == [Helpers]: trackPairOf
+// == [Helpers]: trackPairOf, Wait, makeWait
 
 /** The revseq and lifepath of a Thing, as a `track` holds them. */
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
+
+/** A promise, beside the functions that settle it. */
+interface Wait {
+  readonly promise: Promise<void>
+  readonly resolve: () => void
+  readonly reject:  (refusal: Errors.VaultError) => void
+}
+
+/** A new {@link Wait}, unsettled. */
+function makeWait(): Wait {
+  // The executor runs at once, so both are assigned before the promise is returned.
+  let resolve!: Wait['resolve']
+  let reject!:  Wait['reject']
+  const promise = new Promise<void>((resolveWith, rejectWith) => {
+    resolve = resolveWith
+    reject  = rejectWith
+  })
+  return { promise, resolve, reject }
+}
 // --
 
 // == [Checks]: Checks

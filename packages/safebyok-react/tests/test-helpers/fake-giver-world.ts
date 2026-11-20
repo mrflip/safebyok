@@ -41,7 +41,7 @@ export function voidCarOf(labelpath: string): FakeBoxCar {
 
 /** The snapshot of an unlocked bank whose lease runs a while yet. */
 export const UnlockedBank: BankSnapshot = Object.freeze({
-  stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: 1_800_000_000_000, lastErr: null,
+  stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: 1_800_000_000_000, lastErr: null, unlockWanted: false,
 })
 
 /** A fake Device, and the test's ways past it. */
