@@ -17,7 +17,7 @@ export function fakeBoxRecordOf(labelpath: string, revseq: number): FakeBoxRecor
 export function fullCarOf(record: FakeBoxRecord): FakeBoxCar { return Object.freeze({ liveness: 'full', newest: record, fullest: record }) }
 
 /** The car of a box whose newest revision is known only sparse, beside an older whole one. */
-export function behindCarOf(newest: FakeBoxRecord, fullest: FakeBoxRecord): FakeBoxCar { return Object.freeze({ liveness: 'behind', newest, fullest }) }
+export function bhndCarOf(newest: FakeBoxRecord, fullest: FakeBoxRecord): FakeBoxCar { return Object.freeze({ liveness: 'bhnd', newest, fullest }) }
 
 /** The car of a box none is stored at. */
 export function voidCarOf(labelpath: string): FakeBoxCar { return Object.freeze({ liveness: 'void', newest: fakeBoxRecordOf(labelpath, -1), fullest: null }) }

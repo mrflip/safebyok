@@ -38,7 +38,7 @@ describe("the bridge", () => {
     const { world, first, result } = await setupShowing()
     const second = TH.fakeBoxRecordOf(OpenaiPath, 2)
     world.stored.set(OpenaiPath, TH.fullCarOf(second))
-    act(() => { world._cheat_hear(OpenaiPath, TH.behindCarOf(second, first)) })
+    act(() => { world._cheat_hear(OpenaiPath, TH.bhndCarOf(second, first)) })
     expect(result.current.data).to.eq(first)
     await waitFor(() => { expect(result.current.data).to.deep.equal(second) })
     expect(world.counts.gets).to.eq(2)

@@ -43,7 +43,7 @@ function catchUpBank<CarT extends CarFields>(client: QueryClient, bank: GiverBan
   }
 }
 
-/** Put `car` in the host's entry at `queryKey`, if a hook made one. A car with no record to show is fetched instead; one behind shows while the newer record is fetched. */
+/** Put `car` in the host's entry at `queryKey`, if a hook made one. A car with no record to show is fetched instead; a `bhnd` one shows while the newer record is fetched. */
 function deliverCar(client: QueryClient, queryKey: QueryKey, car: CarFields): void {
   if (client.getQueryCache().find({ queryKey, exact: true }) === undefined) { return }
   if (car.liveness !== 'bare') { client.setQueryData(queryKey, car) }

@@ -120,7 +120,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBhndOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarAgerankNotOwn, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -150,17 +150,20 @@ export const CarFullestShape = "A ThingCar's fullest record is not whole: this i
 /** A full car with two records, or a tombstone. */
 export const CarFullSplit = "A full ThingCar has one live record in both its newest and fullest, and this one does not: this is a bug in safebyok."
 
-/** A behind or bare car whose newest is whole, or a tombstone. */
-export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is live and sparse, and this one's is not: this is a bug in safebyok."
+/** A bhnd or bare car whose newest is whole, or a tombstone. */
+export const CarNewestNotSparse = "A bhnd or bare ThingCar's newest record is live and sparse, and this one's is not: this is a bug in safebyok."
 
-/** A behind car whose fullest is not an earlier revision of its newest's life. */
-export const CarBehindOfOtherRevision = "A behind ThingCar's fullest record is an earlier revision of its newest's Thing and life, and this one's is not: this is a bug in safebyok."
+/** A bhnd car whose fullest is not an earlier revision of its newest's life. */
+export const CarBhndOfOtherRevision = "A bhnd ThingCar's fullest record is an earlier revision of its newest's Thing and life, and this one's is not: this is a bug in safebyok."
 
 /** A gone car whose newest is not gone: a live record, or the void sentinel. */
 export const CarNewestNotGone = "A gone ThingCar's newest record is the tombstone of a deleted Thing, and this one's is a live record or the void sentinel: this is a bug in safebyok."
 
 /** A void car whose newest is not the void sentinel. */
 export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel, and this one's is not: this is a bug in safebyok."
+
+/** A car whose agerank is not the one its records and liveness make. */
+export const CarAgerankNotOwn = "A ThingCar's agerank is made of its records and liveness, and this one's is not: this is a bug in safebyok."
 
 /** Two cars of different Things given to a minder's structural sharing. */
 export const CarsOfOtherThings = "A ThingMinder's structural sharing was given the cars of two different Things: this is a bug in safebyok."

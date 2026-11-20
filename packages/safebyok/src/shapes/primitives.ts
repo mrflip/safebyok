@@ -40,7 +40,7 @@ export const Labelpath = Object.freeze({
 })
 // --
 
-// == [Lives]: Lifeseq, Lifepath, Lifenum, Revtok, VoidLifeseq
+// == [Lives]: Lifeseq, Lifepath, Lifenum, Revtok, VoidLifeseq, Revseq
 /** One life of a Thing, in base-32 digits (`0-9a-v`) padded to ten, so that lifeseqs sort in the order of the lives. The shell's is `-000000001`. */
 export type Lifeseq = string
 /** The lifeseq of each life from a root's down to a Thing's own, joined by `/`. */
@@ -59,7 +59,7 @@ export const VoidLifeseq = '-000000001'
 /** The helpers for a {@link Lifeseq}. */
 export const Lifeseq = Object.freeze({
   /** The lifeseq of life `lifenum`: its base-32 digits (`0-9a-v`) padded to 10, which sort in the order of the lives. Life -1's is the shell's. */
-  ofLifenum(lifenum: Lifenum): Lifeseq { return (lifenum === -1) ? VoidLifeseq : lifenum.toString(32).padStart(LifeseqDigits, '0') },
+  ofLifenum(lifenum: Lifenum): Lifeseq { return paddedSeqOf(lifenum) },
   /** The lifenum of `lifeseq`, the number of the life it names: -1 for the shell's. */
   lifenumOf(lifeseq: Lifeseq): Lifenum { return Number.parseInt(lifeseq, 32) },
   /** True when `lifeseq` is a tombstone's: an odd life, the shell's among them. */
@@ -69,6 +69,17 @@ export const Lifeseq = Object.freeze({
   /** The lifeseqs of a Thing's ancestors: its lifepath less its own lifeseq, `''` for a root. */
   leadingOf(lifepath: Lifepath): string { return lifepath.slice(0, Math.max(0, lifepath.lastIndexOf('/'))) },
 })
+
+/** The helpers for a revision's `revseq`. */
+export const Revseq = Object.freeze({
+  /** `revseq` spelled as a lifeseq is, so that the strings sort in the order of the revisions. The shell's -1 is `-000000001`. */
+  padded(revseq: number): string { return paddedSeqOf(revseq) },
+})
+
+/** `seqnum` in base-32 digits padded to ten, or the shell's `-000000001` for -1: the strings sort as the numbers do. */
+function paddedSeqOf(seqnum: number): string {
+  return (seqnum === -1) ? VoidLifeseq : seqnum.toString(32).padStart(LifeseqDigits, '0')
+}
 // --
 
 // == [Device]: DeviceTok, EpochMillis

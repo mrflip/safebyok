@@ -184,7 +184,7 @@ describe("ThingMinder.list", () => {
     const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
     expect(await minder.list('box')).to.deep.equal([TH.BoxScope.labelpath])
-    expect(minder.at(TH.BoxScope)).to.deep.equal({ liveness: 'bare', newest: Thing.sparseOf(box), fullest: undefined })
+    expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(Thing.sparseOf(box)))
     expect(minder.isStaleAt(TH.BoxScope)).to.be.true
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(box))
   })
@@ -200,7 +200,7 @@ describe("ThingMinder.list", () => {
     expect(minder.isStaleAt(TH.BoxScope)).to.be.false
   })
 
-  it("leaves a box the cache has at an older revision behind and stale, still showing the older record whole", async () => {
+  it("leaves a box the cache has at an older revision bhnd and stale, still showing the older record whole", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
@@ -208,7 +208,7 @@ describe("ThingMinder.list", () => {
     const box1 = TH.nextOf(box0)
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box1)
     await minder.list('box')
-    expect(minder.at(TH.BoxScope)).to.deep.equal({ liveness: 'behind', newest: Thing.sparseOf(box1), fullest: box0 })
+    expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(Thing.sparseOf(box1), box0))
     expect(minder.isStaleAt(TH.BoxScope)).to.be.true
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(box1))
   })
@@ -229,7 +229,7 @@ describe("ThingMinder.list", () => {
     expect(asked.mock.calls).to.have.lengthOf(0)
   })
 
-  it("tells a listener of a listed box once, with its bare or behind car", async () => {
+  it("tells a listener of a listed box once, with its bare or bhnd car", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const box1    = TH.nextOf(box0)
@@ -242,7 +242,7 @@ describe("ThingMinder.list", () => {
     const heard = listenerOf()
     minder.listen(heard)
     await minder.list('box')
-    expect(toldOf(heard)).to.deep.equal([['listing'], ['box/anthropic', 'bare'], ['box/openai', 'behind']])
+    expect(toldOf(heard)).to.deep.equal([['listing'], ['box/anthropic', 'bare'], ['box/openai', 'bhnd']])
   })
 
   it("leaves out a box stored damaged, and tells the bank's tellBadNews its labelpath", async () => {

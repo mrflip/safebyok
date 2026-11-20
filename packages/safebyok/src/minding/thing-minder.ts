@@ -44,7 +44,7 @@ import * as Throwers from '../refusals/throwers'
  *   Only a removal breaks the run: it tells no car, and what arrives after starts afresh. Removal is contemplated as part of a
  *   later feature allowing nested boxes, but not yet. Access after `goodbye()` or altering the gcTime is misuse (the customer
  *   may do as they please with the Giver's React Query cache).
- * - A sparse live record never displaces a whole live record of the same life: it leaves the car `behind`, its fullest
+ * - A sparse live record never displaces a whole live record of the same life: it leaves the car `bhnd`, its fullest
  *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
  *   get fetches the newest whole.
  * - A get answered with a revision older than the car it began with changes nothing in the cache, and refuses `stale_read`.
@@ -197,7 +197,7 @@ export class ThingMinder {
   /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included.
    * Each Thing it answers joins the listing of the Thing at `labelpath` ({@link listingAt}). A list never drops a labelpath
    * from that listing. Each record is cached sparse.
-   * Where that leaves a car `behind` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
+   * Where that leaves a car `bhnd` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
    * answers from the cache.
    * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
    */
@@ -530,7 +530,7 @@ function gotAnswerOf(ask: GetAsk, carQuery: TSQ.Query<ThingCar<ThingRecord>> | u
     if (car.liveness === 'gone')  { return { ...base, act: 'gotgone',  val: car.newest } }
     if (car.liveness === 'void')  { return { ...base, act: 'gotvoid',  val: null } }
   }
-  // A behind or bare car has no whole record of its newest revision.
+  // A bhnd or bare car has no whole record of its newest revision.
   return                                   { ...base, act: 'untimely', val: undefined }
 }
 
