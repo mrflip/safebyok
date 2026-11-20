@@ -1,8 +1,9 @@
 # Thread 7: with_whisper (2026-11-20)
 
-Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved (rework): `safebyok`
-lint, typecheck and 1301 tests green, then `pnpm justify` green on 9c2d636fb plus the rework (big 2946, react 301, e2e 576, every package green), not yet caught up onto #773's restacked 872a14819. Before the rework: `pnpm justify` green after the
-catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 301, e2e 576).
+Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `pnpm justify`
+green after the rebase onto #773's restacked tip 872a14819 (`safebyok` 1342 tests, graphql 448, e2e 576, every package
+green). The rebase's one conflict, in vault.test.ts's sparse-box `putBoxOnce` test, kept this thread's behaviour (the
+box gotten whole, no `bad_record`) with #769's `bhnd` for a behind car; a second test of this thread's takes `bhnd` too.
 
 * **Built** (`packages/safebyok/src/models/vault.ts`, tests in `tests/models/vault.test.ts`):
   * `vault.withWhisper(labelpath, fn)`: checks the labelpath and that `fn` is a function (`bad_record`, before any
@@ -55,13 +56,13 @@ catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 301, e2e 576).
     null).
   * `minder.get`, not `minder.at`, for the whisper: a stale cached whole box would silently hand `fn` an old whisper.
     `putBoxOnce` keeps using a cached car regardless of age, since a stale write refuses `stale_write` anyway.
-  * A car left `behind` or `bare` after the get (a sparse record landing while the get waited: a crossing, out of
+  * A car left `bhnd` (behind) or `bare` after the get (a sparse record landing while the get waited: a crossing, out of
     bounds) is not handled specially: `unsealBox` refuses the sparse record (`bad_record`, from `BoxChecks.record`).
     Set aside: unsealing `car.fullest` (an older revision's whisper, silently), refusing `absent_box` (false), or
     getting again (a retry).
   * Nothing is zeroed: `lease.unseal` zeroes nothing, and strings cannot be zeroed. The unsealed box is a local.
-  * A local `rejectionOf(promise)` helper in vault.test.ts checks `fn`'s throw by identity, chai-style;
-    `Outcome.outcomeOf` would wrap a non-VaultError.
+  * vault.test.ts checks `fn`'s throw by identity with Vitest's `rejects` (the review replaced a hand-rolled
+    `rejectionOf`); `Outcome.outcomeOf` would wrap a non-VaultError.
 * **For the Coach**: the Wh1 recommendation (`absent_box` for never stored and for deleted) is built, taken in YOLO.
 * **Discoveries**:
   * `bank.sweep()` does not dismiss the device's open gating (only `device.sweep()` does), so prompts waiting on a
