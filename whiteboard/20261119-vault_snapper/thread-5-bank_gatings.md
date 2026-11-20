@@ -1,7 +1,8 @@
 # Thread 5: bank_gatings (2026-11-20)
 
-Branch `20261120-bank_gatings`, PR #772, stacked on #770 (thread 4, `20261119-vault_writes`). Proved: `safebyok`
-tests 1262 passed, typecheck and lint clean, at 683c5c958; `pnpm justify` not yet run.
+Branch `20261120-bank_gatings`, PR #772, stacked on #770 (thread 4, `20261119-vault_writes`). Proved: `pnpm justify`
+green after catching up onto #770 at 7cc13c3f8 (`safebyok` 1262 tests, `safebyok-big` 2946, e2e 576, every package
+passing).
 
 * **Built** (`packages/safebyok/src/models/`):
   * `bank.ts` *Prompts*: the four born-bank prompts call `#launchOrJoin(gatingkind, attempt)`. An unlock
