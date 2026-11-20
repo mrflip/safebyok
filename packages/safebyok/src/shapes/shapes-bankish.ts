@@ -12,7 +12,7 @@ import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealer
 import type { BankStamp } from './shapes-stamps'
 import type { BoxRecord } from './shapes-thing'
 import type { BoxWriteAsk, GetAsk, ListAsk, WorldRecord } from './shapes-asks'
-import type { Labelpath } from './primitives'
+import type { EpochMillis, Labelpath } from './primitives'
 
 // == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed
 
@@ -94,5 +94,55 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
+}
+// --
+
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, DeviceSnapshot
+
+/** The stages of a bank, as {@link BankStage} describes each. */
+export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
+/** Where the user stands with their bank, for a host's screen to switch on:
+ * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
+ * - `'starting'`   -- signed in, and the bank is being brought up
+ * - `'unborn'`     -- no bank is stored for this user, or it was deleted
+ * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
+ * - `'unlocked'`   -- the bank holds a lease, and whispers can be read and written
+ * - `'swept'`      -- everything was unloaded, and nothing follows until the host acts
+ * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
+ */
+export type BankStage = typeof bankStageVals[number]
+
+/** A refusal, for a snapshot to show. None of its fields carries secret material. */
+export interface RefusalSnapshot {
+  readonly refusalkind: Errors.Refusalkind
+  readonly family:      Errors.RefusalFamily
+  readonly message:     string
+}
+
+/** A bank's state, for a host to render. */
+export interface BankSnapshot {
+  readonly stage:       BankStage
+  /** True at every stage but `'unlocked'`. */
+  readonly isLocked:    boolean
+  /** True once the bank has ended. An ended bank refuses every call, and its stage says where the user stands. */
+  readonly isEnded:     boolean
+  /** The refusal every call meets once the bank has ended, or null before then. */
+  readonly endCause:    Errors.VaultError | null
+  /** When the lease ends, in epoch milliseconds, or null while locked. */
+  readonly leaseEndsAt: EpochMillis | null
+  /** Why the bank failed to come up, at stage `'failed'`, or null at every other stage. */
+  readonly lastErr:     RefusalSnapshot | null
+}
+
+// isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
+/** The bank snapshot a device shows before it holds a bank object. */
+export const PendingBank: BankSnapshot = Object.freeze({
+  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
+})
+
+/** A device's state, for a host to render. */
+export interface DeviceSnapshot {
+  /** The snapshot of the bank on this device, or {@link PendingBank} before one is made. */
+  readonly bank: BankSnapshot
 }
 // --

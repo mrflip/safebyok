@@ -1,4 +1,5 @@
-import { Clock, Crypto, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { isEqual } from 'es-toolkit'
+import { Clock, Crypto, Errors, Phrases as BigPhrases, VX, Validator } from 'safebyok-big/internals'
 import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
 import { Thing } from './thing'
 import { BaseBox } from './base-box'
@@ -7,7 +8,7 @@ import { Gate } from './gate'
 import { Gating, addPasskey, birthBank, replacePassphrase, revokePasskey, unlockBank } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
-import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
+import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BirthOpts, BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
@@ -21,7 +22,7 @@ import * as Throwers from '../refusals/throwers'
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #endCause
+  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
 
   readonly #device:   Device
   readonly #vaultDB:  VaultDB
@@ -40,9 +41,18 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** Why a sweep disabled the bank, or null until then. */
   #endCause: Errors.VaultError | null = null
+
+  /** The current snapshot, which {@link getSnapshot} returns. */
+  #snapshot: BankSnapshot
+  readonly #subscribers = new Set<() => void>()
+  readonly #getSnapshot = (): BankSnapshot => this.#snapshot
+  readonly #subscribe = (listener: () => void): (() => void) => {
+    this.#subscribers.add(VX.listener.parse(listener))
+    return () => { this.#subscribers.delete(listener) }
+  }
   // --
 
-  // == [Getters]: device, device_tok, vaultDB, scope, stamp, maingate, rootBox, track, queryCacheOpts
+  // == [Getters]: device, device_tok, vaultDB, scope, stamp, maingate, rootBox, track, queryCacheOpts, getSnapshot, subscribe
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
@@ -72,6 +82,14 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** The defaults this bank's minders set on their TanStack Query cache entries. */
   get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
+
+  /** This bank's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes. */
+  get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
+
+  /** Subscribe a listener to this bank's snapshot, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
+   * The listener is called with no argument after each change: read the snapshot again. What it throws goes to {@link tellBadNews}.
+   */
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
@@ -90,6 +108,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     this.#queryCacheOpts = Object.freeze(queryCacheOpts)
     this.#rootBox = Object.freeze(rootBox)
     this.#maingate = Gate.make(maingate, { bank: this })
+    this.#snapshot = this.#makeSnapshot()
+    device.cheatHoldBank(this)
     Object.freeze(this)
   }
 
@@ -279,22 +299,62 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     }
     this.#lease?.evict()
     this.#lease = lease
+    this.#align()
   }
 
   /** Lock the bank: drop its lease and the keys in it. */
   lock(): this {
     this.#lease?.evict()
     this.#lease = null
+    this.#align()
     return this
   }
 
-  /** Disable this bank for good, and sweep its lease. Never throws. */
+  /** Disable this bank for good, and sweep its lease. Never throws.
+   * On a swept device, its `endCause` is the device's.
+   */
   sweep(): this {
     if (this.#endCause !== null) { return this }
-    this.#endCause = Throwers.bankSwept()
+    this.#endCause = this.#device.endCause ?? Throwers.bankSwept()
     this.#lease?.sweep()
     this.#lease = null
+    this.#align()
     return this
+  }
+  // --
+
+  // == [Snapshot]: align, makeSnapshot
+
+  /** Remake the snapshot, and tell each subscriber if it changed. */
+  #align(): void {
+    const next = this.#makeSnapshot()
+    if (isEqual(next, this.#snapshot)) { return }
+    this.#snapshot = next
+    for (const listener of this.#subscribers) {
+      try {
+        listener()
+      } catch (err) {
+        this.tellBadNews([err])
+      }
+    }
+  }
+
+  /** A new snapshot of this bank. */
+  #makeSnapshot(): BankSnapshot {
+    // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
+    const { endCause } = this
+    const isEnded = endCause !== null
+    const lease   = isEnded ? null : this.#lease
+    let stage: BankStage = lease === null ? 'locked' : 'unlocked'
+    if (isEnded) { stage = 'swept' }
+    return Object.freeze({
+      stage,
+      isLocked:    lease === null,
+      isEnded,
+      endCause,
+      leaseEndsAt: lease === null ? null : lease.proved_at + this.#device.leaseMillis,
+      lastErr:     null,
+    })
   }
   // --
 

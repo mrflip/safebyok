@@ -1,8 +1,10 @@
+import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
+import type { Bank } from './bank'
 import type { Gating } from './gating'
 import { guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, BankishChecks } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
 import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
@@ -19,7 +21,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #endCause, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -38,8 +40,23 @@ export class Device {
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
   #openGating: Gating | null = null
+  /** The last bank made on this device, or null for none. {@link lock} and {@link sweep} act on it, and the device's
+   * snapshot carries its snapshot, or {@link PendingBank} while there is none.
+   */
+  #thisIsTemporaryBank: Bank | null = null
+  /** Ends this device's subscription to the bank it holds. */
+  #unsubscribeBank: () => void = () => undefined
   /** Why a sweep disabled the device, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
+
+  /** The current snapshot, which {@link getSnapshot} returns. */
+  #snapshot: DeviceSnapshot
+  readonly #subscribers = new Set<() => void>()
+  readonly #getSnapshot = (): DeviceSnapshot => this.#snapshot
+  readonly #subscribe = (listener: () => void): (() => void) => {
+    this.#subscribers.add(VX.listener.parse(listener))
+    return () => { this.#subscribers.delete(listener) }
+  }
 
   /** This device's scope and token, for `JSON.stringify`. */
   toJSON(): DeviceRecord {
@@ -48,7 +65,7 @@ export class Device {
   }
   // --
 
-  // == [Getters]: scope, openGating, autolockMinutes
+  // == [Getters]: scope, openGating, autolockMinutes, getSnapshot, subscribe
 
   /** The bank scope this device serves. */
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
@@ -58,6 +75,17 @@ export class Device {
 
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
+
+  /** This device's snapshot getter, already bound, as `useSyncExternalStore` wants it.
+   * It returns the same frozen object until something in the snapshot changes. The snapshot includes the bank's, so one
+   * subscription here hears every change to either.
+   */
+  get getSnapshot(): () => DeviceSnapshot { return this.#getSnapshot }
+
+  /** Subscribe a listener to this device's snapshot, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
+   * The listener is called with no argument after each change: read the snapshot again. What it throws goes to {@link tellBadNews}.
+   */
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
 
   // == [Construction]: make, constructor
@@ -76,18 +104,38 @@ export class Device {
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.askUser = (requestCleartext === undefined) ? null : guardRequestCleartext(requestCleartext)
     this.#onBadNews = onBadNews
+    this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
   }
   // --
 
+  // == [Locking]: lock, cheatHoldBank
+
+  /** Lock this device's bank, if it holds one. Never throws. */
+  lock(): this {
+    this.#thisIsTemporaryBank?.lock()
+    return this
+  }
+
+  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is kept.
+  /** Hold `bank` as this device's bank, the one {@link lock}, {@link sweep} and the snapshot act on. Internal. */
+  cheatHoldBank(bank: Bank): void {
+    this.#unsubscribeBank()
+    this.#thisIsTemporaryBank = bank
+    this.#unsubscribeBank = bank.subscribe(this.#align)
+    this.#align()
+  }
+  // --
+
   // == [Ending]: sweep
 
-  /** Disable this device for good, dismissing its open gating. Never throws. */
+  /** Disable this device for good, dismissing its open gating and sweeping its bank. Never throws. */
   sweep(): this {
     if (! this.isEnabled) { return this }
     this.#endCause = Throwers.deviceDisabled()
     this.#openGating?.dismiss()
+    this.#thisIsTemporaryBank?.sweep()
     return this
   }
   // --
@@ -104,6 +152,31 @@ export class Device {
   /** Detach `gating` if it is this device's open gating. */
   detachGating(gating: Gating): void {
     if (this.#openGating === gating) { this.#openGating = null }
+  }
+  // --
+
+  // == [Snapshot]: align, makeSnapshot
+
+  // An arrow, so it stays bound: the bank calls it as a subscriber.
+  /** Remake the snapshot, and tell each subscriber if it changed. */
+  readonly #align = (): void => {
+    const next = this.#makeSnapshot()
+    if (isEqual(next, this.#snapshot)) { return }
+    this.#snapshot = next
+    for (const listener of this.#subscribers) {
+      try {
+        listener()
+      } catch (err) {
+        this.tellBadNews([err])
+      }
+    }
+  }
+
+  /** A new snapshot of this device: its bank's snapshot. */
+  #makeSnapshot(): DeviceSnapshot {
+    return Object.freeze({
+      bank: this.#thisIsTemporaryBank?.getSnapshot() ?? PendingBank,
+    })
   }
   // --
 
