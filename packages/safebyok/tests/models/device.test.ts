@@ -6,6 +6,7 @@ import 'fake-indexeddb/auto'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { Bank } from '../../src/models/bank'
+import { Lease } from '../../src/models/lease'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
@@ -139,30 +140,62 @@ describe("Device.make(record, opts)", () => {
 })
 
 describe("device.sweep()", () => {
-  it("disables the device for good, and never throws", () => {
-    const device = TH.makeDevice()
+  it("sweeps its bank and lets it go, the device staying enabled, and never throws", async () => {
+    const { bank, device } = await TH.buildBornBank()
     expect(device.sweep()).to.equal(device)
-    expect(device.isEnabled).to.be.false
-    TH.expectSyncRefusal(() => device.demandEnabled(), 'disabled')
+    expect(bank.isEnabled).to.be.false
+    expect(device.isEnabled).to.be.true
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
     expect(device.sweep()).to.equal(device)
-    expect(device.isEnabled).to.be.false
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
   })
 
-  it("sweeps its bank, rejecting a call waiting for an unlock", async () => {
+  it("rejects a call waiting for an unlock with its bank's end cause", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const ensuring = bank.ensureUnlocked()
     device.sweep()
-    expect(bank.isEnabled).to.be.false
-    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(device.endCause)
+    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause)
   })
 
-  it("refuses a birth after it, writing nothing", async () => {
-    const device = TH.makeDevice()
-    const births = TH.spyBirths(device)
+  it("leaves the device to judge a passphrase and hold the next bank made on it", async () => {
+    const { device, record } = await TH.buildBornBank()
     device.sweep()
-    await TH.expectRefusal(Bank.birth(device, { passphraseClear: TH.TestPassphrase }), 'disabled')
-    expect(births.tryBirthBank).not.toHaveBeenCalled()
+    expect(await device.judgeStrength(TH.TestPassphrase)).to.deep.equal({ strong: true })
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
+    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
+  })
+
+  it("leaves a bank working when a second is made on its device", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    expect(bank.isEnabled).to.be.true
+    expect(bank.isLocked).to.be.false
+    await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
+  })
+
+  it("sweeps every bank made on the device, an earlier one unlocked too", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    const sweepLease = vi.spyOn(Lease.prototype, 'sweep')
+    device.sweep()
+    expect(sweepLease).toHaveBeenCalledTimes(2)
+    for (const swept of [bank, later]) {
+      expect(swept.isEnabled).to.be.false
+      await TH.expectRefusal(swept.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
+    }
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
+  })
+
+  it("does nothing on a device with no bank, which births one after it", async () => {
+    const device = TH.makeDevice()
+    device.sweep()
+    const bank = await Bank.birth(device, { passphraseClear: TH.TestPassphrase })
+    expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
   })
 })
 
@@ -192,6 +225,17 @@ describe("device.lock()", () => {
     expect(bank.isLocked).to.be.true
     expect(device.lock()).to.equal(device)
     expect(bank.isLocked).to.be.true
+  })
+
+  it("locks every bank made on the device, an earlier one too", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    expect(bank.isLocked).to.be.false
+    expect(later.isLocked).to.be.false
+    device.lock()
+    expect(bank.isLocked).to.be.true
+    expect(later.isLocked).to.be.true
   })
 
   it("does nothing on a device with no bank, or a swept one", () => {
@@ -252,10 +296,21 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     expect(JSON.stringify(snapshots)).not.to.include(passphraseClear)
   })
 
-  it("shows its bank swept once it is swept", async () => {
-    const { device } = await TH.buildBornBank()
-    device.sweep()
-    expect(device.getSnapshot().bank).to.include({ stage: 'swept', isEnded: true, unlockWanted: false })
+  it("shows the pending bank once its bank is swept, and tells its subscribers so", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const snapshots = snapshotsOf(device)
+    bank.sweep()
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
+    expect(snapshots.at(-1)).to.equal(device.getSnapshot())
+  })
+
+  it("keeps the bank it holds when an earlier bank made on it is swept", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    const snapshots = snapshotsOf(device)
+    bank.sweep()
+    expect(snapshots).to.have.lengthOf(0)
+    expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
   })
 
   it("tells every subscriber when one throws, and passes the throw to onBadNews", async () => {
@@ -290,17 +345,23 @@ describe("device.tellBadNews(badnews)", () => {
     expect(onBadNews.mock.calls.map(([heard]) => (heard as BadNews).news.refusalkind)).to.deep.equal(['storage_unavailable', 'unexpected_error'])
   })
 
-  it("warns of each on the device's logger by default, and once the device is swept, in place of the host's", async () => {
+  it("warns of each on the device's logger by default", async () => {
     const warn = vi.fn()
-    const onBadNews = vi.fn()
-    const device = TH.makeDevice({}, { logger: { log: vi.fn(), warn, error: vi.fn() }, onBadNews })
+    const device = TH.makeDevice({}, { logger: { log: vi.fn(), warn, error: vi.fn() }, onBadNews: undefined })
     warn.mockClear()
-    device.sweep()
     device.tellBadNews([new Errors.VaultError('storage_unavailable', "Down.")])
     await TH.eventually(() => warn.mock.calls.length === 1)
     expect(warn.mock.calls[0]?.slice(0, 2)).to.deep.equal(["Down.", { oplabel: 'Device.onBadNews', refusalkind: 'storage_unavailable' }])
-    expect(onBadNews).not.toHaveBeenCalled()
     expect(DefaultOnBadNews).to.be.a('function')
+  })
+
+  it("tells the host's onBadNews still, once the device is swept", async () => {
+    const onBadNews = vi.fn()
+    const device = TH.makeDevice({}, { onBadNews })
+    device.sweep()
+    device.tellBadNews([new Errors.VaultError('storage_unavailable', "Down.")])
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect(onBadNews).toHaveBeenCalledOnce()
   })
 })
 

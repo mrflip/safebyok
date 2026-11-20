@@ -9,7 +9,7 @@ import * as Gatings from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
 import type { BankGatingFriend, BirthCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts } from '../shapes/shapes-gateish'
-import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BirthOpts, BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
+import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BirthOpts, BoxUnsealed, HostedVault, SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
@@ -17,13 +17,14 @@ import { type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type 
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../shapes/shapes-asks'
 import type { VaultDB } from '../storage/vault-db'
+import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** The signed-in user's bank on this device: its main gate, its root box, and its lease while unlocked.
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #unlockWait, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
+  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #unlockWait, #vaults, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
 
   readonly #device:   Device
   readonly #vaultDB:  VaultDB
@@ -42,6 +43,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** The wait every call in {@link ensureUnlocked} shares, or null while none waits. The snapshot's `unlockWanted` is whether there is one. */
   #unlockWait: Wait | null = null
+
+  /** The vaults made on this bank, which its sweep sweeps. */
+  readonly #vaults = new Set<HostedVault>()
 
   /** Why a sweep disabled the bank, or null until then. */
   #endCause: Errors.VaultError | null = null
@@ -315,7 +319,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Unlocking, locking and sweeping]: attachLease, lock, sweep
+  // == [Unlocking, locking and sweeping]: attachLease, lock, sweep, end, hostVault
 
   /** Attach `lease`, evicting the one it replaces, and resume every call waiting for an unlock. Once this bank is disabled, it evicts `lease` instead, and refuses. */
   #attachLease(lease: Lease): void {
@@ -337,17 +341,36 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Disable this bank for good, sweep its lease, and reject every call waiting for an unlock with its `endCause`. Never throws.
-   * On a swept device, its `endCause` is the device's.
+  /** Disable this bank for good, sweep its lease and each vault made on it, and reject every call waiting for an unlock with its `endCause`. Never throws.
+   * Its subscribers are told once, and never again. Its device lets it go, and shows the pending bank. On an ended device, its `endCause` is the device's.
    */
   sweep(): this {
     if (this.#endCause !== null) { return this }
-    this.#endCause = this.#device.endCause ?? Throwers.bankSwept()
+    this.#end(this.#device.endCause ?? Throwers.bankSwept())
+    return this
+  }
+
+  // Every end of a bank comes here. It shuts first, so that a subscriber told of the end, or a vault as it is swept, finds every call refusing.
+  /** End this bank with `endCause`, then end its vaults, and drop what it holds: its vaults, its subscribers, and its device's hold on it. */
+  #end(endCause: Errors.VaultError): void {
+    this.#endCause = endCause
     this.#lease?.sweep()
     this.#lease = null
-    this.#settleUnlockWait(this.#endCause)
+    this.#settleUnlockWait(endCause)
     this.#align()
-    return this
+    for (const vault of this.#vaults) { vault.sweep() }
+    this.#vaults.clear()
+    this.#subscribers.clear()
+    this.#device.cheatDropBank(this)
+  }
+
+  /** Sweep `vault` when this bank is swept. Each Vault made on this bank calls it. Internal.
+   * Refuses once the bank is swept.
+   */
+  hostVault(vault: HostedVault): void {
+    Checks.hostedVault.parse(vault)
+    this.demandEnabled()
+    this.#vaults.add(vault)
   }
   // --
 
@@ -430,10 +453,10 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandOwnBox, demandLease
 
-  /** True until this bank or its device is swept. */
+  /** True until this bank is swept or its device ends. */
   get isEnabled(): boolean { return this.endCause === null }
 
-  /** The refusal every call on this bank meets once it or its device is swept, or null while it is enabled. */
+  /** The refusal every call on this bank meets once it is swept or its device ends, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#endCause ?? this.#device.endCause }
 
   /** True when no lease is attached to this bank. */
@@ -498,8 +521,9 @@ function makeWait(): Wait {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments. */
+/** The checks of {@link Bank.make}'s arguments, and of what {@link Bank.hostVault} is handed. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
+  hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({
     record: obj({ maingate: GateChecks.record, rootBox: BoxChecks.liveOrShell }).loose(),

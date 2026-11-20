@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Bank } from '../../src/models/bank'
 import { Vault } from '../../src/models/vault'
-import type { BoxUnsealed } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type BoxUnsealed, PendingBank } from '../../src/shapes/shapes-bankish'
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
-import { type BoxRecord, Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import { carOf } from '../../src/minding/thing-car'
 import type { ThingMinder } from '../../src/minding/thing-minder'
-import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { GetAsk } from '../../src/shapes/shapes-asks'
+import type { MinderEvent } from '../../src/shapes/shapes-minder'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -51,6 +52,85 @@ describe("Vault.make(bank)", () => {
   it("refuses anything but a bank", () => {
     TH.expectSyncRefusal(() => Vault.make({} as never), 'bad_record')
     TH.expectSyncRefusal(() => Vault.make(null as never), 'bad_record')
+  })
+
+  it("refuses a swept bank", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.sweep()
+    TH.expectSyncRefusal(() => Vault.make(bank), 'disabled')
+  })
+})
+
+/** A vault born on a device whose vaultDB counts the watches its minders stop, read as `unwatched.calls`. */
+async function buildWatchedVault() {
+  const vaultDB = new MemoryVaultDB()
+  const watch   = vaultDB.watch.bind(vaultDB)
+  const unwatched = vi.fn()
+  vi.spyOn(vaultDB, 'watch').mockImplementation((...args) => {
+    const unwatch = watch(...args)
+    return () => { unwatched(); unwatch() }
+  })
+  const born = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB }) })
+  return { ...born, unwatched: unwatched.mock }
+}
+
+/** Each way to sweep a born vault's bank, by what is swept. */
+const SweepCases: readonly (readonly [(born: TH.BornVault) => unknown, string])[] = [
+  [(born) => born.bank.sweep(),   'its bank'],
+  [(born) => born.device.sweep(), 'its device'],
+]
+
+describe("bank.sweep() and device.sweep(), over the vaults made on the bank", () => {
+  for (const [sweepOf, blurb] of SweepCases) {
+    it(`sweep each vault when ${blurb} is swept: its cache emptied, telling each listener of the removal, and its watch stopped`, async () => {
+      const born = await buildWatchedVault()
+      const { bank, minder, vault, unwatched } = born
+      Vault.make(bank).minder.hello()
+      await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+      const events: MinderEvent[] = []
+      minder.listen((event) => { events.push(event) }, ThingFormat)
+      sweepOf(born)
+      expect(minder.at(scopeAt(bank, Openai))).to.be.undefined
+      expect(minder.tryAt(scopeAt(bank, Openai))).to.include({ ok: false })
+      expect(events.map(({ type }) => type)).to.include('removed')
+      expect(unwatched.calls).to.have.lengthOf(2)
+    })
+  }
+
+  it("leave each vault's minder to start again at a hello, on a vaultDB the host keeps", async () => {
+    const { bank, minder } = await TH.buildBornVault()
+    await minder.get(scopeAt(bank, Openai))
+    bank.sweep()
+    minder.hello()
+    expect(await minder.get(scopeAt(bank, Openai))).to.include({ liveness: 'void' })
+  })
+
+  it("go on past a watch whose stop throws, telling onBadNews", async () => {
+    const vaultDB   = new MemoryVaultDB()
+    const watch     = vaultDB.watch.bind(vaultDB)
+    vi.spyOn(vaultDB, 'watch').mockImplementation((...args) => {
+      const unwatch = watch(...args)
+      return () => { unwatch(); throw new Error('a bug in the host') }
+    })
+    const onBadNews = vi.fn()
+    const { bank, device } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
+    Vault.make(bank).minder.hello()
+    expect(() => device.sweep()).not.to.throw()
+    expect(device.getSnapshot().bank).to.equal(PendingBank)
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
+  })
+
+  it("tell the bank's subscribers once, and nothing after", async () => {
+    const { bank, device } = await TH.buildBornVault()
+    const listener = vi.fn()
+    bank.subscribe(listener)
+    bank.sweep()
+    bank.lock()
+    bank.dismissUnlock()
+    await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
+    device.sweep()
+    expect(listener).toHaveBeenCalledOnce()
   })
 })
 
@@ -207,14 +287,13 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     await TH.expectRefusal(vault.putBoxOnce('gate' as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
   })
 
-  it("refuses while the bank is locked, or once its device is swept, and writes nothing", async () => {
-    const { bank, device, vault } = await TH.buildBornVault()
+  it("refuses while the bank is locked, or once its bank is swept, and writes nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
     const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
     bank.lock()
     await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
-    device.sweep()
-    const err = await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
-    expect(err).to.equal(device.endCause)
+    bank.sweep()
+    await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
     expect(written).not.toHaveBeenCalled()
   })
 })

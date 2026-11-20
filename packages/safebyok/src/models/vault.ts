@@ -31,15 +31,29 @@ export class Vault {
 
   // == [Construction]: make, constructor
 
-  /** Make the vault of `bank`'s boxes, with a minder of its own. The minder does nothing until its `hello`. */
+  /** Make the vault of `bank`'s boxes, with a minder of its own. The minder does nothing until its `hello`.
+   * The bank's sweep sweeps the vault. Refuses a swept bank.
+   */
   static make(bank: Bank): Vault {
-    return new Vault(Checks.bank.parse(bank))
+    const vault = new Vault(Checks.bank.parse(bank))
+    bank.hostVault(vault)
+    return vault
   }
 
   private constructor(bank: Bank) {
     this.#bank   = bank
     this.#minder = ThingMinder.make({ vaultDB: bank.vaultDB, queryCacheOpts: bank.queryCacheOpts }, bank)
     Object.freeze(this)
+  }
+  // --
+
+  // == [Ending]: sweep
+
+  /** Stop its minder and empty its cache ({@link ThingMinder.goodbye}). Its bank's sweep calls it. Never throws. */
+  sweep(): this {
+    // The watch's stop is the host's vaultDB code: what it throws is news, and the bank's sweep goes on.
+    try { this.#minder.goodbye() } catch (err) { this.#bank.tellBadNews([err]) }
+    return this
   }
   // --
 
