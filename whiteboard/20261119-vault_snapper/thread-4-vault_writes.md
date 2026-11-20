@@ -1,6 +1,6 @@
 # Thread 4: vault_writes (2026-11-20)
 
-Branch `20261119-vault_writes`, PR #770, on main. Proved: `pnpm --filter safebyok` typecheck, lint, and test (29 files, 1236 tests) green; `pnpm justify` pending.
+Branch `20261119-vault_writes`, PR #770, on main. Proved: `pnpm justify` green after the catch-up onto main 95f1a0425 (safebyok 1236 tests, 6539 across the workspace).
 
 * **Built**:
   * `Vault` in `packages/safebyok/src/models/vault.ts`, exported from the front door `safebyok` beside the ThingMinder (not from `safebyok/core`, which carries no caching). `Vault.make(bank)` checks `bank instanceof Bank` (`Phrases.VaultBankExpected`) and makes its minder with `ThingMinder.make({ vaultDB: bank.vaultDB, queryCacheOpts: bank.queryCacheOpts }, bank)`. It does not call `hello`: make is sync and starts nothing, and starting belongs to startup. It has getters `bank` and `minder`, and is frozen.
