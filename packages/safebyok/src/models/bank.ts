@@ -121,7 +121,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     Object.freeze(this)
   }
 
-  /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life. Mint one pair per gating to birth a bank. */
+  /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life.
+   * Mint one pair per gating that births a bank.
+   */
   static mintStamps(scope: BankScope): { bankStamp: BankStamp, gateStamp: GateStamp } {
     const { userid, banklabel } = StampChecks.bankScope.parse(scope)
     const born_at = Clock.nowMillis()
@@ -183,7 +185,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // verbs: no public method accepts a proving (G9). Each vacates the cleartexts whatever its outcome, and changes nothing where it refuses.
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked.
-   * Refuses `weak_passphrase` before any key is derived, and `gate_made_elsewhere` where a live bank is already stored.
+   * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
+   * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
    */
   static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> {
     const friend = {
@@ -195,8 +198,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** {@link birth}, resolving an `Outcome` instead of throwing. */
   static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
 
-  /** Unlock this bank by its passphrase or its passkey, under a lease citing its main gate.
-   * Every call waiting in {@link ensureUnlocked} resumes. A wrong passphrase or passkey refuses, and leaves the bank as it was.
+  /** Unlock this bank by its passphrase or its passkey, resuming every call waiting in {@link ensureUnlocked}.
+   * A wrong one refuses `wrong_passphrase` or `wrong_passkey`, and the bank stays as it was.
    */
   async unlock(cleartexts: UnlockCleartexts): Promise<this> {
     await Gatings.unlockBank(this, cleartexts, this.#gatingFriend())
@@ -206,8 +209,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** {@link unlock}, resolving an `Outcome` instead of throwing. */
   tryUnlock(cleartexts: UnlockCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.unlock(cleartexts)) }
 
-  /** Replace the passphrase, proved by the current passphrase or the passkey, and unlock under a lease citing the gate written.
-   * The passkey stays, and the bankKey does not change. Refuses `same_passphrase`, and `weak_passphrase`, before any key is derived.
+  /** Replace the passphrase, proved by the current passphrase or the passkey, and leave the bank unlocked.
+   * The passkey stays, and the bankKey does not change.
+   * A new passphrase that is weak, or the same as the current one, refuses (`weak_passphrase`, `same_passphrase`).
    */
   async replacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<this> {
     await Gatings.replacePassphrase(this, cleartexts, this.#gatingFriend())
@@ -217,8 +221,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** {@link replacePassphrase}, resolving an `Outcome` instead of throwing. */
   tryReplacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.replacePassphrase(cleartexts)) }
 
-  /** Add a passkey, proved by the passphrase, and unlock under a lease citing the gate written.
-   * A gate has one passkey at most: this refuses while it has one.
+  /** Add a passkey, proved by the passphrase, and leave the bank unlocked.
+   * A gate has one passkey at most, so this refuses while it has one: revoke that one first.
    */
   async addPasskey(cleartexts: PasskeyAddCleartexts): Promise<this> {
     await Gatings.addPasskey(this, cleartexts, this.#gatingFriend())
@@ -228,8 +232,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** {@link addPasskey}, resolving an `Outcome` instead of throwing. */
   tryAddPasskey(cleartexts: PasskeyAddCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.addPasskey(cleartexts)) }
 
-  /** Revoke the passkey, proved by the passphrase or the passkey itself, and unlock under a lease citing the gate written.
-   * With no passkey, the proof unlocks the bank and nothing is written. The bankKey does not change.
+  /** Revoke the passkey, proved by the passphrase or the passkey itself, and leave the bank unlocked.
+   * With no passkey, the proof only unlocks the bank. The bankKey does not change.
    */
   async revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<this> {
     await Gatings.revokePasskey(this, cleartexts, this.#gatingFriend())
@@ -239,7 +243,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** {@link revokePasskey}, resolving an `Outcome` instead of throwing. */
   tryRevokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.revokePasskey(cleartexts)) }
 
-  /** The friend of this bank's private verbs a gating is handed. */
+  /** This bank's private verbs, for a gating to call. */
   #gatingFriend(): BankGatingFriend {
     return {
       unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
@@ -251,9 +255,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // == [The awaited unlock]: ensureUnlocked, dismissUnlock, settleUnlockWait
   // One wait is shared by every caller, opened by the first and settled once: by any unlock, a dismissal or the bank's end.
 
-  /** Resolve this bank once it is unlocked: at once if it is, or else once any unlock lands, by {@link unlock} or a gate change.
+  /** Resolve this bank once it is unlocked: at once, or when an unlock or a gate change lands.
    * While it waits, the snapshot's `unlockWanted` is true: render the unlock form, and call {@link unlock} from it.
-   * Rejects `dismissed` once {@link dismissUnlock} is called, and with the bank's `endCause` once it ends.
+   * Rejects `dismissed` when {@link dismissUnlock} is called, and with the bank's `endCause` when the bank ends.
    */
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
@@ -265,7 +269,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Reject every call waiting in {@link ensureUnlocked} with `dismissed`, as when the user closes the unlock form. The bank stays locked. */
+  /** Dismiss the awaited unlock: every call waiting in {@link ensureUnlocked} rejects `dismissed`, and the bank stays locked.
+   * Call it when the user closes the unlock form.
+   */
   dismissUnlock(): this {
     this.#settleUnlockWait(Throwers.unlockDismissed())
     this.#align()
@@ -282,9 +288,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [The gatings' private verbs]: birthByProving, unlockByProving, putGate
 
-  /** Write a new bank of `record`, with its main gate and its root box sealed under a lease `opts.proving` builds, and resolve it unlocked under that lease.
-   * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.
-   */
+  /** Store a new bank of `record`, its root box sealed under a lease `opts.proving` builds, and resolve it unlocked under that lease. */
   static async #birthByProving(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
     const { proving, ...bankOpts } = opts
     const bank   = this.make(record, bankOpts)
@@ -321,7 +325,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Unlocking, locking and sweeping]: attachLease, lock, sweep, end, hostVault
 
-  /** Attach `lease`, evicting the one it replaces, and resume every call waiting for an unlock. Once this bank is disabled, it evicts `lease` instead, and refuses. */
+  /** Attach `lease` in place of the current one, and resume every call waiting for an unlock.
+   * On a disabled bank, it evicts `lease` instead, and refuses.
+   */
   #attachLease(lease: Lease): void {
     if (! this.isEnabled) {
       lease.evict()
@@ -341,8 +347,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Disable this bank for good, sweep its lease and each vault made on it, and reject every call waiting for an unlock with its `endCause`. Never throws.
-   * Its subscribers are told once, and never again. Its device lets it go, and shows the pending bank. On an ended device, its `endCause` is the device's.
+  /** End this bank for good: drop its lease, sweep each vault made on it, and reject every call waiting for an unlock. Never throws.
+   * Its subscribers hear of the end, and of nothing after. If its device's snapshot shows this bank, it goes back to `PendingBank`.
    */
   sweep(): this {
     if (this.#endCause !== null) { return this }
@@ -351,7 +357,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   // Every end of a bank comes here. It shuts first, so that a subscriber told of the end, or a vault as it is swept, finds every call refusing.
-  /** End this bank with `endCause`, then end its vaults, and drop what it holds: its vaults, its subscribers, and its device's hold on it. */
+  /** End this bank with `endCause`, sweep its vaults, and let go of them, its subscribers and its device. */
   #end(endCause: Errors.VaultError): void {
     this.#endCause = endCause
     this.#lease?.sweep()
@@ -364,7 +370,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     this.#device.cheatDropBank(this)
   }
 
-  /** Sweep `vault` when this bank is swept. Each Vault made on this bank calls it. Internal.
+  /** Sweep `vault` when this bank is swept. Internal.
    * Refuses once the bank is swept.
    */
   hostVault(vault: HostedVault): void {
@@ -521,7 +527,7 @@ function makeWait(): Wait {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, and of what {@link Bank.hostVault} is handed. */
+/** The checks of {@link Bank.make}'s arguments, and of {@link Bank.hostVault}'s vault. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.

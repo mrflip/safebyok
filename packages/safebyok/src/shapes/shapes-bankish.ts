@@ -51,7 +51,7 @@ export interface BankOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
-/** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the birth's gating underway. */
+/** The options of a bank's birth, beside its record: {@link BankOpts}, plus the `proving` of the main gate that the birth's gating built. */
 export interface BirthOpts extends BankOpts {
   proving: Proving
 }
@@ -137,8 +137,8 @@ export interface BankSnapshot {
   readonly leaseEndsAt: EpochMillis | null
   /** Why the bank failed to come up, at stage `'failed'`, or null at every other stage. */
   readonly lastErr:     RefusalSnapshot | null
-  /** True while a call waits for the bank to be unlocked ({@link Bank.ensureUnlocked}): render the unlock form.
-   * It goes false once the bank is unlocked, the wait is dismissed ({@link Bank.dismissUnlock}), or the bank ends.
+  /** True while a call waits in {@link Bank.ensureUnlocked}: render the unlock form while it is.
+   * It goes false when the bank is unlocked, {@link Bank.dismissUnlock} is called, or the bank ends.
    */
   readonly unlockWanted: boolean
 }
@@ -151,7 +151,7 @@ export const PendingBank: BankSnapshot = Object.freeze({
 
 /** A device's state, for a host to render. */
 export interface DeviceSnapshot {
-  /** The snapshot of the bank on this device, or {@link PendingBank} before one is made. */
+  /** The snapshot of the bank this device holds, or {@link PendingBank} while it holds none. */
   readonly bank: BankSnapshot
 }
 // --

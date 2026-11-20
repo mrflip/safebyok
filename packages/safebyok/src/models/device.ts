@@ -17,7 +17,7 @@ import * as Throwers from '../refusals/throwers'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 /** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and the bank it holds.
- * Make it with `Device.make(record, opts)`. A `sweep()` ends each bank made on it, and leaves the device to make another.
+ * Make it with `Device.make(record, opts)`. A `sweep()` ends every bank made on it, and the device stays usable for the next.
  */
 export class Device {
   // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #madeBanks, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
@@ -36,7 +36,8 @@ export class Device {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The last bank made on this device, or null for none or once it is swept. The device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
+  /** The last bank made on this device, or null for none or once it is swept.
+   * The device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
   #thisIsTemporaryBank: Bank | null = null
   /** Every bank made on this device and not yet swept. */
@@ -121,8 +122,8 @@ export class Device {
   }
 
   // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one held.
-  /** Hold `bank` as this device's bank, the one the snapshot shows.
-   * Making a bank sweeps no other. Internal.
+  /** Hold `bank` as the bank this device's snapshot shows, and as one its lock and sweep reach. Internal.
+   * The bank held before stays as it was.
    */
   cheatHoldBank(bank: Bank): void {
     this.#madeBanks.add(bank)
@@ -132,7 +133,7 @@ export class Device {
     this.#align()
   }
 
-  /** Let go of `bank`, and show {@link PendingBank} if it is the bank this device holds. Internal. */
+  /** Let go of `bank`, and show {@link PendingBank} if it is the bank this device's snapshot shows. Internal. */
   cheatDropBank(bank: Bank): void {
     this.#madeBanks.delete(bank)
     if (bank !== this.#thisIsTemporaryBank) { return }
@@ -145,7 +146,9 @@ export class Device {
 
   // == [Ending]: sweep
 
-  /** Sweep every bank made on this device. The device stays, to judge passphrases and make a bank again. Never throws. */
+  /** Sweep every bank made on this device. Never throws.
+   * The device stays usable: it judges passphrases, and a bank may be made on it again.
+   */
   sweep(): this {
     for (const bank of this.#madeBanks) { bank.sweep() }
     return this

@@ -31,8 +31,8 @@ export class Vault {
 
   // == [Construction]: make, constructor
 
-  /** Make the vault of `bank`'s boxes, with a minder of its own. The minder does nothing until its `hello`.
-   * The bank's sweep sweeps the vault. Refuses a swept bank.
+  /** Make the vault of `bank`'s boxes, with a minder of its own that does nothing until its `hello`.
+   * The bank's sweep sweeps the vault too. Refuses a swept bank.
    */
   static make(bank: Bank): Vault {
     const vault = new Vault(Checks.bank.parse(bank))
@@ -49,7 +49,7 @@ export class Vault {
 
   // == [Ending]: sweep
 
-  /** Stop its minder and empty its cache ({@link ThingMinder.goodbye}). Its bank's sweep calls it. Never throws. */
+  /** Stop this vault's minder and empty its cache ({@link ThingMinder.goodbye}). Never throws. */
   sweep(): this {
     // The watch's stop is the host's vaultDB code: what it throws is news, and the bank's sweep goes on.
     try { this.#minder.goodbye() } catch (err) { this.#bank.tellBadNews([err]) }
