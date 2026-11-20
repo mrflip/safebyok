@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors, SX } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
-import { type BadNews, type BankMakeRecord, bankEndCauseVals, bankStageVals } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type BankMakeRecord, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
@@ -271,7 +271,8 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
 
     bank.sweep()
     expect(counter.calls).to.eq(3)
-    expect(bank.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: 'sweep', leaseEndsAt: null, lastErr: null })
+    expect(bank.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null })
+    expect(bank.getSnapshot().endCause).to.equal(bank.endCause).and.include({ refusalkind: 'disabled' })
   })
 
   it("tells no subscriber of a call that changes nothing in the snapshot: a second lock or sweep, a wrong passphrase, or a box landing", async () => {
@@ -289,15 +290,27 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(counter.calls).to.eq(2)
   })
 
-  it("shows the bank swept once its device is swept", async () => {
+  it("shows the bank swept once its device is swept, its end cause the device's", async () => {
     const { bank, device } = await TH.buildBornBank()
     const counter = countCalls(bank.subscribe)
     device.sweep()
     expect(counter.calls).to.eq(1)
-    expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: 'sweep' })
+    expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: device.endCause })
   })
 
-  it("shows only stages and end causes that bankStageVals and bankEndCauseVals list", async () => {
+  it("keeps its snapshot once swept, telling no subscriber of a lock or of its device's sweep: its end cause stays its own", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.sweep()
+    const swept = bank.getSnapshot()
+    const counter = countCalls(bank.subscribe)
+    bank.lock()
+    device.sweep()
+    expect(counter.calls).to.eq(0)
+    expect(bank.getSnapshot()).to.equal(swept)
+    expect(swept.endCause).to.equal(bank.endCause).and.not.equal(device.endCause)
+  })
+
+  it("shows only stages that bankStageVals lists", async () => {
     const { bank } = await TH.buildBornBank()
     const snapshots = [bank.getSnapshot()]
     bank.lock()
@@ -306,7 +319,6 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     snapshots.push(bank.getSnapshot())
     expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked', 'swept'])
     expect(bankStageVals).to.include.members(snapshots.map(({ stage }) => stage))
-    expect(bankEndCauseVals).to.include(snapshots[2]!.endCause)
   })
 
   it("stops telling a listener once it unsubscribes", async () => {

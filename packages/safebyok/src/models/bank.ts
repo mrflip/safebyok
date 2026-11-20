@@ -427,8 +427,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** This bank's snapshot as its state stands. */
   #makeSnapshot(): BankSnapshot {
-    // A sweep is the one way a bank ends, so an ended bank's cause is 'sweep'.
-    const isEnded = ! this.isEnabled
+    // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
+    const { endCause } = this
+    const isEnded = endCause !== null
     const lease   = isEnded ? null : this.#lease
     let stage: BankStage = lease === null ? 'locked' : 'unlocked'
     if (isEnded) { stage = 'swept' }
@@ -436,7 +437,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
       stage,
       isLocked:    lease === null,
       isEnded,
-      endCause:    isEnded ? 'sweep' : null,
+      endCause,
       leaseEndsAt: lease === null ? null : lease.proved_at + this.#device.leaseMillis,
       lastErr:     null,
     })

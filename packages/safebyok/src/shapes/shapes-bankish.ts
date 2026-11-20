@@ -97,7 +97,7 @@ export interface DeviceOpts {
 }
 // --
 
-// == [Snapshots]: bankStageVals, BankStage, bankEndCauseVals, BankEndCause, RefusalSnapshot, BankSnapshot, OpenGatingSnapshot, DeviceSnapshot
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, OpenGatingSnapshot, DeviceSnapshot
 
 /** The stages of a bank, as {@link BankStage} describes each. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
@@ -111,11 +111,6 @@ export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unl
  * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
  */
 export type BankStage = typeof bankStageVals[number]
-
-/** The ways a bank ends, as {@link BankEndCause} describes them. */
-export const bankEndCauseVals = ['sweep', 'vacate', 'signout', 'delete'] as const
-/** How a bank ended, one of {@link bankEndCauseVals}, for the message a host shows: swept, vacated, signed out of, or deleted. */
-export type BankEndCause = typeof bankEndCauseVals[number]
 
 /** A refusal as a snapshot shows it: its kind, its family and its message, which carry no secret material. */
 export interface RefusalSnapshot {
@@ -131,8 +126,8 @@ export interface BankSnapshot {
   readonly isLocked:    boolean
   /** True once the bank has ended: it refuses every call, and its stage says where the user now stands. */
   readonly isEnded:     boolean
-  /** How the bank ended, or null while it has not. */
-  readonly endCause:    BankEndCause | null
+  /** The refusal every call on the bank meets once it has ended, the one `bank.endCause` returns; null while it has not. */
+  readonly endCause:    Errors.VaultError | null
   /** When the lease ends, in epoch milliseconds, or null while locked. */
   readonly leaseEndsAt: EpochMillis | null
   /** Why the bank failed to come up, at stage `'failed'`; null at every other. */
