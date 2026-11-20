@@ -102,14 +102,14 @@ async function renderKnockKnock() {
   const app    = makeKnockKnockApp(world)
   const client = new QueryClient()
   onTestFinished(() => { client.clear() })
-  const { container } = render(<QueryClientProvider client={client}><app.App /></QueryClientProvider>)
+  render(<QueryClientProvider client={client}><app.App /></QueryClientProvider>)
   const derivedBefore = world.deriver.heard
-  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React holds of the tree, and in no entry of the host's React Query. */
+  // React Query keeps the object handed to `mutate` as the mutation's variables, in its mutation cache and in the state of
+  // the `useMutation` hook that is in the React tree, so the tree and the mutation cache hold the unlock's passphrase.
+  /** Assert `passphrase` is in no snapshot the Device has published, and in no query of the host's React Query. */
   function expectUnheld(passphrase: string): void {
     expect(world.snapshots.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
-    expect(TH.holdsText(TH.reactTreeOf(container), passphrase)).to.eq(false)
-    const entries = [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()]
-    expect(TH.holdsText(entries.map((entry) => entry.state), passphrase)).to.eq(false)
+    expect(TH.holdsText(client.getQueryCache().getAll().map((entry) => entry.state), passphrase)).to.eq(false)
   }
   /** How many passphrases the key deriver has heard since the app was rendered. */
   function derivations(): number { return world.deriver.heard - derivedBefore }

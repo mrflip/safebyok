@@ -56,24 +56,14 @@ function isCar(val: unknown): val is CarFields {
 function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return car.fullest }
 // --
 
-// == [Form mutations]: FormMutationDefaults, takeCleartexts
+// == [Form mutations]: FormMutationDefaults
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
-// the mutation would hold them, and an unlock that needs no network would wait for one. The first attempt takes the
-// cleartexts out of the object handed to `mutate`, so a retry, under a host's default, would hand the verb an empty one.
+// the mutation would hold them, and an unlock that needs no network would wait for one. A form verb is the user's to
+// repeat: an automatic retry would derive keys again on a wrong passphrase, and replay a passkey answer whose PRF bytes
+// the core has zeroed.
 /** The giver's defaults for the mutation of a form verb in the host's React Query. */
 const FormMutationDefaults = { networkMode: 'always', retry: false } as const
-
-// React Query keeps a mutation's variables, the object handed to `mutate`, in its cache and its devtools until the mutation
-// is collected, and a passphrase is a string that cannot be zeroed. Taking the fields out leaves that object empty.
-/** A copy of `cleartexts`, its fields taken out of the object handed in. Anything not an object is handed on as it is, for the verb to refuse. */
-function takeCleartexts<CleartextsT>(cleartexts: CleartextsT): CleartextsT {
-  const handed: unknown = cleartexts
-  if ((typeof handed !== 'object') || (handed === null)) { return cleartexts }
-  const taken = { ...handed }
-  for (const fieldname of Object.keys(handed)) { Reflect.deleteProperty(handed, fieldname) }
-  return taken as CleartextsT
-}
 // --
 
 // == [The giver]: ReactGiver, StrengthVerdictResult, BankGiver, makeReactGiver, Unjudged, makeBankGiver
@@ -193,7 +183,6 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
 
   // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
-  // Each takes the fields out of the cleartexts handed to `mutate`, so React Query keeps nothing of them.
 
   /** React Query's options for the mutation that births the bank, unborn until now, with the user's new passphrase and optional passkey, for your own `useMutation`.
    * Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
@@ -203,9 +192,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
       ...FormMutationDefaults,
       mutationKey: [...bankHead, 'birth'],
       mutationFn:  async (cleartexts: BirthCleartexts): Promise<void> => {
-        const taken = takeCleartexts(cleartexts)
         const bank  = await device.ensureBank()
-        await bank.birth(taken)
+        await bank.birth(cleartexts)
       },
     })
   }
@@ -224,9 +212,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
       ...FormMutationDefaults,
       mutationKey: [...bankHead, 'unlock'],
       mutationFn:  async (cleartexts: UnlockCleartexts): Promise<void> => {
-        const taken = takeCleartexts(cleartexts)
         const bank  = await device.ensureBank()
-        await bank.unlock(taken)
+        await bank.unlock(cleartexts)
       },
     })
   }
@@ -242,9 +229,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
       ...FormMutationDefaults,
       mutationKey: [...bankHead, 'replacePassphrase'],
       mutationFn:  async (cleartexts: PassphraseReplaceCleartexts): Promise<void> => {
-        const taken = takeCleartexts(cleartexts)
         const bank  = await device.ensureBank()
-        await bank.replacePassphrase(taken)
+        await bank.replacePassphrase(cleartexts)
       },
     })
   }
@@ -267,9 +253,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
       ...FormMutationDefaults,
       mutationKey: [...bankHead, 'addPasskey'],
       mutationFn:  async (cleartexts: PasskeyAddCleartexts): Promise<void> => {
-        const taken = takeCleartexts(cleartexts)
         const bank  = await device.ensureBank()
-        await bank.addPasskey(taken)
+        await bank.addPasskey(cleartexts)
       },
     })
   }
@@ -285,9 +270,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
       ...FormMutationDefaults,
       mutationKey: [...bankHead, 'revokePasskey'],
       mutationFn:  async (cleartexts: PasskeyRevokeCleartexts): Promise<void> => {
-        const taken = takeCleartexts(cleartexts)
         const bank  = await device.ensureBank()
-        await bank.revokePasskey(taken)
+        await bank.revokePasskey(cleartexts)
       },
     })
   }

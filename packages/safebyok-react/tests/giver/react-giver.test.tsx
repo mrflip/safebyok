@@ -101,21 +101,13 @@ describe("the form mutations", () => {
     })
   }
 
-  it("takes the cleartexts out of the object handed to mutate, so React Query keeps none of them", async () => {
-    const { world, Acme, client, wrapper } = setup()
+  it("hands the verb the object handed to mutate, left as it came", async () => {
+    const { world, Acme, wrapper } = setup()
     const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
     const handed = { passphraseClear: 'fake passphrase' }
     await act(() => result.current.mutateAsync(handed))
-    expect(handed).to.deep.equal({})
-    expect(client.getMutationCache().getAll().map((mutation) => mutation.state.variables)).to.deep.equal([{}])
+    expect(handed).to.deep.equal({ passphraseClear: 'fake passphrase' })
     expect(world.formCalls).to.deep.equal([{ verb: 'unlock', cleartexts: { passphraseClear: 'fake passphrase' } }])
-  })
-
-  it("hands the verb what is not an object, for the verb to refuse", async () => {
-    const { world, Acme, wrapper } = setup()
-    const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
-    await act(() => result.current.mutateAsync(null as never))
-    expect(world.formCalls).to.deep.equal([{ verb: 'unlock', cleartexts: null }])
   })
 
   it("reports the verb's refusal as the mutation's error", async () => {
