@@ -261,6 +261,12 @@ joined-unlock wait has no loop. Left: the security.md snapshots amendment had re
 by a `sonnet` subagent, 1ccc3d0b3); `withWhisper`'s doc block and STYLE.md's `shapes-enums.ts` sentence (Cleanup);
 prompt before the get (Open Matters).
 
+*Queued, after filing* (the Coach, 2026-11-20, on thread 5's overlaps: "Yes but an unlock checks right after waiting and
+doesn't prompt … you want the other one to finish all the way so that it unlocks"): a rework on #774: `attemptUnlock`
+that finds another kind of gating open waits for it to finish, then checks at once: unlocked, it resolves with no
+prompt, its cleartexts spent unused; otherwise it unlocks directly, as now. The other overlaps go into
+`notes/wontfix.md` as unspecified. A second review over the new commits only.
+
 ### 8. giver_feed
 
 > "We take the hosts' RQ (if they don't have one we'll make it); we offer a keys factory, default settings and a
