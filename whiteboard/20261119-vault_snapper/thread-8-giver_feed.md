@@ -1,6 +1,6 @@
 # Thread 8: giver_feed (2026-11-20)
 
-Branch `20261120-giver_feed`, PR #TBD, stacked on #773. Proved: `safebyok-react` 309/309, of them `tests/giver` 47; `safebyok` 1328 + 2 new key tests; typecheck and lint clean in both. `pnpm justify` is run after the catch-up.
+Branch `20261120-giver_feed`, PR #775, stacked on #773. Proved: `safebyok-react` 309/309, of them `tests/giver` 47; `safebyok` 1328 + 2 new key tests; typecheck and lint clean in both. `pnpm justify` is run after the catch-up.
 
 * **Built**
   * **The Coach's hand edits, swept** (its own commit, crediting the Coach). The minder's key methods take a `Labelpathed`, which is now exported, and `subtreeQueryKey` becomes `childrenQueryKey`. Where the patch met thread 2, `'sok'` and the listener format were kept.
