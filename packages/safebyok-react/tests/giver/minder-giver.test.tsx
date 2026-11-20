@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { giverBankOfMinder } from '../../src/giver/minder-bank'
+import { giverBankOfMinder, giverBankOfVault } from '../../src/giver/minder-bank'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import { ThingMinder } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
@@ -24,6 +24,15 @@ async function setupShowing(labelpath: string, worldOpts: Parameters<typeof TH.m
   }, { wrapper: Wrapper })
   return { world, ...rendered }
 }
+
+describe("giverBankOfVault", () => {
+  it("refuses something that is not a Vault", async () => {
+    const { minder } = await TH.makeMinderGiverWorld()
+    for (const notVault of [null, {}, { bank: {}, minder }, minder]) {
+      TH.expectSyncRefusal(() => giverBankOfVault(notVault as never), 'bad_record')
+    }
+  })
+})
 
 describe("giverBankOfMinder", () => {
   it("refuses something that is not a ThingMinder", () => {
