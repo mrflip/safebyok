@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 to 8 filed, in one line: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 -> #774 -> #775 (#771's changeset check clears on its next push); thread 9 ready (#776), in review; thread 10 (from the Coach's ruling) building on it.
+* **Status:** done (2026-11-20). Ten threads filed in one line: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 -> #774 -> #775 -> #776 -> #777 -> #767 (this plan, the top). See `human/20261119-sprint_vault_snapper_done.md`. SHAs on the thread lines below are as filed, before the restacks.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -305,7 +305,7 @@ sign-in loosening changes no working-case answer within a Device's life.
 reads the Device's snapshot and, in a form action, calls `bank.attemptUnlock` with the passphrase from `FormData`;
 the mutation resumes with the whisper. A second submission while the dialog is open joins it. The test asserts the
 passphrase is never in React state or a snapshot. Any wiring the core lacks is one explicit `cheat…` method. *Depends
-on:* threads 7 and 8, restacked into one line. *Size:* M. *Status:* reviewed at 3e54c503b, filing, #776 (one compaction).
+on:* threads 7 and 8, restacked into one line. *Size:* M. *Status:* filed at dca0fc3f0, #776 (one compaction).
 
 *Review:* fixed (medium, `opus`): a test that the secret search finds a planted secret; three titles, a doc phrase,
 a progress-note comment. Checked by breaking the code: without the FormData delete the search finds the passphrase;
@@ -328,7 +328,12 @@ FormData finding in notes/security.md (dca0fc3f0). *Orchestrator:* from thread 8
 `bank.ensureUnlocked()`; the refresh takes a `silenceErrors` flag that quashes every refusal but `unexpected_error`,
 which goes to bad news, leaving no unhandled rejection. The prompt order is unchanged; the gain is a fresh car and one
 less round trip. *Touches:* `models/vault.ts`, maybe `minding/thing-minder.ts`, their tests. *Depends on:* thread 9
-(stacked on the line's tip). *Size:* S. *Status:* building, branch `20261120-whisper_refresh`, cut from 61224de5a.
+(stacked on the line's tip). *Size:* S. *Status:* filed at 131c53429, #777.
+
+*Review:* fixed (medium): doc blocks say what a caller observes; two titles cut to one clause. Checked: no rejection
+left unhandled, one shared fetch, the minder's invariant holds, the tests fail without the change. Left: an unexpected
+error from the shared fetch reported twice (my call: accept); a dismissed prompt's early fetch still caches; STYLE.md's
+"no refresh in the core" wants the exception named (Cleanup).
 
 ## Order
 
