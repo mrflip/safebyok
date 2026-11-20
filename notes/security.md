@@ -8,13 +8,14 @@ security expert who knows what questions to ask.
 **Adding an entry.** The agent that made the decision hands it to a `sonnet` subagent with this
 file's path, the caution in a sentence or two, the date, and the PR or branch, and commits what
 the subagent wrote. The subagent searches the entries for the same mechanism (`rg -n` for its
-names), reading only the ones it finds. Where one already says it, the subagent amends that
-entry in place (below) and changes no other entry. Otherwise it writes a new dated entry at the top
-of *Of Interest*. Either way it keeps the voice above, and returns the lines it changed.
+names), reading only the ones it finds. Where one already says it, the subagent adds an amendment
+line after that entry (below). Otherwise it writes a new dated entry at the top of *Of Interest*.
+Either way it keeps the voice above, rewrites no entry, and returns the lines it added.
 
-**Amending an entry.** An entry that later work changes is amended in place, never superseded by a
-new entry elsewhere. The amendment is marked inline, `amended YYYY-MM-DD (thread)`, for example
-`amended 2026-10-21 (b_simplify)`, so a reader sees what it said and what it says now in one place.
+**Amending an entry.** No entry is ever rewritten: its words stay as written. An entry that later
+work changes gets a line added directly after it, `amended YYYY-MM-DD (thread): what is now true`,
+for example `amended 2026-10-21 (b_simplify): …`, so a reader sees what it said and what it says now
+in one place.
 
 **A one-time rename (2026-10-18; extended 2026-10-18, 2026-10-19).** With the Coach's approval, the entries
 below had their retired words changed to the reform's cast in one mechanical pass (VOCABULARY.md;
