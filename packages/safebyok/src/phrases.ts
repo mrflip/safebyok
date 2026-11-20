@@ -138,7 +138,7 @@ export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseco
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
-/** A listener given to a minder's `listen` with a feed version other than this one's. */
+/** A minder's `listen` given a feed version other than `ThingFormat`. */
 export const FeedVersionOther = "A ThingMinder's listen is given the version of the feed its listener reads, ThingFormat, and this listener was written for another: its events are not shaped as it expects."
 
 /** A value in a minder's query that is not a car. */
@@ -165,7 +165,7 @@ export const CarNewestNotGone = "A gone ThingCar's newest record is the tombston
 /** A void car whose newest is not the void sentinel. */
 export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel, and this one's is not: this is a bug in safebyok."
 
-/** A car whose agerank is not the one its records and liveness make. */
+/** A car whose agerank does not match its records and liveness. */
 export const CarAgerankNotOwn = "A ThingCar's agerank is made of its records and liveness, and this one's is not: this is a bug in safebyok."
 
 /** Two cars of different Things given to a minder's structural sharing. */

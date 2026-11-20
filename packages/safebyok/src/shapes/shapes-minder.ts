@@ -96,7 +96,7 @@ export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | '
 // == [The car]: ThingCar, BankCar, BoxCar, GateCar, ThingAt, CarAt, DeliverableThing, carLivenessVals
 
 // The vaultDB has a newer whole record when liveness is 'bhnd' or 'bare' (dbHasNewer).
-/** A ThingMinder's cache value for a Thing, frozen through: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
+/** A ThingMinder's cache value for a Thing, deeply frozen: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
  * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
  * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
  * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
@@ -110,8 +110,8 @@ export type ThingCar<RecordT extends Sparse<ThingRecord>> = Readonly<(
   | { liveness: 'gone', newest: Tombstone<RecordT>, fullest: null      } // a deleted Thing's tombstone: known to be gone. dbHasNewer: false
   | { liveness: 'void', newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
 ) & {
-  /** A string that compares as the car's age: of two cars of one Thing, the newer has the greater agerank, and two of the same revisions and liveness the same one.
-   * It joins with `~` the newest's lifepath and revseq, the liveness, and the revseq of `fullest ?? newest` (a placeholder below every revseq when bare), each of fixed width.
+  /** A string that compares as the car's age: of two cars of one Thing, the newer has the greater agerank.
+   * Two cars with the same revisions and liveness have equal ageranks.
    */
   agerank: string
 }>
@@ -183,18 +183,24 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 
 // Each event spreads TanStack Query's cache event into our own, and keeps TanStack's field names (`type`, `action.type`,
 // `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` takes.
-/** What a minder's `listen` tells: a car's query changed, or a listing's. `ThingMinder.isThingEvent` tells them apart. */
+/** An event a minder's `listen` tells: a car's query changed, or a listing's. {@link ThingMinder.isThingEvent} tells them apart. */
 export type MinderEvent = ThingEvent | ListingEvent
 
-/** What every event carries: TanStack Query's cache event without its live query, and the scope of the Thing it is about. */
+/** The fields every minder event carries: TanStack Query's cache event, less its live query, and the scope of the Thing it is about. */
 export type MinderEventOf<DataT> = Readonly<{
   /** `'updated'` when the query's state changed, `'removed'` when the cache dropped the query. */
   type:      'updated' | 'removed'
-  /** What changed the state, as TanStack names its action: a record arrived (`success`), a get was refused (`error`), or a listing was marked stale (`invalidate`). Undefined for a removal. */
+  /** What changed the state, by TanStack's name for the action, or undefined for a removal:
+   * - `'success'`    -- a record arrived
+   * - `'error'`      -- a get was refused
+   * - `'invalidate'` -- a listing was marked stale
+   */
   action:    Readonly<{ type: 'success' | 'error' | 'invalidate' }> | undefined
-  /** The key the query is cached under, frozen: the same key the host may cache the same value under. */
+  /** The key the query is cached under, frozen. A host caching the same value may use the same key. */
   queryKey:  TSQ.QueryKey
-  /** The query's state as it stands, a frozen shallow copy: its `data`, the same object until it changes, its `dataUpdatedAt`, `error`, `isInvalidated`, `status` and the rest. After a removal, its `data` is undefined. */
+  /** A frozen shallow copy of the query's state: `data`, `dataUpdatedAt`, `error`, `isInvalidated`, `status` and the rest.
+   * `data` is the same object until it changes, and undefined after a removal.
+   */
   state:     Readonly<TSQ.QueryState<DataT>>
   /** The user of the bank. */
   userid:    Userid
@@ -224,8 +230,8 @@ export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thin
   lifepath:  Lifepath | undefined
 }> : never
 
-/** A listing's query changed. `state.data` is the labelpaths it now lists, in labelpath order, the same array until one joins, or undefined once removed.
- * A listing marked stale tells `state.isInvalidated` true, and still lists what it did.
+/** A listing's query changed. `state.data` is the labelpaths it now lists, in labelpath order, or undefined once removed.
+ * The array stays the same object until a labelpath joins. A listing marked stale has `state.isInvalidated` true, and still lists what it did.
  */
 export type ListingEvent = MinderEventOf<readonly Labelpath[]> & Readonly<{
   /** The modelkind of the Thing at `labelpath` and of every Thing listed, which is the same: a labelpath starts with its parent's. */

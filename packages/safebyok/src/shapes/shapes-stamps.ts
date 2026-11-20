@@ -39,7 +39,7 @@ export type BoxStamp    = Z.infer<typeof StampChecks.boxStamp>
 
 // == [The lease's forms]: LeaseFormat, LeaseChecks, StampChecks, LeaseStamp, LeaseSparse, LeaseRecord
 
-/** The `fmt` a lease carries, a Thing's own, bound into the wrap of its bankKey. */
+/** The `fmt` a lease carries, the same as every Thing's. It is bound into the wrap of the lease's bankKey. */
 export const LeaseFormat = ThingFormat
 
 /** The checks of a lease's stamp and record. */

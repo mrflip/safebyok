@@ -72,11 +72,11 @@ export const Lifeseq = Object.freeze({
 
 /** The helpers for a revision's `revseq`. */
 export const Revseq = Object.freeze({
-  /** `revseq` spelled as a lifeseq is, so that the strings sort in the order of the revisions. The shell's -1 is `-000000001`. */
+  /** `revseq` as fixed-width text, which sorts in revision order like a {@link Lifeseq}. The shell's -1 is `-000000001`. */
   padded(revseq: number): string { return paddedSeqOf(revseq) },
 })
 
-/** `seqnum` in base-32 digits padded to ten, or the shell's `-000000001` for -1: the strings sort as the numbers do. */
+/** `seqnum` in base-32 digits padded to ten, or `-000000001` for -1, so the strings sort as the numbers do. */
 function paddedSeqOf(seqnum: number): string {
   return (seqnum === -1) ? VoidLifeseq : seqnum.toString(32).padStart(LifeseqDigits, '0')
 }

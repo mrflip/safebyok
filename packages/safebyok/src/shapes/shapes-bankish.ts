@@ -35,7 +35,7 @@ export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
  */
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 
-/** The ask that writes the box {@link Bank.sealBox} sealed, `RecordT`: a put of a live box, or a del of a tombstone. */
+/** The write ask {@link Bank.sealBox} returns, carrying the sealed `record`: a put for a live box, or a del for a tombstone. */
 export type SealedBoxAsk<RecordT extends BoxRecord = BoxRecord> = BoxWriteAsk & Readonly<{ record: RecordT }>
 // --
 
@@ -101,7 +101,7 @@ export interface DeviceOpts {
 
 /** The stages of a bank, as {@link BankStage} describes each. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
-/** Where the user stands with their bank, one of {@link bankStageVals}, as a host's screen switches on it:
+/** Where the user stands with their bank, for a host's screen to switch on:
  * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
  * - `'starting'`   -- signed in, and the bank is being brought up
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
@@ -112,44 +112,44 @@ export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unl
  */
 export type BankStage = typeof bankStageVals[number]
 
-/** A refusal as a snapshot shows it: its kind, its family and its message, which carry no secret material. */
+/** A refusal, for a snapshot to show. None of its fields carries secret material. */
 export interface RefusalSnapshot {
   readonly refusalkind: Errors.Refusalkind
   readonly family:      Errors.RefusalFamily
   readonly message:     string
 }
 
-/** A bank as a host renders it: where the user stands, and when its lease ends. */
+/** A bank's state, for a host to render. */
 export interface BankSnapshot {
   readonly stage:       BankStage
   /** True at every stage but `'unlocked'`. */
   readonly isLocked:    boolean
-  /** True once the bank has ended: it refuses every call, and its stage says where the user now stands. */
+  /** True once the bank has ended. An ended bank refuses every call, and its stage says where the user stands. */
   readonly isEnded:     boolean
-  /** The refusal every call on the bank meets once it has ended, the one `bank.endCause` returns; null while it has not. */
+  /** The refusal every call meets once the bank has ended, or null before then. */
   readonly endCause:    Errors.VaultError | null
   /** When the lease ends, in epoch milliseconds, or null while locked. */
   readonly leaseEndsAt: EpochMillis | null
-  /** Why the bank failed to come up, at stage `'failed'`; null at every other. */
+  /** Why the bank failed to come up, at stage `'failed'`, or null at every other stage. */
   readonly lastErr:     RefusalSnapshot | null
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device reports before it holds a bank object: signed in, and the bank not yet started. */
+/** The bank snapshot a device shows before it holds a bank object. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
 })
 
-/** The gating open on a device, as a host's dialog renders it. */
+/** The gating open on a device, for a host's dialog to render. */
 export interface OpenGatingSnapshot {
   readonly gatingkind:   Gatingkind
-  /** Names this gating among those the device has opened: it grows with each one opened, and again as each ends. */
+  /** A number that tells this gating apart from every other the device opens: key a dialog's form on it. */
   readonly gatingseq:    number
   /** True while an attempt is under way. */
   readonly isAttempting: boolean
 }
 
-/** A device as a host renders it: its bank's snapshot, and the gating open on it. */
+/** A device's state, for a host to render. */
 export interface DeviceSnapshot {
   /** The snapshot of the bank on this device, or {@link PendingBank} before one is made. */
   readonly bank:   BankSnapshot
