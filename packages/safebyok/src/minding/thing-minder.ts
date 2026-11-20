@@ -391,7 +391,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: queryKeyOf, isThingEvent, bankQueryKeyOf, queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: queryKeyOf, isThingEvent, bankQueryKeyOf, queryKey, listingQueryKey, descendantsQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
 
   // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
   // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
@@ -420,8 +420,8 @@ export class ThingMinder {
   /** The query key the list of `labelpathed`'s children is cached under. */
   listingQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '#', 'kids'] }
 
-  /** The key prefix of every car and listing cached under `labelpathed`, but not of its own. */
-  childrenQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
+  /** The key prefix of every car and listing cached under `labelpathed` at any depth, but not of its own. */
+  descendantsQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
 
   /** The part of a query key that `labelpathed` has in common with each of its keys. */
   #keyHeadOf(labelpathed: Labelpathed): string[] { return keyHeadOf(this.scope, labelpathed.labelpath) }

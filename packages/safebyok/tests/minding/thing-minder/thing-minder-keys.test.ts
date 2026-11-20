@@ -22,16 +22,16 @@ describe("ThingMinder keys", () => {
     expect(minder.listingQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '#', 'kids'])
   })
 
-  it("make a children prefix of the labels and '/', which no key of the Thing's own starts", () => {
+  it("make a descendants prefix of the labels and '/', which no key of the Thing's own starts", () => {
     const minder = minderWithoutStart()
-    expect(minder.childrenQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/'])
-    expect(minder.childrenQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '/'])
+    expect(minder.descendantsQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/'])
+    expect(minder.descendantsQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '/'])
   })
 
-  it("match, for a children prefix, every key under the Thing and neither of the Thing's own", () => {
+  it("match, for a descendants prefix, every key under the Thing and neither of the Thing's own", () => {
     const minder = minderWithoutStart()
     const matches = (prefixScope: ThingScope, keyScope: ThingScope) => {
-      const prefix = minder.childrenQueryKey(prefixScope)
+      const prefix = minder.descendantsQueryKey(prefixScope)
       return [minder.queryKey(keyScope), minder.listingQueryKey(keyScope)].map((queryKey) => TSQ.partialMatchKey(queryKey, prefix))
     }
     expect(matches(TH.RootScope, TH.RootScope)).to.deep.equal([false, false])
