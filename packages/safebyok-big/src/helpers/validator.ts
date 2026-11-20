@@ -12,7 +12,7 @@ import * as PX from '../shapes/primitives'
 
 // Judged by its tag: `instanceof` refuses one made in an iframe or a test's jsdom.
 /** True for a Uint8Array from any realm. */
-function isBytes(candidate: unknown): candidate is Uint8Array { return ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]' }
+export function isBytes(candidate: unknown): candidate is Uint8Array { return ArrayBuffer.isView(candidate) && Object.prototype.toString.call(candidate) === '[object Uint8Array]' }
 
 /** The makers a `Checkers` builder is given: Zod's under short names, its scalars ready made, the label checks and `epochMillis`.
  * Make an object strict with `obj({ ... }).strict()`, and null with `lit(null)`. Import a maker the kit
