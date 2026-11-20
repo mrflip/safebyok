@@ -195,8 +195,15 @@ refactored (or is, in commits that diff cleanly), and the four born-bank gatings
 
 *Touches:* `models/bank.ts` (prompts), `models/gating.ts`, `models/device.ts`, their tests. *Depends on:* thread 4
 (same file, stacked). *Look-ahead:* thread 6's snapshots tell of the gating; thread 9 drives `attemptUnlock` from a
-form. *Size:* M. *Status:* ready, #772 (branch `20261120-bank_gatings`); in review, `high` on `opus` (cleartexts now enter
-outside a gating).
+form. *Size:* M. *Status:* filed, #772 (branch `20261120-bank_gatings`), at 76edb6866.
+
+*Review:* fixed (high, `opus`, against G1, G2, G8, G9): `attemptWithoutGating` refuses a disabled bank before any
+cleartext is used and spends cleartexts on every outcome; tests now prove no key is derived on a swept bank, a passkey
+answer is zeroed, sloppy inputs refuse, and a throwing getter's message leaks nowhere; doc blocks of `device.lock()`,
+`attemptRevokePasskey` and the joining prompts corrected. Left: a joined unlock takes a gate change's failure (TOP
+row); joining and handing in differ by kind (a crossing); the G9 drift unrecorded (thread 6 writes it); an open
+gating on a swept bank is refused only at `#attachLease` (Cleanup: `Bank.sweep()` dismisses it); `cheatHoldBank`
+moves on a failed birth (a stand-in); VOCABULARY's *gating* row stale (Cleanup).
 
 ### 6. snapshots
 
@@ -228,7 +235,11 @@ deleted, refuses `absent_box` (the recommendation of open matter Wh1, taken in Y
 thread 4's review: `#newestAt` gets the whole record when the car is neither `full` nor `gone`, so a write over a box
 known only from a list keeps its sidecar (taken in YOLO); and `notes/security.md`'s thread 4 line says
 `Vault.putBoxOnce` takes the bank's lease, which the Vault does not hold: correct it through a `sonnet` subagent, as
-the file's header says. *Touches:* `models/vault.ts`, its tests. *Depends on:* thread 6 (the line through threads 4 and 5). *Size:* S to M.
+the file's header says. And W2, ruled ("A put needs unlock anyway. Document as won't fix", 2026-11-20): a
+`notes/wontfix.md` entry, that changing only a box's sidecar needs the bank unlocked and the whisper in hand, since
+sealing a new revision keeps none of the old whisper. *Touches:* `models/vault.ts`, its tests. *Depends on:* thread 6 (the line through threads 4 and 5). Also: `tests/models/vault.test.ts`'s comment above the try-it-first tests credits MemoryVaultDB's own microtask;
+correct it to `AdapterVaultDB` telling every watcher of a write's tracked records before the write returns (the
+Coach, 2026-11-20). *Size:* S to M.
 
 ### 8. giver_feed
 
@@ -243,8 +254,12 @@ query defaults are `networkMode: 'always'`, `structuralSharing` keeping the grea
 `GiverBank.getBoxCar`'s doc block is corrected. *Orchestrator:* records freeze in place as they land (thread 1), so
 the giver's docs say a host's vaultDB must not mutate the objects it answered with. From thread 2's review: a removal
 event keeps TanStack's `status` with `data` undefined, so the bridge branches on `type === 'removed'` first. The giver's bank snapshot hook reads the Device's snapshot.
-*Touches:* `packages/safebyok-react/src/giver/`. *Depends on:* threads 2 and 6, restacked into one line; and the
-Coach's uncommitted edits to `react-giver.ts` (*For the Coach*). *Size:* M.
+*Orchestrator:* the Coach's hand edits, swept ("Sweep them, change back as you like only cosmetic changes intended",
+2026-11-20): apply `coach-hand-edits.patch` (this directory) first, with `git apply -3`, as its own commit. It renames
+`subtreeQueryKey` to `childrenQueryKey`, takes a `Labelpathed` where a `ThingScope` was, and makes `react-giver.ts`
+easier to read; its invariant hunks are already on #769 and merge away. Where it meets thread 2's `'sok'` and event
+rewrite, keep the threads' behaviour and the Coach's names. *Touches:* `packages/safebyok-react/src/giver/`.
+*Depends on:* threads 2 and 6, restacked into one line. *Size:* M.
 
 ### 9. knock_knock
 
@@ -261,10 +276,9 @@ on:* threads 7 and 8. *Size:* M.
 ## Order
 
 Threads 1, 3 and 4 start at once. Thread 2 follows 1; 5 follows 4, then 6 and 7 on that line. Thread 8 waits on 2 and
-6 restacked into one line, and on the Coach (*For the Coach*); thread 9 on 7 and 8.
+6 restacked into one line; thread 9 on 7 and 8.
 
 ## For the Coach
 
-* **TOP: your uncommitted edits to `react-giver.ts`** (and to `thing-minder.ts` and its keys test) sit in the base
-  checkout. Threads 1 and 2 rewrite `thing-minder.ts` from origin/main, and thread 8 rewrites the giver. Thread 8
-  waits until you commit them, or say to go ahead without them.
+* ~~TOP: your uncommitted edits to `react-giver.ts`~~ → *Coach (2026-11-20):* "Sweep them, change back as you like only
+  cosmetic changes intended". Snapshotted as `coach-hand-edits.patch`; thread 8 applies it first.

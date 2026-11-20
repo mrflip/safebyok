@@ -30,8 +30,10 @@ orchestrator writes it.
 * `sealBox`/`tombstoneBox` resolve a `SealedBoxAsk` (`{ ...ask, record }`) citing the donor sparse.
 * `putBoxOnce`/`delBoxOnce` resolve the record as stored and throw a refusal. By labelpath over a car left `bhnd` or
   `bare` by a list, a patch with no sidecar refuses `sidecar_missing` (open matter: get the whole first).
-* Try-it-first holds on MemoryVaultDB through its own `#notify` microtask; real adapters promise no timing (open
-  matter, TOP).
+* Try-it-first holds for every adapter built on `AdapterVaultDB` (memory, Postgres): it tells every watcher of a
+  write's tracked bank and gate records (`notifyTrackedRecords`, `adapter-vault-db.ts`) before the write returns. A good
+  write's own record is not notified: the caller lands it. `vault.test.ts`'s comment crediting MemoryVaultDB's
+  microtask is wrong; thread 7 corrects it (the Coach, 2026-11-20).
 
 ## Thread 2, minder_feed (#771) (*Orchestrator:*)
 
@@ -56,10 +58,12 @@ orchestrator writes it.
   and zeroes a passkey answer's bytes on every outcome.
 * `device.lock()` locks the device's bank, learned through `device.cheatHoldBank` (each Bank's constructor; last made
   wins): the sprint's one cheat. `device.openGating` exposes `gatingkind`, `isOpen`; `#isAttempting` is private; no
-  last refusal is kept (thread 6 adds it). `gatingseq` deferred to thread 6.
+  last refusal is kept (thread 6 adds it). `gatingseq` deferred to thread 6. Reviewed at 76edb6866; filed.
+* Open (TOP row): a joined unlock takes a gate change's failure; Rec: an unlock joins only an unlock gating. Thread 7
+  waits on it only if `withWhisper` must say which.
 
 ## The sprint doc (*Orchestrator:*)
 
 * https://claude.ai/artifact/HHcmx1GE3oZyh6rQMWjgv3 — doc `83e42a7e-4892-49d9-b45e-585ca636e9a0`; State enum `b9b89cb1-c517`.
-* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 8);
+* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 245);
   Cleanup `6077489e-8954` / `14b54849-af59`; Progress `51ab4975-ceed` / `26336557-6583`; Resolved `a912f3b9-5db8` / `c14689aa-a452`.

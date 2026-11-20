@@ -1,0 +1,294 @@
+diff --git a/packages/safebyok-react/src/giver/react-giver.ts b/packages/safebyok-react/src/giver/react-giver.ts
+index 5d291e2a7..151b5e90f 100644
+--- a/packages/safebyok-react/src/giver/react-giver.ts
++++ b/packages/safebyok-react/src/giver/react-giver.ts
+@@ -6,7 +6,8 @@ import { useEffect, useSyncExternalStore } from 'react'
+ import { type Banklabel, type UserID, type carLivenessVals, Checkers } from 'safebyok'
+ import { bridgeDevice } from './react-bridge'
+ 
+-// == [What a giver asks of the Device]: BankStage, BankSnapshot, DeviceSnapshot, CarFields, GiverBank, GiverDevice
++// move these to a separate file as the rest of the code does
++// == [Types]: BankStage, BankSnapshot, DeviceSnapshot, CarFields, GiverBank, GiverDevice
+ 
+ /** Where a bank stands in this tab: nobody signed in, starting, known to be not yet stored, ready, or failed to start. */
+ export type BankStage = 'signed_out' | 'starting' | 'unborn' | 'ready' | 'failed'
+@@ -52,6 +53,8 @@ export interface GiverDevice<CarT extends CarFields> {
+ 
+ // == [Checks]: Checks, isGiverDevice
+ 
++// move these to a separate file as the rest of the code does. And use their checks, not handrolls
++
+ const Checks = Checkers('bad_record', ({ custom, str }) => ({
+   device:    custom<GiverDevice<CarFields>>(isGiverDevice, 'Expected a Device'),
+   banklabel: str.min(1),
+@@ -74,11 +77,15 @@ const CarStaleTime = Infinity
+ 
+ // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
+ /** What a bank's hooks report before the Device has heard of the bank. */
+-export const PendingBank: BankSnapshot = Object.freeze({ stage: 'signed_out', isLocked: true, leaseEndsAt: null, lastErr: null })
++export const PendingBank: BankSnapshot = Object.freeze({
++  stage: 'signed_out', isLocked: true, leaseEndsAt: null, lastErr: null,
++})
+ 
++// make a checker and derive the type
+ /** React Query's own options for `useBoxRecord`, less the key, the fetch and the `select` that picks the record. */
+ export type BoxRecordOpts<CarT extends CarFields> = Omit<UseQueryOptions<CarT, Error, CarT['fullest']>, 'queryKey' | 'queryFn' | 'select'>
+ 
++// run a slop checker on all the doc blocks in this package
+ /** What {@link makeReactGiver} returns. */
+ export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGiver<CarT>>
+ 
+@@ -86,10 +93,14 @@ export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGive
+ export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
+ 
+ /** Make the React hooks for `device`. Make them once, at module scope, beside the Device: `export const Giver = makeReactGiver(device)`. */
++/** React hooks for `device`.
++ * @example `export const Giver = makeReactGiver(device)`.
++ */
+ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
+   Checks.device.parse(device)
+ 
+-  /** Keep the host's React Query entries of every bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
++  // have an agent look up a well-regarded library (urql?) and mimic its doc block style
++  /** Keeps the host's React Query entries of every bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
+   function useBridge(): void {
+     const client = useQueryClient()
+     useEffect(() => bridgeDevice(client, device), [client])
+diff --git a/packages/safebyok/src/minding/thing-minder.ts b/packages/safebyok/src/minding/thing-minder.ts
+index bb8dc00b5..15a1f6686 100644
+--- a/packages/safebyok/src/minding/thing-minder.ts
++++ b/packages/safebyok/src/minding/thing-minder.ts
+@@ -23,6 +23,8 @@ import {
+ import { bestCarOf, carOf, dbHasNewer } from './thing-car'
+ import * as Throwers from '../refusals/throwers'
+ 
++export type Labelpathed = { labelpath: Labelpath }
++
+ /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
+  * the children of the root box and of each Thing listed.
+  * Four sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
+@@ -37,6 +39,12 @@ import * as Throwers from '../refusals/throwers'
+  *   has heard of, never on the order they arrived in.
+  * - The order records arrive in never changes a car's liveness, or the revisions it carries.
+  * - A car never goes back: it carries the newest revision any source has told of, and a newer life replaces an older one whole.
++ * - A listener is told of each car and listing as the cache changes, in that order, so what it is told never goes back either.
++ *   Each car told of a Thing has a newest no older than the last, and within one life it never loses its fullest record or
++ *   takes an older one. A refused get tells the car unchanged. Each listing told lists every labelpath the last one did.
++ *   Only a removal breaks the run: it tells no car, and what arrives after starts afresh. Removal is contemplated as part of a
++ *   later feature allowing nested boxes, but not yet. Access after `goodbye()` or altering the gcTime is misuse (the customer
++ *   may do as they please with the Giver's React Query cache).
+  * - A sparse live record never displaces a whole live record of the same life: it leaves the car `behind`, its fullest
+  *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
+  *   get fetches the newest whole.
+@@ -148,13 +156,13 @@ export class ThingMinder {
+   /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
+    * A bare listing lists only the children heard of since `hello` ({@link isListingBareAt}).
+    */
+-  listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
+-    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(scoped)))
++  listingAt(labelpathed: Labelpathed): readonly Labelpath[] | undefined {
++    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(labelpathed)))
+   }
+ 
+   /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
+-  isListingBareAt(scoped: ThingScope): boolean {
+-    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(scoped)))?.dataUpdatedAt === BareListedAt
++  isListingBareAt(labelpathed: Labelpathed): boolean {
++    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(labelpathed)))?.dataUpdatedAt === BareListedAt
+   }
+ 
+   /** The cache's answer for `scoped`, without waiting on the vaultDB.
+@@ -362,7 +370,7 @@ export class ThingMinder {
+   }
+   // --
+ 
+-  // == [TSQ Asks]: queryKey, listingQueryKey, subtreeQueryKey, #keyHeadOf, #bankKeyHead, #tsqQueryOptions, #askAt, #shellAt
++  // == [TSQ Asks]: queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #bankKeyHead, #tsqQueryOptions, #askAt, #shellAt
+ 
+   // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
+   // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
+@@ -370,17 +378,17 @@ export class ThingMinder {
+   // query defaults by key prefix too, so without a mark the root box's key would start every box's key, and no defaults
+   // could single out the root box. A labelpath starts with its modelkind, so the key does too.
+   /** The query key `scoped`'s car is cached under. */
+-  queryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '!'] }
++  queryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '!'] }
+ 
+   /** The query key the list of `scoped`'s children is cached under. */
+-  listingQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '#', 'kids'] }
++  listingQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '#', 'kids'] }
+ 
+   /** The key prefix of everything cached under `scoped`, a car or a listing, and of neither of its own. */
+-  subtreeQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '/'] }
++  childrenQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
+ 
+   /** The part of a query key that `scoped` has in common with each of its keys. */
+-  #keyHeadOf(scoped: ThingScope): string[] {
+-    const labels = scoped.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
++  #keyHeadOf(labelpathed: Labelpathed): string[] {
++    const labels = labelpathed.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
+     return [...this.#bankKeyHead(), ...labels]
+   }
+ 
+@@ -389,21 +397,21 @@ export class ThingMinder {
+ 
+   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
+   /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
+-  #tsqQueryOptions(scoped: ThingScope, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
+-    const queryOpts = { queryKey: this.queryKey(scoped) }
++  #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
++    const queryOpts = { queryKey: this.queryKey(labelpathed) }
+     if (opts.staleTime === undefined) { return queryOpts }
+     return { ...queryOpts, staleTime: staleTimeFnOf(opts.staleTime) }
+   }
+ 
+   /** The get ask the minder sends the vaultDB for `scoped`, a scope in this minder's bank. */
+-  #askAt(scoped: ThingScope): GetAsk {
+-    return this.#bank.makeGetAsk({ labelpath: scoped.labelpath, ifAbsent: 'nil' })
++  #askAt(labelpathed: Labelpathed): GetAsk {
++    return this.#bank.makeGetAsk({ labelpath: labelpathed.labelpath, ifAbsent: 'nil' })
+   }
+ 
+   // Boxes are the only Things under a root, for now: one label under the root box.
+   /** The shell at `scoped`. Below a root, it lives in the life of the bank's root box. */
+-  #shellAt(scoped: ThingScope): VoidSentinel {
+-    return scoped.labelpath.includes('/') ? Shell.of(scoped, this.rootBox) : Shell.of(scoped)
++  #shellAt(labelpathed: Labelpathed): VoidSentinel {
++    return labelpathed.labelpath.includes('/') ? Shell.of(labelpathed, this.rootBox) : Shell.of(labelpathed)
+   }
+   // --
+ 
+@@ -419,9 +427,9 @@ export class ThingMinder {
+   get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: Labelpath.RootBox } }
+ 
+   /** The scope of `scoped`, demanding that it is in this minder's bank. */
+-  #demandOwnScope(scoped: ThingScope): ThingScope {
++  #demandOwnScope(labelpathed: Labelpathed): ThingScope {
+     // Its fields alone: an ask or a record passes, and is read as its scope.
+-    return ThingChecks.thingScope.parseConsistent(scoped, this.scope)
++    return ThingChecks.thingScope.parseConsistent(labelpathed, this.scope)
+   }
+ 
+   /** Demand that the minder is minding: after `hello`, before `goodbye`. */
+@@ -527,7 +535,7 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
+ /** A listing of every labelpath in `prior` and in `labelpaths`, once each, in labelpath order. */
+ function listingOf(prior: readonly Labelpath[], labelpaths: readonly Labelpath[]): Labelpath[] {
+   // Labelpaths sort by code unit, as the vaultDB lists them; the union holds no two alike. The rule's `one - other` is for numbers.
+-  return union(prior, labelpaths).toSorted((one, other) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
++  return union(prior, labelpaths).toSorted((one: Labelpath, other: Labelpath) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
+ }
+ 
+ /** TanStack's structural sharing for a listing: `prior` where `next` lists the same labelpaths, else `next`, frozen. */
+diff --git a/packages/safebyok/tests/minding/thing-minder/thing-minder-keys.test.ts b/packages/safebyok/tests/minding/thing-minder/thing-minder-keys.test.ts
+index 310271a65..e815fa9cc 100644
+--- a/packages/safebyok/tests/minding/thing-minder/thing-minder-keys.test.ts
++++ b/packages/safebyok/tests/minding/thing-minder/thing-minder-keys.test.ts
+@@ -23,14 +23,14 @@ describe("ThingMinder keys", () => {
+ 
+   it("make a subtree prefix of the labels and '/', which no key of the Thing's own starts", () => {
+     const minder = minderWithoutStart()
+-    expect(minder.subtreeQueryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/'])
+-    expect(minder.subtreeQueryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '/'])
++    expect(minder.childrenQueryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/'])
++    expect(minder.childrenQueryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '/'])
+   })
+ 
+   it("match, for a subtree prefix, every key under the Thing and neither of the Thing's own", () => {
+     const minder = minderWithoutStart()
+     const matches = (prefixScope: ThingScope, keyScope: ThingScope) => {
+-      const prefix = minder.subtreeQueryKey(prefixScope)
++      const prefix = minder.childrenQueryKey(prefixScope)
+       return [minder.queryKey(keyScope), minder.listingQueryKey(keyScope)].map((queryKey) => TSQ.partialMatchKey(queryKey, prefix))
+     }
+     expect(matches(TH.RootScope, TH.RootScope)).to.deep.equal([false, false])
+diff --git a/packages/safebyok/tests/minding/thing-minder/thing-minder-listing-orders.test.ts b/packages/safebyok/tests/minding/thing-minder/thing-minder-listing-orders.test.ts
+index d3eaca643..ca793dc3e 100644
+--- a/packages/safebyok/tests/minding/thing-minder/thing-minder-listing-orders.test.ts
++++ b/packages/safebyok/tests/minding/thing-minder/thing-minder-listing-orders.test.ts
+@@ -1,6 +1,10 @@
+ import { describe, expect, it, vi } from 'vitest'
++import type { ThingCar } from '../../../src/shapes/shapes-minder'
++import type { Labelpath } from '../../../src/shapes/primitives'
++import type { ThingRecord } from '../../../src/shapes/shapes-thing'
++import { Thing } from '../../../src/models/thing'
+ import * as TH from '../../test-helpers'
+-import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
++import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf } from './world'
+ 
+ // == [Listings in any order]: ListingStep, OrdersWithoutWrite, ListingOrders, listingAfter
+ 
+@@ -74,3 +78,74 @@ describe("a ThingMinder's listing is the same, in any order", () => {
+   })
+ })
+ // --
++
++// == [Events in any order]: Openai, Reborn, eventsAfter, backwardCars, isForwardCar, fullestRecordOf, shrunkListings
++
++/** The box openai, as the store holds it at the start. */
++const Openai = TH.boxThingOf()
++
++/** The box openai, deleted and born again in a later life on another device. */
++const Reborn = TH.boxRebornOf(TH.boxTombOf(TH.nextOf(Openai)))
++
++/** Each event a listener is told while `steps` run, in order, over a store holding the box openai at revision 0, and the
++ * refusalkind of each get refused. The get and the list read the store, the write replaces openai with its revision 1,
++ * and the notice tells of {@link Reborn}, which the store never holds: a get after it is refused.
++ */
++async function eventsAfter(steps: readonly ListingStep[]) {
++  const vaultDB = new QuietVaultDB()
++  await storedBoxOf(vaultDB)
++  const { minder, receive } = minderWorldOf(vaultDB)
++  const heard      = listenerOf()
++  minder.listen(heard)
++  const replaceAsk = TH.replaceAskOf(Openai, TH.nextOf(Openai))
++  const refusalkinds: unknown[] = []
++  const stepRunners: Readonly<Record<ListingStep, () => Promise<void> | void>> = {
++    list:   async () => { await minder.list('box') },
++    get:    async () => {
++      try { await minder.get(TH.BoxScope, { staleTime: 0 }) } catch (err) { refusalkinds.push((err as { refusalkind?: unknown }).refusalkind) }
++    },
++    write:  async () => { await TH.expectGood(minder.tryWrite(replaceAsk)) },
++    notice: () => { receive(noticeOf(Reborn)) },
++  }
++  for (const step of steps) { await stepRunners[step]() }
++  return { events: heard.mock.calls.map(([event]) => event), refusalkinds }
++}
++
++/** Each car in `cars`, told in that order, that went back from the one told before it. */
++function backwardCars(cars: readonly (ThingCar<ThingRecord> | undefined)[]) {
++  return cars.filter((car, ii) => (ii > 0) && (! isForwardCar(cars[ii - 1], car)))
++}
++
++/** True when `next`, told after `prior`, has a newest no older, and within one life a fullest record no older. */
++function isForwardCar(prior: ThingCar<ThingRecord> | undefined, next: ThingCar<ThingRecord> | undefined): boolean {
++  if ((prior === undefined) || (next === undefined) || (Thing.cmp(prior.newest, next.newest) < 0)) { return false }
++  if (prior.newest.lifepath !== next.newest.lifepath) { return true }
++  const [priorFullest, nextFullest] = [fullestRecordOf(prior), fullestRecordOf(next)]
++  return (priorFullest === undefined) || ((nextFullest !== undefined) && (Thing.cmp(priorFullest, nextFullest) >= 0))
++}
++
++/** The fullest record `car` stands for, its tombstone or shell included, or undefined for a bare car. */
++function fullestRecordOf(car: ThingCar<ThingRecord>) { return (car.liveness === 'bare') ? undefined : (car.fullest ?? car.newest) }
++
++/** Each listing in `listings`, told in that order, that lacks a labelpath of the one told before it. */
++function shrunkListings(listings: readonly (readonly Labelpath[] | undefined)[]) {
++  return listings.filter((labelpaths, ii) => (ii > 0) && (listings[ii - 1] ?? []).some((labelpath) => (! labelpaths?.includes(labelpath))))
++}
++
++describe("a ThingMinder tells each car and listing going forward, in any order", () => {
++  describe("of a list, a get, a write and a notice of a later life", () => {
++    for (const steps of ListingOrders) {
++      const blurb = steps.join(', ')
++      it(blurb, async () => {
++        const { events, refusalkinds } = await eventsAfter(steps)
++        const cars     = events.flatMap((event) => ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) ? [event.car] : [])
++        const listings = events.flatMap((event) => ((event.carkind === 'listing') && (event.of.parentpath === 'box')) ? [event.labelpaths] : [])
++        expect(backwardCars(cars)).to.deep.equal([])
++        expect(shrunkListings(listings)).to.deep.equal([])
++        expect(cars.at(-1)?.newest).to.deep.equal(Reborn)
++        expect(refusalkinds.filter((kind) => kind !== 'stale_read')).to.deep.equal([])
++      })
++    }
++  })
++})
++// --
