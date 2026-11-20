@@ -38,7 +38,7 @@ export function makeHeldDeriver(): HeldDeriver {
 }
 // --
 
-// == [The world]: JokesPath, JokesKey, KnockKnockWorld, makeKnockKnockWorld, _cheat_giverDeviceOf, stopNothing
+// == [The world]: JokesPath, JokesKey, KnockKnockWorld, buildKnockKnockWorld, _cheat_giverDeviceOf, stopNothing
 
 /** The labelpath of the box holding the joke service's key. */
 export const JokesPath = 'box/jokes'
@@ -60,7 +60,7 @@ export interface KnockKnockWorld {
 /** A Device with no `requestCleartext`, its bank born under {@link LeanTH.TestPassphrase} with the joke service's key stored at {@link JokesPath}, then locked.
  * The Device is swept as the test finishes, ending any gating still open.
  */
-export async function makeKnockKnockWorld(): Promise<KnockKnockWorld> {
+export async function buildKnockKnockWorld(): Promise<KnockKnockWorld> {
   const deriver = makeHeldDeriver()
   const { device, bank, vault } = await LeanTH.buildBornVault({ device: LeanTH.makeDevice({}, { keyDeriver: deriver }) })
   onTestFinished(() => { device.sweep() })

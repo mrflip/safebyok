@@ -99,7 +99,7 @@ function takeText(form: FormData, fieldname: string): string {
 
 /** Hue's app over a fresh world, rendered under the test's own QueryClient. */
 async function renderKnockKnock() {
-  const world  = await TH.makeKnockKnockWorld()
+  const world  = await TH.buildKnockKnockWorld()
   const app    = makeKnockKnockApp(world)
   const client = new QueryClient()
   onTestFinished(() => { client.clear() })
