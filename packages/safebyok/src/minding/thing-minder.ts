@@ -200,15 +200,19 @@ export class ThingMinder {
    * Where that leaves a car `bhnd` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
    * answers from the cache.
    * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
+   * A list answered after `goodbye` caches nothing.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
     MinderChecks.minderLabelpath.parse(labelpath)
     this.#demandReady()
-    const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
-    const answer = await this.#vaultDB.tryListThings(ask)
+    const minding = this.#minding
+    const ask     = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
+    const answer  = await this.#vaultDB.tryListThings(ask)
     if (! answer.ok) { throw answer.err }
     if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
     const labelpaths = answer.val.map((record) => record.labelpath)
+    // A list answered after goodbye belongs to the cache goodbye emptied, though a fresh hello has started another.
+    if (this.#minding !== minding) { return labelpaths }
     TSQ.notifyManager.batch(() => {
       this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
       for (const record of answer.val) { this.#sendToTSQ(record) }
@@ -279,9 +283,11 @@ export class ThingMinder {
     } catch (err) {
       return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
     }
-    const answer = await this.#vaultDB.tryWriteThing(ask)
-    // Only the record written lands here. A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
-    if (answer.ok) { this.#sendToTSQ(answer.val) }
+    const minding = this.#minding
+    const answer  = await this.#vaultDB.tryWriteThing(ask)
+    // Only the record written lands here, and only in the cache the write began in: a fresh hello's is another. A refusal's
+    // dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
+    if (answer.ok && (this.#minding === minding)) { this.#sendToTSQ(answer.val) }
     return answer
   }
   // --

@@ -7,7 +7,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type ThingRecord, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { fakeBankOf, LateVaultDB, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
+import { fakeBankOf, LateVaultDB, LateListVaultDB, LateWriteVaultDB, boxBirthAskOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
 
 describe("ThingMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
@@ -191,6 +191,32 @@ describe("ThingMinder.goodbye", () => {
     }
     // Tripwire: the sweep reaches both a get refused and a get that returned before goodbye.
     expect([outcomes.has('disabled'), outcomes.has('full')]).to.deep.equal([true, true])
+  })
+
+  it("answers a list that answers after goodbye and a fresh hello, and caches nothing of it", async () => {
+    const vaultDB = new LateListVaultDB()
+    await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    const listing = minder.list('box')
+    await TH.eventually(() => vaultDB.isHolding)
+    minder.goodbye()
+    minder.hello()
+    vaultDB.release()
+    expect(await listing).to.deep.equal(['box/openai'])
+    expect([minder.listingAt(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([[], undefined])
+  })
+
+  it("answers a write that answers after goodbye and a fresh hello, and caches nothing of it", async () => {
+    const vaultDB = await bornOf(new LateWriteVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    vaultDB.hold()
+    const writing = minder.tryWrite(boxBirthAskOf())
+    await TH.eventually(() => vaultDB.isHolding)
+    minder.goodbye()
+    minder.hello()
+    vaultDB.release()
+    expect(await writing).to.deep.include({ ok: true, act: 'born', val: TH.boxThingOf() })
+    expect([minder.listingAt(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([[], undefined])
   })
 
   it("lets hello start the minder again, with the cache's timings it was made with", async () => {
