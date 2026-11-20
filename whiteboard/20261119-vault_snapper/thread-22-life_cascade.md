@@ -1,7 +1,7 @@
 # Thread 22: life_cascade (2026-11-20)
 
 Branch `20261120-life_cascade`, PR #788, stacked on #786. Proved: `pnpm justify` green after the catch-up (safebyok
-1326, safebyok-big 2946, safebyok-react 348, e2e 576, the rest green).
+1329 after the review rework (device sweeps every bank), safebyok-big 2946, safebyok-react 348, e2e 576, the rest green).
 
 The Coach (2026-11-20): "device should stay but everything else should be disabled and device has dropped refs after
 sweep, delete, or vacate ... stop watches, unset minder, vaultdb, bank, any other refs, stop notifications. cache
@@ -17,8 +17,10 @@ empties itself delivers notifications".
     listener `'removed'`.
   - `device.cheatDropBank(bank)` unsubscribes from that bank, drops it and shows `PendingBank`. It ignores a bank the
     device does not hold.
-  - `device.sweep()` only sweeps the bank the device holds. The device stays enabled, still judges strength, and holds
-    the next bank made or born on it.
+  - `device.sweep()` sweeps every bank made on the device and not yet swept (the device keeps them in `#madeBanks`,
+    added by `cheatHoldBank`, removed by `cheatDropBank`; `#thisIsTemporaryBank` stays the one its snapshot shows and
+    `device.lock()` locks). Making a bank sweeps nothing. The device stays enabled, still judges strength, and holds
+    the next bank made or born on it. (Reworked after review, with the Coach's ruling "yes the device should sweep".)
   - New export: `type HostedVault` (`{ sweep(): unknown }`, `shapes-bankish.ts`), with the phrase `HostedVaultExpected`.
   - Tests:
     - `tests/models/vault.test.ts`: the cascade under both sweeps, with two vaults (cache emptied, removal told, both
@@ -26,7 +28,8 @@ empties itself delivers notifications".
       refusing a swept bank.
     - `tests/models/bank.test.ts`: `hostVault`'s checks, and a hosted vault swept once.
     - `tests/models/device.test.ts`: `device.sweep()` rewritten; the snapshot showing `PendingBank`; an earlier bank's
-      sweep leaving the later one shown.
+      sweep leaving the later one shown; two banks on one device, the earlier unlocked, both swept by `device.sweep()`
+      (both leases swept, both refusing `disabled`); a second bank leaving the first working.
 * **Decisions made**:
   - **How the bank reaches its vaults: registration.** The vault registers itself in `Vault.make`. `safebyok/core`
     carries no caching, so `bank.ts` cannot import `Vault` or the minder. A `Set`, not the last vault, because a bank
@@ -55,9 +58,9 @@ empties itself delivers notifications".
   - **Tests removed:** `gating.test.ts` "refuses on a swept device ...": nothing ends a device now. The device-ending
     tests in `device.test.ts` and `bank.test.ts` were rewritten for a device that stays.
 * **Discoveries**:
-  - **A bank made earlier on the device** (two `Bank.make` calls on one device) is not reached by `device.sweep()`, and
-    now stays enabled. Before, it refused every call once its device was swept. This is written into
-    `notes/guarantees-drift.md` (the leaseKey entry, amended) and `notes/security.md`.
+  - **A bank made earlier on the device** was not reached by `device.sweep()`, and stayed enabled (the review's
+    significant finding). Fixed: the device sweeps every bank made on it. One drift remains, in
+    `notes/guarantees-drift.md`: `device.lock()` locks only the last bank made.
   - **Crossings, written into `notes/wontfix.md`:**
     - A birth in flight across `device.sweep()` now resolves a bank, which the device holds. This widens the "A lock, a
       sweep or a second form verb" entry.

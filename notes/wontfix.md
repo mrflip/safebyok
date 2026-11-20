@@ -112,7 +112,7 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
     change that attaches its lease after the lock leaves the bank unlocked.
   - A sweep while an attempt is in flight: the attempt's write, if it has not yet begun, refuses `disabled`; one already
     sent lands in storage, and the lease the attempt then builds is evicted and the verb refuses `disabled`.
-  - A `device.sweep()` while a `Bank.birth` on that device is in flight sweeps the bank the device holds then, if any:
+  - A `device.sweep()` while a `Bank.birth` on that device is in flight sweeps each bank made on the device then:
     a birth whose bank is not yet made goes on, and the device holds the bank it makes. A device stays usable after
     its sweep, so the birth is not refused.
   - Two gate changes on one bank at once each cite the gate they proved against: the first to reach the vaultDB is
