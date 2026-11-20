@@ -105,6 +105,33 @@ Reasoning for wontfix: every revision is sealed under the lease, so a put needs 
 and a seal keeps none of the cited whisper; carrying it across would mean a new construction or an unseal hidden in a
 write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock anyway. Document as won't fix".
 
+### A lock, a sweep or a second form verb while a form verb runs
+
+* current outcome, as built, and promised nowhere:
+  - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an unlock or a gate
+    change that attaches its lease after the lock leaves the bank unlocked.
+  - A sweep while an attempt is in flight: the attempt's write, if it has not yet begun, refuses `disabled`; one already
+    sent lands in storage, and the lease the attempt then builds is evicted and the verb refuses `disabled`.
+  - Two gate changes on one bank at once each cite the gate they proved against: the first to reach the vaultDB is
+    written, and the second refuses `stale_write`, changes nothing and unlocks nothing. Until the bank observes itself,
+    its main gate stays the one it last wrote, so a gate change made on another device refuses `stale_write` here too.
+* alternatives:
+  - have a lock or a sweep wait for, or reach into, an attempt in flight, or have an attempt check the lock state between
+    its steps: a lifecycle call reaching across an attempt, or new checks in a primitive's critical path, for a crossing.
+  - a lock across the form verbs: a lock is a last resort.
+  - take the gate stored from a `stale_write`'s answer and prove against it: the bank observing itself, which is later
+    work, and which would still not let a proof made against one gate write over another.
+* workaround: the host's form submits one verb at a time and awaits it before locking or sweeping the bank; after
+  `stale_write`, the host makes the bank again from what is stored.
+
+Steps to reproduce: call `bank.unlock(...)` and, before it resolves, `bank.lock()`: the bank ends unlocked. Or call
+`bank.replacePassphrase(...)` twice without awaiting the first: the second refuses `stale_write`.
+
+Reasoning for wontfix: each case is two of the host's own calls crossing over one bank, which the host sequences; what
+lands is what the calls amount to in the order they ran, nothing is left inconsistent in storage, and a refused gate
+change never unlocks. Specifying them would mean waits, dismissals or checks reaching across an attempt and the bank's
+lifecycle: new machinery in a primitive's critical path, for crossings the host avoids by awaiting its own calls.
+
 ### A minder's answer that crosses a `goodbye` and a fresh `hello`
 
 * current outcome, as built, and promised nowhere: a `get`, `list` or `write` the ThingMinder began before `goodbye`,
