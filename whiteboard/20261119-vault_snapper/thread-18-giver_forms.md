@@ -1,6 +1,6 @@
 # Thread 18: giver_forms (2026-11-20)
 
-Branch `20261120-giver_forms`, PR #TBD, stacked on #785 (thread 17, form_verbs). Proved: safebyok-react's tests 346/346, lint and typecheck clean; `pnpm justify` after the catch-up: TBD.
+Branch `20261120-giver_forms`, PR #786, stacked on #785 (thread 17, form_verbs). Proved: safebyok-react's tests 346/346, lint and typecheck clean; `pnpm justify` after the catch-up: TBD.
 
 * **Built** (all in `packages/safebyok-react/src/giver/`):
   * `useGating` and the giver's `ServerSnapshot` are gone. Nothing gating-shaped is left in the giver.
