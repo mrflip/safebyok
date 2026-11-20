@@ -34,6 +34,16 @@ function strengthChecker(passphrase: string) { return (passphrase === 'weak' ? {
 /** A bank born on `device` through its prompt, by {@link TH.TestPassphrase}. */
 function birthByPrompt(device: Device): Promise<Bank> { return TH.answerPrompt(device, Bank.launchBirthBankPrompt(device), { passphraseClear: TH.TestPassphrase }) }
 
+/** Cleartexts an unlock's re-entry point must refuse, by what is wrong with them. */
+const SloppyUnlockCleartexts = [
+  // not cleartexts at all:
+  [null,                    'null'],
+  ["a bare passphrase",     'a bare string'],
+  // the wrong shape:
+  [{},                      'no field'],
+  [{ passphraseClear: 42 }, 'a passphrase that is not text'],
+] as const
+
 /** Whether `promise` has settled yet, as a flag that flips once it does. */
 function settledFlag(promise: Promise<unknown>): { readonly isSettled: boolean } {
   const flag = { isSettled: false }
@@ -547,6 +557,26 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const passkeyClear = TH.passkeyAnswerOf()
     await TH.expectBad(bank.attemptUnlock({ passkeyClear }), 'disabled')
     expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
+  })
+
+  for (const [cleartexts, blurb] of SloppyUnlockCleartexts) {
+    it(`resolves a refusal for ${blurb} with no gating open, the bank locked`, async () => {
+      const { bank, device } = await TH.buildBornBank()
+      bank.lock()
+      await TH.expectBad(bank.attemptUnlock(cleartexts as never))
+      expect(bank.isLocked).to.be.true
+      expect(device.openGating).to.be.null
+    })
+  }
+
+  it("resolves a refusal quoting nothing of what a throwing getter threw", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.lock()
+    const cleartexts = { get passphraseClear(): string { throw new Error(TH.TestPassphrase) } }
+    const err = await TH.expectBad(bank.attemptUnlock(cleartexts))
+    expect(JSON.stringify(err)).to.not.include(TH.TestPassphrase)
+    expect(err.message).to.not.include(TH.TestPassphrase)
+    expect(err.cause).to.be.undefined
   })
 })
 
