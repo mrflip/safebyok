@@ -28,8 +28,8 @@ describe("ThingMinder.listen", () => {
   })
 
   it("types a car's event by its modelkind", () => {
-    expectTypeOf<Extract<MinderEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxCar | undefined>()
-    expectTypeOf<Extract<MinderEvent, { modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateCar | undefined>()
+    expectTypeOf<Extract<ThingEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxCar | undefined>()
+    expectTypeOf<Extract<ThingEvent, { modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateCar | undefined>()
     expectTypeOf<Exclude<MinderEvent, ThingEvent>['state']['data']>().toEqualTypeOf<readonly Labelpath[] | undefined>()
   })
 
