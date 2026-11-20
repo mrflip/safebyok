@@ -305,7 +305,14 @@ sign-in loosening changes no working-case answer within a Device's life.
 reads the Device's snapshot and, in a form action, calls `bank.attemptUnlock` with the passphrase from `FormData`;
 the mutation resumes with the whisper. A second submission while the dialog is open joins it. The test asserts the
 passphrase is never in React state or a snapshot. Any wiring the core lacks is one explicit `cheat…` method. *Depends
-on:* threads 7 and 8, restacked into one line. *Size:* M. *Status:* ready, #776 (one compaction); in review, `medium` on `opus`. *Orchestrator:* from thread 8 (#775): use `Giver.useGating()`,
+on:* threads 7 and 8, restacked into one line. *Size:* M. *Status:* reviewed at 3e54c503b, filing, #776 (one compaction).
+
+*Review:* fixed (medium, `opus`): a test that the secret search finds a planted secret; three titles, a doc phrase,
+a progress-note comment. Checked by breaking the code: without the FormData delete the search finds the passphrase;
+without the join, test 4 fails. The thread file's account of the naked passphrase matches the code. Left: the join
+test's wait checks nothing (its pause does the work); the button's `isAttempting` half untested; `holdsText` skips
+symbol keys and byte buffers; the rename to `buildKnockKnockWorld` (thread 10). A `sonnet` subagent recorded the
+FormData finding in notes/security.md (dca0fc3f0). *Orchestrator:* from thread 8 (#775): use `Giver.useGating()`,
 `Giver.forBank(label).useBankSnapshot()` and `useBoxRecord(labelpath)`; the real Device has no `ensureBank` or
 `onBankStart`, so the giver's bank wiring needs them on the Device or a wrapper (`minderDeviceOf` in
 `tests/test-helpers/minder-giver-world.ts` shows the shape): the one cheat goes there. The test brings its own
