@@ -1,7 +1,7 @@
 # Thread 11: minder_try (2026-11-20)
 
-Branch `20261120-minder_try`, PR #778, stacked on #777 (whisper_refresh). Proved: safebyok 1374 tests, safebyok-react 329,
-typecheck and lint clean in both, before the catch-up.
+Branch `20261120-minder_try`, PR #778, stacked on #777 (whisper_refresh). Proved: `pnpm justify` green after the catch-up onto #777
+(safebyok 1374 tests, safebyok-react 329, e2e 576).
 
 * **Built**:
   * **The goodbye-then-hello token is out** (`packages/safebyok/src/minding/thing-minder.ts`). `#minding: symbol | null` is
