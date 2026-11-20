@@ -352,7 +352,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const gating = device.openGating!
     const secondUsing = vault.withWhisper(Openai, ({ revseq }) => revseq + 1)
     expect(device.openGating).to.equal(gating)
-    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
     expect(await Promise.all([firstUsing, secondUsing])).to.deep.equal([0, 1])
   })
 

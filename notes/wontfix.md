@@ -108,10 +108,10 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
 ### A direct gate change, a lock or a sweep beside an open gating
 
 * current outcome, as built, and promised nowhere:
-  - `attemptReplacePassphrase`, `attemptAddPasskey` or `attemptRevokePasskey`, while an `unlock_bank` gating or a
-    gating of another kind is open on the bank, makes its change directly, as with no gating open. The open gating
-    stays open, and the prompts waiting on it keep waiting, the bank unlocked or not, until an attempt of its own kind
-    or a dismiss concludes it.
+  - `tryAttemptReplacePassphrase`, `tryAttemptAddPasskey` or `tryAttemptRevokePasskey`, or its throwing twin, while
+    an `unlock_bank` gating or a gating of another kind is open on the bank, makes its change directly, as with no
+    gating open. The open gating stays open, and the prompts waiting on it keep waiting, the bank unlocked or not,
+    until an attempt of its own kind or a dismiss concludes it.
   - `bank.lock()` or `bank.sweep()`, while a gating is open on the bank, leaves that gating open: an attempt still runs
     after a lock, and refuses `disabled` after a sweep, which ends the gating. `device.sweep()` dismisses it.
   - A lock or a sweep while an attempt is in flight lands wherever the attempt's steps have reached: an unlock that
@@ -127,13 +127,13 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
   dismisses its open gating (`gating.dismiss()`) before locking or sweeping the bank.
 
 Steps to reproduce: open an unlock prompt (`bank.ensureUnlocked()` on a locked bank) and, with its gating open, call
-`bank.attemptReplacePassphrase(...)`: the passphrase changes and the bank unlocks, and the unlock prompt still waits.
+`bank.tryAttemptReplacePassphrase(...)`: the passphrase changes and the bank unlocks, and the unlock prompt still waits.
 Or open any prompt and call `bank.lock()` or `bank.sweep()` while it is open, or while its attempt runs.
 
 Reasoning for wontfix: each case is two of the host's own calls crossing over one bank, which the host sequences; what
 lands is what the calls amount to in the order they ran, and nothing is left inconsistent in storage. Specifying them
 would mean waits, dismissals or checks reaching across the gating and the bank's lifecycle: new machinery in a
-primitive's critical path, for crossings the host avoids by sequencing its own calls. An `attemptUnlock` beside a gating of another
+primitive's critical path, for crossings the host avoids by sequencing its own calls. A `tryAttemptUnlock` beside a gating of another
 kind is not among them: it waits that gating out, then resolves at once if the bank is unlocked. Ruled by the Coach,
 2026-11-20, vault_snapper, on thread 5's overlapping gatings.
 

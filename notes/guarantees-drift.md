@@ -30,3 +30,6 @@ what differs from big, in a sentence or two.
   four re-entry points, `attemptUnlock`, `attemptReplacePassphrase`, `attemptAddPasskey` and `attemptRevokePasskey`
   (`packages/safebyok/src/models/bank.ts`), take the cleartexts a form collected and pass them unread to `gating.ts`
   (the open gating, or `attemptWithoutGating`), so G1 and G9 hold in substance.
+  amended 2026-11-20 (vault_try): the four are now `tryAttemptUnlock`, `tryAttemptReplacePassphrase`,
+  `tryAttemptAddPasskey` and `tryAttemptRevokePasskey`, each answering an outcome, with throwing twins under the old names
+  that call them; neither reads the cleartexts, so G1 and G9 still hold in substance.

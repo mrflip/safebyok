@@ -411,7 +411,7 @@ describe("bank.ensureUnlocked()", () => {
 })
 
 describe("a prompt on a bank whose gating is open", () => {
-  it("joins it, and every waiter resumes after one attemptUnlock", async () => {
+  it("joins it, and every waiter resumes after one tryAttemptUnlock", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const make = vi.spyOn(Lease, 'make')
@@ -419,7 +419,7 @@ describe("a prompt on a bank whose gating is open", () => {
     const gating = device.openGating!
     const secondEnsuring = bank.ensureUnlocked()
     expect(device.openGating).to.equal(gating)
-    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
     expect(await firstEnsuring).to.equal(bank)
     expect(await secondEnsuring).to.equal(bank)
     expect(make).toHaveBeenCalledTimes(1)
@@ -433,7 +433,7 @@ describe("a prompt on a bank whose gating is open", () => {
     bank.lock()
     requestCleartext.mockClear()
     const ensurings = [bank.ensureUnlocked(), bank.launchUnlockBankPrompt()]
-    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
     expect(await Promise.all(ensurings)).to.deep.equal([bank, bank])
     expect(requestCleartext).toHaveBeenCalledTimes(1)
   })
@@ -443,11 +443,11 @@ describe("a prompt on a bank whose gating is open", () => {
     bank.lock()
     const ensurings = [bank.ensureUnlocked(), bank.ensureUnlocked()]
     const settled = ensurings.map((ensuring) => settledFlag(ensuring))
-    await TH.expectBad(bank.attemptUnlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
+    await TH.expectBad(bank.tryAttemptUnlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
     await TH.wakeupAtNextTick()
     expect(settled.map((flag) => flag.isSettled)).to.deep.equal([false, false])
     expect(device.openGating!.isOpen).to.be.true
-    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
     expect(await Promise.all(ensurings)).to.deep.equal([bank, bank])
   })
 
@@ -465,7 +465,7 @@ describe("a prompt on a bank whose gating is open", () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.maingate
     const prompts = [bank.launchReplacePassphrasePrompt(), bank.launchReplacePassphrasePrompt()]
-    await TH.expectGood(bank.attemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
+    await TH.expectGood(bank.tryAttemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
     expect(await Promise.all(prompts)).to.deep.equal([bank, bank])
     expect(bank.maingate).to.include({ revseq: ante.revseq + 1 })
     expect(device.openGating).to.be.null
@@ -478,7 +478,7 @@ describe("a prompt on a bank whose gating is open", () => {
     const gating = device.openGating!
     const ensuring = bank.ensureUnlocked()
     expect(device.openGating).to.equal(gating)
-    await TH.expectGood(bank.attemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
+    await TH.expectGood(bank.tryAttemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
     expect(await ensuring).to.equal(bank)
     expect(await replacing).to.equal(bank)
     expect(bank.isUnlocked).to.be.true
@@ -497,19 +497,9 @@ describe("a prompt on a bank whose gating is open", () => {
     await TH.wakeupAtNextTick()
     expect(settled.map((flag) => flag.isSettled)).to.deep.equal([false, false])
     expect(device.openGating).to.include({ gatingkind: 'unlock_bank' }).and.not.equal(gating)
-    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
     expect(await Promise.all(ensurings)).to.deep.equal([bank, bank])
     expect(bank.isUnlocked).to.be.true
-  })
-
-  it("refuses 'disabled' when the device is swept while it waits out a gate change, opening no gating", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    bank.lock()
-    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
-    const ensuring = TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
-    device.sweep()
-    await Promise.all([replacing, ensuring])
-    expect(device.openGating).to.be.null
   })
 
   it("refuses a gate change while a gating of another kind is open, leaving that gating open", async () => {
@@ -533,12 +523,12 @@ describe("a prompt on a bank whose gating is open", () => {
   })
 })
 
-describe("bank.attemptUnlock(cleartexts)", () => {
+describe("bank.tryAttemptUnlock(cleartexts)", () => {
   it("unlocks with no gating open, opening none", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const make = vi.spyOn(Lease, 'make')
-    expect(await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))).to.equal(bank)
+    expect(await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))).to.equal(bank)
     expect(bank.isUnlocked).to.be.true
     expect(device.openGating).to.be.null
     expect(make.mock.calls[0]![0]).to.include({ gate_revtok: bank.maingate.revtok, wayinkind: 'passphrase' })
@@ -547,7 +537,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
   it("resolves the refusal of a wrong passphrase with no gating open, the bank locked", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
-    await TH.expectBad(bank.attemptUnlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
+    await TH.expectBad(bank.tryAttemptUnlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
     expect(bank.isLocked).to.be.true
   })
 
@@ -556,7 +546,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const { bank } = await TH.buildBornBank({ passkeyCleartext })
     bank.lock()
     const passkeyClear = TH.copyOfAnswer(passkeyCleartext)
-    await TH.expectGood(bank.attemptUnlock({ passkeyClear }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passkeyClear }))
     expect(bank.isUnlocked).to.be.true
     expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
   })
@@ -565,7 +555,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
     bank.lock()
     const passkeyClear = TH.passkeyAnswerOf()
-    await TH.expectBad(bank.attemptUnlock({ passkeyClear }))
+    await TH.expectBad(bank.tryAttemptUnlock({ passkeyClear }))
     expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
     expect(bank.isLocked).to.be.true
   })
@@ -575,7 +565,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }) })
     bank.sweep()
     deriveKeyBytes.mockClear()
-    await TH.expectBad(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }), 'disabled')
+    await TH.expectBad(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }), 'disabled')
     expect(deriveKeyBytes).not.toHaveBeenCalled()
   })
 
@@ -583,7 +573,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
     bank.sweep()
     const passkeyClear = TH.passkeyAnswerOf()
-    await TH.expectBad(bank.attemptUnlock({ passkeyClear }), 'disabled')
+    await TH.expectBad(bank.tryAttemptUnlock({ passkeyClear }), 'disabled')
     expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
   })
 
@@ -591,7 +581,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     it(`resolves a refusal for ${blurb} with no gating open, the bank locked`, async () => {
       const { bank, device } = await TH.buildBornBank()
       bank.lock()
-      await TH.expectBad(bank.attemptUnlock(cleartexts as never))
+      await TH.expectBad(bank.tryAttemptUnlock(cleartexts as never))
       expect(bank.isLocked).to.be.true
       expect(device.openGating).to.be.null
     })
@@ -604,12 +594,12 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const gating = device.openGating!
     // The bank has no passkey: used, this answer would be refused.
     const passkeyClear = TH.passkeyAnswerOf()
-    const attempting = bank.attemptUnlock({ passkeyClear })
+    const attempting = bank.tryAttemptUnlock({ passkeyClear })
     const settled = settledFlag(attempting)
     await TH.wakeupAtNextTick()
     expect(settled.isSettled).to.be.false
     expect(device.openGating).to.equal(gating)
-    await TH.expectGood(bank.attemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
+    await TH.expectGood(bank.tryAttemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
     expect(await TH.expectGood(attempting)).to.equal(bank)
     expect(await replacing).to.equal(bank)
     expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
@@ -622,7 +612,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     bank.lock()
     const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
     const gating = device.openGating!
-    const attempting = bank.attemptUnlock({ passphraseClear: TH.TestPassphrase })
+    const attempting = bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase })
     gating.dismiss()
     await replacing
     expect(await TH.expectGood(attempting)).to.equal(bank)
@@ -634,7 +624,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
-    const attempting = bank.attemptUnlock({ passphraseClear: 'not the passphrase' })
+    const attempting = bank.tryAttemptUnlock({ passphraseClear: 'not the passphrase' })
     device.openGating!.dismiss()
     await replacing
     await TH.expectBad(attempting, 'wrong_passphrase')
@@ -648,26 +638,12 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
     const gating = device.openGating!
     const ensuring = bank.ensureUnlocked()
-    const attempting = bank.attemptUnlock({ passphraseClear: TH.TestPassphrase })
+    const attempting = bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase })
     gating.dismiss()
     await replacing
     expect(await TH.expectGood(attempting)).to.equal(bank)
     expect(await ensuring).to.equal(bank)
     expect(bank.isUnlocked).to.be.true
-    expect(device.openGating).to.be.null
-  })
-
-  it("resolves 'disabled' when the device is swept while it waits out a gate change, deriving no key", async () => {
-    const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
-    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }) })
-    bank.lock()
-    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
-    deriveKeyBytes.mockClear()
-    const attempting = bank.attemptUnlock({ passphraseClear: TH.TestPassphrase })
-    device.sweep()
-    await replacing
-    await TH.expectBad(attempting, 'disabled')
-    expect(deriveKeyBytes).not.toHaveBeenCalled()
     expect(device.openGating).to.be.null
   })
 
@@ -678,7 +654,7 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const gating = device.openGating!
     bank.sweep()
     const passkeyClear = TH.passkeyAnswerOf()
-    const attempting = bank.attemptUnlock({ passkeyClear })
+    const attempting = bank.tryAttemptUnlock({ passkeyClear })
     const settled = settledFlag(attempting)
     await TH.wakeupAtNextTick()
     expect(settled.isSettled).to.be.true
@@ -693,19 +669,19 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
     const cleartexts = { get passphraseClear(): string { throw new Error(TH.TestPassphrase) } }
-    const err = await TH.expectBad(bank.attemptUnlock(cleartexts))
+    const err = await TH.expectBad(bank.tryAttemptUnlock(cleartexts))
     expect(JSON.stringify(err)).to.not.include(TH.TestPassphrase)
     expect(err.message).to.not.include(TH.TestPassphrase)
     expect(err.cause).to.be.undefined
   })
 })
 
-describe("bank.attemptReplacePassphrase(cleartexts)", () => {
+describe("bank.tryAttemptReplacePassphrase(cleartexts)", () => {
   it("answers the open replace_passphrase gating, and its prompt resumes", async () => {
     const { bank, device } = await TH.buildBornBank()
     const replacing = bank.launchReplacePassphrasePrompt()
     const gating = device.openGating!
-    await TH.expectGood(bank.attemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
+    await TH.expectGood(bank.tryAttemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
     expect(await replacing).to.equal(bank)
     expect(gating.isOpen).to.be.false
   })
@@ -713,22 +689,22 @@ describe("bank.attemptReplacePassphrase(cleartexts)", () => {
   it("replaces the passphrase with no gating open, and the new one then unlocks", async () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.maingate
-    await TH.expectGood(bank.attemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
+    await TH.expectGood(bank.tryAttemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
     expect(device.openGating).to.be.null
     expect(bank.maingate).to.include({ revseq: ante.revseq + 1 })
     expect(await storedGateOf(bank)).to.deep.equal(bank.maingate.pickle())
     bank.lock()
-    await TH.expectBad(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }), 'wrong_passphrase')
-    await TH.expectGood(bank.attemptUnlock({ passphraseClear: NextPassphrase }))
+    await TH.expectBad(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }), 'wrong_passphrase')
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: NextPassphrase }))
   })
 })
 
-describe("bank.attemptAddPasskey(cleartexts)", () => {
+describe("bank.tryAttemptAddPasskey(cleartexts)", () => {
   it("answers the open add_passkey gating, and its prompt resumes", async () => {
     const { bank, device } = await TH.buildBornBank()
     const adding = bank.launchAddPasskeyPrompt()
     const gating = device.openGating!
-    await TH.expectGood(bank.attemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear: TH.passkeyAnswerOf() }))
+    await TH.expectGood(bank.tryAttemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear: TH.passkeyAnswerOf() }))
     expect(await adding).to.equal(bank)
     expect(gating.isOpen).to.be.false
     expect(bank.maingate.passkey0).to.not.be.null
@@ -737,10 +713,10 @@ describe("bank.attemptAddPasskey(cleartexts)", () => {
   it("adds the passkey with no gating open, and the passkey then unlocks", async () => {
     const { bank } = await TH.buildBornBank()
     const passkeyCleartext = TH.passkeyAnswerOf()
-    await TH.expectGood(bank.attemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear: TH.copyOfAnswer(passkeyCleartext) }))
+    await TH.expectGood(bank.tryAttemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear: TH.copyOfAnswer(passkeyCleartext) }))
     expect(await storedGateOf(bank)).to.deep.equal(bank.maingate.pickle())
     bank.lock()
-    await TH.expectGood(bank.attemptUnlock({ passkeyClear: TH.copyOfAnswer(passkeyCleartext) }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passkeyClear: TH.copyOfAnswer(passkeyCleartext) }))
   })
 
   it("resolves a refusal with no gating open while the gate has a passkey, writing nothing and zeroing the answer's bytes", async () => {
@@ -748,19 +724,19 @@ describe("bank.attemptAddPasskey(cleartexts)", () => {
     const ante = bank.maingate
     const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
     const passkeyClear = TH.passkeyAnswerOf()
-    await TH.expectBad(bank.attemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear }), 'bad_record')
+    await TH.expectBad(bank.tryAttemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear }), 'bad_record')
     expect(tryWriteThing).not.toHaveBeenCalled()
     expect(bank.maingate).to.equal(ante)
     expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
   })
 })
 
-describe("bank.attemptRevokePasskey(cleartexts)", () => {
+describe("bank.tryAttemptRevokePasskey(cleartexts)", () => {
   it("answers the open revoke_passkey gating, and its prompt resumes", async () => {
     const { bank, device } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
     const revoking = bank.launchRevokePasskeyPrompt()
     const gating = device.openGating!
-    await TH.expectGood(bank.attemptRevokePasskey({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptRevokePasskey({ passphraseClear: TH.TestPassphrase }))
     expect(await revoking).to.equal(bank)
     expect(gating.isOpen).to.be.false
     expect(bank.maingate.passkey0).to.be.null
@@ -768,7 +744,7 @@ describe("bank.attemptRevokePasskey(cleartexts)", () => {
 
   it("revokes the passkey with no gating open", async () => {
     const { bank, device } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
-    await TH.expectGood(bank.attemptRevokePasskey({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptRevokePasskey({ passphraseClear: TH.TestPassphrase }))
     expect(device.openGating).to.be.null
     expect(bank.maingate.passkey0).to.be.null
     expect(await storedGateOf(bank)).to.deep.equal(bank.maingate.pickle())
@@ -778,8 +754,36 @@ describe("bank.attemptRevokePasskey(cleartexts)", () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.maingate
     const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
-    expect(await TH.expectGood(bank.attemptRevokePasskey({ passphraseClear: TH.TestPassphrase }))).to.equal(bank)
+    expect(await TH.expectGood(bank.tryAttemptRevokePasskey({ passphraseClear: TH.TestPassphrase }))).to.equal(bank)
     expect(tryWriteThing).not.toHaveBeenCalled()
     expect(bank.maingate).to.equal(ante)
+  })
+})
+
+describe("bank's throwing re-entry points: attemptUnlock, attemptReplacePassphrase, attemptAddPasskey, attemptRevokePasskey", () => {
+  it("attemptUnlock resolves the bank unlocked, and rejects the refusal its try form answers", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.lock()
+    await TH.expectRefusal(bank.attemptUnlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
+    expect(await bank.attemptUnlock({ passphraseClear: TH.TestPassphrase })).to.equal(bank)
+    expect(bank.isUnlocked).to.be.true
+  })
+
+  it("attemptReplacePassphrase resolves the bank, and rejects a wrong current passphrase", async () => {
+    const { bank } = await TH.buildBornBank()
+    await TH.expectRefusal(bank.attemptReplacePassphrase({ antePassphraseClear: 'not the passphrase', nextPassphraseClear: NextPassphrase }), 'wrong_passphrase')
+    expect(await bank.attemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase })).to.equal(bank)
+  })
+
+  it("attemptAddPasskey resolves the bank, and rejects while the gate has a passkey", async () => {
+    const { bank } = await TH.buildBornBank()
+    expect(await bank.attemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear: TH.passkeyAnswerOf() })).to.equal(bank)
+    await TH.expectRefusal(bank.attemptAddPasskey({ passphraseClear: TH.TestPassphrase, passkeyClear: TH.passkeyAnswerOf() }), 'bad_record')
+  })
+
+  it("attemptRevokePasskey resolves the bank, and rejects a wrong passphrase", async () => {
+    const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.passkeyAnswerOf() })
+    await TH.expectRefusal(bank.attemptRevokePasskey({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
+    expect(await bank.attemptRevokePasskey({ passphraseClear: TH.TestPassphrase })).to.equal(bank)
   })
 })

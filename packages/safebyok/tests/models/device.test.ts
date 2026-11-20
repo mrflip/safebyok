@@ -294,7 +294,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     const prompting = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
     const snapshots = snapshotsOf(device)
     const passphraseClear = 'not the passphrase, though long enough'
-    await TH.expectBad(bank.attemptUnlock({ passphraseClear }), 'wrong_passphrase')
+    await TH.expectBad(bank.tryAttemptUnlock({ passphraseClear }), 'wrong_passphrase')
     expect(snapshots.map(({ gating }) => gating?.isAttempting)).to.deep.equal([true, false])
     expect(JSON.stringify(device.getSnapshot())).not.to.include(passphraseClear)
     device.openGating!.dismiss()
@@ -305,7 +305,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const prompting = bank.launchUnlockBankPrompt()
-    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
     await prompting
     expect(device.getSnapshot()).to.deep.equal({ bank: bank.getSnapshot(), gating: null })
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })

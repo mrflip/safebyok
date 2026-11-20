@@ -47,7 +47,7 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
 
   /** Unlock the bank with the passphrase in `form`, answering the unlock gating open. */
   async function unlockAction(_prior: UnlockState, form: FormData): Promise<UnlockState> {
-    const outcome = await bank.attemptUnlock({ passphraseClear: takeText(form, 'passphrase') })
+    const outcome = await bank.tryAttemptUnlock({ passphraseClear: takeText(form, 'passphrase') })
     return { refusalkind: outcome.ok ? null : outcome.err.refusalkind }
   }
 
