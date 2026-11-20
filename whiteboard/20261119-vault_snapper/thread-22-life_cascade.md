@@ -1,6 +1,6 @@
 # Thread 22: life_cascade (2026-11-20)
 
-Branch `20261120-life_cascade`, PR #TBD, stacked on #786. Proved: safebyok 1326 tests, safebyok-react 348, lint and
+Branch `20261120-life_cascade`, PR #788, stacked on #786. Proved: safebyok 1326 tests, safebyok-react 348, lint and
 typecheck clean in safebyok; `pnpm justify` at ready (see the PR's **Tests:** line).
 
 The Coach (2026-11-20): "device should stay but everything else should be disabled and device has dropped refs after
