@@ -1,17 +1,16 @@
 /** The giver: React hooks over a Device and its bank. This tab's state comes from the Device; stored records come through the host's React Query. */
 
-import { type Query, type QueryKey, queryOptions, replaceEqualDeep, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
-import { useEffect, useSyncExternalStore } from 'react'
+import {
+  type Query, type QueryKey, type UseMutationResult, type UseQueryResult, mutationOptions, queryOptions, replaceEqualDeep, useMutation, useQuery, useQueryClient,
+} from '@tanstack/react-query'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
-import { type BankSnapshot, type DeviceSnapshot, type OpenGatingSnapshot, PendingBank, ThingMinder, dbHasNewer } from 'safebyok'
+import {
+  type BankSnapshot, type BirthCleartexts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict, type UnlockCleartexts,
+  PendingBank, ThingMinder, dbHasNewer,
+} from 'safebyok'
 import { bridgeDevice } from './react-bridge'
 import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeChecks } from './shapes-giver'
-
-// == [Snapshots]: ServerSnapshot
-
-/** The snapshot the hooks report during a server render and while hydrating: no bank object, and no gating open. */
-const ServerSnapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
-// --
 
 // == [Query defaults]: carQueryDefaults, carStaleTimeOf, newerCarOf, isCar, fullestOf
 
@@ -57,10 +56,41 @@ function isCar(val: unknown): val is CarFields {
 function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return car.fullest }
 // --
 
-// == [The giver]: ReactGiver, BankGiver, makeReactGiver, makeBankGiver
+// == [Form mutations]: FormMutationDefaults, takeCleartexts
+
+// A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
+// the mutation would hold them, and an unlock that needs no network would wait for one.
+/** The giver's defaults for the mutation of a form verb in the host's React Query. */
+const FormMutationDefaults = { networkMode: 'always' } as const
+
+// React Query keeps a mutation's variables, the object handed to `mutate`, in its cache and its devtools until the mutation
+// is collected, and a passphrase is a string that cannot be zeroed. Taking the fields out leaves that object empty.
+/** A copy of `cleartexts`, its fields taken out of the object handed in. Anything not an object is handed on as it is, for the verb to refuse. */
+function takeCleartexts<CleartextsT>(cleartexts: CleartextsT): CleartextsT {
+  const handed: unknown = cleartexts
+  if ((typeof handed !== 'object') || (handed === null)) { return cleartexts }
+  const taken = { ...handed }
+  for (const fieldname of Object.keys(handed)) { Reflect.deleteProperty(handed, fieldname) }
+  return taken as CleartextsT
+}
+// --
+
+// == [The giver]: ReactGiver, StrengthVerdictResult, BankGiver, makeReactGiver, Unjudged, makeBankGiver
 
 /** What {@link makeReactGiver} returns. */
 export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGiver<CarT>>
+
+/** What a giver's `useStrengthVerdict` returns: the latest verdict on a new passphrase, and `judge` to ask for the next. */
+export type StrengthVerdictResult = Readonly<{
+  /** The verdict on the passphrase last judged, or null before any verdict lands or after the checker refuses. It stays while the next is judged. */
+  verdict:   PassphraseVerdict | null
+  /** True from a call to `judge` until its verdict lands. */
+  isJudging: boolean
+  /** The checker's refusal of the passphrase last judged, or null. */
+  lastErr:   unknown
+  /** Ask the Device's strength checker for its verdict on `passphrase`, resolving once it lands. Call it as the user types, with the field's value. Never rejects. */
+  judge:     (passphrase: string) => Promise<void>
+}>
 
 /** What a giver's `forBank` returns. */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
@@ -78,14 +108,35 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
     useEffect(() => bridgeDevice(client, device), [client])
   }
 
-  /** The gating open on the Device, for a dialog to render, or null for none. Synchronous: it never waits and never suspends. */
-  function useGating(): OpenGatingSnapshot | null {
-    return useSyncExternalStore(device.subscribe, () => device.getSnapshot().gating, () => ServerSnapshot.gating)
+  // Only the verdict of the latest call to `judge` lands: an earlier one, such as a checker's first while it loads its
+  // dictionary, may resolve after a later one, and would show the strength of what the user typed before.
+  /** The strength checker's verdict on a new passphrase, for a meter beside its field. Hold the form's submit until `verdict.strong`.
+   * The verb judges the passphrase again, and refuses `weak_passphrase` where it is weak. The hook keeps the verdict, never the passphrase.
+   * @example
+   *   const strength = Giver.useStrengthVerdict()
+   *   <input name="nextPassphrase" type="password" onChange={(event) => { void strength.judge(event.target.value) }} />
+   *   <button disabled={! strength.verdict?.strong}>Change passphrase</button>
+   */
+  function useStrengthVerdict(): StrengthVerdictResult {
+    const [judged, setJudged] = useState<Omit<StrengthVerdictResult, 'judge'>>(Unjudged)
+    const judgeseq = useRef(0)
+    async function judge(passphrase: string): Promise<void> {
+      judgeseq.current += 1
+      const ownseq = judgeseq.current
+      setJudged((prior) => ({ ...prior, isJudging: true }))
+      try {
+        const verdict = await device.judgeStrength(passphrase)
+        if (ownseq === judgeseq.current) { setJudged({ verdict, isJudging: false, lastErr: null }) }
+      } catch (err) {
+        if (ownseq === judgeseq.current) { setJudged({ verdict: null, isJudging: false, lastErr: err }) }
+      }
+    }
+    return { ...judged, judge }
   }
 
   return Object.freeze({
     useBridge,
-    useGating,
+    useStrengthVerdict,
     /** The hooks for the Device's bank, refusing any other banklabel. Name the result in PascalCase (`const Acme = Giver.forBank('acme')`), so the rules-of-hooks lint checks `Acme.useBoxRecord()`. */
     forBank: (banklabel: string) => {
       ScopeChecks.bankScoped.parseConsistent({ banklabel }, { banklabel: device.banklabel })
@@ -94,8 +145,13 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
   })
 }
 
+/** What {@link StrengthVerdictResult} holds before anything is judged. */
+const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null })
+
 /** The hooks for `device`'s bank. */
 function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
+  const bankHead = bankQueryKey(device)
+
   /** This tab's state of the bank: its stage, whether it is locked, and when its lease ends. Synchronous: it never waits and never suspends.
    * Given `select`, it re-renders only when what `select` returns changes, which must be a field of the snapshot or a primitive, never a new object.
    */
@@ -133,7 +189,123 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
     return useQuery({ ...boxCarQueryOptions(labelpath), select: fullestOf as (car: CarT) => SelT, ...opts })
   }
 
-  return Object.freeze({ useBankSnapshot, useBoxRecord, boxCarQueryOptions })
+  // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
+  // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
+  // Each takes the fields out of the cleartexts handed to `mutate`, so React Query keeps nothing of them.
+
+  /** React Query's options for the mutation that births the bank, unborn until now, with the user's new passphrase and optional passkey, for your own `useMutation`.
+   * Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
+   */
+  function birthMutationOptions() {
+    return mutationOptions({
+      ...FormMutationDefaults,
+      mutationKey: [...bankHead, 'birth'],
+      mutationFn:  async (cleartexts: BirthCleartexts): Promise<void> => {
+        const taken = takeCleartexts(cleartexts)
+        const bank  = await device.ensureBank()
+        await bank.birth(taken)
+      },
+    })
+  }
+
+  /** The mutation that births the bank: {@link birthMutationOptions}, through `useMutation`. */
+  function useBirth(): UseMutationResult<void, Error, BirthCleartexts> { return useMutation(birthMutationOptions()) }
+
+  /** React Query's options for the mutation that unlocks the bank by its passphrase or its passkey, for your own `useMutation`.
+   * Every call waiting for the bank to be unlocked resumes. A wrong passphrase or passkey refuses, and the bank stays locked.
+   * @example
+   *   const unlock = Acme.useUnlock()
+   *   <form action={(form) => { unlock.mutate({ passphraseClear: String(form.get('passphrase')) }); form.delete('passphrase') }}>
+   */
+  function unlockMutationOptions() {
+    return mutationOptions({
+      ...FormMutationDefaults,
+      mutationKey: [...bankHead, 'unlock'],
+      mutationFn:  async (cleartexts: UnlockCleartexts): Promise<void> => {
+        const taken = takeCleartexts(cleartexts)
+        const bank  = await device.ensureBank()
+        await bank.unlock(taken)
+      },
+    })
+  }
+
+  /** The mutation that unlocks the bank: {@link unlockMutationOptions}, through `useMutation`. */
+  function useUnlock(): UseMutationResult<void, Error, UnlockCleartexts> { return useMutation(unlockMutationOptions()) }
+
+  /** React Query's options for the mutation that replaces the passphrase, proved by the current passphrase or the passkey, for your own `useMutation`.
+   * It leaves the bank unlocked. Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the new passphrase strong.
+   */
+  function replacePassphraseMutationOptions() {
+    return mutationOptions({
+      ...FormMutationDefaults,
+      mutationKey: [...bankHead, 'replacePassphrase'],
+      mutationFn:  async (cleartexts: PassphraseReplaceCleartexts): Promise<void> => {
+        const taken = takeCleartexts(cleartexts)
+        const bank  = await device.ensureBank()
+        await bank.replacePassphrase(taken)
+      },
+    })
+  }
+
+  /** The mutation that replaces the passphrase: {@link replacePassphraseMutationOptions}, through `useMutation`. */
+  function useReplacePassphrase(): UseMutationResult<void, Error, PassphraseReplaceCleartexts> { return useMutation(replacePassphraseMutationOptions()) }
+
+  /** React Query's options for the mutation that adds a passkey, proved by the passphrase, for your own `useMutation`.
+   * Run the WebAuthn ceremony first, in the click handler before anything slow, as the browser requires, and hand its PRF answer in as `nextPasskeyClear`.
+   * It leaves the bank unlocked.
+   * @example
+   *   const addPasskey = Acme.useAddPasskey()
+   *   async function onAdd() {
+   *     const nextPasskeyClear = await createPasskey()   // the host's WebAuthn create, with the PRF extension
+   *     addPasskey.mutate({ passphraseClear: passphraseField.value, nextPasskeyClear })
+   *   }
+   */
+  function addPasskeyMutationOptions() {
+    return mutationOptions({
+      ...FormMutationDefaults,
+      mutationKey: [...bankHead, 'addPasskey'],
+      mutationFn:  async (cleartexts: PasskeyAddCleartexts): Promise<void> => {
+        const taken = takeCleartexts(cleartexts)
+        const bank  = await device.ensureBank()
+        await bank.addPasskey(taken)
+      },
+    })
+  }
+
+  /** The mutation that adds a passkey: {@link addPasskeyMutationOptions}, through `useMutation`. */
+  function useAddPasskey(): UseMutationResult<void, Error, PasskeyAddCleartexts> { return useMutation(addPasskeyMutationOptions()) }
+
+  /** React Query's options for the mutation that revokes the passkey, proved by the passphrase or the passkey, for your own `useMutation`.
+   * It leaves the bank unlocked.
+   */
+  function revokePasskeyMutationOptions() {
+    return mutationOptions({
+      ...FormMutationDefaults,
+      mutationKey: [...bankHead, 'revokePasskey'],
+      mutationFn:  async (cleartexts: PasskeyRevokeCleartexts): Promise<void> => {
+        const taken = takeCleartexts(cleartexts)
+        const bank  = await device.ensureBank()
+        await bank.revokePasskey(taken)
+      },
+    })
+  }
+
+  /** The mutation that revokes the passkey: {@link revokePasskeyMutationOptions}, through `useMutation`. */
+  function useRevokePasskey(): UseMutationResult<void, Error, PasskeyRevokeCleartexts> { return useMutation(revokePasskeyMutationOptions()) }
+
+  /** Close the unlock form: every call waiting for the bank to be unlocked refuses `dismissed`, and the bank stays locked.
+   * Show the unlock form while `useBankSnapshot((snap) => snap.unlockWanted)` is true, and call this from its close button.
+   */
+  async function dismissUnlock(): Promise<void> {
+    const bank = await device.ensureBank()
+    bank.dismissUnlock()
+  }
+
+  return Object.freeze({
+    useBankSnapshot, useBoxRecord, boxCarQueryOptions,
+    birthMutationOptions, useBirth, unlockMutationOptions, useUnlock, replacePassphraseMutationOptions, useReplacePassphrase,
+    addPasskeyMutationOptions, useAddPasskey, revokePasskeyMutationOptions, useRevokePasskey, dismissUnlock,
+  })
 }
 // --
 

@@ -1,12 +1,26 @@
-import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, type UseMutationOptions, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { type OpenGatingSnapshot, PendingBank } from 'safebyok'
+import { PendingBank, VaultError } from 'safebyok'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const OpenaiPath = 'box/openai'
+
+type AcmeGiver = ReturnType<typeof setup>['Acme']
+
+/** A passkey answer, an obvious fake: what a WebAuthn ceremony with the PRF extension hands the host. */
+const FakePasskeyAnswer = Object.freeze({ credential_id: 'fake-credential', prfBytes: new Uint8Array(32).fill(7) })
+
+/** Each form verb, its mutationOptions and its hook, and the cleartexts a form hands it, obvious fakes. */
+const FormCases = [
+  ["birth",             (acme: AcmeGiver) => acme.birthMutationOptions(),             (acme: AcmeGiver) => acme.useBirth(),             { passphraseClear: "fake new passphrase" }],
+  ["unlock",            (acme: AcmeGiver) => acme.unlockMutationOptions(),            (acme: AcmeGiver) => acme.useUnlock(),            { passphraseClear: "fake passphrase" }],
+  ["replacePassphrase", (acme: AcmeGiver) => acme.replacePassphraseMutationOptions(), (acme: AcmeGiver) => acme.useReplacePassphrase(), { passkeyClear: FakePasskeyAnswer, nextPassphraseClear: "fake new passphrase" }],
+  ["addPasskey",        (acme: AcmeGiver) => acme.addPasskeyMutationOptions(),        (acme: AcmeGiver) => acme.useAddPasskey(),        { passphraseClear: "fake passphrase", nextPasskeyClear: FakePasskeyAnswer }],
+  ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     { passkeyClear: FakePasskeyAnswer }],
+] as const
 
 /** A fake world, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
 function setup() {
@@ -29,7 +43,11 @@ describe("makeReactGiver", () => {
   // makeReactGiver @example
   it("gives the hooks of the Device's bank, and refuses any other banklabel", () => {
     const { Giver } = setup()
-    expect(Object.keys(Giver.forBank('acme'))).to.deep.equal(['useBankSnapshot', 'useBoxRecord', 'boxCarQueryOptions'])
+    expect(Object.keys(Giver.forBank('acme'))).to.deep.equal([
+      'useBankSnapshot', 'useBoxRecord', 'boxCarQueryOptions',
+      'birthMutationOptions', 'useBirth', 'unlockMutationOptions', 'useUnlock', 'replacePassphraseMutationOptions', 'useReplacePassphrase',
+      'addPasskeyMutationOptions', 'useAddPasskey', 'revokePasskeyMutationOptions', 'useRevokePasskey', 'dismissUnlock',
+    ])
     for (const banklabel of ['other', '']) {
       TH.expectSyncRefusal(() => Giver.forBank(banklabel), 'bad_scope')
     }
@@ -63,27 +81,105 @@ describe("useBankSnapshot", () => {
     act(() => { world._cheat_setBank({ ...TH.UnlockedBank, leaseEndsAt: 1_900_000_000_000 }) })
     expect(renders).to.eq(2)
   })
+})
 
-  it("ignores a change to the gating", () => {
+describe("the form mutations", () => {
+  for (const [verb, optionsOf, useForm, cleartexts] of FormCases) {
+    it(`runs the bank's ${verb} through its mutationOptions`, async () => {
+      const { world, Acme, wrapper } = setup()
+      const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, object>), { wrapper })
+      await act(() => result.current.mutateAsync({ ...cleartexts }))
+      expect(world.formCalls).to.deep.equal([{ verb, cleartexts }])
+    })
+
+    it(`runs the bank's ${verb} through its hook`, async () => {
+      const { world, Acme, wrapper } = setup()
+      const { result } = renderHook(() => useForm(Acme), { wrapper })
+      act(() => { result.current.mutate({ ...cleartexts } as never) })
+      await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+      expect(world.formCalls).to.deep.equal([{ verb, cleartexts }])
+    })
+  }
+
+  it("takes the cleartexts out of the object handed to mutate, so React Query keeps none of them", async () => {
+    const { world, Acme, client, wrapper } = setup()
+    const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
+    const handed = { passphraseClear: "fake passphrase" }
+    await act(() => result.current.mutateAsync(handed))
+    expect(handed).to.deep.equal({})
+    expect(client.getMutationCache().getAll().map((mutation) => mutation.state.variables)).to.deep.equal([{}])
+    expect(world.formCalls).to.deep.equal([{ verb: 'unlock', cleartexts: { passphraseClear: "fake passphrase" } }])
+  })
+
+  it("hands the verb what is not an object, for the verb to refuse", async () => {
     const { world, Acme, wrapper } = setup()
-    let renders = 0
-    renderHook(() => {
-      renders += 1
-      return Acme.useBankSnapshot()
-    }, { wrapper })
-    act(() => { world._cheat_setGating({ gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false }) })
-    expect(renders).to.eq(1)
+    const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
+    await act(() => result.current.mutateAsync(null as never))
+    expect(world.formCalls).to.deep.equal([{ verb: 'unlock', cleartexts: null }])
+  })
+
+  it("reports the verb's refusal as the mutation's error", async () => {
+    const { world, Acme, wrapper } = setup()
+    const refusal = new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.')
+    world.refuseFormVerbs(refusal)
+    const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
+    act(() => { result.current.mutate({ passphraseClear: "fake wrong passphrase" }) })
+    await waitFor(() => { expect(result.current.error).to.eq(refusal) })
+    expect(refusal.family).to.eq('condition')
+  })
+
+  it("keys each form mutation under the bank", () => {
+    const { Acme } = setup()
+    expect(Acme.unlockMutationOptions().mutationKey).to.deep.equal(['sok', 'u1', 'acme', 'unlock'])
+    expect(Acme.addPasskeyMutationOptions().mutationKey).to.deep.equal(['sok', 'u1', 'acme', 'addPasskey'])
   })
 })
 
-describe("useGating", () => {
-  it("reads null with no gating open, and re-renders with the gating once one is", () => {
+describe("dismissUnlock", () => {
+  it("dismisses the bank's wait for an unlock", async () => {
+    const { world, Acme } = setup()
+    await Acme.dismissUnlock()
+    expect(world.formCalls).to.deep.equal([{ verb: 'dismissUnlock', cleartexts: undefined }])
+  })
+})
+
+describe("useStrengthVerdict", () => {
+  it("judges a new passphrase, pending until the verdict lands", async () => {
     const { world, Giver, wrapper } = setup()
-    const { result } = renderHook(() => Giver.useGating(), { wrapper })
-    expect(result.current).to.be.null
-    const gating = { gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false } as OpenGatingSnapshot
-    act(() => { world._cheat_setGating(gating) })
-    expect(result.current).to.eq(gating)
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, false])
+    const release = world.pauseVerdicts()
+    let judging: Promise<void> = Promise.resolve()
+    act(() => { judging = result.current.judge("short") })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, true])
+    release()
+    await act(() => judging)
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.fakeVerdictOf("short"), false])
+    await act(() => result.current.judge("a fake passphrase long enough"))
+    expect(result.current.verdict).to.deep.equal({ strong: true })
+  })
+
+  it("keeps the last verdict while the next is judged", async () => {
+    const { world, Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    await act(() => result.current.judge("short"))
+    const release = world.pauseVerdicts()
+    let judging: Promise<void> = Promise.resolve()
+    act(() => { judging = result.current.judge("a fake passphrase long enough") })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.fakeVerdictOf("short"), true])
+    release()
+    await act(() => judging)
+    expect(result.current.verdict).to.deep.equal({ strong: true })
+  })
+
+  it("reports the checker's refusal as lastErr, with no verdict", async () => {
+    const { world, Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    await act(() => result.current.judge("short"))
+    const refusal = new VaultError('unexpected_error', 'The strength checker failed.')
+    world.refuseVerdicts(refusal)
+    await act(() => result.current.judge("a fake passphrase long enough"))
+    expect([result.current.verdict, result.current.isJudging, result.current.lastErr]).to.deep.equal([null, false, refusal])
   })
 })
 

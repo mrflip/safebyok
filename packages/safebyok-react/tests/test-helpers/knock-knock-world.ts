@@ -3,7 +3,7 @@
 import { onTestFinished } from 'vitest'
 import type { Bank, BoxCar, Device, DeviceSnapshot, KeyDeriver, Vault } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
-import { giverBankOfMinder } from '../../src/giver/minder-bank'
+import { giverBankOfVault } from '../../src/giver/minder-bank'
 import type { GiverBank, GiverDevice } from '../../src/giver/shapes-giver'
 
 // == [The key deriver]: HeldDeriver, makeHeldDeriver
@@ -57,8 +57,8 @@ export interface KnockKnockWorld {
   snapshots:   DeviceSnapshot[]
 }
 
-/** A Device with no `requestCleartext`, its bank born under {@link LeanTH.TestPassphrase} with the joke service's key stored at {@link JokesPath}, then locked.
- * The Device is swept as the test finishes, ending any gating still open.
+/** A Device, its bank born under {@link LeanTH.TestPassphrase} with the joke service's key stored at {@link JokesPath}, then locked.
+ * The Device is swept as the test finishes, ending any wait for an unlock.
  */
 export async function buildKnockKnockWorld(): Promise<KnockKnockWorld> {
   const deriver = makeHeldDeriver()
@@ -72,17 +72,18 @@ export async function buildKnockKnockWorld(): Promise<KnockKnockWorld> {
 }
 
 // The giver asks a Device for its bank object, started, and the new core's Device starts none. This is the
-// test's one way past the core: the Device's own snapshot and subscribe, beside the vault the test made.
-/** The giver's view of `device`: its own scope, snapshot and subscribe, and a bank object over `vault`'s minder, started once and never ending. */
+// test's one way past the core: the Device's own snapshot, subscribe and strength check, beside the vault the test made.
+/** The giver's view of `device`: its own scope, snapshot, subscribe and strength check, and a bank object over `vault`, started once and never ending. */
 export function _cheat_giverDeviceOf(device: Device, vault: Vault): GiverDevice<BoxCar> {
-  const bank = giverBankOfMinder(vault.minder)
+  const bank = giverBankOfVault(vault)
   return Object.freeze({
-    userid:      device.userid,
-    banklabel:   device.banklabel,
-    getSnapshot: device.getSnapshot,
-    subscribe:   device.subscribe,
-    ensureBank:  () => Promise.resolve(bank),
-    onBankStart: (starter: (started: GiverBank<BoxCar>) => () => void) => {
+    userid:        device.userid,
+    banklabel:     device.banklabel,
+    getSnapshot:   device.getSnapshot,
+    subscribe:     device.subscribe,
+    judgeStrength: (passphrase: string) => device.judgeStrength(passphrase),
+    ensureBank:    () => Promise.resolve(bank),
+    onBankStart:   (starter: (started: GiverBank<BoxCar>) => () => void) => {
       starter(bank)
       return stopNothing
     },
