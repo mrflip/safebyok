@@ -8,14 +8,15 @@
 /** `ThingMinder`, which minds every Thing in one bank in a TanStack Query cache of its own. */
 
 import * as TSQ from '@tanstack/query-core'
-import { noop, union } from 'es-toolkit'
-import { Errors, Outcome, Validator } from 'safebyok-big/internals'
+import { union } from 'es-toolkit'
+import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type ThingFormat, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
+import { type GetAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import { refusedAnswerOf } from '../storage/refused-answer'
 import {
   type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
   type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
@@ -139,7 +140,7 @@ export class ThingMinder {
     )
   }
 
-  /** Stop minding, and empty the cache. A get still waiting refuses `disabled`. A later `hello` starts minding again. */
+  /** Stop minding, and empty the cache. A later `hello` starts minding again. */
   goodbye(): void {
     this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
@@ -148,7 +149,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, list, isStaleAt, listen
+  // == [Reading]: at, listingAt, isListingBareAt, tryAt, tryGet, get, backgroundRefresh, tryList, list, isStaleAt, listen
 
   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
@@ -176,11 +177,11 @@ export class ThingMinder {
       MinderChecks.minderTryAtOpts.parse(opts)
       this.#demandReady()
       const scope = this.#demandOwnScope(scoped)
-      if (opts.ifStale === 'refresh') { this.#backgroundRefresh(scope, opts) }
+      if (opts.ifStale === 'refresh') { this.backgroundRefresh(scope, { staleTime: opts.staleTime }) }
       return this.#answerOfTSQ(this.#askAt(scope), opts) as TSQGotAnswer<ThingAt<LabelpathT>>
     } catch (err) {
       // The try asks the vaultDB nothing: what it throws that is no refusal is a bug.
-      return { ok: false, ask: loggableAskOf({ ...scoped, op: 'get', ifAbsent: 'nil' }), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
+      return refusedAnswerOf({ ...scoped, op: 'get', ifAbsent: 'nil' }, err)
     }
   }
 
@@ -189,9 +190,23 @@ export class ThingMinder {
    * With no root car cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
    */
   async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<CarAt<LabelpathT>> {
-    MinderChecks.minderGetOpts.parse(opts)
-    this.#demandReady()
-    return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
+    return Outcome.valOf(await this.tryGet(scoped, opts))
+  }
+
+  /** {@link get}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
+  async tryGet<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<Outcome.Outcome<CarAt<LabelpathT>>> {
+    return await Outcome.outcomeOf(async () => {
+      MinderChecks.minderGetOpts.parse(opts)
+      this.#demandReady()
+      return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
+    })
+  }
+
+  /** Get `scoped`'s car in the background, unless it is timely, and return at once.
+   * It throws nothing and tells no one of a refusal, misuse included. A refusal from the vaultDB shows as `lastErr` in the next {@link tryAt}.
+   */
+  backgroundRefresh(scoped: ThingScope, opts: MinderGetOpts = {}): void {
+    void this.tryGet(scoped, opts)
   }
 
   /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included.
@@ -202,18 +217,25 @@ export class ThingMinder {
    * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
-    MinderChecks.minderLabelpath.parse(labelpath)
-    this.#demandReady()
-    const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
-    const answer = await this.#vaultDB.tryListThings(ask)
-    if (! answer.ok) { throw answer.err }
-    if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
-    const labelpaths = answer.val.map((record) => record.labelpath)
-    TSQ.notifyManager.batch(() => {
-      this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
-      for (const record of answer.val) { this.#sendToTSQ(record) }
+    return Outcome.valOf(await this.tryList(labelpath))
+  }
+
+  /** {@link list}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
+  async tryList(labelpath: Labelpath): Promise<Outcome.Outcome<Labelpath[]>> {
+    return await Outcome.outcomeOf(async () => {
+      MinderChecks.minderLabelpath.parse(labelpath)
+      this.#demandReady()
+      const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
+      const answer = await this.#vaultDB.tryListThings(ask)
+      if (! answer.ok) { throw answer.err }
+      if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
+      const labelpaths = answer.val.map((record) => record.labelpath)
+      TSQ.notifyManager.batch(() => {
+        this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
+        for (const record of answer.val) { this.#sendToTSQ(record) }
+      })
+      return labelpaths
     })
-    return labelpaths
   }
 
   /** True when `scoped`'s car is missing or not timely. */
@@ -264,12 +286,11 @@ export class ThingMinder {
   }
   // --
 
-  // == [Writing]: tryWrite
+  // == [Writing]: tryWrite, write
 
   /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
    * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
-   * A write answered after `goodbye` caches nothing.
    * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
@@ -277,33 +298,26 @@ export class ThingMinder {
       this.#demandReady()
       this.#demandOwnScope(ask)
     } catch (err) {
-      return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
+      return refusedAnswerOf(ask, err)
     }
     const answer = await this.#vaultDB.tryWriteThing(ask)
     // Only the record written lands here. A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
     if (answer.ok) { this.#sendToTSQ(answer.val) }
     return answer
   }
+
+  /** {@link tryWrite}, throwing its refusal instead of answering it: the record written, on success. */
+  async write(ask: WriteAsk): Promise<ThingRecord> {
+    return Outcome.valOf(await this.tryWrite(ask))
+  }
   // --
 
-  // == [TSQ Direct Cache Calls]: #backgroundRefresh, #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #seedListing, #sendListingToTSQ, #setListingDefaults, #joinParentListing
-
-  // Its refusal is cached beside the car, where the next tryAt finds it as `lastErr`.
-  /** Fetch `scoped`'s car in the background, if it is stale. */
-  #backgroundRefresh(scoped: ThingScope, opts: MinderGetOpts): void {
-    void this.#doGet(scoped, opts).catch(noop)
-  }
+  // == [TSQ Direct Cache Calls]: #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #seedListing, #sendListingToTSQ, #setListingDefaults, #joinParentListing
 
   // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
   /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
-    let fetched: ThingCar<ThingRecord>
-    try {
-      fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
-    } catch (err) {
-      // TanStack cancels a get under way when goodbye empties the cache.
-      throw (err instanceof TSQ.CancelledError) ? Throwers.minderNotStarted() : err
-    }
+    const fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
     // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
     // get may have left the cache a later record.
     const car = this.#cachedAt(scoped) ?? fetched

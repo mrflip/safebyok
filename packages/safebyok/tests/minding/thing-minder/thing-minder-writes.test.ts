@@ -200,3 +200,28 @@ describe("ThingMinder.tryWrite", () => {
     })
   }
 })
+
+describe("ThingMinder.write", () => {
+  it("returns the record written, once it is in its car", async () => {
+    const vaultDB = await bornOf(new QuietVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    expect(await minder.write(boxBirthAskOf())).to.deep.equal(TH.boxThingOf())
+    expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(TH.boxThingOf()))
+  })
+
+  it("throws the vaultDB's refusal", async () => {
+    const vaultDB = await bornOf(new QuietVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.write(boxBirthAskOf())
+    await TH.expectRefusal(minder.write(boxBirthAskOf()), 'stale_write')
+  })
+
+  it("throws, and asks the vaultDB nothing, while not minding", async () => {
+    const vaultDB = await bornOf(new QuietVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    minder.goodbye()
+    const written = vi.spyOn(vaultDB, 'tryWriteThing')
+    await TH.expectRefusal(minder.write(boxBirthAskOf()), 'disabled')
+    expect(written.mock.calls).to.have.lengthOf(0)
+  })
+})

@@ -6,7 +6,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { fakeBankOf, LateVaultDB, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
+import { fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
 
 describe("ThingMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
@@ -156,17 +156,6 @@ describe("ThingMinder.goodbye", () => {
     expect(minder.at(TH.GateScope)).to.be.undefined
     await TH.expectBad(minder.tryAt(TH.GateScope), 'disabled')
     await TH.expectRefusal(minder.get(TH.GateScope), 'disabled')
-  })
-
-  it("refuses a get under way disabled, and caches nothing it answers after", async () => {
-    const vaultDB = await bornOf(new LateVaultDB())
-    const { minder } = minderWorldOf(vaultDB)
-    const getting = minder.get(TH.GateScope)
-    await TH.eventually(() => vaultDB.isHolding)
-    minder.goodbye()
-    vaultDB.release()
-    await TH.expectRefusal(getting, 'disabled')
-    expect(minder.at(TH.GateScope)).to.be.undefined
   })
 
   it("lets hello start the minder again, with the cache's timings it was made with", async () => {

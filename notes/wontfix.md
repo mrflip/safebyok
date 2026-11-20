@@ -85,3 +85,25 @@ Reasoning for wontfix: the device was sent revisions of both rows, so either cas
 underneath it: work stops until the page reloads, or until a developer catches the error and restarts the system.
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
 `tracked` type and at `notifyTrackedRecords` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
+
+### A minder's answer that crosses a `goodbye` and a fresh `hello`
+
+* current outcome, as built, and promised nowhere: a `get`, `list` or `write` the ThingMinder began before `goodbye`,
+  answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may join its Thing
+  to the new root box's listing. What a get still waiting at `goodbye` refuses, even with no `hello`, is unspecified.
+  A list sets its listing and caches its sparse records, and a good write caches the record written, as though
+  begun after the `hello`. Each answers its caller as the vaultDB answered it.
+* alternatives:
+  - a token for each stretch of minding, compared as each answer lands: a new state, and a check in the critical path
+    of every get, list and write, for a crossing.
+  - cancel each operation under way at `goodbye`: an abort controller in a primitive's critical path.
+* workaround: the host awaits its minder's gets, lists and writes before calling `goodbye`.
+
+Steps to reproduce: start a `list('box')` (or a write, or a get) on a started minder whose vaultDB answers late; call
+`goodbye()` and then `hello()` while it waits; let the vaultDB answer. The new cache's listing, and the car, hold what
+the earlier stretch asked for.
+
+Reasoning for wontfix: what lands is a record the vaultDB did store, so the cache is never wrong about the bank, only
+early to hear of it; and a `goodbye` and `hello` around an operation are two of the host's own calls crossing it, which
+the host sequences. Guarding against it put a token and three checks into the common case for a case no host meets by
+accident. Ruled by the Coach, 2026-11-20, vault_snapper: "The goodbye-then-hello token -- let's pull this out".
