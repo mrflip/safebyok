@@ -252,7 +252,8 @@ again before starting"): an unlock prompt that finds another kind of gating open
 outcome, then checks unlocked again before starting or joining an unlock gating (bank.ts); plus `bankStageVals`,
 `bankEndCauseVals` and the `subscribe` docs' `tellBadNews` wording from thread 6's review. *Size:* S to M. *Status:* ready, #774 (branch `20261120-with_whisper`; one compaction), reworked for the Coach's two
 snapshot rulings (`lastRefusal` ripped out until v1; the bank snapshot's `endCause` holds the error, 2026-11-20) at
-192a39d07; reviewed at a1cbd3424, filing.
+192a39d07; reviewed at a1cbd3424; filed at 8dc00e05d, rebased onto the restacked #773 (one conflict, the `bhnd`
+spelling in vault.test.ts); in rework for the queued ruling below.
 
 *Review:* fixed (high, `opus`, against G6–G9): the rethrow test checks `fn`'s throw by identity. Checked: the unsealed
 box stays inside `fn`; `fn`'s throw is rethrown unwrapped; every refusal of `withWhisper`'s own comes before the
