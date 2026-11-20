@@ -86,6 +86,25 @@ underneath it: work stops until the page reloads, or until a developer catches t
 Pinned by a type-level test that each `tracked` entry is exactly its record or `'same'`, and by a `//` comment at the
 `tracked` type and at `notifyTrackedRecords` pointing here. Ruled by the Coach, 2026-11-15, lean_buttonup T1.
 
+### Changing only a box's sidecar needs the bank unlocked and the whisper in hand
+
+* current outcome: `vault.putBoxOnce` takes the whisper on every write, a change to the sidecar alone (its title, say)
+  included, and seals the new revision under the bank's lease: without `secrets` it refuses `bad_record`, and on a
+  locked bank `bank_locked`.
+* alternatives:
+  - carry the cited revision's sealed whisper into the new one: its seal is bound to the revision it was sealed in, so
+    it would not unseal there, and unbinding it changes the construction, which is not ours to invent.
+  - unseal the cited whisper inside the write: it still needs the lease, and hides an unseal inside a write.
+* workaround: change the sidecar from inside `withWhisper`, citing the unsealed box:
+  `vault.withWhisper(labelpath, (box) => vault.putBoxOnce(box, { sidecar: { ...box.sidecar, title } }, { whisper: box.whisper }))`.
+
+Steps to reproduce: lock the bank, then put a box with a new sidecar and no `secrets`, or with the whisper but the bank
+still locked.
+
+Reasoning for wontfix: every revision is sealed under the lease, so a put needs the bank unlocked whatever it changes,
+and a seal keeps none of the cited whisper; carrying it across would mean a new construction or an unseal hidden in a
+write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock anyway. Document as won't fix".
+
 ### A minder's answer that crosses a `goodbye` and a fresh `hello`
 
 * current outcome, as built, and promised nowhere: a `get`, `list` or `write` the ThingMinder began before `goodbye`,
