@@ -26,6 +26,7 @@ describe("makeReactGiver", () => {
     }
   })
 
+  // makeReactGiver @example
   it("gives the hooks of the Device's bank, and refuses any other banklabel", () => {
     const { Giver } = setup()
     expect(Object.keys(Giver.forBank('acme'))).to.deep.equal(['useBankSnapshot', 'useBoxRecord', 'boxCarQueryOptions'])
