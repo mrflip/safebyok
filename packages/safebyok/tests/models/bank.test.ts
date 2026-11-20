@@ -320,7 +320,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
   }
 
   const UncheckedCases = [
-    [(box: LiveOf<BoxRecord>) => ({ ...box, fmt: ThingFormat + 1 }),                                           'its fmt not its one value'],
+    [(box: LiveOf<BoxRecord>) => ({ ...box, fmt: 'a010502' }),                                                 'its fmt not its one value'],
     [(box: LiveOf<BoxRecord>) => ({ ...box, am: 'd' }),                                                        'am d'],
     [(box: LiveOf<BoxRecord>) => ({ ...box, label: 'openai_api_key' }),                                        'a label not the last of its labelpath'],
     [(box: LiveOf<BoxRecord>) => ({ ...box, whisper_sealed: { ...box.whisper_sealed, codectag: 'JSON v1' } }), 'a codectag that is not a label'],

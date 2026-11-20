@@ -80,7 +80,8 @@ describe("Lease.make(record, { bank })", () => {
   })
 
   const MalformedCases = [
-    [(record: LeaseRecord) => ({ ...record, fmt: 7000 }),                                             'of another fmt'],
+    [(record: LeaseRecord) => ({ ...record, fmt: 'a010502' }),                                        'of another fmt'],
+    [(record: LeaseRecord) => ({ ...record, fmt: 7102 }),                                             'whose fmt is a number'],
     [(record: LeaseRecord) => ({ ...record, bank_key_lease_wrapped: undefined }),                     'with no wrapped bankKey'],
     [(record: LeaseRecord) => ({ ...record, proved_at: undefined }),                                  'with no proved_at'],
     [(record: LeaseRecord) => ({ ...record, wayinkind: 'carrier_pigeon' }),                           'of an unknown wayinkind'],

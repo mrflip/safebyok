@@ -350,7 +350,7 @@ The new core (`packages/safebyok`) stores a box as a Thing, with one sealed part
 `whisper_ciphered` and `box_key_wrapped`. **Measured** in one run on 2026-11-18: Node 24, `packages/safebyok` at
 `20261118-records` (dfe63d03d), each box sealed with real WebCrypto through `Bank.sealBox` and `Bank.tombstoneBox` on
 a born bank of the test helpers, whose userid has 2 characters and banklabel 4. Bytes of `JSON.stringify`. Every
-Thing's `fmt` was then its kind's four digits; it is now `100501`, so add 2 bytes to each figure (**Computed**). A box
+Thing's `fmt` was then its kind's four digits; it is now the quoted string `"a010501"`, so add 5 bytes to each figure (**Computed**). A box
 tombstone now carries `"sidecar":{}`, as in the last row.
 
 | Box Thing                                                    | Labels at minimum (`box/oa`) | 30-character label |
