@@ -48,8 +48,8 @@ export class Vault {
   /** Seal and write the box at `cited`'s labelpath, with `patch` applied and `secrets` encrypted, over `cited`. Answers the box as stored.
    * Given a labelpath, it writes over the newest revision this vault's minder has of the box, getting it when nothing is cached.
    * One attempt: a revision other than `cited` stored there refuses `stale_write`, and the minder caches the stored one as the watch tells of it.
-   * Over a tombstone or no box, `patch` must give the sidecar; so must it over a sparse `cited`, or a newest the minder holds sparse.
-   * A refusal, misuse included, is its bad outcome.
+   * Over a tombstone or no box, `patch` must give the sidecar; so must it over a sparse box, whether `cited` or the newest the minder caches.
+   * A refusal, misuse included, is its bad outcome. Rejects, whether or not the write was made, when the answer carries a record of another bank.
    * @example
    *   const { ok, val: box, err } = await vault.tryPutBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
@@ -73,6 +73,7 @@ export class Vault {
 
   /** Write the tombstone of the box at `labelpath`, over the newest revision this vault's minder has of it. Answers the tombstone as stored.
    * Its car is then `gone`, and its labelpath stays in its parent's listing. A refusal, misuse included, is its bad outcome.
+   * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
     const sealed = await Outcome.outcomeOf(async () => await this.#bank.tombstoneBox(await this.#newestAt(labelpath)))
