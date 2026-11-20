@@ -97,7 +97,7 @@ export interface DeviceOpts {
 }
 // --
 
-// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, OpenGatingSnapshot, DeviceSnapshot
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, OpenGatingSnapshot, DeviceSnapshot
 
 /** The stages of a bank, as {@link BankStage} describes each. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
@@ -134,6 +134,12 @@ export interface BankSnapshot {
   readonly lastErr:     RefusalSnapshot | null
 }
 
+// isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
+/** What a device reports as its bank before it holds a bank object: signed in, and the bank not yet started. */
+export const PendingBank: BankSnapshot = Object.freeze({
+  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
+})
+
 /** The gating open on a device, as a host's dialog renders it. */
 export interface OpenGatingSnapshot {
   readonly gatingkind:   Gatingkind
@@ -145,8 +151,8 @@ export interface OpenGatingSnapshot {
 
 /** A device as a host renders it: its bank's snapshot, and the gating open on it. */
 export interface DeviceSnapshot {
-  /** The snapshot of the bank on this device, or null before one is made. */
-  readonly bank:   BankSnapshot | null
+  /** The snapshot of the bank on this device, or {@link PendingBank} before one is made. */
+  readonly bank:   BankSnapshot
   /** The gating open on this device, or null for none. */
   readonly gating: OpenGatingSnapshot | null
 }

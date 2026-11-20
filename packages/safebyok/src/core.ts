@@ -28,7 +28,7 @@ export {
 export {
   type BadNews, type BadNewsHandler, type BankAskDraft, type BankDna, type BankMakeRecord, type BankOpts, type BankSnapshot, type BankStage, type BirthOpts, type BoxUnsealed, type DeviceOpts, type DeviceRecord,
   type DeviceSnapshot, type OpenGatingSnapshot, type RefusalSnapshot, type SealedBoxAsk,
-  BankishChecks, bankStageVals,
+  BankishChecks, PendingBank, bankStageVals,
 } from './shapes/shapes-bankish'
 export {
   type AskUser, type BankGatingFriend, type BirthFriend, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,

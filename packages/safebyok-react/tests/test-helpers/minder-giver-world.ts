@@ -1,6 +1,6 @@
 /** A Device for the giver's tests over the new core's minder: one bank, born in a memory vaultDB, already started. */
 
-import { type BoxCar, type DeviceSnapshot, type MinderFriend, ThingMinder } from 'safebyok'
+import { type BoxCar, type DeviceSnapshot, type MinderFriend, PendingBank, ThingMinder } from 'safebyok'
 import { type BoxRecord, type GetAsk, type ThingRecord, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { giverBankOfMinder } from '../../src/giver/minder-bank'
@@ -89,7 +89,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
 
 /** A Device of `minder`'s user and bank, its one bank object `bank`, never ending. */
 function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxCar>): GiverDevice<BoxCar> {
-  const snapshot: DeviceSnapshot = Object.freeze({ bank: null, gating: null })
+  const snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
   return Object.freeze({
     userid:      minder.userid,
     banklabel:   minder.banklabel,

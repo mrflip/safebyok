@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import type { OpenGatingSnapshot } from 'safebyok'
+import { type OpenGatingSnapshot, PendingBank } from 'safebyok'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { PendingBank, makeReactGiver } from '../../src/giver/react-giver'
+import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const OpenaiPath = 'box/openai'

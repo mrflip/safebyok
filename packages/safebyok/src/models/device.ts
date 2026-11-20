@@ -4,7 +4,7 @@ import type { Bank } from './bank'
 import type { Gating } from './gating'
 import { guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
 import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
@@ -42,7 +42,7 @@ export class Device {
   #openGating: Gating | null = null
   /** The count of gatings opened and ended on this device, which names the open one in the snapshot. */
   #gatingseq = 0
-  /** The bank {@link lock} locks and {@link sweep} sweeps, whose snapshot this device's forwards: the last made on this device, or null for none. */
+  /** The bank {@link lock} locks and {@link sweep} sweeps, whose snapshot this device's forwards: the last made on this device, or null for none, when the snapshot is {@link PendingBank}. */
   #thisIsTemporaryBank: Bank | null = null
   /** Ends this device's subscription to the bank it holds. */
   #unsubscribeBank: () => void = () => undefined
@@ -183,7 +183,7 @@ export class Device {
   #makeSnapshot(): DeviceSnapshot {
     const gating = this.#openGating
     return Object.freeze({
-      bank:   this.#thisIsTemporaryBank?.getSnapshot() ?? null,
+      bank:   this.#thisIsTemporaryBank?.getSnapshot() ?? PendingBank,
       gating: gating === null ? null : Object.freeze({
         gatingkind: gating.gatingkind, gatingseq: this.#gatingseq, isAttempting: gating.isAttempting,
       }),

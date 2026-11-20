@@ -9,13 +9,14 @@
 
 import * as TSQ from '@tanstack/query-core'
 import { union } from 'es-toolkit'
-import { Errors, Outcome, Validator } from 'safebyok-big/internals'
+import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type ThingFormat, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
-import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
+import { type GetAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import { refusedAnswerOf } from '../storage/refused-answer'
 import {
   type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
   type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
@@ -181,7 +182,7 @@ export class ThingMinder {
       return this.#answerOfTSQ(this.#askAt(scope), opts) as TSQGotAnswer<ThingAt<LabelpathT>>
     } catch (err) {
       // The try asks the vaultDB nothing: what it throws that is no refusal is a bug.
-      return { ok: false, ask: loggableAskOf({ ...scoped, op: 'get', ifAbsent: 'nil' }), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
+      return refusedAnswerOf({ ...scoped, op: 'get', ifAbsent: 'nil' }, err)
     }
   }
 
@@ -298,7 +299,7 @@ export class ThingMinder {
       this.#demandReady()
       this.#demandOwnScope(ask)
     } catch (err) {
-      return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
+      return refusedAnswerOf(ask, err)
     }
     const answer = await this.#vaultDB.tryWriteThing(ask)
     // Only the record written lands here. A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.

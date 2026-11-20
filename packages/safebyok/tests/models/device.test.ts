@@ -9,7 +9,7 @@ import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
-import type { BadNews, DeviceSnapshot } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
 
 describe("a page that is not a secure context", () => {
@@ -248,9 +248,9 @@ function snapshotsOf(device: Device): DeviceSnapshot[] {
 }
 
 describe("device.getSnapshot() and device.subscribe(listener)", () => {
-  it("shows no bank and no gating before a bank is made", () => {
+  it("shows the pending bank and no gating before a bank is made", () => {
     const device = TH.makeDevice()
-    expect(device.getSnapshot()).to.deep.equal({ bank: null, gating: null })
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank, gating: null })
     expect(Object.isFrozen(device.getSnapshot())).to.be.true
   })
 

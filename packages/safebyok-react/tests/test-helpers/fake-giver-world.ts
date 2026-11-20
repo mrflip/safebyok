@@ -1,6 +1,6 @@
 /** A fake Device for the giver's tests: its bank started on demand, and box cars the test stores and announces. */
 
-import type { BankSnapshot, DeviceSnapshot, OpenGatingSnapshot } from 'safebyok'
+import { type BankSnapshot, type DeviceSnapshot, type OpenGatingSnapshot, PendingBank } from 'safebyok'
 import { boxCarQueryKey } from '../../src/giver/react-giver'
 import type { CarFields, GiverBank, GiverDevice, GiverEvent } from '../../src/giver/shapes-giver'
 
@@ -54,7 +54,7 @@ export interface FakeGiverWorld {
   /** Hold each car the vaultDB reads from now on until the function returned is called: it then answers what it read. */
   pauseAnswers(): () => void
   /** Replace the Device's snapshot of its bank. */
-  _cheat_setBank(snapshot: BankSnapshot | null): void
+  _cheat_setBank(snapshot: BankSnapshot): void
   /** Replace the Device's snapshot of its open gating. */
   _cheat_setGating(snapshot: OpenGatingSnapshot | null): void
   /** Announce `car` to the bank object's listeners, as its minder would on caching it at `dataUpdatedAt`. */
@@ -70,7 +70,7 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
   type Starter = (bank: GiverBank<FakeBoxCar>) => () => void
   const userid    = 'u1'
   const banklabel = 'acme'
-  let snapshot: DeviceSnapshot = Object.freeze({ bank: null, gating: null })
+  let snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
   let answerPause: Promise<void> | null = null
   let bank: GiverBank<FakeBoxCar> | null = null
   const deviceListeners = new Set<() => void>()

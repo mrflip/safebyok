@@ -3,20 +3,14 @@
 import { type Query, type QueryKey, queryOptions, replaceEqualDeep, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useEffect, useSyncExternalStore } from 'react'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
-import { type BankSnapshot, type DeviceSnapshot, type OpenGatingSnapshot, ThingMinder, dbHasNewer } from 'safebyok'
+import { type BankSnapshot, type DeviceSnapshot, type OpenGatingSnapshot, PendingBank, ThingMinder, dbHasNewer } from 'safebyok'
 import { bridgeDevice } from './react-bridge'
 import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeChecks } from './shapes-giver'
 
-// == [Snapshots]: PendingBank, ServerSnapshot
-
-// isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** What a bank's hooks report before the Device holds a bank object: signed in, and the bank not yet started. */
-export const PendingBank: BankSnapshot = Object.freeze({
-  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
-})
+// == [Snapshots]: ServerSnapshot
 
 /** What the hooks report during a server render and while hydrating: no bank object, and no gating open. */
-const ServerSnapshot: DeviceSnapshot = Object.freeze({ bank: null, gating: null })
+const ServerSnapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
 // --
 
 // == [Query defaults]: carQueryDefaults, carStaleTimeOf, newerCarOf, isCar, fullestOf
@@ -107,7 +101,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   function useBankSnapshot<SelT>(select: (snap: BankSnapshot) => SelT): SelT
   function useBankSnapshot<SelT>(select?: (snap: BankSnapshot) => SelT): BankSnapshot | SelT {
     const pick = select ?? ((snap: BankSnapshot) => snap)
-    return useSyncExternalStore(device.subscribe, () => pick(device.getSnapshot().bank ?? PendingBank), () => pick(PendingBank))
+    return useSyncExternalStore(device.subscribe, () => pick(device.getSnapshot().bank), () => pick(PendingBank))
   }
 
   /** React Query's options for the box's whole car, for a `useQuery`, `queryClient.query` or route loader of your own: `data` is the car, the newest revision heard of beside the fullest record.
