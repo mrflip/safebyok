@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 to 5 filed and out of draft (#769, #771 one line; #770, #772 another; #768); thread 6 ready ([#773](https://github.com/mrflip/safebyok/pull/773)), in review; thread 7 building on it.
+* **Status:** threads 1 to 6 restacked into one line, main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 (justify green at the tip, 2026-11-20); thread 7 building on #773's old tip; thread 8 building on the line's tip.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -270,7 +270,8 @@ event keeps TanStack's `status` with `data` undefined, so the bridge branches on
 `subtreeQueryKey` to `childrenQueryKey`, takes a `Labelpathed` where a `ThingScope` was, and makes `react-giver.ts`
 easier to read; its invariant hunks are already on #769 and merge away. Where it meets thread 2's `'sok'` and event
 rewrite, keep the threads' behaviour and the Coach's names. *Touches:* `packages/safebyok-react/src/giver/`.
-*Depends on:* threads 2 and 6, restacked into one line. *Size:* M.
+*Depends on:* threads 2 and 6, restacked into one line. *Size:* M. *Status:* building, branch `20261120-giver_feed`,
+cut from the restacked tip 872a14819.
 
 ### 9. knock_knock
 

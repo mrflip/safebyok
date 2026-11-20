@@ -72,6 +72,12 @@ orchestrator writes it.
   `subscribe` are getters returning arrows: safe to hand out unbound (thread 8).
 * `device.sweep()` now sweeps its held bank (through the cheat). `isWatching`, `heardAt` left out entirely.
 
+## The line (*Orchestrator:*)
+
+* Restacked 2026-11-20: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773, every base `main`. Two mechanical fixes
+  at the restack: the feed-version test table now uses strings (`ThingFormat` is one), on #771; the vault's
+  sparse-newest test expects `bhnd`, on #770. Rollback tags `*-prerestack-20261120004904` in the main repo.
+
 ## The sprint doc (*Orchestrator:*)
 
 * https://claude.ai/artifact/HHcmx1GE3oZyh6rQMWjgv3 — doc `83e42a7e-4892-49d9-b45e-585ca636e9a0`; State enum `b9b89cb1-c517`.
