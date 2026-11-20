@@ -26,13 +26,14 @@ Branch `20261120-vault_try`, PR #779, stacked on #778 (minder_try). Proved: `pnp
   * **Swept-while-waiting tests deleted**: bank-prompts' "refuses 'disabled' when the device is swept while it waits
     out a gate change" and "resolves 'disabled' when the device is swept while it waits out a gate change". The
     `demandEnabled` after the wait and the test of a bank already swept on entry stay.
-  * **`LeaseFormat` is `'a007102'`** (`packages/safebyok/src/shapes/shapes-stamps.ts`), was `7102`. A lease is never
-    stored: its `fmt` is only bound into the in-memory wrap of its bankKey, so no record fails and nothing migrates.
-    ctx-bytes test quotes it; lease.test's malformed table has an off-format string and the old number.
+  * **`LeaseFormat` is `ThingFormat`**, `'a010501'` (`packages/safebyok/src/shapes/shapes-stamps.ts`:
+    `export const LeaseFormat = ThingFormat`), was `7102`. A lease is never stored: its `fmt` is only bound into the
+    in-memory wrap of its bankKey, so no record fails and nothing migrates. ctx-bytes test quotes it; lease.test's
+    malformed table has an off-format string and the old number.
   * Changeset `.changeset/20261120-vault_try.md` (empty: safebyok is private).
 
 * **Decisions made**:
   * **Misuse in the try forms is a bad outcome**, not a throw, matching thread 11's minder (`tryGet`, `tryList`,
     `tryWrite`), whose open matter on this is pending the Coach. The Bank's try forms already answered so.
-  * **The string `'a007102'`**: no rule derives `'a010501'` from `100_501`, so I kept the lease's digits behind the
-    same `a` and a six-digit pad, distinct from the Thing's format and greppable. Any distinct string serves.
+  * **The lease's `fmt` is the Thing's `fmt`**, per the Coach's directive ("That should be the same string as the
+    `fmt` -- `a010501` iirc"). My first build gave it a string of its own, `'a007102'`; the reviewer reset it.
