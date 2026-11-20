@@ -71,7 +71,7 @@ export async function makeKnockKnockWorld(): Promise<KnockKnockWorld> {
   return { device, bank, vault, giverDevice: _cheat_giverDeviceOf(device, vault), deriver, snapshots }
 }
 
-// The giver asks a Device for its bank object, started, and the new core's Device does not yet start one. This is the
+// The giver asks a Device for its bank object, started, and the new core's Device starts none. This is the
 // test's one way past the core: the Device's own snapshot and subscribe, beside the vault the test made.
 /** The giver's view of `device`: its own scope, snapshot and subscribe, and a bank object over `vault`'s minder, started once and never ending. */
 export function _cheat_giverDeviceOf(device: Device, vault: Vault): GiverDevice<BoxCar> {

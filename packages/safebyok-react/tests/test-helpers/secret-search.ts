@@ -21,7 +21,7 @@ export function holdsText(root: unknown, text: string): boolean {
   return false
 }
 
-/** The values `val` holds directly, for {@link holdsText} to search */
+/** The values `val` holds directly */
 function childrenOf(val: object): unknown[] {
   if (val instanceof FormData) { return [...val.values()] }
   if (val instanceof Map)      { return [...val.keys(), ...val.values()] }

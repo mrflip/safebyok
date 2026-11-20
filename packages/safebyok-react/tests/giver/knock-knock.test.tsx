@@ -136,7 +136,7 @@ function unlockGatingseqsOf(world: TH.KnockKnockWorld): number[] {
 }
 
 describe("the knock-knock app", () => {
-  it("asks for the passphrase when a line needs the locked vault's key, and tells the joke once unlocked", async () => {
+  it("asks for the passphrase before telling a joke that needs the locked vault's key", async () => {
     const { world, heard, expectUnheld } = await renderKnockKnock()
     expect(screen.getByText('Locked')).to.exist
     await screen.findByText('Key stored')
@@ -170,7 +170,7 @@ describe("the knock-knock app", () => {
     expect(derivations()).to.eq(1)
   })
 
-  it("keeps the dialog open after a wrong passphrase, empties the field, and unlocks on the next try", async () => {
+  it("keeps the dialog open for another try after a wrong passphrase", async () => {
     const { world, heard, expectUnheld } = await renderKnockKnock()
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })
@@ -187,7 +187,7 @@ describe("the knock-knock app", () => {
     expectUnheld(Passphrase)
   })
 
-  it("joins a second line sent while the dialog is open to the same unlock, and answers both", async () => {
+  it("joins a second line sent while the dialog is open to the same unlock", async () => {
     const { world, heard, derivations, expectUnheld } = await renderKnockKnock()
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })
