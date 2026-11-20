@@ -1,7 +1,8 @@
 # Thread 7: with_whisper (2026-11-20)
 
-Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `pnpm justify`
-green after the catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 301, e2e 576, every package green).
+Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved (rework): `safebyok`
+lint, typecheck and 1301 tests green, then `pnpm justify` green on 9c2d636fb plus the rework (big 2946, react 301, e2e 576, every package green), not yet caught up onto #773's restacked 872a14819. Before the rework: `pnpm justify` green after the
+catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 301, e2e 576).
 
 * **Built** (`packages/safebyok/src/models/vault.ts`, tests in `tests/models/vault.test.ts`):
   * `vault.withWhisper(labelpath, fn)`: checks the labelpath and that `fn` is a function (`bad_record`, before any
@@ -22,9 +23,9 @@ green after the catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 
   * Item 4: the comment above "a vault's minder, beside the bank's own writes" now credits `AdapterVaultDB` (every
     adapter built on it: memory, Postgres) with telling each watch of the bank, main gate and root box records a write
     answers with, before the answer reaches its caller (`VaultDB.watch`'s bullet).
-  * From thread 6's review (orchestrator): `bankStageVals` and `bankEndCauseVals` (`shapes/shapes-bankish.ts`,
-    exported from `safebyok/core`), `as const` lists `BankStage` and `BankEndCause` derive from; a test in
-    `bank.test.ts` checks every stage and end cause a bank shows is listed. The Bank's and the Device's `subscribe` doc
+  * From thread 6's review (orchestrator): `bankStageVals` (`shapes/shapes-bankish.ts`, exported from
+    `safebyok/core`), the `as const` list `BankStage` derives from; a test in `bank.test.ts` checks every stage a bank
+    shows is listed. (A `bankEndCauseVals` beside it went with `BankEndCause`, below.) The Bank's and the Device's `subscribe` doc
     blocks say a throwing listener is reported through `tellBadNews`.
   * The Coach's ruling (2026-11-20, "It waits and checks unlocked again before starting; the prior usually unlocks or
     deletes"), in `models/bank.ts` *Prompts*: `launchUnlockBankPrompt` (so `ensureUnlocked` and `withWhisper`), finding a
@@ -35,6 +36,19 @@ green after the catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 
     change that lands (resolves, no second gating), one dismissed (an `unlock_bank` gating of its own opens, both
     waiters resume on one `attemptUnlock`), and the device swept meanwhile (`disabled`). A `bank.sweep()` alone leaves
     the device's gating open, so that test sweeps the device.
+  * Rework, the Coach's rulings on thread 6's snapshots (2026-11-20), a commit each:
+    * **No last refusal** ("Who asked for the feature? ... Can we rip it out until v1 ships"): the device snapshot's
+      `gating` is `{ gatingkind, gatingseq, isAttempting }`; `gating.lastRefusal`, the Gating's `#lastRefusal` and
+      `refusalSnapshotOf` (`models/device.ts`) are gone, with their gating tests (two cases; the `isAttempting` case
+      stays) and the device test's refusal lines (its no-cleartext check stays). A dialog shows the refusal its own
+      `attempt…` call resolves with. `RefusalSnapshot` stays, for `BankSnapshot.lastErr`.
+    * **endCause holds the error** ("Can the snapshot hold an error? It would be better"): `BankSnapshot.endCause` is
+      `Errors.VaultError | null`, read from the `bank.endCause` getter in `#makeSnapshot` (still pure), so getter and
+      snapshot agree; `BankEndCause` and `bankEndCauseVals` are gone, `bankStageVals` stays. Tests: the swept snapshot
+      holds `bank.endCause`, a device-swept one `device.endCause`, and a swept bank's snapshot stays the same object,
+      no subscriber told, across a `lock()` (which aligns) and its device's sweep, its cause still its own. A mutation
+      (a copy of the error per snapshot) fails three of them.
+    * `notes/security.md` (sonnet subagent): the snapshots entry, amended in place for both.
 * **Decisions made**:
   * Unlock first, then get: the gloss's order, and a get after a long prompt is fresher than one before it. A box that
     is absent therefore prompts, then refuses `absent_box`; a host usually knows beforehand (its record hook's data is
@@ -49,5 +63,9 @@ green after the catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 
   * A local `rejectionOf(promise)` helper in vault.test.ts checks `fn`'s throw by identity, chai-style;
     `Outcome.outcomeOf` would wrap a non-VaultError.
 * **For the Coach**: the Wh1 recommendation (`absent_box` for never stored and for deleted) is built, taken in YOLO.
-* **Discoveries**: `bank.sweep()` does not dismiss the device's open gating (only `device.sweep()` does), so prompts
-  waiting on a gating of a swept bank wait until someone dismisses it or an attempt refuses `disabled`. Unchanged here.
+* **Discoveries**:
+  * `bank.sweep()` does not dismiss the device's open gating (only `device.sweep()` does), so prompts waiting on a
+    gating of a swept bank wait until someone dismisses it or an attempt refuses `disabled`. Unchanged here.
+  * es-toolkit's `isEqual` compares two Errors by `name` and `message` alone, so `#align` would keep an old snapshot
+    over a different error with the same message. Harmless today: a bank's end cause never changes once set (its own
+    sweep's, or its device's, which its own sweep then adopts). Left as is.
