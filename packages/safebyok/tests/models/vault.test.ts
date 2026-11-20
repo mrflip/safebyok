@@ -230,7 +230,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const { record: stored } = await bank.sealBox(first, {}, { whisper: { apiKey: 'sk-test-1111' } })
     rowsOf(bank).set(Openai, stored)
     await minder.list('box')
-    expect(minder.at(scopeAt(bank, Openai))?.liveness).to.equal('behind')
+    expect(minder.at(scopeAt(bank, Openai))?.liveness).to.equal('bhnd')
     expect(await vault.withWhisper(Openai, ({ whisper, revtok }) => ({ whisper, revtok }))).to.deep.equal({ whisper: { apiKey: 'sk-test-1111' }, revtok: stored.revtok })
   })
 
