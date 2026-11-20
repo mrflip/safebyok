@@ -372,24 +372,42 @@ describe("ThingMinder.list", () => {
 })
 
 describe("ThingMinder.tryList", () => {
-  it("resolves the labelpaths listed as a good outcome", async () => {
+  it("answers as the vaultDB did, with the records listed", async () => {
     const vaultDB = new MemoryVaultDB()
-    await storedBoxOf(vaultDB)
+    const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
-    expect(await TH.expectGood(minder.tryList('box'))).to.deep.equal([TH.BoxScope.labelpath])
+    const listed = vi.spyOn(vaultDB, 'tryListThings')
+    const answer = await minder.tryList('box')
+    expect(answer).to.eq(await listed.mock.results[0]?.value)
+    expect(answer).to.deep.include({ ok: true, val: [Thing.sparseOf(box)], damaged_rows: [] })
+    expect(minder.listingAt(TH.RootScope)).to.deep.equal([TH.BoxScope.labelpath])
   })
 
-  it("resolves the vaultDB's refusal as a bad outcome", async () => {
+  it("answers with the damaged_rows the vaultDB reports, and leaves them out of val", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    vaultDB._cheat_things(TH.ThingBank).set('box/bad', { ...TH.boxThingOf('bad'), whisper_sealed: {} })
+    const { minder } = minderWorldOf(vaultDB)
+    const answer = await minder.tryList('box')
+    expect(answer.ok).to.be.true
+    expect(answer.damaged_rows.map((row) => row.labelpath)).to.deep.equal(['box/bad'])
+    expect(answer.ok && answer.val.map((record) => record.labelpath)).to.deep.equal([TH.BoxScope.labelpath])
+  })
+
+  it("answers the vaultDB's refusal", async () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     await TH.expectBad(minder.tryList('box'), 'storage_issue')
   })
 
-  it("resolves a labelpath that is no Thing's as a bad outcome", async () => {
-    const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
+  it("answers a labelpath that is no Thing's as a refusal, without asking the vaultDB", async () => {
+    const vaultDB = await bornOf(new MemoryVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    const listed = vi.spyOn(vaultDB, 'tryListThings')
     await TH.expectBad(minder.tryList('vault'), 'bad_record')
+    expect(listed.mock.calls).to.have.lengthOf(0)
   })
 
-  it("resolves a list after goodbye as a bad outcome", async () => {
+  it("answers a list after goodbye as a refusal", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     minder.goodbye()
     await TH.expectBad(minder.tryList('box'), 'disabled')

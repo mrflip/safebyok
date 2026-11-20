@@ -15,7 +15,7 @@ import { type ThingFormat, type ThingRecord, type ThingScope, type VoidSentinel,
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
-import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
+import type { ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import {
   type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
@@ -145,7 +145,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, tryGet, backgroundRefresh, list, tryList, isStaleAt, listen
+  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, tryGet, backgroundRefresh, tryList, list, isStaleAt, listen
 
   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
@@ -203,31 +203,35 @@ export class ThingMinder {
     void this.tryGet(scoped, opts)
   }
 
-  /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included.
+  /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included, and answer as the vaultDB did, a refusal included.
    * Each Thing it answers joins the listing of the Thing at `labelpath` ({@link listingAt}). A list never drops a labelpath
    * from that listing. Each record is cached sparse.
    * Where that leaves a car `bhnd` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
    * answers from the cache.
-   * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
+   * A Thing stored damaged is left out of `val`, reported in `damaged_rows`, and told to the bank's `tellBadNews` by its labelpath.
+   * Before `hello`, after `goodbye`, or for a labelpath that is no Thing's, it answers the refusal without asking the vaultDB.
    */
-  async list(labelpath: Labelpath): Promise<Labelpath[]> {
-    MinderChecks.minderLabelpath.parse(labelpath)
-    this.#demandReady()
+  async tryList(labelpath: Labelpath): Promise<ListThingsAnswer> {
+    try {
+      MinderChecks.minderLabelpath.parse(labelpath)
+      this.#demandReady()
+    } catch (err) {
+      return { ...refusedAnswerOf({ ...this.scope, labelpath, op: 'list', ifAbsent: 'nil' }, err), parent: null, damaged_rows: [] }
+    }
     const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
     const answer = await this.#vaultDB.tryListThings(ask)
-    if (! answer.ok) { throw answer.err }
+    if (! answer.ok) { return answer }
     if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
-    const labelpaths = answer.val.map((record) => record.labelpath)
     TSQ.notifyManager.batch(() => {
-      this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
+      this.#sendListingToTSQ({ ...this.scope, labelpath }, answer.val.map((record) => record.labelpath))
       for (const record of answer.val) { this.#sendToTSQ(record) }
     })
-    return labelpaths
+    return answer
   }
 
-  /** {@link list}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
-  async tryList(labelpath: Labelpath): Promise<Outcome.Outcome<Labelpath[]>> {
-    return await Outcome.outcomeOf(() => this.list(labelpath))
+  /** {@link tryList}, throwing its refusal instead of answering it: the labelpaths listed, on success. */
+  async list(labelpath: Labelpath): Promise<Labelpath[]> {
+    return Outcome.valOf(await this.tryList(labelpath)).map((record) => record.labelpath)
   }
 
   /** True when `scoped`'s car is missing or not timely. */
