@@ -1,7 +1,7 @@
 # Thread 7: with_whisper (2026-11-20)
 
 Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `pnpm justify`
-green after the rebase onto #773's restacked tip 872a14819 (`safebyok` 1342 tests, graphql 448, e2e 576, every package
+green after the rebase onto #773's restacked tip 872a14819 (before the overlapping-gatings rework) (`safebyok` 1342 tests, graphql 448, e2e 576, every package
 green). The rebase's one conflict, in vault.test.ts's sparse-box `putBoxOnce` test, kept this thread's behaviour (the
 box gotten whole, no `bad_record`) with #769's `bhnd` for a behind car; a second test of this thread's takes `bhnd` too.
 
@@ -46,10 +46,26 @@ box gotten whole, no `bad_record`) with #769's `bhnd` for a behind car; a second
     * **endCause holds the error** ("Can the snapshot hold an error? It would be better"): `BankSnapshot.endCause` is
       `Errors.VaultError | null`, read from the `bank.endCause` getter in `#makeSnapshot` (still pure), so getter and
       snapshot agree; `BankEndCause` and `bankEndCauseVals` are gone, `bankStageVals` stays. Tests: the swept snapshot
-      holds `bank.endCause`, a device-swept one `device.endCause`, and a swept bank's snapshot stays the same object,
-      no subscriber told, across a `lock()` (which aligns) and its device's sweep, its cause still its own. A mutation
-      (a copy of the error per snapshot) fails three of them.
+      holds `bank.endCause` (a device-swept one `device.endCause`), and stays the same object across a `lock()` and its
+      device's sweep.
     * `notes/security.md` (sonnet subagent): the snapshots entry, amended in place for both.
+  * Rework, the Coach's ruling on thread 5's overlapping gatings (2026-11-20, "an unlock checks right after waiting and
+    doesn't prompt"):
+    * `bank.attemptUnlock` (`models/bank.ts` *Re-entry points*), finding a gating of another kind open on its bank,
+      awaits its `whenConcluded`, then resolves ok through `attemptWithoutGating(this, cleartexts, () =>
+      Promise.resolve(this))` if the bank is unlocked (cleartexts spent unchecked, a disabled bank refused at the door),
+      and otherwise goes on to `#handIn` as before: it answers an `unlock_bank` gating open by then (one a prompt that
+      waited out the same gating opened), or unlocks directly. The same wait-then-check as `launchUnlockBankPrompt`; no
+      loop. Five tests in `bank-prompts.test.ts`'s `attemptUnlock` block: a gate change that lands (resolves ok, an
+      unusable passkey answer unused and zeroed), a dismissed one then a right and a wrong passphrase directly, a
+      waiting `ensureUnlocked` whose unlock gating the attempt answers, and a device swept meanwhile (`disabled`, no key
+      derived). With the change reverted, three fail; the two dismissed-then-direct cases state the outcome, and pass
+      either way.
+    * `notes/wontfix.md`, "A direct gate change, a lock or a sweep beside an open gating": the direct
+      `attemptReplacePassphrase`/`attemptAddPasskey`/`attemptRevokePasskey` beside an open gating, and any crossing of
+      `lock()` or a sweep with an open gating or an attempt in flight, as built, promised nowhere.
+    * `notes/security.md` (sonnet subagent): the with_whisper entry, amended in place: an ok outcome there means only
+      that the bank is unlocked.
 * **Decisions made**:
   * Unlock first, then get: the gloss's order, and a get after a long prompt is fresher than one before it. A box that
     is absent therefore prompts, then refuses `absent_box`; a host usually knows beforehand (its record hook's data is
@@ -67,6 +83,5 @@ box gotten whole, no `bad_record`) with #769's `bhnd` for a behind car; a second
 * **Discoveries**:
   * `bank.sweep()` does not dismiss the device's open gating (only `device.sweep()` does), so prompts waiting on a
     gating of a swept bank wait until someone dismisses it or an attempt refuses `disabled`. Unchanged here.
-  * es-toolkit's `isEqual` compares two Errors by `name` and `message` alone, so `#align` would keep an old snapshot
-    over a different error with the same message. Harmless today: a bank's end cause never changes once set (its own
-    sweep's, or its device's, which its own sweep then adopts). Left as is.
+  * es-toolkit's `isEqual` compares two Errors by `name` and `message` alone; harmless, as a bank's end cause never
+    changes once set.
