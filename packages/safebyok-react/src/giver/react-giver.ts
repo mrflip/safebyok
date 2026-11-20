@@ -59,9 +59,10 @@ function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return 
 // == [Form mutations]: FormMutationDefaults, takeCleartexts
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
-// the mutation would hold them, and an unlock that needs no network would wait for one.
+// the mutation would hold them, and an unlock that needs no network would wait for one. The first attempt takes the
+// cleartexts out of the object handed to `mutate`, so a retry, under a host's default, would hand the verb an empty one.
 /** The giver's defaults for the mutation of a form verb in the host's React Query. */
-const FormMutationDefaults = { networkMode: 'always' } as const
+const FormMutationDefaults = { networkMode: 'always', retry: false } as const
 
 // React Query keeps a mutation's variables, the object handed to `mutate`, in its cache and its devtools until the mutation
 // is collected, and a passphrase is a string that cannot be zeroed. Taking the fields out leaves that object empty.

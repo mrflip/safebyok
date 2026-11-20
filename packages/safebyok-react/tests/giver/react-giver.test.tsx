@@ -128,6 +128,19 @@ describe("the form mutations", () => {
     expect(refusal.family).to.eq('condition')
   })
 
+  it("runs the verb once under a host's default of retrying mutations", async () => {
+    const { world, Acme } = setup()
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
+    onTestFinished(() => { client.clear() })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
+    const refusal = new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.')
+    world.refuseFormVerbs(refusal)
+    const { result } = renderHook(() => Acme.useUnlock(), { wrapper: Wrapper })
+    act(() => { result.current.mutate({ passphraseClear: 'fake wrong passphrase' }) })
+    await waitFor(() => { expect(result.current.error).to.eq(refusal) })
+    expect(world.formCalls).to.deep.equal([{ verb: 'unlock', cleartexts: { passphraseClear: 'fake wrong passphrase' } }])
+  })
+
   it("keys each form mutation under the bank", () => {
     const { Acme } = setup()
     expect(Acme.unlockMutationOptions().mutationKey).to.deep.equal(['sok', 'u1', 'acme', 'unlock'])
