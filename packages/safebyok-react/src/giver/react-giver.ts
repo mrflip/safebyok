@@ -9,7 +9,7 @@ import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeCheck
 
 // == [Snapshots]: ServerSnapshot
 
-/** What the hooks report during a server render and while hydrating: no bank object, and no gating open. */
+/** The snapshot the hooks report during a server render and while hydrating: no bank object, and no gating open. */
 const ServerSnapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
 // --
 
@@ -28,7 +28,7 @@ function carQueryDefaults<CarT extends CarFields>() {
   } as const
 }
 
-/** Fresh until the bridge replaces the car, unless the vaultDB is known to hold a newer revision than the car's fullest record. */
+/** The staleTime of a car's entry: 0 where the vaultDB is known to hold a newer whole record, else Infinity (the bridge keeps it current). */
 function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>): number {
   const car = entry.state.data
   return ((car !== undefined) && dbHasNewer(car)) ? 0 : Infinity
@@ -39,7 +39,9 @@ function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>)
 // with the new key's, so cars of two boxes take the default too: their agerank says nothing of which to show. A box's cars
 // never go back, so the newer car holds everything the older one does, and nothing needs merging. Without this, a fetch
 // that read an older car and resolved after the bridge copied a newer one would put the older car back.
-/** Of `prior` and `next`, cars of one box, the car with the greater agerank, `prior` on a tie; anything else, as TanStack's `replaceEqualDeep`. */
+/** Structural sharing for a car's entry: of two cars of one box, the one with the greater agerank, `prior` on a tie.
+ * Anything else goes to TanStack's default, `replaceEqualDeep`.
+ */
 function newerCarOf(prior: unknown, next: unknown): unknown {
   if (! (isCar(prior) && isCar(next) && (prior.newest.labelpath === next.newest.labelpath))) { return replaceEqualDeep(prior, next) }
   return (next.agerank > prior.agerank) ? next : prior
@@ -63,8 +65,8 @@ export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGive
 /** What a giver's `forBank` returns. */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
-/** React hooks for `device`. Make them once, at module scope, beside the Device.
- * The objects the host's vaultDB answers with are frozen as they land, so a vaultDB must never change an object once it has answered with it.
+/** Make the React hooks for `device`. Make them once, at module scope, beside the Device.
+ * The objects a vaultDB answers with are deep-frozen when cached, so a vaultDB must never change an object after answering with it.
  * @example export const Giver = makeReactGiver(device)
  */
 export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
@@ -84,7 +86,7 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
   return Object.freeze({
     useBridge,
     useGating,
-    /** The hooks for the Device's bank; any other banklabel is refused. Name the result in PascalCase (`const Acme = Giver.forBank('acme')`), so the rules-of-hooks lint checks `Acme.useBoxRecord()`. */
+    /** The hooks for the Device's bank, refusing any other banklabel. Name the result in PascalCase (`const Acme = Giver.forBank('acme')`), so the rules-of-hooks lint checks `Acme.useBoxRecord()`. */
     forBank: (banklabel: string) => {
       ScopeChecks.bankScoped.parseConsistent({ banklabel }, { banklabel: device.banklabel })
       return makeBankGiver(device)
@@ -104,8 +106,11 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
     return useSyncExternalStore(device.subscribe, () => pick(device.getSnapshot().bank), () => pick(PendingBank))
   }
 
-  /** React Query's options for the box's whole car, for a `useQuery`, `queryClient.query` or route loader of your own: `data` is the car, the newest revision heard of beside the fullest record.
-   * Its defaults keep the car fresh until the bridge copies a newer one, stale while the vaultDB holds a newer revision, fetching while offline, and never replaced by an older car. Any may be overridden.
+  /** React Query's options for the box's whole car, for your own `useQuery`, `queryClient.query` or route loader.
+   * `data` is the car: the newest revision heard of, beside the fullest record. Its defaults, any of which you may override:
+   * - fresh until the bridge copies a newer car, and stale while the vaultDB is known to hold a newer revision
+   * - fetches even while offline
+   * - never replaces a car with an older one
    */
   function boxCarQueryOptions(labelpath: string) {
     const labelpathC = Checks.labelpath.parse(labelpath)
@@ -119,9 +124,10 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
     })
   }
 
-  /** The box's fullest record as stored, through React Query: `data` is the record to show, its whisper still sealed; null when none is stored or it was deleted; undefined while pending.
-   * A record that a newer revision has overtaken shows until the newer one arrives. The giver's `useBridge` must be mounted for it to follow changes.
-   * `opts` are React Query's own, over {@link boxCarQueryOptions}'s; a `select` given there is handed the whole car.
+  /** The box's fullest stored record, through React Query, its whisper still sealed.
+   * `data` is the record to show, null when none is stored or it was deleted, and undefined while pending. A record
+   * overtaken by a newer revision shows until the newer one arrives. Mount the giver's `useBridge` for it to follow changes.
+   * `opts` are React Query's own, and override {@link boxCarQueryOptions}'s. A `select` given there is handed the whole car.
    */
   function useBoxRecord<SelT = CarT['fullest']>(labelpath: string, opts: BoxQueryOpts<CarT, SelT> = {}): UseQueryResult<SelT> {
     return useQuery({ ...boxCarQueryOptions(labelpath), select: fullestOf as (car: CarT) => SelT, ...opts })

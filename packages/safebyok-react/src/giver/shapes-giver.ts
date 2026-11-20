@@ -15,15 +15,15 @@ export type CarFields = Readonly<{
   fullest:  unknown
 }>
 
-/** What the giver reads of a minder's event about a box's car. A minder's `ThingEvent` of a box is one. */
+/** The fields the giver reads of a minder's event about a box's car. A minder's `ThingEvent` of a box has them all. */
 export type GiverEvent<CarT extends CarFields> = Readonly<{
   type:     'updated' | 'removed'
-  /** The key the minder caches the car under, which is the host's key for it too. */
+  /** The key the minder caches the car under, and the host's key for it too. */
   queryKey: QueryKey
   state:    Readonly<{ data: CarT | undefined, dataUpdatedAt: number }>
 }>
 
-/** What the giver asks of a started bank object. */
+/** The calls the giver makes of a started bank object. */
 export interface GiverBank<CarT extends CarFields> {
   /** The car for the box at `labelpath`: at once from a car the bank's minder holds timely, else asked of the vaultDB. An unborn bank answers the void car without asking. */
   getBoxCar(labelpath: string): Promise<CarT>
@@ -31,13 +31,13 @@ export interface GiverBank<CarT extends CarFields> {
   listenBoxCars(listener: (event: GiverEvent<CarT>) => void): () => void
 }
 
-/** What the giver asks of a Device: a Device's own scope, snapshot and subscribe, and its bank object. */
+/** The members the giver needs of a Device: its scope, its snapshot and subscribe, and its bank object. */
 export interface GiverDevice<CarT extends CarFields> {
   readonly userid:      Userid
   readonly banklabel:   Banklabel
-  /** As a Device's: a function returning the same snapshot until something in it changes, safe to pass unbound. */
+  /** Returns the same snapshot until something in it changes. Safe to pass unbound. */
   readonly getSnapshot: () => DeviceSnapshot
-  /** As a Device's: subscribes a listener to the snapshot and returns its unsubscribe, safe to pass unbound. */
+  /** Subscribes a listener to the snapshot, and returns its unsubscribe. Safe to pass unbound. */
   readonly subscribe:   (listener: () => void) => () => void
   /** The bank object, started once. */
   ensureBank(): Promise<GiverBank<CarT>>

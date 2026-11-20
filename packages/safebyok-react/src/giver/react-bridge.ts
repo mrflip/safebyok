@@ -7,7 +7,7 @@ import { bankQueryKey } from './react-giver'
 import type { CarFields, GiverDevice, GiverEvent } from './shapes-giver'
 
 /** Copy each box car the bank's minder caches into the host's entry for it, wherever a hook has made one. Returns the function that stops copying.
- * It starts by fetching again each entry that shows a car, so that one a route loader filled before the bridge started shows what the minder heard since.
+ * It starts by invalidating each entry that shows a car, so one a route loader filled before the bridge started catches up with the minder.
  * When a bank object ends, its entries are reset, so a hook still showing them fetches again from the bank object that follows.
  */
 export function bridgeDevice<CarT extends CarFields>(client: QueryClient, device: GiverDevice<CarT>): () => void {
@@ -35,7 +35,9 @@ export function bridgeDevice<CarT extends CarFields>(client: QueryClient, device
 
 // A removal is the minder letting go of a car it no longer needs, not news of the vaultDB, so the host's entry keeps what it
 // shows: the host's cache keeps what the host's options say, and a mounted hook does not flicker back to pending.
-/** Put the event's car in the host's entry for it, if a hook made one. A car with no record to show is fetched instead; a `bhnd` one shows while the newer record is fetched. */
+/** Put the event's car in the host's entry for it, if a hook made one.
+ * A `bare` car, with no record to show, is fetched instead. A `bhnd` car shows while the newer record is fetched.
+ */
 function deliverEvent(client: QueryClient, event: GiverEvent<CarFields>): void {
   const { type, queryKey, state: { data: car, dataUpdatedAt } } = event
   if ((type === 'removed') || (car === undefined) || (client.getQueryCache().find({ queryKey, exact: true }) === undefined)) { return }
