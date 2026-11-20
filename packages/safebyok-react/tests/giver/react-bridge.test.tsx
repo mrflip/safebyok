@@ -6,10 +6,11 @@ import { boxCarQueryKey, makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const OpenaiPath = 'box/openai'
+const OpenaiKey  = boxCarQueryKey({ userid: 'u1', banklabel: 'acme', labelpath: OpenaiPath })
 
-/** A fake world with revision 1 of the OpenAI box stored, its giver for `acme`, and a hook that mounts the bridge and shows the box's record. */
-async function setupShowing() {
-  const world  = TH.makeFakeGiverWorld('u1')
+/** A fake world with revision 1 of the OpenAI box stored, its giver for `acme`, and a fresh QueryClient's wrapper. */
+function setup() {
+  const world  = TH.makeFakeGiverWorld()
   const Giver  = makeReactGiver(world.device)
   const Acme   = Giver.forBank('acme')
   const client = new QueryClient()
@@ -17,12 +18,20 @@ async function setupShowing() {
   function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
   const first  = TH.fakeBoxRecordOf(OpenaiPath, 1)
   world.stored.set(OpenaiPath, TH.fullCarOf(first))
-  const rendered = renderHook(() => {
+  /** Render a hook that mounts the bridge and shows the box's record */
+  const renderShowing = () => renderHook(() => {
     Giver.useBridge()
     return Acme.useBoxRecord(OpenaiPath)
   }, { wrapper: Wrapper })
-  await waitFor(() => { expect(rendered.result.current.data).to.eq(first) })
-  return { world, client, first, ...rendered }
+  return { world, Acme, client, first, renderShowing }
+}
+
+/** {@link setup}, with the hook rendered and showing revision 1. */
+async function setupShowing() {
+  const { renderShowing, ...rest } = setup()
+  const rendered = renderShowing()
+  await waitFor(() => { expect(rendered.result.current.data).to.eq(rest.first) })
+  return { ...rest, ...rendered }
 }
 
 describe("the bridge", () => {
@@ -32,6 +41,12 @@ describe("the bridge", () => {
     act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(second)) })
     await waitFor(() => { expect(result.current.data).to.deep.equal(second) })
     expect(world.counts.gets).to.eq(1)
+  })
+
+  it("dates the host's entry by when the minder heard of the car", async () => {
+    const { world, result } = await setupShowing()
+    act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2)), 1_700_000_000_000) })
+    await waitFor(() => { expect(result.current.dataUpdatedAt).to.eq(1_700_000_000_000) })
   })
 
   it("keeps showing the older record while a newer revision is fetched whole", async () => {
@@ -44,6 +59,35 @@ describe("the bridge", () => {
     expect(world.counts.gets).to.eq(2)
   })
 
+  it("fetches a car with no record to show in place of copying it", async () => {
+    const { world, first, result } = await setupShowing()
+    const second = TH.fakeBoxRecordOf(OpenaiPath, 2)
+    world.stored.set(OpenaiPath, TH.fullCarOf(second))
+    act(() => { world._cheat_hear(OpenaiPath, TH.bareCarOf(second)) })
+    expect(result.current.data).to.eq(first)
+    await waitFor(() => { expect(result.current.data).to.deep.equal(second) })
+    expect(world.counts.gets).to.eq(2)
+  })
+
+  it("keeps an older car a late fetch answers from replacing a newer one it copied", async () => {
+    const { world, client, renderShowing } = setup()
+    const answer = world.pauseAnswers()
+    const { result } = renderShowing()
+    await waitFor(() => { expect(world.counts.gets).to.eq(1) })
+    const second = TH.fakeBoxRecordOf(OpenaiPath, 2)
+    act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(second)) })
+    await waitFor(() => { expect(result.current.data).to.deep.equal(second) })
+    act(() => { answer() })
+    await waitFor(() => { expect(client.getQueryState(OpenaiKey)?.fetchStatus).to.eq('idle') })
+    expect(result.current.data).to.deep.equal(second)
+  })
+
+  it("leaves the host's entry showing its car when the minder lets go of it", async () => {
+    const { world, first, client, result } = await setupShowing()
+    act(() => { world._cheat_hearRemoved(OpenaiPath) })
+    expect([result.current.data, client.getQueryData(OpenaiKey)]).to.deep.equal([first, TH.fullCarOf(first)])
+  })
+
   it("copies no car into an entry no hook has made", async () => {
     const { world, client } = await setupShowing()
     const otherPath = 'box/anthropic'
@@ -54,7 +98,7 @@ describe("the bridge", () => {
   it("fetches again from the next bank object when a bank object ends", async () => {
     const { world, result } = await setupShowing()
     world.stored.delete(OpenaiPath)
-    act(() => { world._cheat_endBank('acme') })
+    act(() => { world._cheat_endBank() })
     await waitFor(() => { expect(result.current.data).to.be.null })
     expect(world.counts.gets).to.eq(2)
   })
@@ -63,26 +107,16 @@ describe("the bridge", () => {
     const { world, client, first, unmount } = await setupShowing()
     unmount()
     act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2))) })
-    const car = client.getQueryData(boxCarQueryKey({ userid: 'u1', banklabel: 'acme', labelpath: OpenaiPath }))
-    expect(car).to.deep.equal(TH.fullCarOf(first))
+    expect(client.getQueryData(OpenaiKey)).to.deep.equal(TH.fullCarOf(first))
   })
 
-  it("shows a revision the minder heard before the bridge mounted, without fetching again", async () => {
-    const world  = TH.makeFakeGiverWorld('u1')
-    const Giver  = makeReactGiver(world.device)
-    const Acme   = Giver.forBank('acme')
-    const client = new QueryClient()
-    onTestFinished(() => { client.clear() })
-    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
-    world.stored.set(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 1)))
+  it("shows a revision the minder heard before the bridge mounted, without asking the vaultDB again", async () => {
+    const { world, Acme, client, renderShowing } = setup()
     // A route loader fetches the box before any component mounts.
     await client.query(Acme.boxCarQueryOptions(OpenaiPath))
     const second = TH.fakeBoxRecordOf(OpenaiPath, 2)
     world._cheat_hear(OpenaiPath, TH.fullCarOf(second))
-    const { result } = renderHook(() => {
-      Giver.useBridge()
-      return Acme.useBoxRecord(OpenaiPath)
-    }, { wrapper: Wrapper })
+    const { result } = renderShowing()
     await waitFor(() => { expect(result.current.data).to.deep.equal(second) })
     expect(world.counts.gets).to.eq(1)
   })

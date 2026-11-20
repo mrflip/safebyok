@@ -1,16 +1,16 @@
-import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
+import type { OpenGatingSnapshot } from 'safebyok'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { PendingBank, makeReactGiver, type BankSnapshot } from '../../src/giver/react-giver'
+import { PendingBank, makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const OpenaiPath = 'box/openai'
-const ReadyUnlocked: BankSnapshot = Object.freeze({ stage: 'ready', isLocked: false, leaseEndsAt: 1_800_000_000_000, lastErr: null })
 
-/** A fake world signed in as `userid`, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
-function setup(userid: string | null = 'u1') {
-  const world  = TH.makeFakeGiverWorld(userid)
+/** A fake world, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
+function setup() {
+  const world  = TH.makeFakeGiverWorld()
   const Giver  = makeReactGiver(world.device)
   const Acme   = Giver.forBank('acme')
   const client = new QueryClient()
@@ -26,25 +26,28 @@ describe("makeReactGiver", () => {
     }
   })
 
-  it("refuses an empty banklabel", () => {
+  it("gives the hooks of the Device's bank, and refuses any other banklabel", () => {
     const { Giver } = setup()
-    TH.expectSyncRefusal(() => Giver.forBank(''), 'bad_record')
+    expect(Object.keys(Giver.forBank('acme'))).to.deep.equal(['useBankSnapshot', 'useBoxRecord', 'boxCarQueryOptions'])
+    for (const banklabel of ['other', '']) {
+      TH.expectSyncRefusal(() => Giver.forBank(banklabel), 'bad_scope')
+    }
   })
 })
 
 describe("useBankSnapshot", () => {
-  it("reads as locked and signed out before the Device has heard of the bank", () => {
+  it("reads as starting and locked before the Device holds a bank object", () => {
     const { Acme, wrapper } = setup()
     const { result } = renderHook(() => Acme.useBankSnapshot(), { wrapper })
     expect(result.current).to.eq(PendingBank)
-    expect(result.current.isLocked).to.eq(true)
+    expect([result.current.stage, result.current.isLocked]).to.deep.equal(['starting', true])
   })
 
   it("re-renders with the bank's snapshot when it changes", () => {
     const { world, Acme, wrapper } = setup()
     const { result } = renderHook(() => Acme.useBankSnapshot(), { wrapper })
-    act(() => { world._cheat_setBank('acme', ReadyUnlocked) })
-    expect(result.current).to.eq(ReadyUnlocked)
+    act(() => { world._cheat_setBank(TH.UnlockedBank) })
+    expect(result.current).to.eq(TH.UnlockedBank)
   })
 
   it("given a selector, re-renders only when what it selects changes", () => {
@@ -54,21 +57,32 @@ describe("useBankSnapshot", () => {
       renders += 1
       return Acme.useBankSnapshot((snap) => snap.isLocked)
     }, { wrapper })
-    act(() => { world._cheat_setBank('acme', ReadyUnlocked) })
+    act(() => { world._cheat_setBank(TH.UnlockedBank) })
     expect([result.current, renders]).to.deep.equal([false, 2])
-    act(() => { world._cheat_setBank('acme', { ...ReadyUnlocked, lastErr: new Error('a refusal the lock does not care about') }) })
+    act(() => { world._cheat_setBank({ ...TH.UnlockedBank, leaseEndsAt: 1_900_000_000_000 }) })
     expect(renders).to.eq(2)
   })
 
-  it("ignores a change to another bank", () => {
+  it("ignores a change to the gating", () => {
     const { world, Acme, wrapper } = setup()
     let renders = 0
     renderHook(() => {
       renders += 1
       return Acme.useBankSnapshot()
     }, { wrapper })
-    act(() => { world._cheat_setBank('other', ReadyUnlocked) })
+    act(() => { world._cheat_setGating({ gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false } as OpenGatingSnapshot) })
     expect(renders).to.eq(1)
+  })
+})
+
+describe("useGating", () => {
+  it("reads null with no gating open, and re-renders with the gating once one is", () => {
+    const { world, Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useGating(), { wrapper })
+    expect(result.current).to.be.null
+    const gating = { gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false } as OpenGatingSnapshot
+    act(() => { world._cheat_setGating(gating) })
+    expect(result.current).to.eq(gating)
   })
 })
 
@@ -89,30 +103,41 @@ describe("useBoxRecord", () => {
     expect(result.current.data).to.be.null
   })
 
-  it("fetches nothing while nobody is signed in, and fetches once someone is", async () => {
-    const { world, Acme, wrapper } = setup(null)
+  it("stays fresh while the car is whole, and goes stale while the vaultDB holds a newer revision", async () => {
+    const { world, Acme, client, wrapper } = setup()
+    const first = TH.fakeBoxRecordOf(OpenaiPath, 1)
+    world.stored.set(OpenaiPath, TH.fullCarOf(first))
+    await client.query(Acme.boxCarQueryOptions(OpenaiPath))
     const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    expect([result.current.isPending, result.current.fetchStatus, world.counts.gets]).to.deep.equal([true, 'idle', 0])
-    act(() => { world._cheat_signIn('u1') })
+    expect([result.current.data, result.current.isStale]).to.deep.equal([first, false])
+    act(() => { client.setQueryData(Acme.boxCarQueryOptions(OpenaiPath).queryKey, TH.bhndCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2), first)) })
+    await waitFor(() => { expect([result.current.data, result.current.isStale]).to.deep.equal([first, true]) })
+  })
+
+  it("fetches while the browser is offline", async () => {
+    const { world, Acme, wrapper } = setup()
+    onlineManager.setOnline(false)
+    onTestFinished(() => { onlineManager.setOnline(true) })
+    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     expect(world.counts.gets).to.eq(1)
   })
 
-  it("keeps each user's record under a key of its own", async () => {
-    const { world, Acme, wrapper } = setup('u1')
+  it("takes React Query's own options over the giver's defaults", async () => {
+    const { world, Acme, wrapper } = setup()
     world.stored.set(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 1)))
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    await waitFor(() => { expect(result.current.data).not.to.be.undefined })
-    world.stored.delete(OpenaiPath)
-    act(() => { world._cheat_signIn('u2') })
-    expect(result.current.data).to.be.undefined
-    await waitFor(() => { expect(result.current.data).to.be.null })
+    const idle = renderHook(() => Acme.useBoxRecord(OpenaiPath, { enabled: false }), { wrapper })
+    expect([idle.result.current.fetchStatus, world.counts.gets]).to.deep.equal(['idle', 0])
+    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath, { staleTime: 0 }), { wrapper })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(result.current.isStale).to.eq(true)
   })
 
-  it("takes React Query's own options", () => {
+  it("hands a select of the host's the whole car", async () => {
     const { world, Acme, wrapper } = setup()
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath, { enabled: false }), { wrapper })
-    expect([result.current.fetchStatus, world.counts.gets]).to.deep.equal(['idle', 0])
+    world.stored.set(OpenaiPath, TH.bhndCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2), TH.fakeBoxRecordOf(OpenaiPath, 1)))
+    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath, { select: (car) => car.newest.revseq }), { wrapper })
+    await waitFor(() => { expect(result.current.data).to.eq(2) })
   })
 
   it("refuses a labelpath that is not a string", () => {
@@ -132,6 +157,11 @@ describe("boxCarQueryOptions", () => {
     await waitFor(() => { expect(result.current.data).to.eq(car) })
   })
 
+  it("keys the car as the bank's minder does", () => {
+    const { Acme } = setup()
+    expect(Acme.boxCarQueryOptions(OpenaiPath).queryKey).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '!'])
+  })
+
   it("lets a fetch ahead of render fill the entry that useBoxRecord then shows at once", async () => {
     const { world, Acme, client, wrapper } = setup()
     const record = TH.fakeBoxRecordOf(OpenaiPath, 1)
@@ -139,5 +169,17 @@ describe("boxCarQueryOptions", () => {
     await client.query(Acme.boxCarQueryOptions(OpenaiPath))
     const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
     expect([result.current.data, world.counts.gets]).to.deep.equal([record, 1])
+  })
+
+  it("never replaces a car with an older one", async () => {
+    const { world, Acme, client } = setup()
+    const first = TH.fakeBoxRecordOf(OpenaiPath, 1)
+    world.stored.set(OpenaiPath, TH.fullCarOf(first))
+    const { queryKey } = Acme.boxCarQueryOptions(OpenaiPath)
+    await client.query(Acme.boxCarQueryOptions(OpenaiPath))
+    const second = TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2))
+    client.setQueryData(queryKey, second)
+    client.setQueryData(queryKey, TH.fullCarOf(first))
+    expect(client.getQueryData(queryKey)).to.eq(second)
   })
 })
