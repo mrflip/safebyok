@@ -51,7 +51,8 @@ export class Vault {
 
   /** Stop its minder and empty its cache ({@link ThingMinder.goodbye}). Its bank's sweep calls it. Never throws. */
   sweep(): this {
-    this.#minder.goodbye()
+    // The watch's stop is the host's vaultDB code: what it throws is news, and the bank's sweep goes on.
+    try { this.#minder.goodbye() } catch (err) { this.#bank.tellBadNews([err]) }
     return this
   }
   // --

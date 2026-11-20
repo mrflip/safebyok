@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Bank } from '../../src/models/bank'
 import { Vault } from '../../src/models/vault'
-import type { BoxUnsealed } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type BoxUnsealed, PendingBank } from '../../src/shapes/shapes-bankish'
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
@@ -103,6 +103,22 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     bank.sweep()
     minder.hello()
     expect(await minder.get(scopeAt(bank, Openai))).to.include({ liveness: 'void' })
+  })
+
+  it("go on past a watch whose stop throws, telling onBadNews", async () => {
+    const vaultDB   = new MemoryVaultDB()
+    const watch     = vaultDB.watch.bind(vaultDB)
+    vi.spyOn(vaultDB, 'watch').mockImplementation((...args) => {
+      const unwatch = watch(...args)
+      return () => { unwatch(); throw new Error('a bug in the host') }
+    })
+    const onBadNews = vi.fn()
+    const { bank, device } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
+    Vault.make(bank).minder.hello()
+    expect(() => device.sweep()).not.to.throw()
+    expect(device.getSnapshot().bank).to.equal(PendingBank)
+    await TH.eventually(() => onBadNews.mock.calls.length === 2)
+    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
   })
 
   it("tell the bank's subscribers once, and nothing after", async () => {
