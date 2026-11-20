@@ -12,7 +12,7 @@ import * as Throwers from '../refusals/throwers'
 
 // Each attempt checks its cleartexts, proves them, and makes its change through the bank's private verbs its friend carries.
 // A cleartext goes only to checkedCleartexts, a strength check and a Proving builder, and a proving never leaves the attempt
-// that built it but for those verbs (G9). Each spends its cleartexts whatever its outcome (G2), and changes nothing where it
+// that built it but for those verbs (G9). Each vacates its cleartexts whatever its outcome (G2), and changes nothing where it
 // refuses: a gate change writes the gate before it unlocks, so a refused write never unlocks.
 
 /** Birth a bank of `device`'s scope from the user's new passphrase and optional passkey: write it, and unlock it.
@@ -32,7 +32,7 @@ export async function birthBank(device: Device, cleartexts: unknown, friend: Bir
     const bankRecord = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins: { main, passkey0 } } })
     return await friend.birth(bankRecord, passphraseProving)
   } finally {
-    spendCleartexts(cleartexts)
+    vacateCleartexts(cleartexts)
   }
 }
 
@@ -44,7 +44,7 @@ export async function unlockBank(bank: Bank, cleartexts: unknown, friend: Pick<B
     const proved = await provingOf(bank.device, bank.maingate, proof)
     return await friend.unlockByProving(proved)
   } finally {
-    spendCleartexts(cleartexts)
+    vacateCleartexts(cleartexts)
   }
 }
 
@@ -66,7 +66,7 @@ export async function replacePassphrase(bank: Bank, cleartexts: unknown, friend:
     await friend.putGate(nextGateAsk(ante, { main, passkey0: ante.passkey0 }, 'replace_passphrase'))
     return await friend.unlockByProving(proved)
   } finally {
-    spendCleartexts(cleartexts)
+    vacateCleartexts(cleartexts)
   }
 }
 
@@ -84,7 +84,7 @@ export async function addPasskey(bank: Bank, cleartexts: unknown, friend: BankGa
     await friend.putGate(nextGateAsk(ante, { main: ante.main, passkey0 }, 'add_passkey'))
     return await friend.unlockByProving(proved)
   } finally {
-    spendCleartexts(cleartexts)
+    vacateCleartexts(cleartexts)
   }
 }
 
@@ -99,12 +99,12 @@ export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: Ban
     if (ante.passkey0 !== null) { await friend.putGate(nextGateAsk(ante, { main: ante.main, passkey0: null }, 'revoke_passkey')) }
     return await friend.unlockByProving(proved)
   } finally {
-    spendCleartexts(cleartexts)
+    vacateCleartexts(cleartexts)
   }
 }
 // --
 
-// == [An attempt's helpers]: checkedCleartexts, checkStrength, provingOf, nextGateAsk, spendCleartexts, spendAnswerAt
+// == [An attempt's helpers]: checkedCleartexts, checkStrength, provingOf, nextGateAsk, vacateCleartexts, vacateAnswerAt
 
 /** Check `cleartexts` with `checker`.
  * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
@@ -137,14 +137,14 @@ function nextGateAsk(ante: Gate, wayins: GateDna['wayins'], policy: EX.StoragePo
 }
 
 /** Zero the PRF bytes of each passkey answer in `cleartexts`, the proof's and a new passkey's (G2). */
-function spendCleartexts(cleartexts: unknown): void {
-  spendAnswerAt(cleartexts, 'passkeyClear')
-  spendAnswerAt(cleartexts, 'nextPasskeyClear')
+function vacateCleartexts(cleartexts: unknown): void {
+  vacateAnswerAt(cleartexts, 'passkeyClear')
+  vacateAnswerAt(cleartexts, 'nextPasskeyClear')
 }
 
 /** Zero the PRF bytes of the passkey answer at `fieldname` in `cleartexts`, if it has one. */
-function spendAnswerAt(cleartexts: unknown, fieldname: 'passkeyClear' | 'nextPasskeyClear'): void {
-  // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the outcome it follows.
+function vacateAnswerAt(cleartexts: unknown, fieldname: 'passkeyClear' | 'nextPasskeyClear'): void {
+  // The reach-in may meet a getter or a proxy of the host's, which may throw: vacating is best effort, and never replaces the outcome it follows.
   // The cleartexts may be unchecked, as when the shape refuses, so nothing about them is assumed. An answer is single-use: once zeroed, a
   // second hand-in is refused by its all-zero bytes.
   try {
@@ -153,7 +153,7 @@ function spendAnswerAt(cleartexts: unknown, fieldname: 'passkeyClear' | 'nextPas
     if (ArrayBuffer.isView(prfBytes)) { new Uint8Array(prfBytes.buffer, prfBytes.byteOffset, prfBytes.byteLength).fill(0) }
     // A bare ArrayBuffer, as WebAuthn hands the PRF output, judged by its tag for the same reason.
     if (Object.prototype.toString.call(prfBytes) === '[object ArrayBuffer]') { new Uint8Array(prfBytes as ArrayBuffer).fill(0) }
-  } catch { /* nothing left to spend */ }
+  } catch { /* nothing left to vacate */ }
 }
 // --
 

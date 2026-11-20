@@ -17,7 +17,7 @@ what differs from big, in a sentence or two.
 
 ## Drifted
 
-* 2026-11-20 (form_verbs), G2: **A passkey answer is spent after every attempt.** In big an attempt refused with a
+* 2026-11-20 (form_verbs), G2: **A passkey answer is vacated after every attempt.** In big an attempt refused with a
   correctable refusal, short of its gating's last, left the answer's PRF bytes un-zeroed for the host to hand in again.
   The new core has no gating to try again in: each attempt (`packages/safebyok/src/models/gating.ts`) zeroes every
   passkey answer it is handed, the proof's (`passkeyClear`) and a new passkey's (`nextPasskeyClear`), in a `finally`,

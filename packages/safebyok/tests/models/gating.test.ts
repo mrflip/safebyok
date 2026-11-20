@@ -1,4 +1,4 @@
-/** The attempts behind the bank's form verbs: `Bank.birth` over real provings and its device's MemoryVaultDB, and how every attempt spends the passkey answers it is handed, whatever its outcome. */
+/** The attempts behind the bank's form verbs: `Bank.birth` over real provings and its device's MemoryVaultDB, and how every attempt vacates the passkey answers it is handed, whatever its outcome. */
 
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
@@ -167,13 +167,13 @@ describe("Bank.birth(device, cleartexts)", () => {
 })
 
 describe("Bank.birth(device, cleartexts): what it refuses before it derives a key", () => {
-  it("refuses a device that is not a Device, spending the passkey answer", async () => {
+  it("refuses a device that is not a Device, vacating the passkey answer", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
     await TH.expectRefusal(birth(TH.provingDeviceOf() as never, { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }), 'bad_record')
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
-  it("refuses on a swept device, writing nothing and spending the passkey answer", async () => {
+  it("refuses on a swept device, writing nothing and vacating the passkey answer", async () => {
     const device = TH.makeDevice()
     const births = TH.spyBirths(device)
     device.sweep()
@@ -191,7 +191,7 @@ describe("Bank.birth(device, cleartexts): what it refuses before it derives a ke
   })
 })
 
-describe("an attempt's spending of the passkey answers it is handed", () => {
+describe("an attempt's vacating of the passkey answers it is handed", () => {
   it("zeroes the answer once a birth lands", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
     await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext })
@@ -220,7 +220,7 @@ describe("an attempt's spending of the passkey answers it is handed", () => {
 
   it("zeroes a passkey answer handed as a bare ArrayBuffer", async () => {
     const prfBuffer = new Uint8Array(32).fill(7).buffer
-    // Whether the check accepts a bare buffer is not this test's subject: the bytes are spent either way.
+    // Whether the check accepts a bare buffer is not this test's subject: the bytes are vacated either way.
     await Bank.tryBirth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } })
     expect(TH.isZeroed(new Uint8Array(prfBuffer))).to.be.true
   })

@@ -108,7 +108,7 @@ export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { retur
 
 /** What a test may say of a {@link buildBornBank} bank. */
 export interface BornBankGiven {
-  /** The passkey answer whose wayin the gate gets beside its passphrase's; none when left out. It is not spent. */
+  /** The passkey answer whose wayin the gate gets beside its passphrase's; none when left out. It is not vacated. */
   passkeyCleartext?: GX.PasskeyAnswer | undefined
   /** The device the bank is on: a {@link makeDevice} device when left out. */
   device?:       Device | undefined
@@ -227,7 +227,7 @@ export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gat
 
 // == [Bytes]: isZeroed
 
-/** Whether every byte of `bytes` is zero: what a spent passkey answer or refused key bytes are left as. */
+/** Whether every byte of `bytes` is zero: what a vacated passkey answer or refused key bytes are left as. */
 export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte) => byte === 0) }
 // --
 

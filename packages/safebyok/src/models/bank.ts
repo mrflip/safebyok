@@ -176,7 +176,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Form verbs]: birth, tryBirth, unlock, tryUnlock, replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, gatingFriend
   // Each hands the cleartexts a form collected, unread, to its attempt in gating.ts, with a friend of this bank's private
-  // verbs: no public method accepts a proving (G9). Each spends the cleartexts whatever its outcome, and changes nothing where it refuses.
+  // verbs: no public method accepts a proving (G9). Each vacates the cleartexts whatever its outcome, and changes nothing where it refuses.
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked.
    * Refuses `weak_passphrase` before any key is derived, and `gate_made_elsewhere` where a live bank is already stored.
