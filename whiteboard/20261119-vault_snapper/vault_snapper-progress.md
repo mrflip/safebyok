@@ -62,8 +62,18 @@ orchestrator writes it.
 * Open (TOP row): a joined unlock takes a gate change's failure; Rec: an unlock joins only an unlock gating. Thread 7
   waits on it only if `withWhisper` must say which.
 
+## Thread 6, snapshots (#773) (*Orchestrator:*)
+
+* `bank.getSnapshot()`/`subscribe()`: `{ stage, isLocked, isEnded, endCause, leaseEndsAt, lastErr }`; `BankStage` holds all
+  of S1, only `locked`/`unlocked`/`swept` reached; `leaseEndsAt` = `proved_at + leaseMillis`; `lastErr` null for now.
+* `device.getSnapshot()`/`subscribe()`: `{ bank, gating }`, `bank` the held bank's own snapshot object; `gating` is
+  `{ gatingkind, gatingseq, isAttempting, lastRefusal }` or null; `gatingseq` odd while a gating is open, on the Device
+  only. `lastRefusal` is `{ refusalkind, family, message }`, kept until the next refusal. Both `getSnapshot` and
+  `subscribe` are getters returning arrows: safe to hand out unbound (thread 8).
+* `device.sweep()` now sweeps its held bank (through the cheat). `isWatching`, `heardAt` left out entirely.
+
 ## The sprint doc (*Orchestrator:*)
 
 * https://claude.ai/artifact/HHcmx1GE3oZyh6rQMWjgv3 — doc `83e42a7e-4892-49d9-b45e-585ca636e9a0`; State enum `b9b89cb1-c517`.
-* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 245);
+* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 246);
   Cleanup `6077489e-8954` / `14b54849-af59`; Progress `51ab4975-ceed` / `26336557-6583`; Resolved `a912f3b9-5db8` / `c14689aa-a452`.

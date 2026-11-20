@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1, 3 and 4 filed ([#769](https://github.com/mrflip/safebyok/pull/769), [#768](https://github.com/mrflip/safebyok/pull/768), [#770](https://github.com/mrflip/safebyok/pull/770)); #769 and #770 out of draft; threads 2 and 5 ready ([#771](https://github.com/mrflip/safebyok/pull/771), [#772](https://github.com/mrflip/safebyok/pull/772)), in review; thread 6 building on thread 5.
+* **Status:** threads 1 to 5 filed and out of draft (#769, #771 one line; #770, #772 another; #768); thread 6 ready ([#773](https://github.com/mrflip/safebyok/pull/773)), in review; thread 7 building on it.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -195,7 +195,7 @@ refactored (or is, in commits that diff cleanly), and the four born-bank gatings
 
 *Touches:* `models/bank.ts` (prompts), `models/gating.ts`, `models/device.ts`, their tests. *Depends on:* thread 4
 (same file, stacked). *Look-ahead:* thread 6's snapshots tell of the gating; thread 9 drives `attemptUnlock` from a
-form. *Size:* M. *Status:* filed, #772 (branch `20261120-bank_gatings`), at 76edb6866.
+form. *Size:* M. *Status:* filed, #772 (branch `20261120-bank_gatings`), at 76edb6866; out of draft.
 
 *Review:* fixed (high, `opus`, against G1, G2, G8, G9): `attemptWithoutGating` refuses a disabled bank before any
 cleartext is used and spends cleartexts on every outcome; tests now prove no key is derived on a swept bank, a passkey
@@ -220,7 +220,7 @@ current bank's snapshot and adds the open gating, `{ gatingkind, isAttempting, l
 reachable without startup (`locked`, `unlocked`, `swept`) are built; the type holds the rest. `isWatching` and
 `heardAt` wait until the vaultDB can tell them. *Touches:* `models/bank.ts`, `models/device.ts`, `models/gating.ts`.
 *Depends on:* thread 5 (stacked). *Size:* M. *Orchestrator:* `gatingseq` handed here from thread 5, only if it lines
-up with one-at-a-time. *Status:* building, branch `20261120-snapshots`, cut from thread 5's tip f7091958a.
+up with one-at-a-time. *Status:* ready, #773 (branch `20261120-snapshots`); in review, `high` on `opus` (one compaction before ready).
 
 ### 7. with_whisper
 
@@ -239,7 +239,7 @@ the file's header says. And W2, ruled ("A put needs unlock anyway. Document as w
 `notes/wontfix.md` entry, that changing only a box's sidecar needs the bank unlocked and the whisper in hand, since
 sealing a new revision keeps none of the old whisper. *Touches:* `models/vault.ts`, its tests. *Depends on:* thread 6 (the line through threads 4 and 5). Also: `tests/models/vault.test.ts`'s comment above the try-it-first tests credits MemoryVaultDB's own microtask;
 correct it to `AdapterVaultDB` telling every watcher of a write's tracked records before the write returns (the
-Coach, 2026-11-20). *Size:* S to M.
+Coach, 2026-11-20). *Size:* S to M. *Status:* building, branch `20261120-with_whisper`, cut from thread 6's tip 1ec318df4.
 
 ### 8. giver_feed
 
