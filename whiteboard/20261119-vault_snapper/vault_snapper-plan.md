@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 to 6 restacked into one line, main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 (justify green at the tip, 2026-11-20); thread 7 building on #773's old tip; thread 8 building on the line's tip.
+* **Status:** threads 1 to 6 in one line, main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 (justify green at the tip; #773's CI green); thread 7 ready (#774), in rework for two snapshot rulings; thread 8 building on #773.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -250,7 +250,9 @@ correct it to `AdapterVaultDB` telling every watcher of a write's tracked record
 Coach, 2026-11-20). And the Coach's ruling on a joined unlock (2026-11-20, "It waits and checks unlocked
 again before starting"): an unlock prompt that finds another kind of gating open waits for it to end, whatever its
 outcome, then checks unlocked again before starting or joining an unlock gating (bank.ts); plus `bankStageVals`,
-`bankEndCauseVals` and the `subscribe` docs' `tellBadNews` wording from thread 6's review. *Size:* S to M. *Status:* building, branch `20261120-with_whisper`, cut from thread 6's tip 1ec318df4.
+`bankEndCauseVals` and the `subscribe` docs' `tellBadNews` wording from thread 6's review. *Size:* S to M. *Status:* ready, #774 (branch `20261120-with_whisper`; one compaction); a rework worker adds the
+Coach's two snapshot rulings before review: `lastRefusal` ripped out until v1, and the bank snapshot's `endCause`
+holds the error (2026-11-20).
 
 ### 8. giver_feed
 

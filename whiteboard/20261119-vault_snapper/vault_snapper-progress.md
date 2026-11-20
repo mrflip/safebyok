@@ -72,6 +72,15 @@ orchestrator writes it.
   `subscribe` are getters returning arrows: safe to hand out unbound (thread 8).
 * `device.sweep()` now sweeps its held bank (through the cheat). `isWatching`, `heardAt` left out entirely.
 
+## Thread 7, with_whisper (#774) (*Orchestrator:*)
+
+* `vault.withWhisper(labelpath, fn)`: checks its arguments (`bad_record`), `bank.ensureUnlocked()`, `minder.get`, refuses
+  `absent_box` (big's `boxAbsent`, re-exported) for a box never stored or deleted, else `fn(await bank.unsealBox(newest))`,
+  resolving what `fn` resolves and rethrowing its throw as is. `fn` may be sync or async.
+* An unlock prompt finding another kind of gating open awaits its `whenConcluded` (never rejects), then `demandEnabled()`
+  and resolves if unlocked, else launches or joins an unlock gating; `#launchOrJoin` joins only its own kind.
+* Rulings in rework (the Coach, 2026-11-20): no `lastRefusal` until v1; `BankSnapshot.endCause` is the VaultError or null.
+
 ## The line (*Orchestrator:*)
 
 * Restacked 2026-11-20: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773, every base `main`. Two mechanical fixes
@@ -81,5 +90,5 @@ orchestrator writes it.
 ## The sprint doc (*Orchestrator:*)
 
 * https://claude.ai/artifact/HHcmx1GE3oZyh6rQMWjgv3 — doc `83e42a7e-4892-49d9-b45e-585ca636e9a0`; State enum `b9b89cb1-c517`.
-* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 349);
+* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 566);
   Cleanup `6077489e-8954` / `14b54849-af59`; Progress `51ab4975-ceed` / `26336557-6583`; Resolved `a912f3b9-5db8` / `c14689aa-a452`.
