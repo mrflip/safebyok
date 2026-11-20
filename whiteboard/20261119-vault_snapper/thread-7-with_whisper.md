@@ -1,7 +1,7 @@
 # Thread 7: with_whisper (2026-11-20)
 
-Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `safebyok` 1302
-tests, typecheck and lint green before the catch-up; `pnpm justify` after it, below.
+Branch `20261120-with_whisper`, PR #774, stacked on #773 (thread 6, `20261120-snapshots`). Proved: `pnpm justify`
+green after the catch-up onto 26746570d (`safebyok` 1302 tests, big 2946, react 301, e2e 576, every package green).
 
 * **Built** (`packages/safebyok/src/models/vault.ts`, tests in `tests/models/vault.test.ts`):
   * `vault.withWhisper(labelpath, fn)`: checks the labelpath and that `fn` is a function (`bad_record`, before any
