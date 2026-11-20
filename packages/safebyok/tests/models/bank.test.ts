@@ -267,11 +267,11 @@ function countCalls(subscribe: (listener: () => void) => unknown): { readonly ca
 describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
   it("shows a born bank unlocked, its lease ending the device's lease length after it was proved", async () => {
     const { bank, device } = await TH.buildBornBank()
-    expect(bank.getSnapshot()).to.deep.equal({ stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: TH.T0 + device.leaseMillis, lastErr: null, unlockWanted: false })
+    expect(bank.getSnapshot()).to.deep.equal({ stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: TH.T0 + device.leaseMillis, lastErr: null, isUnlockWanted: false })
     expect(Object.isFrozen(bank.getSnapshot())).to.be.true
   })
 
-  it("tells its subscribers once each for a lock, an unlock and a sweep, the snapshot the same object between them", async () => {
+  it("tells its subscribers once each for a lock, an `unlock` gating and a sweep, the snapshot the same object between them", async () => {
     const { bank } = await TH.buildBornBank()
     const counter = countCalls(bank.subscribe)
     const unlocked = bank.getSnapshot()
@@ -280,7 +280,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     bank.lock()
     const locked = bank.getSnapshot()
     expect(counter.calls).to.eq(1)
-    expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, unlockWanted: false })
+    expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot()).to.equal(locked)
 
     await TH.expectGood(bank.tryUnlock({ passphraseClear: TH.TestPassphrase }))
@@ -289,7 +289,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
 
     bank.sweep()
     expect(counter.calls).to.eq(3)
-    expect(bank.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, unlockWanted: false })
+    expect(bank.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot().endCause).to.equal(bank.endCause).and.include({ refusalkind: 'disabled' })
   })
 

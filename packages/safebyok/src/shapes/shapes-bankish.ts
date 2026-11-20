@@ -140,13 +140,13 @@ export interface BankSnapshot {
   /** True while a call waits in {@link Bank.ensureUnlocked}: render the unlock form while it is.
    * It goes false when the bank is unlocked, {@link Bank.dismissUnlock} is called, or the bank ends.
    */
-  readonly unlockWanted: boolean
+  readonly isUnlockWanted: boolean
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
 /** The bank snapshot a device shows before it holds a bank object. */
 export const PendingBank: BankSnapshot = Object.freeze({
-  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, unlockWanted: false,
+  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
 /** A device's state, for a host to render. */

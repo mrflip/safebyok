@@ -41,7 +41,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** The attached lease, null while locked. */
   #lease: Lease | null = null
 
-  /** The wait every call in {@link ensureUnlocked} shares, or null while none waits. The snapshot's `unlockWanted` is whether there is one. */
+  /** The wait every call in {@link ensureUnlocked} shares, or null while none waits. The snapshot's `isUnlockWanted` is whether there is one. */
   #unlockWait: Wait | null = null
 
   /** The vaults made on this bank, which its sweep sweeps. */
@@ -252,11 +252,11 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [The awaited unlock]: ensureUnlocked, dismissUnlock, settleUnlockWait
+  // == [The awaited `unlock` gating]: ensureUnlocked, dismissUnlock, settleUnlockWait
   // One wait is shared by every caller, opened by the first and settled once: by any unlock, a dismissal or the bank's end.
 
-  /** Resolve this bank once it is unlocked: at once, or when an unlock or a gate change lands.
-   * While it waits, the snapshot's `unlockWanted` is true: render the unlock form, and call {@link unlock} from it.
+  /** Resolve this bank once it is unlocked: at once, or when an `unlock` gating or a gate change lands.
+   * While it waits, the snapshot's `isUnlockWanted` is true: render the unlock form, and call {@link unlock} from it.
    * Rejects `dismissed` when {@link dismissUnlock} is called, and with the bank's `endCause` when the bank ends.
    */
   async ensureUnlocked(): Promise<this> {
@@ -269,7 +269,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Dismiss the awaited unlock: every call waiting in {@link ensureUnlocked} rejects `dismissed`, and the bank stays locked.
+  /** Dismiss the awaited `unlock` gating: every call waiting in {@link ensureUnlocked} rejects `dismissed`, and the bank stays locked.
    * Call it when the user closes the unlock form.
    */
   dismissUnlock(): this {
@@ -278,7 +278,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Settle the wait for an unlock, if one is open: resolve it for null, or reject it with `refusal`. */
+  /** Settle the wait for an `unlock` gating, if one is open: resolve it for null, or reject it with `refusal`. */
   #settleUnlockWait(refusal: Errors.VaultError | null): void {
     const wait = this.#unlockWait
     this.#unlockWait = null
@@ -325,7 +325,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Unlocking, locking and sweeping]: attachLease, lock, sweep, end, hostVault
 
-  /** Attach `lease` in place of the current one, and resume every call waiting for an unlock.
+  /** Attach `lease` in place of the current one, and resume every call waiting for an `unlock` gating.
    * On a disabled bank, it evicts `lease` instead, and refuses.
    */
   #attachLease(lease: Lease): void {
@@ -347,7 +347,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** End this bank for good: drop its lease, sweep each vault made on it, and reject every call waiting for an unlock. Never throws.
+  /** End this bank for good: drop its lease, sweep each vault made on it, and reject every call waiting for an `unlock` gating. Never throws.
    * Its subscribers hear of the end, and of nothing after. If its device's snapshot shows this bank, it goes back to `PendingBank`.
    */
   sweep(): this {
@@ -411,7 +411,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
       endCause,
       leaseEndsAt:  lease === null ? null : lease.proved_at + this.#device.leaseMillis,
       lastErr:      null,
-      unlockWanted: this.#unlockWait !== null,
+      isUnlockWanted: this.#unlockWait !== null,
     })
   }
   // --

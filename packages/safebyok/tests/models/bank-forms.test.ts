@@ -1,4 +1,4 @@
-/** The bank's form verbs, each over real provings and its device's MemoryVaultDB, and the awaited unlock every verb resolves. */
+/** The bank's form verbs, each over real provings and its device's MemoryVaultDB, and the awaited `unlock` gating every verb resolves. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
@@ -47,7 +47,7 @@ function settledFlag(promise: Promise<unknown>): { readonly isSettled: boolean }
   return flag
 }
 
-/** Cleartexts an unlock must refuse, by what is wrong with them. */
+/** Cleartexts an `unlock` gating must refuse, by what is wrong with them. */
 const SloppyUnlockCleartexts = [
   [null,                    'null'],
   ["a bare passphrase",     'a bare string'],
@@ -77,7 +77,7 @@ describe("bank.unlock(cleartexts)", () => {
     expect(TH.isZeroed(answer.prfBytes)).to.be.true
   })
 
-  it("evicts the lease an unlock replaces", async () => {
+  it("evicts the lease an `unlock` gating replaces", async () => {
     const { bank } = await TH.buildBornBank()
     const evict = vi.spyOn(Lease.prototype, 'evict')
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
@@ -387,24 +387,24 @@ describe("bank.ensureUnlocked()", () => {
   it("resolves at once on an unlocked bank, wanting no unlock", async () => {
     const { bank } = await TH.buildBornBank()
     expect(await bank.ensureUnlocked()).to.equal(bank)
-    expect(bank.getSnapshot().unlockWanted).to.be.false
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 
-  it("on a locked bank, wants an unlock, and every waiter resolves once unlock lands", async () => {
+  it("on a locked bank, wants an `unlock` gating, and every waiter resolves once it lands", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
     const ensurings = [bank.ensureUnlocked(), bank.ensureUnlocked()]
-    expect(bank.getSnapshot().unlockWanted).to.be.true
+    expect(bank.getSnapshot().isUnlockWanted).to.be.true
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
     expect(await Promise.all(ensurings)).to.deep.equal([bank, bank])
-    expect(bank.getSnapshot().unlockWanted).to.be.false
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 
-  it("tells the bank's subscribers that an unlock is wanted", async () => {
+  it("tells the bank's subscribers that an `unlock` gating is wanted", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
     const seen: boolean[] = []
-    bank.subscribe(() => { seen.push(bank.getSnapshot().unlockWanted) })
+    bank.subscribe(() => { seen.push(bank.getSnapshot().isUnlockWanted) })
     const ensuring = bank.ensureUnlocked()
     void bank.ensureUnlocked()
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
@@ -420,7 +420,7 @@ describe("bank.ensureUnlocked()", () => {
     await TH.expectRefusal(bank.unlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
     await TH.wakeupAtNextTick()
     expect(settled.isSettled).to.be.false
-    expect(bank.getSnapshot().unlockWanted).to.be.true
+    expect(bank.getSnapshot().isUnlockWanted).to.be.true
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
     expect(await ensuring).to.equal(bank)
   })
@@ -431,7 +431,7 @@ describe("bank.ensureUnlocked()", () => {
     const ensuring = bank.ensureUnlocked()
     await bank.replacePassphrase({ passphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase })
     expect(await ensuring).to.equal(bank)
-    expect(bank.getSnapshot().unlockWanted).to.be.false
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 
   it("rejects every waiter 'dismissed' on dismissUnlock, the bank still locked, and the next call waits afresh", async () => {
@@ -439,27 +439,27 @@ describe("bank.ensureUnlocked()", () => {
     bank.lock()
     const ensurings = [bank.ensureUnlocked(), bank.ensureUnlocked()].map((ensuring) => TH.expectRefusal(ensuring, 'dismissed'))
     expect(bank.dismissUnlock()).to.equal(bank)
-    expect(bank.getSnapshot().unlockWanted).to.be.false
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
     await Promise.all(ensurings)
     expect(bank.isLocked).to.be.true
     const next = bank.ensureUnlocked()
-    expect(bank.getSnapshot().unlockWanted).to.be.true
+    expect(bank.getSnapshot().isUnlockWanted).to.be.true
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
     expect(await next).to.equal(bank)
   })
 
-  it("rejects 'dismissed' when a subscriber dismisses the wait as it hears an unlock is wanted", async () => {
+  it("rejects 'dismissed' when a subscriber dismisses the wait as it hears an `unlock` gating is wanted", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
-    bank.subscribe(() => { if (bank.getSnapshot().unlockWanted) { bank.dismissUnlock() } })
+    bank.subscribe(() => { if (bank.getSnapshot().isUnlockWanted) { bank.dismissUnlock() } })
     await TH.expectRefusal(bank.ensureUnlocked(), 'dismissed')
-    expect(bank.getSnapshot().unlockWanted).to.be.false
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 
-  it("rejects with the bank's end cause when a subscriber sweeps the bank as it hears an unlock is wanted", async () => {
+  it("rejects with the bank's end cause when a subscriber sweeps the bank as it hears an `unlock` gating is wanted", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
-    bank.subscribe(() => { if (bank.getSnapshot().unlockWanted) { bank.sweep() } })
+    bank.subscribe(() => { if (bank.getSnapshot().isUnlockWanted) { bank.sweep() } })
     expect(await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')).to.equal(bank.endCause)
   })
 
@@ -476,7 +476,7 @@ describe("bank.ensureUnlocked()", () => {
     bank.lock()
     const ensurings = [bank.ensureUnlocked(), bank.ensureUnlocked()]
     bank.sweep()
-    expect(bank.getSnapshot()).to.include({ unlockWanted: false, stage: 'swept' })
+    expect(bank.getSnapshot()).to.include({ isUnlockWanted: false, stage: 'swept' })
     for (const ensuring of ensurings) { expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause) }
   })
 
@@ -492,6 +492,6 @@ describe("bank.ensureUnlocked()", () => {
     const { bank } = await TH.buildBornBank()
     bank.sweep()
     await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
-    expect(bank.getSnapshot().unlockWanted).to.be.false
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 })

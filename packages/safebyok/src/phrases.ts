@@ -23,7 +23,7 @@ export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its b
 /** A call on a bank after its sweep. */
 export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
 
-/** A call that waited for an unlock, when the wait was dismissed. */
+/** A call that waited for an `unlock` gating, when the wait was dismissed. */
 export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed locked and the call waiting on it was not made: try again when you want it.'
 
 /** A vault made without a bank. */

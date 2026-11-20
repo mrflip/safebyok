@@ -58,8 +58,8 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
 
   /** The unlock dialog, open while a call waits for the bank to be unlocked. */
   function UnlockDialog() {
-    const unlockWanted = Acme.useBankSnapshot((snap) => snap.unlockWanted)
-    if (! unlockWanted) { return null }
+    const isUnlockWanted = Acme.useBankSnapshot((snap) => snap.isUnlockWanted)
+    if (! isUnlockWanted) { return null }
     return <dialog open aria-label="Unlock"><UnlockForm /></dialog>
   }
 
@@ -128,13 +128,13 @@ function typePassphrase(passphrase: string): void {
   fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
 }
 
-/** How many times the Device's snapshots have shown a call waiting for an unlock: each rise of `unlockWanted`. */
+/** How many times the Device's snapshots have shown a call waiting for an `unlock` gating: each rise of `isUnlockWanted`. */
 function unlockAsksOf(world: TH.KnockKnockWorld): number {
   let asks = 0
   let wasWanted = false
   for (const snap of world.snapshots) {
-    if (! wasWanted && snap.bank.unlockWanted) { asks += 1 }
-    wasWanted = snap.bank.unlockWanted
+    if (! wasWanted && snap.bank.isUnlockWanted) { asks += 1 }
+    wasWanted = snap.bank.isUnlockWanted
   }
   return asks
 }

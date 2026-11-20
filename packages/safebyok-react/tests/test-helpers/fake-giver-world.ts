@@ -41,7 +41,7 @@ export function voidCarOf(labelpath: string): FakeBoxCar {
 
 /** The snapshot of an unlocked bank whose lease runs a while yet. */
 export const UnlockedBank: BankSnapshot = Object.freeze({
-  stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: 1_800_000_000_000, lastErr: null, unlockWanted: false,
+  stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: 1_800_000_000_000, lastErr: null, isUnlockWanted: false,
 })
 
 /** The verbs of a giver's bank that a form calls. */

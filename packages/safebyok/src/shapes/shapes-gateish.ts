@@ -17,7 +17,7 @@ import type { BankMakeRecord } from './shapes-bankish'
 
 // == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, CloakCleartexts
 
-// A gate change's proof is named as an unlock's, `passphraseClear` or `passkeyClear`, and what it puts in place is named `next…`.
+// A gate change's proof is named as an `unlock` gating's, `passphraseClear` or `passkeyClear`, and what it puts in place is named `next…`.
 /** The checks of what {@link Bank.birth}, {@link Bank.unlock}, {@link Bank.replacePassphrase}, {@link Bank.addPasskey}, {@link Bank.revokePasskey} and {@link cloak} are handed.
  * A cleartext is only ever checked in its gating (models/gating.ts): the cloak's check judges none.
  */

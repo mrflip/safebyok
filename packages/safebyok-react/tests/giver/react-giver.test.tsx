@@ -145,7 +145,7 @@ describe("the form mutations", () => {
 })
 
 describe("dismissUnlock", () => {
-  it("dismisses the bank's wait for an unlock", async () => {
+  it("dismisses the bank's wait for an `unlock` gating", async () => {
     const { world, Acme } = setup()
     await Acme.dismissUnlock()
     expect(world.formCalls).to.deep.equal([{ verb: 'dismissUnlock', cleartexts: undefined }])

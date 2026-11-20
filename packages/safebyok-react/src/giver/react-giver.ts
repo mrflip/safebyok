@@ -59,7 +59,7 @@ function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return 
 // == [Form mutations]: FormMutationDefaults, vacateCloak, cleartextsOf
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
-// the mutation would keep its cloak full, and an unlock that needs no network would wait for one.
+// the mutation would keep its cloak full, and an `unlock` gating that needs no network would wait for one.
 /** The giver's defaults for a form verb's mutation: it runs offline, never retries, and vacates its cloak once it settles. */
 const FormMutationDefaults = {
   networkMode: 'always',
@@ -304,8 +304,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   /** The mutation that revokes the passkey: {@link revokePasskeyMutationOptions}, through `useMutation`. */
   function useRevokePasskey(): UseMutationResult<void, Error, Cloak> { return useMutation(revokePasskeyMutationOptions()) }
 
-  /** Dismiss the awaited unlock: every call waiting for the bank to be unlocked rejects `dismissed`, and the bank stays locked.
-   * Show the unlock form while `useBankSnapshot((snap) => snap.unlockWanted)` is true, and call this from its close button.
+  /** Dismiss the awaited `unlock` gating: every call waiting for the bank to be unlocked rejects `dismissed`, and the bank stays locked.
+   * Show the unlock form while `useBankSnapshot((snap) => snap.isUnlockWanted)` is true, and call this from its close button.
    */
   async function dismissUnlock(): Promise<void> {
     const bank = await device.ensureBank()

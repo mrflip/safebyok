@@ -108,7 +108,7 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
 ### A lock, a sweep or a second form verb while a form verb runs
 
 * current outcome, as built, and promised nowhere:
-  - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an unlock or a gate
+  - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an `unlock` gating or a gate
     change that attaches its lease after the lock leaves the bank unlocked.
   - A sweep while an attempt is in flight: the attempt's write, if it has not yet begun, refuses `disabled`; one already
     sent lands in storage, and the lease the attempt then builds is evicted and the verb refuses `disabled`.

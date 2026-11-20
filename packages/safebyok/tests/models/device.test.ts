@@ -150,7 +150,7 @@ describe("device.sweep()", () => {
     expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
   })
 
-  it("rejects a call waiting for an unlock with its bank's end cause", async () => {
+  it("rejects a call waiting for an `unlock` gating with its bank's end cause", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const ensuring = bank.ensureUnlocked()
@@ -280,7 +280,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
   })
 
-  it("shows an unlock wanted while a call waits for one, and carries no cleartext", async () => {
+  it("shows an `unlock` gating wanted while a call waits for one, and carries no cleartext", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const snapshots = snapshotsOf(device)
@@ -289,9 +289,9 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     await TH.expectRefusal(bank.unlock({ passphraseClear }), 'wrong_passphrase')
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
     await ensuring
-    expect(snapshots.map(({ bank: { stage, unlockWanted } }) => ({ stage, unlockWanted }))).to.deep.equal([
-      { stage: 'locked', unlockWanted: true },
-      { stage: 'unlocked', unlockWanted: false },
+    expect(snapshots.map(({ bank: { stage, isUnlockWanted } }) => ({ stage, isUnlockWanted }))).to.deep.equal([
+      { stage: 'locked', isUnlockWanted: true },
+      { stage: 'unlocked', isUnlockWanted: false },
     ])
     expect(JSON.stringify(snapshots)).not.to.include(passphraseClear)
   })

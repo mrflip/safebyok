@@ -36,10 +36,10 @@ export class Cloak {
     Object.freeze(this)
   }
 
-  /** The passphrase: a new bank's, or the proof of an unlock or a gate change. */
+  /** The passphrase: a new bank's, or the proof of an `unlock` gating or a gate change. */
   get passphraseClear(): string | undefined { return this.#passphraseCleartext }
 
-  /** A fresh copy of the passkey answer: a new bank's, or the proof of an unlock or a gate change. */
+  /** A fresh copy of the passkey answer: a new bank's, or the proof of an `unlock` gating or a gate change. */
   get passkeyClear(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#passkeyCleartext) }
 
   /** The new passphrase. */

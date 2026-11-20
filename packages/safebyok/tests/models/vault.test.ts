@@ -359,13 +359,13 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(await vault.withWhisper(Openai, ({ whisper, revtok }) => ({ whisper, revtok }))).to.deep.equal({ whisper: { apiKey: 'sk-test-1111' }, revtok: stored.revtok })
   })
 
-  it("on a locked bank, wants an unlock, and calls fn once the unlock lands", async () => {
+  it("on a locked bank, wants an `unlock` gating, and calls fn once it lands", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
     const fn = vi.fn(({ whisper }: BoxUnsealed) => String(whisper['apiKey']))
     const using = vault.withWhisper(Openai, fn)
-    expect(bank.getSnapshot().unlockWanted).to.be.true
+    expect(bank.getSnapshot().isUnlockWanted).to.be.true
     expect(fn).not.toHaveBeenCalled()
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
     expect(await using).to.equal('sk-test-0000')
@@ -383,7 +383,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const using = other.withWhisper(Openai, ({ revseq }) => revseq)
     await vi.advanceTimersByTimeAsync(0)
     expect(boxGetsOf(asked)).to.equal(1)
-    expect(bank.getSnapshot().unlockWanted).to.be.true
+    expect(bank.getSnapshot().isUnlockWanted).to.be.true
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
     expect(await using).to.equal(0)
     expect(boxGetsOf(asked)).to.equal(1)
@@ -395,7 +395,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     bank.lock()
     const fn = vi.fn()
     const refused = TH.expectRefusal(vault.withWhisper(Openai, fn), 'absent_box')
-    expect(bank.getSnapshot().unlockWanted).to.be.true
+    expect(bank.getSnapshot().isUnlockWanted).to.be.true
     await bank.unlock({ passphraseClear: TH.TestPassphrase })
     await refused
     expect(fn).not.toHaveBeenCalled()
@@ -466,7 +466,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await TH.expectRefusal(vault.withWhisper(Openai, undefined as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper(Openai, 'apiKey' as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper('gate' as never, () => undefined), 'bad_record')
-    expect(bank.getSnapshot().unlockWanted).to.be.false
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 })
 

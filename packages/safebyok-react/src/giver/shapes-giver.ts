@@ -26,7 +26,7 @@ export type GiverEvent<CarT extends CarFields> = Readonly<{
   state:    Readonly<{ data: CarT | undefined, dataUpdatedAt: number }>
 }>
 
-/** The calls the giver makes of a started bank object: its boxes' cars, its form verbs, and the dismissal of the awaited unlock. */
+/** The calls the giver makes of a started bank object: its boxes' cars, its form verbs, and the dismissal of the awaited `unlock` gating. */
 export interface GiverBank<CarT extends CarFields> {
   /** The car for the box at `labelpath`: at once from a car the bank's minder holds timely, else asked of the vaultDB. An unborn bank answers the void car without asking. */
   getBoxCar(labelpath: string): Promise<CarT>
@@ -42,7 +42,7 @@ export interface GiverBank<CarT extends CarFields> {
   addPasskey(cleartexts: PasskeyAddCleartexts): Promise<unknown>
   /** Revoke the passkey, proved by the passphrase or the passkey, leaving the bank unlocked. */
   revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<unknown>
-  /** Dismiss the awaited unlock: every call waiting for this bank to be unlocked rejects `dismissed`, and the bank stays locked. */
+  /** Dismiss the awaited `unlock` gating: every call waiting for this bank to be unlocked rejects `dismissed`, and the bank stays locked. */
   dismissUnlock(): void
 }
 
