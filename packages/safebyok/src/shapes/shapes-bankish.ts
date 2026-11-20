@@ -56,7 +56,7 @@ export interface BirthOpts extends BankOpts {
   proving: Proving
 }
 
-// The core carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
+// `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
 /** A vault a bank hosts: the bank's sweep sweeps it. */
 export interface HostedVault {
   /** End the vault, as its bank ends. */
