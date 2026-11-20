@@ -98,6 +98,13 @@ govern how code is changed:
   whizbangs into the critical path of a primitive operation: the customer, or orchestration
   code we provide, can add them as warranted.
   A lock where none was needed before is a last resort too.
+* **Hours separate updates.** A gate change, a lock, a sweep or a delete happens a few times a
+  day; a fetch is in flight for milliseconds. A fetch, a write or a waiter that lands across an
+  end-of-life event (sweep, vacate, delete, goodbye) is a rare event overlapping a millisecond
+  window: its outcome is unspecified, and it is never a design input. It earns no guard, token,
+  state or test, and no reshaping of a common path. Write it as a row in `notes/wontfix.md`,
+  where the new core's loosened guarantees are kept. Report it only if it could corrupt what the
+  bankDB stores or put secret material where it should not be, and then report it, never fix it.
 
 ## Commands
 
