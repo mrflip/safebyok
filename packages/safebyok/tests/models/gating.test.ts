@@ -270,6 +270,20 @@ describe("gating.attempt(cleartexts)", () => {
   })
 })
 
+describe("gating.isAttempting", () => {
+  it("is attempting only while an attempt runs", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const latch = TH.makeLatch()
+    const gating = launchedGating({ device, attempt: async () => { await latch.pass(); return bank } })
+    expect(gating.isAttempting).to.be.false
+    const attempting = gating.attempt(cleartextsOf())
+    expect(gating.isAttempting).to.be.true
+    latch.release()
+    await TH.expectGood(attempting)
+    expect(gating.isAttempting).to.be.false
+  })
+})
+
 describe("gating.dismiss()", () => {
   it("concludes 'dismissed', letting the device go", async () => {
     const device = TH.makeDevice()

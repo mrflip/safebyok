@@ -21,7 +21,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #gatingseq, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -40,6 +40,8 @@ export class Device {
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
   #openGating: Gating | null = null
+  /** Counts each gating opened and each ended on this device. The snapshot's `gatingseq` is its value. */
+  #gatingseq = 0
   /** The last bank made on this device, or null for none. {@link lock} and {@link sweep} act on it, and the device's
    * snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
@@ -140,19 +142,27 @@ export class Device {
   }
   // --
 
-  // == [The one gating open]: attachGating, detachGating
+  // == [The one gating open]: attachGating, detachGating, alignOpenGating
 
   /** Attach `gating` as this device's open gating. Refuses `already_asking` while another is open. */
   attachGating(gating: Gating): void {
     this.demandEnabled()
     if (this.#openGating !== null) { throw Throwers.alreadyAsking() }
     this.#openGating = gating
+    this.#gatingseq += 1
+    this.#align()
   }
 
   /** Detach `gating` if it is this device's open gating. */
   detachGating(gating: Gating): void {
-    if (this.#openGating === gating) { this.#openGating = null }
+    if (this.#openGating !== gating) { return }
+    this.#openGating = null
+    this.#gatingseq += 1
+    this.#align()
   }
+
+  /** Refresh the snapshot once the open gating's attempt begins or ends. Internal. */
+  alignOpenGating(): void { this.#align() }
   // --
 
   // == [Snapshot]: align, makeSnapshot
@@ -172,10 +182,14 @@ export class Device {
     }
   }
 
-  /** A new snapshot of this device: its bank's snapshot. */
+  /** A new snapshot of this device: its bank's snapshot, and its open gating. */
   #makeSnapshot(): DeviceSnapshot {
+    const gating = this.#openGating
     return Object.freeze({
-      bank: this.#thisIsTemporaryBank?.getSnapshot() ?? PendingBank,
+      bank:   this.#thisIsTemporaryBank?.getSnapshot() ?? PendingBank,
+      gating: gating === null ? null : Object.freeze({
+        gatingkind: gating.gatingkind, gatingseq: this.#gatingseq, isAttempting: gating.isAttempting,
+      }),
     })
   }
   // --

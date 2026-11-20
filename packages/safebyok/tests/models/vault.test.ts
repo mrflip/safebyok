@@ -323,6 +323,18 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(fn).not.toHaveBeenCalled()
   })
 
+  it("opens one gating for two calls on a locked bank, and both resume after one unlock", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const firstUsing  = vault.withWhisper(Openai, ({ revseq }) => revseq)
+    const gating = device.openGating!
+    const secondUsing = vault.withWhisper(Openai, ({ revseq }) => revseq + 1)
+    expect(device.openGating).to.equal(gating)
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    expect(await Promise.all([firstUsing, secondUsing])).to.deep.equal([0, 1])
+  })
+
   it("rejects as the unlock does when the user dismisses it, never calling fn", async () => {
     const { bank, device, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })

@@ -248,9 +248,9 @@ function snapshotsOf(device: Device): DeviceSnapshot[] {
 }
 
 describe("device.getSnapshot() and device.subscribe(listener)", () => {
-  it("shows the pending bank before a bank is made", () => {
+  it("shows the pending bank and no gating before a bank is made", () => {
     const device = TH.makeDevice()
-    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank, gating: null })
     expect(Object.isFrozen(device.getSnapshot())).to.be.true
   })
 
@@ -272,6 +272,53 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     bank.lock()
     expect(snapshots).to.have.lengthOf(0)
     expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
+  })
+
+  it("shows the gating open on it, under a gatingseq that grows as each gating opens and ends", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const first = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
+    expect(device.getSnapshot().gating).to.deep.equal({ gatingkind: 'unlock_bank', gatingseq: 3, isAttempting: false })
+    device.openGating!.dismiss()
+    await first
+    expect(device.getSnapshot().gating).to.be.null
+    const second = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
+    expect(device.getSnapshot().gating).to.include({ gatingseq: 5 })
+    device.openGating!.dismiss()
+    await second
+  })
+
+  it("shows an attempt under way until it is refused, and carries no cleartext", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const prompting = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
+    const snapshots = snapshotsOf(device)
+    const passphraseClear = 'not the passphrase, though long enough'
+    await TH.expectBad(bank.tryAttemptUnlock({ passphraseClear }), 'wrong_passphrase')
+    expect(snapshots.map(({ gating }) => gating?.isAttempting)).to.deep.equal([true, false])
+    expect(JSON.stringify(device.getSnapshot())).not.to.include(passphraseClear)
+    device.openGating!.dismiss()
+    await prompting
+  })
+
+  it("shows the gating gone, and the bank unlocked, once an attempt lands", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const prompting = bank.launchUnlockBankPrompt()
+    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    await prompting
+    expect(device.getSnapshot()).to.deep.equal({ bank: bank.getSnapshot(), gating: null })
+    expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
+  })
+
+  it("shows its bank swept once it is swept, and its gating gone", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const prompting = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
+    device.sweep()
+    await prompting
+    expect(device.getSnapshot().gating).to.be.null
+    expect(device.getSnapshot().bank).to.include({ stage: 'swept', isEnded: true })
   })
 
   it("tells every subscriber when one throws, and passes the throw to onBadNews", async () => {

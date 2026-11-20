@@ -40,10 +40,13 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   #isLastAttempt = false
   // --
 
-  // == [Getters]: isOpen, whenConcluded, scope, toJSON
+  // == [Getters]: isOpen, isAttempting, whenConcluded, scope, toJSON
 
   /** True until this gating concludes. */
   get isOpen(): boolean { return this.#outcome === null }
+
+  /** True while an attempt is under way. */
+  get isAttempting(): boolean { return this.#isAttempting }
 
   /** Resolves with the outcome once this gating concludes, and never rejects.
    * Close the dialog when it resolves.
@@ -114,6 +117,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
       return Promise.resolve(Outcome.bad(refusal))
     }
     this.#isAttempting = true
+    this.#device.alignOpenGating()
     return this.#attemptOnce(cleartexts)
   }
 
@@ -133,6 +137,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
       spendCleartexts(cleartexts)
       this.#concludeOnce(outcome)
     }
+    this.#device.alignOpenGating()
     return outcome
   }
   // --
@@ -233,6 +238,21 @@ export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: Ban
 
   await friend.putGate({ cited: ante.pickle(), record: ante.makeNextRecord({ main: ante.main, passkey0: null }), options: { policies: ['revoke_passkey'] } })
   return friend.unlockByProving(proved)
+}
+// --
+
+// == [Without a gating]: attemptWithoutGating
+
+/** Run `attempt` once on `cleartexts` with no gating open, resolving an `Outcome` instead of throwing.
+ * A disabled `bank` refuses without running it. The PRF bytes of a passkey answer in `cleartexts` are zeroed whatever the outcome.
+ */
+export async function attemptWithoutGating(bank: Bank, cleartexts: unknown, attempt: GatingAttempt): Promise<Outcome.Outcome<Bank>> {
+  const outcome = await Outcome.outcomeOf(() => {
+    bank.demandEnabled()
+    return attempt(cleartexts)
+  })
+  spendCleartexts(cleartexts)
+  return outcome
 }
 // --
 

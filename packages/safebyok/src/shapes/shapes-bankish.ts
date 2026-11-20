@@ -6,7 +6,7 @@ import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { Proving } from '../models/proving'
 import type { VaultDB } from '../storage/vault-db'
-import type { GateDna, RequestCleartext, StrengthChecker } from './shapes-gateish'
+import type { GateDna, Gatingkind, RequestCleartext, StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealers'
 import type { BankStamp } from './shapes-stamps'
@@ -97,7 +97,7 @@ export interface DeviceOpts {
 }
 // --
 
-// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, DeviceSnapshot
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, OpenGatingSnapshot, DeviceSnapshot
 
 /** The stages of a bank, as {@link BankStage} describes each. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
@@ -140,9 +140,20 @@ export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
 })
 
+/** The gating open on a device, for a host's dialog to render. */
+export interface OpenGatingSnapshot {
+  readonly gatingkind:   Gatingkind
+  /** A number that tells this gating apart from every other the device opens: key a dialog's form on it. */
+  readonly gatingseq:    number
+  /** True while an attempt is under way. */
+  readonly isAttempting: boolean
+}
+
 /** A device's state, for a host to render. */
 export interface DeviceSnapshot {
   /** The snapshot of the bank on this device, or {@link PendingBank} before one is made. */
-  readonly bank: BankSnapshot
+  readonly bank:   BankSnapshot
+  /** The gating open on this device, or null for none. */
+  readonly gating: OpenGatingSnapshot | null
 }
 // --
