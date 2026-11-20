@@ -1,6 +1,6 @@
 # Thread 10: whisper_refresh (2026-11-20)
 
-Branch `20261120-whisper_refresh`, PR #777, stacked on #776. Proved: `pnpm --filter safebyok test` (29 files, 1364 tests), lint and typecheck; `pnpm --filter safebyok-react test` (25 files, 314 tests) and lint.
+Branch `20261120-whisper_refresh`, PR #777, stacked on #776. Proved: `pnpm justify` green after the catch-up onto #776 at dca0fc3f0 (safebyok 1364 tests, safebyok-react 329, e2e 576).
 
 * **Built**:
   * `ThingMinder.refresh(scoped, opts)` (`packages/safebyok/src/minding/thing-minder.ts`, *Reading*): a get in the background,
