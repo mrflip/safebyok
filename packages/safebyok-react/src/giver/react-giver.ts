@@ -6,7 +6,8 @@ import { useEffect, useSyncExternalStore } from 'react'
 import { type Banklabel, type UserID, type carLivenessVals, Checkers } from 'safebyok'
 import { bridgeDevice } from './react-bridge'
 
-// == [What a giver asks of the Device]: BankStage, BankSnapshot, DeviceSnapshot, CarFields, GiverBank, GiverDevice
+// move these to a separate file as the rest of the code does
+// == [Types]: BankStage, BankSnapshot, DeviceSnapshot, CarFields, GiverBank, GiverDevice
 
 /** Where a bank stands in this tab: nobody signed in, starting, known to be not yet stored, ready, or failed to start. */
 export type BankStage = 'signed_out' | 'starting' | 'unborn' | 'ready' | 'failed'
@@ -52,6 +53,8 @@ export interface GiverDevice<CarT extends CarFields> {
 
 // == [Checks]: Checks, isGiverDevice
 
+// move these to a separate file as the rest of the code does. And use their checks, not handrolls
+
 const Checks = Checkers('bad_record', ({ custom, str }) => ({
   device:    custom<GiverDevice<CarFields>>(isGiverDevice, 'Expected a Device'),
   banklabel: str.min(1),
@@ -74,11 +77,15 @@ const CarStaleTime = Infinity
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
 /** What a bank's hooks report before the Device has heard of the bank. */
-export const PendingBank: BankSnapshot = Object.freeze({ stage: 'signed_out', isLocked: true, leaseEndsAt: null, lastErr: null })
+export const PendingBank: BankSnapshot = Object.freeze({
+  stage: 'signed_out', isLocked: true, leaseEndsAt: null, lastErr: null,
+})
 
+// make a checker and derive the type
 /** React Query's own options for `useBoxRecord`, less the key, the fetch and the `select` that picks the record. */
 export type BoxRecordOpts<CarT extends CarFields> = Omit<UseQueryOptions<CarT, Error, CarT['fullest']>, 'queryKey' | 'queryFn' | 'select'>
 
+// run a slop checker on all the doc blocks in this package
 /** What {@link makeReactGiver} returns. */
 export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGiver<CarT>>
 
@@ -86,10 +93,14 @@ export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGive
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
 /** Make the React hooks for `device`. Make them once, at module scope, beside the Device: `export const Giver = makeReactGiver(device)`. */
+/** React hooks for `device`.
+ * @example `export const Giver = makeReactGiver(device)`.
+ */
 export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   Checks.device.parse(device)
 
-  /** Keep the host's React Query entries of every bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
+  // have an agent look up a well-regarded library (urql?) and mimic its doc block style
+  /** Keeps the host's React Query entries of every bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
   function useBridge(): void {
     const client = useQueryClient()
     useEffect(() => bridgeDevice(client, device), [client])

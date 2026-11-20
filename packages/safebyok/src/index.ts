@@ -13,7 +13,7 @@ export {
   type ListingEvent, type MinderEvent, type MinderEventOf, type ThingEvent,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, MinderChecks, type MinderFriend, type MinderGetOpts, type MinderInvalidateOpts, type MinderTryAtOpts, type TsqStaleTime,
 } from './shapes/shapes-minder'
-export { ThingMinder } from './minding/thing-minder'
+export { type Labelpathed, ThingMinder } from './minding/thing-minder'
 export { Vault } from './models/vault'
 export { carOf, dbHasNewer } from './minding/thing-car'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'

@@ -24,6 +24,9 @@ import { bestCarOf, carOf, dbHasNewer } from './thing-car'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
+/** Anything naming a labelpath: a scope, an ask or a record. */
+export type Labelpathed = { labelpath: Labelpath }
+
 /** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
  * the children of the root box and of each Thing listed.
  * Four sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
@@ -158,13 +161,13 @@ export class ThingMinder {
   /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
    * A bare listing lists only the children heard of since `hello` ({@link isListingBareAt}).
    */
-  listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
-    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(scoped)))
+  listingAt(labelpathed: Labelpathed): readonly Labelpath[] | undefined {
+    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(labelpathed)))
   }
 
   /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
-  isListingBareAt(scoped: ThingScope): boolean {
-    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(scoped)))?.dataUpdatedAt === BareListedAt
+  isListingBareAt(labelpathed: Labelpathed): boolean {
+    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(labelpathed)))?.dataUpdatedAt === BareListedAt
   }
 
   /** The cache's answer for `scoped`, without waiting on the vaultDB.
@@ -391,7 +394,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: queryKey, listingQueryKey, subtreeQueryKey, #keyHeadOf, #bankKeyHead, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #bankKeyHead, #tsqQueryOptions, #askAt, #shellAt
 
   // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
   // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
@@ -399,17 +402,17 @@ export class ThingMinder {
   // query defaults by key prefix too, so without a mark the root box's key would start every box's key, and no defaults
   // could single out the root box. A labelpath starts with its modelkind, so the key does too.
   /** The query key `scoped`'s car is cached under. */
-  queryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '!'] }
+  queryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '!'] }
 
   /** The query key the list of `scoped`'s children is cached under. */
-  listingQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '#', 'kids'] }
+  listingQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '#', 'kids'] }
 
   /** The key prefix of everything cached under `scoped`, a car or a listing, and of neither of its own. */
-  subtreeQueryKey(scoped: ThingScope): TSQ.QueryKey { return [...this.#keyHeadOf(scoped), '/'] }
+  childrenQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
 
   /** The part of a query key that `scoped` has in common with each of its keys. */
-  #keyHeadOf(scoped: ThingScope): string[] {
-    const labels = scoped.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
+  #keyHeadOf(labelpathed: Labelpathed): string[] {
+    const labels = labelpathed.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
     return [...this.#bankKeyHead(), ...labels]
   }
 
@@ -418,21 +421,21 @@ export class ThingMinder {
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
   /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
-  #tsqQueryOptions(scoped: ThingScope, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
-    const queryOpts = { queryKey: this.queryKey(scoped) }
+  #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
+    const queryOpts = { queryKey: this.queryKey(labelpathed) }
     if (opts.staleTime === undefined) { return queryOpts }
     return { ...queryOpts, staleTime: staleTimeFnOf(opts.staleTime) }
   }
 
   /** The get ask the minder sends the vaultDB for `scoped`, a scope in this minder's bank. */
-  #askAt(scoped: ThingScope): GetAsk {
-    return this.#bank.makeGetAsk({ labelpath: scoped.labelpath, ifAbsent: 'nil' })
+  #askAt(labelpathed: Labelpathed): GetAsk {
+    return this.#bank.makeGetAsk({ labelpath: labelpathed.labelpath, ifAbsent: 'nil' })
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
   /** The shell at `scoped`. Below a root, it lives in the life of the bank's root box. */
-  #shellAt(scoped: ThingScope): VoidSentinel {
-    return scoped.labelpath.includes('/') ? Shell.of(scoped, this.rootBox) : Shell.of(scoped)
+  #shellAt(labelpathed: Labelpathed): VoidSentinel {
+    return labelpathed.labelpath.includes('/') ? Shell.of(labelpathed, this.rootBox) : Shell.of(labelpathed)
   }
   // --
 
@@ -448,9 +451,9 @@ export class ThingMinder {
   get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: Labelpath.RootBox } }
 
   /** The scope of `scoped`, demanding that it is in this minder's bank. */
-  #demandOwnScope(scoped: ThingScope): ThingScope {
+  #demandOwnScope(labelpathed: Labelpathed): ThingScope {
     // Its fields alone: an ask or a record passes, and is read as its scope.
-    return ThingChecks.thingScope.parseConsistent(scoped, this.scope)
+    return ThingChecks.thingScope.parseConsistent(labelpathed, this.scope)
   }
 
   /** `record`, refused where the vaultDB delivered it of another bank, or of another labelpath than `scoped` names. */
@@ -576,7 +579,7 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
 /** A listing of every labelpath in `prior` and in `labelpaths`, once each, in labelpath order. */
 function listingOf(prior: readonly Labelpath[], labelpaths: readonly Labelpath[]): Labelpath[] {
   // Labelpaths sort by code unit, as the vaultDB lists them; the union holds no two alike. The rule's `one - other` is for numbers.
-  return union(prior, labelpaths).toSorted((one, other) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
+  return union(prior, labelpaths).toSorted((one: Labelpath, other: Labelpath) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
 }
 
 /** TanStack's structural sharing for a listing: `prior` where `next` lists the same labelpaths, else `next`, frozen. */
