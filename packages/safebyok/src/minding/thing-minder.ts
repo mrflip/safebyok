@@ -156,16 +156,16 @@ export class ThingMinder {
     return this.#cachedAt(this.#demandOwnScope(scoped)) as CarAt<LabelpathT> | undefined
   }
 
-  /** The cached listing of `labelpathed`'s children, however old, or undefined for none. Never asks the vaultDB.
+  /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
    * A bare listing lists only the children heard of since `hello` ({@link isListingBareAt}).
    */
-  listingAt(labelpathed: Labelpathed): readonly Labelpath[] | undefined {
-    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(labelpathed)))
+  listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
+    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(scoped)))
   }
 
-  /** True when `labelpathed`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
-  isListingBareAt(labelpathed: Labelpathed): boolean {
-    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(labelpathed)))?.dataUpdatedAt === BareListedAt
+  /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
+  isListingBareAt(scoped: ThingScope): boolean {
+    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(scoped)))?.dataUpdatedAt === BareListedAt
   }
 
   /** The cache's answer for `scoped`, without waiting on the vaultDB.
