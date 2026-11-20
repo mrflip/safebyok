@@ -3,26 +3,26 @@ import { Bank } from './bank'
 import { Device } from './device'
 import type { Gate } from './gate'
 import { NOVEL, PasskeyProving, PassphraseProving, type Proving } from './proving'
-import { type BankGatingFriend, type BirthFriend, type GateDna, type ProvedCleartexts, CleartextChecks } from '../shapes/shapes-gateish'
+import { type BankGatingFriend, type BirthGatingFriend, type GateDna, type ProvedCleartexts, CleartextChecks } from '../shapes/shapes-gateish'
 import type { PutAskDraft } from '../shapes/shapes-asks'
 import type { GateRecord } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-// == [The attempts]: birthBank, unlockBank, replacePassphrase, addPasskey, revokePasskey
+// == [The gatings]: birthBank, unlockBank, replacePassphrase, addPasskey, revokePasskey
 
-// Each attempt checks its cleartexts, proves them, and makes its change through the bank's private verbs its friend carries.
-// A cleartext goes only to checkedCleartexts, a strength check and a Proving builder, and a proving never leaves the attempt
+// Each gating checks its cleartexts, proves them, and makes its change through the bank's private verbs its friend carries.
+// A cleartext goes only to checkedCleartexts, a strength check and a Proving builder, and a proving never leaves the gating
 // that built it but for those verbs (G9). Each vacates its cleartexts whatever its outcome (G2), and changes nothing where it
 // refuses: a gate change writes the gate before it unlocks, so a refused write never unlocks.
 
 /** Birth a bank of `device`'s scope from the user's new passphrase and optional passkey: write it, and unlock it.
  * Refuses `gate_made_elsewhere` if a live bank is already stored there.
  */
-export async function birthBank(device: Device, cleartexts: unknown, friend: BirthFriend): Promise<Bank> {
+export async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
   try {
     Checks.device.parse(device).demandEnabled()
     const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(CleartextChecks.birth, cleartexts)
-    // A birth's stamps are minted here, one pair per attempt.
+    // A birth's stamps are minted here, one pair per gating.
     const { bankStamp, gateStamp } = Bank.mintStamps(device)
     const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
     const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext) : null
@@ -104,7 +104,7 @@ export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: Ban
 }
 // --
 
-// == [An attempt's helpers]: checkedCleartexts, checkStrength, provingOf, nextGateAsk, vacateCleartexts, vacateAnswerAt
+// == [A gating's helpers]: checkedCleartexts, checkStrength, provingOf, nextGateAsk, vacateCleartexts, vacateAnswerAt
 
 /** Check `cleartexts` with `checker`.
  * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
@@ -129,7 +129,7 @@ function provingOf(device: Device, gate: Gate, proof: ProvedCleartexts): Promise
   return PassphraseProving.buildStored(device, gate, proof.passphraseClear)
 }
 
-// The ask cites the gate the attempt proved against, never the bank's main gate as it stands at the write: a gate change
+// The ask cites the gate the gating proved against, never the bank's main gate as it stands at the write: a gate change
 // landed meanwhile is refused as stale, and the proof unlocks nothing.
 /** The draft of the put that writes the next revision of `ante`, with `wayins`, over `ante`, under the storage policy of its change. */
 function nextGateAsk(ante: Gate, wayins: GateDna['wayins'], policy: EX.StoragePolicy): PutAskDraft<GateRecord> {

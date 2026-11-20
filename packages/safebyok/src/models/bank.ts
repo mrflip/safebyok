@@ -5,7 +5,7 @@ import { Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
-import * as Attempts from './gating'
+import * as Gatings from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
 import type { BankGatingFriend, BirthCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts } from '../shapes/shapes-gateish'
@@ -117,7 +117,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     Object.freeze(this)
   }
 
-  /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life. Mint one pair per attempt to birth a bank. */
+  /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life. Mint one pair per gating to birth a bank. */
   static mintStamps(scope: BankScope): { bankStamp: BankStamp, gateStamp: GateStamp } {
     const { userid, banklabel } = StampChecks.bankScope.parse(scope)
     const born_at = Clock.nowMillis()
@@ -175,7 +175,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // --
 
   // == [Form verbs]: birth, tryBirth, unlock, tryUnlock, replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, gatingFriend
-  // Each hands the cleartexts a form collected, unread, to its attempt in gating.ts, with a friend of this bank's private
+  // Each hands the cleartexts a form collected, unread, to its gating in gating.ts, with a friend of this bank's private
   // verbs: no public method accepts a proving (G9). Each vacates the cleartexts whatever its outcome, and changes nothing where it refuses.
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked.
@@ -185,7 +185,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     const friend = {
       birth: (record: BankMakeRecord, proving: Proving) => Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving }),
     }
-    return Attempts.birthBank(device, cleartexts, friend)
+    return Gatings.birthBank(device, cleartexts, friend)
   }
 
   /** {@link birth}, resolving an `Outcome` instead of throwing. */
@@ -195,7 +195,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
    * Every call waiting in {@link ensureUnlocked} resumes. A wrong passphrase or passkey refuses, and leaves the bank as it was.
    */
   async unlock(cleartexts: UnlockCleartexts): Promise<this> {
-    await Attempts.unlockBank(this, cleartexts, this.#gatingFriend())
+    await Gatings.unlockBank(this, cleartexts, this.#gatingFriend())
     return this
   }
 
@@ -206,7 +206,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
    * The passkey stays, and the bankKey does not change. Refuses `same_passphrase`, and `weak_passphrase`, before any key is derived.
    */
   async replacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<this> {
-    await Attempts.replacePassphrase(this, cleartexts, this.#gatingFriend())
+    await Gatings.replacePassphrase(this, cleartexts, this.#gatingFriend())
     return this
   }
 
@@ -217,7 +217,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
    * A gate has one passkey at most: this refuses while it has one.
    */
   async addPasskey(cleartexts: PasskeyAddCleartexts): Promise<this> {
-    await Attempts.addPasskey(this, cleartexts, this.#gatingFriend())
+    await Gatings.addPasskey(this, cleartexts, this.#gatingFriend())
     return this
   }
 
@@ -228,14 +228,14 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
    * With no passkey, the proof unlocks the bank and nothing is written. The bankKey does not change.
    */
   async revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<this> {
-    await Attempts.revokePasskey(this, cleartexts, this.#gatingFriend())
+    await Gatings.revokePasskey(this, cleartexts, this.#gatingFriend())
     return this
   }
 
   /** {@link revokePasskey}, resolving an `Outcome` instead of throwing. */
   tryRevokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.revokePasskey(cleartexts)) }
 
-  /** The friend of this bank's private verbs an attempt is handed. */
+  /** The friend of this bank's private verbs a gating is handed. */
   #gatingFriend(): BankGatingFriend {
     return {
       unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
@@ -276,7 +276,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [The attempts' private verbs]: birthByProving, unlockByProving, putGate
+  // == [The gatings' private verbs]: birthByProving, unlockByProving, putGate
 
   /** Write a new bank of `record`, with its main gate and its root box sealed under a lease `opts.proving` builds, and resolve it unlocked under that lease.
    * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.

@@ -1,4 +1,4 @@
-/** The attempts behind the bank's form verbs: `Bank.birth` over real provings and its device's MemoryVaultDB, and how every attempt vacates the passkey answers it is handed, whatever its outcome. */
+/** The gatings behind the bank's form verbs: `Bank.birth` over real provings and its device's MemoryVaultDB, and how every gating vacates the passkey answers it is handed, whatever its outcome. */
 
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it, vi } from 'vitest'
@@ -191,7 +191,7 @@ describe("Bank.birth(device, cleartexts): what it refuses before it derives a ke
   })
 })
 
-describe("an attempt's vacating of the passkey answers it is handed", () => {
+describe("a gating's vacating of the passkey answers it is handed", () => {
   it("zeroes the answer once a birth lands", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
     await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext })

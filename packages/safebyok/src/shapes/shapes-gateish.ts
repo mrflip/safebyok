@@ -20,7 +20,7 @@ import type { BankMakeRecord } from './shapes-bankish'
 
 // A gate change's proof is named as an unlock's, `passphraseClear` or `passkeyClear`, and what it puts in place is named `next…`.
 /** The checks of what {@link Bank.birth}, {@link Bank.unlock}, {@link Bank.replacePassphrase}, {@link Bank.addPasskey}, {@link Bank.revokePasskey} and {@link cloak} are handed.
- * A cleartext is only ever checked in its attempt (models/gating.ts): the cloak's check judges none.
+ * A cleartext is only ever checked in its gating (models/gating.ts): the cloak's check judges none.
  */
 export const CleartextChecks = Validator.Checkers('bad_record', ({ obj, unk }) => {
   const proof = { passphraseClear: GX.passphraseCleartext.optional(), passkeyClear: GX.passkeyAnswer.nullable().optional() }
@@ -65,15 +65,15 @@ export type CloakCleartexts = Partial<BirthCleartexts & UnlockCleartexts & Passp
 export type ProvedCleartexts = { passphraseClear: GX.PassphraseCleartext, passkeyClear?: never } | { passkeyClear: GX.PasskeyAnswer, passphraseClear?: never }
 // --
 
-// == [Given to an attempt]: BirthFriend, BankGatingFriend
+// == [Given to a gating]: BirthGatingFriend, BankGatingFriend
 
-/** The private birth {@link Bank.birth} hands its attempt. Internal. */
-export interface BirthFriend {
+/** The private birth {@link Bank.birth} hands its gating. Internal. */
+export interface BirthGatingFriend {
   /** Write the bank of `record`, and resolve it unlocked under a lease `proving` builds. */
   birth: (record: BankMakeRecord, proving: Proving) => Promise<Bank>
 }
 
-/** The private verbs a bank hands the attempt of a form verb on it. Internal. */
+/** The private verbs a bank hands the gating of a form verb on it. Internal. */
 export interface BankGatingFriend {
   /** Unlock the bank under a lease `proved` builds, citing its main gate. */
   unlockByProving: (proved: Proving) => Promise<Bank>

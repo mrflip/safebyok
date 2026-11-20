@@ -51,7 +51,7 @@ export interface BankOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
-/** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the birth's attempt underway. */
+/** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the birth's gating underway. */
 export interface BirthOpts extends BankOpts {
   proving: Proving
 }
