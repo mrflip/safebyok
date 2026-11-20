@@ -185,6 +185,14 @@ describe("useStrengthVerdict", () => {
     expect(result.current.verdict).to.deep.equal({ strong: true })
   })
 
+  it("keeps one judge across renders", async () => {
+    const { Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    const { judge } = result.current
+    await act(() => result.current.judge('short'))
+    expect(result.current.judge).to.eq(judge)
+  })
+
   it("reports the checker's refusal as lastErr, with no verdict", async () => {
     const { world, Giver, wrapper } = setup()
     const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })

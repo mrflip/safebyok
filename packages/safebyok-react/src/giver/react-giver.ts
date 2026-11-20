@@ -3,7 +3,7 @@
 import {
   type Query, type QueryKey, type UseMutationResult, type UseQueryResult, mutationOptions, queryOptions, replaceEqualDeep, useMutation, useQuery, useQueryClient,
 } from '@tanstack/react-query'
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import {
   type BankSnapshot, type BirthCleartexts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict, type UnlockCleartexts,
@@ -121,7 +121,8 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
   function useStrengthVerdict(): StrengthVerdictResult {
     const [judged, setJudged] = useState<Omit<StrengthVerdictResult, 'judge'>>(Unjudged)
     const judgeseq = useRef(0)
-    async function judge(passphrase: string): Promise<void> {
+    // One `judge` for the hook's life, so a host may list it in an effect's dependencies.
+    const judge = useCallback(async (passphrase: string): Promise<void> => {
       judgeseq.current += 1
       const ownseq = judgeseq.current
       setJudged((prior) => ({ ...prior, isJudging: true }))
@@ -131,7 +132,7 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
       } catch (err) {
         if (ownseq === judgeseq.current) { setJudged({ verdict: null, isJudging: false, lastErr: err }) }
       }
-    }
+    }, [])
     return { ...judged, judge }
   }
 
