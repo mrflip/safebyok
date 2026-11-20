@@ -6,7 +6,7 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
+import { Hours24, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
 
 describe("ThingMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
@@ -21,7 +21,7 @@ describe("ThingMinder.make", () => {
     [{ queryCacheOpts: { retry: 3 } },                      null,                'refuses a retry, which no host sets'],
     [{ queryCacheOpts: { staleTime: -1 } },                 null,                'refuses a negative staleTime'],
     [{ queryCacheOpts: { staleTime: MaxTimerMillis + 1 } }, null,                'refuses a staleTime past MaxTimerMillis'],
-    [{ queryCacheOpts: { gcTime: MaxTimerMillis + 1 } },    null,                'refuses a gcTime past MaxTimerMillis'],
+    [{ queryCacheOpts: { gcTime: 10 } },                    null,                'refuses a gcTime, which no host sets'],
     [{ queryCacheOpts: { staleTime: 'static' } },           null,                "refuses a staleTime of 'static' for the minder's own"],
   ] as const
   for (const [optsOver, bank, blurb] of MakeCases) {
@@ -111,21 +111,20 @@ describe("ThingMinder.hello", () => {
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(shell))
   })
 
-  it("keeps the root box cached past the host's gcTime, which collects the boxes under it, until goodbye", async () => {
+  it("keeps every cached car and listing until goodbye, however long after", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()
       const box     = await storedBoxOf(vaultDB)
-      const minder  = minderOf(vaultDB, { gcTime: 10 })
+      const minder  = minderOf(vaultDB)
       minder.hello()
       await minder.get(TH.RootScope)
       await minder.list('box')
       expect(minder.at(TH.BoxScope)).to.have.property('liveness', 'bare')
-      await vi.advanceTimersByTimeAsync(20)
+      await vi.advanceTimersByTimeAsync(Hours24)
       expect(minder.at(TH.RootScope)?.newest).to.deep.equal(TH.rootBoxOf())
-      expect(minder.at(TH.BoxScope)).to.be.undefined
-      await minder.list('box')
       expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(Thing.sparseOf(box)))
+      expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
       minder.goodbye()
       expect([minder.at(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([undefined, undefined])
     } finally {
@@ -158,13 +157,13 @@ describe("ThingMinder.goodbye", () => {
     await TH.expectRefusal(minder.get(TH.GateScope), 'disabled')
   })
 
-  it("lets hello start the minder again, with the cache's timings it was made with", async () => {
+  it("lets hello start the minder again, with the staleTime it was made with", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()
       await storedBoxOf(vaultDB)
       const gate    = TH.gateThingOf()
-      const minder  = minderOf(vaultDB, { staleTime: 5, gcTime: 10 })
+      const minder  = minderOf(vaultDB, { staleTime: 5 })
       minder.hello()
       minder.goodbye()
       minder.hello()
@@ -172,8 +171,8 @@ describe("ThingMinder.goodbye", () => {
       await minder.get(TH.RootScope)
       await vi.advanceTimersByTimeAsync(5)
       expect(minder.isStaleAt(TH.GateScope)).to.be.true
-      await vi.advanceTimersByTimeAsync(20)
-      expect([minder.at(TH.GateScope), minder.at(TH.RootScope)?.liveness]).to.deep.equal([undefined, 'full'])
+      await vi.advanceTimersByTimeAsync(Hours24)
+      expect([minder.at(TH.GateScope)?.liveness, minder.at(TH.RootScope)?.liveness]).to.deep.equal(['full', 'full'])
     } finally {
       vi.useRealTimers()
     }

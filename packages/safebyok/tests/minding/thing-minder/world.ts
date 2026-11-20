@@ -78,6 +78,9 @@ export class DownVaultDB extends MemoryVaultDB {
   protected override doGetThing(): never { throw new Error('connection refused') }
 }
 
+/** A day, in milliseconds: far past the five minutes after which TanStack Query collects a query by default. */
+export const Hours24 = 24 * 60 * 60 * 1000
+
 /** A minder of `bank` over `vaultDB`. */
 export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): ThingMinder {
   return ThingMinder.make({ vaultDB, queryCacheOpts }, bank)

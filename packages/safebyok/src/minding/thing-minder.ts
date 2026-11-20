@@ -47,14 +47,14 @@ export type Labelpathed = { labelpath: Labelpath }
  *   Each car told of a Thing has a newest no older than the last, and within one life it never loses its fullest record or
  *   takes an older one. A refused get tells the car unchanged. Each listing told lists every labelpath the last one did.
  *   Only a removal breaks the run: its event carries no car or listing, and what is told after it starts over. The cache
- *   removes a query at `goodbye`, or once a finite gcTime passes.
+ *   removes a query only at `goodbye`.
  * - A sparse live record never displaces a whole live record of the same life: it leaves the car `bhnd`, its fullest
  *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
  *   get fetches the newest whole.
  * - A get answered with a revision older than the car it began with changes nothing in the cache, and refuses `stale_read`.
  * - A listing never drops a labelpath: a list adds what it answers, and each record that lands adds its own. So once a
  *   listing is cached, what it lists depends only on which records arrived, never on their order.
- * - The root box's listing is cached from `hello` until `goodbye`, whatever the host's gcTime. So each box that lands
+ * - The root box's listing is cached from `hello` until `goodbye`. So each box that lands
  *   joins it, before its first list or after: what it lists depends only on which records arrived since `hello`, never
  *   on whether they came before the answer of its first list.
  * - A listing is bare from `hello` until a list sets it, even a list that answers nothing. A record joining it, or an
@@ -115,10 +115,6 @@ export class ThingMinder {
       queryFn:           ({ queryKey }) => this.#fetchCar(this.#askAt(this.#scopeOfQueryKey(queryKey))),
       structuralSharing: bestCarOf,
     } } })
-    // The root box's car and listing stay, whatever the host's gcTime: their keys' defaults reach no box under it. The
-    // listing's are set on '#', its mark without its tag, so that the defaults each list sets at its whole key keep them.
-    tsq.setQueryDefaults(this.queryKey(this.#rootBoxScope), { gcTime: Infinity })
-    tsq.setQueryDefaults([...this.#keyHeadOf(this.#rootBoxScope), '#'], { gcTime: Infinity })
     return tsq
   }
   // --

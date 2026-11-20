@@ -18,27 +18,22 @@ import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 export interface QueryCacheOpts {
   /** How long a car stays timely, in milliseconds up to {@link MaxTimerMillis}, or `Infinity` for one that never ages. A `bhnd` or `bare` car is never timely. */
   staleTime: number
-  /** How long a car stays in the cache after it was first cached or last fetched from the vaultDB, in milliseconds up to {@link MaxTimerMillis}. `Infinity` means until `goodbye`.
-   * A record that arrives by a notice or a list does not extend it, and nor does a get answered from the cache. The root box's car and listing stay until `goodbye`, whatever the gcTime.
-   * Any other listing stays as long after it was first listed: a later list does not extend it, and restores it once collected.
-   */
-  gcTime:    number
 }
 
-/** The default {@link QueryCacheOpts}: a car stays timely for an hour, and stays cached until `goodbye`. */
-export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ staleTime: 60 * 60 * 1000, gcTime: Infinity })
+/** The default {@link QueryCacheOpts}: a car stays timely for an hour. */
+export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ staleTime: 60 * 60 * 1000 })
 
 // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its
 // caller. A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
-/** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, and is never retried. */
-export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry: false } as const)
+/** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, is never retried, and its car stays cached until `goodbye`. */
+export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry: false, gcTime: Infinity } as const)
 
-// TanStack Query passes a finite gcTime or staleTime to a timer as it is, and a timer longer than 2^31 - 1 milliseconds
+// TanStack Query passes a finite staleTime to a timer as it is, and a timer longer than 2^31 - 1 milliseconds
 // fires at once, in every JavaScript runtime. The bound is a whole number of hours, below that limit.
-/** The longest finite gcTime or staleTime, in hours: 24.5 days. Give `Infinity` for a longer one. */
+/** The longest finite staleTime, in hours: 24.5 days. Give `Infinity` for a longer one. */
 export const MaxTimerHours = 588
 
-/** The longest finite gcTime or staleTime, in milliseconds: 24.5 days. Give `Infinity` for a longer one. */
+/** The longest finite staleTime, in milliseconds: 24.5 days. Give `Infinity` for a longer one. */
 export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 // --
 
@@ -46,12 +41,10 @@ export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 
 /** The checks of a minder's arguments and options. */
 const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
-  const gcTime           = union([uint.max(MaxTimerMillis, Phrases.GcTimeShape), lit(Infinity)])
   const staleMillis      = uint.max(MaxTimerMillis, Phrases.StaleTimeShape)
   const staleTime        = union([staleMillis, lit(Infinity)])
   const queryCacheOpts   = obj({
     staleTime: orDefault(staleTime, DefaultQueryCacheOpts.staleTime),
-    gcTime:    orDefault(gcTime, DefaultQueryCacheOpts.gcTime),
   }).strict()
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)

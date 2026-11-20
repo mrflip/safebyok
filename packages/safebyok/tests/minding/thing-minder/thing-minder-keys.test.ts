@@ -56,10 +56,4 @@ describe("ThingMinder keys", () => {
     TH.expectSyncRefusal(() => ThingMinder.queryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
     TH.expectSyncRefusal(() => ThingMinder.bankQueryKeyOf({ userid: 'u1' } as never), 'bad_record')
   })
-
-  it("start no other key with the root box's car key, the one its gcTime default is set on", () => {
-    const minder = minderWithoutStart()
-    const queryKeys = [minder.queryKey(TH.RootScope), minder.listingQueryKey(TH.RootScope), minder.queryKey(TH.BoxScope)]
-    expect(queryKeys.map((queryKey) => TSQ.partialMatchKey(queryKey, minder.queryKey(TH.RootScope)))).to.deep.equal([true, false, false])
-  })
 })

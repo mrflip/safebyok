@@ -4,7 +4,7 @@ import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { type ThingRecord, Shell } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
-import { GateGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
+import { Hours24, GateGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
 
 describe("ThingMinder.at", () => {
   it("holds nothing before any get", () => {
@@ -162,36 +162,17 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.be.undefined
   })
 
-  it("collects a listing under the host's gcTime, from its first list, and a later list restores it", async () => {
+  it("keeps the root box's listing until goodbye, however long after", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()
       await storedBoxOf(vaultDB)
-      const minder  = minderOf(vaultDB, { gcTime: 10 })
+      const minder  = minderOf(vaultDB)
       minder.hello()
-      await minder.list('gate')
-      await vi.advanceTimersByTimeAsync(6)
-      await minder.list('gate')
-      await vi.advanceTimersByTimeAsync(6)
-      expect(minder.listingAt(TH.GateScope)).to.be.undefined
-      await minder.list('gate')
-      expect(minder.listingAt(TH.GateScope)).to.deep.equal([])
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("keeps the root box's listing until goodbye, whatever the host's gcTime", async () => {
-    vi.useFakeTimers()
-    try {
-      const vaultDB = new MemoryVaultDB()
-      await storedBoxOf(vaultDB)
-      const minder  = minderOf(vaultDB, { gcTime: 10 })
-      minder.hello()
-      await vi.advanceTimersByTimeAsync(20)
+      await vi.advanceTimersByTimeAsync(Hours24)
       expect(minder.listingAt(TH.RootScope)).to.deep.equal([])
       await minder.list('box')
-      await vi.advanceTimersByTimeAsync(20)
+      await vi.advanceTimersByTimeAsync(Hours24)
       expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
       minder.goodbye()
       expect(minder.listingAt(TH.RootScope)).to.be.undefined

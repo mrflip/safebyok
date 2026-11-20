@@ -120,7 +120,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, FeedVersionOther, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBhndOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarAgerankNotOwn, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBhndOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarAgerankNotOwn, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -131,9 +131,6 @@ export const MinderNotStarted = 'This ThingMinder is not minding: call hello bef
 
 /** A get that storage answered older than the record the minder held when it began. */
 export const StaleRead = 'Storage answered with a revision older than one this device already held. The newer record stays cached, and a later get asks again.'
-
-/** A gcTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
-export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
