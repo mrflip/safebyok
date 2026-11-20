@@ -40,6 +40,16 @@ what differs from big, in a sentence or two.
   device yet.
   amended 2026-11-20 (snapshots, #773): `device.sweep()` now reaches the last `Bank` made on the device, through
   `device.cheatHoldBank`, and sweeps its lease; a `Bank` made earlier on the same device still keeps its leaseKey.
+  amended 2026-11-20 (life_cascade): `device.sweep()` no longer ends the device. It sweeps the bank it holds (whose
+  `lease.sweep()` evicts the leaseKey, as before), lets that bank go, and stays usable, so a bank made after it is a
+  fresh one with no lease until it is unlocked. A bank made earlier was still not reached, and stayed enabled too:
+  its lease sealed and unsealed until it expired or that bank was locked or swept.
+  amended 2026-11-20 (life_cascade, review): that drift is gone. The device keeps each `Bank` made on it
+  (`device.cheatHoldBank`) until it is swept, and `device.sweep()` sweeps every one, so every lease is evicted and every
+  bank refuses `disabled`; making a bank sweeps no other. One drift remained: `device.lock()` locked only the last bank
+  made, and an earlier one kept its lease until it expired or was locked or swept.
+  amended 2026-11-20 (life_cascade, review): that remaining drift is gone: `device.lock()` locks every bank made on the
+  device, so no lease outlives a device's lock or sweep.
 * 2026-11-20 (bank_gatings, #772), G1 and G9: **The Bank takes cleartexts, unread.** In big no `Bank` method ever
   received a passphrase or PRF bytes (G1's chain; G9's "only Gating, Proving and Lease"). In the new core the Bank's
   four re-entry points, `attemptUnlock`, `attemptReplacePassphrase`, `attemptAddPasskey` and `attemptRevokePasskey`
