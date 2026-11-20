@@ -95,6 +95,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
 
 describe("vault.putBoxOnce(cited, patch, secrets)", () => {
   it("resolves a birth with the box as stored already in its car and in its parent's listing", async () => {
+    // putBoxOnce @example
     const { bank, vault, minder } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(box).to.include({ labelpath: Openai, revseq: 0, am: 'a' })
