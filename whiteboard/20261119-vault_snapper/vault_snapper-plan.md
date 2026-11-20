@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1, 3 and 4 filed ([#769](https://github.com/mrflip/safebyok/pull/769), [#768](https://github.com/mrflip/safebyok/pull/768), [#770](https://github.com/mrflip/safebyok/pull/770)); threads 2 and 5 building, stacked on #769 and #770.
+* **Status:** threads 1, 3 and 4 filed ([#769](https://github.com/mrflip/safebyok/pull/769), [#768](https://github.com/mrflip/safebyok/pull/768), [#770](https://github.com/mrflip/safebyok/pull/770)); #769 and #770 out of draft; thread 2 ready ([#771](https://github.com/mrflip/safebyok/pull/771)), in review; thread 5 building on #770.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -96,7 +96,7 @@ not frozen*, and *A get resuming after `goodbye` and `hello` joins the new listi
 
 *Touches:* `minding/thing-car.ts`, `shapes/shapes-minder.ts`, `minding/thing-minder.ts`, their tests, the giver's
 reads of `liveness`, VOCABULARY.md. *Depends on:* nothing (origin/main). *Look-ahead:* thread 2 decorates each event
-with the car's `agerank`; thread 8 uses it as the host's structural sharing. *Size:* M. *Status:* filed, #769, at 2e14d2b61.
+with the car's `agerank`; thread 8 uses it as the host's structural sharing. *Size:* M. *Status:* filed, #769, at 2e14d2b61; out of draft.
 
 *Review:* fixed (medium): realigned two test tables after the rename (whitespace). Kept: one `eslint-disable-line
 unicorn/prefer-simple-sort-comparator` in the agerank ordering test. Left, minor: `list` and `tryWrite` land answers
@@ -122,7 +122,7 @@ new event, so its tests pass; nothing else in the giver (thread 8).
 
 *Touches:* `shapes/shapes-minder.ts`, `minding/thing-minder.ts` (`listen`, `#minderEventOf`, `#bankKeyHead`), the
 minder's tests, `packages/safebyok-react/src/giver/minder-bank.ts`. *Depends on:* thread 1 (`agerank`; same files).
-*Look-ahead:* thread 8's bridge copies `state`. *Size:* M. *Status:* building, stacked on #769. *Orchestrator:* given, in YOLO, the same per-stretch check for `list` and `tryWrite` that thread 1 gave `#doGet`.
+*Look-ahead:* thread 8's bridge copies `state`. *Size:* M. *Status:* ready, #771 (branch `20261120-minder_feed`); in review (one compaction before ready). *Orchestrator:* given, in YOLO, the same per-stretch check for `list` and `tryWrite` that thread 1 gave `#doGet`.
 
 ### 3. format_string
 
@@ -160,7 +160,7 @@ damaged; the changeset says so. *Levels:* worker on `sonnet`; review `low`. *Sta
 
 *Touches:* `models/bank.ts` (its boxes sections), a new `models/vault.ts`, its tests, VOCABULARY.md. *Depends on:*
 nothing (origin/main). *Look-ahead:* thread 7 puts `withWhisper` on the Vault; thread 5 edits `bank.ts`'s prompts,
-stacked on this. *Size:* M to L. *Status:* filed, #770, at 7cc13c3f8 (one compaction before ready).
+stacked on this. *Size:* M to L. *Status:* filed, #770, at 7cc13c3f8 (one compaction before ready); out of draft.
 
 *Review:* flagged, nothing blocking (medium): added the `// putBoxOnce @example` marker to the birth test. Left:
 a sparse newest by labelpath refuses `sidecar_missing` (taken in YOLO, thread 7); no re-check of the bank before
