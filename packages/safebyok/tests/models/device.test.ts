@@ -6,6 +6,7 @@ import 'fake-indexeddb/auto'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { Bank } from '../../src/models/bank'
+import { Lease } from '../../src/models/lease'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
@@ -165,6 +166,29 @@ describe("device.sweep()", () => {
     expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
     await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
+  })
+
+  it("leaves a bank working when a second is made on its device", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    expect(bank.isEnabled).to.be.true
+    expect(bank.isLocked).to.be.false
+    await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
+  })
+
+  it("sweeps every bank made on the device, an earlier one unlocked too", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    const sweepLease = vi.spyOn(Lease.prototype, 'sweep')
+    device.sweep()
+    expect(sweepLease).toHaveBeenCalledTimes(2)
+    for (const swept of [bank, later]) {
+      expect(swept.isEnabled).to.be.false
+      await TH.expectRefusal(swept.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
+    }
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
   })
 
   it("does nothing on a device with no bank, which births one after it", async () => {

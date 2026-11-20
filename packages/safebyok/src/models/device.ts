@@ -17,10 +17,10 @@ import * as Throwers from '../refusals/throwers'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 /** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and the bank it holds.
- * Make it with `Device.make(record, opts)`. A `sweep()` ends its bank, and leaves the device to make another.
+ * Make it with `Device.make(record, opts)`. A `sweep()` ends each bank made on it, and leaves the device to make another.
  */
 export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #madeBanks, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -36,10 +36,12 @@ export class Device {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The last bank made on this device, or null for none or once it is swept. {@link lock} and {@link sweep} act on it, and
+  /** The last bank made on this device, or null for none or once it is swept. {@link lock} acts on it, and
    * the device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
   #thisIsTemporaryBank: Bank | null = null
+  /** Every bank made on this device and not yet swept, the one it holds among them. {@link sweep} sweeps each. */
+  readonly #madeBanks = new Set<Bank>()
   /** Ends this device's subscription to the bank it holds. */
   #unsubscribeBank: () => void = () => undefined
   // Nothing ends a device yet: its sweep ends only its bank.
@@ -119,17 +121,19 @@ export class Device {
     return this
   }
 
-  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is kept.
-  /** Hold `bank` as this device's bank, the one {@link lock}, {@link sweep} and the snapshot act on. Internal. */
+  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one held.
+  /** Hold `bank` as this device's bank, the one {@link lock} and the snapshot act on, and keep it for {@link sweep}. Making a bank sweeps no other. Internal. */
   cheatHoldBank(bank: Bank): void {
+    this.#madeBanks.add(bank)
     this.#unsubscribeBank()
     this.#thisIsTemporaryBank = bank
     this.#unsubscribeBank = bank.subscribe(this.#align)
     this.#align()
   }
 
-  /** Let go of `bank`, if it is the bank this device holds, and show {@link PendingBank}. A bank calls it as it is swept. Internal. */
+  /** Let go of `bank`, and show {@link PendingBank} if it is the bank this device holds. A bank calls it as it is swept. Internal. */
   cheatDropBank(bank: Bank): void {
+    this.#madeBanks.delete(bank)
     if (bank !== this.#thisIsTemporaryBank) { return }
     this.#unsubscribeBank()
     this.#unsubscribeBank = () => undefined
@@ -140,9 +144,9 @@ export class Device {
 
   // == [Ending]: sweep
 
-  /** Sweep this device's bank, if it holds one. The device stays, to judge passphrases and make a bank again. Never throws. */
+  /** Sweep every bank made on this device. The device stays, to judge passphrases and make a bank again. Never throws. */
   sweep(): this {
-    this.#thisIsTemporaryBank?.sweep()
+    for (const bank of this.#madeBanks) { bank.sweep() }
     return this
   }
   // --
