@@ -71,7 +71,7 @@ describe("useBankSnapshot", () => {
       renders += 1
       return Acme.useBankSnapshot()
     }, { wrapper })
-    act(() => { world._cheat_setGating({ gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false } as OpenGatingSnapshot) })
+    act(() => { world._cheat_setGating({ gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false }) })
     expect(renders).to.eq(1)
   })
 })
