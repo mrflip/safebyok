@@ -9,22 +9,22 @@ describe("ThingMinder keys", () => {
 
   it("interleave '/' between the labels, then end with '!' for the Thing's car", () => {
     const minder = minderWithoutStart()
-    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'gate', '!'])
-    expect(minder.queryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '!'])
-    expect(minder.queryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '!'])
-    expect(minder.queryKey(TH.BankScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'bank', '!'])
+    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['sok', 'u1', 'acme', 'gate', '!'])
+    expect(minder.queryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '!'])
+    expect(minder.queryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '!'])
+    expect(minder.queryKey(TH.BankScope)).to.deep.equal(['sok', 'u1', 'acme', 'bank', '!'])
   })
 
   it("put the list of a Thing's children under '#' and 'kids'", () => {
     const minder = minderWithoutStart()
-    expect(minder.listingQueryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '#', 'kids'])
-    expect(minder.listingQueryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '#', 'kids'])
+    expect(minder.listingQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '#', 'kids'])
+    expect(minder.listingQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '#', 'kids'])
   })
 
   it("make a subtree prefix of the labels and '/', which no key of the Thing's own starts", () => {
     const minder = minderWithoutStart()
-    expect(minder.subtreeQueryKey(TH.RootScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/'])
-    expect(minder.subtreeQueryKey(TH.BoxScope)).to.deep.equal(['safebyok', 'u1', 'acme', 'box', '/', 'openai', '/'])
+    expect(minder.subtreeQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/'])
+    expect(minder.subtreeQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '/'])
   })
 
   it("match, for a subtree prefix, every key under the Thing and neither of the Thing's own", () => {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { DeliverableThing } from '../../../src/shapes/shapes-minder'
 import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { Shell } from '../../../src/shapes/shapes-thing'
+import { Shell, ThingFormat } from '../../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
@@ -240,7 +240,7 @@ describe("ThingMinder.list", () => {
     const { minder, receive } = minderWorldOf(vaultDB)
     receive(noticeOf(box0))
     const heard = listenerOf()
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     await minder.list('box')
     expect(toldOf(heard)).to.deep.equal([['listing'], ['box/anthropic', 'bare'], ['box/openai', 'bhnd']])
   })

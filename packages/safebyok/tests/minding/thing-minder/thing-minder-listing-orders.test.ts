@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { ThingCar } from '../../../src/shapes/shapes-minder'
 import type { Labelpath } from '../../../src/shapes/primitives'
-import type { ThingRecord } from '../../../src/shapes/shapes-thing'
+import { type ThingRecord, ThingFormat } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf } from './world'
@@ -96,7 +96,7 @@ async function eventsAfter(steps: readonly ListingStep[]) {
   await storedBoxOf(vaultDB)
   const { minder, receive } = minderWorldOf(vaultDB)
   const heard      = listenerOf()
-  minder.listen(heard)
+  minder.listen(heard, ThingFormat)
   const replaceAsk = TH.replaceAskOf(Openai, TH.nextOf(Openai))
   const refusalkinds: unknown[] = []
   const stepRunners: Readonly<Record<ListingStep, () => Promise<void> | void>> = {
@@ -138,8 +138,8 @@ describe("a ThingMinder tells each car and listing going forward, in any order",
       const blurb = steps.join(', ')
       it(blurb, async () => {
         const { events, refusalkinds } = await eventsAfter(steps)
-        const cars     = events.flatMap((event) => ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) ? [event.car] : [])
-        const listings = events.flatMap((event) => ((event.carkind === 'listing') && (event.of.parentpath === 'box')) ? [event.labelpaths] : [])
+        const cars     = events.flatMap((event) => ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) ? [event.state.data] : [])
+        const listings = events.flatMap((event) => ((event.carkind === 'listing') && (event.labelpath === 'box')) ? [event.state.data] : [])
         expect(backwardCars(cars)).to.deep.equal([])
         expect(shrunkListings(listings)).to.deep.equal([])
         expect(cars.at(-1)?.newest).to.deep.equal(Reborn)

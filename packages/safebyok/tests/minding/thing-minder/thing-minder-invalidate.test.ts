@@ -1,13 +1,22 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { InvalidationEvent } from '../../../src/shapes/shapes-minder'
+import type { MinderEvent } from '../../../src/shapes/shapes-minder'
 import type { Labelpath } from '../../../src/shapes/primitives'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { ThingFormat } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { listenerOf, minderWorldOf, storedBoxOf } from './world'
 
-/** The event a listener is told when the listing of the Thing at `labelpath` is invalidated. */
-function invalidationOf(labelpath: Labelpath): InvalidationEvent {
-  return { carkind: 'invalidation', modelkind: (labelpath === 'gate') ? 'gate' : 'box', labelpath, card: 'list', tag: 'kids' }
+/** What a listener is told when the listing of the Thing at `labelpath` is invalidated, as {@link toldOf} reads it. */
+function invalidationOf(labelpath: Labelpath) {
+  return { carkind: 'listing', modelkind: (labelpath === 'gate') ? 'gate' : 'box', labelpath, action: 'invalidate', isInvalidated: true }
+}
+
+/** The kind, scope, action and staleness of each event `heard` was told. */
+function toldOf(heard: ReturnType<typeof listenerOf>) {
+  return heard.mock.calls.map(([event]: [MinderEvent]) => {
+    const { carkind, modelkind, labelpath, action, state } = event
+    return { carkind, modelkind, labelpath, action: action?.type, isInvalidated: state.isInvalidated }
+  })
 }
 
 /** A minder that has listed the root box, the box under it, and the main gate, over a store holding the box. */
@@ -22,9 +31,9 @@ async function listedWorldOf() {
 describe("ThingMinder.invalidate", () => {
   it("tells a listener of each listing under the labelpath, its own included", async () => {
     const { minder, heard } = await listedWorldOf()
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     minder.invalidate('box', { list: 'all' })
-    expect(heard.mock.calls.map(([event]) => event)).to.have.deep.members([invalidationOf('box'), invalidationOf('box/openai')])
+    expect(toldOf(heard)).to.have.deep.members([invalidationOf('box'), invalidationOf('box/openai')])
     expect(heard.mock.calls).to.have.lengthOf(2)
   })
 
@@ -37,22 +46,22 @@ describe("ThingMinder.invalidate", () => {
 
   it("tells of the listings under a labelpath alone, and of the listing of a Thing with none under it", async () => {
     const { minder, heard } = await listedWorldOf()
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     minder.invalidate('box/openai', { list: 'all' })
-    expect(heard.mock.calls).to.deep.equal([[invalidationOf('box/openai')]])
+    expect(toldOf(heard)).to.deep.equal([invalidationOf('box/openai')])
   })
 
   it("tells of every listing in the bank where it is given no labelpath", async () => {
     const { minder, heard } = await listedWorldOf()
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     minder.invalidate(undefined, { list: 'all' })
-    expect(heard.mock.calls.map(([event]) => event)).to.have.deep.members([invalidationOf('box'), invalidationOf('box/openai'), invalidationOf('gate')])
+    expect(toldOf(heard)).to.have.deep.members([invalidationOf('box'), invalidationOf('box/openai'), invalidationOf('gate')])
     expect(heard.mock.calls).to.have.lengthOf(3)
   })
 
   it("tells nothing of a labelpath with no listing cached", async () => {
     const { minder, heard } = await listedWorldOf()
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     minder.invalidate('box/anthropic', { list: 'all' })
     expect(heard.mock.calls).to.have.lengthOf(0)
   })
@@ -61,20 +70,20 @@ describe("ThingMinder.invalidate", () => {
     const { minder, heard } = await listedWorldOf()
     const car     = await minder.get(TH.GateScope)
     const listing = minder.listingAt(TH.RootScope)
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     minder.invalidate(undefined, { list: 'all' })
     expect(minder.at(TH.GateScope)).to.eq(car)
     expect(minder.listingAt(TH.RootScope)).to.eq(listing)
-    expect(heard.mock.calls.filter(([event]) => event.carkind !== 'invalidation')).to.have.lengthOf(0)
+    expect(heard.mock.calls.filter(([event]) => event.action?.type !== 'invalidate')).to.have.lengthOf(0)
   })
 
   it("tells a listing only the first time it is invalidated", async () => {
     const { minder, heard } = await listedWorldOf()
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     minder.invalidate('box', { list: 'all' })
     minder.invalidate('box', { list: 'all' })
     minder.invalidate(undefined, { list: 'all' })
-    expect(heard.mock.calls.map(([event]) => event)).to.have.deep.members([invalidationOf('box'), invalidationOf('box/openai'), invalidationOf('gate')])
+    expect(toldOf(heard)).to.have.deep.members([invalidationOf('box'), invalidationOf('box/openai'), invalidationOf('gate')])
     expect(heard.mock.calls).to.have.lengthOf(3)
   })
 
@@ -82,21 +91,21 @@ describe("ThingMinder.invalidate", () => {
     const { minder, vaultDB, heard } = await listedWorldOf()
     minder.invalidate('box', { list: 'all' })
     vaultDB._cheat_things(TH.ThingBank).set('box/anthropic', TH.boxThingOf('anthropic'))
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     expect(await minder.list('box')).to.deep.equal(['box/anthropic', 'box/openai'])
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
     expect(heard.mock.calls.map(([event]) => event.carkind)).to.include('listing')
     minder.invalidate('box', { list: 'all' })
-    expect(heard.mock.calls.filter(([event]) => event.carkind === 'invalidation').map(([event]) => event)).to.deep.equal([invalidationOf('box')])
+    expect(toldOf(heard).filter((told) => told.action === 'invalidate')).to.deep.equal([invalidationOf('box')])
   })
 
-  it("tells a removed listing as a listing event with no labelpaths, never an invalidation", async () => {
+  it("tells a removed listing as a removal with no labelpaths, never an invalidation", async () => {
     const { minder, heard } = await listedWorldOf()
     minder.invalidate(undefined, { list: 'all' })
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     minder.goodbye()
-    expect(heard.mock.calls.filter(([event]) => event.carkind === 'invalidation')).to.have.lengthOf(0)
-    expect(heard.mock.calls.filter(([event]) => (event.carkind === 'listing') && (event.labelpaths === undefined))).to.have.lengthOf(3)
+    expect(heard.mock.calls.filter(([event]) => event.action?.type === 'invalidate')).to.have.lengthOf(0)
+    expect(heard.mock.calls.filter(([event]) => (event.carkind === 'listing') && (event.type === 'removed') && (event.state.data === undefined))).to.have.lengthOf(3)
   })
 
   const BadArgs = [

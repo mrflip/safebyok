@@ -120,7 +120,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBhndOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarAgerankNotOwn, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, FeedVersionOther, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBhndOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarAgerankNotOwn, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -137,6 +137,9 @@ export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseco
 
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
+
+/** A listener given to a minder's `listen` with a feed version other than this one's. */
+export const FeedVersionOther = "A ThingMinder's listen is given the version of the feed its listener reads, ThingFormat, and this listener was written for another: its events are not shaped as it expects."
 
 /** A value in a minder's query that is not a car. */
 export const NotACar = "A ThingMinder's structural sharing was given a value that is not a ThingCar: only cars belong in its cache."
