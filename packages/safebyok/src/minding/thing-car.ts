@@ -12,8 +12,9 @@ import type { DeliverableThing, ThingCar } from '../shapes/shapes-minder'
 
 // == [Making cars]: carOf, frozenCarOf, bestCarOf, tagBestNewestSL, tagBestFullestSL, tagBestNewestRecordSL
 
-/** The car of `newest`, with `fullest` the whole record of its life where `newest` is sparse. Both records are frozen where they lie.
- * A deleted Thing's car is `gone`, even when its tombstone is sparse, and the void sentinel's is `void`. A sparse `newest` with no `fullest` makes a `bare` car.
+/** The car of `newest`, with `fullest` the whole record of its life where `newest` is sparse.
+ * It deep-freezes both records in place. A deleted Thing's car is `gone`, even when its tombstone is sparse, and the void
+ * sentinel's is `void`. A sparse `newest` with no `fullest` makes a `bare` car.
  */
 export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar<ThingRecord> {
   ThingChecks.scopedCited.parse(newest)
@@ -28,7 +29,7 @@ export function carOf(newest: DeliverableThing, fullest?: ThingRecord): ThingCar
 }
 
 // A listener, or a host's select, handed the car must not reach into the cache through it: its records are frozen too.
-/** The car of `liveness`, `newest` and `fullest`, with its agerank, frozen through. */
+/** The car of `liveness`, `newest` and `fullest`, with its agerank, deeply frozen. */
 function frozenCarOf(liveness: ThingCar<ThingRecord>['liveness'], newest: DeliverableThing, fullest: ThingRecord | null | undefined): ThingCar<ThingRecord> {
   deepFreeze(newest)
   deepFreeze(fullest)
@@ -89,12 +90,11 @@ export function dbHasNewer(car: Pick<ThingCar<ThingRecord>, 'liveness'>): boolea
   return (car.liveness === 'bhnd') || (car.liveness === 'bare')
 }
 
-// Each field is of fixed width for one Thing, so two ageranks are settled before either reaches a '~'. The liveness tags,
-// all four letters, sort void > gone > full > bhnd > bare. A bare car has no fullest, and takes NoFullestRevseq, below
-// every revseq. The fullest's revseq settles two bhnd cars with the same newest.
-/** The agerank of a sound car of a Thing: a string that compares above the agerank of each older car of that Thing.
- * It joins with `~` the newest's lifepath and revseq, the liveness, and the revseq of `fullest ?? newest`.
- */
+// It joins with `~` the newest's lifepath and revseq, the liveness, and the revseq of `fullest ?? newest`. Each field is of
+// fixed width for one Thing, so two ageranks are settled before either reaches a '~'. The liveness tags, all four letters,
+// sort void > gone > full > bhnd > bare. A bare car has no fullest, and takes NoFullestRevseq, below every revseq. The
+// fullest's revseq settles two bhnd cars with the same newest.
+/** The agerank of a sound car of a Thing: a string that compares above the agerank of each older car of that Thing. */
 export function agerankOf(car: Pick<ThingCar<ThingRecord>, 'liveness' | 'newest' | 'fullest'>): string {
   const { liveness, newest, fullest } = car
   const fullestRevseq = (liveness === 'bare') ? NoFullestRevseq : Revseq.padded((fullest ?? newest).revseq)

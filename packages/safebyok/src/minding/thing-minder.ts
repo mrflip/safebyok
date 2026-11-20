@@ -43,12 +43,11 @@ export type Labelpathed = { labelpath: Labelpath }
  *   has heard of, never on the order they arrived in.
  * - The order records arrive in never changes a car's liveness, or the revisions it carries.
  * - A car never goes back: it carries the newest revision any source has told of, and a newer life replaces an older one whole.
- * - A listener is told of each car and listing as the cache changes, in that order, so what it is told never goes back either.
+ * - A listener is told of each car and listing in the order the cache changes, so what it is told never goes back either.
  *   Each car told of a Thing has a newest no older than the last, and within one life it never loses its fullest record or
  *   takes an older one. A refused get tells the car unchanged. Each listing told lists every labelpath the last one did.
- *   Only a removal breaks the run: it tells no car, and what arrives after starts afresh. Removal is contemplated as part of a
- *   later feature allowing nested boxes, but not yet. Access after `goodbye()` or altering the gcTime is misuse (the customer
- *   may do as they please with the Giver's React Query cache).
+ *   Only a removal breaks the run: its event carries no car or listing, and what is told after it starts over. The cache
+ *   removes a query at `goodbye`, or once a finite gcTime passes.
  * - A sparse live record never displaces a whole live record of the same life: it leaves the car `bhnd`, its fullest
  *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
  *   get fetches the newest whole.
@@ -247,9 +246,9 @@ export class ThingMinder {
   }
 
   /** Call `listener` with each change the cache tells of, as a {@link MinderEvent}. Returns the function that stops it.
-   * `version` is the version of the feed `listener` was written against, which is `ThingFormat`; any other refuses.
-   * It tells a `thing` event each time a record arrives in a car (even one that changes nothing), a get of it is refused,
-   * or it is removed. It tells a `listing` event each time a list sets a listing (even to the labelpaths it had), a labelpath
+   * Pass `ThingFormat` as `version`, the version of the event shape `listener` was written for; any other refuses.
+   * It tells a {@link ThingEvent} each time a record arrives in a car (even one that changes nothing), a get of it is refused,
+   * or it is removed. It tells a {@link ListingEvent} each time a list sets a listing (even to the labelpaths it had), a labelpath
    * joins it, `hello` caches the root box's, `invalidate` marks it stale, or it is removed.
    * Nothing is called when a car ages past `staleTime`, and listening caches no car.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
@@ -272,8 +271,8 @@ export class ThingMinder {
   // == [Invalidating]: invalidate
 
   /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
-   * Each listing marked tells a `listing` event whose `state.isInvalidated` is true, once until the listing is next set, by a list or by a record joining it. It asks the vaultDB nothing, and
-   * leaves what each listing lists as it was.
+   * Each listing marked tells one {@link ListingEvent} with `state.isInvalidated` true, and no more until a list or a joining record sets it again.
+   * It asks the vaultDB nothing, and leaves what each listing lists as it was.
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
@@ -403,13 +402,13 @@ export class ThingMinder {
   // under the Thing and neither of its own keys. No label is '!', '/' or '#', so no mark is mistaken for one. TanStack matches
   // query defaults by key prefix too, so without a mark the root box's key would start every box's key, and no defaults
   // could single out the root box. A labelpath starts with its modelkind, so the key does too.
-  /** The query key a minder caches `scope`'s car under: a host caching the same car keys it the same. */
+  /** The query key a minder caches `scope`'s car under. A host caching the same car may use the same key. */
   static queryKeyOf(scope: ThingScope): TSQ.QueryKey {
     const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
     return [...keyHeadOf({ userid, banklabel }, labelpath), '!']
   }
 
-  /** True when `event`, an event a minder's `listen` told, is of a car's query, not a listing's. */
+  /** True when `event` is about a car's query, not a listing's. */
   static isThingEvent(event: MinderEvent): event is ThingEvent {
     return event.queryKey.at(-1) === '!'
   }
@@ -425,7 +424,7 @@ export class ThingMinder {
   /** The query key the list of `labelpathed`'s children is cached under. */
   listingQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '#', 'kids'] }
 
-  /** The key prefix of everything cached under `labelpathed`, a car or a listing, and of neither of its own. */
+  /** The key prefix of every car and listing cached under `labelpathed`, but not of its own. */
   childrenQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
 
   /** The part of a query key that `labelpathed` has in common with each of its keys. */
