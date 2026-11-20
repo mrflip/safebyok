@@ -243,8 +243,8 @@ export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: Ban
 
 // == [Without a gating]: attemptWithoutGating
 
-/** Run `attempt` once on `cleartexts`, for a re-entry point of `bank` with no gating open, resolving an outcome instead of throwing.
- * A disabled bank refuses at the door. The cleartexts are spent whatever the outcome: no next attempt waits for them.
+/** Run `attempt` once on `cleartexts` with no gating open, resolving an `Outcome` instead of throwing.
+ * A disabled `bank` refuses without running it. The PRF bytes of a passkey answer in `cleartexts` are zeroed whatever the outcome.
  */
 export async function attemptWithoutGating(bank: Bank, cleartexts: unknown, attempt: GatingAttempt): Promise<Outcome.Outcome<Bank>> {
   const outcome = await Outcome.outcomeOf(() => {

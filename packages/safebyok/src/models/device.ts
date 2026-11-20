@@ -40,10 +40,10 @@ export class Device {
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
   #openGating: Gating | null = null
-  /** The count of gatings opened and ended on this device, which names the open one in the snapshot. */
+  /** Counts each gating opened and each ended on this device. The snapshot's `gatingseq` is its value. */
   #gatingseq = 0
-  /** The bank {@link lock} locks and {@link sweep} sweeps, whose snapshot this device forwards: the last made on this device.
-   * Null for none, and the snapshot is then {@link PendingBank}.
+  /** The last bank made on this device, or null for none. {@link lock} and {@link sweep} act on it, and the device's
+   * snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
   #thisIsTemporaryBank: Bank | null = null
   /** Ends this device's subscription to the bank it holds. */
@@ -51,7 +51,7 @@ export class Device {
   /** Why a sweep disabled the device, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
 
-  /** The snapshot held, which {@link getSnapshot} returns until something in it changes. */
+  /** The current snapshot, which {@link getSnapshot} returns. */
   #snapshot: DeviceSnapshot
   readonly #subscribers = new Set<() => void>()
   readonly #getSnapshot = (): DeviceSnapshot => this.#snapshot
@@ -78,13 +78,14 @@ export class Device {
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
 
-  /** A function returning this device's snapshot: the same frozen object until something in it changes. Safe to pass without binding, as `useSyncExternalStore` wants.
-   * It carries the bank's own snapshot, so one subscription here hears every change to either.
+  /** This device's snapshot getter, already bound, as `useSyncExternalStore` wants it.
+   * It returns the same frozen object until something in the snapshot changes. The snapshot includes the bank's, so one
+   * subscription here hears every change to either.
    */
   get getSnapshot(): () => DeviceSnapshot { return this.#getSnapshot }
 
-  /** A function that subscribes a listener to this device's snapshot and returns its unsubscribe. Safe to pass without binding, as `useSyncExternalStore` wants.
-   * The listener is called with no argument after each change: read the snapshot again. What it throws is reported through {@link tellBadNews}.
+  /** Subscribe a listener to this device's snapshot, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
+   * The listener is called with no argument after each change: read the snapshot again. What it throws goes to {@link tellBadNews}.
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
@@ -113,14 +114,14 @@ export class Device {
 
   // == [Locking]: lock, cheatHoldBank
 
-  /** Lock this device's bank. Never throws. */
+  /** Lock this device's bank, if it holds one. Never throws. */
   lock(): this {
     this.#thisIsTemporaryBank?.lock()
     return this
   }
 
   // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is kept.
-  /** Hold `bank` as the bank {@link lock} locks, {@link sweep} sweeps and the snapshot shows. Internal: call it from each Bank made on this device. */
+  /** Hold `bank` as this device's bank, the one {@link lock}, {@link sweep} and the snapshot act on. Internal. */
   cheatHoldBank(bank: Bank): void {
     this.#unsubscribeBank()
     this.#thisIsTemporaryBank = bank
@@ -160,14 +161,14 @@ export class Device {
     this.#align()
   }
 
-  /** Tell the subscribers if the open gating's attempt began or ended. Internal: call it as the open gating's attempt begins and ends. */
+  /** Refresh the snapshot once the open gating's attempt begins or ends. Internal. */
   alignOpenGating(): void { this.#align() }
   // --
 
   // == [Snapshot]: align, makeSnapshot
 
   // An arrow, so it stays bound: the bank calls it as a subscriber.
-  /** Remake the snapshot, and where it changed, hold the new one and tell each subscriber. */
+  /** Remake the snapshot, and tell each subscriber if it changed. */
   readonly #align = (): void => {
     const next = this.#makeSnapshot()
     if (isEqual(next, this.#snapshot)) { return }
@@ -181,7 +182,7 @@ export class Device {
     }
   }
 
-  /** This device's snapshot as its state stands: its bank's own, and the open gating's. */
+  /** A new snapshot of this device: its bank's snapshot, and its open gating. */
   #makeSnapshot(): DeviceSnapshot {
     const gating = this.#openGating
     return Object.freeze({

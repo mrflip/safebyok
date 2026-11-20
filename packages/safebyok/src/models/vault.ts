@@ -10,8 +10,8 @@ import type { ScopeAt } from '../shapes/shapes-minder'
 import type { BoxRecord } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 
-/** One bank's boxes in this tab: the minder that caches them, and the verbs a host writes them and uses their whispers with.
- * Each write seals under the bank's lease, so it needs the bank unlocked, and lands in the minder's cache before it resolves.
+/** One bank's boxes in this tab: a minder that caches them, and the verbs to write them and use their whispers.
+ * Each write seals under the bank's lease, so it needs the bank unlocked. What it writes is cached before it resolves.
  */
 export class Vault {
   // == [Props]: #bank, #minder
@@ -45,11 +45,11 @@ export class Vault {
 
   // == [Writing boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
 
-  /** Seal and write the box at `cited`'s labelpath, with `patch` applied and `secrets` encrypted, over `cited`. Answers the box as stored.
-   * Given a labelpath, it writes over the newest revision this vault's minder has of the box, getting it when nothing is cached.
-   * One attempt: a revision other than `cited` stored there refuses `stale_write`, and the minder caches the stored one as the watch tells of it.
-   * Over a tombstone or no box, `patch` must give the sidecar; so must it over a sparse box, whether `cited` or the newest the minder caches.
-   * A refusal, misuse included, is its bad outcome. Rejects, whether or not the write was made, when the answer carries a record of another bank.
+  /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the stored box.
+   * Given a labelpath, it writes over the newest revision the minder has of the box, fetching it when none is cached.
+   * It tries once. Where another revision is stored, it refuses `stale_write`, and the minder caches that revision when the watch tells of it.
+   * Over a sparse box, a tombstone or no box, `patch` must give the sidecar.
+   * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
    * @example
    *   const { ok, val: box, err } = await vault.tryPutBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
@@ -71,9 +71,10 @@ export class Vault {
     return Outcome.valOf(await this.tryPutBoxOnce(cited, patch, secrets))
   }
 
-  /** Write the tombstone of the box at `labelpath`, over the newest revision this vault's minder has of it. Answers the tombstone as stored.
-   * Its car is then `gone`, and its labelpath stays in its parent's listing. A refusal, misuse included, is its bad outcome.
-   * Rejects, whether or not the write was made, when the answer carries a record of another bank.
+  /** Delete the box at `labelpath`, resolving an `Outcome` of its stored tombstone.
+   * It writes over the newest revision the minder has of the box, fetching it when none is cached. The box's car is then `gone`,
+   * and its labelpath stays in its parent's listing.
+   * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
     const sealed = await Outcome.outcomeOf(async () => await this.#bank.tombstoneBox(await this.#newestAt(labelpath)))
@@ -90,10 +91,10 @@ export class Vault {
 
   // == [Using whispers]: withWhisper
 
-  /** Call `fn` with the box at `labelpath` unsealed, once the bank is unlocked, and resolve what `fn` resolves.
-   * On a locked bank it first waits for the bank to be unlocked, asking the user where need be, as {@link Bank.ensureUnlocked} does, and rejects as that does.
-   * `fn` gets the box's newest revision, whole, as the minder gets it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
-   * It keeps nothing of the unsealed box, and rethrows what `fn` throws as it came: keep the whisper inside `fn`, and return only what is safe to hold.
+  /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
+   * On a locked bank, it first unlocks it with {@link Bank.ensureUnlocked}, which may ask the user, and rejects if that does.
+   * `fn` gets the box whole, as {@link ThingMinder.get} answers it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
+   * Nothing of the unsealed box is kept, and what `fn` throws is rethrown unchanged. Keep the whisper inside `fn`, and return only what is safe to hold.
    * @example
    *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))
    */
@@ -117,7 +118,7 @@ export class Vault {
     return { ...this.#bank.scope, labelpath: BoxChecks.labelpath.parse(labelpath) as BoxLabelpath }
   }
 
-  /** The newest revision the minder has of the box at `labelpath`: cached, or else got. */
+  /** The newest revision the minder has of the box at `labelpath`: the cached one, or else fetched. */
   async #newestAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
     const scope = this.#scopeAt(labelpath)
     const car   = this.#minder.at(scope) ?? await this.#minder.get(scope)

@@ -43,7 +43,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** Why a sweep disabled the bank, or null until then. */
   #endCause: Errors.VaultError | null = null
 
-  /** The snapshot held, which {@link getSnapshot} returns until something in it changes. */
+  /** The current snapshot, which {@link getSnapshot} returns. */
   #snapshot: BankSnapshot
   readonly #subscribers = new Set<() => void>()
   readonly #getSnapshot = (): BankSnapshot => this.#snapshot
@@ -84,11 +84,11 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** The defaults this bank's minders set on their TanStack Query cache entries. */
   get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
 
-  /** A function returning this bank's snapshot: the same frozen object until something in it changes. Safe to pass without binding, as `useSyncExternalStore` wants. */
+  /** This bank's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes. */
   get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
 
-  /** A function that subscribes a listener to this bank's snapshot and returns its unsubscribe. Safe to pass without binding, as `useSyncExternalStore` wants.
-   * The listener is called with no argument after each change: read the snapshot again. What it throws is reported through {@link tellBadNews}.
+  /** Subscribe a listener to this bank's snapshot, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
+   * The listener is called with no argument after each change: read the snapshot again. What it throws goes to {@link tellBadNews}.
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
@@ -237,8 +237,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Resolve at once if this bank is unlocked, and otherwise ask the user to unlock it, as {@link launchUnlockBankPrompt} does.
-   * A gate change open on this bank is waited out first: if it leaves the bank unlocked, this resolves without asking.
+  /** Unlock this bank by asking the user, unless it is already unlocked.
+   * A gate change open on this bank is waited for first, and the user is asked only if it leaves the bank locked.
    */
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
@@ -259,9 +259,10 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // that every prompt waiting on that gating resumes once it lands. With none open, it makes its change directly. An unlock waits out a
   // gating of another kind first, as its prompt does. Each try form answers an outcome; its twin throws the refusal instead.
 
-  /** Unlock this bank with the passphrase or the passkey in `cleartexts`, answering the `unlock_bank` gating open on it, if any. Resolves an outcome instead of throwing.
-   * A correctable refusal, such as `wrong_passphrase`, leaves that gating open for another attempt. A passkey answer's PRF bytes are zeroed once handed in, except after a refusal that leaves a gating open.
-   * While a gating of another kind is open on this bank, it waits for that one to end, however it ends, and resolves without using `cleartexts` if the bank is then unlocked.
+  /** Unlock this bank with the passphrase or passkey in `cleartexts`, resolving an `Outcome` instead of throwing.
+   * It answers the `unlock_bank` gating open on this bank, if any. A correctable refusal, such as `wrong_passphrase`, leaves that gating open for another attempt.
+   * A passkey answer's PRF bytes are zeroed once used, unless a refusal leaves a gating open.
+   * A gating of another kind open on this bank is waited for first. If it leaves the bank unlocked, this resolves without using `cleartexts`.
    */
   async tryAttemptUnlock(cleartexts: CleartextsForGatingkind['unlock_bank']): Promise<Outcome.Outcome<Bank>> {
     const open = this.#device.openGating
@@ -279,8 +280,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return Outcome.valOf(await this.tryAttemptUnlock(cleartexts))
   }
 
-  /** Replace the passphrase with the next one in `cleartexts`, proved by the current one beside it, answering the `replace_passphrase` gating open on this bank, if any.
-   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands.
+  /** Replace the passphrase with the new one in `cleartexts`, proved by the current one, resolving an `Outcome` instead of throwing.
+   * It answers the `replace_passphrase` gating open on this bank, if any. On success the bank is left unlocked.
    */
   tryAttemptReplacePassphrase(cleartexts: CleartextsForGatingkind['replace_passphrase']): Promise<Outcome.Outcome<Bank>> {
     return this.#handIn('replace_passphrase', cleartexts, (cleartexts) => this.#replacePassphraseWith(cleartexts))
@@ -291,8 +292,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return Outcome.valOf(await this.tryAttemptReplacePassphrase(cleartexts))
   }
 
-  /** Add the passkey in `cleartexts`, proved by the passphrase beside it, answering the `add_passkey` gating open on this bank, if any.
-   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands. With no gating open, a gate that has a passkey refuses.
+  /** Add the passkey in `cleartexts`, proved by the passphrase, resolving an `Outcome` instead of throwing.
+   * It answers the `add_passkey` gating open on this bank, if any. On success the bank is left unlocked. With no gating open,
+   * a gate that already has a passkey refuses.
    */
   tryAttemptAddPasskey(cleartexts: CleartextsForGatingkind['add_passkey']): Promise<Outcome.Outcome<Bank>> {
     return this.#handIn('add_passkey', cleartexts, (cleartexts) => {
@@ -306,8 +308,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return Outcome.valOf(await this.tryAttemptAddPasskey(cleartexts))
   }
 
-  /** Revoke the passkey, proved by the passphrase in `cleartexts`, answering the `revoke_passkey` gating open on this bank, if any.
-   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands. With no gating open and no passkey, it resolves at once and changes nothing, as {@link launchRevokePasskeyPrompt} does.
+  /** Revoke the passkey, proved by the passphrase in `cleartexts`, resolving an `Outcome` instead of throwing.
+   * It answers the `revoke_passkey` gating open on this bank, if any. On success the bank is left unlocked. With no gating
+   * open and no passkey, it resolves at once and changes nothing.
    */
   tryAttemptRevokePasskey(cleartexts: CleartextsForGatingkind['revoke_passkey']): Promise<Outcome.Outcome<Bank>> {
     return this.#handIn('revoke_passkey', cleartexts, async (cleartexts) => (this.#maingate.passkey0 === null ? this : this.#revokePasskeyWith(cleartexts)))
@@ -426,7 +429,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Disable this bank for good, and sweep its lease. Never throws.
-   * On a swept device, the bank's refusal is the device's.
+   * On a swept device, its `endCause` is the device's.
    */
   sweep(): this {
     if (this.#endCause !== null) { return this }
@@ -440,7 +443,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Snapshot]: align, makeSnapshot
 
-  /** Remake the snapshot, and where it changed, hold the new one and tell each subscriber. */
+  /** Remake the snapshot, and tell each subscriber if it changed. */
   #align(): void {
     const next = this.#makeSnapshot()
     if (isEqual(next, this.#snapshot)) { return }
@@ -454,7 +457,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     }
   }
 
-  /** This bank's snapshot as its state stands. */
+  /** A new snapshot of this bank. */
   #makeSnapshot(): BankSnapshot {
     // A sweep is the one way a bank ends, so an ended bank's stage is 'swept'.
     const { endCause } = this
@@ -475,10 +478,13 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Boxes]: sealBox, tombstoneBox, unsealBox
 
-  /** Seal the next revision of the box `donorProps`, with `publicProps` applied and the whisper of `secretProps` encrypted, and return the ask that writes it over `donorProps`. Needs the bank unlocked.
-   * The seal checks its arguments (an unknown key in `publicProps` or `secretProps` refuses) and the box it seals, so pass `donorProps` as you have it: whole or sparse, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
-   * A live box's revision keeps its sidecar unless `publicProps` gives one. After a tombstone or the shell, the revision begins the box's next life, and `publicProps` must give its sidecar.
-   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead ({@link tombstoneBox}), returns the del ask, and refuses `secretProps` or any sidecar but `{}`.
+  /** Seal the next revision of the box `donorProps`, and return the ask that writes it over `donorProps`. Needs the bank unlocked.
+   * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
+   * Pass `donorProps` as you have it: whole or sparse, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
+   * A whole live box's revision keeps its sidecar unless `publicProps` gives one. Over a sparse box, a tombstone or the shell,
+   * `publicProps` must give the sidecar. After a tombstone or the shell, the revision begins the box's next life.
+   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead ({@link tombstoneBox}), returns a del
+   * ask, and refuses `secretProps` or any sidecar but `{}`.
    * Its `written_at` is `publicProps.written_at`, or now. The ask cites `donorProps` sparse, and carries nothing of its whisper.
    * @example
    *   const { record } = await bank.sealBox(box, { sidecar: { account: 'work' } }, { whisper })
