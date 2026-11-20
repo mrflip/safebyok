@@ -253,7 +253,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Revoke the passkey, proved by the passphrase in `cleartexts`, answering the `revoke_passkey` gating open on this bank, if any.
-   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands. With no gating open and no passkey, it resolves at once, as {@link launchRevokePasskeyPrompt} does.
+   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands. With no gating open and no passkey, it resolves at once and changes nothing, as {@link launchRevokePasskeyPrompt} does.
    */
   attemptRevokePasskey(cleartexts: CleartextsForGatingkind['revoke_passkey']): Promise<Outcome.Outcome<Bank>> {
     return this.#handIn('revoke_passkey', cleartexts, async (cleartexts) => (this.#maingate.passkey0 === null ? this : this.#revokePasskeyWith(cleartexts)))

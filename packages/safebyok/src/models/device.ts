@@ -86,7 +86,7 @@ export class Device {
 
   // == [Locking]: lock, cheatHoldBank
 
-  /** Lock every bank on this device. Never throws. */
+  /** Lock this device's bank. Never throws. */
   lock(): this {
     this.#thisIsTemporaryBank?.lock()
     return this
