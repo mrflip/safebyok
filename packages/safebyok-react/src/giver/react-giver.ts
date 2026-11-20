@@ -96,7 +96,8 @@ export type StrengthVerdictResult = Readonly<{
 
 /** What a giver's `forBank` returns.
  * Each form mutation is handed a {@link Cloak}, and vacates it once it settles: an `onSettled` of your own in its options
- * replaces that, so vacate the cloak there too. Retry no `condition` refusal: it is the user's to correct.
+ * replaces that, so vacate the cloak there too, and one in your QueryClient's mutation defaults does not run for it.
+ * Retry no `condition` refusal: it is the user's to correct.
  */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
