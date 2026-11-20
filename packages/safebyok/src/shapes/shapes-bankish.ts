@@ -135,7 +135,7 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** What a device reports as its bank before it holds a bank object: signed in, and the bank not yet started. */
+/** The bank snapshot a device reports before it holds a bank object: signed in, and the bank not yet started. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
 })
