@@ -256,12 +256,20 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Re-entry points]: attemptUnlock, attemptReplacePassphrase, attemptAddPasskey, attemptRevokePasskey, handIn
   // Each hands the user's cleartexts to the gating of its kind open on this bank, as a form does with what the user typed, so
-  // that every prompt waiting on that gating resumes once it lands. With none open, it makes its change directly.
+  // that every prompt waiting on that gating resumes once it lands. With none open, it makes its change directly. An unlock waits out a
+  // gating of another kind first, as its prompt does.
 
   /** Unlock this bank with the passphrase or the passkey in `cleartexts`, answering the `unlock_bank` gating open on it, if any. Resolves an outcome instead of throwing.
    * A correctable refusal, such as `wrong_passphrase`, leaves that gating open for another attempt. A passkey answer's PRF bytes are zeroed once handed in, except after a refusal that leaves a gating open.
+   * While a gating of another kind is open on this bank, it waits for that one to end, however it ends, and resolves without using `cleartexts` if the bank is then unlocked.
    */
-  attemptUnlock(cleartexts: CleartextsForGatingkind['unlock_bank']): Promise<Outcome.Outcome<Bank>> {
+  async attemptUnlock(cleartexts: CleartextsForGatingkind['unlock_bank']): Promise<Outcome.Outcome<Bank>> {
+    const open = this.#device.openGating
+    if ((open?.bank === this) && (open.gatingkind !== 'unlock_bank')) {
+      // Its outcome is not the unlock's: whenConcluded resolves a refusal as an outcome, and the bank is checked afresh.
+      await open.whenConcluded
+      if (this.isUnlocked) { return attemptWithoutGating(this, cleartexts, () => Promise.resolve(this)) }
+    }
     return this.#handIn('unlock_bank', cleartexts, (cleartexts) => this.#unlockBankWith(cleartexts))
   }
 

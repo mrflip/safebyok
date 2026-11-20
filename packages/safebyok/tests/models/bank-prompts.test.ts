@@ -597,6 +597,80 @@ describe("bank.attemptUnlock(cleartexts)", () => {
     })
   }
 
+  it("waits for a gate change open on the bank to land, then resolves without using its cleartexts, zeroing a passkey answer's bytes", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const replacing = bank.launchReplacePassphrasePrompt()
+    const gating = device.openGating!
+    // The bank has no passkey: used, this answer would be refused.
+    const passkeyClear = TH.passkeyAnswerOf()
+    const attempting = bank.attemptUnlock({ passkeyClear })
+    const settled = settledFlag(attempting)
+    await TH.wakeupAtNextTick()
+    expect(settled.isSettled).to.be.false
+    expect(device.openGating).to.equal(gating)
+    await TH.expectGood(bank.attemptReplacePassphrase({ antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase }))
+    expect(await TH.expectGood(attempting)).to.equal(bank)
+    expect(await replacing).to.equal(bank)
+    expect([...passkeyClear.prfBytes].every((byte) => byte === 0)).to.be.true
+    expect(bank.isUnlocked).to.be.true
+    expect(device.openGating).to.be.null
+  })
+
+  it("waits out a dismissed gate change, then unlocks directly, opening no gating", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
+    const gating = device.openGating!
+    const attempting = bank.attemptUnlock({ passphraseClear: TH.TestPassphrase })
+    gating.dismiss()
+    await replacing
+    expect(await TH.expectGood(attempting)).to.equal(bank)
+    expect(bank.isUnlocked).to.be.true
+    expect(device.openGating).to.be.null
+  })
+
+  it("waits out a dismissed gate change, then refuses a wrong passphrase directly, the bank locked", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
+    const attempting = bank.attemptUnlock({ passphraseClear: 'not the passphrase' })
+    device.openGating!.dismiss()
+    await replacing
+    await TH.expectBad(attempting, 'wrong_passphrase')
+    expect(bank.isLocked).to.be.true
+    expect(device.openGating).to.be.null
+  })
+
+  it("answers the unlock gating a prompt that waited out the same gate change opens, and the prompt resumes", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
+    const gating = device.openGating!
+    const ensuring = bank.ensureUnlocked()
+    const attempting = bank.attemptUnlock({ passphraseClear: TH.TestPassphrase })
+    gating.dismiss()
+    await replacing
+    expect(await TH.expectGood(attempting)).to.equal(bank)
+    expect(await ensuring).to.equal(bank)
+    expect(bank.isUnlocked).to.be.true
+    expect(device.openGating).to.be.null
+  })
+
+  it("resolves 'disabled' when the device is swept while it waits out a gate change, deriving no key", async () => {
+    const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }) })
+    bank.lock()
+    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
+    deriveKeyBytes.mockClear()
+    const attempting = bank.attemptUnlock({ passphraseClear: TH.TestPassphrase })
+    device.sweep()
+    await replacing
+    await TH.expectBad(attempting, 'disabled')
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+    expect(device.openGating).to.be.null
+  })
+
   it("resolves a refusal quoting nothing of what a throwing getter threw", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
