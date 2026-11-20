@@ -157,7 +157,9 @@ device.lock()                                         bank.lock(): drops the lea
 **Open (U2):** the front-facing interface for gatings, to be settled from the design side and back from what the
 calls need, once the simple case (a passphrase unlock) works end to end. Still open: a dispatch tag for menus drawn
 from data (`launch(kind)`, waiting on the simple case), and whether the host's `requestCleartext` callback (the
-Device's `askUser`) and the public `launch…Prompt` verbs stay. Recommended: retire the callback.
+Device's `askUser`) and the public `launch…Prompt` verbs stay. ~~Recommended: retire the callback.~~ *The Coach
+(2026-11-20): "Put it back how it was I forgot about the table thing":* the callback and the `launch…Prompt` verbs
+stay as they stand; nothing is retired. The dispatch tag waits on the simple case.
 
 *Done when:* two `withWhisper` calls on a locked bank open one gating and both resume after one `device.unlock`; a
 `device.unlock` citing an old `gatingseq` or another userid refuses without attempting; `device.dismiss` rejects
@@ -338,6 +340,6 @@ each, and a get under way refusing with the new kind.
 |---|---|---|
 | W1 | The orchestrating put, and how a host runs it (a `useMutation`, the host's or the Vault's) | Later, its own discussion |
 | W2 | A rename while locked needs an unlock and the whisper | Accept for now |
-| U2 | The front-facing interface for gatings, after the simple case | Retire the `requestCleartext` callback; a dispatch tag waits on the simple case |
+| U2 | The front-facing interface for gatings, after the simple case | Ruled: keep the `requestCleartext` callback and the `launch…Prompt` verbs; a dispatch tag waits on the simple case |
 | Wh1 | `withWhisper` on a box not stored, or deleted | Refuse `absent_box` |
 | D1 | How a draft reads the whisper's fields | A `whisperOf()` callback the React part supplies |
