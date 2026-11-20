@@ -15,7 +15,7 @@ import * as Throwers from '../refusals/throwers'
  * The gating keeps no cleartext between attempts.
  */
 export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, gatingTok, userid, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isLaunched, #isAttempting, #isLastAttempt
+  // == [Props]: gatingkind, gatingTok, userid, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isLaunched, #isAttempting, #isLastAttempt, #lastRefusal
 
   declare readonly gatingkind:    KindT
   /** A random token unique to this gating. Key the dialog on it: the next gating's form then starts empty. */
@@ -38,12 +38,19 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   #isLaunched    = false
   #isAttempting  = false
   #isLastAttempt = false
+  #lastRefusal:  Errors.VaultError | null = null
   // --
 
-  // == [Getters]: isOpen, whenConcluded, scope, toJSON
+  // == [Getters]: isOpen, isAttempting, lastRefusal, whenConcluded, scope, toJSON
 
   /** True until this gating concludes. */
   get isOpen(): boolean { return this.#outcome === null }
+
+  /** True while an attempt is under way. */
+  get isAttempting(): boolean { return this.#isAttempting }
+
+  /** The refusal the last attempt to finish met, or null before any was refused. A refusal at the door, such as `attempt_in_flight`, is not kept. */
+  get lastRefusal(): Errors.VaultError | null { return this.#lastRefusal }
 
   /** Resolves with the outcome once this gating concludes, and never rejects.
    * Close the dialog when it resolves.
@@ -114,6 +121,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
       return Promise.resolve(Outcome.bad(refusal))
     }
     this.#isAttempting = true
+    this.#device.alignOpenGating()
     return this.#attemptOnce(cleartexts)
   }
 
@@ -128,11 +136,13 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   async #attemptOnce(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome.Outcome<Bank>> {
     const outcome = await Outcome.outcomeOf(() => this.#attempt(cleartexts))
     this.#isAttempting = false
+    if (! outcome.ok) { this.#lastRefusal = outcome.err }
     // A correctable refusal, short of the last attempt, leaves the cleartexts unspent for the next.
     if (outcome.ok || (! isCorrectable(outcome.err)) || this.#isLastAttempt) {
       spendCleartexts(cleartexts)
       this.#concludeOnce(outcome)
     }
+    this.#device.alignOpenGating()
     return outcome
   }
   // --

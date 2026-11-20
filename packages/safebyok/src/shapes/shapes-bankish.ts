@@ -6,13 +6,13 @@ import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { Proving } from '../models/proving'
 import type { VaultDB } from '../storage/vault-db'
-import type { GateDna, RequestCleartext, StrengthChecker } from './shapes-gateish'
+import type { GateDna, Gatingkind, RequestCleartext, StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealers'
 import type { BankStamp } from './shapes-stamps'
 import type { BoxRecord } from './shapes-thing'
 import type { BoxWriteAsk, GetAsk, ListAsk, WorldRecord } from './shapes-asks'
-import type { Labelpath } from './primitives'
+import type { EpochMillis, Labelpath } from './primitives'
 
 // == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed
 
@@ -94,5 +94,63 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
+}
+// --
+
+// == [Snapshots]: BankStage, BankEndCause, RefusalSnapshot, BankSnapshot, OpenGatingSnapshot, DeviceSnapshot
+
+/** Where the user stands with their bank, as a host's screen switches on it:
+ * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
+ * - `'starting'`   -- signed in, and the bank is being brought up
+ * - `'unborn'`     -- no bank is stored for this user, or it was deleted
+ * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
+ * - `'unlocked'`   -- the bank holds a lease, and whispers can be read and written
+ * - `'swept'`      -- everything was unloaded, and nothing follows until the host acts
+ * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
+ */
+export type BankStage = 'signed_out' | 'starting' | 'unborn' | 'locked' | 'unlocked' | 'swept' | 'failed'
+
+/** How a bank ended, for the message a host shows: swept, vacated, signed out of, or deleted. */
+export type BankEndCause = 'sweep' | 'vacate' | 'signout' | 'delete'
+
+/** A refusal as a snapshot shows it: its kind, its family and its message, which carry no secret material. */
+export interface RefusalSnapshot {
+  readonly refusalkind: Errors.Refusalkind
+  readonly family:      Errors.RefusalFamily
+  readonly message:     string
+}
+
+/** A bank as a host renders it: where the user stands, and when its lease ends. */
+export interface BankSnapshot {
+  readonly stage:       BankStage
+  /** True at every stage but `'unlocked'`. */
+  readonly isLocked:    boolean
+  /** True once the bank has ended: it refuses every call, and its stage says where the user now stands. */
+  readonly isEnded:     boolean
+  /** How the bank ended, or null while it has not. */
+  readonly endCause:    BankEndCause | null
+  /** When the lease ends, in epoch milliseconds, or null while locked. */
+  readonly leaseEndsAt: EpochMillis | null
+  /** Why the bank failed to come up, at stage `'failed'`; null at every other. */
+  readonly lastErr:     RefusalSnapshot | null
+}
+
+/** The gating open on a device, as a host's dialog renders it. */
+export interface OpenGatingSnapshot {
+  readonly gatingkind:   Gatingkind
+  /** Names this gating among those the device has opened: it grows with each one opened, and again as each ends. */
+  readonly gatingseq:    number
+  /** True while an attempt is under way. */
+  readonly isAttempting: boolean
+  /** The last refusal an attempt met, for the dialog to show, or null before any. */
+  readonly lastRefusal:  RefusalSnapshot | null
+}
+
+/** A device as a host renders it: its bank's snapshot, and the gating open on it. */
+export interface DeviceSnapshot {
+  /** The snapshot of the bank on this device, or null before one is made. */
+  readonly bank:   BankSnapshot | null
+  /** The gating open on this device, or null for none. */
+  readonly gating: OpenGatingSnapshot | null
 }
 // --
