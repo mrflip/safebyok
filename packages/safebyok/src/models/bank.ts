@@ -417,7 +417,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** This bank's snapshot as its state stands. */
   #makeSnapshot(): BankSnapshot {
-    // A sweep is the only ending built: vacate, sign-out and delete come with startup.
+    // A sweep is the one way a bank ends, so an ended bank's cause is 'sweep'.
     const isEnded = ! this.isEnabled
     const lease   = isEnded ? null : this.#lease
     let stage: BankStage = lease === null ? 'locked' : 'unlocked'
