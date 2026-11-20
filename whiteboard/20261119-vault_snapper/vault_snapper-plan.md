@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 to 8 filed, in one line: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 -> #774 -> #775 (justify green at the tip; #771's changeset check clears on its next push); thread 9 building on #775.
+* **Status:** threads 1 to 8 filed, in one line: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 -> #774 -> #775 (#771's changeset check clears on its next push); thread 9 ready (#776), in review; thread 10 (from the Coach's ruling) building on it.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -305,11 +305,23 @@ sign-in loosening changes no working-case answer within a Device's life.
 reads the Device's snapshot and, in a form action, calls `bank.attemptUnlock` with the passphrase from `FormData`;
 the mutation resumes with the whisper. A second submission while the dialog is open joins it. The test asserts the
 passphrase is never in React state or a snapshot. Any wiring the core lacks is one explicit `cheat…` method. *Depends
-on:* threads 7 and 8, restacked into one line. *Size:* M. *Status:* building, branch `20261120-knock_knock`, cut from 26ba2bb99. *Orchestrator:* from thread 8 (#775): use `Giver.useGating()`,
+on:* threads 7 and 8, restacked into one line. *Size:* M. *Status:* ready, #776 (one compaction); in review, `medium` on `opus`. *Orchestrator:* from thread 8 (#775): use `Giver.useGating()`,
 `Giver.forBank(label).useBankSnapshot()` and `useBoxRecord(labelpath)`; the real Device has no `ensureBank` or
 `onBankStart`, so the giver's bank wiring needs them on the Device or a wrapper (`minderDeviceOf` in
 `tests/test-helpers/minder-giver-world.ts` shows the shape): the one cheat goes there. The test brings its own
 `QueryClientProvider`. From thread 7: `bank.attemptUnlock` waits out another kind of gating, then checks.
+
+### 10. whisper_refresh
+
+> "Start a background refresh before ensure unlock / Have the background refresh accept a flag silence errors that
+> quashes all but unexpected errors" (the Coach, 2026-11-20, on the matter "withWhisper asks for the passphrase before
+> it knows the box is absent")
+
+*Gloss.* `vault.withWhisper` starts a refresh of the box (a get through the minder) in the background before it awaits
+`bank.ensureUnlocked()`; the refresh takes a `silenceErrors` flag that quashes every refusal but `unexpected_error`,
+which goes to bad news, leaving no unhandled rejection. The prompt order is unchanged; the gain is a fresh car and one
+less round trip. *Touches:* `models/vault.ts`, maybe `minding/thing-minder.ts`, their tests. *Depends on:* thread 9
+(stacked on the line's tip). *Size:* S. *Status:* building, branch `20261120-whisper_refresh`, cut from 61224de5a.
 
 ## Order
 
