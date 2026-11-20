@@ -239,7 +239,7 @@ describe("bank.lock() and bank.sweep()", () => {
   })
 })
 
-/** Subscribe a counter to `bank`'s snapshot, read as `calls`. */
+/** A counter, read as `calls`, of the times a listener handed to `subscribe` is called. */
 function countCalls(subscribe: (listener: () => void) => unknown): { readonly calls: number } {
   const counter = { calls: 0 }
   subscribe(() => { counter.calls += 1 })

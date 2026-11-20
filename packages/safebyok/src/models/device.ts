@@ -118,7 +118,7 @@ export class Device {
   }
 
   // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is kept.
-  /** Hold `bank` as the bank {@link lock} locks, {@link sweep} sweeps and the snapshot shows. Internal: only the Bank's constructor calls it. */
+  /** Hold `bank` as the bank {@link lock} locks, {@link sweep} sweeps and the snapshot shows. Internal: call it from each Bank made on this device. */
   cheatHoldBank(bank: Bank): void {
     this.#unsubscribeBank()
     this.#thisIsTemporaryBank = bank
@@ -158,7 +158,7 @@ export class Device {
     this.#align()
   }
 
-  /** Tell the subscribers if the open gating's attempt or refusal changed. Internal: the open gating calls it as an attempt begins and ends. */
+  /** Tell the subscribers if the open gating's attempt or refusal changed. Internal: call it as the open gating's attempt begins and ends. */
   alignOpenGating(): void { this.#align() }
   // --
 

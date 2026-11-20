@@ -49,7 +49,7 @@ export class Gating<KindT extends Gatingkind = Gatingkind> {
   /** True while an attempt is under way. */
   get isAttempting(): boolean { return this.#isAttempting }
 
-  /** The refusal the last attempt to finish met, or null before any was refused. A refusal at the door, such as `attempt_in_flight`, is not kept. */
+  /** The refusal the last attempt to finish met, or null before any was refused. A refusal met before an attempt starts is not kept. */
   get lastRefusal(): Errors.VaultError | null { return this.#lastRefusal }
 
   /** Resolves with the outcome once this gating concludes, and never rejects.
