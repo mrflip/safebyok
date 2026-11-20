@@ -5,6 +5,7 @@ import { type BoxCar, type BoxLabelpath, Checkers, Labelpath, ThingFormat, Thing
 import type { GiverBank, GiverEvent } from './shapes-giver'
 
 // == [Checks]: Checks
+
 const Checks = Checkers('bad_record', ({ custom }) => ({
   minder:       custom<ThingMinder>((val) => val instanceof ThingMinder, 'Expected a ThingMinder'),
   boxLabelpath: custom<BoxLabelpath>((val) => (typeof val === 'string') && Labelpath.isBox(val), 'Expected the labelpath of a box'),
