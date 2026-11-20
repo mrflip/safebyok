@@ -88,7 +88,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
 
   /** A function that subscribes a listener to this bank's snapshot and returns its unsubscribe. Safe to pass without binding, as `useSyncExternalStore` wants.
-   * The listener is called with no argument after each change: read the snapshot again. What it throws goes to the device's `onBadNews`.
+   * The listener is called with no argument after each change: read the snapshot again. What it throws is reported through {@link tellBadNews}.
    */
   get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
   // --
