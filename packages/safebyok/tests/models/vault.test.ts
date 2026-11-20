@@ -29,6 +29,16 @@ async function unsealedAt(vault: Vault): Promise<BoxUnsealed> {
   return vault.bank.unsealBox(car.newest as BoxRecord)
 }
 
+/** What `promise` rejects with. */
+async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
+  try {
+    await promise
+  } catch (err) {
+    return err
+  }
+  throw new Error('it resolved')
+}
+
 /** The design's put flow: get the box or its shell, add one to its count of apicalls, seal and put it over what it got. */
 async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
   const { newest } = await vault.minder.get(scopeAt(vault.bank, Openai))
@@ -204,6 +214,117 @@ describe("vault.delBoxOnce(labelpath)", () => {
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await vault.delBoxOnce(Openai)
     await TH.expectRefusal(vault.delBoxOnce(Openai), 'bad_record')
+  })
+})
+
+describe("vault.withWhisper(labelpath, fn)", () => {
+  it("calls fn with the box unsealed, and resolves what fn resolves", async () => {
+    // withWhisper @example
+    const { vault } = await TH.buildBornVault()
+    const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const fn = vi.fn(({ whisper }: BoxUnsealed) => Promise.resolve(`asked with ${String(whisper['apiKey'])}`))
+    expect(await vault.withWhisper(Openai, fn)).to.equal('asked with sk-test-0000')
+    expect(fn).toHaveBeenCalledTimes(1)
+    expect(fn.mock.calls[0]![0]).to.deep.include({ labelpath: Openai, revtok: box.revtok, whisper: TH.Whisper, sidecar: TH.Sidecar })
+  })
+
+  it("resolves what a synchronous fn returns", async () => {
+    const { vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(await vault.withWhisper(Openai, ({ sidecar }) => sidecar)).to.deep.equal(TH.Sidecar)
+  })
+
+  it("unseals the newest revision stored, where the minder holds it only sparse", async () => {
+    const { bank, vault, minder } = await TH.buildBornVault()
+    const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const { record: stored } = await bank.sealBox(first, {}, { whisper: { apiKey: 'sk-test-1111' } })
+    rowsOf(bank).set(Openai, stored)
+    await minder.list('box')
+    expect(minder.at(scopeAt(bank, Openai))?.liveness).to.equal('behind')
+    expect(await vault.withWhisper(Openai, ({ whisper, revtok }) => ({ whisper, revtok }))).to.deep.equal({ whisper: { apiKey: 'sk-test-1111' }, revtok: stored.revtok })
+  })
+
+  it("on a locked bank, asks the user to unlock it, and calls fn once the unlock lands", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const fn = vi.fn(({ whisper }: BoxUnsealed) => String(whisper['apiKey']))
+    const using = vault.withWhisper(Openai, fn)
+    expect(device.openGating).to.include({ gatingkind: 'unlock_bank', bank })
+    expect(fn).not.toHaveBeenCalled()
+    await TH.answerPrompt(device, using, { passphraseClear: TH.TestPassphrase })
+    expect(await using).to.equal('sk-test-0000')
+    expect(bank.isUnlocked).to.be.true
+  })
+
+  it("opens one gating for two calls on a locked bank, and both resume after one unlock", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const firstUsing  = vault.withWhisper(Openai, ({ revseq }) => revseq)
+    const gating = device.openGating!
+    const secondUsing = vault.withWhisper(Openai, ({ revseq }) => revseq + 1)
+    expect(device.openGating).to.equal(gating)
+    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    expect(await Promise.all([firstUsing, secondUsing])).to.deep.equal([0, 1])
+  })
+
+  it("rejects as the unlock does when the user dismisses it, never calling fn", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const fn = vi.fn()
+    const using = TH.expectRefusal(vault.withWhisper(Openai, fn), 'dismissed')
+    device.openGating!.dismiss()
+    await using
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("refuses once the device is swept, never calling fn", async () => {
+    const { device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    device.sweep()
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withWhisper(Openai, fn), 'disabled')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("refuses 'absent_box' for a box never stored, and for one deleted, never calling fn", async () => {
+    const { vault } = await TH.buildBornVault()
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withWhisper(Openai, fn), 'absent_box')
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    await vault.delBoxOnce(Openai)
+    await TH.expectRefusal(vault.withWhisper(Openai, fn), 'absent_box')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("rethrows what fn throws, as it came", async () => {
+    const { vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const thrown = new Error('the host could not reach the model')
+    expect(await rejectionOf(vault.withWhisper(Openai, () => { throw thrown }))).to.equal(thrown)
+    expect(await rejectionOf(vault.withWhisper(Openai, () => Promise.reject(thrown)))).to.equal(thrown)
+  })
+
+  it("leaves no trace of the whisper in the minder's cache or a snapshot", async () => {
+    const { bank, device, vault, minder } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const using = vault.withWhisper(Openai, () => 'done')
+    await TH.answerPrompt(device, using, { passphraseClear: TH.TestPassphrase })
+    expect(await using).to.equal('done')
+    const traces = JSON.stringify([minder.at(scopeAt(bank, Openai)), minder.listingAt(scopeAt(bank, 'box')), bank.getSnapshot(), device.getSnapshot()])
+    expect(traces).to.include(Openai).and.not.include('sk-test-0000')
+  })
+
+  it("refuses an fn that is not a function, or a labelpath that is not a box's, opening no gating", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    bank.lock()
+    await TH.expectRefusal(vault.withWhisper(Openai, undefined as never), 'bad_record')
+    await TH.expectRefusal(vault.withWhisper(Openai, 'apiKey' as never), 'bad_record')
+    await TH.expectRefusal(vault.withWhisper('gate' as never, () => undefined), 'bad_record')
+    expect(device.openGating).to.be.null
   })
 })
 

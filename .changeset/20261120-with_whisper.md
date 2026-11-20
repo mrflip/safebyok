@@ -1,0 +1,4 @@
+---
+---
+
+Empty: the new `safebyok` is private, and `safebyok-big` is untouched. What a caller of the new core will see: **`vault.withWhisper(labelpath, fn)`** calls `fn` with the box at `labelpath` unsealed (its whisper, sidecar and record fields) and resolves what `fn` resolves. On a locked bank it first asks the user to unlock it, as `bank.ensureUnlocked()` does, and rejects as that does (`dismissed`, say). It unseals the box's newest revision as the vault's minder gets it, and refuses `absent_box` where no box is stored, or it was deleted. It keeps nothing of the unsealed box, and rethrows what `fn` throws as it came. **`vault.putBoxOnce(labelpath, patch, secrets)`** now gets the box whole when its minder holds it only sparse (known from a list, say), so it keeps the stored sidecar where it refused `bad_record` for want of one; a sparse box passed as `cited` still needs the sidecar in `patch`. **Stored format:** unchanged.

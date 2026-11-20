@@ -1,15 +1,16 @@
-import { Validator } from 'safebyok-big/internals'
+import { type Helpers, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { ThingMinder } from '../minding/thing-minder'
 import * as Phrases from '../phrases'
-import type { SealedBoxAsk } from '../shapes/shapes-bankish'
+import * as Throwers from '../refusals/throwers'
+import type { BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import type { BoxLabelpath } from '../shapes/primitives'
 import type { ScopeAt } from '../shapes/shapes-minder'
 import type { BoxRecord } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 
-/** One bank's boxes in this tab: the minder that caches them, and the verbs a host writes them with.
+/** One bank's boxes in this tab: the minder that caches them, and the verbs a host writes them and uses their whispers with.
  * Each write seals under the bank's lease, so it needs the bank unlocked, and lands in the minder's cache before it resolves.
  */
 export class Vault {
@@ -64,6 +65,26 @@ export class Vault {
   }
   // --
 
+  // == [Using whispers]: withWhisper
+
+  /** Call `fn` with the box at `labelpath` unsealed, once the bank is unlocked, and resolve what `fn` resolves.
+   * On a locked bank it first asks the user to unlock it, and rejects as {@link Bank.ensureUnlocked} does.
+   * `fn` gets the box's newest revision, whole, as the minder gets it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
+   * It keeps nothing of the unsealed box, and rethrows what `fn` throws as it came: keep the whisper inside `fn`, and return only what is safe to hold.
+   * @example
+   *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))
+   */
+  async withWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
+    const scope = this.#scopeAt(labelpath)
+    Checks.fn.parse(fn)
+    await this.#bank.ensureUnlocked()
+    const car = await this.#minder.get(scope)
+    if ((car.liveness === 'gone') || (car.liveness === 'void')) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
+    // A get leaves the car full, unless a sparse record landed while it waited: the unseal then refuses the sparse one.
+    return await fn(await this.#bank.unsealBox(car.newest as BoxRecord))
+  }
+  // --
+
   // == [Helpers]: #scopeAt, #newestAt, #writeOnce
 
   /** The scope of the box at `labelpath`, in this vault's bank. */
@@ -92,8 +113,9 @@ export class Vault {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Vault.make}'s argument. */
-const Checks = Validator.Checkers('bad_record', ({ custom }) => ({
+/** The checks of {@link Vault.make}'s argument, and of {@link Vault.withWhisper}'s `fn`. */
+const Checks = Validator.Checkers('bad_record', ({ custom, fn }) => ({
   bank: custom<Bank>((val) => val instanceof Bank, Phrases.VaultBankExpected),
+  fn:   fn<(box: BoxUnsealed) => unknown>(),
 }))
 // --
