@@ -97,9 +97,11 @@ export interface DeviceOpts {
 }
 // --
 
-// == [Snapshots]: BankStage, BankEndCause, RefusalSnapshot, BankSnapshot, OpenGatingSnapshot, DeviceSnapshot
+// == [Snapshots]: bankStageVals, BankStage, bankEndCauseVals, BankEndCause, RefusalSnapshot, BankSnapshot, OpenGatingSnapshot, DeviceSnapshot
 
-/** Where the user stands with their bank, as a host's screen switches on it:
+/** The stages of a bank, as {@link BankStage} describes each. */
+export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
+/** Where the user stands with their bank, one of {@link bankStageVals}, as a host's screen switches on it:
  * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
  * - `'starting'`   -- signed in, and the bank is being brought up
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
@@ -108,10 +110,12 @@ export interface DeviceOpts {
  * - `'swept'`      -- everything was unloaded, and nothing follows until the host acts
  * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
  */
-export type BankStage = 'signed_out' | 'starting' | 'unborn' | 'locked' | 'unlocked' | 'swept' | 'failed'
+export type BankStage = typeof bankStageVals[number]
 
-/** How a bank ended, for the message a host shows: swept, vacated, signed out of, or deleted. */
-export type BankEndCause = 'sweep' | 'vacate' | 'signout' | 'delete'
+/** The ways a bank ends, as {@link BankEndCause} describes them. */
+export const bankEndCauseVals = ['sweep', 'vacate', 'signout', 'delete'] as const
+/** How a bank ended, one of {@link bankEndCauseVals}, for the message a host shows: swept, vacated, signed out of, or deleted. */
+export type BankEndCause = typeof bankEndCauseVals[number]
 
 /** A refusal as a snapshot shows it: its kind, its family and its message, which carry no secret material. */
 export interface RefusalSnapshot {

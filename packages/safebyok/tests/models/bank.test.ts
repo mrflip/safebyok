@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Crypto, Errors, SX } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
-import type { BadNews, BankMakeRecord } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type BankMakeRecord, bankEndCauseVals, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
@@ -295,6 +295,18 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     device.sweep()
     expect(counter.calls).to.eq(1)
     expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: 'sweep' })
+  })
+
+  it("shows only stages and end causes that bankStageVals and bankEndCauseVals list", async () => {
+    const { bank } = await TH.buildBornBank()
+    const snapshots = [bank.getSnapshot()]
+    bank.lock()
+    snapshots.push(bank.getSnapshot())
+    bank.sweep()
+    snapshots.push(bank.getSnapshot())
+    expect(snapshots.map(({ stage }) => stage)).to.deep.equal(['unlocked', 'locked', 'swept'])
+    expect(bankStageVals).to.include.members(snapshots.map(({ stage }) => stage))
+    expect(bankEndCauseVals).to.include(snapshots[2]!.endCause)
   })
 
   it("stops telling a listener once it unsubscribes", async () => {
