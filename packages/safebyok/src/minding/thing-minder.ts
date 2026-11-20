@@ -159,14 +159,14 @@ export class ThingMinder {
     return this.#cachedAt(this.#demandOwnScope(scoped)) as CarAt<LabelpathT> | undefined
   }
 
-  /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
+  /** The cached listing of `labelpathed`'s children, however old, or undefined for none. Never asks the vaultDB.
    * A bare listing lists only the children heard of since `hello` ({@link isListingBareAt}).
    */
   listingAt(labelpathed: Labelpathed): readonly Labelpath[] | undefined {
     return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(labelpathed)))
   }
 
-  /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
+  /** True when `labelpathed`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
   isListingBareAt(labelpathed: Labelpathed): boolean {
     return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(labelpathed)))?.dataUpdatedAt === BareListedAt
   }
@@ -413,33 +413,33 @@ export class ThingMinder {
     return bankKeyHeadOf(ThingChecks.bankScope.parse(scope))
   }
 
-  /** The query key `scoped`'s car is cached under. */
+  /** The query key `labelpathed`'s car is cached under. */
   queryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '!'] }
 
-  /** The query key the list of `scoped`'s children is cached under. */
+  /** The query key the list of `labelpathed`'s children is cached under. */
   listingQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '#', 'kids'] }
 
-  /** The key prefix of everything cached under `scoped`, a car or a listing, and of neither of its own. */
+  /** The key prefix of everything cached under `labelpathed`, a car or a listing, and of neither of its own. */
   childrenQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
 
-  /** The part of a query key that `scoped` has in common with each of its keys. */
+  /** The part of a query key that `labelpathed` has in common with each of its keys. */
   #keyHeadOf(labelpathed: Labelpathed): string[] { return keyHeadOf(this.scope, labelpathed.labelpath) }
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
-  /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
+  /** TanStack's query options for a get of `labelpathed`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
   #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
     const queryOpts = { queryKey: this.queryKey(labelpathed) }
     if (opts.staleTime === undefined) { return queryOpts }
     return { ...queryOpts, staleTime: staleTimeFnOf(opts.staleTime) }
   }
 
-  /** The get ask the minder sends the vaultDB for `scoped`, a scope in this minder's bank. */
+  /** The get ask the minder sends the vaultDB for `labelpathed`, in this minder's bank. */
   #askAt(labelpathed: Labelpathed): GetAsk {
     return this.#bank.makeGetAsk({ labelpath: labelpathed.labelpath, ifAbsent: 'nil' })
   }
 
   // Boxes are the only Things under a root, for now: one label under the root box.
-  /** The shell at `scoped`. Below a root, it lives in the life of the bank's root box. */
+  /** The shell at `labelpathed`. Below a root, it lives in the life of the bank's root box. */
   #shellAt(labelpathed: Labelpathed): VoidSentinel {
     return labelpathed.labelpath.includes('/') ? Shell.of(labelpathed, this.rootBox) : Shell.of(labelpathed)
   }
@@ -456,7 +456,7 @@ export class ThingMinder {
   /** The scope of the bank's root box. */
   get #rootBoxScope(): ThingScope { return { ...this.scope, labelpath: Labelpath.RootBox } }
 
-  /** The scope of `scoped`, demanding that it is in this minder's bank. */
+  /** The scope of `labelpathed`, demanding that it is in this minder's bank. */
   #demandOwnScope(labelpathed: Labelpathed): ThingScope {
     // Its fields alone: an ask or a record passes, and is read as its scope.
     return ThingChecks.thingScope.parseConsistent(labelpathed, this.scope)

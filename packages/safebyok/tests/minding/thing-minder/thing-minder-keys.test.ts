@@ -22,13 +22,13 @@ describe("ThingMinder keys", () => {
     expect(minder.listingQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '#', 'kids'])
   })
 
-  it("make a subtree prefix of the labels and '/', which no key of the Thing's own starts", () => {
+  it("make a children prefix of the labels and '/', which no key of the Thing's own starts", () => {
     const minder = minderWithoutStart()
     expect(minder.childrenQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/'])
     expect(minder.childrenQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '/'])
   })
 
-  it("match, for a subtree prefix, every key under the Thing and neither of the Thing's own", () => {
+  it("match, for a children prefix, every key under the Thing and neither of the Thing's own", () => {
     const minder = minderWithoutStart()
     const matches = (prefixScope: ThingScope, keyScope: ThingScope) => {
       const prefix = minder.childrenQueryKey(prefixScope)
