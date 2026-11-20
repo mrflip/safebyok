@@ -471,7 +471,7 @@ describe("a prompt on a bank whose gating is open", () => {
     expect(device.openGating).to.be.null
   })
 
-  it("joins a gate change for an unlock, and resumes once the gate change lands, the bank unlocked", async () => {
+  it("waits for a gate change to land, then resolves without asking, the bank unlocked", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const replacing = bank.launchReplacePassphrasePrompt()
@@ -482,6 +482,34 @@ describe("a prompt on a bank whose gating is open", () => {
     expect(await ensuring).to.equal(bank)
     expect(await replacing).to.equal(bank)
     expect(bank.isUnlocked).to.be.true
+    expect(device.openGating).to.be.null
+  })
+
+  it("waits out a dismissed gate change, then asks to unlock in a gating of its own", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
+    const gating = device.openGating!
+    const ensurings = [bank.ensureUnlocked(), bank.launchUnlockBankPrompt()]
+    const settled = ensurings.map((ensuring) => settledFlag(ensuring))
+    gating.dismiss()
+    await replacing
+    await TH.wakeupAtNextTick()
+    expect(settled.map((flag) => flag.isSettled)).to.deep.equal([false, false])
+    expect(device.openGating).to.include({ gatingkind: 'unlock_bank' }).and.not.equal(gating)
+    await TH.expectGood(bank.attemptUnlock({ passphraseClear: TH.TestPassphrase }))
+    expect(await Promise.all(ensurings)).to.deep.equal([bank, bank])
+    expect(bank.isUnlocked).to.be.true
+  })
+
+  it("refuses 'disabled' when the device is swept while it waits out a gate change, opening no gating", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const replacing = TH.expectRefusal(bank.launchReplacePassphrasePrompt(), 'dismissed')
+    const ensuring = TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
+    device.sweep()
+    await Promise.all([replacing, ensuring])
+    expect(device.openGating).to.be.null
   })
 
   it("refuses a gate change while a gating of another kind is open, leaving that gating open", async () => {

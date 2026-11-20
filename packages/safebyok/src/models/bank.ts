@@ -172,8 +172,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // --
 
   // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt, ensureUnlocked, launchOrJoin
-  // A prompt opens a gating and waits for it to conclude. One on a bank whose gating is open joins that gating where it can: every gating
-  // on a born bank ends with it unlocked, so an unlock joins any of them.
+  // A prompt opens a gating and waits for it to conclude, or joins the gating of its own kind open on its bank. An unlock that finds a
+  // gating of another kind open waits for it to end, and asks only if the bank is still locked: a gate change mostly leaves it unlocked.
 
   /** Ask the user for a new passphrase and optional passkey, and birth the bank of `device`'s scope with them. Resolves the bank, unlocked.
    * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
@@ -189,10 +189,18 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Ask the user for the passphrase or the passkey, and unlock this bank with it.
-   * While a gating of any kind is open on this bank, it joins that gating instead, and resolves when it lands.
+   * While an `unlock_bank` gating is open on this bank, it joins that gating instead.
+   * While a gating of another kind is open on it, it waits for that one to end, however it ends, and asks only if the bank is still locked.
    */
   async launchUnlockBankPrompt(): Promise<this> {
     this.demandEnabled()
+    const open = this.#device.openGating
+    if ((open?.bank === this) && (open.gatingkind !== 'unlock_bank')) {
+      // Its outcome is not the unlock's: whenConcluded resolves a refusal as an outcome, and the bank is checked afresh.
+      await open.whenConcluded
+      this.demandEnabled()
+      if (this.isUnlocked) { return this }
+    }
     await this.#launchOrJoin('unlock_bank', (cleartexts) => this.#unlockBankWith(cleartexts))
     return this
   }
@@ -229,17 +237,19 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Resolve at once if this bank is unlocked, and otherwise ask the user to unlock it, as {@link launchUnlockBankPrompt} does. */
+  /** Resolve at once if this bank is unlocked, and otherwise ask the user to unlock it, as {@link launchUnlockBankPrompt} does.
+   * A gate change open on this bank is waited out first: if it leaves the bank unlocked, this resolves without asking.
+   */
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
     if (this.isUnlocked) { return this }
     return this.launchUnlockBankPrompt()
   }
 
-  /** Join the open gating on this bank that a `gatingkind` prompt may join, or else launch one whose attempts run `attempt` */
+  /** Join the `gatingkind` gating open on this bank, or else launch one whose attempts run `attempt`. */
   async #launchOrJoin(gatingkind: Gatingkind, attempt: GatingAttempt): Promise<Bank> {
     const open = this.#device.openGating
-    if (open?.bank === this && (gatingkind === 'unlock_bank' || open.gatingkind === gatingkind)) { return Outcome.valOf(await open.whenConcluded) }
+    if ((open?.bank === this) && (open.gatingkind === gatingkind)) { return Outcome.valOf(await open.whenConcluded) }
     return Gating.make({ gatingkind }, { device: this.#device, bank: this, askUser: this.#device.askUser, attempt }).launch()
   }
   // --
