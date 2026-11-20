@@ -1,6 +1,6 @@
 # Thread 17: form_verbs (2026-11-20)
 
-Branch `20261120-form_verbs`, PR #TBD, stacked on #784 (`20261120-logical_gating`). Design:
+Branch `20261120-form_verbs`, PR #785, stacked on #784 (`20261120-logical_gating`). Design:
 `whiteboard/20261119-vault_snapper/gating-forms.md` (in the base checkout). Proved: `safebyok` lint, typecheck (with
 forgotten-exports) and 1314 tests green; `safebyok-react` **red on purpose**, mended by thread 18 (below).
 
