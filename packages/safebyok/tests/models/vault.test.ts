@@ -76,8 +76,8 @@ async function buildWatchedVault() {
 
 /** Each way to sweep a born vault's bank, by what is swept. */
 const SweepCases: readonly (readonly [(born: TH.BornVault) => unknown, string])[] = [
-  [(born) => born.bank.sweep(),   "its bank"],
-  [(born) => born.device.sweep(), "its device"],
+  [(born) => born.bank.sweep(),   'its bank'],
+  [(born) => born.device.sweep(), 'its device'],
 ]
 
 describe("bank.sweep() and device.sweep(), over the vaults made on the bank", () => {
