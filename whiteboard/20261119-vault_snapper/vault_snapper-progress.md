@@ -81,6 +81,16 @@ orchestrator writes it.
   and resolves if unlocked, else launches or joins an unlock gating; `#launchOrJoin` joins only its own kind.
 * Rulings in rework (the Coach, 2026-11-20): no `lastRefusal` until v1; `BankSnapshot.endCause` is the VaultError or null.
 
+## Thread 8, giver_feed (#775) (*Orchestrator:*)
+
+* The Coach's hand edits applied first (`Labelpathed` exported; `childrenQueryKey`). Core statics
+  `ThingMinder.queryKeyOf` and `bankQueryKeyOf` give keys without a minder; the giver's keys are the minder's (`'sok'`).
+* The bridge copies each event's car under `event.queryKey`, `dataUpdatedAt` the minder's; refetches when `dbHasNewer`,
+  and refetches a `bare` car; a removal leaves the host's entry. At start it refetches entries already showing a car.
+* Defaults (overridable): `networkMode: 'always'`, `staleTime` 0 while the vaultDB holds newer, `structuralSharing` by
+  agerank, `select` → `fullest`. Hooks: `useGating()`, `forBank(label).useBankSnapshot()`, `useBoxRecord(labelpath)`.
+  The giver makes no QueryClient and no longer follows sign-in. Shapes in `giver/shapes-giver.ts`.
+
 ## The line (*Orchestrator:*)
 
 * Restacked 2026-11-20: main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773, every base `main`. Two mechanical fixes
@@ -90,5 +100,5 @@ orchestrator writes it.
 ## The sprint doc (*Orchestrator:*)
 
 * https://claude.ai/artifact/HHcmx1GE3oZyh6rQMWjgv3 — doc `83e42a7e-4892-49d9-b45e-585ca636e9a0`; State enum `b9b89cb1-c517`.
-* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 716);
+* Tabs (tab id / body id): Open Matters `1a05d4a3-494c` / `cb45b78b-f909` (matters table `m6pymgdn7tc.85`, bookmark rev 717);
   Cleanup `6077489e-8954` / `14b54849-af59`; Progress `51ab4975-ceed` / `26336557-6583`; Resolved `a912f3b9-5db8` / `c14689aa-a452`.

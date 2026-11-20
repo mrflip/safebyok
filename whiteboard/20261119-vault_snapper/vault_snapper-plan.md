@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 to 6 in one line, main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 (justify green at the tip; every check green but #771's changeset check, which ran against its old base and clears on its next push); thread 7 (#774) in review; thread 8 building on #773.
+* **Status:** threads 1 to 6 in one line, main -> #768 -> #769 -> #771 -> #770 -> #772 -> #773 (#771's changeset check clears on its next push); thread 7 filed (#774), in rework for the overlap ruling; thread 8 ready (#775), in review; thread 9 waits on 7 and 8 restacked.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -286,8 +286,8 @@ event keeps TanStack's `status` with `data` undefined, so the bridge branches on
 `subtreeQueryKey` to `childrenQueryKey`, takes a `Labelpathed` where a `ThingScope` was, and makes `react-giver.ts`
 easier to read; its invariant hunks are already on #769 and merge away. Where it meets thread 2's `'sok'` and event
 rewrite, keep the threads' behaviour and the Coach's names. *Touches:* `packages/safebyok-react/src/giver/`.
-*Depends on:* threads 2 and 6, restacked into one line. *Size:* M. *Status:* building, branch `20261120-giver_feed`,
-cut from the restacked tip 872a14819.
+*Depends on:* threads 2 and 6, restacked into one line. *Size:* M. *Status:* ready, #775 (branch
+`20261120-giver_feed`, at 08710c644; one compaction); in review, `medium` on `opus`.
 
 ### 9. knock_knock
 
@@ -299,7 +299,11 @@ cut from the restacked tip 872a14819.
 reads the Device's snapshot and, in a form action, calls `bank.attemptUnlock` with the passphrase from `FormData`;
 the mutation resumes with the whisper. A second submission while the dialog is open joins it. The test asserts the
 passphrase is never in React state or a snapshot. Any wiring the core lacks is one explicit `cheat…` method. *Depends
-on:* threads 7 and 8. *Size:* M.
+on:* threads 7 and 8, restacked into one line. *Size:* M. *Orchestrator:* from thread 8 (#775): use `Giver.useGating()`,
+`Giver.forBank(label).useBankSnapshot()` and `useBoxRecord(labelpath)`; the real Device has no `ensureBank` or
+`onBankStart`, so the giver's bank wiring needs them on the Device or a wrapper (`minderDeviceOf` in
+`tests/test-helpers/minder-giver-world.ts` shows the shape): the one cheat goes there. The test brings its own
+`QueryClientProvider`. From thread 7: `bank.attemptUnlock` waits out another kind of gating, then checks.
 
 ## Order
 
