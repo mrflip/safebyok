@@ -223,6 +223,23 @@ describe("device.sweep()", () => {
   })
 })
 
+describe("device.lock()", () => {
+  it("locks the bank made on the device, and never throws", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    expect(device.lock()).to.equal(device)
+    expect(bank.isLocked).to.be.true
+    expect(device.lock()).to.equal(device)
+    expect(bank.isLocked).to.be.true
+  })
+
+  it("does nothing on a device with no bank, or a swept one", () => {
+    const device = TH.makeDevice()
+    expect(device.lock()).to.equal(device)
+    device.sweep()
+    expect(device.lock()).to.equal(device)
+  })
+})
+
 describe("device.tellBadNews(badnews)", () => {
   it("tells a refusal as it is and anything else thrown as an unexpected error, and drops the news of a thing disabled", async () => {
     const onBadNews = vi.fn()

@@ -1,13 +1,13 @@
-import { Clock, Crypto, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { Clock, Crypto, Errors, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
 import { Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
-import { Gating, addPasskey, birthBank, replacePassphrase, revokePasskey, unlockBank } from './gating'
+import { Gating, addPasskey, attemptWithoutGating, birthBank, replacePassphrase, revokePasskey, unlockBank } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
-import type { GatingAttempt, Gatingkind } from '../shapes/shapes-gateish'
+import type { CleartextsForGatingkind, GatingAttempt, Gatingkind } from '../shapes/shapes-gateish'
 import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BirthOpts, BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -91,6 +91,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     this.#queryCacheOpts = Object.freeze(queryCacheOpts)
     this.#rootBox = Object.freeze(rootBox)
     this.#maingate = Gate.make(maingate, { bank: this })
+    device.cheatHoldBank(this)
     Object.freeze(this)
   }
 
@@ -151,7 +152,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt, launch
+  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt, ensureUnlocked, launchOrJoin
+  // A prompt opens a gating and waits for it to conclude. One on a bank whose gating is open joins that gating where it can: every gating
+  // on a born bank ends with it unlocked, so an unlock joins any of them.
 
   /** Ask the user for a new passphrase and optional passkey, and birth the bank of `device`'s scope with them. Resolves the bank, unlocked.
    * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
@@ -166,45 +169,101 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return gating.launch()
   }
 
-  /** Ask the user for the passphrase or the passkey, and unlock this bank with it. */
+  /** Ask the user for the passphrase or the passkey, and unlock this bank with it.
+   * While a gating of any kind is open on this bank, it joins that gating instead, and resolves when it lands.
+   */
   async launchUnlockBankPrompt(): Promise<this> {
     this.demandEnabled()
-    await this.#launch('unlock_bank', (cleartexts) => this.#unlockBankWith(cleartexts))
+    await this.#launchOrJoin('unlock_bank', (cleartexts) => this.#unlockBankWith(cleartexts))
     return this
   }
 
   /** Ask the user for the current passphrase and a new one, and replace the passphrase. Leaves the bank unlocked.
-   * The passkey stays, and the bankKey does not change.
+   * The passkey stays, and the bankKey does not change. While a `replace_passphrase` gating is open on this bank, it joins that gating instead.
    */
   async launchReplacePassphrasePrompt(): Promise<this> {
     this.demandEnabled()
-    await this.#launch('replace_passphrase', (cleartexts) => this.#replacePassphraseWith(cleartexts))
+    await this.#launchOrJoin('replace_passphrase', (cleartexts) => this.#replacePassphraseWith(cleartexts))
     return this
   }
 
   /** Ask the user for the passphrase and a new passkey, and add the passkey. Leaves the bank unlocked.
-   * A gate has one passkey at most: this refuses, asking nobody, while it has one.
+   * A gate has one passkey at most: this refuses, asking nobody, while it has one. While an `add_passkey` gating is open on this bank, it joins that gating instead.
    */
   async launchAddPasskeyPrompt(): Promise<this> {
     this.demandEnabled()
     this.#maingate.demandPasskeyAddable()
-    await this.#launch('add_passkey', (cleartexts) => this.#addPasskeyWith(cleartexts))
+    await this.#launchOrJoin('add_passkey', (cleartexts) => this.#addPasskeyWith(cleartexts))
     return this
   }
 
   /** Ask the user for the passphrase, and revoke the passkey. Leaves the bank unlocked.
-   * With no passkey, it returns at once and asks nobody. The bankKey does not change.
+   * With no passkey, it returns at once and asks nobody. The bankKey does not change. While a `revoke_passkey` gating is open on this bank, it joins that gating instead.
    */
   async launchRevokePasskeyPrompt(): Promise<this> {
     this.demandEnabled()
     if (this.#maingate.passkey0 === null) { return this }
-    await this.#launch('revoke_passkey', (cleartexts) => this.#revokePasskeyWith(cleartexts))
+    await this.#launchOrJoin('revoke_passkey', (cleartexts) => this.#revokePasskeyWith(cleartexts))
     return this
   }
 
-  /** Launch a gating of `gatingkind` on this bank, each attempt running `attempt`, and resolve the bank once one lands. */
-  #launch(gatingkind: Gatingkind, attempt: GatingAttempt): Promise<Bank> {
+  /** Resolve at once if this bank is unlocked, and otherwise ask the user to unlock it, as {@link launchUnlockBankPrompt} does. */
+  async ensureUnlocked(): Promise<this> {
+    this.demandEnabled()
+    if (this.isUnlocked) { return this }
+    return this.launchUnlockBankPrompt()
+  }
+
+  /** Join the gating open on this bank that a prompt for `gatingkind` may join, or launch one of `gatingkind`, each attempt running `attempt`. Resolves the bank once the gating lands.
+   * Refuses `already_asking` while a gating it may not join is open on the device.
+   */
+  async #launchOrJoin(gatingkind: Gatingkind, attempt: GatingAttempt): Promise<Bank> {
+    const open = this.#device.openGating
+    if (open?.bank === this && (gatingkind === 'unlock_bank' || open.gatingkind === gatingkind)) { return Outcome.valOf(await open.whenConcluded) }
     return Gating.make({ gatingkind }, { device: this.#device, bank: this, askUser: this.#device.askUser, attempt }).launch()
+  }
+  // --
+
+  // == [Re-entry points]: attemptUnlock, attemptReplacePassphrase, attemptAddPasskey, attemptRevokePasskey, handIn
+  // Each hands the user's cleartexts to the gating of its kind open on this bank, as a form does with what the user typed, so
+  // that every prompt waiting on that gating resumes once it lands. With none open, it makes its change directly.
+
+  /** Unlock this bank with the passphrase or the passkey in `cleartexts`, answering the `unlock_bank` gating open on it, if any. Resolves an outcome instead of throwing.
+   * A correctable refusal, such as `wrong_passphrase`, leaves that gating open for another attempt. A passkey answer's PRF bytes are zeroed once handed in, except after a refusal that leaves a gating open.
+   */
+  attemptUnlock(cleartexts: CleartextsForGatingkind['unlock_bank']): Promise<Outcome.Outcome<Bank>> {
+    return this.#handIn('unlock_bank', cleartexts, (cleartexts) => this.#unlockBankWith(cleartexts))
+  }
+
+  /** Replace the passphrase with the next one in `cleartexts`, proved by the current one beside it, answering the `replace_passphrase` gating open on this bank, if any.
+   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands.
+   */
+  attemptReplacePassphrase(cleartexts: CleartextsForGatingkind['replace_passphrase']): Promise<Outcome.Outcome<Bank>> {
+    return this.#handIn('replace_passphrase', cleartexts, (cleartexts) => this.#replacePassphraseWith(cleartexts))
+  }
+
+  /** Add the passkey in `cleartexts`, proved by the passphrase beside it, answering the `add_passkey` gating open on this bank, if any.
+   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands. With no gating open, a gate that has a passkey refuses.
+   */
+  attemptAddPasskey(cleartexts: CleartextsForGatingkind['add_passkey']): Promise<Outcome.Outcome<Bank>> {
+    return this.#handIn('add_passkey', cleartexts, (cleartexts) => {
+      this.#maingate.demandPasskeyAddable()
+      return this.#addPasskeyWith(cleartexts)
+    })
+  }
+
+  /** Revoke the passkey, proved by the passphrase in `cleartexts`, answering the `revoke_passkey` gating open on this bank, if any.
+   * Resolves an outcome instead of throwing, and leaves the bank unlocked where it lands. With no gating open and no passkey, it resolves at once, as {@link launchRevokePasskeyPrompt} does.
+   */
+  attemptRevokePasskey(cleartexts: CleartextsForGatingkind['revoke_passkey']): Promise<Outcome.Outcome<Bank>> {
+    return this.#handIn('revoke_passkey', cleartexts, async (cleartexts) => (this.#maingate.passkey0 === null ? this : this.#revokePasskeyWith(cleartexts)))
+  }
+
+  /** Attempt the gating of `gatingkind` open on this bank with `cleartexts`, or with none open, run `attempt` on them once, without a gating. */
+  #handIn<KindT extends Gatingkind>(gatingkind: KindT, cleartexts: CleartextsForGatingkind[KindT], attempt: GatingAttempt): Promise<Outcome.Outcome<Bank>> {
+    const open = this.#device.openGating
+    if (open?.bank === this && open.gatingkind === gatingkind) { return open.attempt(cleartexts) }
+    return attemptWithoutGating(this, cleartexts, attempt)
   }
   // --
 

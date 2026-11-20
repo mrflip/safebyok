@@ -1,4 +1,5 @@
 import { Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
+import type { Bank } from './bank'
 import type { Gating } from './gating'
 import { guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
@@ -19,7 +20,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #endCause, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #thisIsTemporaryBank, #endCause, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -38,6 +39,8 @@ export class Device {
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
   #openGating: Gating | null = null
+  /** The bank {@link lock} locks: the last made on this device, or null for none. */
+  #thisIsTemporaryBank: Bank | null = null
   /** Why a sweep disabled the device, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
 
@@ -79,6 +82,19 @@ export class Device {
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
   }
+  // --
+
+  // == [Locking]: lock, cheatHoldBank
+
+  /** Lock every bank on this device. Never throws. */
+  lock(): this {
+    this.#thisIsTemporaryBank?.lock()
+    return this
+  }
+
+  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is kept.
+  /** Hold `bank` as the bank {@link lock} locks. Internal: only the Bank's constructor calls it. */
+  cheatHoldBank(bank: Bank): void { this.#thisIsTemporaryBank = bank }
   // --
 
   // == [Ending]: sweep
