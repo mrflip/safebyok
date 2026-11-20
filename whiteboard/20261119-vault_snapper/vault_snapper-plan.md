@@ -4,7 +4,7 @@
   /turbochat").
 * **Levels, by default:** review `medium`; the worker and the reviewer on their agents' own model and effort; the
   style pass on `style-reviewer`'s pin. **Threads at once:** 3.
-* **Status:** threads 1 and 4 ready ([#769](https://github.com/mrflip/safebyok/pull/769), [#770](https://github.com/mrflip/safebyok/pull/770)), in review; threads 2 and 5 building on them; thread 3 filed and out of draft ([#768](https://github.com/mrflip/safebyok/pull/768)).
+* **Status:** threads 1, 3 and 4 filed ([#769](https://github.com/mrflip/safebyok/pull/769), [#768](https://github.com/mrflip/safebyok/pull/768), [#770](https://github.com/mrflip/safebyok/pull/770)); threads 2 and 5 building, stacked on #769 and #770.
 
 The design behind this sprint is in this directory: `vault-pieces.md` (the threads' specs, section by section, with
 the Coach's rulings marked *Settled*), `dream-interface-2.md` (the interface aimed at), `comparable-wiki-drafts.md`
@@ -96,7 +96,15 @@ not frozen*, and *A get resuming after `goodbye` and `hello` joins the new listi
 
 *Touches:* `minding/thing-car.ts`, `shapes/shapes-minder.ts`, `minding/thing-minder.ts`, their tests, the giver's
 reads of `liveness`, VOCABULARY.md. *Depends on:* nothing (origin/main). *Look-ahead:* thread 2 decorates each event
-with the car's `agerank`; thread 8 uses it as the host's structural sharing. *Size:* M. *Status:* ready, #769; in review.
+with the car's `agerank`; thread 8 uses it as the host's structural sharing. *Size:* M. *Status:* filed, #769, at 2e14d2b61.
+
+*Review:* fixed (medium): realigned two test tables after the rename (whitespace). Kept: one `eslint-disable-line
+unicorn/prefer-simple-sort-comparator` in the agerank ordering test. Left, minor: `list` and `tryWrite` land answers
+after a `goodbye` then `hello`, against `tryWrite`'s doc (given to thread 2); `carOf` freezes a bhnd pair before
+its check refuses it (a bug path already); records freeze in place, so a vaultDB that mutates what it answered with
+throws (thread 8's notes); doc blocks of `agerankOf` and `ThingCar.agerank` recite their recipe, and `Revseq.padded`
+has no direct test, nor do two long test titles fit one clause (Cleanup). Dropped: a void car sorting below a live
+one, correct.
 
 ### 2. minder_feed
 
@@ -152,7 +160,13 @@ damaged; the changeset says so. *Levels:* worker on `sonnet`; review `low`. *Sta
 
 *Touches:* `models/bank.ts` (its boxes sections), a new `models/vault.ts`, its tests, VOCABULARY.md. *Depends on:*
 nothing (origin/main). *Look-ahead:* thread 7 puts `withWhisper` on the Vault; thread 5 edits `bank.ts`'s prompts,
-stacked on this. *Size:* M to L. *Status:* ready, #770; in review (one compaction before ready).
+stacked on this. *Size:* M to L. *Status:* filed, #770, at 7cc13c3f8 (one compaction before ready).
+
+*Review:* flagged, nothing blocking (medium): added the `// putBoxOnce @example` marker to the birth test. Left:
+a sparse newest by labelpath refuses `sidecar_missing` (taken in YOLO, thread 7); no re-check of the bank before
+`tryWrite` while `sealBox` awaits (a crossing, out of bounds); a vault's minder is not ended at a bank sweep (the
+cascade, later); `notes/security.md` says the Vault takes the bank's lease, which it does not (thread 7); doc-block
+register of `putBoxOnce` and `sealBox`'s first line (Cleanup); a doomed by-labelpath call costs a get, harmless.
 
 ### 5. bank_gatings
 
@@ -202,8 +216,11 @@ reachable without startup (`locked`, `unlocked`, `swept`) are built; the type ho
 *Gloss.* `vault-pieces.md`, *Wh*. `vault.withWhisper(labelpath, fn)`: `bank.ensureUnlocked()` (a prompt, joining any
 open gating), the box's whole record through the minder, `bank.unsealBox`, then `fn` with the unsealed box (its
 whisper, sidecar and record fields). Nothing of it is returned, cached or put in a snapshot. A box never stored, or
-deleted, refuses `absent_box` (the recommendation of open matter Wh1, taken in YOLO). *Touches:* `models/vault.ts`,
-its tests. *Depends on:* thread 6 (the line through threads 4 and 5). *Size:* S to M.
+deleted, refuses `absent_box` (the recommendation of open matter Wh1, taken in YOLO). *Orchestrator:* also, from
+thread 4's review: `#newestAt` gets the whole record when the car is neither `full` nor `gone`, so a write over a box
+known only from a list keeps its sidecar (taken in YOLO); and `notes/security.md`'s thread 4 line says
+`Vault.putBoxOnce` takes the bank's lease, which the Vault does not hold: correct it through a `sonnet` subagent, as
+the file's header says. *Touches:* `models/vault.ts`, its tests. *Depends on:* thread 6 (the line through threads 4 and 5). *Size:* S to M.
 
 ### 8. giver_feed
 
@@ -215,7 +232,8 @@ its tests. *Depends on:* thread 6 (the line through threads 4 and 5). *Size:* S 
 giver adopts the feed: the bridge copies each event's `state.data`; host keys are the minder's (`'sok'` head); its
 query defaults are `networkMode: 'always'`, `structuralSharing` keeping the greater `agerank` (prior on a tie),
 `staleTime` 0 for a `bhnd` or `bare` car, `select` picking `fullest`, each a default a host may override.
-`GiverBank.getBoxCar`'s doc block is corrected. The giver's bank snapshot hook reads the Device's snapshot.
+`GiverBank.getBoxCar`'s doc block is corrected. *Orchestrator:* records freeze in place as they land (thread 1), so
+the giver's docs say a host's vaultDB must not mutate the objects it answered with. The giver's bank snapshot hook reads the Device's snapshot.
 *Touches:* `packages/safebyok-react/src/giver/`. *Depends on:* threads 2 and 6, restacked into one line; and the
 Coach's uncommitted edits to `react-giver.ts` (*For the Coach*). *Size:* M.
 
