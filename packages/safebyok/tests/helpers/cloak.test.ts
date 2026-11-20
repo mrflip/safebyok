@@ -11,6 +11,7 @@ const FakePassphrase = 'fake passphrase'
 const FakeNextPassphrase = 'fake next passphrase'
 
 describe("cloak", () => {
+  // cloak @example
   it("reads each cleartext it adopted through its getter", () => {
     const cloaked = cloak({ passphraseClear: FakePassphrase, nextPassphraseClear: FakeNextPassphrase })
     expect(cloaked).to.be.instanceOf(Cloak)
