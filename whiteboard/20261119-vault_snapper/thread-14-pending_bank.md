@@ -1,6 +1,6 @@
 # Thread 14: pending_bank (2026-11-20)
 
-Branch `20261120-pending_bank`, PR #781, stacked on #780 (background_refresh). Proved: PROVED
+Branch `20261120-pending_bank`, PR #781, stacked on #780 (background_refresh). Proved: `pnpm justify` green after the catch-up (safebyok vitest 1376, safebyok-react 329, e2e 576, the rest).
 
 * **Built**:
   * `PendingBank` moved from the giver into the core, `packages/safebyok/src/shapes/shapes-bankish.ts` beside `BankSnapshot` (its isLocked reason comment kept), exported from `core.ts` and so from `safebyok`.
