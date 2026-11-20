@@ -94,6 +94,37 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
   })
 })
 
+describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
+  it("answers the box as stored, already in its car", async () => {
+    // tryPutBoxOnce @example
+    const { bank, vault, minder } = await TH.buildBornVault()
+    const { ok, val: box, err } = await vault.tryPutBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(ok).to.be.true
+    expect(err).to.be.undefined
+    expect(box).to.include({ labelpath: Openai, revseq: 0, am: 'a' })
+    expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(carOf(box!))
+  })
+
+  it("answers stale_write over an older revision as the minder's write answers it, with the revision stored", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const { record: stored } = await bank.sealBox(first, {}, { whisper: { apiKey: 'sk-test-1111' } })
+    rowsOf(bank).set(Openai, stored)
+    const answer = await vault.tryPutBoxOnce(Openai, {}, { whisper: TH.Whisper })
+    await TH.expectBad(answer, 'stale_write')
+    expect(answer).to.have.nested.property('dbhas.revtok', stored.revtok)
+  })
+
+  it("answers a refusal met before the write, and writes nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    bank.lock()
+    await TH.expectBad(vault.tryPutBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
+    await TH.expectBad(vault.tryPutBoxOnce('gate' as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
+    expect(written).not.toHaveBeenCalled()
+  })
+})
+
 describe("vault.putBoxOnce(cited, patch, secrets)", () => {
   it("resolves a birth with the box as stored already in its car and in its parent's listing", async () => {
     // putBoxOnce @example
@@ -135,16 +166,15 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     expect(rowsOf(bank).get(Openai)).to.include({ revtok: stored.revtok })
   })
 
-  it("given a labelpath cached sparse, gets the box whole and keeps its stored sidecar", async () => {
+  it("refuses a newest cached sparse when the patch gives no sidecar", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: stored } = await bank.sealBox(first, {}, { whisper: TH.Whisper })
     rowsOf(bank).set(Openai, stored)
     await minder.list('box')
     expect(minder.at(scopeAt(bank, Openai))?.liveness).to.equal('bhnd')
-    const next = await vault.putBoxOnce(Openai, {}, { whisper: TH.Whisper })
-    expect(next).to.include({ revseq: 2 })
-    expect(next.sidecar).to.deep.equal(TH.Sidecar)
+    await TH.expectRefusal(vault.putBoxOnce(Openai, {}, { whisper: TH.Whisper }), 'bad_record')
+    expect(await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.include({ revseq: 2 })
   })
 
   it("refuses a sparse cited box when the patch gives no sidecar, and writes nothing", async () => {
@@ -185,6 +215,21 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     device.sweep()
     const err = await TH.expectRefusal(vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'disabled')
     expect(err).to.equal(device.endCause)
+    expect(written).not.toHaveBeenCalled()
+  })
+})
+
+describe("vault.tryDelBoxOnce(labelpath)", () => {
+  it("answers the tombstone as stored", async () => {
+    const { vault } = await TH.buildBornVault()
+    const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(await TH.expectGood(vault.tryDelBoxOnce(Openai))).to.include({ labelpath: Openai, am: 'x', revseq: box.revseq + 1 })
+  })
+
+  it("answers a refusal for a box never stored, and writes nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    await TH.expectBad(vault.tryDelBoxOnce(Openai), 'bad_record')
     expect(written).not.toHaveBeenCalled()
   })
 })

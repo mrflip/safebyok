@@ -1,9 +1,9 @@
-import { type Helpers, Validator } from 'safebyok-big/internals'
+import { type Helpers, Outcome, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { ThingMinder } from '../minding/thing-minder'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
-import type { BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
+import type { BoxUnsealed } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import type { BoxLabelpath } from '../shapes/primitives'
 import type { ScopeAt } from '../shapes/shapes-minder'
@@ -43,25 +43,47 @@ export class Vault {
   }
   // --
 
-  // == [Writing boxes]: putBoxOnce, delBoxOnce
+  // == [Writing boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
 
-  /** Seal and write the box at `cited`'s labelpath, with `patch` applied and `secrets` encrypted, over `cited`. Resolves the box as stored.
-   * Given a labelpath, it writes over the newest revision this vault's minder has of the box, getting it unless the box is cached whole or deleted.
+  /** Seal and write the box at `cited`'s labelpath, with `patch` applied and `secrets` encrypted, over `cited`. Answers the box as stored.
+   * Given a labelpath, it writes over the newest revision this vault's minder has of the box, getting it when nothing is cached.
    * One attempt: a revision other than `cited` stored there refuses `stale_write`, and the minder caches the stored one as the watch tells of it.
-   * Over a tombstone or no box, `patch` must give the sidecar; so must it over a sparse `cited`.
+   * Over a tombstone or no box, `patch` must give the sidecar; so must it over a sparse `cited`, or a newest the minder holds sparse.
+   * A refusal, misuse included, is its bad outcome.
+   * @example
+   *   const { ok, val: box, err } = await vault.tryPutBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
+   */
+  async tryPutBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>> {
+    const sealed = await Outcome.outcomeOf(async () => {
+      const donorProps = (typeof cited === 'string') ? await this.#newestAt(cited) : cited
+      return await this.#bank.sealBox(donorProps, patch, secrets)
+    })
+    if (! sealed.ok) { return sealed }
+    // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
+    return await this.#minder.tryWrite(sealed.val) as Outcome.Outcome<LiveOf<BoxRecord>>
+  }
+
+  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the box as stored, on success.
    * @example
    *   const box = await vault.putBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
   async putBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
-    const donorProps = (typeof cited === 'string') ? await this.#newestAt(cited) : cited
-    return await this.#writeOnce(await this.#bank.sealBox(donorProps, patch, secrets)) as LiveOf<BoxRecord>
+    return Outcome.valOf(await this.tryPutBoxOnce(cited, patch, secrets))
   }
 
-  /** Write the tombstone of the box at `labelpath`, over the newest revision this vault's minder has of it. Resolves the tombstone as stored.
-   * Its car is then `gone`, and its labelpath stays in its parent's listing.
+  /** Write the tombstone of the box at `labelpath`, over the newest revision this vault's minder has of it. Answers the tombstone as stored.
+   * Its car is then `gone`, and its labelpath stays in its parent's listing. A refusal, misuse included, is its bad outcome.
    */
+  async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
+    const sealed = await Outcome.outcomeOf(async () => await this.#bank.tombstoneBox(await this.#newestAt(labelpath)))
+    if (! sealed.ok) { return sealed }
+    // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
+    return await this.#minder.tryWrite(sealed.val) as Outcome.Outcome<TombstoneOf<BoxRecord>>
+  }
+
+  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the tombstone as stored, on success. */
   async delBoxOnce(labelpath: BoxLabelpath): Promise<TombstoneOf<BoxRecord>> {
-    return await this.#writeOnce(await this.#bank.tombstoneBox(await this.#newestAt(labelpath))) as TombstoneOf<BoxRecord>
+    return Outcome.valOf(await this.tryDelBoxOnce(labelpath))
   }
   // --
 
@@ -87,25 +109,18 @@ export class Vault {
   }
   // --
 
-  // == [Helpers]: #scopeAt, #newestAt, #writeOnce
+  // == [Helpers]: #scopeAt, #newestAt
 
   /** The scope of the box at `labelpath`, in this vault's bank. */
   #scopeAt(labelpath: BoxLabelpath): ScopeAt<BoxLabelpath> {
     return { ...this.#bank.scope, labelpath: BoxChecks.labelpath.parse(labelpath) as BoxLabelpath }
   }
 
-  /** The newest revision the minder has of the box at `labelpath`: cached whole or as a tombstone, or else got. */
+  /** The newest revision the minder has of the box at `labelpath`: cached, or else got. */
   async #newestAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
-    const scope  = this.#scopeAt(labelpath)
-    const cached = this.#minder.at(scope)
-    const car    = ((cached?.liveness === 'full') || (cached?.liveness === 'gone')) ? cached : await this.#minder.get(scope)
+    const scope = this.#scopeAt(labelpath)
+    const car   = this.#minder.at(scope) ?? await this.#minder.get(scope)
     return car.newest
-  }
-
-  /** Write `ask` through the minder, resolving the record stored and throwing its refusal. */
-  async #writeOnce(ask: SealedBoxAsk): Promise<BoxRecord> {
-    // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
-    return await this.#minder.write(ask) as BoxRecord
   }
   // --
 }
