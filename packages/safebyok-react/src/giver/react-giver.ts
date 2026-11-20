@@ -116,7 +116,7 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
    * @example
    *   const strength = Giver.useStrengthVerdict()
    *   <input name="nextPassphrase" type="password" onChange={(event) => { void strength.judge(event.target.value) }} />
-   *   <button disabled={! strength.verdict?.strong}>Change passphrase</button>
+   *   <button disabled={strength.isJudging || ! strength.verdict?.strong}>Change passphrase</button>
    */
   function useStrengthVerdict(): StrengthVerdictResult {
     const [judged, setJudged] = useState<Omit<StrengthVerdictResult, 'judge'>>(Unjudged)
