@@ -5,6 +5,7 @@ import * as Phrases from '../phrases'
 import type { SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import type { BoxLabelpath } from '../shapes/primitives'
+import type { ScopeAt } from '../shapes/shapes-minder'
 import type { BoxRecord } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 
@@ -44,9 +45,9 @@ export class Vault {
   // == [Writing boxes]: putBoxOnce, delBoxOnce
 
   /** Seal and write the box at `cited`'s labelpath, with `patch` applied and `secrets` encrypted, over `cited`. Resolves the box as stored.
-   * Given a labelpath, it writes over the newest revision this vault's minder has of the box, getting it when nothing is cached.
+   * Given a labelpath, it writes over the newest revision this vault's minder has of the box, getting it unless the box is cached whole or deleted.
    * One attempt: a revision other than `cited` stored there refuses `stale_write`, and the minder caches the stored one as the watch tells of it.
-   * Over a tombstone or no box, `patch` must give the sidecar; so must it over a newest the minder holds sparse.
+   * Over a tombstone or no box, `patch` must give the sidecar; so must it over a sparse `cited`.
    * @example
    *   const box = await vault.putBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
@@ -63,12 +64,18 @@ export class Vault {
   }
   // --
 
-  // == [Helpers]: #newestAt, #writeOnce
+  // == [Helpers]: #scopeAt, #newestAt, #writeOnce
 
-  /** The newest revision the minder has of the box at `labelpath`: cached, or else got. */
+  /** The scope of the box at `labelpath`, in this vault's bank. */
+  #scopeAt(labelpath: BoxLabelpath): ScopeAt<BoxLabelpath> {
+    return { ...this.#bank.scope, labelpath: BoxChecks.labelpath.parse(labelpath) as BoxLabelpath }
+  }
+
+  /** The newest revision the minder has of the box at `labelpath`: cached whole or as a tombstone, or else got. */
   async #newestAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
-    const scope = { ...this.#bank.scope, labelpath: BoxChecks.labelpath.parse(labelpath) as BoxLabelpath }
-    const car   = this.#minder.at(scope) ?? await this.#minder.get(scope)
+    const scope  = this.#scopeAt(labelpath)
+    const cached = this.#minder.at(scope)
+    const car    = ((cached?.liveness === 'full') || (cached?.liveness === 'gone')) ? cached : await this.#minder.get(scope)
     return car.newest
   }
 

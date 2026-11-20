@@ -134,15 +134,24 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     expect(rowsOf(bank).get(Openai)).to.include({ revtok: stored.revtok })
   })
 
-  it("refuses a newest cached sparse when the patch gives no sidecar", async () => {
+  it("given a labelpath cached sparse, gets the box whole and keeps its stored sidecar", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: stored } = await bank.sealBox(first, {}, { whisper: TH.Whisper })
     rowsOf(bank).set(Openai, stored)
     await minder.list('box')
     expect(minder.at(scopeAt(bank, Openai))?.liveness).to.equal('bhnd')
-    await TH.expectRefusal(vault.putBoxOnce(Openai, {}, { whisper: TH.Whisper }), 'bad_record')
-    expect(await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.include({ revseq: 2 })
+    const next = await vault.putBoxOnce(Openai, {}, { whisper: TH.Whisper })
+    expect(next).to.include({ revseq: 2 })
+    expect(next.sidecar).to.deep.equal(TH.Sidecar)
+  })
+
+  it("refuses a sparse cited box when the patch gives no sidecar, and writes nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    await TH.expectRefusal(vault.putBoxOnce(Thing.sparseOf(first), {}, { whisper: TH.Whisper }), 'bad_record')
+    expect(written).not.toHaveBeenCalled()
   })
 
   it("writes nothing of an unsealed box's whisper, cited or sealed", async () => {
