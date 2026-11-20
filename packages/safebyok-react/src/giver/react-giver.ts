@@ -60,7 +60,7 @@ function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return 
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
 // the mutation would keep its cloak full, and an unlock that needs no network would wait for one.
-/** The giver's defaults for the mutation of a form verb in the host's React Query: it runs offline, never retries, and its cloak is vacated once it settles. */
+/** The giver's defaults for a form verb's mutation: it runs offline, never retries, and vacates its cloak once it settles. */
 const FormMutationDefaults = {
   networkMode: 'always',
   // Set false to keep the analysis simple. A retry may be safe to enable, but enabling one is unspecified behaviour:
@@ -87,22 +87,26 @@ function cleartextsOf(cloaked: Cloak): CloakCleartexts {
 /** What {@link makeReactGiver} returns. */
 export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGiver<CarT>>
 
-/** What a giver's `useStrengthVerdict` returns: the latest verdict on a new passphrase, and `judge` to ask for the next. */
+/** The result of a giver's `useStrengthVerdict`: the latest verdict on a new passphrase, and `judge` to ask for the next. */
 export type StrengthVerdictResult = Readonly<{
-  /** The verdict on the passphrase last judged, or null before any verdict lands or after the checker refuses. It stays while the next is judged. */
+  /** The verdict on the passphrase last judged, or null before any verdict lands or after the checker refuses.
+   * It stays while the next is judged.
+   */
   verdict:   PassphraseVerdict | null
   /** True from a call to `judge` until its verdict lands. */
   isJudging: boolean
   /** The checker's refusal of the passphrase last judged, or null. */
   lastErr:   unknown
-  /** Ask the Device's strength checker for its verdict on `passphrase`, resolving once it lands. Call it as the user types, with the field's value. Never rejects. */
+  /** Ask the Device's strength checker for its verdict on `passphrase`, resolving once it lands. Never rejects.
+   * Call it as the user types, with the field's value.
+   */
   judge:     (passphrase: string) => Promise<void>
 }>
 
-/** What a giver's `forBank` returns.
- * Each form mutation is handed a {@link Cloak}, and vacates it once it settles: an `onSettled` of your own in its options
- * replaces that, so vacate the cloak there too, and one in your QueryClient's mutation defaults does not run for it.
- * A form mutation never retries. Hold a form's submit while its mutation is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
+/** The hooks of a giver's `forBank`, for the Device's bank.
+ * Hand each form mutation a {@link Cloak}: the mutation vacates it once it settles. An `onSettled` of your own in its
+ * options replaces that, so vacate the cloak there too. One in your QueryClient's mutation defaults does not run for it.
+ * A form mutation never retries. Hold the submit while it is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
  */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
@@ -157,7 +161,7 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
   })
 }
 
-/** What {@link StrengthVerdictResult} holds before anything is judged. */
+/** The fields of a {@link StrengthVerdictResult} before anything is judged. */
 const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null })
 
 /** The hooks for `device`'s bank. */
@@ -204,7 +208,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
 
-  /** React Query's options for the mutation that births the bank, unborn until now, with the user's new passphrase and optional passkey, for your own `useMutation`.
+  /** React Query's options for the mutation that births the bank, for your own `useMutation`.
+   * Hand it the user's new passphrase and optional passkey. It leaves the bank unlocked.
    * Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
    */
   function birthMutationOptions() {
@@ -259,7 +264,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   function useReplacePassphrase(): UseMutationResult<void, Error, Cloak> { return useMutation(replacePassphraseMutationOptions()) }
 
   /** React Query's options for the mutation that adds a passkey, proved by the passphrase, for your own `useMutation`.
-   * Run the WebAuthn ceremony first, in the click handler before anything slow, as the browser requires, and hand its PRF answer in as `nextPasskeyClear`.
+   * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it), and hand its PRF answer in as `nextPasskeyClear`.
    * It leaves the bank unlocked.
    * @example
    *   const addPasskey = Acme.useAddPasskey()
@@ -299,7 +304,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   /** The mutation that revokes the passkey: {@link revokePasskeyMutationOptions}, through `useMutation`. */
   function useRevokePasskey(): UseMutationResult<void, Error, Cloak> { return useMutation(revokePasskeyMutationOptions()) }
 
-  /** Close the unlock form: every call waiting for the bank to be unlocked refuses `dismissed`, and the bank stays locked.
+  /** Dismiss the awaited unlock: every call waiting for the bank to be unlocked rejects `dismissed`, and the bank stays locked.
    * Show the unlock form while `useBankSnapshot((snap) => snap.unlockWanted)` is true, and call this from its close button.
    */
   async function dismissUnlock(): Promise<void> {
