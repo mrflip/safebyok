@@ -17,9 +17,11 @@ describe("the front door, safebyok", () => {
     for (const [exportname, val] of Object.entries(Storage)) { expect(Front, exportname).to.have.property(exportname).that.eq(val) }
   })
 
-  it("exports the minder, which safebyok/core leaves out", () => {
+  it("exports the minder and the vault, which safebyok/core leaves out", () => {
     expect(Front.ThingMinder).to.be.a('function')
+    expect(Front.Vault).to.be.a('function')
     expect(Core).to.not.have.property('ThingMinder')
+    expect(Core).to.not.have.property('Vault')
   })
 
   it("re-exports safebyok-big's refusals, its sanitizer and logger, the very ones the core throws and logs with", () => {

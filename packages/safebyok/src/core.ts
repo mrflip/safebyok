@@ -1,4 +1,4 @@
-// safebyok/core: the device, bank, gate, gating, wayin and lease, the bank's methods that put its Things through its vaultDB,
+// safebyok/core: the device, bank, gate, gating, wayin and lease, the bank's methods that seal its boxes and put its Things,
 // and every type their signatures name; no caching, so neither the ThingMinder nor TanStack Query. Private while it is built.
 // The proving and gating classes are exported as types alone: a proving's `buildLease` is public, and a gating is made only
 // by the bank's prompts, which hand its attempt the bank's private verbs.
@@ -26,8 +26,8 @@ export {
   type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
 export {
-  type BadNews, type BadNewsHandler, type BankAskDraft, type BankDna, type BankMakeRecord, type BankOpts, type BirthOpts, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type GetBoxAnswer,
-  type GetBoxAskDraft, BankishChecks,
+  type BadNews, type BadNewsHandler, type BankAskDraft, type BankDna, type BankMakeRecord, type BankOpts, type BirthOpts, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type SealedBoxAsk,
+  BankishChecks,
 } from './shapes/shapes-bankish'
 export {
   type AskUser, type BankGatingFriend, type BirthFriend, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,

@@ -14,6 +14,8 @@ import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testi
 import { Bank } from '../../src/models/bank'
 import { Device } from '../../src/models/device'
 import { Lease } from '../../src/models/lease'
+import { Vault } from '../../src/models/vault'
+import type { ThingMinder } from '../../src/minding/thing-minder'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankMakeRecord, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
@@ -102,7 +104,7 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
 export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) } }
 // --
 
-// == [A born bank]: answerPrompt, BornBankGiven, BornBank, buildBornBank
+// == [A born bank]: answerPrompt, BornBankGiven, BornBank, buildBornBank, BornVault, buildBornVault
 
 /** Answer the gating `launching` opened on `device` with `cleartexts`, as a host's dialog would: resolve the bank the attempt lands, or reject with its refusal.
  * A gating the attempt leaves open, after a correctable refusal, is dismissed. A launch refused before it opened a gating rejects as it came.
@@ -152,6 +154,20 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
     mintStamps.mockRestore()
     makeRecord.mockRestore()
   }
+}
+
+/** A {@link buildBornBank} bank, beside the vault of its boxes and that vault's minder. */
+export interface BornVault extends BornBank {
+  vault:  Vault
+  minder: ThingMinder
+}
+
+/** A {@link buildBornBank} bank, unlocked, and the vault of its boxes, whose minder has said `hello`. */
+export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
+  const born  = await buildBornBank(given)
+  const vault = Vault.make(born.bank)
+  vault.minder.hello()
+  return { ...born, vault, minder: vault.minder }
 }
 // --
 

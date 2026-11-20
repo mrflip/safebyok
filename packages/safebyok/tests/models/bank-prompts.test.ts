@@ -52,7 +52,7 @@ describe("Bank.launchBirthBankPrompt(device)", () => {
     expect(bank.maingate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: dialog.passkeyCleartexts[0]!.credential_id })
     expect(TH.isZeroed(dialog.passkeyCleartexts[0]!.prfBytes)).to.be.true
     expect(device.openGating).to.be.null
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { whisper } = await bank.unsealBox(box)
     expect(whisper).to.deep.equal(TH.Whisper)
   })
@@ -291,7 +291,7 @@ describe("bank.launchReplacePassphrasePrompt()", () => {
 
   it("unlocks by the new passphrase afterwards, and refuses the old one, under the same bankKey", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await TH.answerPrompt(device, bank.launchReplacePassphrasePrompt(), { antePassphraseClear: TH.TestPassphrase, nextPassphraseClear: NextPassphrase })
     bank.lock()
     await TH.expectRefusal(TH.answerPrompt(device, bank.launchUnlockBankPrompt(), { passphraseClear: TH.TestPassphrase }), 'wrong_passphrase')
