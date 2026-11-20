@@ -36,15 +36,14 @@ export class Device {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The last bank made on this device, or null for none or once it is swept. {@link lock} acts on it, and
-   * the device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
+  /** The last bank made on this device, or null for none or once it is swept. The device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
   #thisIsTemporaryBank: Bank | null = null
-  /** Every bank made on this device and not yet swept, the one it holds among them. {@link sweep} sweeps each. */
+  /** Every bank made on this device and not yet swept, the one it holds among them. {@link lock} locks, and {@link sweep} sweeps, each. */
   readonly #madeBanks = new Set<Bank>()
   /** Ends this device's subscription to the bank it holds. */
   #unsubscribeBank: () => void = () => undefined
-  // Nothing ends a device yet: its sweep ends only its bank.
+  // Nothing ends a device yet: its sweep ends only its banks.
   /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
 
@@ -115,14 +114,14 @@ export class Device {
 
   // == [Locking]: lock, cheatHoldBank, cheatDropBank
 
-  /** Lock this device's bank, if it holds one. Never throws. */
+  /** Lock every bank made on this device. Never throws. */
   lock(): this {
-    this.#thisIsTemporaryBank?.lock()
+    for (const bank of this.#madeBanks) { bank.lock() }
     return this
   }
 
   // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one held.
-  /** Hold `bank` as this device's bank, the one {@link lock} and the snapshot act on, and keep it for {@link sweep}. Making a bank sweeps no other. Internal. */
+  /** Hold `bank` as this device's bank, the one the snapshot shows, and keep it for {@link lock} and {@link sweep}. Making a bank sweeps no other. Internal. */
   cheatHoldBank(bank: Bank): void {
     this.#madeBanks.add(bank)
     this.#unsubscribeBank()

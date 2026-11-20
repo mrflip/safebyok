@@ -227,6 +227,17 @@ describe("device.lock()", () => {
     expect(bank.isLocked).to.be.true
   })
 
+  it("locks every bank made on the device, an earlier one too", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    expect(bank.isLocked).to.be.false
+    expect(later.isLocked).to.be.false
+    device.lock()
+    expect(bank.isLocked).to.be.true
+    expect(later.isLocked).to.be.true
+  })
+
   it("does nothing on a device with no bank, or a swept one", () => {
     const device = TH.makeDevice()
     expect(device.lock()).to.equal(device)

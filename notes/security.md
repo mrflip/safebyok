@@ -41,6 +41,8 @@ added or folded into through the subagent, and no other entry changes.
 
 ## Of Interest
 
+* 2026-11-20 (life_cascade, review rework, [#788](https://github.com/mrflip/safebyok/pull/788)): **In the new core, `packages/safebyok`, `device.lock()` now locks every `Bank` made on the device (the set `#madeBanks` in `models/device.ts`), not only the last one, so an earlier unlocked bank no longer keeps its lease after the user locks the device; this supersedes the entry from earlier today that says `device.lock()` locks only the last bank made.**
+
 * 2026-11-20 (life_cascade, review rework, [#788](https://github.com/mrflip/safebyok/pull/788)): **In the new core, `packages/safebyok`, `device.sweep()` now sweeps every `Bank` made on the device, not only the last one, so an earlier unlocked bank no longer keeps its lease (leaseKey) and every bank refuses `disabled` after the device's sweep; `device.lock()` still locks only the last bank made.** The device (`models/device.ts`) keeps each bank passed to `cheatHoldBank` in `#madeBanks` until `cheatDropBank`; making a bank sweeps nothing. This supersedes the earlier entry from this thread (`device.sweep()` no longer ends the device) where it says a bank made earlier stays enabled after `device.sweep()`.
 
 * 2026-11-20 (life_cascade, branch `20261120-life_cascade`): **In the new core, `packages/safebyok` (not `safebyok-big`), `bank.sweep()` shuts the bank synchronously before it sweeps the vaults made on it, and each vault's sweep empties its TanStack cache, so no sealed box record stays cached in the tab for that bank.**
