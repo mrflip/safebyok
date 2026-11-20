@@ -1,7 +1,7 @@
 # Thread 12: vault_try (2026-11-20)
 
-Branch `20261120-vault_try`, PR #779, stacked on #778 (minder_try). Proved: `pnpm --filter safebyok test` (1382 pass),
-typecheck and lint; safebyok-react's knock-knock test (4 pass); `pnpm justify` pending.
+Branch `20261120-vault_try`, PR #779, stacked on #778 (minder_try). Proved: `pnpm justify` green after the catch-up onto
+#778 at 4d55299ae (safebyok 1382 tests, safebyok-react 329, e2e 576).
 
 * **Built**:
   * **The read in put is reverted** (`packages/safebyok/src/models/vault.ts`). `#newestAt` is thread 4's again,
