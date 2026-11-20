@@ -37,8 +37,10 @@ what differs from big, in a sentence or two.
   its lease sealed and unsealed until it expired or that bank was locked or swept.
   amended 2026-11-20 (life_cascade, review): that drift is gone. The device keeps each `Bank` made on it
   (`device.cheatHoldBank`) until it is swept, and `device.sweep()` sweeps every one, so every lease is evicted and every
-  bank refuses `disabled`; making a bank sweeps no other. One drift remains: `device.lock()` locks only the last bank
-  made, and an earlier one keeps its lease until it expires or is locked or swept.
+  bank refuses `disabled`; making a bank sweeps no other. One drift remained: `device.lock()` locked only the last bank
+  made, and an earlier one kept its lease until it expired or was locked or swept.
+  amended 2026-11-20 (life_cascade, review): that remaining drift is gone: `device.lock()` locks every bank made on the
+  device, so no lease outlives a device's lock or sweep.
 * 2026-11-20 (bank_gatings, #772), G1 and G9: **The Bank takes cleartexts, unread.** In big no `Bank` method ever
   received a passphrase or PRF bytes (G1's chain; G9's "only Gating, Proving and Lease"). In the new core the Bank's
   four re-entry points, `attemptUnlock`, `attemptReplacePassphrase`, `attemptAddPasskey` and `attemptRevokePasskey`

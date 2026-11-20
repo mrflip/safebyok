@@ -1,7 +1,7 @@
 # Thread 22: life_cascade (2026-11-20)
 
 Branch `20261120-life_cascade`, PR #788, stacked on #786. Proved: `pnpm justify` green after the catch-up (safebyok
-1329 after the review rework (device sweeps every bank), safebyok-big 2946, safebyok-react 348, e2e 576, the rest green).
+1330 after the review rework (device sweeps and locks every bank), safebyok-big 2946, safebyok-react 348, e2e 576, the rest green).
 
 The Coach (2026-11-20): "device should stay but everything else should be disabled and device has dropped refs after
 sweep, delete, or vacate ... stop watches, unset minder, vaultdb, bank, any other refs, stop notifications. cache
@@ -19,7 +19,7 @@ empties itself delivers notifications".
     device does not hold.
   - `device.sweep()` sweeps every bank made on the device and not yet swept (the device keeps them in `#madeBanks`,
     added by `cheatHoldBank`, removed by `cheatDropBank`; `#thisIsTemporaryBank` stays the one its snapshot shows and
-    `device.lock()` locks). Making a bank sweeps nothing. The device stays enabled, still judges strength, and holds
+    `device.lock()` locks every bank in the set). Making a bank sweeps nothing. The device stays enabled, still judges strength, and holds
     the next bank made or born on it. (Reworked after review, with the Coach's ruling "yes the device should sweep".)
   - New export: `type HostedVault` (`{ sweep(): unknown }`, `shapes-bankish.ts`), with the phrase `HostedVaultExpected`.
   - Tests:
@@ -59,8 +59,8 @@ empties itself delivers notifications".
     tests in `device.test.ts` and `bank.test.ts` were rewritten for a device that stays.
 * **Discoveries**:
   - **A bank made earlier on the device** was not reached by `device.sweep()`, and stayed enabled (the review's
-    significant finding). Fixed: the device sweeps every bank made on it. One drift remains, in
-    `notes/guarantees-drift.md`: `device.lock()` locks only the last bank made.
+    significant finding). Fixed: the device sweeps every bank made on it. `device.lock()` too locks every bank made on it, so
+    `notes/guarantees-drift.md` keeps no drift here.
   - **Crossings, written into `notes/wontfix.md`:**
     - A birth in flight across `device.sweep()` now resolves a bank, which the device holds. This widens the "A lock, a
       sweep or a second form verb" entry.
