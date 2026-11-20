@@ -1,8 +1,11 @@
 # Thread 17: form_verbs (2026-11-20)
 
 Branch `20261120-form_verbs`, PR #785, stacked on #784 (`20261120-logical_gating`). Design:
-`whiteboard/20261119-vault_snapper/gating-forms.md` (in the base checkout). Proved: `safebyok` lint, typecheck (with
-forgotten-exports) and 1314 tests green; `safebyok-react` **red on purpose**, mended by thread 18 (below).
+`whiteboard/20261119-vault_snapper/gating-forms.md` (in the base checkout). Proved: `pnpm justify` after catching up onto #784 at cb46d987e: every package green (`safebyok` 1315 tests,
+`safebyok-big` 2946, e2e 576, the adapters) but `safebyok-react`, **red on purpose**, mended by thread 18: its lint (22
+errors) and typecheck fail in `src/giver/react-giver.ts`, `tests/giver/knock-knock.test.tsx`,
+`tests/giver/react-giver.test.tsx` and `tests/test-helpers/fake-giver-world.ts`, and the 4 knock-knock tests fail
+(325 of 329 pass).
 
 * **Built** (`packages/safebyok/src/`):
   * `models/bank.ts` *Form verbs*: `Bank.birth(device, cleartexts)` (a static, kept on Bank: it needs the private
