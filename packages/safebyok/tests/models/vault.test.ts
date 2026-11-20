@@ -140,7 +140,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     const { record: stored } = await bank.sealBox(first, {}, { whisper: TH.Whisper })
     rowsOf(bank).set(Openai, stored)
     await minder.list('box')
-    expect(minder.at(scopeAt(bank, Openai))?.liveness).to.equal('behind')
+    expect(minder.at(scopeAt(bank, Openai))?.liveness).to.equal('bhnd')
     await TH.expectRefusal(vault.putBoxOnce(Openai, {}, { whisper: TH.Whisper }), 'bad_record')
     expect(await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })).to.include({ revseq: 2 })
   })
