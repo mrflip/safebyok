@@ -254,9 +254,10 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
     if (this.isUnlocked) { return this }
-    this.#unlockWait ??= makeWait()
+    // Held here: a subscriber told by the align may dismiss the wait or sweep the bank, which clears #unlockWait.
+    const wait = (this.#unlockWait ??= makeWait())
     this.#align()
-    await this.#unlockWait.promise
+    await wait.promise
     return this
   }
 

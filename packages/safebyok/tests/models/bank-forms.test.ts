@@ -448,6 +448,21 @@ describe("bank.ensureUnlocked()", () => {
     expect(await next).to.equal(bank)
   })
 
+  it("rejects 'dismissed' when a subscriber dismisses the wait as it hears an unlock is wanted", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.lock()
+    bank.subscribe(() => { if (bank.getSnapshot().unlockWanted) { bank.dismissUnlock() } })
+    await TH.expectRefusal(bank.ensureUnlocked(), 'dismissed')
+    expect(bank.getSnapshot().unlockWanted).to.be.false
+  })
+
+  it("rejects with the bank's end cause when a subscriber sweeps the bank as it hears an unlock is wanted", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.lock()
+    bank.subscribe(() => { if (bank.getSnapshot().unlockWanted) { bank.sweep() } })
+    expect(await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')).to.equal(bank.endCause)
+  })
+
   it("dismissUnlock changes nothing with no call waiting", async () => {
     const { bank } = await TH.buildBornBank()
     bank.lock()
