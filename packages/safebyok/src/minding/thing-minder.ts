@@ -75,7 +75,7 @@ export type Labelpathed = { labelpath: Labelpath }
  * - `invalidate` asks the vaultDB nothing, and changes no car and no listing's labelpaths: it marks listings, never cars.
  */
 export class ThingMinder {
-  // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #minding, #isReady
+  // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
   readonly userid:    Userid
   readonly banklabel: Banklabel
   readonly #bank:           MinderFriend
@@ -83,11 +83,8 @@ export class ThingMinder {
   readonly #tsq:            TSQ.QueryClient
   readonly #queryCacheOpts: Readonly<QueryCacheOpts>
   #unwatch: (() => void) | null = null
-  /** A token for each stretch of minding, from `hello` until `goodbye`, or null while not minding. */
-  #minding: symbol | null = null
-
   /** True while minding: from `hello` until `goodbye`. */
-  get #isReady(): boolean { return this.#minding !== null }
+  #isReady = false
   // --
 
   // == [Construction]: make, constructor, #makeTSQ
@@ -133,7 +130,7 @@ export class ThingMinder {
    */
   hello(): void {
     if (this.#isReady) { return }
-    this.#minding = Symbol('minding')
+    this.#isReady = true
     this.#seedListing(this.#rootBoxScope)
     this.#unwatch = this.#vaultDB.watch(
       this.scope,
@@ -145,7 +142,7 @@ export class ThingMinder {
 
   /** Stop minding, and empty the cache. A get still waiting refuses `disabled`. A later `hello` starts minding again. */
   goodbye(): void {
-    this.#minding = null
+    this.#isReady = false
     if (this.#unwatch) { this.#unwatch() }
     this.#unwatch = null
     this.#tsq.clear()
@@ -217,19 +214,15 @@ export class ThingMinder {
    * Where that leaves a car `bhnd` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
    * answers from the cache.
    * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
-   * A list answered after `goodbye` caches nothing.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
     MinderChecks.minderLabelpath.parse(labelpath)
     this.#demandReady()
-    const minding = this.#minding
-    const ask     = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
-    const answer  = await this.#vaultDB.tryListThings(ask)
+    const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
+    const answer = await this.#vaultDB.tryListThings(ask)
     if (! answer.ok) { throw answer.err }
     if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
     const labelpaths = answer.val.map((record) => record.labelpath)
-    // A list answered after goodbye belongs to the cache goodbye emptied, though a fresh hello has started another.
-    if (this.#minding !== minding) { return labelpaths }
     TSQ.notifyManager.batch(() => {
       this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
       for (const record of answer.val) { this.#sendToTSQ(record) }
@@ -290,7 +283,6 @@ export class ThingMinder {
   /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
    * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
-   * A write answered after `goodbye` caches nothing.
    * Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryWrite(ask: WriteAsk): Promise<WriteThingAnswer> {
@@ -300,11 +292,9 @@ export class ThingMinder {
     } catch (err) {
       return { ok: false, ask: loggableAskOf(ask), act: 'unclassified_storing', world: null, dbhas: null, err: Errors.isVaultError(err) ? err : Throwers.unexpectedError(err) }
     }
-    const minding = this.#minding
-    const answer  = await this.#vaultDB.tryWriteThing(ask)
-    // Only the record written lands here, and only in the cache the write began in: a fresh hello's is another. A refusal's
-    // dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
-    if (answer.ok && (this.#minding === minding)) { this.#sendToTSQ(answer.val) }
+    const answer = await this.#vaultDB.tryWriteThing(ask)
+    // Only the record written lands here. A refusal's dbhas, and any tracked and updated bank, main gate or root box, land through the watch.
+    if (answer.ok) { this.#sendToTSQ(answer.val) }
     return answer
   }
   // --
@@ -320,7 +310,6 @@ export class ThingMinder {
   // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
   /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
-    const minding = this.#minding
     let fetched: ThingCar<ThingRecord>
     try {
       fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
@@ -328,9 +317,6 @@ export class ThingMinder {
       // TanStack cancels a get under way when goodbye empties the cache.
       throw (err instanceof TSQ.CancelledError) ? Throwers.minderNotStarted() : err
     }
-    // A get whose fetch had settled when goodbye came is not cancelled, and resumes some microtasks later, perhaps after a
-    // fresh hello: its record belongs to the cache goodbye emptied, and must join no listing of the new one.
-    if (this.#minding !== minding) { throw Throwers.minderNotStarted() }
     // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
     // get may have left the cache a later record.
     const car = this.#cachedAt(scoped) ?? fetched

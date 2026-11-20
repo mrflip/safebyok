@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Errors } from 'safebyok-big/internals'
-import { type ThingCar, DefaultQueryCacheOpts, MaxTimerMillis } from '../../../src/shapes/shapes-minder'
+import { DefaultQueryCacheOpts, MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { carOf } from '../../../src/minding/thing-car'
 import { ThingMinder } from '../../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { type ThingRecord, Shell } from '../../../src/shapes/shapes-thing'
+import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { fakeBankOf, LateVaultDB, LateListVaultDB, LateWriteVaultDB, boxBirthAskOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
+import { fakeBankOf, LateVaultDB, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf } from './world'
 
 describe("ThingMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
@@ -170,55 +169,6 @@ describe("ThingMinder.goodbye", () => {
     expect(minder.at(TH.GateScope)).to.be.undefined
   })
 
-  // A fetch that settled before goodbye is not cancelled, and its get resumes some microtasks later. The sweep lands goodbye
-  // and hello at each hop after the vaultDB answers, from before the fetch settles to after the get has returned.
-  it("refuses a get that answers after goodbye and a fresh hello, and joins nothing to the new root listing", async () => {
-    const outcomes = new Set<string>()
-    for (let hops = 0; hops < 12; hops++) {
-      const vaultDB = new LateVaultDB()
-      await storedBoxOf(vaultDB)
-      const { minder } = minderWorldOf(vaultDB)
-      const getting = outcomeOf(minder.get(TH.BoxScope))
-      await TH.eventually(() => vaultDB.isHolding)
-      vaultDB.release()
-      for (let ii = 0; ii < hops; ii++) { await Promise.resolve() }
-      minder.goodbye()
-      minder.hello()
-      const outcome = await getting
-      outcomes.add(outcome)
-      expect(outcome).to.be.oneOf(['disabled', 'full'])
-      expect([minder.listingAt(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([[], undefined])
-    }
-    // Tripwire: the sweep reaches both a get refused and a get that returned before goodbye.
-    expect([outcomes.has('disabled'), outcomes.has('full')]).to.deep.equal([true, true])
-  })
-
-  it("answers a list that answers after goodbye and a fresh hello, and caches nothing of it", async () => {
-    const vaultDB = new LateListVaultDB()
-    await storedBoxOf(vaultDB)
-    const { minder } = minderWorldOf(vaultDB)
-    const listing = minder.list('box')
-    await TH.eventually(() => vaultDB.isHolding)
-    minder.goodbye()
-    minder.hello()
-    vaultDB.release()
-    expect(await listing).to.deep.equal(['box/openai'])
-    expect([minder.listingAt(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([[], undefined])
-  })
-
-  it("answers a write that answers after goodbye and a fresh hello, and caches nothing of it", async () => {
-    const vaultDB = await bornOf(new LateWriteVaultDB())
-    const { minder } = minderWorldOf(vaultDB)
-    vaultDB.hold()
-    const writing = minder.tryWrite(boxBirthAskOf())
-    await TH.eventually(() => vaultDB.isHolding)
-    minder.goodbye()
-    minder.hello()
-    vaultDB.release()
-    expect(await writing).to.deep.include({ ok: true, act: 'born', val: TH.boxThingOf() })
-    expect([minder.listingAt(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([[], undefined])
-  })
-
   it("lets hello start the minder again, with the cache's timings it was made with", async () => {
     vi.useFakeTimers()
     try {
@@ -240,13 +190,3 @@ describe("ThingMinder.goodbye", () => {
     }
   })
 })
-
-/** The liveness of the car `getting` answers, or the refusalkind of its refusal. */
-async function outcomeOf(getting: Promise<ThingCar<ThingRecord>>): Promise<string> {
-  try {
-    const car = await getting
-    return car.liveness
-  } catch (err) {
-    return (err as Errors.VaultError).refusalkind
-  }
-}

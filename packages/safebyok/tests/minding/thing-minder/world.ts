@@ -7,8 +7,8 @@ import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
 import { type GateRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
-import { type GetAsk, type ListAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
-import type { GetThingAnswer, ListThingsAnswer, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
+import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
+import type { GetThingAnswer, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
 import * as TH from '../../test-helpers'
 
 /** The get ask a minder sends the vaultDB for the main gate: the bank's, tracking the roots at revision 0. */
@@ -44,23 +44,6 @@ export class LateVaultDB extends MemoryVaultDB {
   }
 
   /** Let every get that waits answer what it read. */
-  release(): void { for (const resolve of this.#releases.splice(0)) { resolve() } }
-}
-
-/** A vaultDB whose lists read the store at once, and answer only when the test calls `release`. */
-export class LateListVaultDB extends MemoryVaultDB {
-  readonly #releases: (() => void)[] = []
-
-  /** True while a list has read the store and waits to answer. */
-  get isHolding(): boolean { return this.#releases.length > 0 }
-
-  override async tryListThings(ask: ListAsk): Promise<ListThingsAnswer> {
-    const answer = await super.tryListThings(ask)
-    await new Promise<void>((resolve) => { this.#releases.push(resolve) })
-    return answer
-  }
-
-  /** Let every list that waits answer what it read. */
   release(): void { for (const resolve of this.#releases.splice(0)) { resolve() } }
 }
 
