@@ -9,7 +9,7 @@
 
 import { type Mock, type MockInstance, afterEach, beforeEach, vi } from 'vitest'
 import type { Deriver } from 'safebyok-big/internals'
-import { Consts, Crypto, GX, Outcome, SX } from 'safebyok-big/internals'
+import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
 import { Device } from '../../src/models/device'
@@ -104,23 +104,7 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
 export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) } }
 // --
 
-// == [A born bank]: answerPrompt, BornBankGiven, BornBank, buildBornBank, BornVault, buildBornVault
-
-/** Answer the gating `launching` opened on `device` with `cleartexts`, as a host's dialog would: resolve the bank the attempt lands, or reject with its refusal.
- * A gating the attempt leaves open, after a correctable refusal, is dismissed. A launch refused before it opened a gating rejects as it came.
- */
-export async function answerPrompt(device: Device, launching: Promise<unknown>, cleartexts: unknown): Promise<Bank> {
-  const gating = device.openGating
-  if (gating === null) {
-    await launching
-    throw new Error('the prompt opened no gating')
-  }
-  const launched = Outcome.outcomeOf(() => launching)
-  const outcome = await gating.attempt(cleartexts as never)
-  gating.dismiss()
-  await launched
-  return Outcome.valOf(outcome)
-}
+// == [A born bank]: BornBankGiven, BornBank, buildBornBank, BornVault, buildBornVault
 
 /** What a test may say of a {@link buildBornBank} bank. */
 export interface BornBankGiven {
@@ -138,7 +122,7 @@ export interface BornBank {
   proving: PassphraseProving
 }
 
-/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB through a `birth_bank` gating, and so unlocked.
+/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB by `Bank.birth`, and so unlocked.
  * Its proving is a stored proving of the main gate, by {@link TestPassphrase}.
  */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
@@ -146,7 +130,7 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   const makeRecord = vi.spyOn(Bank, 'makeRecord')
   try {
     const passkeyClear = passkeyCleartext && copyOfAnswer(passkeyCleartext)
-    const bank = await answerPrompt(device, Bank.launchBirthBankPrompt(device), { passphraseClear: TestPassphrase, passkeyClear })
+    const bank = await Bank.birth(device, { passphraseClear: TestPassphrase, passkeyClear })
     const record = makeRecord.mock.results.at(-1)!.value as BankMakeRecord
     const proving = await PassphraseProving.buildStored(device, bank.maingate, TestPassphrase)
     return { device, bank, record, proving }

@@ -5,10 +5,10 @@ import { Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
-import { Gating, addPasskey, attemptWithoutGating, birthBank, replacePassphrase, revokePasskey, unlockBank } from './gating'
+import * as Attempts from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
-import type { CleartextsForGatingkind, GatingAttempt, Gatingkind } from '../shapes/shapes-gateish'
+import type { BankGatingFriend, BirthCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts } from '../shapes/shapes-gateish'
 import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BirthOpts, BoxUnsealed, SealedBoxAsk } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
@@ -23,7 +23,7 @@ import * as Throwers from '../refusals/throwers'
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
+  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #unlockWait, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
 
   readonly #device:   Device
   readonly #vaultDB:  VaultDB
@@ -39,6 +39,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** The attached lease, null while locked. */
   #lease: Lease | null = null
+
+  /** The wait every call in {@link ensureUnlocked} shares, or null while none waits. The snapshot's `unlockWanted` is whether there is one. */
+  #unlockWait: Wait | null = null
 
   /** Why a sweep disabled the bank, or null until then. */
   #endCause: Errors.VaultError | null = null
@@ -171,209 +174,113 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt, ensureUnlocked, launchOrJoin
-  // A prompt opens a gating and waits for it to conclude, or joins the gating of its own kind open on its bank. An unlock that finds a
-  // gating of another kind open waits for it to end, and asks only if the bank is still locked: a gate change mostly leaves it unlocked.
+  // == [Form verbs]: birth, tryBirth, unlock, tryUnlock, replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, gatingFriend
+  // Each hands the cleartexts a form collected, unread, to its attempt in gating.ts, with a friend of this bank's private
+  // verbs: no public method accepts a proving (G9). Each spends the cleartexts whatever its outcome, and changes nothing where it refuses.
 
-  /** Ask the user for a new passphrase and optional passkey, and birth the bank of `device`'s scope with them. Resolves the bank, unlocked.
-   * Call it only where no bank is stored: over one, the attempt refuses `gate_made_elsewhere`.
+  /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked.
+   * Refuses `weak_passphrase` before any key is derived, and `gate_made_elsewhere` where a live bank is already stored.
    */
-  static async launchBirthBankPrompt(device: Device): Promise<Bank> {
+  static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> {
     const friend = {
-      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birth(record, { device, vaultDB: device.vaultDB, proving }),
+      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving }),
     }
-    const gating = Gating.make({ gatingkind: 'birth_bank' }, {
-      device, bank: null, askUser: device.askUser, attempt: (cleartexts) => birthBank(device, cleartexts, friend),
-    })
-    return gating.launch()
+    return Attempts.birthBank(device, cleartexts, friend)
   }
 
-  /** Ask the user for the passphrase or the passkey, and unlock this bank with it.
-   * While an `unlock_bank` gating is open on this bank, it joins that gating instead.
-   * While a gating of another kind is open on it, it waits for that one to end, however it ends, and asks only if the bank is still locked.
+  /** {@link birth}, resolving an `Outcome` instead of throwing. */
+  static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
+
+  /** Unlock this bank by its passphrase or its passkey, under a lease citing its main gate.
+   * Every call waiting in {@link ensureUnlocked} resumes. A wrong passphrase or passkey refuses, and leaves the bank as it was.
    */
-  async launchUnlockBankPrompt(): Promise<this> {
-    this.demandEnabled()
-    const open = this.#device.openGating
-    if ((open?.bank === this) && (open.gatingkind !== 'unlock_bank')) {
-      // Its outcome is not the unlock's: whenConcluded resolves a refusal as an outcome, and the bank is checked afresh.
-      await open.whenConcluded
-      this.demandEnabled()
-      if (this.isUnlocked) { return this }
+  async unlock(cleartexts: UnlockCleartexts): Promise<this> {
+    await Attempts.unlockBank(this, cleartexts, this.#gatingFriend())
+    return this
+  }
+
+  /** {@link unlock}, resolving an `Outcome` instead of throwing. */
+  tryUnlock(cleartexts: UnlockCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.unlock(cleartexts)) }
+
+  /** Replace the passphrase, proved by the current passphrase or the passkey, and unlock under a lease citing the gate written.
+   * The passkey stays, and the bankKey does not change. Refuses `same_passphrase`, and `weak_passphrase`, before any key is derived.
+   */
+  async replacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<this> {
+    await Attempts.replacePassphrase(this, cleartexts, this.#gatingFriend())
+    return this
+  }
+
+  /** {@link replacePassphrase}, resolving an `Outcome` instead of throwing. */
+  tryReplacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.replacePassphrase(cleartexts)) }
+
+  /** Add a passkey, proved by the passphrase, and unlock under a lease citing the gate written.
+   * A gate has one passkey at most: this refuses while it has one.
+   */
+  async addPasskey(cleartexts: PasskeyAddCleartexts): Promise<this> {
+    await Attempts.addPasskey(this, cleartexts, this.#gatingFriend())
+    return this
+  }
+
+  /** {@link addPasskey}, resolving an `Outcome` instead of throwing. */
+  tryAddPasskey(cleartexts: PasskeyAddCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.addPasskey(cleartexts)) }
+
+  /** Revoke the passkey, proved by the passphrase or the passkey itself, and unlock under a lease citing the gate written.
+   * With no passkey, the proof unlocks the bank and nothing is written. The bankKey does not change.
+   */
+  async revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<this> {
+    await Attempts.revokePasskey(this, cleartexts, this.#gatingFriend())
+    return this
+  }
+
+  /** {@link revokePasskey}, resolving an `Outcome` instead of throwing. */
+  tryRevokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.revokePasskey(cleartexts)) }
+
+  /** The friend of this bank's private verbs an attempt is handed. */
+  #gatingFriend(): BankGatingFriend {
+    return {
+      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
+      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
     }
-    await this.#launchOrJoin('unlock_bank', (cleartexts) => this.#unlockBankWith(cleartexts))
-    return this
   }
+  // --
 
-  /** Ask the user for the current passphrase and a new one, and replace the passphrase. Leaves the bank unlocked.
-   * The passkey stays, and the bankKey does not change.
-   * While a `replace_passphrase` gating is open on this bank, it joins that gating instead.
-   */
-  async launchReplacePassphrasePrompt(): Promise<this> {
-    this.demandEnabled()
-    await this.#launchOrJoin('replace_passphrase', (cleartexts) => this.#replacePassphraseWith(cleartexts))
-    return this
-  }
+  // == [The awaited unlock]: ensureUnlocked, dismissUnlock, settleUnlockWait
+  // One wait is shared by every caller, opened by the first and settled once: by any unlock, a dismissal or the bank's end.
 
-  /** Ask the user for the passphrase and a new passkey, and add the passkey. Leaves the bank unlocked.
-   * A gate has one passkey at most: this refuses, asking nobody, while it has one.
-   * While an `add_passkey` gating is open on this bank, it joins that gating instead.
-   */
-  async launchAddPasskeyPrompt(): Promise<this> {
-    this.demandEnabled()
-    this.#maingate.demandPasskeyAddable()
-    await this.#launchOrJoin('add_passkey', (cleartexts) => this.#addPasskeyWith(cleartexts))
-    return this
-  }
-
-  /** Ask the user for the passphrase, and revoke the passkey. Leaves the bank unlocked.
-   * With no passkey, it returns at once and asks nobody. The bankKey does not change.
-   * While a `revoke_passkey` gating is open on this bank, it joins that gating instead.
-   */
-  async launchRevokePasskeyPrompt(): Promise<this> {
-    this.demandEnabled()
-    if (this.#maingate.passkey0 === null) { return this }
-    await this.#launchOrJoin('revoke_passkey', (cleartexts) => this.#revokePasskeyWith(cleartexts))
-    return this
-  }
-
-  /** Unlock this bank by asking the user, unless it is already unlocked.
-   * A gate change open on this bank is waited for first, and the user is asked only if it leaves the bank locked.
+  /** Resolve this bank once it is unlocked: at once if it is, or else once any unlock lands, by {@link unlock} or a gate change.
+   * While it waits, the snapshot's `unlockWanted` is true: render the unlock form, and call {@link unlock} from it.
+   * Rejects `dismissed` once {@link dismissUnlock} is called, and with the bank's `endCause` once it ends.
    */
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
     if (this.isUnlocked) { return this }
-    return this.launchUnlockBankPrompt()
+    this.#unlockWait ??= makeWait()
+    this.#align()
+    await this.#unlockWait.promise
+    return this
   }
 
-  /** Join the `gatingkind` gating open on this bank, or else launch one whose attempts run `attempt`. */
-  async #launchOrJoin(gatingkind: Gatingkind, attempt: GatingAttempt): Promise<Bank> {
-    const open = this.#device.openGating
-    if ((open?.bank === this) && (open.gatingkind === gatingkind)) { return Outcome.valOf(await open.whenConcluded) }
-    return Gating.make({ gatingkind }, { device: this.#device, bank: this, askUser: this.#device.askUser, attempt }).launch()
-  }
-  // --
-
-  // == [Re-entry points]: tryAttemptUnlock, attemptUnlock, tryAttemptReplacePassphrase, attemptReplacePassphrase, tryAttemptAddPasskey, attemptAddPasskey, tryAttemptRevokePasskey, attemptRevokePasskey, handIn
-  // Each hands the user's cleartexts to the gating of its kind open on this bank, as a form does with what the user typed, so
-  // that every prompt waiting on that gating resumes once it lands. With none open, it makes its change directly. An unlock waits out a
-  // gating of another kind first, as its prompt does. Each try form answers an outcome; its twin throws the refusal instead.
-
-  /** Unlock this bank with the passphrase or passkey in `cleartexts`, resolving an `Outcome` instead of throwing.
-   * It answers the `unlock_bank` gating open on this bank, if any. A correctable refusal, such as `wrong_passphrase`, leaves that gating open for another attempt.
-   * A passkey answer's PRF bytes are zeroed once used, unless a refusal leaves a gating open.
-   * A gating of another kind open on this bank is waited for first. If it leaves the bank unlocked, this resolves without using `cleartexts`.
-   */
-  async tryAttemptUnlock(cleartexts: CleartextsForGatingkind['unlock_bank']): Promise<Outcome.Outcome<Bank>> {
-    const open = this.#device.openGating
-    // A disabled bank waits on nothing: #handIn refuses it at once, as a bank's sweep leaves the device's open gating open.
-    if (this.isEnabled && (open?.bank === this) && (open.gatingkind !== 'unlock_bank')) {
-      // Its outcome is not the unlock's: whenConcluded resolves a refusal as an outcome, and the bank is checked afresh.
-      await open.whenConcluded
-      if (this.isUnlocked) { return attemptWithoutGating(this, cleartexts, () => Promise.resolve(this)) }
-    }
-    return this.#handIn('unlock_bank', cleartexts, (cleartexts) => this.#unlockBankWith(cleartexts))
+  /** Reject every call waiting in {@link ensureUnlocked} with `dismissed`, as when the user closes the unlock form. The bank stays locked. */
+  dismissUnlock(): this {
+    this.#settleUnlockWait(Throwers.unlockDismissed())
+    this.#align()
+    return this
   }
 
-  /** {@link tryAttemptUnlock}, throwing its refusal instead of answering it: this bank, unlocked, on success. */
-  async attemptUnlock(cleartexts: CleartextsForGatingkind['unlock_bank']): Promise<Bank> {
-    return Outcome.valOf(await this.tryAttemptUnlock(cleartexts))
-  }
-
-  /** Replace the passphrase with the new one in `cleartexts`, proved by the current one, resolving an `Outcome` instead of throwing.
-   * It answers the `replace_passphrase` gating open on this bank, if any. On success the bank is left unlocked.
-   */
-  tryAttemptReplacePassphrase(cleartexts: CleartextsForGatingkind['replace_passphrase']): Promise<Outcome.Outcome<Bank>> {
-    return this.#handIn('replace_passphrase', cleartexts, (cleartexts) => this.#replacePassphraseWith(cleartexts))
-  }
-
-  /** {@link tryAttemptReplacePassphrase}, throwing its refusal instead of answering it: this bank, on success. */
-  async attemptReplacePassphrase(cleartexts: CleartextsForGatingkind['replace_passphrase']): Promise<Bank> {
-    return Outcome.valOf(await this.tryAttemptReplacePassphrase(cleartexts))
-  }
-
-  /** Add the passkey in `cleartexts`, proved by the passphrase, resolving an `Outcome` instead of throwing.
-   * It answers the `add_passkey` gating open on this bank, if any. On success the bank is left unlocked. With no gating open,
-   * a gate that already has a passkey refuses.
-   */
-  tryAttemptAddPasskey(cleartexts: CleartextsForGatingkind['add_passkey']): Promise<Outcome.Outcome<Bank>> {
-    return this.#handIn('add_passkey', cleartexts, (cleartexts) => {
-      this.#maingate.demandPasskeyAddable()
-      return this.#addPasskeyWith(cleartexts)
-    })
-  }
-
-  /** {@link tryAttemptAddPasskey}, throwing its refusal instead of answering it: this bank, on success. */
-  async attemptAddPasskey(cleartexts: CleartextsForGatingkind['add_passkey']): Promise<Bank> {
-    return Outcome.valOf(await this.tryAttemptAddPasskey(cleartexts))
-  }
-
-  /** Revoke the passkey, proved by the passphrase in `cleartexts`, resolving an `Outcome` instead of throwing.
-   * It answers the `revoke_passkey` gating open on this bank, if any. On success the bank is left unlocked. With no gating
-   * open and no passkey, it resolves at once and changes nothing.
-   */
-  tryAttemptRevokePasskey(cleartexts: CleartextsForGatingkind['revoke_passkey']): Promise<Outcome.Outcome<Bank>> {
-    return this.#handIn('revoke_passkey', cleartexts, async (cleartexts) => (this.#maingate.passkey0 === null ? this : this.#revokePasskeyWith(cleartexts)))
-  }
-
-  /** {@link tryAttemptRevokePasskey}, throwing its refusal instead of answering it: this bank, on success. */
-  async attemptRevokePasskey(cleartexts: CleartextsForGatingkind['revoke_passkey']): Promise<Bank> {
-    return Outcome.valOf(await this.tryAttemptRevokePasskey(cleartexts))
-  }
-
-  /** Hand `cleartexts` to this bank's open gating of `gatingkind`, or with none open, to `attempt` once */
-  #handIn<KindT extends Gatingkind>(gatingkind: KindT, cleartexts: CleartextsForGatingkind[KindT], attempt: GatingAttempt): Promise<Outcome.Outcome<Bank>> {
-    const open = this.#device.openGating
-    if (open?.bank === this && open.gatingkind === gatingkind) { return open.attempt(cleartexts) }
-    return attemptWithoutGating(this, cleartexts, attempt)
+  /** Settle the wait for an unlock, if one is open: resolve it for null, or reject it with `refusal`. */
+  #settleUnlockWait(refusal: Errors.VaultError | null): void {
+    const wait = this.#unlockWait
+    this.#unlockWait = null
+    if (refusal === null) { wait?.resolve() } else { wait?.reject(refusal) }
   }
   // --
 
-  // == [The gatings' attempts]: unlockBankWith, replacePassphraseWith, addPasskeyWith, revokePasskeyWith
-  // Each hands its attempt a friend of this bank's private verbs: no public method accepts a proving (G9).
-
-  /** Unlock this bank with `cleartexts`: its passphrase or its passkey. */
-  #unlockBankWith(cleartexts: unknown): Promise<Bank> {
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-    }
-    return unlockBank(this, cleartexts, friend)
-  }
-
-  /** Replace the passphrase with `cleartexts`: the current one and the next. */
-  #replacePassphraseWith(cleartexts: unknown): Promise<Bank> {
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
-    }
-    return replacePassphrase(this, cleartexts, friend)
-  }
-
-  /** Add the passkey in `cleartexts`, proved by the passphrase beside it. */
-  #addPasskeyWith(cleartexts: unknown): Promise<Bank> {
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
-    }
-    return addPasskey(this, cleartexts, friend)
-  }
-
-  /** Revoke the passkey, proved by the passphrase in `cleartexts`. */
-  #revokePasskeyWith(cleartexts: unknown): Promise<Bank> {
-    const friend = {
-      unlockByProving: (proved: Proving) => this.#unlockByProving(proved),
-      putGate:         (ask: PutAskDraft<GateRecord>) => this.#putGate(ask),
-    }
-    return revokePasskey(this, cleartexts, friend)
-  }
-  // --
-
-  // == [The gatings' private verbs]: birth, unlockByProving, putGate
+  // == [The attempts' private verbs]: birthByProving, unlockByProving, putGate
 
   /** Write a new bank of `record`, with its main gate and its root box sealed under a lease `opts.proving` builds, and resolve it unlocked under that lease.
    * Refuses `gate_made_elsewhere` if another bank is already stored at its scope.
    */
-  static async #birth(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
+  static async #birthByProving(record: BankMakeRecord, opts: BirthOpts): Promise<Bank> {
     const { proving, ...bankOpts } = opts
     const bank   = this.make(record, bankOpts)
     bank.demandEnabled()
@@ -409,7 +316,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Unlocking, locking and sweeping]: attachLease, lock, sweep
 
-  /** Attach `lease`, evicting the one it replaces. Once this bank is disabled, it evicts `lease` instead, and refuses. */
+  /** Attach `lease`, evicting the one it replaces, and resume every call waiting for an unlock. Once this bank is disabled, it evicts `lease` instead, and refuses. */
   #attachLease(lease: Lease): void {
     if (! this.isEnabled) {
       lease.evict()
@@ -417,6 +324,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     }
     this.#lease?.evict()
     this.#lease = lease
+    this.#settleUnlockWait(null)
     this.#align()
   }
 
@@ -428,7 +336,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Disable this bank for good, and sweep its lease. Never throws.
+  /** Disable this bank for good, sweep its lease, and reject every call waiting for an unlock with its `endCause`. Never throws.
    * On a swept device, its `endCause` is the device's.
    */
   sweep(): this {
@@ -436,6 +344,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     this.#endCause = this.#device.endCause ?? Throwers.bankSwept()
     this.#lease?.sweep()
     this.#lease = null
+    this.#settleUnlockWait(this.#endCause)
     this.#align()
     return this
   }
@@ -470,8 +379,9 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
       isLocked:    lease === null,
       isEnded,
       endCause,
-      leaseEndsAt: lease === null ? null : lease.proved_at + this.#device.leaseMillis,
-      lastErr:     null,
+      leaseEndsAt:  lease === null ? null : lease.proved_at + this.#device.leaseMillis,
+      lastErr:      null,
+      unlockWanted: this.#unlockWait !== null,
     })
   }
   // --
@@ -559,10 +469,29 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   static override readonly modelkind = 'bank'
 }
 
-// == [Helpers]: trackPairOf
+// == [Helpers]: trackPairOf, Wait, makeWait
 
 /** The revseq and lifepath of a Thing, as a `track` holds them. */
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
+
+/** A promise, beside the functions that settle it. */
+interface Wait {
+  readonly promise: Promise<void>
+  readonly resolve: () => void
+  readonly reject:  (refusal: Errors.VaultError) => void
+}
+
+/** A new {@link Wait}, unsettled. */
+function makeWait(): Wait {
+  // The executor runs at once, so both are assigned before the promise is returned.
+  let resolve!: Wait['resolve']
+  let reject!:  Wait['reject']
+  const promise = new Promise<void>((resolveWith, rejectWith) => {
+    resolve = resolveWith
+    reject  = rejectWith
+  })
+  return { promise, resolve, reject }
+}
 // --
 
 // == [Checks]: Checks

@@ -6,9 +6,8 @@ import 'fake-indexeddb/auto'
 import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { Bank } from '../../src/models/bank'
-import { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
+import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
-import type { Gating } from '../../src/models/gating'
 import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
 
@@ -30,13 +29,12 @@ describe("a page that is not a secure context", () => {
 })
 
 describe("Device.make(record, opts)", () => {
-  it("makes an enabled device of the record's scope and token, opening no gating", () => {
+  it("makes an enabled device of the record's scope and token", () => {
     const device = TH.makeDevice()
     expect(device).to.include({ ...TH.WorldScope, device_tok: TH.DeviceTok })
     expect(device.scope).to.deep.equal(TH.WorldScope)
     expect(device.isEnabled).to.be.true
     expect(device.demandEnabled()).to.equal(device)
-    expect(device.openGating).to.be.null
     expect(device.modelkind).to.eq('device')
   })
 
@@ -66,10 +64,9 @@ describe("Device.make(record, opts)", () => {
   })
 
   it("wraps each of the host's functions, keeping none of the host's own on a property", () => {
-    const requestCleartext = vi.fn()
-    const device = TH.makeDevice({}, { requestCleartext })
+    const device = TH.makeDevice()
     for (const guarded of [device.keyDeriver, device.strengthChecker]) { expect(Consts.isGuarded(guarded)).to.be.true }
-    expect(Object.values(device)).to.not.include.members([requestCleartext, TH.testDeriver, TH.anyStrengthChecker])
+    expect(Object.values(device)).to.not.include.members([TH.testDeriver, TH.anyStrengthChecker])
   })
 
   it("rounds a fraction of a minute to the nearest millisecond, and turns Infinity into ForeverMillis", () => {
@@ -92,7 +89,6 @@ describe("Device.make(record, opts)", () => {
     ['keyDeriver',       { keyDeriver: 3 }],
     ['strengthChecker',  { strengthChecker: 3 }],
     ['logger',           { logger: 3 }],
-    ['requestCleartext', { requestCleartext: null }],
   ] as const
 
   for (const [fieldname, moved] of OptsCases) {
@@ -107,6 +103,7 @@ describe("Device.make(record, opts)", () => {
     [{ autolockMinutes: -5 },    'an autolock of negative minutes'],
     [{ autolockMinutes: '30' },  'an autolock written as text'],
     [{ gates: ['main'] },        'an option of the old core'],
+    [{ requestCleartext: vi.fn() }, 'a requestCleartext, which a device does not take'],
     [{ onBadNews: 'tell me' },   'an onBadNews that is not a function'],
   ] as const
 
@@ -141,42 +138,6 @@ describe("Device.make(record, opts)", () => {
   })
 })
 
-describe("guardRequestCleartext(requestCleartext)", () => {
-  it("resolves true once the dialog returns, having shown it the gating", async () => {
-    const gating = {} as Gating
-    const dialog = vi.fn()
-    const guarded = guardRequestCleartext(dialog)
-    expect(Consts.isGuarded(guarded)).to.be.true
-    expect(await guarded(gating)).to.be.true
-    expect(dialog).toHaveBeenCalledExactlyOnceWith(gating)
-  })
-
-  it("waits on a dialog that returns a promise", async () => {
-    const latch = TH.makeLatch()
-    let isSettled = false
-    async function settling(): Promise<boolean> {
-      const answer = await guardRequestCleartext(() => latch.pass())({} as Gating)
-      isSettled = true
-      return answer
-    }
-    const asking = settling()
-    await TH.wakeupAtNextTick()
-    expect(isSettled).to.be.false
-    latch.release()
-    expect(await asking).to.be.true
-  })
-
-  it("resolves false, dropping what the dialog threw or rejected with", async () => {
-    expect(await guardRequestCleartext(() => { throw new Error(TH.TestPassphrase) })({} as Gating)).to.be.false
-    expect(await guardRequestCleartext(() => Promise.reject(new Error(TH.TestPassphrase)))({} as Gating)).to.be.false
-  })
-
-  it("refuses a dialog that is not a function, naming it", () => {
-    const err = TH.expectSyncRefusal(() => guardRequestCleartext('ask' as never), 'bad_record')
-    expect(err.message).to.match(/^requestCleartext: /)
-  })
-})
-
 describe("device.sweep()", () => {
   it("disables the device for good, and never throws", () => {
     const device = TH.makeDevice()
@@ -187,39 +148,40 @@ describe("device.sweep()", () => {
     expect(device.isEnabled).to.be.false
   })
 
-  it("dismisses the gating open on the device", async () => {
-    const device = TH.makeDevice()
-    const prompting = TH.expectRefusal(Bank.launchBirthBankPrompt(device), 'dismissed')
-    const gating = device.openGating!
+  it("sweeps its bank, rejecting a call waiting for an unlock", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const ensuring = bank.ensureUnlocked()
     device.sweep()
-    await prompting
-    expect(gating.isOpen).to.be.false
-    expect(device.openGating).to.be.null
+    expect(bank.isEnabled).to.be.false
+    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(device.endCause)
   })
 
-  it("lets an attempt under way finish as the gating's last, and no bank unlocks on the swept device", async () => {
-    const latch = TH.makeLatch()
-    const keyDeriver = { ...TH.testDeriver, deriveKeyBytes: async (passphrase: string, saltBytes: Uint8Array) => {
-      await latch.pass()
-      return TH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
-    } }
-    const device = TH.makeDevice({}, { keyDeriver })
-    const prompting = TH.expectRefusal(Bank.launchBirthBankPrompt(device), 'disabled')
-    const gating = device.openGating!
-    const attempting = gating.attempt({ passphraseClear: TH.TestPassphrase })
+  it("refuses a birth after it, writing nothing", async () => {
+    const device = TH.makeDevice()
+    const births = TH.spyBirths(device)
     device.sweep()
-    expect(gating.isOpen).to.be.true
-    latch.release()
-    await TH.expectBad(attempting, 'disabled')
-    await prompting
-    expect(gating.isOpen).to.be.false
+    await TH.expectRefusal(Bank.birth(device, { passphraseClear: TH.TestPassphrase }), 'disabled')
+    expect(births.tryBirthBank).not.toHaveBeenCalled()
+  })
+})
+
+describe("device.judgeStrength(passphraseCleartext)", () => {
+  it("returns the verdict of the device's strength checker, given the device's scope", async () => {
+    const strengthChecker = vi.fn((passphrase: string) => (passphrase === 'weak' ? { strong: false as const, reason: 'too short' } : { strong: true as const }))
+    const device = TH.makeDevice({}, { strengthChecker })
+    expect(await device.judgeStrength('weak')).to.deep.equal({ strong: false, reason: 'too short' })
+    expect(await device.judgeStrength(TH.TestPassphrase)).to.deep.equal({ strong: true })
+    expect(strengthChecker).toHaveBeenLastCalledWith(TH.TestPassphrase, TH.WorldScope)
   })
 
-  it("refuses a gating launched after it", async () => {
-    const device = TH.makeDevice()
-    device.sweep()
-    await TH.expectRefusal(Bank.launchBirthBankPrompt(device), 'disabled')
-    expect(device.openGating).to.be.null
+  it("judges every passphrase weak with no strengthChecker", async () => {
+    const device = TH.makeDevice({}, { strengthChecker: undefined })
+    expect(await device.judgeStrength(TH.TestPassphrase)).to.include({ strong: false })
+  })
+
+  it("rejects, rather than throws, a value that is not a string", async () => {
+    await TH.expectRefusal(TH.makeDevice().judgeStrength(null as never), 'bad_record')
   })
 })
 
@@ -248,9 +210,9 @@ function snapshotsOf(device: Device): DeviceSnapshot[] {
 }
 
 describe("device.getSnapshot() and device.subscribe(listener)", () => {
-  it("shows the pending bank and no gating before a bank is made", () => {
+  it("shows the pending bank before a bank is made", () => {
     const device = TH.makeDevice()
-    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank, gating: null })
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
     expect(Object.isFrozen(device.getSnapshot())).to.be.true
   })
 
@@ -274,51 +236,26 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
   })
 
-  it("shows the gating open on it, under a gatingseq that grows as each gating opens and ends", async () => {
+  it("shows an unlock wanted while a call waits for one, and carries no cleartext", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
-    const first = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
-    expect(device.getSnapshot().gating).to.deep.equal({ gatingkind: 'unlock_bank', gatingseq: 3, isAttempting: false })
-    device.openGating!.dismiss()
-    await first
-    expect(device.getSnapshot().gating).to.be.null
-    const second = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
-    expect(device.getSnapshot().gating).to.include({ gatingseq: 5 })
-    device.openGating!.dismiss()
-    await second
-  })
-
-  it("shows an attempt under way until it is refused, and carries no cleartext", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    bank.lock()
-    const prompting = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
     const snapshots = snapshotsOf(device)
+    const ensuring = bank.ensureUnlocked()
     const passphraseClear = 'not the passphrase, though long enough'
-    await TH.expectBad(bank.tryAttemptUnlock({ passphraseClear }), 'wrong_passphrase')
-    expect(snapshots.map(({ gating }) => gating?.isAttempting)).to.deep.equal([true, false])
-    expect(JSON.stringify(device.getSnapshot())).not.to.include(passphraseClear)
-    device.openGating!.dismiss()
-    await prompting
+    await TH.expectRefusal(bank.unlock({ passphraseClear }), 'wrong_passphrase')
+    await bank.unlock({ passphraseClear: TH.TestPassphrase })
+    await ensuring
+    expect(snapshots.map(({ bank: { stage, unlockWanted } }) => ({ stage, unlockWanted }))).to.deep.equal([
+      { stage: 'locked', unlockWanted: true },
+      { stage: 'unlocked', unlockWanted: false },
+    ])
+    expect(JSON.stringify(snapshots)).not.to.include(passphraseClear)
   })
 
-  it("shows the gating gone, and the bank unlocked, once an attempt lands", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    bank.lock()
-    const prompting = bank.launchUnlockBankPrompt()
-    await TH.expectGood(bank.tryAttemptUnlock({ passphraseClear: TH.TestPassphrase }))
-    await prompting
-    expect(device.getSnapshot()).to.deep.equal({ bank: bank.getSnapshot(), gating: null })
-    expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
-  })
-
-  it("shows its bank swept once it is swept, and its gating gone", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    bank.lock()
-    const prompting = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
+  it("shows its bank swept once it is swept", async () => {
+    const { device } = await TH.buildBornBank()
     device.sweep()
-    await prompting
-    expect(device.getSnapshot().gating).to.be.null
-    expect(device.getSnapshot().bank).to.include({ stage: 'swept', isEnded: true })
+    expect(device.getSnapshot().bank).to.include({ stage: 'swept', isEnded: true, unlockWanted: false })
   })
 
   it("tells every subscriber when one throws, and passes the throw to onBadNews", async () => {
