@@ -1,7 +1,8 @@
 # Thread 6: snapshots (2026-11-20)
 
-Branch `20261120-snapshots`, PR #773, stacked on #772 (thread 5, `20261120-bank_gatings`). Proved: `safebyok`
-lint, typecheck and tests green (1281 tests) before catch-up; `pnpm justify` after catch-up is in the PR's **Tests:** line.
+Branch `20261120-snapshots`, PR #773, stacked on #772 (thread 5, `20261120-bank_gatings`). Proved: `pnpm justify`
+green after catching up onto #772 at 76edb6866 (`safebyok` 1287 tests, `safebyok-big` 2946, e2e 576, every package
+passing).
 
 * **Built** (`packages/safebyok/src/`):
   * `shapes/shapes-bankish.ts` *Snapshots*: `BankStage` (all of S1's stages: `signed_out`, `starting`, `unborn`,
