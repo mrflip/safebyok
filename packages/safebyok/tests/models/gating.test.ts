@@ -91,7 +91,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   })
 
   const CleartextsCases = [
-    [{ passphraseClear: TH.TestPassphrase, nextPassphraseClear: TH.TestPassphrase },     'cleartexts meant for another form verb'],
+    [{ passphraseClear: TH.TestPassphrase, nextPassphraseClear: TH.TestPassphrase },       'cleartexts meant for another form verb'],
     [{ passphraseClear: TH.TestPassphrase, stray: TH.TestPassphrase },                     'a stray field'],
     [{ passkeyClear: null },                                                                'no passphrase'],
     [{ passphraseClear: 42 },                                                              'a passphrase that is not a string'],
