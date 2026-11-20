@@ -480,12 +480,12 @@ describe("bank.ensureUnlocked()", () => {
     for (const ensuring of ensurings) { expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause) }
   })
 
-  it("rejects every waiter with the device's end cause when the device is swept", async () => {
+  it("rejects every waiter with the bank's end cause when the device is swept", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const ensuring = bank.ensureUnlocked()
     device.sweep()
-    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(device.endCause)
+    expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause)
   })
 
   it("refuses a swept bank, wanting no unlock", async () => {

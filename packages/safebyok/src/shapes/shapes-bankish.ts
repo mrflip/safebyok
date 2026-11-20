@@ -39,7 +39,7 @@ export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbse
 export type SealedBoxAsk<RecordT extends BoxRecord = BoxRecord> = BoxWriteAsk & Readonly<{ record: RecordT }>
 // --
 
-// == [The bank's making]: BankOpts, BirthOpts
+// == [The bank's making]: BankOpts, BirthOpts, HostedVault
 
 /** The options of {@link Bank.make}, beside its record. */
 export interface BankOpts {
@@ -54,6 +54,13 @@ export interface BankOpts {
 /** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the birth's attempt underway. */
 export interface BirthOpts extends BankOpts {
   proving: Proving
+}
+
+// The core carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
+/** A vault a bank hosts: the bank's sweep sweeps it. */
+export interface HostedVault {
+  /** End the vault, as its bank ends. */
+  sweep(): unknown
 }
 // --
 

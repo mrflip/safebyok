@@ -17,7 +17,7 @@ import * as Throwers from '../refusals/throwers'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 /** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and the bank it holds.
- * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
+ * Make it with `Device.make(record, opts)`. A `sweep()` ends its bank, and leaves the device to make another.
  */
 export class Device {
   // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
@@ -36,13 +36,14 @@ export class Device {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The last bank made on this device, or null for none. {@link lock} and {@link sweep} act on it, and the device's
-   * snapshot carries its snapshot, or {@link PendingBank} while there is none.
+  /** The last bank made on this device, or null for none or once it is swept. {@link lock} and {@link sweep} act on it, and
+   * the device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
   #thisIsTemporaryBank: Bank | null = null
   /** Ends this device's subscription to the bank it holds. */
   #unsubscribeBank: () => void = () => undefined
-  /** Why a sweep disabled the device, or null while it is enabled. */
+  // Nothing ends a device yet: its sweep ends only its bank.
+  /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
 
   /** The current snapshot, which {@link getSnapshot} returns. */
@@ -110,7 +111,7 @@ export class Device {
   judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Locking]: lock, cheatHoldBank
+  // == [Locking]: lock, cheatHoldBank, cheatDropBank
 
   /** Lock this device's bank, if it holds one. Never throws. */
   lock(): this {
@@ -126,14 +127,21 @@ export class Device {
     this.#unsubscribeBank = bank.subscribe(this.#align)
     this.#align()
   }
+
+  /** Let go of `bank`, if it is the bank this device holds, and show {@link PendingBank}. A bank calls it as it is swept. Internal. */
+  cheatDropBank(bank: Bank): void {
+    if (bank !== this.#thisIsTemporaryBank) { return }
+    this.#unsubscribeBank()
+    this.#unsubscribeBank = () => undefined
+    this.#thisIsTemporaryBank = null
+    this.#align()
+  }
   // --
 
   // == [Ending]: sweep
 
-  /** Disable this device for good, and sweep its bank. Never throws. */
+  /** Sweep this device's bank, if it holds one. The device stays, to judge passphrases and make a bank again. Never throws. */
   sweep(): this {
-    if (! this.isEnabled) { return this }
-    this.#endCause = Throwers.deviceDisabled()
     this.#thisIsTemporaryBank?.sweep()
     return this
   }
@@ -165,7 +173,7 @@ export class Device {
   // == [Telling the host]: tellBadNews
 
   /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
-   * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device is disabled, the
+   * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device ends, the
    * default handler hears instead of the host's.
    */
   tellBadNews(badnews: readonly unknown[]): void {
@@ -177,10 +185,10 @@ export class Device {
 
   // == [Guards]: isEnabled, endCause, demandEnabled
 
-  /** True from `Device.make` until a sweep, and never again. */
+  /** True from `Device.make` until the device ends, and never again. */
   get isEnabled(): boolean { return this.#endCause === null }
 
-  /** The refusal every call on this device meets after a sweep, or null while it is enabled. */
+  /** The refusal every call on this device meets once it ends, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#endCause }
 
   /** Throw unless {@link isEnabled}. */
