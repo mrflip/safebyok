@@ -3,9 +3,15 @@
 import { type Query, type QueryKey, queryOptions, replaceEqualDeep, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query'
 import { useEffect, useSyncExternalStore } from 'react'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
-import { type BankSnapshot, PendingBank, ThingMinder, dbHasNewer } from 'safebyok'
+import { type BankSnapshot, type DeviceSnapshot, type OpenGatingSnapshot, PendingBank, ThingMinder, dbHasNewer } from 'safebyok'
 import { bridgeDevice } from './react-bridge'
 import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeChecks } from './shapes-giver'
+
+// == [Snapshots]: ServerSnapshot
+
+/** The snapshot the hooks report during a server render and while hydrating: no bank object, and no gating open. */
+const ServerSnapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
+// --
 
 // == [Query defaults]: carQueryDefaults, carStaleTimeOf, newerCarOf, isCar, fullestOf
 
@@ -72,8 +78,14 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
     useEffect(() => bridgeDevice(client, device), [client])
   }
 
+  /** The gating open on the Device, for a dialog to render, or null for none. Synchronous: it never waits and never suspends. */
+  function useGating(): OpenGatingSnapshot | null {
+    return useSyncExternalStore(device.subscribe, () => device.getSnapshot().gating, () => ServerSnapshot.gating)
+  }
+
   return Object.freeze({
     useBridge,
+    useGating,
     /** The hooks for the Device's bank, refusing any other banklabel. Name the result in PascalCase (`const Acme = Giver.forBank('acme')`), so the rules-of-hooks lint checks `Acme.useBoxRecord()`. */
     forBank: (banklabel: string) => {
       ScopeChecks.bankScoped.parseConsistent({ banklabel }, { banklabel: device.banklabel })

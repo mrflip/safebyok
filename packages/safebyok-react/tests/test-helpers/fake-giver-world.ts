@@ -1,6 +1,6 @@
 /** A fake Device for the giver's tests: its bank started on demand, and box cars the test stores and announces. */
 
-import { type BankSnapshot, type DeviceSnapshot, PendingBank } from 'safebyok'
+import { type BankSnapshot, type DeviceSnapshot, type OpenGatingSnapshot, PendingBank } from 'safebyok'
 import { boxCarQueryKey } from '../../src/giver/react-giver'
 import type { CarFields, GiverBank, GiverDevice, GiverEvent } from '../../src/giver/shapes-giver'
 
@@ -55,6 +55,8 @@ export interface FakeGiverWorld {
   pauseAnswers(): () => void
   /** Replace the Device's snapshot of its bank. */
   _cheat_setBank(snapshot: BankSnapshot): void
+  /** Replace the Device's snapshot of its open gating. */
+  _cheat_setGating(snapshot: OpenGatingSnapshot | null): void
   /** Announce `car` to the bank object's listeners, as its minder would on caching it at `dataUpdatedAt`. */
   _cheat_hear(labelpath: string, car: FakeBoxCar, dataUpdatedAt?: number): void
   /** Announce that the minder let go of the car at `labelpath`. */
@@ -68,7 +70,7 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
   type Starter = (bank: GiverBank<FakeBoxCar>) => () => void
   const userid    = 'u1'
   const banklabel = 'acme'
-  let snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank })
+  let snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
   let answerPause: Promise<void> | null = null
   let bank: GiverBank<FakeBoxCar> | null = null
   const deviceListeners = new Set<() => void>()
@@ -137,7 +139,8 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
       answerPause = new Promise<void>((resolve) => { release = resolve })
       return () => { answerPause = null; release() }
     },
-    _cheat_setBank: (bankSnapshot) => { publish({ ...snapshot, bank: bankSnapshot }) },
+    _cheat_setBank:   (bankSnapshot) => { publish({ ...snapshot, bank: bankSnapshot }) },
+    _cheat_setGating: (gatingSnapshot) => { publish({ ...snapshot, gating: gatingSnapshot }) },
     _cheat_hear:      (labelpath, car, dataUpdatedAt = Date.now()) => {
       cached.set(labelpath, car)
       emit({ type: 'updated', queryKey: boxCarQueryKey({ userid, banklabel, labelpath }), state: { data: car, dataUpdatedAt } })

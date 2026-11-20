@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { PendingBank } from 'safebyok'
+import { type OpenGatingSnapshot, PendingBank } from 'safebyok'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
@@ -62,6 +62,28 @@ describe("useBankSnapshot", () => {
     expect([result.current, renders]).to.deep.equal([false, 2])
     act(() => { world._cheat_setBank({ ...TH.UnlockedBank, leaseEndsAt: 1_900_000_000_000 }) })
     expect(renders).to.eq(2)
+  })
+
+  it("ignores a change to the gating", () => {
+    const { world, Acme, wrapper } = setup()
+    let renders = 0
+    renderHook(() => {
+      renders += 1
+      return Acme.useBankSnapshot()
+    }, { wrapper })
+    act(() => { world._cheat_setGating({ gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false }) })
+    expect(renders).to.eq(1)
+  })
+})
+
+describe("useGating", () => {
+  it("reads null with no gating open, and re-renders with the gating once one is", () => {
+    const { world, Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useGating(), { wrapper })
+    expect(result.current).to.be.null
+    const gating = { gatingkind: 'unlock_bank', gatingseq: 1, isAttempting: false } as OpenGatingSnapshot
+    act(() => { world._cheat_setGating(gating) })
+    expect(result.current).to.eq(gating)
   })
 })
 

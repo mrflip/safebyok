@@ -319,3 +319,5 @@ const b64Of = (source: BufferSource): string => (
 )
 // --
 export * from './test-helpers/minder-giver-world'
+export * from './test-helpers/knock-knock-world'
+export * from './test-helpers/secret-search'

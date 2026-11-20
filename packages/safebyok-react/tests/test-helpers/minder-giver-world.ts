@@ -89,7 +89,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
 
 /** A Device of `minder`'s user and bank, its one bank object `bank`, never ending. */
 function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxCar>): GiverDevice<BoxCar> {
-  const snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank })
+  const snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank, gating: null })
   return Object.freeze({
     userid:      minder.userid,
     banklabel:   minder.banklabel,
