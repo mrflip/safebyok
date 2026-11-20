@@ -2,6 +2,7 @@ import * as TSQ from '@tanstack/query-core'
 import { describe, expect, it } from 'vitest'
 import type { ThingScope } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
+import { ThingMinder } from '../../../src/minding/thing-minder'
 import { minderWithoutStart } from './world'
 
 describe("ThingMinder keys", () => {
@@ -41,6 +42,19 @@ describe("ThingMinder keys", () => {
     expect(matches(TH.BoxScope, TH.RootScope)).to.deep.equal([false, false])
     expect(matches(TH.BoxScope, { ...TH.BoxScope, labelpath: 'box/openai2' })).to.deep.equal([false, false])
     expect(matches(TH.RootScope, TH.GateScope)).to.deep.equal([false, false])
+  })
+
+  it("are the same, made without a minder, for anyone caching the same car", () => {
+    const minder = minderWithoutStart()
+    for (const scope of [TH.GateScope, TH.RootScope, TH.BoxScope, TH.BankScope]) {
+      expect(ThingMinder.queryKeyOf(scope)).to.deep.equal(minder.queryKey(scope))
+    }
+    expect(ThingMinder.bankQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme'])
+  })
+
+  it("made without a minder, refuse a scope that is not one", () => {
+    TH.expectSyncRefusal(() => ThingMinder.queryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
+    TH.expectSyncRefusal(() => ThingMinder.bankQueryKeyOf({ userid: 'u1' } as never), 'bad_record')
   })
 
   it("start no other key with the root box's car key, the one its gcTime default is set on", () => {

@@ -13,6 +13,7 @@ import { Errors, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type ThingFormat, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
+import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import {
@@ -261,7 +262,7 @@ export class ThingMinder {
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
-    const keyHead = (labelpath === undefined) ? this.#bankKeyHead() : this.#keyHeadOf({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
+    const keyHead = (labelpath === undefined) ? bankKeyHeadOf(this.scope) : this.#keyHeadOf({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
     // refetchType 'none': TanStack would otherwise refetch each active match. A listing has no queryFn to run, and the minder fetches nothing here.
     void this.#tsq.invalidateQueries({
       queryKey:    keyHead,
@@ -394,13 +395,24 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #bankKeyHead, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: queryKeyOf, bankQueryKeyOf, queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
 
   // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
   // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
   // under the Thing and neither of its own keys. No label is '!', '/' or '#', so no mark is mistaken for one. TanStack matches
   // query defaults by key prefix too, so without a mark the root box's key would start every box's key, and no defaults
   // could single out the root box. A labelpath starts with its modelkind, so the key does too.
+  /** The query key a minder caches `scope`'s car under: a host caching the same car keys it the same. */
+  static queryKeyOf(scope: ThingScope): TSQ.QueryKey {
+    const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
+    return [...keyHeadOf({ userid, banklabel }, labelpath), '!']
+  }
+
+  /** The key prefix of everything a minder of `scope`'s bank caches. */
+  static bankQueryKeyOf(scope: BankScope): TSQ.QueryKey {
+    return bankKeyHeadOf(ThingChecks.bankScope.parse(scope))
+  }
+
   /** The query key `scoped`'s car is cached under. */
   queryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '!'] }
 
@@ -411,13 +423,7 @@ export class ThingMinder {
   childrenQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
 
   /** The part of a query key that `scoped` has in common with each of its keys. */
-  #keyHeadOf(labelpathed: Labelpathed): string[] {
-    const labels = labelpathed.labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
-    return [...this.#bankKeyHead(), ...labels]
-  }
-
-  /** The part of a query key that every key of this bank has in common. */
-  #bankKeyHead(): string[] { return ['sok', this.userid, this.banklabel] }
+  #keyHeadOf(labelpathed: Labelpathed): string[] { return keyHeadOf(this.scope, labelpathed.labelpath) }
 
   // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
   /** TanStack's query options for a get of `scoped`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
@@ -523,7 +529,16 @@ export class ThingMinder {
   // --
 }
 
-// == [Helpers]: BareListedAt, UsefulTSQEvent, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+// == [Helpers]: keyHeadOf, bankKeyHeadOf, BareListedAt, UsefulTSQEvent, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+
+/** The part of a query key that the Thing at `labelpath` in `scope`'s bank has in common with each of its keys. */
+function keyHeadOf(scope: BankScope, labelpath: Labelpath): string[] {
+  const labels = labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
+  return [...bankKeyHeadOf(scope), ...labels]
+}
+
+/** The part of a query key that every key of `scope`'s bank has in common. */
+function bankKeyHeadOf({ userid, banklabel }: BankScope): string[] { return ['sok', userid, banklabel] }
 
 /** The time a bare listing was last listed: TanStack's `dataUpdatedAt` for a query no fetch has set. */
 const BareListedAt = 0
