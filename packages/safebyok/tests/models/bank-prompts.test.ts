@@ -367,3 +367,28 @@ describe("bank.launchRevokePasskeyPrompt()", () => {
     expect(bank.maingate).to.equal(ante)
   })
 })
+
+describe("bank.ensureUnlocked()", () => {
+  it("resolves at once on an unlocked bank, opening no gating", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    expect(await bank.ensureUnlocked()).to.equal(bank)
+    expect(device.openGating).to.be.null
+  })
+
+  it("opens an unlock gating on a locked bank, and resolves once an attempt lands", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.lock()
+    const ensuring = bank.ensureUnlocked()
+    expect(device.openGating).to.include({ gatingkind: 'unlock_bank', bank })
+    expect(await TH.answerPrompt(device, ensuring, { passphraseClear: TH.TestPassphrase })).to.equal(bank)
+    expect(await ensuring).to.equal(bank)
+    expect(bank.isUnlocked).to.be.true
+  })
+
+  it("refuses a swept bank, opening no gating", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    bank.sweep()
+    await TH.expectRefusal(bank.ensureUnlocked(), 'disabled')
+    expect(device.openGating).to.be.null
+  })
+})

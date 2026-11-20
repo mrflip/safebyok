@@ -170,7 +170,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt
+  // == [Prompts]: launchBirthBankPrompt, launchUnlockBankPrompt, launchReplacePassphrasePrompt, launchAddPasskeyPrompt, launchRevokePasskeyPrompt, ensureUnlocked
   // Each hands its gating's attempt a friend of this bank's private verbs: no public method accepts a proving (G9).
 
   /** Ask the user for a new passphrase and optional passkey, and birth the bank of `device`'s scope with them. Resolves the bank, unlocked.
@@ -247,6 +247,13 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     })
     await gating.launch()
     return this
+  }
+
+  /** Unlock this bank by asking the user, unless it is already unlocked. */
+  async ensureUnlocked(): Promise<this> {
+    this.demandEnabled()
+    if (this.isUnlocked) { return this }
+    return this.launchUnlockBankPrompt()
   }
   // --
 
