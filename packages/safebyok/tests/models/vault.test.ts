@@ -105,7 +105,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
     expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(carOf(box!))
   })
 
-  it("answers stale_write over an older revision as the minder's write answers it, with the revision stored", async () => {
+  it("answers stale_write over an older revision, with the revision stored", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: stored } = await bank.sealBox(first, {}, { whisper: { apiKey: 'sk-test-1111' } })
