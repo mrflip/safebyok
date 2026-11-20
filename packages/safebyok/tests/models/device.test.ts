@@ -278,7 +278,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const first = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
-    expect(device.getSnapshot().gating).to.deep.equal({ gatingkind: 'unlock_bank', gatingseq: 3, isAttempting: false, lastRefusal: null })
+    expect(device.getSnapshot().gating).to.deep.equal({ gatingkind: 'unlock_bank', gatingseq: 3, isAttempting: false })
     device.openGating!.dismiss()
     await first
     expect(device.getSnapshot().gating).to.be.null
@@ -288,7 +288,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     await second
   })
 
-  it("shows an attempt under way, then the refusal it met, which carries no cleartext", async () => {
+  it("shows an attempt under way until it is refused, and carries no cleartext", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.lock()
     const prompting = TH.expectRefusal(bank.launchUnlockBankPrompt(), 'dismissed')
@@ -296,9 +296,6 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     const passphraseClear = 'not the passphrase, though long enough'
     await TH.expectBad(bank.attemptUnlock({ passphraseClear }), 'wrong_passphrase')
     expect(snapshots.map(({ gating }) => gating?.isAttempting)).to.deep.equal([true, false])
-    const { lastRefusal } = device.getSnapshot().gating!
-    expect(lastRefusal).to.include({ refusalkind: 'wrong_passphrase', family: 'condition' })
-    expect(Object.keys(lastRefusal!)).to.have.members(['refusalkind', 'family', 'message'])
     expect(JSON.stringify(device.getSnapshot())).not.to.include(passphraseClear)
     device.openGating!.dismiss()
     await prompting

@@ -4,7 +4,7 @@ import type { Bank } from './bank'
 import type { Gating } from './gating'
 import { guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks } from '../shapes/shapes-bankish'
+import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks } from '../shapes/shapes-bankish'
 import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
@@ -158,7 +158,7 @@ export class Device {
     this.#align()
   }
 
-  /** Tell the subscribers if the open gating's attempt or refusal changed. Internal: call it as the open gating's attempt begins and ends. */
+  /** Tell the subscribers if the open gating's attempt began or ended. Internal: call it as the open gating's attempt begins and ends. */
   alignOpenGating(): void { this.#align() }
   // --
 
@@ -185,7 +185,7 @@ export class Device {
     return Object.freeze({
       bank:   this.#thisIsTemporaryBank?.getSnapshot() ?? null,
       gating: gating === null ? null : Object.freeze({
-        gatingkind: gating.gatingkind, gatingseq: this.#gatingseq, isAttempting: gating.isAttempting, lastRefusal: refusalSnapshotOf(gating.lastRefusal),
+        gatingkind: gating.gatingkind, gatingseq: this.#gatingseq, isAttempting: gating.isAttempting,
       }),
     })
   }
@@ -248,7 +248,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: guardRequestCleartext, refusalSnapshotOf, millisOf, checkSecureContext
+// == [Helpers]: guardRequestCleartext, millisOf, checkSecureContext
 
 // What the dialog throws is dropped: it may quote what the user typed.
 /** Guard the host's `requestCleartext`: the guard resolves true when the host's resolves, and false when it throws, dropping the throw. */
@@ -262,13 +262,6 @@ export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUs
       return false
     }
   })
-}
-
-/** What a snapshot shows of `refusal`, or null for none. */
-function refusalSnapshotOf(refusal: Errors.VaultError | null): RefusalSnapshot | null {
-  if (refusal === null) { return null }
-  const { refusalkind, family, message } = refusal
-  return Object.freeze({ refusalkind, family, message })
 }
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.

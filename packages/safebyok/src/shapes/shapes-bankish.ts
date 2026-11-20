@@ -146,8 +146,6 @@ export interface OpenGatingSnapshot {
   readonly gatingseq:    number
   /** True while an attempt is under way. */
   readonly isAttempting: boolean
-  /** The last refusal an attempt met, for the dialog to show, or null before any. */
-  readonly lastRefusal:  RefusalSnapshot | null
 }
 
 /** A device as a host renders it: its bank's snapshot, and the gating open on it. */

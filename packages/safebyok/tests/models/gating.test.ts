@@ -270,8 +270,8 @@ describe("gating.attempt(cleartexts)", () => {
   })
 })
 
-describe("gating.isAttempting and gating.lastRefusal", () => {
-  it("is attempting only while an attempt runs, and keeps no refusal before one is met", async () => {
+describe("gating.isAttempting", () => {
+  it("is attempting only while an attempt runs", async () => {
     const { bank, device } = await TH.buildBornBank()
     const latch = TH.makeLatch()
     const gating = launchedGating({ device, attempt: async () => { await latch.pass(); return bank } })
@@ -281,29 +281,6 @@ describe("gating.isAttempting and gating.lastRefusal", () => {
     latch.release()
     await TH.expectGood(attempting)
     expect(gating.isAttempting).to.be.false
-    expect(gating.lastRefusal).to.be.null
-  })
-
-  it("keeps the refusal of the last attempt, until the next one meets another", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const weak = new Errors.VaultError('weak_passphrase', 'too short')
-    const wrong = new Errors.VaultError('wrong_passphrase', 'not it')
-    const gating = launchedGating({ device, attempt: attemptLanding(bank, wrong, weak) })
-    await TH.expectBad(gating.attempt(cleartextsOf()))
-    expect(gating.lastRefusal).to.equal(wrong)
-    await TH.expectBad(gating.attempt(cleartextsOf()))
-    expect(gating.lastRefusal).to.equal(weak)
-  })
-
-  it("keeps no refusal met at the door", async () => {
-    const { bank, device } = await TH.buildBornBank()
-    const latch = TH.makeLatch()
-    const gating = launchedGating({ device, attempt: async () => { await latch.pass(); return bank } })
-    const attempting = gating.attempt(cleartextsOf())
-    await TH.expectBad(gating.attempt(cleartextsOf()), 'attempt_in_flight')
-    expect(gating.lastRefusal).to.be.null
-    latch.release()
-    await attempting
   })
 })
 
