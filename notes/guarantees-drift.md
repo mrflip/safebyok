@@ -23,3 +23,8 @@ what differs from big, in a sentence or two.
   its lease refuses every seal and unseal, but the lease keeps its leaseKey until the `Bank` is let go.
   `bank.sweep()` (`packages/safebyok/src/models/bank.ts`) evicts it through `lease.sweep()`; nothing calls it from the
   device yet.
+* 2026-11-20 (bank_gatings, #772), G1 and G9: **The Bank takes cleartexts, unread.** In big no `Bank` method ever
+  received a passphrase or PRF bytes (G1's chain; G9's "only Gating, Proving and Lease"). In the new core the Bank's
+  four re-entry points, `attemptUnlock`, `attemptReplacePassphrase`, `attemptAddPasskey` and `attemptRevokePasskey`
+  (`packages/safebyok/src/models/bank.ts`), take the cleartexts a form collected and pass them unread to `gating.ts`
+  (the open gating, or `attemptWithoutGating`), so G1 and G9 hold in substance.
