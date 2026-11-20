@@ -215,8 +215,8 @@ describe("ThingMinder.listen", () => {
   })
 
   const BadVersions = [
-    [undefined,         'refuses a listener given no feed version'],
-    [ThingFormat + 1,   'refuses a feed version newer than its own'],
+    [undefined,           'refuses a listener given no feed version'],
+    [ThingFormat + 1,     'refuses a feed version newer than its own'],
     [String(ThingFormat), 'refuses its own feed version spelled another way'],
   ] as const
   for (const [version, blurb] of BadVersions) {
