@@ -21,9 +21,9 @@ const ServerSnapshot: DeviceSnapshot = Object.freeze({ bank: null, gating: null 
 
 // == [Query defaults]: carQueryDefaults, carStaleTimeOf, newerCarOf, isCar, fullestOf
 
-// A design note, pinned (the Coach, 2026-11-19): a host may override anything the giver supplies here (the keys, each of
-// these defaults, and the `select` that picks `fullest`), so nothing in the giver may depend on one staying in place. The
-// bridge copies each car into the host's entry whatever that entry's options say.
+// A host may override anything the giver supplies here (the keys, each of these defaults, and the `select` that picks
+// `fullest`), so nothing in the giver may depend on one staying in place. The bridge copies each car into the host's entry
+// whatever that entry's options say.
 /** The giver's defaults for the query of a box's car in the host's React Query. */
 function carQueryDefaults<CarT extends CarFields>() {
   return {
