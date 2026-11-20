@@ -74,7 +74,7 @@ function vacateCloak(_data: unknown, _err: Error | null, cloaked: Cloak): void {
 
 // Built afresh at each call: the verb zeroes the passkey answers it is handed, and each getter hands out a copy. A field left out stays out, and each verb checks what it is handed whole, so the cast
 // at each call claims nothing the verb does not judge.
-/** The cleartexts `cloaked` has, for one attempt of a form verb. */
+/** The cleartexts `cloaked` has, for one call of a form verb. */
 function cleartextsOf(cloaked: Cloak): CloakCleartexts {
   const { passphraseClear, passkeyClear, nextPassphraseClear, nextPasskeyClear } = cloaked
   const fields = Object.entries({ passphraseClear, passkeyClear, nextPassphraseClear, nextPasskeyClear })
