@@ -1,8 +1,9 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import type { BoxCar, GateCar, MinderEvent } from '../../../src/shapes/shapes-minder'
+import type { BoxCar, GateCar, MinderEvent, ThingEvent } from '../../../src/shapes/shapes-minder'
 import type { Labelpath } from '../../../src/shapes/primitives'
 import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { ThingMinder } from '../../../src/minding/thing-minder'
 import { ThingFormat } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, listenerOf, toldOf } from './world'
@@ -15,10 +16,10 @@ describe("ThingMinder.listen", () => {
     const unlisten = minder.listen(heard, ThingFormat)
     await minder.get(TH.BoxScope)
     expect(heard.mock.calls).to.have.lengthOf(1)
-    expect(heard.mock.calls[0]?.[0]).to.deep.include({ type: 'updated', action: { type: 'success' }, carkind: 'thing', ...TH.BoxScope, modelkind: 'box', queryKey: minder.queryKey(TH.BoxScope) })
+    expect(heard.mock.calls[0]?.[0]).to.deep.include({ type: 'updated', action: { type: 'success' }, ...TH.BoxScope, modelkind: 'box', queryKey: minder.queryKey(TH.BoxScope) })
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', minder.at(TH.BoxScope))
     const gateCar = await minder.get(TH.GateScope)
-    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ carkind: 'thing', ...TH.GateScope, modelkind: 'gate', queryKey: minder.queryKey(TH.GateScope) })
+    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ ...TH.GateScope, modelkind: 'gate', queryKey: minder.queryKey(TH.GateScope) })
     expect(heard.mock.calls.at(-1)?.[0]).to.have.nested.property('state.data', gateCar)
     unlisten()
     heard.mockClear()
@@ -27,9 +28,26 @@ describe("ThingMinder.listen", () => {
   })
 
   it("types a car's event by its modelkind", () => {
-    expectTypeOf<Extract<MinderEvent, { carkind: 'thing', modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxCar | undefined>()
-    expectTypeOf<Extract<MinderEvent, { carkind: 'thing', modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateCar | undefined>()
-    expectTypeOf<Extract<MinderEvent, { carkind: 'listing' }>['state']['data']>().toEqualTypeOf<readonly Labelpath[] | undefined>()
+    expectTypeOf<Extract<MinderEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxCar | undefined>()
+    expectTypeOf<Extract<MinderEvent, { modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateCar | undefined>()
+    expectTypeOf<Exclude<MinderEvent, ThingEvent>['state']['data']>().toEqualTypeOf<readonly Labelpath[] | undefined>()
+  })
+
+  it("tells a car's event from a listing's by isThingEvent", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    const heard = listenerOf()
+    minder.listen(heard, ThingFormat)
+    await minder.list('box')
+    await minder.get(TH.BoxScope)
+    const told = heard.mock.calls.map(([event]) => [ThingMinder.isThingEvent(event), event.queryKey.at(-1)])
+    expect(told).to.deep.equal([[false, 'kids'], [true, '!'], [true, '!']])
+  })
+
+  it("narrows a minder's event to a car's by isThingEvent", () => {
+    const narrowed = (event: MinderEvent) => (ThingMinder.isThingEvent(event) ? event : undefined)
+    expectTypeOf<ReturnType<typeof narrowed>>().toEqualTypeOf<ThingEvent | undefined>()
   })
 
   it("tells TanStack's state as it stands, in a frozen copy, and never the query itself", async () => {
@@ -151,9 +169,9 @@ describe("ThingMinder.listen", () => {
     const heard = listenerOf()
     minder.listen(heard, ThingFormat)
     await minder.list('box')
-    const listed = heard.mock.calls.map(([event]) => event).filter((event) => event.carkind === 'listing')
+    const listed = heard.mock.calls.map(([event]) => event).filter((event) => ! ThingMinder.isThingEvent(event))
     expect(listed).to.have.lengthOf(1)
-    expect(listed[0]).to.deep.include({ type: 'updated', action: { type: 'success' }, carkind: 'listing', ...TH.RootScope, modelkind: 'box', tag: 'kids', queryKey: minder.listingQueryKey(TH.RootScope) })
+    expect(listed[0]).to.deep.include({ type: 'updated', action: { type: 'success' }, ...TH.RootScope, modelkind: 'box', queryKey: minder.listingQueryKey(TH.RootScope) })
     expect(listed[0]).to.have.nested.property('state.data', minder.listingAt(TH.RootScope))
     expect(listed[0]?.state.data).to.deep.equal(['box/openai'])
   })
@@ -164,7 +182,7 @@ describe("ThingMinder.listen", () => {
     minder.listen(heard, ThingFormat)
     minder.hello()
     expect(heard.mock.calls).to.have.lengthOf(1)
-    expect(heard.mock.calls[0]?.[0]).to.deep.include({ carkind: 'listing', ...TH.RootScope, modelkind: 'box', tag: 'kids' })
+    expect(heard.mock.calls[0]?.[0]).to.deep.include({ ...TH.RootScope, modelkind: 'box', queryKey: minder.listingQueryKey(TH.RootScope) })
     expect(heard.mock.calls[0]?.[0].state).to.deep.include({ data: [], dataUpdatedAt: 0 })
   })
 
@@ -189,9 +207,9 @@ describe("ThingMinder.listen", () => {
     const heard = listenerOf()
     minder.listen(heard, ThingFormat)
     minder.goodbye()
-    const removed = heard.mock.calls.map(([event]) => event).filter((event) => event.carkind === 'listing')
+    const removed = heard.mock.calls.map(([event]) => event).filter((event) => ! ThingMinder.isThingEvent(event))
     expect(removed).to.have.lengthOf(1)
-    expect(removed[0]).to.deep.include({ type: 'removed', action: undefined, ...TH.RootScope, modelkind: 'box', tag: 'kids' })
+    expect(removed[0]).to.deep.include({ type: 'removed', action: undefined, ...TH.RootScope, modelkind: 'box', queryKey: minder.listingQueryKey(TH.RootScope) })
     expect(removed[0]?.state).to.deep.include({ data: undefined, status: 'success' })
   })
 

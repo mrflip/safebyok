@@ -44,7 +44,7 @@ describe("ThingMinder.tryWrite", () => {
     let isResolved = false
     const told: { isResolved: boolean, car: unknown }[] = []
     minder.listen((event) => {
-      if ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.state.data }) }
+      if (ThingMinder.isThingEvent(event) && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.state.data }) }
     }, ThingFormat)
     const mine = TH.nextOf(box0, { revtok: TH.revtokOf('mine') })
     const answer = await minder.tryWrite(TH.replaceAskOf(box0, mine))
@@ -93,7 +93,7 @@ describe("ThingMinder.tryWrite", () => {
     let isResolved = false
     const told: { isResolved: boolean, car: unknown }[] = []
     minder.listen((event) => {
-      if ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.state.data }) }
+      if (ThingMinder.isThingEvent(event) && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.state.data }) }
     }, ThingFormat)
     await minder.tryWrite(boxBirthAskOf())
     isResolved = true

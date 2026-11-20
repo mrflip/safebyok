@@ -394,7 +394,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: queryKeyOf, bankQueryKeyOf, queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: queryKeyOf, isThingEvent, bankQueryKeyOf, queryKey, listingQueryKey, childrenQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
 
   // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
   // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
@@ -405,6 +405,11 @@ export class ThingMinder {
   static queryKeyOf(scope: ThingScope): TSQ.QueryKey {
     const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
     return [...keyHeadOf({ userid, banklabel }, labelpath), '!']
+  }
+
+  /** True when `event`, an event a minder's `listen` told, is of a car's query, not a listing's. */
+  static isThingEvent(event: MinderEvent): event is ThingEvent {
+    return event.queryKey.at(-1) === '!'
   }
 
   /** The key prefix of everything a minder of `scope`'s bank caches. */
@@ -517,12 +522,12 @@ export class ThingMinder {
       const newest = car?.newest
       // The car at a labelpath is of the kind its labelpath starts with.
       return Object.freeze({
-        ...told, carkind: 'thing', agerank: car?.agerank,
+        ...told, agerank: car?.agerank,
         revtok: newest?.revtok, revseq: newest?.revseq, am: newest?.am, lifeseq: newest?.lifeseq, lifepath: newest?.lifepath,
       }) as ThingEvent
     }
     // A listing lists Things of its parent's kind, as a labelpath starts with its parent's.
-    if (queryKey.at(-1) === 'kids') { return Object.freeze({ ...told, carkind: 'listing', tag: 'kids' }) as ListingEvent }
+    if (queryKey.at(-1) === 'kids') { return Object.freeze(told) as ListingEvent }
     return undefined
   }
   // --

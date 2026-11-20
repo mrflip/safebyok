@@ -189,7 +189,7 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 
 // Each event spreads TanStack Query's cache event into our own, and keeps TanStack's field names (`type`, `action.type`,
 // `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` takes.
-/** What a minder's `listen` tells, told apart by `carkind`: a car's query changed, or a listing's. */
+/** What a minder's `listen` tells: a car's query changed, or a listing's. `ThingMinder.isThingEvent` tells them apart. */
 export type MinderEvent = ThingEvent | ListingEvent
 
 /** What every event carries: TanStack Query's cache event without its live query, and the scope of the Thing it is about. */
@@ -214,7 +214,6 @@ export type MinderEventOf<DataT> = Readonly<{
  * It also carries the car's `agerank` and its newest record's revision and life, each undefined where no car is cached.
  */
 export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind ? MinderEventOf<ThingCar<RecordOfKind<KindT>>> & Readonly<{
-  carkind:   'thing'
   /** The modelkind of the Thing, which its labelpath starts with. */
   modelkind: KindT
   /** The car's agerank: of two events of one Thing, the greater agerank tells the newer car. */
@@ -235,11 +234,8 @@ export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thin
  * A listing marked stale tells `state.isInvalidated` true, and still lists what it did.
  */
 export type ListingEvent = MinderEventOf<readonly Labelpath[]> & Readonly<{
-  carkind:   'listing'
   /** The modelkind of the Thing at `labelpath` and of every Thing listed, which is the same: a labelpath starts with its parent's. */
   modelkind: Thingkind
-  /** The listing's name: `'kids'`, the Things directly under `labelpath`. */
-  tag:       'kids'
 }>
 // --
 

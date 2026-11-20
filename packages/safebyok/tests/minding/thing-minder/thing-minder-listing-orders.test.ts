@@ -3,6 +3,7 @@ import type { ThingCar } from '../../../src/shapes/shapes-minder'
 import type { Labelpath } from '../../../src/shapes/primitives'
 import { type ThingRecord, ThingFormat } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
+import { ThingMinder } from '../../../src/minding/thing-minder'
 import * as TH from '../../test-helpers'
 import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf } from './world'
 
@@ -138,8 +139,8 @@ describe("a ThingMinder tells each car and listing going forward, in any order",
       const blurb = steps.join(', ')
       it(blurb, async () => {
         const { events, refusalkinds } = await eventsAfter(steps)
-        const cars     = events.flatMap((event) => ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) ? [event.state.data] : [])
-        const listings = events.flatMap((event) => ((event.carkind === 'listing') && (event.labelpath === 'box')) ? [event.state.data] : [])
+        const cars     = events.flatMap((event) => (ThingMinder.isThingEvent(event) && (event.labelpath === TH.BoxScope.labelpath)) ? [event.state.data] : [])
+        const listings = events.flatMap((event) => ((! ThingMinder.isThingEvent(event)) && (event.labelpath === 'box')) ? [event.state.data] : [])
         expect(backwardCars(cars)).to.deep.equal([])
         expect(shrunkListings(listings)).to.deep.equal([])
         expect(cars.at(-1)?.newest).to.deep.equal(Reborn)

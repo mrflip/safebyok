@@ -22,7 +22,7 @@ export function giverBankOfMinder(minder: ThingMinder): GiverBank<BoxCar> {
   return Object.freeze({
     getBoxCar:     async (labelpath: string) => minder.get({ ...minder.scope, labelpath: Checks.boxLabelpath.parse(labelpath) }),
     listenBoxCars: (listener: (event: GiverEvent<BoxCar>) => void) => minder.listen((event) => {
-      if ((event.carkind === 'thing') && (event.modelkind === 'box')) { listener(event) }
+      if (ThingMinder.isThingEvent(event) && (event.modelkind === 'box')) { listener(event) }
     }, ThingFormat),
   })
 }

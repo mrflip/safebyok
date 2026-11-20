@@ -2,20 +2,21 @@ import { describe, expect, it, vi } from 'vitest'
 import type { MinderEvent } from '../../../src/shapes/shapes-minder'
 import type { Labelpath } from '../../../src/shapes/primitives'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { ThingMinder } from '../../../src/minding/thing-minder'
 import { ThingFormat } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { listenerOf, minderWorldOf, storedBoxOf } from './world'
 
 /** What a listener is told when the listing of the Thing at `labelpath` is invalidated, as {@link toldOf} reads it. */
 function invalidationOf(labelpath: Labelpath) {
-  return { carkind: 'listing', modelkind: (labelpath === 'gate') ? 'gate' : 'box', labelpath, action: 'invalidate', isInvalidated: true }
+  return { isThing: false, modelkind: (labelpath === 'gate') ? 'gate' : 'box', labelpath, action: 'invalidate', isInvalidated: true }
 }
 
-/** The kind, scope, action and staleness of each event `heard` was told. */
+/** Whether each event `heard` was told is a car's, and its scope, action and staleness. */
 function toldOf(heard: ReturnType<typeof listenerOf>) {
   return heard.mock.calls.map(([event]: [MinderEvent]) => {
-    const { carkind, modelkind, labelpath, action, state } = event
-    return { carkind, modelkind, labelpath, action: action?.type, isInvalidated: state.isInvalidated }
+    const { modelkind, labelpath, action, state } = event
+    return { isThing: ThingMinder.isThingEvent(event), modelkind, labelpath, action: action?.type, isInvalidated: state.isInvalidated }
   })
 }
 
@@ -94,7 +95,7 @@ describe("ThingMinder.invalidate", () => {
     minder.listen(heard, ThingFormat)
     expect(await minder.list('box')).to.deep.equal(['box/anthropic', 'box/openai'])
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
-    expect(heard.mock.calls.map(([event]) => event.carkind)).to.include('listing')
+    expect(heard.mock.calls.map(([event]) => ThingMinder.isThingEvent(event))).to.include(false)
     minder.invalidate('box', { list: 'all' })
     expect(toldOf(heard).filter((told) => told.action === 'invalidate')).to.deep.equal([invalidationOf('box')])
   })
@@ -105,7 +106,7 @@ describe("ThingMinder.invalidate", () => {
     minder.listen(heard, ThingFormat)
     minder.goodbye()
     expect(heard.mock.calls.filter(([event]) => event.action?.type === 'invalidate')).to.have.lengthOf(0)
-    expect(heard.mock.calls.filter(([event]) => (event.carkind === 'listing') && (event.type === 'removed') && (event.state.data === undefined))).to.have.lengthOf(3)
+    expect(heard.mock.calls.filter(([event]) => (! ThingMinder.isThingEvent(event)) && (event.type === 'removed') && (event.state.data === undefined))).to.have.lengthOf(3)
   })
 
   const BadArgs = [

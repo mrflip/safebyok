@@ -154,9 +154,9 @@ export function cheatBox(vaultDB: MemoryVaultDB, box: DeliverableThing): void { 
 /** A listener that records each event it is told. */
 export function listenerOf() { return vi.fn<(event: MinderEvent) => void>() }
 
-/** The labelpath and the car's liveness of each car `listener` was told of, in order, or the carkind of any other event. */
+/** The labelpath and the car's liveness of each car `listener` was told of, in order, or `'listing'` for a listing's event. */
 export function toldOf(listener: ReturnType<typeof listenerOf>): (readonly [Labelpath, ThingCar<ThingRecord>['liveness'] | undefined] | readonly [string])[] {
-  return listener.mock.calls.map(([event]) => ((event.carkind === 'thing') ? [event.labelpath, event.state.data?.liveness] as const : [event.carkind] as const))
+  return listener.mock.calls.map(([event]) => (ThingMinder.isThingEvent(event) ? [event.labelpath, event.state.data?.liveness] as const : ['listing'] as const))
 }
 
 /** The ask that births the box `boxlabel` under the root box, over its shell. */
