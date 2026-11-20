@@ -145,7 +145,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, isListingBareAt, tryAt, tryGet, get, backgroundRefresh, tryList, list, isStaleAt, listen
+  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, tryGet, backgroundRefresh, list, tryList, isStaleAt, listen
 
   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
@@ -186,16 +186,14 @@ export class ThingMinder {
    * With no root car cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
    */
   async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<CarAt<LabelpathT>> {
-    return Outcome.valOf(await this.tryGet(scoped, opts))
+    MinderChecks.minderGetOpts.parse(opts)
+    this.#demandReady()
+    return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
   }
 
   /** {@link get}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
   async tryGet<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<Outcome.Outcome<CarAt<LabelpathT>>> {
-    return await Outcome.outcomeOf(async () => {
-      MinderChecks.minderGetOpts.parse(opts)
-      this.#demandReady()
-      return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
-    })
+    return await Outcome.outcomeOf(() => this.get(scoped, opts))
   }
 
   /** Get `scoped`'s car in the background, unless it is timely, and return at once.
@@ -213,25 +211,23 @@ export class ThingMinder {
    * A Thing stored damaged is left out, and told to the bank's `tellBadNews` by its labelpath.
    */
   async list(labelpath: Labelpath): Promise<Labelpath[]> {
-    return Outcome.valOf(await this.tryList(labelpath))
+    MinderChecks.minderLabelpath.parse(labelpath)
+    this.#demandReady()
+    const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
+    const answer = await this.#vaultDB.tryListThings(ask)
+    if (! answer.ok) { throw answer.err }
+    if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
+    const labelpaths = answer.val.map((record) => record.labelpath)
+    TSQ.notifyManager.batch(() => {
+      this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
+      for (const record of answer.val) { this.#sendToTSQ(record) }
+    })
+    return labelpaths
   }
 
   /** {@link list}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
   async tryList(labelpath: Labelpath): Promise<Outcome.Outcome<Labelpath[]>> {
-    return await Outcome.outcomeOf(async () => {
-      MinderChecks.minderLabelpath.parse(labelpath)
-      this.#demandReady()
-      const ask    = this.#bank.makeListAsk({ labelpath, ifAbsent: 'nil' })
-      const answer = await this.#vaultDB.tryListThings(ask)
-      if (! answer.ok) { throw answer.err }
-      if (answer.damaged_rows.length > 0) { this.#bank.tellBadNews([Throwers.childrenStoredDamaged(ask, answer.damaged_rows)]) }
-      const labelpaths = answer.val.map((record) => record.labelpath)
-      TSQ.notifyManager.batch(() => {
-        this.#sendListingToTSQ({ ...this.scope, labelpath }, labelpaths)
-        for (const record of answer.val) { this.#sendToTSQ(record) }
-      })
-      return labelpaths
-    })
+    return await Outcome.outcomeOf(() => this.list(labelpath))
   }
 
   /** True when `scoped`'s car is missing or not timely. */
