@@ -359,8 +359,8 @@ async function bornLeaseWorld() {
   return { bank, device, lease }
 }
 
-describe("lease.isEnabled and lease.demandEnabled(), over its bank's device", () => {
-  it("is enabled while in force on an enabled device, and not once evicted", async () => {
+describe("lease.isEnabled and lease.demandEnabled(), over its bank", () => {
+  it("is enabled while in force on an enabled bank, and not once evicted", async () => {
     const { lease } = await bornLeaseWorld()
     expect(lease.isEnabled).to.be.true
     expect(lease.demandEnabled()).to.equal(lease)
@@ -369,34 +369,34 @@ describe("lease.isEnabled and lease.demandEnabled(), over its bank's device", ()
     TH.expectSyncRefusal(() => lease.demandEnabled(), 'bank_locked')
   })
 
-  it("is not enabled once its device is swept, though not evicted, and throws the device's refusal before 'bank_locked'", async () => {
-    const { device, lease } = await bornLeaseWorld()
-    device.sweep()
+  it("is not enabled once its bank is swept, though not evicted, and throws the bank's refusal before 'bank_locked'", async () => {
+    const { bank, lease } = await bornLeaseWorld()
+    bank.sweep()
     expect([lease.isEnabled, lease.isEvicted]).to.deep.equal([false, false])
     const swept = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
     lease.evict()
     const sweptAndEvicted = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
-    expect([swept, sweptAndEvicted]).to.deep.equal([device.endCause, device.endCause])
+    expect([swept, sweptAndEvicted]).to.deep.equal([bank.endCause, bank.endCause])
   })
 
-  it("refuses a seal and an unseal with the device's refusal once the device is swept", async () => {
-    const { device, lease } = await bornLeaseWorld()
+  it("refuses a seal and an unseal with the bank's refusal once the device is swept", async () => {
+    const { bank, device, lease } = await bornLeaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const shell = TH.boxShellOf()
     device.sweep()
-    expect(await TH.expectRefusal(lease.seal(BaseBox, shell, PublicProps, Cleartexts), 'disabled')).to.equal(device.endCause)
-    expect(await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')).to.equal(device.endCause)
+    expect(await TH.expectRefusal(lease.seal(BaseBox, shell, PublicProps, Cleartexts), 'disabled')).to.equal(bank.endCause)
+    expect(await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')).to.equal(bank.endCause)
   })
 
   // As a lock refuses a seal or an unseal under way, so does a sweep.
   it("refuses a seal and an unseal already under way when the device is swept as they run", async () => {
-    const { device, lease } = await bornLeaseWorld()
+    const { bank, device, lease } = await bornLeaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const sealing = TH.expectRefusal(lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'disabled')
     const unsealing = TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')
     device.sweep()
-    expect(await sealing).to.equal(device.endCause)
-    expect(await unsealing).to.equal(device.endCause)
+    expect(await sealing).to.equal(bank.endCause)
+    expect(await unsealing).to.equal(bank.endCause)
   })
 })
 

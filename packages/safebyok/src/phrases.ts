@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, UnlockDismissed, VaultBankExpected
+// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, UnlockDismissed, VaultBankExpected, HostedVaultExpected
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -28,6 +28,9 @@ export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed loc
 
 /** A vault made without a bank. */
 export const VaultBankExpected = 'A Vault is made with the Bank whose boxes it carries.'
+
+/** Something a bank is asked to host that has no sweep. */
+export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'
 // --
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks
