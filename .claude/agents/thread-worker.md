@@ -129,7 +129,7 @@ problem changes that contract or works around it, that is a significant question
 `blocked`, quoting the contract.
 
 A crossing -- a fetch, a write or a waiter landing across a sweep, vacate, delete or goodbye -- is
-no question and no work (CLAUDE.md, *Hours separate updates*). Write it as a row in
+no question and no work (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`). Write it as a row in
 `notes/wontfix.md`, and build nothing for it; report it only if it could corrupt what the bankDB
 stores or put secret material where it should not be.
 

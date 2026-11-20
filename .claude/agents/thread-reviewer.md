@@ -107,7 +107,7 @@ whatever else you fixed, and report `flagged` with the finding, what fixing it w
 your recommendation. The orchestrator decides what happens next.
 
 A crossing -- a fetch, a write or a waiter landing across a sweep, vacate, delete or goodbye -- is
-no finding (CLAUDE.md, *Hours separate updates*): you are paid to find bugs, not to show that one
+no finding (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`): you are paid to find bugs, not to show that one
 is possible. Write it as a row in `notes/wontfix.md` and fix nothing; report it only if it could
 corrupt what the bankDB stores or put secret material where it should not be.
 
