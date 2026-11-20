@@ -1,6 +1,6 @@
 # Thread 1: car_agerank (2026-11-19)
 
-Branch `20261119-car_agerank`, PR #PRNUM, on main. Proved: `safebyok` 1259 tests, `safebyok-react` 301, both typecheck and lint clean; `pnpm justify` at ready.
+Branch `20261119-car_agerank`, PR [#769](https://github.com/mrflip/safebyok/pull/769), on main. Proved: `safebyok` 1259 tests, `safebyok-react` 301, both typecheck and lint clean; `pnpm justify` at ready.
 
 * **Built**:
   * The orchestrator's invariant patch, as its own commit (893ad4c40): a listener's run of cars and listings never goes back.
