@@ -1,6 +1,6 @@
 # Thread 2: minder_feed (2026-11-20)
 
-Branch `20261120-minder_feed` (the handoff said `20261119-`; the worktree was cut as `20261120-`), PR [#771](https://github.com/mrflip/safebyok/pull/771), stacked on [#769](https://github.com/mrflip/safebyok/pull/769) (`20261119-car_agerank`). Proved: `safebyok` 1267 tests, `safebyok-react` 301, both typecheck and lint clean.
+Branch `20261120-minder_feed` (the handoff said `20261119-`; the worktree was cut as `20261120-`), PR [#771](https://github.com/mrflip/safebyok/pull/771), stacked on [#769](https://github.com/mrflip/safebyok/pull/769) (`20261119-car_agerank`). Proved: `pnpm justify` green after the catch-up onto 2e14d2b61 (safebyok 1267, safebyok-react 301, safebyok-big 2946, e2e 576).
 
 * **Built**:
   * Each `MinderEvent` (`src/shapes/shapes-minder.ts`) is TanStack's cache event spread into ours, with `car` and `labelpaths` gone. It carries:
