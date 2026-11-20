@@ -17,6 +17,15 @@ what differs from big, in a sentence or two.
 
 ## Drifted
 
+* 2026-11-20 (cloak), G1, G2 and G9: **A cloak keeps a form's cleartexts for its mutation's life.** `cloak()`
+  (`packages/safebyok/src/helpers/cloak.ts`) adopts a form's passphrases and passkey answers into a `Cloak`'s private
+  fields, and safebyok-react's giver hands each form mutation one, vacating it once the mutation settles. So a
+  passphrase is held in a field (G1: in big, only ever an argument or a local), and a copy of a passkey answer's PRF
+  bytes outlives each attempt, for all the mutation's retries (G2: in big an answer is single-use; G9: in big only
+  `Gating`, `Proving` and `Lease` hold a pre-image). The host's PRF bytes are zeroed at adoption, each attempt still
+  zeroes the copy it is handed, and `vacate()` zeroes the cloak's own. A host's `onSettled` in a form mutation's options
+  replaces the vacate, and the cloak then keeps its cleartexts until it is let go.
+
 * 2026-11-20 (form_verbs), G2: **A passkey answer is vacated after every attempt.** In big an attempt refused with a
   correctable refusal, short of its gating's last, left the answer's PRF bytes un-zeroed for the host to hand in again.
   The new core has no gating to try again in: each attempt (`packages/safebyok/src/models/gating.ts`) zeroes every
