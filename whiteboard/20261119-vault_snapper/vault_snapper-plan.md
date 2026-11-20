@@ -220,7 +220,15 @@ current bank's snapshot and adds the open gating, `{ gatingkind, isAttempting, l
 reachable without startup (`locked`, `unlocked`, `swept`) are built; the type holds the rest. `isWatching` and
 `heardAt` wait until the vaultDB can tell them. *Touches:* `models/bank.ts`, `models/device.ts`, `models/gating.ts`.
 *Depends on:* thread 5 (stacked). *Size:* M. *Orchestrator:* `gatingseq` handed here from thread 5, only if it lines
-up with one-at-a-time. *Status:* ready, #773 (branch `20261120-snapshots`); in review, `high` on `opus` (one compaction before ready).
+up with one-at-a-time. *Status:* reviewed at 26746570d, filing, #773 (branch `20261120-snapshots`; one compaction before ready).
+
+*Review:* fixed (high, `opus`, against G8, G9): a progress note in a comment, and doc blocks of `alignOpenGating`,
+`cheatHoldBank`, `gating.lastRefusal`. Checked: no secret reaches a snapshot (`lastRefusal` is the message `attempt()`
+already resolves; a strength checker's `reason` is G8's host obligation); `useSyncExternalStore`-fit; the
+`device.sweep()` cascade changes no working-case answer. Left: `leaseEndsAt` enforced by nothing (Open Matters);
+the cheat's stale or early bank snapshots (Cleanup); `subscribe` docs name `onBadNews` where `tellBadNews` may use
+the default (thread 7); `bankStageVals`/`bankEndCauseVals` (thread 7); `isLocked`/`isEnded` derivable from `stage`
+(kept: the Coach named them); `endCause`'s two senses (Open Matters); a pre-existing crossing in `Lease.#bankKey`.
 
 ### 7. with_whisper
 
