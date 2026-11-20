@@ -122,7 +122,13 @@ new event, so its tests pass; nothing else in the giver (thread 8).
 
 *Touches:* `shapes/shapes-minder.ts`, `minding/thing-minder.ts` (`listen`, `#minderEventOf`, `#bankKeyHead`), the
 minder's tests, `packages/safebyok-react/src/giver/minder-bank.ts`. *Depends on:* thread 1 (`agerank`; same files).
-*Look-ahead:* thread 8's bridge copies `state`. *Size:* M. *Status:* ready, #771 (branch `20261120-minder_feed`); in review (one compaction before ready). *Orchestrator:* given, in YOLO, the same per-stretch check for `list` and `tryWrite` that thread 1 gave `#doGet`.
+*Look-ahead:* thread 8's bridge copies `state`. *Size:* M. *Status:* ready, #771 (branch `20261120-minder_feed`); filed at 4d9ed6923 (one compaction before ready).
+
+*Review:* fixed (medium): aligned a test table (whitespace). The no-going-back invariant holds: an event's fields come
+from one snapshot in the synchronous cache callback. Left, minor: a removal event keeps TanStack's `status`
+(`success` with no data; thread 8 branches on `type === 'removed'`); `list` tells bad news before its stretch check
+(left: the rows are damaged whatever the minder's state); `#minderEventOf` casts `state.data` unchecked (low risk);
+`react-giver.ts` keys still `'safebyok'` (thread 8); seven doc blocks for a documentarian (Cleanup). *Orchestrator:* given, in YOLO, the same per-stretch check for `list` and `tryWrite` that thread 1 gave `#doGet`.
 
 ### 3. format_string
 
@@ -235,7 +241,8 @@ giver adopts the feed: the bridge copies each event's `state.data`; host keys ar
 query defaults are `networkMode: 'always'`, `structuralSharing` keeping the greater `agerank` (prior on a tie),
 `staleTime` 0 for a `bhnd` or `bare` car, `select` picking `fullest`, each a default a host may override.
 `GiverBank.getBoxCar`'s doc block is corrected. *Orchestrator:* records freeze in place as they land (thread 1), so
-the giver's docs say a host's vaultDB must not mutate the objects it answered with. The giver's bank snapshot hook reads the Device's snapshot.
+the giver's docs say a host's vaultDB must not mutate the objects it answered with. From thread 2's review: a removal
+event keeps TanStack's `status` with `data` undefined, so the bridge branches on `type === 'removed'` first. The giver's bank snapshot hook reads the Device's snapshot.
 *Touches:* `packages/safebyok-react/src/giver/`. *Depends on:* threads 2 and 6, restacked into one line; and the
 Coach's uncommitted edits to `react-giver.ts` (*For the Coach*). *Size:* M.
 
