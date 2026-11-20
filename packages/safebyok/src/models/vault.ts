@@ -68,7 +68,7 @@ export class Vault {
   // == [Using whispers]: withWhisper
 
   /** Call `fn` with the box at `labelpath` unsealed, once the bank is unlocked, and resolve what `fn` resolves.
-   * On a locked bank it first waits for the bank to be unlocked, asking the user where need be, as {@link Bank.ensureUnlocked} does, and rejects as that does.
+   * On a locked bank it first waits for the bank to be unlocked, asking the user where need be, as {@link Bank.ensureUnlocked} does, and rejects as that does. It gets the box from the vaultDB meanwhile.
    * `fn` gets the box's newest revision, whole, as the minder gets it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
    * It keeps nothing of the unsealed box, and rethrows what `fn` throws as it came: keep the whisper inside `fn`, and return only what is safe to hold.
    * @example
@@ -77,6 +77,8 @@ export class Vault {
   async withWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
     const scope = this.#scopeAt(labelpath)
     Checks.fn.parse(fn)
+    // Asked before the unlock, so the vaultDB answers while the user types, and the get below finds the car timely or shares the fetch.
+    this.#minder.refresh(scope, { silenceErrors: true })
     await this.#bank.ensureUnlocked()
     const car = await this.#minder.get(scope)
     if ((car.liveness === 'gone') || (car.liveness === 'void')) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }

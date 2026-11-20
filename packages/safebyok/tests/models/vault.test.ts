@@ -8,6 +8,7 @@ import { Thing } from '../../src/models/thing'
 import { carOf } from '../../src/minding/thing-car'
 import type { ThingMinder } from '../../src/minding/thing-minder'
 import type { MemoryVaultDB } from '../../src/storage/memory-vault-db'
+import type { GetAsk } from '../../src/shapes/shapes-asks'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -247,6 +248,57 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(bank.isUnlocked).to.be.true
   })
 
+  it("on a locked bank, gets the box from the vaultDB while the user is asked, and not again once unlocked", async () => {
+    const onBadNews = vi.fn()
+    const { bank, device, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const other = Vault.make(bank)
+    other.minder.hello()
+    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const using = other.withWhisper(Openai, ({ revseq }) => revseq)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(boxGetsOf(asked)).to.equal(1)
+    expect(device.openGating).to.include({ gatingkind: 'unlock_bank', bank })
+    await TH.answerPrompt(device, using, { passphraseClear: TH.TestPassphrase })
+    expect(await using).to.equal(0)
+    expect(boxGetsOf(asked)).to.equal(1)
+    expect(onBadNews).not.toHaveBeenCalled()
+  })
+
+  it("on a locked bank, tells no bad news of a storage refusal met while the user is asked, and gets the box again once unlocked", async () => {
+    const onBadNews = vi.fn()
+    const { bank, device, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const other = Vault.make(bank)
+    other.minder.hello()
+    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    vi.spyOn(bank.vaultDB as unknown as { doGetThing: () => never }, 'doGetThing').mockImplementationOnce(() => { throw new Error('connection refused') })
+    const using = other.withWhisper(Openai, ({ revseq }) => revseq)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(boxGetsOf(asked)).to.equal(1)
+    const answer = other.minder.tryAt(scopeAt(bank, Openai))
+    expect(answer).to.deep.include({ act: 'vacant', isFetching: false })
+    expect(answer).to.have.nested.property('lastErr.refusalkind', 'storage_unavailable')
+    await TH.answerPrompt(device, using, { passphraseClear: TH.TestPassphrase })
+    expect(await using).to.equal(0)
+    expect(boxGetsOf(asked)).to.equal(2)
+    expect(onBadNews).not.toHaveBeenCalled()
+  })
+
+  it("on a locked bank, asks the user before it refuses 'absent_box' for a box never stored", async () => {
+    const { bank, device, vault } = await TH.buildBornVault()
+    bank.lock()
+    const fn = vi.fn()
+    const using = vault.withWhisper(Openai, fn)
+    expect(device.openGating).to.include({ gatingkind: 'unlock_bank', bank })
+    const refused = TH.expectRefusal(using, 'absent_box')
+    await TH.answerPrompt(device, using, { passphraseClear: TH.TestPassphrase })
+    await refused
+    expect(fn).not.toHaveBeenCalled()
+  })
+
   it("opens one gating for two calls on a locked bank, and both resume after one unlock", async () => {
     const { bank, device, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -317,6 +369,11 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(device.openGating).to.be.null
   })
 })
+
+/** How many of the gets `asked` saw were of the box at {@link Openai}. */
+function boxGetsOf(asked: { mock: { calls: [GetAsk][] } }): number {
+  return asked.mock.calls.filter(([ask]) => ask.labelpath === Openai).length
+}
 
 /** The revtok of `minder`'s car at `labelpath` at the moment each write the vaultDB answers comes back to its caller. */
 function carsOnAnswer(bank: Bank, minder: ThingMinder, labelpath: string): (string | undefined)[] {

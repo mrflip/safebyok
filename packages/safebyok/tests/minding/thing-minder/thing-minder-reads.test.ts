@@ -178,6 +178,99 @@ describe("ThingMinder.get", () => {
 
 })
 
+describe("ThingMinder.refresh", () => {
+  it("returns at once, and caches the car the vaultDB answers", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const gate    = await storedGateOf(vaultDB, 1)
+    const { minder } = minderWorldOf(vaultDB)
+    minder.refresh(TH.GateScope)
+    expect(minder.at(TH.GateScope)).to.be.undefined
+    await TH.eventually(() => minder.at(TH.GateScope) !== undefined)
+    expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate))
+  })
+
+  it("asks the vaultDB nothing while the car is timely", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(TH.GateScope)
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    minder.refresh(TH.GateScope)
+    await TH.wakeupAtNextTick()
+    expect(asked.mock.calls).to.have.lengthOf(0)
+  })
+
+  it("shares its fetch with a get made while it waits", async () => {
+    const vaultDB = new LateVaultDB()
+    const gate    = await storedGateOf(vaultDB, 0)
+    const { minder } = minderWorldOf(vaultDB)
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    minder.refresh(TH.GateScope)
+    const getting = minder.get(TH.GateScope)
+    await TH.eventually(() => vaultDB.isHolding)
+    vaultDB.release()
+    expect(await getting).to.deep.equal(carOf(gate))
+    expect(asked.mock.calls).to.have.lengthOf(1)
+  })
+
+  it("tells its refusal to the bank's bad news", async () => {
+    const { bank, minder } = minderWorldOf(await bornOf(new DownVaultDB()))
+    minder.refresh(TH.GateScope)
+    await TH.eventually(() => bank.tellBadNews.mock.calls.length > 0)
+    expect(badnewsOf(bank)).to.deep.equal(['storage_unavailable'])
+  })
+
+  it("drops a storage refusal under silenceErrors", async () => {
+    const vaultDB = await bornOf(new DownVaultDB())
+    const { bank, minder } = minderWorldOf(vaultDB)
+    const asked = vi.spyOn(vaultDB, 'tryGetThing')
+    minder.refresh(TH.GateScope, { silenceErrors: true })
+    await TH.eventually(() => asked.mock.calls.length === 1)
+    await TH.wakeupAtNextTick()
+    expect(badnewsOf(bank)).to.deep.equal([])
+  })
+
+  it("drops the refusal of a minder not started under silenceErrors, and tells it otherwise", async () => {
+    const { bank, minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
+    minder.refresh(TH.GateScope, { silenceErrors: true })
+    await TH.wakeupAtNextTick()
+    expect(badnewsOf(bank)).to.deep.equal([])
+    minder.refresh(TH.GateScope)
+    await TH.eventually(() => bank.tellBadNews.mock.calls.length > 0)
+    expect(badnewsOf(bank)).to.deep.equal(['disabled'])
+  })
+
+  it("still tells an unexpected_error under silenceErrors", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { bank, minder } = minderWorldOf(vaultDB)
+    const theirs = TH.boxThingOf('anthropic')
+    vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve({ ok: true, act: 'gotlive', ask, world: null, val: theirs }))
+    minder.refresh(TH.BoxScope, { silenceErrors: true })
+    await TH.eventually(() => bank.tellBadNews.mock.calls.length > 0)
+    expect(badnewsOf(bank)).to.deep.equal(['unexpected_error'])
+    expect(minder.at(TH.BoxScope)).to.be.undefined
+  })
+
+  const RefusedArgs = [
+    [{ ...TH.GateScope, userid: 'u2' }, {},                                'refuses bad_record for a scope of another bank, asking nothing'],
+    [TH.GateScope,                      { silenceErrors: 'yes' },          'refuses bad_record for a silenceErrors that is not a boolean'],
+    [TH.GateScope,                      { ifStale: 'refresh' },            'refuses bad_record for an option it does not know'],
+    [TH.GateScope,                      { staleTime: -1 },                 'refuses bad_record for a negative staleTime'],
+  ] as const
+  for (const [scoped, opts, blurb] of RefusedArgs) {
+    it(blurb, async () => {
+      const vaultDB = await bornOf(new MemoryVaultDB())
+      const { bank, minder } = minderWorldOf(vaultDB)
+      const asked = vi.spyOn(vaultDB, 'tryGetThing')
+      TH.expectSyncRefusal(() => { minder.refresh(scoped, opts as never) }, 'bad_record')
+      await TH.wakeupAtNextTick()
+      expect(asked.mock.calls).to.have.lengthOf(0)
+      expect(badnewsOf(bank)).to.deep.equal([])
+    })
+  }
+})
+
 describe("ThingMinder.list", () => {
   it("lists the boxes under the root box, and caches each bare and stale", async () => {
     const vaultDB = new MemoryVaultDB()

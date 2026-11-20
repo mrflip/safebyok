@@ -45,7 +45,7 @@ export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 // == [Checks]: RawChecks, MinderChecks
 
 /** The checks of a minder's arguments and options. */
-const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
+const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault, bool }) => {
   const gcTime           = union([uint.max(MaxTimerMillis, Phrases.GcTimeShape), lit(Infinity)])
   const staleMillis      = uint.max(MaxTimerMillis, Phrases.StaleTimeShape)
   const staleTime        = union([staleMillis, lit(Infinity)])
@@ -65,8 +65,9 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   // Each option may be left out, or given as undefined, for no opinion.
   const minderGetOpts    = obj({ staleTime: tsqStaleTime.optional() }).strict()
   const minderTryAtOpts  = minderGetOpts.extend({ ifStale: oneof(['get', 'refresh']).optional() }).strict()
+  const minderRefreshOpts = minderGetOpts.extend({ silenceErrors: bool.optional() }).strict()
   const minderInvalidateOpts = obj({ list: lit('all') }).strict()
-  return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, feedVersion, minderLabelpath, minderTryAtOpts, minderGetOpts, minderInvalidateOpts }
+  return { queryCacheOpts, queryCacheOptsOrDefault, tsqStaleTime, minderFriend, minderListener, feedVersion, minderLabelpath, minderTryAtOpts, minderRefreshOpts, minderGetOpts, minderInvalidateOpts }
 })
 
 /** The checks of a ThingMinder's arguments and options.
@@ -87,6 +88,11 @@ export type MinderGetOpts    = Z.input<typeof MinderChecks.minderGetOpts>
  * - `ifStale: 'refresh'` -- also fetch a stale or missing car in the background
  */
 export type MinderTryAtOpts  = Z.input<typeof MinderChecks.minderTryAtOpts>
+/** `refresh`'s options, each of which may be undefined for no opinion:
+ * - `staleTime`     -- overrides the minder's own
+ * - `silenceErrors` -- drop every refusal but an `unexpected_error`, which still goes to the bank's `tellBadNews`
+ */
+export type MinderRefreshOpts = Z.input<typeof MinderChecks.minderRefreshOpts>
 /** `invalidate`'s options, which it requires: `list: 'all'` marks every listing under the labelpath stale. */
 export type MinderInvalidateOpts = Z.input<typeof MinderChecks.minderInvalidateOpts>
 /** The parts of a {@link Bank} a minder uses: its scope, its ask builders, and where trouble no caller waits on goes. */

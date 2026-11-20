@@ -17,7 +17,7 @@ import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
 import type { ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import {
-  type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
+  type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderRefreshOpts, type MinderTryAtOpts,
   type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
@@ -152,7 +152,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, list, isStaleAt, listen
+  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, refresh, list, isStaleAt, listen
 
   /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
   at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
@@ -196,6 +196,19 @@ export class ThingMinder {
     MinderChecks.minderGetOpts.parse(opts)
     this.#demandReady()
     return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
+  }
+
+  /** Get `scoped`'s car in the background, unless it is timely, and return at once. A get under way meanwhile shares the fetch.
+   * Its refusal goes to the bank's `tellBadNews`. Under `silenceErrors`, only an `unexpected_error` does: every other refusal is dropped.
+   */
+  refresh(scoped: ThingScope, opts: MinderRefreshOpts = {}): void {
+    const { silenceErrors, staleTime } = MinderChecks.minderRefreshOpts.parse(opts)
+    const scope = this.#demandOwnScope(scoped)
+    void this.get(scope, { staleTime }).catch((err: unknown) => {
+      const refusal = Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)
+      if (silenceErrors && (refusal.refusalkind !== 'unexpected_error')) { return }
+      this.#bank.tellBadNews([refusal])
+    })
   }
 
   /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included.
