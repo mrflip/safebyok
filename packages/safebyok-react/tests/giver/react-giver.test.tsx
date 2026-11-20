@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider, type UseMutationOptions, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { PendingBank, VaultError } from 'safebyok'
+import { type Cloak, PendingBank, VaultError, cloak } from 'safebyok'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
@@ -10,17 +10,22 @@ const OpenaiPath = 'box/openai'
 
 type AcmeGiver = ReturnType<typeof setup>['Acme']
 
-/** A passkey answer, an obvious fake: what a WebAuthn ceremony with the PRF extension hands the host. */
-const FakePasskeyAnswer = Object.freeze({ credential_id: 'fake-credential', prfBytes: new Uint8Array(32).fill(7) })
+/** A passkey answer, an obvious fake: what a WebAuthn ceremony with the PRF extension hands the host. A new one each call, as a cloak zeroes the bytes it adopts. */
+function fakePasskeyAnswer() { return { credential_id: 'fake-credential', prf_salt_b64: 'ZmFrZSBzYWx0', prfBytes: new Uint8Array(32).fill(7) } }
 
-/** Each form verb, its mutationOptions and its hook, and the cleartexts a form hands it, obvious fakes. */
+/** Each form verb, its mutationOptions and its hook, and the cleartexts a form hands it, obvious fakes, new at each call. */
 const FormCases = [
-  ["birth",             (acme: AcmeGiver) => acme.birthMutationOptions(),             (acme: AcmeGiver) => acme.useBirth(),             { passphraseClear: "fake new passphrase" }],
-  ["unlock",            (acme: AcmeGiver) => acme.unlockMutationOptions(),            (acme: AcmeGiver) => acme.useUnlock(),            { passphraseClear: "fake passphrase" }],
-  ["replacePassphrase", (acme: AcmeGiver) => acme.replacePassphraseMutationOptions(), (acme: AcmeGiver) => acme.useReplacePassphrase(), { passkeyClear: FakePasskeyAnswer, nextPassphraseClear: "fake new passphrase" }],
-  ["addPasskey",        (acme: AcmeGiver) => acme.addPasskeyMutationOptions(),        (acme: AcmeGiver) => acme.useAddPasskey(),        { passphraseClear: "fake passphrase", nextPasskeyClear: FakePasskeyAnswer }],
-  ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     { passkeyClear: FakePasskeyAnswer }],
+  ["birth",             (acme: AcmeGiver) => acme.birthMutationOptions(),             (acme: AcmeGiver) => acme.useBirth(),             () => ({ passphraseClear: "fake new passphrase" })],
+  ["unlock",            (acme: AcmeGiver) => acme.unlockMutationOptions(),            (acme: AcmeGiver) => acme.useUnlock(),            () => ({ passphraseClear: "fake passphrase" })],
+  ["replacePassphrase", (acme: AcmeGiver) => acme.replacePassphraseMutationOptions(), (acme: AcmeGiver) => acme.useReplacePassphrase(), () => ({ passkeyClear: fakePasskeyAnswer(), nextPassphraseClear: "fake new passphrase" })],
+  ["addPasskey",        (acme: AcmeGiver) => acme.addPasskeyMutationOptions(),        (acme: AcmeGiver) => acme.useAddPasskey(),        () => ({ passphraseClear: "fake passphrase", nextPasskeyClear: fakePasskeyAnswer() })],
+  ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     () => ({ passkeyClear: fakePasskeyAnswer() })],
 ] as const
+
+/** True of a cloak that holds nothing. */
+function isVacated(cloaked: Cloak): boolean {
+  return [cloaked.passphraseClear, cloaked.passkeyClear, cloaked.nextPassphraseClear, cloaked.nextPasskeyClear].every((val) => val === undefined)
+}
 
 /** A fake world, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
 function setup() {
@@ -84,53 +89,52 @@ describe("useBankSnapshot", () => {
 })
 
 describe("the form mutations", () => {
-  for (const [verb, optionsOf, useForm, cleartexts] of FormCases) {
-    it(`runs the bank's ${verb} through its mutationOptions`, async () => {
+  for (const [verb, optionsOf, useForm, cleartextsOf] of FormCases) {
+    it(`runs the bank's ${verb} through its mutationOptions, with the cleartexts the cloak holds, and vacates the cloak`, async () => {
       const { world, Acme, wrapper } = setup()
-      const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, object>), { wrapper })
-      await act(() => result.current.mutateAsync({ ...cleartexts }))
-      expect(world.formCalls).to.deep.equal([{ verb, cleartexts }])
+      const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, Cloak>), { wrapper })
+      const cloaked = cloak(cleartextsOf())
+      await act(() => result.current.mutateAsync(cloaked))
+      expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
+      expect(isVacated(cloaked)).to.eq(true)
     })
 
-    it(`runs the bank's ${verb} through its hook`, async () => {
+    it(`runs the bank's ${verb} through its hook, with the cleartexts the cloak holds, and vacates the cloak`, async () => {
       const { world, Acme, wrapper } = setup()
       const { result } = renderHook(() => useForm(Acme), { wrapper })
-      act(() => { result.current.mutate({ ...cleartexts } as never) })
+      const cloaked = cloak(cleartextsOf())
+      act(() => { result.current.mutate(cloaked) })
       await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-      expect(world.formCalls).to.deep.equal([{ verb, cleartexts }])
+      expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
+      expect(isVacated(cloaked)).to.eq(true)
     })
   }
 
-  it("hands the verb the object handed to mutate, left as it came", async () => {
-    const { world, Acme, wrapper } = setup()
-    const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
-    const handed = { passphraseClear: 'fake passphrase' }
-    await act(() => result.current.mutateAsync(handed))
-    expect(handed).to.deep.equal({ passphraseClear: 'fake passphrase' })
-    expect(world.formCalls).to.deep.equal([{ verb: 'unlock', cleartexts: { passphraseClear: 'fake passphrase' } }])
-  })
-
-  it("reports the verb's refusal as the mutation's error", async () => {
+  it("reports the verb's refusal as the mutation's error, and vacates the cloak", async () => {
     const { world, Acme, wrapper } = setup()
     const refusal = new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.')
     world.refuseFormVerbs(refusal)
     const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
-    act(() => { result.current.mutate({ passphraseClear: 'fake wrong passphrase' }) })
+    const cloaked = cloak({ passphraseClear: 'fake wrong passphrase' })
+    act(() => { result.current.mutate(cloaked) })
     await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-    expect(refusal.family).to.eq('condition')
+    expect([refusal.family, isVacated(cloaked)]).to.deep.equal(['condition', true])
   })
 
-  it("runs the verb once under a host's default of retrying mutations", async () => {
+  it("hands each retry the cloak's cleartexts whole, under a host's default of retrying mutations, and vacates it once settled", async () => {
     const { world, Acme } = setup()
     const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
     onTestFinished(() => { client.clear() })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
     const refusal = new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.')
     world.refuseFormVerbs(refusal)
-    const { result } = renderHook(() => Acme.useUnlock(), { wrapper: Wrapper })
-    act(() => { result.current.mutate({ passphraseClear: 'fake wrong passphrase' }) })
+    const { result } = renderHook(() => Acme.useRevokePasskey(), { wrapper: Wrapper })
+    const cloaked = cloak({ passkeyClear: fakePasskeyAnswer() })
+    act(() => { result.current.mutate(cloaked) })
     await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-    expect(world.formCalls).to.deep.equal([{ verb: 'unlock', cleartexts: { passphraseClear: 'fake wrong passphrase' } }])
+    const handed = { verb: 'revokePasskey', cleartexts: { passkeyClear: fakePasskeyAnswer() } }
+    expect(world.formCalls).to.deep.equal([handed, handed])
+    expect(isVacated(cloaked)).to.eq(true)
   })
 
   it("keys each form mutation under the bank", () => {
