@@ -1,6 +1,6 @@
 # Thread 5: bank_gatings (2026-11-20)
 
-Branch `20261120-bank_gatings`, PR pending, stacked on #770 (thread 4, `20261119-vault_writes`). Proved: `safebyok`
+Branch `20261120-bank_gatings`, PR #772, stacked on #770 (thread 4, `20261119-vault_writes`). Proved: `safebyok`
 tests 1262 passed, typecheck and lint clean, at 683c5c958; `pnpm justify` not yet run.
 
 * **Built** (`packages/safebyok/src/models/`):
