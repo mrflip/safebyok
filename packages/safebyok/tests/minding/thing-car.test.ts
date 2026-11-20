@@ -107,14 +107,14 @@ describe("bestCarOf", () => {
   const MergeCases = [
     // the newest revision, and the newest whole record:
     [carOf(Box0),           carOf(Box1),                carOf(Box1),                 'a later whole record makes a full car of it'],
-    [carOf(Box0),           carOf(Thing.sparseOf(Box1)),      bhndOf(Box1, Box0),        'a later sparse record leaves the whole one behind it'],
-    [carOf(Thing.sparseOf(Box1)), carOf(Box0),                bhndOf(Box1, Box0),        'an older whole record under a newer sparse one stays behind it'],
-    [bhndOf(Box2, Box0),  carOf(Box1),                bhndOf(Box2, Box1),        'a newer whole record, still older than the newest, moves up behind it'],
-    [bhndOf(Box1, Box0),  carOf(Box1),                carOf(Box1),                 'the whole record of the newest revision makes the car full'],
+    [carOf(Box0),           carOf(Thing.sparseOf(Box1)),      bhndOf(Box1, Box0),          'a later sparse record leaves the whole one behind it'],
+    [carOf(Thing.sparseOf(Box1)), carOf(Box0),                bhndOf(Box1, Box0),          'an older whole record under a newer sparse one stays behind it'],
+    [bhndOf(Box2, Box0),    carOf(Box1),                bhndOf(Box2, Box1),          'a newer whole record, still older than the newest, moves up behind it'],
+    [bhndOf(Box1, Box0),    carOf(Box1),                carOf(Box1),                 'the whole record of the newest revision makes the car full'],
     [carOf(Thing.sparseOf(Box0)), carOf(Box0),                carOf(Box0),                 'the whole record of a bare revision makes the car full'],
     // tombstones and lives:
-    [bhndOf(Box1, Box0),  carOf(BoxGone),             carOf(BoxGone),              'a whole tombstone replaces the older whole record'],
-    [bhndOf(Box1, Box0),  carOf(Thing.sparseOf(BoxGone)),   carOf(Thing.sparseOf(BoxGone)),    'a sparse tombstone replaces the older whole record'],
+    [bhndOf(Box1, Box0),    carOf(BoxGone),             carOf(BoxGone),              'a whole tombstone replaces the older whole record'],
+    [bhndOf(Box1, Box0),    carOf(Thing.sparseOf(BoxGone)),   carOf(Thing.sparseOf(BoxGone)),    'a sparse tombstone replaces the older whole record'],
     [carOf(Box2),           carOf(Thing.sparseOf(BoxReborn)), carOf(Thing.sparseOf(BoxReborn)),  'a later life heard sparse has no whole record of the earlier life'],
     [carOf(BoxShell),       carOf(Thing.sparseOf(Box0)),      carOf(Thing.sparseOf(Box0)),       'any record replaces the void sentinel'],
   ] as const
@@ -129,7 +129,7 @@ describe("bestCarOf", () => {
     [carOf(Box1),               carOf({ ...Box1 }),        'an equal revision arrives on a full car'],
     [carOf(Box1),               carOf(Thing.sparseOf(Box1)),     'a sparse equal revision arrives on a full car'],
     [carOf(Thing.sparseOf(Box1)),     carOf(Thing.sparseOf(Box1)),     'a sparse equal revision arrives on a bare car'],
-    [bhndOf(Box2, Box1),      carOf(Box0),               'a whole record older than the fullest arrives on a bhnd car'],
+    [bhndOf(Box2, Box1),        carOf(Box0),               'a whole record older than the fullest arrives on a bhnd car'],
     [carOf(BoxGone),            carOf(Box2),               'the whole record before the tombstone arrives on a gone car'],
     [carOf(Thing.sparseOf(BoxGone)),  carOf(BoxGone),            'a whole tombstone arrives on a sparse one'],
   ] as const
