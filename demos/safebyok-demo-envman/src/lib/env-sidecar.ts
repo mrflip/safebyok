@@ -53,6 +53,8 @@ export function epochMsOfDay(dayValue: string): number | undefined {
   return Number.isNaN(epochMs) ? undefined : epochMs
 }
 
+/** `val` if it is text, else empty. */
 function textOf(val: unknown): string { return (typeof val === 'string') ? val : '' }
 
+/** `val` if it is a finite number, else `fallback`. */
 function numberOr(val: unknown, fallback: number): number { return Number.isFinite(val) ? (val as number) : fallback }
