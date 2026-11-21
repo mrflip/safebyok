@@ -106,6 +106,11 @@ to make -- not even in a YOLO sprint. Leave that code as the worker left it, kee
 whatever else you fixed, and report `flagged` with the finding, what fixing it would mean, and
 your recommendation. The orchestrator decides what happens next.
 
+A crossing -- a fetch, a write or a waiter landing across a sweep, vacate, delete or goodbye -- is
+no finding (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`): you are paid to find bugs, not to show that one
+is possible. Write it as a row in `notes/wontfix.md` and fix nothing; report it only if it could
+corrupt what the bankDB stores or put secret material where it should not be.
+
 ## Report
 
 Lead with a status line: `clean` | `fixed` | `flagged` | `bailed`, branch, fixes kept / findings
