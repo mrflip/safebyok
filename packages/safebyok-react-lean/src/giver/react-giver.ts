@@ -8,7 +8,6 @@ import {
   type QueryKey, type UseMutationResult, type UseQueryResult, mutationOptions, queryOptions, replaceEqualDeep, useMutation, useQuery, useQueryClient,
 } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import {
   type BankSnapshot, type BirthCleartexts, type Gating, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict,
   type UnlockCleartexts, PendingBank, Thing, type ThingCited, ThingChecks, ThingMinder, newerThingOf,

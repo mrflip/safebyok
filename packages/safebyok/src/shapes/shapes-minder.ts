@@ -10,7 +10,9 @@ import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
 import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel, ThingChecks, ThingFormat } from './shapes-thing'
-import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
+import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, AskChecks } from './shapes-asks'
+import type { BankAskDraft } from './shapes-bankish'
+import type { LiveOf, ShellOf } from './shapes-sealers'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 
@@ -57,7 +59,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
   // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once.
   const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
-  const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
+  const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.MinderFriendExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
   const feedVersion      = lit(MinderEventFormat, Phrases.FeedVersionOther)
   const minderLabelpath  = ThingChecks.thingScope.shape.labelpath
@@ -90,8 +92,20 @@ export type MinderGetOpts    = Z.input<typeof MinderChecks.minderGetOpts>
 export type MinderTryAtOpts  = Z.input<typeof MinderChecks.minderTryAtOpts>
 /** `invalidate`'s options, which it requires: `list: 'all'` marks every listing under the labelpath stale. */
 export type MinderInvalidateOpts = Z.input<typeof MinderChecks.minderInvalidateOpts>
-/** The parts of a {@link Bank} a minder uses: its scope, its ask builders, and where trouble no caller waits on goes. */
-export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
+/** What a minder is made with: its bank's scope and root box, the builders of the asks it sends, and where trouble no caller waits on goes.
+ * A Device is one, and so is a {@link Bank}.
+ */
+export interface MinderFriend {
+  readonly scope:   ThingWatchScope
+  /** The bank's root box, or its shell before the bank is born: a box's shell lives in its life. */
+  readonly rootBox: LiveOf<BoxRecord> | ShellOf<BoxRecord>
+  /** The get ask for the Thing at `ask.labelpath` in the bank. */
+  makeGetAsk(ask: BankAskDraft): GetAsk
+  /** The list ask for the children of the Thing at `ask.labelpath` in the bank. */
+  makeListAsk(ask: BankAskDraft): ListAsk
+  /** Hear failures no caller is waiting on. Never throws. */
+  tellBadNews(badnews: readonly unknown[]): void
+}
 // --
 
 // == [Records]: ThingAt, DeliverableThing

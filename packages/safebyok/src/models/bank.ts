@@ -1,6 +1,5 @@
 import { isEqual } from 'es-toolkit'
 import { Clock, Crypto, Errors, Outcome, Phrases as BigPhrases, VX, Validator } from 'safebyok-big/internals'
-import { type QueryCacheOpts, MinderChecks } from '../shapes/shapes-minder'
 import { Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
@@ -24,11 +23,10 @@ import * as Throwers from '../refusals/throwers'
  * Boxes are sealed and unsealed under its private lease, and stored in its vaultDB.
  */
 export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements BankStamp {
-  // == [Props]: #device, #vaultDB, #queryCacheOpts, #maingate, #rootBox, #lease, #unlockWait, #vaults, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
+  // == [Props]: #device, #vaultDB, #maingate, #rootBox, #lease, #unlockWait, #vaults, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe
 
   readonly #device:   Device
   readonly #vaultDB:  VaultDB
-  readonly #queryCacheOpts: Readonly<QueryCacheOpts>
 
   // Replaced where a gate change lands: by the gate it wrote.
   /** The main gate, as this bank last wrote or was made with it. */
@@ -60,7 +58,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Getters]: device, device_tok, vaultDB, scope, stamp, maingate, rootBox, track, queryCacheOpts, getSnapshot, subscribe
+  // == [Getters]: device, device_tok, vaultDB, scope, stamp, maingate, rootBox, track, getSnapshot, subscribe
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
@@ -88,9 +86,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return { bank: trackPairOf(this), [Labelpath.MainGate]: trackPairOf(this.#maingate), [Labelpath.RootBox]: trackPairOf(this.#rootBox) }
   }
 
-  /** The defaults this bank's minders set on their items and lists in TanStack Query's cache. */
-  get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
-
   /** This bank's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes. */
   get getSnapshot(): () => BankSnapshot { return this.#getSnapshot }
 
@@ -102,22 +97,22 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, with its main gate and root box, on `opts.device`, with its boxes in `opts.vaultDB`. */
+  /** Make the bank of `record`, with its main gate and root box, on `opts.device`, with its boxes in `opts.vaultDB`. Locked, and nothing is fetched or stored.
+   * The device is not told of it: a device makes its own bank in its `hello`, and is handed the bank its birth makes.
+   */
   static make(record: BankMakeRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
-    const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB, queryCacheOpts } } = Checks.bankMakeArgs.parse({ record, opts })
+    const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB } } = Checks.bankMakeArgs.parse({ record, opts })
     const bankRecord = BankChecks.record.parse(rest)
     Validator.checkedConsistent(StampChecks.bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(rootBox, { ...StampChecks.bankScope.parse(bankRecord), labelpath: 'box' }, { kind: 'record_conflict' })
     super(bankRecord)
     this.#device = device
     this.#vaultDB = vaultDB
-    this.#queryCacheOpts = Object.freeze(queryCacheOpts)
     this.#rootBox = Object.freeze(rootBox)
     this.#maingate = Gate.make(maingate, { bank: this })
     this.#snapshot = this.#makeSnapshot()
-    device.cheatHoldBank(this)
     Object.freeze(this)
   }
 
@@ -188,12 +183,13 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** The gating of {@link birth} over `cleartexts`, for a form mutation to attempt. */
   static birthGating(device: Device, cleartexts: BirthCleartexts): BirthGating {
     const friend = {
-      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving }),
+      // Cheat (react_life): birth hands the born bank to its device itself, until birth's caller does.
+      birth: async (record: BankMakeRecord, proving: Proving) => device.adoptBornBank(await Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving })),
     }
     return new BirthGating(device, cleartexts, friend)
   }
 
-  /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked.
+  /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
    * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
    */
@@ -364,7 +360,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** End this bank for good: drop its lease, sweep each vault made on it, and reject every call waiting for an `unlock` gating. Never throws.
-   * Its subscribers hear of the end, and of nothing after. If its device's snapshot shows this bank, it goes back to `PendingBank`.
+   * Its subscribers hear of the end, and of nothing after.
    */
   sweep(): this {
     if (this.#endCause !== null) { return this }
@@ -373,7 +369,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   // Every end of a bank comes here. It shuts first, so that a subscriber told of the end, or a vault as it is swept, finds every call refusing.
-  /** End this bank with `endCause`, sweep its vaults, and let go of them, its subscribers and its device. */
+  /** End this bank with `endCause`, sweep its vaults, and let go of them and its subscribers. */
   #end(endCause: Errors.VaultError): void {
     this.#endCause = endCause
     this.#lease?.sweep()
@@ -383,7 +379,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     for (const vault of this.#vaults) { vault.sweep() }
     this.#vaults.clear()
     this.#subscribers.clear()
-    this.#device.cheatDropBank(this)
   }
 
   /** Sweep `vault` when this bank is swept. Internal.
@@ -552,7 +547,6 @@ const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
     opts:   obj({
       device:         custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
       vaultDB:        ThingChecks.vaultDBShape,
-      queryCacheOpts: MinderChecks.queryCacheOptsOrDefault,
     }),
   }),
 }))
