@@ -1,6 +1,7 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, render, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { type BoxRecord, MinderEventFormat, ThingMinder } from 'safebyok'
+import { type BoxRecord, type GateRecord, MinderEventFormat, type PasskeyWayinHeader, ThingMinder } from 'safebyok'
+import { liveGateOf } from '../../src/index'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as TH from '../test-helpers'
@@ -142,6 +143,32 @@ const OrderCases = [
 
 /** Release nothing: no pause has been made yet. */
 function releaseNothing(): void { /* nothing paused */ }
+
+describe("the bridge's main gate", () => {
+  it("shows a passkey another device adds, without fetching again, and without the bankKey it wraps", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    let header: PasskeyWayinHeader | null | undefined
+    function GateProbe() {
+      header = world.Bank.useGate({ select: (gate) => liveGateOf(gate)?.wayins.passkey0 ?? null }).data
+      return <p>{header?.wayinkind ?? 'none'}</p>
+    }
+    const { container } = render(TH.providerTreeOf(world, <GateProbe />, { userid: TH.ProviderUser }))
+    await waitFor(() => { expect(header).to.be.null })
+    // The minder freezes, so the spy goes on its class, counting the giver's device's calls alone.
+    const { minder } = world._cheat_device()
+    const get = vi.spyOn(ThingMinder.prototype, 'get')
+    onTestFinished(() => { get.mockRestore() })
+    const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
+    await act(async () => {
+      await other.hello()
+      await other.bank!.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
+    })
+    await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
+    expect(get.mock.contexts.filter((context) => context === minder)).to.have.lengthOf(0)
+    const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
+    TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
+  })
+})
 
 describe("the bridge shows the newest record, in either order of a late answer and the news of a newer revision", () => {
   for (const [isWatching, firstStep, blurb] of OrderCases) {

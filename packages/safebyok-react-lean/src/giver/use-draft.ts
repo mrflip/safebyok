@@ -2,10 +2,9 @@
 
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
-import { type BankSnapshot, type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sidecar, Thing, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
+import { type BankSnapshot, type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
 import { PartsPhrases } from '../parts/phrases-parts'
 import { liveOf } from './giver-defaults'
-import type { GiverSlot } from './giver-slot'
 import * as Phrases from './phrases-giver'
 import type { BoxSelected, BoxShown } from './react-giver'
 import type { BoxQueryOpts } from './shapes-giver'
@@ -72,13 +71,15 @@ type DraftFriend = Readonly<{
   useBank:     <SelT>(select: (snap: BankSnapshot) => SelT) => SelT
   useBox:      (labelpath: string, opts: BoxQueryOpts<BoxShown, BoxShown>) => Readonly<{ data: BoxShown | undefined }>
   withWhisper: <ResultT>(labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>) => Promise<ResultT>
+  /** The vault of the signed-in user's bank, refusing `absent_vault` while there is none. */
+  demandVault: () => Vault
 }>
 // --
 
 // == [The hook]: makeUseDraft
 
-/** The `useDraft` of `slot`'s bank, reading the bank through `bank`. */
-export function makeUseDraft(slot: GiverSlot, bank: DraftFriend) {
+/** The `useDraft` of the bank `bank` reads. */
+export function makeUseDraft(bank: DraftFriend) {
   /** A draft of the box at `labelpath`: an editor's sidecar, its whisper's fields as inputs, and `put` and `discard` for its Save and Undo.
    * The fields' text lives only in the inputs: React never holds it, and `put` reads it from there.
    * @example
@@ -183,7 +184,7 @@ export function makeUseDraft(slot: GiverSlot, bank: DraftFriend) {
         const nextWhisper = { ...whisper, ...edits }
         const draftSidecar = sidecarSet ?? ((pinned === null) ? unsealed.sidecar : baseSidecar)
         const patch = { sidecar: sidecarOf ? sidecarOf(nextWhisper, draftSidecar) : draftSidecar }
-        return await slot.demandVault().putBoxOnce(pinned ?? Thing.sparseOf(unsealed), patch, { whisper: nextWhisper })
+        return await bank.demandVault().putBoxOnce(pinned ?? Thing.sparseOf(unsealed), patch, { whisper: nextWhisper })
       })
       discard()
       return box

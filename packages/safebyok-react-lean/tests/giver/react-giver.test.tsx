@@ -1,12 +1,12 @@
 import { QueryClient, QueryClientProvider, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useActionState, useEffect } from 'react'
-import { type BankSnapshot, type BoxRecord, type Gating, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
+import { type BankSnapshot, type BoxRecord, type GateRecord, type Gating, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { liveOf } from '../../src/giver/giver-defaults'
+import { liveGateOf, liveOf } from '../../src/giver/giver-defaults'
 import { mask } from '../../src/index'
-import { type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
+import { type GateShown, type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const Passphrase = LeanTH.TestPassphrase
@@ -60,7 +60,7 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'useStageChange', 'usePasskeyHeader', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
+      'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
       'birthGating', 'unlockGating', 'replacePassphraseGating', 'addPasskeyGating', 'revokePasskeyGating',
       'birthMutationOptions', 'unlockMutationOptions', 'replacePassphraseMutationOptions', 'addPasskeyMutationOptions', 'revokePasskeyMutationOptions',
@@ -303,29 +303,51 @@ describe("the form mutations", () => {
   })
 })
 
-/** The passkey header beside the add and revoke mutations, over a world with the jokes bank stored, once it shows `locked`. */
-async function renderPasskeyHeader() {
+/** The gate's passkey header, by `useGate`, beside the add and revoke mutations, over a world with the jokes bank stored, once it shows `locked`. */
+async function renderGate() {
   const rendered = await renderUnder((world) => ({
-    header: world.Bank.usePasskeyHeader(), add: world.Bank.useAddPasskey(), revoke: world.Bank.useRevokePasskey(), stage: world.Bank.useBank((bank) => bank.stage),
+    gate: world.Bank.useGate(), header: world.Bank.useGate({ select: passkeyHeaderOf }).data,
+    add: world.Bank.useAddPasskey(), revoke: world.Bank.useRevokePasskey(), stage: world.Bank.useBank((bank) => bank.stage),
   }), { stored: 'jokes' })
   await waitFor(() => { expect(rendered.result.current.stage).to.eq('locked') })
+  await waitFor(() => { expect(rendered.result.current.gate.data).to.not.be.undefined })
   return rendered
 }
 
-describe("usePasskeyHeader", () => {
-  it("answers null while nobody is signed in", async () => {
-    const { result } = await renderUnder((world) => world.Bank.usePasskeyHeader(), {}, { userid: null })
-    expect(result.current).to.be.null
+/** The passkey header of a gate as `useGate` shows it, or null for none. */
+function passkeyHeaderOf(gate: GateShown) { return liveGateOf(gate)?.wayins.passkey0 ?? null }
+
+/** The ciphertext of each wrapped bankKey on the gate the world's vaultDB stores. */
+function storedWrapsOf(world: TH.ProviderWorld): string[] {
+  const gate = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
+  return [gate.wayins.main, gate.wayins.passkey0].filter((wayin) => wayin !== null).map((wayin) => wayin.bank_key_wayin_wrapped.ciphertext_b64)
+}
+
+describe("useGate", () => {
+  it("answers undefined and fetches nothing while nobody is signed in", async () => {
+    const { result, world } = await renderUnder((world) => world.Bank.useGate(), { stored: 'jokes' }, { userid: null })
+    expect(result.current.data).to.be.undefined
+    expect(result.current.fetchStatus).to.eq('idle')
+    expect(world.counts.gets).to.eq(0)
   })
 
-  it("answers null for a bank with no passkey", async () => {
-    const { result } = await renderPasskeyHeader()
+  it("answers null while the bank is unborn", async () => {
+    const { result } = await renderUnder((world) => ({ gate: world.Bank.useGate(), stage: world.Bank.useBank((bank) => bank.stage) }))
+    await waitFor(() => { expect(result.current.stage).to.eq('unborn') })
+    await waitFor(() => { expect(result.current.gate.data).to.be.null })
+  })
+
+  it("answers the stored gate with no passkey, keyed by keys.gate()", async () => {
+    const { result, world } = await renderGate()
     expect(result.current.header).to.be.null
+    expect(result.current.gate.data?.wayins.main.wayinkind).to.eq('passphrase')
+    expect(world.Bank.keys.gate()).to.deep.equal(['sok', 'u1', 'acme', 'item', 'gate', '!'])
+    expect(world.client.getQueryData(world.Bank.keys.gate())).to.have.property('wayins')
   })
 
-  // usePasskeyHeader @example
-  it("answers the passkey's header once one is added, and null again once it is revoked", async () => {
-    const { result, world } = await renderPasskeyHeader()
+  // useGate @example
+  it("shows a passkey added, and then revoked, with no reload", async () => {
+    const { result, world } = await renderGate()
     act(() => { result.current.add.mutate(result.current.add.gating({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })) })
     await waitFor(() => { expect(result.current.header?.wayinkind).to.eq('passkey') })
     expect(result.current.header).to.deep.equal(await TH._cheat_passkeyHeaderOf(world))
@@ -334,12 +356,28 @@ describe("usePasskeyHeader", () => {
   })
 
   it("answers the same header at each render until the passkey changes", async () => {
-    const { result, rerender } = await renderPasskeyHeader()
+    const { result, rerender } = await renderGate()
     act(() => { result.current.add.mutate(result.current.add.gating({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })) })
     await waitFor(() => { expect(result.current.header).to.not.be.null })
     const { header } = result.current
     rerender()
     expect(result.current.header).to.eq(header)
+  })
+
+  it("holds no wrapped bankKey or passphrase in the host's cache or the rendered tree", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    function ShowGate() {
+      const { data: gate } = world.Bank.useGate()
+      const add = world.Bank.useAddPasskey()
+      const stage = world.Bank.useBank((bank) => bank.stage)
+      useEffect(() => { if (stage === 'locked') { add.mutate(add.gating({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })) } }, [stage]) // eslint-disable-line react-hooks/exhaustive-deps
+      return <pre>{JSON.stringify(gate)}</pre>
+    }
+    const { container } = render(TH.providerTreeOf(world, <ShowGate />, { userid: TH.ProviderUser }))
+    await waitFor(() => { expect(container.textContent).to.contain('"wayinkind":"passkey"') })
+    const wraps = storedWrapsOf(world)
+    expect(wraps).to.have.lengthOf(2)
+    for (const text of [...wraps, Passphrase]) { TH.expectTextUnheld(text, container, world.client) }
   })
 })
 

@@ -1,13 +1,30 @@
 /** The giver's types and checks: the events it reads of a minder, and what a host hands it. */
 
-import type { QueryKey, UseQueryOptions } from '@tanstack/react-query'
-import { type Banklabel, type Userid, Checkers } from 'safebyok'
+import type { QueryClient, QueryKey, UseQueryOptions } from '@tanstack/react-query'
+import { type BankSnapshot, type Banklabel, type DeviceOpts, type KeyDeriver, type Userid, type VaultDB, Checkers, PendingBank, isVaultDB } from 'safebyok'
+import * as Phrases from './phrases-giver'
 
-// == [Types]: GiverEvent, BoxQueryOpts
+// == [Types]: GiverBanks, GiverConfig, GiverMount, SignedOutBank, GiverEvent, BoxQueryOpts
 
-/** The fields the giver reads of a minder's event about a box's item or its soon. A minder's `ThingEvent` or `SoonEvent` of a box has them all. */
+/** The one bank a giver serves, keyed by its banklabel: `{ knock: { vaultDB } }`. */
+export type GiverBanks<BanklabelT extends string = string> = Readonly<Record<BanklabelT, Readonly<{ vaultDB: VaultDB }>>>
+
+/** A giver's config: its one bank and where that is stored, and the options of each device it makes. */
+export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB'>>
+
+/** What a provider hands the giver as it starts a device: the host's QueryClient, and a vaultDB and key deriver that replace the config's. */
+export type GiverMount = Readonly<{
+  client:      QueryClient
+  vaultDB?:    VaultDB | undefined
+  keyDeriver?: KeyDeriver | undefined
+}>
+
+/** The bank snapshot a giver's hooks show while nobody is signed in. */
+export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
+
+/** The fields the giver reads of a minder's event about the item or soon of a box or the main gate. A minder's `ThingEvent` or `SoonEvent` of either has them all. */
 export type GiverEvent = Readonly<{
-  /** Whether the event is of the box's item or of its soon. */
+  /** Whether the event is of the Thing's item or of its soon. */
   eventkind: 'item' | 'soon'
   type:      'added' | 'updated' | 'removed'
   /** What changed the item or soon, or undefined where it was added or removed: `'invalidate'` when the item fell behind a newer revision heard of. */
@@ -25,10 +42,27 @@ export type GiverEvent = Readonly<{
 export type BoxQueryOpts<RecordT, SelT> = Omit<UseQueryOptions<RecordT, Error, SelT>, 'queryKey' | 'queryFn'>
 // --
 
-// == [Checks]: ScopeChecks
+// == [Checks]: ScopeChecks, ConfigChecks, isOneBank
 
 /** The check that a banklabel names the giver's bank. */
-export const ScopeChecks = Checkers('bad_scope', ({ obj, label }) => ({
+export const ScopeChecks = Checkers('bad_scope', ({ obj, label, banklabel }) => ({
   bankScoped: obj({ banklabel: label }),
+  banklabel,
 }))
+
+/** The check of a giver's config, which answers its one bank as `[[banklabel, { vaultDB }]]`. */
+export const ConfigChecks = Checkers('bad_record', ({ obj, custom }) => ({
+  giverConfig: obj({
+    banks: custom<GiverBanks>(isOneBank, Phrases.OneBankExpected).transform((banks) => Object.entries(banks) as [[Banklabel, Readonly<{ vaultDB: VaultDB }>]]),
+  }),
+}))
+
+/** True when `val` names exactly one bank by a valid banklabel, and its vaultDB. */
+function isOneBank(val: unknown): boolean {
+  if ((typeof val !== 'object') || (val === null)) { return false }
+  const entries = Object.entries(val)
+  if (entries.length !== 1) { return false }
+  const [[banklabel, bank]] = entries as [[string, unknown]]
+  return ScopeChecks.banklabel.safeParse(banklabel).success && (typeof bank === 'object') && (bank !== null) && isVaultDB((bank as { vaultDB?: unknown }).vaultDB)
+}
 // --
