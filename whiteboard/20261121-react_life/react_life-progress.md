@@ -125,3 +125,13 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
 * **The kit's bank prop is right for now, not in the end:** the provider's context serves it; thread 11.
 * **Box-hook names follow STYLE.md:** `nullifyThing` → a `fooOf` name, `PutBoxActionResult.error` → `err`,
   `delBox` → `delBoxOnce`; thread 11, before envman.
+
+## Thread 8, giver_box_list (#804, ready)
+
+* `Knock.useBoxList()`: no arguments (labelpaths are flat). `data` is host labelpaths (`'jokes'`) in labelpath
+  order, the same array until a box joins; **deleted boxes stay listed** and their `useBox` answers null, so a row
+  renders nothing on null. Loading: `data` undefined, `isPending`. Signed out: `skipToken`, `fetchStatus` idle. No
+  bank: `[]`. A locked bank lists as usual. A `putBoxOnce` joins the listing through the bridge.
+* `Knock.keys.boxList()` is the minder's own listing key, via the new core static `ThingMinder.listQueryKeyOf(scope)`;
+  `keys.under()` does not cover it.
+* No opts, no `boxListQuery`, no `useQueryOptions().boxList` yet.
