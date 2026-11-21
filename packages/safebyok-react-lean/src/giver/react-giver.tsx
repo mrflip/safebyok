@@ -2,11 +2,11 @@
  * Its provider says who is signed in. Its hooks read the slot the provider fills, and records come through the host's React Query.
  */
 
-import { type DataTag, type QueryKey, type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type DataTag, type QueryKey, type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, skipToken, useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   Bank, type BankSnapshot, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, type Gating, type KeyDeriver, Labelpath, type LiveOf,
-  type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
+  type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyWayinHeader, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
   type TombstoneOf, type UnlockCleartexts, type Userid, type VaultDB, type Whisper,
 } from 'safebyok'
 import { FormMutationDefaults, boxQueryKeyOf, boxesQueryKeyUnder, nullifyThing, recordQueryDefaults } from './giver-defaults'
@@ -199,6 +199,21 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
   function useBank<SelT>(select: (snap: BankSnapshot) => SelT): SelT
   function useBank<SelT>(select?: (snap: BankSnapshot) => SelT): BankSnapshot | SelT {
     return useShownSnapshot((snap) => (select ? select(snap.bank) : snap.bank))
+  }
+
+  // Cheat (react_life): the bank's snapshot does not carry its gate, so this reads the gate during render, and re-renders
+  // on each change of stage and on each form mutation of the bank that succeeds, the ways a passkey comes and goes.
+  /** The header of the bank's passkey, or null while it has none or there is no bank.
+   * Show `AddPasskeyForm` while it is null and `RevokePasskeyForm` while it is not, and hand it to `PasskeyUnlockButton`.
+   * @example
+   *   const passkeyHeader = Knock.usePasskeyHeader()
+   *   <PasskeyUnlockButton bank={Knock} passkeyHeader={passkeyHeader} />
+   */
+  function usePasskeyHeader(): PasskeyWayinHeader | null {
+    useBank((snap) => snap.stage)
+    useMutationState({ filters: { mutationKey: ['sok', banklabel], status: 'success' }, select: (mutation) => mutation.state.submittedAt })
+    const passkey0 = slot.device?.bank?.maingate.passkey0 ?? null
+    return useMemo(() => (passkey0?.toJSON() as PasskeyWayinHeader | undefined) ?? null, [passkey0])
   }
 
   /** True while the bank's minder has heard of a newer revision of the box than its item. */
@@ -402,7 +417,7 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
   }
 
   const bankGiver = Object.freeze({
-    useBank, useBox, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, lock, dismissUnlock,
+    useBank, usePasskeyHeader, useBox, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
   })
   return { bankGiver, boxQueryOf }
