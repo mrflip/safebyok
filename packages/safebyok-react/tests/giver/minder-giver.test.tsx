@@ -22,7 +22,7 @@ async function setupShowing(labelpath: string, worldOpts: Parameters<typeof TH.m
     Giver.useBridge()
     return Bank.useBoxRecord(labelpath)
   }, { wrapper: Wrapper })
-  return { world, ...rendered }
+  return { world, client, ...rendered }
 }
 
 describe("giverBankOfVault", () => {
@@ -45,19 +45,42 @@ describe("giverBankOfMinder", () => {
     const { minder } = await TH.makeMinderGiverWorld()
     const bank = giverBankOfMinder(minder)
     for (const labelpath of ['gate', 'bank', 'boxes/openai']) {
-      await TH.expectRefusal(bank.getBoxCar(labelpath), 'bad_record')
+      await TH.expectRefusal(bank.getBoxRecord(labelpath), 'bad_record')
     }
   })
 
-  it("passes on each event of the minder about a box's car, and none about another kind's", async () => {
-    const { minder } = await TH.makeMinderGiverWorld()
+  it("answers whether a box's item is behind, and false for a labelpath that is not a box's", async () => {
+    const world = await TH.makeMinderGiverWorld({ isWatching: false })
+    const { minder } = world
+    const bank  = giverBankOfMinder(minder)
+    await minder.get({ ...minder.scope, labelpath: OpenaiPath })
+    await world._cheat_birthBox(LeanTH.boxThingOf('openai'))
+    expect(bank.isBoxRecordBehind(OpenaiPath)).to.eq(false)
+    await minder.list('box')
+    expect(bank.isBoxRecordBehind(OpenaiPath)).to.eq(true)
+    for (const labelpath of ["gate", "bank", "boxes/openai", "", 7, undefined]) {
+      expect(bank.isBoxRecordBehind(labelpath as never)).to.eq(false)
+    }
+  })
+
+  it("passes on each event of the minder about a box's item and its soon, its falling behind and their removal included, and none about another kind's", async () => {
+    const world  = await TH.makeMinderGiverWorld({ isWatching: false })
+    const { minder } = world
     const told: unknown[][] = []
-    giverBankOfMinder(minder).listenBoxCars((event) => { told.push([event.type, event.queryKey, event.state.data?.liveness]) })
+    giverBankOfMinder(minder).listenBoxRecords((event) => {
+      told.push([event.eventkind, event.type, event.action?.type, (event.state.data as Readonly<{ revseq: number }> | undefined)?.revseq])
+    })
     await minder.get({ ...minder.scope, labelpath: 'gate' })
     await minder.get({ ...minder.scope, labelpath: OpenaiPath })
+    await world._cheat_birthBox(LeanTH.boxThingOf('openai'))
+    await minder.list('box')
+    await minder.get({ ...minder.scope, labelpath: OpenaiPath })
     minder.goodbye()
-    const queryKey = ThingMinder.queryKeyOf({ ...minder.scope, labelpath: OpenaiPath })
-    expect(told).to.deep.equal([['updated', queryKey, 'void'], ['removed', queryKey, undefined]])
+    expect(told).to.deep.equal([
+      ['item', 'added', undefined, undefined], ['item', 'updated', 'fetch', undefined], ['item', 'updated', 'success', -1],
+      ['soon', 'added', undefined, undefined], ['soon', 'updated', 'success', 0], ['item', 'updated', 'invalidate', -1],
+      ['item', 'updated', 'fetch', -1], ['item', 'updated', 'success', 0], ['soon', 'removed', undefined, 0], ['item', 'removed', undefined, 0],
+    ])
   })
 })
 
@@ -91,7 +114,7 @@ describe("the giver over a minder", () => {
     const box = LeanTH.boxThingOf('openai')
     const { world, result } = await setupShowing(OpenaiPath, { isWatching: false })
     await act(() => world._cheat_birthBox(box))
-    // Unwatched, the minder knows of the box only by asking: the host refetches the void car it showed.
+    // Unwatched, the minder knows of the box only by asking: the host refetches the shell it showed.
     await act(() => world.minder.list('box'))
     await waitFor(() => { expect(result.current.data).to.deep.equal(box) })
     const next = LeanTH.nextOf(box, { sidecar: { account: 'home' } })
@@ -103,6 +126,29 @@ describe("the giver over a minder", () => {
     expect(result.current.data).to.deep.equal(box)
     releaseGets()
     await waitFor(() => { expect(result.current.data).to.deep.equal(next) })
+    expect(world.counts.gets).to.eq(gets + 1)
+  })
+
+  it("refetches the host's item when a newer revision is listed after a refused get", async () => {
+    const box = LeanTH.boxThingOf('openai')
+    const { world, client, result } = await setupShowing(OpenaiPath, { isWatching: false })
+    const scope = { ...world.minder.scope, labelpath: OpenaiPath }
+    await act(() => world._cheat_birthBox(box))
+    await act(() => world.minder.list('box'))
+    await waitFor(() => { expect(result.current.data).to.deep.equal(box) })
+    const next = LeanTH.nextOf(box, { sidecar: { account: 'home' } })
+    await act(() => world._cheat_replace(box, next))
+    await act(() => world.minder.list('box'))
+    await waitFor(() => { expect(result.current.data).to.deep.equal(next) })
+    // The vaultDB answers an older revision than the minder has: the get refuses stale_read.
+    world.vaultDB._cheat_things(LeanTH.ThingBank).set(OpenaiPath, box)
+    await act(async () => { await LeanTH.expectBad(world.minder.tryGet(scope, { staleTime: 0 }), 'stale_read') })
+    expect(client.getQueryState(ThingMinder.itemQueryKeyOf(scope))).to.deep.include({ isInvalidated: true, data: next })
+    const newest = LeanTH.nextOf(next)
+    world.vaultDB._cheat_things(LeanTH.ThingBank).set(OpenaiPath, newest)
+    const { gets } = world.counts
+    await act(() => world.minder.list('box'))
+    await waitFor(() => { expect(result.current.data).to.deep.equal(newest) })
     expect(world.counts.gets).to.eq(gets + 1)
   })
 })

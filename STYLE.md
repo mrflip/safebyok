@@ -99,8 +99,9 @@ customer**, wherever a name can manage it:
   true while a whisper shows on screen.
 * **No negation**: no dis-, un- or non-. `isEnabled`, not `isDisabled`, whose every negation reads
   as a double negative.
-* **Positive valence**, with the grain of the sentence it sits in: `isDBNewer`, not `isBehind`.
-* **Named for its impact on the customer**: `isDBNewer`, not `hasLatestUpdates`, which is true in
+* **Positive valence**, with the grain of the sentence it sits in: no negative posing as a positive, such as `isInvalidated`
+  where `isTimely` says what holds.
+* **Named for its impact on the customer**: `isBehind`, not `hasLatestUpdates`, which is true in
   the safe state, nor `needsRefreshToMergePut`, which names one consequence, and not always truly.
 
 **A validator is named for the parameter it checks**, in that parameter's case (`user_id`,

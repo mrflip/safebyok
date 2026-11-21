@@ -1,7 +1,7 @@
 import { noop } from 'es-toolkit'
 import { Errors } from 'safebyok-big/internals'
 import { vi } from 'vitest'
-import type { DeliverableThing, MinderEvent, MinderFriend, QueryCacheOpts, TSQAnswer, ThingCar } from '../../../src/shapes/shapes-minder'
+import type { DeliverableThing, ListingEvent, MinderEvent, ThingEvent, MinderFriend, QueryCacheOpts, TSQAnswer } from '../../../src/shapes/shapes-minder'
 import { ThingMinder } from '../../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
@@ -134,14 +134,19 @@ export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['
   return box
 }
 
-/** A watch notice of `thing`, as the vaultDB sends one. */
-export function noticeOf(thing: ThingNotice['val']): ThingNotice {
-  return { ok: true, act: (thing.am === 'a') ? 'gotlive' : 'gotgone', val: thing }
+/** A watch notice of `record` sparse, as the vaultDB sends one for a large record. */
+export function sparseNoticeOf(record: ThingRecord): ThingNotice {
+  return noticeOf(Thing.sparseOf(record) as ThingRecord)
 }
 
-/** The revtok of the newest record the minder has for the main gate, or undefined for nothing or the void sentinel. */
+/** A watch notice of `thing`, as the vaultDB sends one. */
+export function noticeOf(thing: ThingNotice['val']): ThingNotice {
+  return { ok: true, act: Thing.isLive(thing) ? 'gotlive' : 'gotgone', val: thing }
+}
+
+/** The revtok of the main gate's item, or undefined for nothing or the void sentinel. */
 export function revtokAt(minder: ThingMinder): Revtok | undefined {
-  const record: DeliverableThing | undefined = minder.at(TH.GateScope)?.newest
+  const record: DeliverableThing | undefined = minder.at(TH.GateScope)
   return ((record === undefined) || Thing.isVoidSentinel(record)) ? undefined : record.revtok
 }
 
@@ -155,11 +160,46 @@ export function boxScopeOf(boxlabel: string): ThingScope { return { ...TH.ThingB
 export function cheatBox(vaultDB: MemoryVaultDB, box: DeliverableThing): void { vaultDB._cheat_things(TH.ThingBank).set(box.labelpath, box) }
 
 /** A listener that records each event it is told. */
-export function listenerOf() { return vi.fn<(event: MinderEvent) => void>() }
+export function everyEventListenerOf() { return vi.fn<(event: MinderEvent) => void>() }
 
-/** The labelpath and the car's liveness of each car `listener` was told of, in order, or `'listing'` for a listing's event. */
-export function toldOf(listener: ReturnType<typeof listenerOf>): (readonly [Labelpath, ThingCar<ThingRecord>['liveness'] | undefined] | readonly [string])[] {
-  return listener.mock.calls.map(([event]) => (ThingMinder.isThingEvent(event) ? [event.labelpath, event.state.data?.liveness] as const : ['listing'] as const))
+/** A listener that records only `success`, `error`, `invalidate` and removal events. */
+export function listenerOf() {
+  const heard = everyEventListenerOf()
+  function listener(event: MinderEvent): void {
+    if ((event.type === 'removed') || ['success', 'error', 'invalidate'].includes(event.action?.type ?? '')) { heard(event) }
+  }
+  return Object.assign(listener, { mock: heard.mock, mockClear: () => heard.mockClear() })
+}
+
+/** True when `event` is about a listing's query: neither an item's nor a soon's. */
+export function isListingEvent(event: MinderEvent): event is ListingEvent {
+  return event.eventkind === 'list'
+}
+
+/** What an item's event tells: `'behind'` for its falling behind, `'removed'` for its removal, else whether its record is live, gone or the shell (`'void'`), or undefined for no record. */
+export type ToldSort = 'live' | 'gone' | 'void' | 'behind' | 'removed' | undefined
+
+/** A summary of each event `listener` recorded, in order:
+ * - an item's    -- `[labelpath, ToldSort]` ({@link ToldSort})
+ * - a soon's     -- `['soon', labelpath, revseq]`, with `'removed'` in place of the revseq for its removal
+ * - a listing's  -- `['listing']`
+ */
+export function toldOf(listener: ReturnType<typeof listenerOf>): (readonly [Labelpath, ToldSort] | readonly ['soon', Labelpath, number | 'removed' | undefined] | readonly ['listing'])[] {
+  return listener.mock.calls.map(([event]) => {
+    if (event.eventkind === 'item') { return [event.labelpath, toldSortOf(event)] as const }
+    if (event.eventkind === 'soon') { return ['soon', event.labelpath, (event.type === 'removed') ? 'removed' : event.revseq] as const }
+    return ['listing'] as const
+  })
+}
+
+/** The {@link ToldSort} of `event`, an item's. */
+function toldSortOf(event: ThingEvent): ToldSort {
+  if (event.type === 'removed')            { return 'removed' }
+  if (event.action?.type === 'invalidate') { return 'behind' }
+  const record = event.state.data
+  if (record === undefined)                { return undefined }
+  if (Thing.isVoidSentinel(record))        { return 'void' }
+  return Thing.isGone(record) ? 'gone' : 'live'
 }
 
 /** The ask that births the box `boxlabel` under the root box, over its shell. */

@@ -14,7 +14,7 @@ import type { DamagedThing } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: bankSwept, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot
+// == [Model Throwers]: bankSwept, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, boxSoonestBare
 
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
@@ -33,6 +33,11 @@ export function sidecarMissing(): Errors.VaultError { return new Errors.VaultErr
 
 /** A `record_conflict` refusal: a box's lifepath is of another life of its bank's root box. */
 export function boxOfOtherRoot(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
+
+/** A `stale_read` refusal: the device has heard of a newer revision of the box at `labelpath` but has no whole record of its newest life. */
+export function boxSoonestBare(labelpath: string): Errors.VaultError {
+  return new Errors.VaultError('stale_read', Phrases.BoxSoonestBare, { meta: { labelpaths: [labelpath] } })
+}
 // --
 
 // == [Write Throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing
@@ -96,7 +101,7 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: minderNotStarted, staleRead, childrenStoredDamaged, carsOfOtherThings
+// == [Minding Throwers]: minderNotStarted, staleRead, childrenStoredDamaged, recordsOfOtherThings
 
 /** The refusal of a read or a write on a minder that is not minding. */
 export function minderNotStarted(): Errors.VaultError {
@@ -113,6 +118,6 @@ export function childrenStoredDamaged(ask: ListAsk, damaged_rows: readonly Damag
   return new Errors.VaultError('damaged_row', Phrases.ChildrenStoredDamaged, { meta: { ask: loggableAskOf(ask), labelpaths: damaged_rows.map(({ labelpath }) => labelpath) } })
 }
 
-/** The refusal of the cars of two different Things, given to a minder's structural sharing. */
-export function carsOfOtherThings(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.CarsOfOtherThings) }
+/** The refusal of the records of two different Things, given to `newerThingOf`. */
+export function recordsOfOtherThings(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.RecordsOfOtherThings) }
 // --

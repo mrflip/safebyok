@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 import { DefaultQueryCacheOpts, MaxTimerMillis } from '../../../src/shapes/shapes-minder'
-import { carOf } from '../../../src/minding/thing-car'
 import { ThingMinder } from '../../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import { Shell } from '../../../src/shapes/shapes-thing'
@@ -38,7 +37,7 @@ describe("ThingMinder.make", () => {
 })
 
 describe("ThingMinder.hello", () => {
-  it("counts a car timely for the staleTime the minder was made with, an hour by default", async () => {
+  it("counts an item timely for the staleTime the minder was made with, an hour by default", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = await bornOf(new MemoryVaultDB())
@@ -58,7 +57,7 @@ describe("ThingMinder.hello", () => {
     }
   })
 
-  it("accepts a staleTime of Infinity as the minder's own, under which a full car never ages and a bare one is stale", async () => {
+  it("accepts a staleTime of Infinity as the minder's own, under which a whole record never ages and a sparse one alone is stale", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()
@@ -97,7 +96,7 @@ describe("ThingMinder.hello", () => {
     expect(minder.at(TH.RootScope)).to.be.undefined
     expect(minder.at(TH.GateScope)).to.be.undefined
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
-    expect(await minder.get(TH.RootScope)).to.deep.equal(carOf(TH.rootBoxOf()))
+    expect(await minder.get(TH.RootScope)).to.deep.equal(TH.rootBoxOf())
     expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
@@ -113,10 +112,10 @@ describe("ThingMinder.hello", () => {
     await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
     receive(noticeOf(TH.rootBoxOf()))
     const shell = Shell.of(TH.BoxScope, TH.rootBoxOf())
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(shell))
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(shell)
   })
 
-  it("has every cached car and listing until goodbye, however long after", async () => {
+  it("has every cached item, soon and listing until goodbye, however long after", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()
@@ -125,13 +124,12 @@ describe("ThingMinder.hello", () => {
       minder.hello()
       await minder.get(TH.RootScope)
       await minder.list('box')
-      expect(minder.at(TH.BoxScope)).to.have.property('liveness', 'bare')
       await vi.advanceTimersByTimeAsync(Hours24)
-      expect(minder.at(TH.RootScope)?.newest).to.deep.equal(TH.rootBoxOf())
-      expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(Thing.sparseOf(box)))
+      expect(minder.at(TH.RootScope)).to.deep.equal(TH.rootBoxOf())
+      expect(minder.soonAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(box))
       expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
       minder.goodbye()
-      expect([minder.at(TH.RootScope), minder.at(TH.BoxScope)]).to.deep.equal([undefined, undefined])
+      expect([minder.at(TH.RootScope), minder.soonAt(TH.BoxScope)]).to.deep.equal([undefined, undefined])
     } finally {
       vi.useRealTimers()
     }
@@ -151,7 +149,7 @@ async function fetchedWorldOf() {
   const gate0   = await storedGateOf(vaultDB, 0)
   const { minder } = minderWorldOf(vaultDB)
   await minder.get(TH.GateScope)
-  expect(minder.at(TH.RootScope)).to.have.property('liveness', 'full')
+  expect(minder.at(TH.RootScope)).to.deep.equal(TH.rootBoxOf())
   return { minder, vaultDB, gate0 }
 }
 
@@ -188,12 +186,12 @@ describe("ThingMinder.goodbye", () => {
       minder.hello()
       minder.goodbye()
       minder.hello()
-      expect(await minder.get(TH.GateScope)).to.deep.equal(carOf(gate))
+      expect(await minder.get(TH.GateScope)).to.deep.equal(gate)
       await minder.get(TH.RootScope)
       await vi.advanceTimersByTimeAsync(5)
       expect(minder.isStaleAt(TH.GateScope)).to.be.true
       await vi.advanceTimersByTimeAsync(Hours24)
-      expect([minder.at(TH.GateScope)?.liveness, minder.at(TH.RootScope)?.liveness]).to.deep.equal(['full', 'full'])
+      expect([minder.at(TH.GateScope), minder.at(TH.RootScope)]).to.deep.equal([gate, TH.rootBoxOf()])
     } finally {
       vi.useRealTimers()
     }

@@ -31,30 +31,33 @@ Reasoning for wontfix: it needs three passphrase prompts on two devices racing, 
 nothing, which a retry clears. Mending it would put a retry or a lock in a primitive's critical path. Ruled by the
 Coach, 2026-11-15, box_ops thread 1.
 
-### A late, older answer keeps the newer record, but marks it fresh
+### A get's late, older answer keeps the newer record, but marks it fresh
 
-* current outcome: the ThingMinder keeps the newer record it holds, and TanStack Query marks the entry fresh as of the
-  late answer. The record reads as timely for longer, by however long that answer was in flight.
+* current outcome: when a get's answer lands after a newer record from another source, the ThingMinder keeps the newer
+  record, and TanStack Query marks the item fresh as of the get's answer. The record reads as timely for longer, by
+  however long that answer was in flight. A whole record older than the item from any other source (a notice, or a
+  write's answer) is dropped, and leaves the item as fresh as it was.
 * alternatives:
-  - skip a delivery that `mergedCarOf` would refuse: a listing's could, but a get's queryFn must return its car,
-    so a get would still move the staleness on.
-  - deliver with the held record's `dataUpdatedAt` as `updatedAt`: which record wins is known only inside
-    `structuralSharing`, after the time has been chosen.
+  - skip a get's answer that `newerThingOf` would refuse: a get's queryFn must return its record, and TanStack Query
+    lands it itself.
+  - deliver with the held record's `dataUpdatedAt` as `updatedAt`: TanStack Query dates a get's answer as it lands,
+    and which record wins is known only inside `structuralSharing`, after the time has been chosen.
 * workaround: none needed. A get with a short `staleTime` asks storage again.
 
 Steps to create: a get starts; a notice of a newer revision lands; the get's answer, of the older revision, lands
 after it.
 
 Reasoning for wontfix: the gain is at most one answer's time in flight, against a `staleTime` of an hour, and the fix
-would put a comparison outside `structuralSharing`. Ruled by the Coach, 2026-11-15, vault_minder.
+would put a comparison outside `structuralSharing`. Ruled by the Coach, 2026-11-15, vault_minder; narrowed to a get by
+the Coach, 2026-11-20, soon_item rework.
 
 ### The ThingMinder detects no conflict among the records it holds
 
-* current outcome: `mergedCarOf` returns the later record by lifepath and then revseq. Two records of one revision
+* current outcome: `newerThingOf` returns the later record by lifepath and then revseq. Two records of one revision
   with different revtoks keep whichever landed first. A get that storage answers older than the record cached when
   the get began refuses `stale_read`, and the cached record stays.
 * alternatives:
-  - refuse `record_conflict` in the cache: `mergedCarOf` must stay pure, since TanStack Query calls it for every
+  - refuse `record_conflict` in the cache: `newerThingOf` must stay pure, since TanStack Query calls it for every
     observer's result, so a refusal would need a state of its own outside it.
 * workaround: none needed. A write citing what the cache holds is refused by storage where storage holds otherwise,
   and the refusal carries the stored record.
@@ -152,10 +155,45 @@ lifecycle: new machinery in a primitive's critical path, for crossings the host 
 * workaround: the host awaits its minder's gets, lists and writes before calling `goodbye`.
 
 Steps to reproduce: start a `list('box')` (or a write, or a get) on a started minder whose vaultDB answers late; call
-`goodbye()` and then `hello()` while it waits; let the vaultDB answer. The new cache's listing, and the car, hold what
+`goodbye()` and then `hello()` while it waits; let the vaultDB answer. The new cache's listing, and the item, hold what
 the earlier stretch asked for.
 
 Reasoning for wontfix: what lands is a record the vaultDB did store, so the cache is never wrong about the bank, only
 early to hear of it; and a `goodbye` and `hello` around an operation are two of the host's own calls crossing it, which
 the host sequences. Guarding against it put a token and three checks into the common case for a case no host meets by
 accident. Ruled by the Coach, 2026-11-20, vault_snapper: "The goodbye-then-hello token -- let's pull this out".
+
+### A sparse record from a newer life leaves the old life's record in the item
+
+* current outcome: when a Thing's soon is of a newer life than its item (a list or a notice tells of the Thing born again,
+  sparse), the item keeps the old life's whole record, marked invalidated, until a get fetches the new life whole. `at()`
+  answers the old life's record meanwhile, `tryAt` answers `untimely`, and `vault.withWhisper` refuses `stale_read`
+  where its get leaves the item so.
+* alternatives:
+  - remove the item when such a soon lands: `at()` then answers nothing, and a host's bridge, which ignores a removal,
+    keeps showing the old life all the same (TODO.md).
+  - keep a whole record and a sparse one together in one entry, with a merge, a liveness and checks of its own.
+* workaround: a get, which fetches the new life whole.
+
+Steps to reproduce: get a box; on another device, delete it and put it again; list its parent before getting it again.
+
+Reasoning for wontfix: the old record is marked behind, as any item behind its soon is, so nothing answers it as timely;
+removing it would add a branch to every landing for a state a get already ends. Ruled by the Coach and the orchestrator,
+2026-11-20, soon_item.
+
+### A sparse record that lands while a get waits
+
+* current outcome: a get holds the soonest record cached when it began, and refuses only an answer older than that. A
+  sparse record that lands while it waits is cached as the Thing's soon; the get's answer lands in the item, older than
+  the soon, and the item is marked behind it at once. The get answers that older whole record.
+* alternatives:
+  - refuse the get `stale_read` when a newer soon is cached as its answer lands: a check outside `structuralSharing`,
+    against a record the get did not begin with, in a primitive's critical path.
+* workaround: none needed. The next get fetches the newest whole record.
+
+Steps to reproduce: start a get of a box; while the vaultDB answers it, list its parent after another device wrote the
+box anew; let the get answer.
+
+Reasoning for wontfix: it is a crossing of a get and a list or notice, which the host does not sequence and which no
+retry, lock or abort may settle in a primitive's critical path; what each answer says is a revision the vaultDB did store,
+and the cache marks itself behind before any later call reads it. Ruled by the orchestrator, 2026-11-20, soon_item.

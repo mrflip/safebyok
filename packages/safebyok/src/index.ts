@@ -9,13 +9,13 @@ export * from './core'
 export * from './storage'
 /* eslint-enable import-x/export */
 export {
-  type BankCar, type BoxCar, type CarAt, type CarFreshness, type DeliverableThing, type GateCar, type GotAnswer, type MinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, carLivenessVals,
-  type ListingEvent, type MinderEvent, type MinderEventOf, type ThingEvent,
+  type DeliverableThing, type GotAnswer, type MinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt,
+  type ListingEvent, type MinderActionOf, type MinderActionTyped, type TSQQueryAction, type MinderEvent, type MinderEventkind, MinderEventFormat, type MinderEventOf, type RecordEventFields, type SoonEvent, type ThingEvent,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, MinderChecks, type MinderFriend, type MinderGetOpts, type MinderInvalidateOpts, type MinderTryAtOpts, type TsqStaleTime,
 } from './shapes/shapes-minder'
 export { type Labelpathed, ThingMinder } from './minding/thing-minder'
 export { Vault } from './models/vault'
-export { carOf, dbHasNewer } from './minding/thing-car'
+export { newerThingOf } from './minding/newer-thing'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
 
 // From safebyok-big, beside what core.ts and storage.ts re-export: the kinds, sizes and patterns a host checks its own input

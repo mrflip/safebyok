@@ -1,7 +1,7 @@
 /** The knock-knock app's world: the real core's Device, its bank born over a memory vaultDB and locked, the vault with the joke service's key, and the giver's view of that Device. */
 
 import { onTestFinished } from 'vitest'
-import type { Bank, BoxCar, Device, DeviceSnapshot, KeyDeriver, Vault } from 'safebyok'
+import type { Bank, BoxRecord, Device, Tombstone, DeviceSnapshot, KeyDeriver, Vault } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { giverBankOfVault } from '../../src/giver/minder-bank'
 import type { GiverBank, GiverDevice } from '../../src/giver/shapes-giver'
@@ -51,7 +51,7 @@ export interface KnockKnockWorld {
   device:      Device
   bank:        Bank
   vault:       Vault
-  giverDevice: GiverDevice<BoxCar>
+  giverDevice: GiverDevice<BoxRecord | Tombstone<BoxRecord>>
   deriver:     HeldDeriver
   /** Every snapshot the Device has published, the first among them. */
   snapshots:   DeviceSnapshot[]
@@ -74,7 +74,7 @@ export async function buildKnockKnockWorld(): Promise<KnockKnockWorld> {
 // The giver asks a Device for its bank object, started, and the new core's Device starts none. This is the
 // test's one way past the core: the Device's own snapshot, subscribe and strength check, beside the vault the test made.
 /** The giver's view of `device`: its own scope, snapshot, subscribe and strength check, and a bank object over `vault`, started once and never ending. */
-export function _cheat_giverDeviceOf(device: Device, vault: Vault): GiverDevice<BoxCar> {
+export function _cheat_giverDeviceOf(device: Device, vault: Vault): GiverDevice<BoxRecord | Tombstone<BoxRecord>> {
   const bank = giverBankOfVault(vault)
   return Object.freeze({
     userid:        device.userid,
@@ -83,7 +83,7 @@ export function _cheat_giverDeviceOf(device: Device, vault: Vault): GiverDevice<
     subscribe:     device.subscribe,
     judgeStrength: (passphrase: string) => device.judgeStrength(passphrase),
     ensureBank:    () => Promise.resolve(bank),
-    onBankStart:   (starter: (started: GiverBank<BoxCar>) => () => void) => {
+    onBankStart:   (starter: (started: GiverBank<BoxRecord | Tombstone<BoxRecord>>) => () => void) => {
       starter(bank)
       return stopNothing
     },
