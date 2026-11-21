@@ -93,6 +93,8 @@ commits follow it, the seal surface and its docs. A second review need read only
   - The birth's double unlock (birth gate, then the bank's gate) is the price of `Bank.make` still making
   its own gate; thread 2's `Bank.make(record, { …, gate })` deletes it.
 * **For the Coach** (Open matters):
+  - **No waiting put verb**: `sealBoxEnsuringUnlock` went with no replacement (above); recommend none until a caller
+    needs a vault put that waits for the unlock.
   - **Startup fix**: make the birth hand its gate to `Bank.make(record, { device, vaultDB, gate })` and have
     `Device.#bringUp` make the gate from the minder's record first (thread 2 as designed). That removes the second
     unlock and the throwaway gate.
