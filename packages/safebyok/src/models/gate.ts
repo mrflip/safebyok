@@ -82,6 +82,7 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   static make(record: GateRecord, opts: GateOpts): Gate {
     const { record: gateRecord, opts: { device, vaultDB, bankStamp } } = Checks.gateMakeArgs.parse({ record, opts })
     // A gate's life is its own, so only the bank's scope is checked: a gate of another life of the bank passes.
+    Validator.checkedConsistent(StampChecks.bankScope.parse(bankStamp), device.scope, { kind: 'record_conflict' })
     Validator.checkedConsistent(gateRecord, StampChecks.bankScope.parse(bankStamp), { kind: 'record_conflict' })
     return new Gate(gateRecord, { device, vaultDB, bankStamp })
   }

@@ -117,6 +117,14 @@ describe("Gate.make(record, { device, vaultDB, bankStamp })", () => {
     })
   }
 
+  for (const [moved, blurb] of OtherBankCases) {
+    it(`refuses a device of ${blurb} than its bank's`, async () => {
+      const record = await gateRecordOf()
+      const device = TH.makeDevice(moved)
+      TH.expectSyncRefusal(() => Gate.make(record, { device, vaultDB: device.vaultDB, bankStamp: TH.WorldBankStamp }), 'record_conflict')
+    })
+  }
+
   it("accepts a record of another life than its bank's: only the bank's scope is checked", async () => {
     const later = Lifeseq.ofLifenum(2)
     const record = { ...await gateRecordOf(), lifeseq: later, lifepath: later }
