@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Thread 1 cut.
+* **Status:** running. Thread 1 filed, out of draft (#797). Thread 2 building, stacked on #797.
 
 ## The goal
 
@@ -167,6 +167,8 @@ Serves threads 2 to 10, which all write in it.
 * **Levels:** `sonnet`, low effort; review `low`. **Depends on:** nothing.
 * **Look-ahead:** every later thread writes here. **Size:** small.
 * **Ready when:** `pnpm --filter safebyok-react-lean test` passes the same 62 giver cases.
+* *Orchestrator:* ready, #797. The plan's 62 was a miscount: the four test files moved unchanged and vitest counts 88.
+* *Review:* fixed (low). `safebyok` takes `@tanstack/query-core` as a devDependency beside the peer; the changeset's front matter tidied. Left: the copied `eslint.config.mjs` still names `safebyok-react` in its block labels (rename when next touched); `secret-search.ts` duplicated until `safebyok-react` retires; react-query a required peer (right); the lean package reaches query-core through `safebyok` (fine).
 
 ### 2. `device_bring_up`: the device starts its own bank
 
