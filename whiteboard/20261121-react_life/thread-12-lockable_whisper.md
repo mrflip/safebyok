@@ -1,6 +1,6 @@
 # Thread 12: lockable_whisper (2026-11-21)
 
-Branch `20261121-lockable_whisper`, PR #TBD, stacked on #807. Proved: `safebyok-react-lean` lint, typecheck, test
+Branch `20261121-lockable_whisper`, PR #808, stacked on #807. Proved: `safebyok-react-lean` lint, typecheck, test
 (15 files, 239); `safebyok-demo-knockknock` lint, typecheck, test (4 files, 26); `safebyok-demo-envman` lint,
 typecheck, test (3 files, 20). `pnpm justify` after the catch-up: see the PR's **Tests:** line. Nobody has clicked
 through either page in a real browser.
