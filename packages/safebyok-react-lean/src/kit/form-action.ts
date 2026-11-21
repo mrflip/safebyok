@@ -2,7 +2,7 @@
 
 import type { FormMutationResult } from '../giver/react-giver'
 
-// == [The action]: formActionOf, textOf
+// == [The action]: formActionOf, takeText
 
 // React hands one FormData to the action and to `useFormStatus().data` in every component inside the form, and
 // keeps it after the action ends: as the form's pending status, and in the action's queued update. A field
@@ -22,7 +22,7 @@ export function formActionOf<CleartextsT, FieldnameT extends string>(
   cleartextsOf: (texts: Readonly<Record<FieldnameT, string>>) => CleartextsT | Promise<CleartextsT>,
 ): (form: FormData) => Promise<boolean> {
   return async (form) => {
-    const texts = Object.fromEntries(fieldnames.map((fieldname) => [fieldname, textOf(form, fieldname)])) as Record<FieldnameT, string>
+    const texts = Object.fromEntries(fieldnames.map((fieldname) => [fieldname, takeText(form, fieldname)])) as Record<FieldnameT, string>
     const gating = mutation.gating(await cleartextsOf(texts))
     try {
       await mutation.mutateAsync(gating)
@@ -33,8 +33,8 @@ export function formActionOf<CleartextsT, FieldnameT extends string>(
   }
 }
 
-/** The text of `form`'s field `fieldname`, or '' for none, deleted from `form`. */
-function textOf(form: FormData, fieldname: string): string {
+/** Take the text of `form`'s field `fieldname` out of `form`: its text, or '' for none. */
+function takeText(form: FormData, fieldname: string): string {
   const val = form.get(fieldname)
   form.delete(fieldname)
   return (typeof val === 'string') ? val : ''
