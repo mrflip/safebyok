@@ -15,19 +15,19 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // == [The bank]: giverBankOfVault, giverBankOfMinder
 
-/** The giver's bank over `vault`: its boxes, through its minder, and the form verbs of its bank.
- * Its `birth` makes another Bank object on the same device, and refuses `gate_made_elsewhere` where a live bank is already stored.
+/** The giver's bank over `vault`: its boxes, through its minder, and the gatings of its bank's form verbs.
+ * Its birth gating makes another Bank object on the same device, and refuses `gate_made_elsewhere` where a live bank is already stored.
  */
 export function giverBankOfVault(vault: Vault): GiverBank<BoxCar> {
   const { bank, minder } = Checks.vault.parse(vault)
   return Object.freeze({
     ...giverBankOfMinder(minder),
-    birth:             (cleartexts) => Bank.birth(bank.device, cleartexts),
-    unlock:            (cleartexts) => bank.unlock(cleartexts),
-    replacePassphrase: (cleartexts) => bank.replacePassphrase(cleartexts),
-    addPasskey:        (cleartexts) => bank.addPasskey(cleartexts),
-    revokePasskey:     (cleartexts) => bank.revokePasskey(cleartexts),
-    dismissUnlock:     () => { bank.dismissUnlock() },
+    birthGating:             (cleartexts) => Bank.birthGating(bank.device, cleartexts),
+    unlockGating:            (cleartexts) => bank.unlockGating(cleartexts),
+    replacePassphraseGating: (cleartexts) => bank.replacePassphraseGating(cleartexts),
+    addPasskeyGating:        (cleartexts) => bank.addPasskeyGating(cleartexts),
+    revokePasskeyGating:     (cleartexts) => bank.revokePasskeyGating(cleartexts),
+    dismissUnlock:           () => { bank.dismissUnlock() },
   } satisfies GiverBank<BoxCar>)
 }
 

@@ -3,7 +3,7 @@
 import type { QueryKey, UseQueryOptions } from '@tanstack/react-query'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import {
-  type Banklabel, type BirthCleartexts, type DeviceSnapshot, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict,
+  type Banklabel, type BirthCleartexts, type DeviceSnapshot, type Gating, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict,
   type UnlockCleartexts, type Userid, type carLivenessVals, Checkers,
 } from 'safebyok'
 
@@ -26,22 +26,22 @@ export type GiverEvent<CarT extends CarFields> = Readonly<{
   state:    Readonly<{ data: CarT | undefined, dataUpdatedAt: number }>
 }>
 
-/** The calls the giver makes of a started bank object: its boxes' cars, its form verbs, and the dismissal of the awaited `unlock` gating. */
+/** The calls the giver makes of a started bank object: its boxes' cars, its form verbs' gatings, and the dismissal of the awaited `unlock` gating. */
 export interface GiverBank<CarT extends CarFields> {
   /** The car for the box at `labelpath`: at once from a timely car the bank's minder has, else asked of the vaultDB. An unborn bank answers the void car without asking. */
   getBoxCar(labelpath: string): Promise<CarT>
   /** Call `listener` with each event of the bank's minder about a box's car. Returns the function that stops it. */
   listenBoxCars(listener: (event: GiverEvent<CarT>) => void): () => void
-  /** Birth this bank, unborn until now, with the user's new passphrase and optional passkey, leaving it unlocked. */
-  birth(cleartexts: BirthCleartexts): Promise<unknown>
-  /** Unlock this bank by its passphrase or its passkey. */
-  unlock(cleartexts: UnlockCleartexts): Promise<unknown>
-  /** Replace the passphrase, proved by the current passphrase or the passkey, leaving the bank unlocked. */
-  replacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<unknown>
-  /** Add a passkey, proved by the passphrase, leaving the bank unlocked. */
-  addPasskey(cleartexts: PasskeyAddCleartexts): Promise<unknown>
-  /** Revoke the passkey, proved by the passphrase or the passkey, leaving the bank unlocked. */
-  revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<unknown>
+  /** The gating that births this bank, unborn until now, with the user's new passphrase and optional passkey, leaving it unlocked. */
+  birthGating(cleartexts: BirthCleartexts): Gating
+  /** The gating that unlocks this bank by its passphrase or its passkey. */
+  unlockGating(cleartexts: UnlockCleartexts): Gating
+  /** The gating that replaces the passphrase, proved by the current passphrase or the passkey, leaving the bank unlocked. */
+  replacePassphraseGating(cleartexts: PassphraseReplaceCleartexts): Gating
+  /** The gating that adds a passkey, proved by the passphrase, leaving the bank unlocked. */
+  addPasskeyGating(cleartexts: PasskeyAddCleartexts): Gating
+  /** The gating that revokes the passkey, proved by the passphrase or the passkey, leaving the bank unlocked. */
+  revokePasskeyGating(cleartexts: PasskeyRevokeCleartexts): Gating
   /** Dismiss the awaited `unlock` gating: every call waiting for this bank to be unlocked rejects `dismissed`, and the bank stays locked. */
   dismissUnlock(): void
 }

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider, type UseMutationOptions, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { type Cloak, PendingBank, VaultError, cloak } from 'safebyok'
+import { type Gating, PendingBank, VaultError } from 'safebyok'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
@@ -10,21 +10,21 @@ const OpenaiPath = 'box/openai'
 
 type AcmeGiver = ReturnType<typeof setup>['Acme']
 
-/** A passkey answer, an obvious fake: what a WebAuthn ceremony with the PRF extension hands the host. A new one each call, as a cloak zeroes the bytes it adopts. */
+/** A passkey answer, an obvious fake: what a WebAuthn ceremony with the PRF extension hands the host. A new one each call, as a gating zeroes the bytes it adopts. */
 function fakePasskeyAnswer() { return { credential_id: 'fake-credential', prf_salt_b64: 'ZmFrZSBzYWx0', prfBytes: new Uint8Array(32).fill(7) } }
 
-/** Each form verb, its mutationOptions and its hook, and the cleartexts a form hands it, obvious fakes, new at each call. */
+/** Each form verb, its gating maker, its mutationOptions and its hook, and the cleartexts a form hands it, obvious fakes, new at each call. */
 const FormCases = [
-  ["birth",             (acme: AcmeGiver) => acme.birthMutationOptions(),             (acme: AcmeGiver) => acme.useBirth(),             () => ({ passphraseCleartext: "fake new passphrase" })],
-  ["unlock",            (acme: AcmeGiver) => acme.unlockMutationOptions(),            (acme: AcmeGiver) => acme.useUnlock(),            () => ({ passphraseCleartext: "fake passphrase" })],
-  ["replacePassphrase", (acme: AcmeGiver) => acme.replacePassphraseMutationOptions(), (acme: AcmeGiver) => acme.useReplacePassphrase(), () => ({ passkeyCleartext: fakePasskeyAnswer(), nextPassphraseCleartext: "fake new passphrase" })],
-  ["addPasskey",        (acme: AcmeGiver) => acme.addPasskeyMutationOptions(),        (acme: AcmeGiver) => acme.useAddPasskey(),        () => ({ passphraseCleartext: "fake passphrase", nextPasskeyCleartext: fakePasskeyAnswer() })],
-  ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     () => ({ passkeyCleartext: fakePasskeyAnswer() })],
+  ["birth",             (acme: AcmeGiver) => acme.birthGating,             (acme: AcmeGiver) => acme.birthMutationOptions(),             (acme: AcmeGiver) => acme.useBirth(),             () => ({ passphraseCleartext: "fake new passphrase" })],
+  ["unlock",            (acme: AcmeGiver) => acme.unlockGating,            (acme: AcmeGiver) => acme.unlockMutationOptions(),            (acme: AcmeGiver) => acme.useUnlock(),            () => ({ passphraseCleartext: "fake passphrase" })],
+  ["replacePassphrase", (acme: AcmeGiver) => acme.replacePassphraseGating, (acme: AcmeGiver) => acme.replacePassphraseMutationOptions(), (acme: AcmeGiver) => acme.useReplacePassphrase(), () => ({ passkeyCleartext: fakePasskeyAnswer(), nextPassphraseCleartext: "fake new passphrase" })],
+  ["addPasskey",        (acme: AcmeGiver) => acme.addPasskeyGating,        (acme: AcmeGiver) => acme.addPasskeyMutationOptions(),        (acme: AcmeGiver) => acme.useAddPasskey(),        () => ({ passphraseCleartext: "fake passphrase", nextPasskeyCleartext: fakePasskeyAnswer() })],
+  ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyGating,     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     () => ({ passkeyCleartext: fakePasskeyAnswer() })],
 ] as const
 
-/** True of a cloak that contains nothing. */
-function isVacated(cloaked: Cloak): boolean {
-  return [cloaked.passphraseCleartext, cloaked.passkeyCleartext, cloaked.nextPassphraseCleartext, cloaked.nextPasskeyCleartext].every((val) => val === undefined)
+/** True of a gating that contains nothing. */
+function isVacated(gating: Gating): boolean {
+  return [gating.passphraseCleartext, gating.passkeyCleartext, gating.nextPassphraseCleartext, gating.nextPasskeyCleartext].every((val) => val === undefined)
 }
 
 /** A fake world, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
@@ -50,8 +50,9 @@ describe("makeReactGiver", () => {
     const { Giver } = setup()
     expect(Object.keys(Giver.forBank('acme'))).to.deep.equal([
       'useBankSnapshot', 'useBoxRecord', 'boxCarQueryOptions',
-      'birthMutationOptions', 'useBirth', 'unlockMutationOptions', 'useUnlock', 'replacePassphraseMutationOptions', 'useReplacePassphrase',
-      'addPasskeyMutationOptions', 'useAddPasskey', 'revokePasskeyMutationOptions', 'useRevokePasskey', 'dismissUnlock',
+      'birthGating', 'birthMutationOptions', 'useBirth', 'unlockGating', 'unlockMutationOptions', 'useUnlock',
+      'replacePassphraseGating', 'replacePassphraseMutationOptions', 'useReplacePassphrase', 'addPasskeyGating', 'addPasskeyMutationOptions', 'useAddPasskey',
+      'revokePasskeyGating', 'revokePasskeyMutationOptions', 'useRevokePasskey', 'dismissUnlock',
     ])
   })
 
@@ -92,37 +93,37 @@ describe("useBankSnapshot", () => {
   })
 })
 
-/** Run the bank's verb through its mutationOptions with a cloak of `cleartexts`; the fake world and the cloak after it settles. */
-async function runThroughOptions(optionsOf: (acme: AcmeGiver) => unknown, cleartexts: Parameters<typeof cloak>[0]) {
+/** Attempt the bank's verb through its mutationOptions, with a gating its maker makes of `cleartexts`; the fake world and the gating after it settles. */
+async function runThroughOptions(makerOf: (acme: AcmeGiver) => (cleartexts: never) => Promise<Gating>, optionsOf: (acme: AcmeGiver) => unknown, cleartexts: unknown) {
   const { world, Acme, wrapper } = setup()
-  const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, Cloak>), { wrapper })
-  const cloaked = cloak(cleartexts)
-  await act(() => result.current.mutateAsync(cloaked))
-  return { world, cloaked }
+  const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, Gating>), { wrapper })
+  const gating = await makerOf(Acme)(cleartexts as never)
+  await act(() => result.current.mutateAsync(gating))
+  return { world, gating }
 }
 
-/** Run the bank's verb through its hook with a cloak of `cleartexts`; the fake world and the cloak after it settles. */
-async function runThroughHook(useForm: (acme: AcmeGiver) => { mutate: (cloaked: Cloak) => void, isSuccess: boolean }, cleartexts: Parameters<typeof cloak>[0]) {
+/** Attempt the bank's verb through its hook, with a gating the hook's `gating` makes of `cleartexts`; the fake world and the gating after it settles. */
+async function runThroughHook(useForm: (acme: AcmeGiver) => { mutate: (gating: Gating) => void, gating: (cleartexts: never) => Promise<Gating>, isSuccess: boolean }, cleartexts: unknown) {
   const { world, Acme, wrapper } = setup()
   const { result } = renderHook(() => useForm(Acme), { wrapper })
-  const cloaked = cloak(cleartexts)
-  act(() => { result.current.mutate(cloaked) })
+  const gating = await result.current.gating(cleartexts as never)
+  act(() => { result.current.mutate(gating) })
   await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-  return { world, cloaked }
+  return { world, gating }
 }
 
-/** Run `useUnlock` against a world whose form verbs refuse with `refusal`; the cloak and the mutation's error once it shows. */
+/** Attempt `useUnlock`'s gating against a world whose form verbs refuse with `refusal`; the gating and the mutation's error once it shows. */
 async function runRefusedUnlock(refusal: VaultError) {
   const { world, Acme, wrapper } = setup()
   world.refuseFormVerbs(refusal)
   const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
-  const cloaked = cloak({ passphraseCleartext: 'fake wrong passphrase' })
-  act(() => { result.current.mutate(cloaked) })
+  const gating = await result.current.gating({ passphraseCleartext: 'fake wrong passphrase' })
+  act(() => { result.current.mutate(gating) })
   await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-  return { cloaked, err: result.current.error }
+  return { gating, err: result.current.error }
 }
 
-/** Run `useRevokePasskey` against a refusing world under a host's default of retrying mutations once; the fake world and the cloak once the error shows. */
+/** Attempt `useRevokePasskey`'s gating against a refusing world under a host's default of retrying mutations once; the fake world and the gating once the error shows. */
 async function runRefusedUnderRetries(refusal: VaultError) {
   const { world, Acme } = setup()
   const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
@@ -130,32 +131,32 @@ async function runRefusedUnderRetries(refusal: VaultError) {
   function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
   world.refuseFormVerbs(refusal)
   const { result } = renderHook(() => Acme.useRevokePasskey(), { wrapper: Wrapper })
-  const cloaked = cloak({ passkeyCleartext: fakePasskeyAnswer() })
-  act(() => { result.current.mutate(cloaked) })
+  const gating = await result.current.gating({ passkeyCleartext: fakePasskeyAnswer() })
+  act(() => { result.current.mutate(gating) })
   await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-  return { world, cloaked }
+  return { world, gating }
 }
 
 describe("the form mutations", () => {
-  for (const [verb, optionsOf, useForm, cleartextsOf] of FormCases) {
-    it(`hands the bank's ${verb} the cleartexts the cloak has, through its mutationOptions`, async () => {
-      const { world } = await runThroughOptions(optionsOf, cleartextsOf())
+  for (const [verb, makerOf, optionsOf, useForm, cleartextsOf] of FormCases) {
+    it(`attempts the bank's ${verb} gating, with the cleartexts it has, through its mutationOptions`, async () => {
+      const { world } = await runThroughOptions(makerOf, optionsOf, cleartextsOf())
       expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
     })
 
-    it(`vacates the cloak once the bank's ${verb} runs through its mutationOptions`, async () => {
-      const { cloaked } = await runThroughOptions(optionsOf, cleartextsOf())
-      expect(isVacated(cloaked)).to.eq(true)
+    it(`vacates the gating once the bank's ${verb} runs through its mutationOptions`, async () => {
+      const { gating } = await runThroughOptions(makerOf, optionsOf, cleartextsOf())
+      expect(isVacated(gating)).to.eq(true)
     })
 
-    it(`hands the bank's ${verb} the cleartexts the cloak has, through its hook`, async () => {
+    it(`attempts the bank's ${verb} gating, made by the hook's gating, through its hook`, async () => {
       const { world } = await runThroughHook(useForm, cleartextsOf())
       expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
     })
 
-    it(`vacates the cloak once the bank's ${verb} runs through its hook`, async () => {
-      const { cloaked } = await runThroughHook(useForm, cleartextsOf())
-      expect(isVacated(cloaked)).to.eq(true)
+    it(`vacates the gating once the bank's ${verb} runs through its hook`, async () => {
+      const { gating } = await runThroughHook(useForm, cleartextsOf())
+      expect(isVacated(gating)).to.eq(true)
     })
   }
 
@@ -166,9 +167,9 @@ describe("the form mutations", () => {
     expect(refusal.family).to.eq('condition')
   })
 
-  it("vacates the cloak when the verb refuses", async () => {
-    const { cloaked } = await runRefusedUnlock(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    expect(isVacated(cloaked)).to.eq(true)
+  it("vacates the gating when the verb refuses", async () => {
+    const { gating } = await runRefusedUnlock(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
+    expect(isVacated(gating)).to.eq(true)
   })
 
   it("runs the verb once under a host's default of retrying mutations", async () => {
@@ -177,9 +178,9 @@ describe("the form mutations", () => {
     expect(world.formCalls).to.deep.equal([handed])
   })
 
-  it("vacates the cloak once the verb settles under a host's default of retrying mutations", async () => {
-    const { cloaked } = await runRefusedUnderRetries(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    expect(isVacated(cloaked)).to.eq(true)
+  it("vacates the gating once the verb settles under a host's default of retrying mutations", async () => {
+    const { gating } = await runRefusedUnderRetries(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
+    expect(isVacated(gating)).to.eq(true)
   })
 
   it("keys each form mutation under the bank", () => {

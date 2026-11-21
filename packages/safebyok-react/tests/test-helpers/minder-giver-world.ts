@@ -104,18 +104,18 @@ function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxCar>): GiverDevi
   })
 }
 
-/** The form verbs of a bank object over a minder alone: each refuses, since this world has no gate to prove against. */
+/** The form verbs' gatings of a bank object over a minder alone: each refuses, since this world has no gate to prove against. */
 const NoFormVerbs = Object.freeze({
-  birth:             refuseNoGate,
-  unlock:            refuseNoGate,
-  replacePassphrase: refuseNoGate,
-  addPasskey:        refuseNoGate,
-  revokePasskey:     refuseNoGate,
-  dismissUnlock:     unsubscribeNothing,
+  birthGating:             refuseNoGate,
+  unlockGating:            refuseNoGate,
+  replacePassphraseGating: refuseNoGate,
+  addPasskeyGating:        refuseNoGate,
+  revokePasskeyGating:     refuseNoGate,
+  dismissUnlock:           unsubscribeNothing,
 })
 
 /** Refuse a call this world cannot answer: it has no gate. */
-function refuseNoGate(): Promise<never> { return Promise.reject(new Error('The minder giver world has no gate')) }
+function refuseNoGate(): never { throw new Error('The minder giver world has no gate') }
 
 /** Stop a subscription that hears nothing: there is nothing to stop. */
 function unsubscribeNothing(): void { /* nothing to stop */ }

@@ -1,6 +1,7 @@
-/** A fake Device for the giver's tests: its bank started on demand, box cars the test stores and announces, and form verbs that record what they are handed. */
+/** A fake Device for the giver's tests: its bank started on demand, box cars the test stores and announces, and form verbs' gatings that record what they are handed. */
 
-import { type BankSnapshot, type DeviceSnapshot, type PassphraseVerdict, PendingBank } from 'safebyok'
+import { type BankSnapshot, type DeviceSnapshot, type Gating, type PassphraseVerdict, PendingBank } from 'safebyok'
+import * as LeanTH from 'safebyok/testing'
 import { boxCarQueryKey } from '../../src/giver/react-giver'
 import type { CarFields, GiverBank, GiverDevice, GiverEvent } from '../../src/giver/shapes-giver'
 
@@ -59,7 +60,7 @@ export interface FakeGiverWorld {
   stored:  Map<string, FakeBoxCar>
   /** How many cars the bank objects have asked the vaultDB for. */
   counts:  { gets: number }
-  /** Each form verb called on the bank objects, in order, with the cleartexts it was handed. */
+  /** Each form verb attempted on the bank objects, in order, with a copy of the cleartexts its gating had, and dismissUnlock. */
   formCalls: Readonly<{ verb: FakeFormVerb, cleartexts: unknown }>[]
   /** Pause each car the vaultDB reads from now on until the function returned is called: it then answers what it read. */
   pauseAnswers(): () => void
@@ -120,11 +121,15 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
     return car
   }
 
-  // As the bank's verbs do, it answers once the verb is done, or rejects with the refusal.
+  // As the bank's verbs do, it answers once the verb is done, or rejects with the refusal. The copy outlives the gating's vacate.
   async function hearForm(verb: FakeFormVerb, cleartexts: unknown): Promise<void> {
-    formCalls.push(Object.freeze({ verb, cleartexts }))
+    formCalls.push(Object.freeze({ verb, cleartexts: structuredClone(cleartexts) }))
     await Promise.resolve()
     if (formRefusal !== null) { throw formRefusal }
+  }
+
+  function gatingHeardAs(verb: FakeFormVerb, cleartexts: unknown): Gating {
+    return LeanTH._cheat_gatingOf(cleartexts, (adopted) => hearForm(verb, adopted))
   }
 
   async function judgeStrength(passphrase: string): Promise<PassphraseVerdict> {
@@ -140,12 +145,12 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
         carListeners.add(listener)
         return () => { carListeners.delete(listener) }
       },
-      birth:             (cleartexts: unknown) => hearForm('birth', cleartexts),
-      unlock:            (cleartexts: unknown) => hearForm('unlock', cleartexts),
-      replacePassphrase: (cleartexts: unknown) => hearForm('replacePassphrase', cleartexts),
-      addPasskey:        (cleartexts: unknown) => hearForm('addPasskey', cleartexts),
-      revokePasskey:     (cleartexts: unknown) => hearForm('revokePasskey', cleartexts),
-      dismissUnlock:     () => { formCalls.push(Object.freeze({ verb: 'dismissUnlock', cleartexts: undefined })) },
+      birthGating:             (cleartexts: unknown) => gatingHeardAs('birth', cleartexts),
+      unlockGating:            (cleartexts: unknown) => gatingHeardAs('unlock', cleartexts),
+      replacePassphraseGating: (cleartexts: unknown) => gatingHeardAs('replacePassphrase', cleartexts),
+      addPasskeyGating:        (cleartexts: unknown) => gatingHeardAs('addPasskey', cleartexts),
+      revokePasskeyGating:     (cleartexts: unknown) => gatingHeardAs('revokePasskey', cleartexts),
+      dismissUnlock:           () => { formCalls.push(Object.freeze({ verb: 'dismissUnlock', cleartexts: undefined })) },
     })
     bank = started
     for (const starter of endings.keys()) { endings.set(starter, starter(started)) }
