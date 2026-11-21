@@ -1,8 +1,8 @@
 # Thread: plain_words (2026-11-21)
 
 Branch `20261121-plain_words`, stacked on #767 (the top of the vault_snapper line), cut at `fa4709048`.
-Proved: safebyok lint, typecheck, 1343 tests; safebyok-react lint, typecheck, 347 tests (safebyok-big and safebyok built
-first); `pnpm justify` at the tip.
+Proved: safebyok lint, typecheck, 1352 tests; safebyok-react lint, typecheck, 360 tests (safebyok-big and safebyok built
+first); `pnpm justify` at the tip before the rework, which touched test files only.
 
 Language fixes to the new core (`packages/safebyok/src`, `tests`) and the React giver (`packages/safebyok-react/src/giver`,
 `tests/giver`, the giver's test helpers), from the read-only hunt's report (`goop/report.md` in the sprint's scratchpad),
@@ -29,8 +29,7 @@ under the Coach's rulings of 2026-11-21.
     takes" (a function taking an argument) stays.
   * **hear/tell** stays wherever a listener, a subscriber, a watch or `onBadNews` really hears or is told. A deriver,
     a checker, a lease, a form verb, the minder fed by its sources, and a handler being called are fixed.
-  * **Two unrelated behaviours** in one title are listed below, not split: `notes/gallant-test_titles.md`,
-    `#outcome-not-action`, says to list them.
+  * **Two unrelated behaviours** in one title were listed, then split in the rework (below).
   * Logical "hold" (a precondition holds) stays.
   * `CloakCleartexts` drops `PasskeyRevokeCleartexts` from its intersection: with the port, it is the same type as
     `UnlockCleartexts`, and lint's `no-duplicate-type-constituents` refuses the duplicate. The type is unchanged.
@@ -45,17 +44,15 @@ under the Coach's rulings of 2026-11-21.
   * Big's `oneProofOf` export now has no user outside big; big's own `bankUnlockCleartexts` still uses it. Left in place.
   * VOCABULARY's `clear` row names `passphraseClear` as the deprecated form: still true (big), left.
 * **For the Coach** (skipped entries, path:line at the thread's tip):
-  * Two unrelated behaviours in one test, to split if wanted: react-giver.test.tsx:49 ("gives the hooks … and refuses
-    any other banklabel"), :113, :124, and the `${verb}` pair at :93 and :102; thing-minder-invalidate.test.ts:48;
-    thing-minder-listen.test.ts:215; thing-minder-staleness.test.ts:112; thing-minder-reads.test.ts:78;
-    bank.test.ts:748; device.test.ts:328; base-box.test.ts:128; adapter-vault-db.test.ts:136;
-    thing-minder-lifecycle.test.ts:104 and :144.
+  * Rework (Coach, 2026-11-21): the two-behaviour tests are split, one per outcome, with a module-level helper where the
+    two share a long setup. Two titles named one outcome and could not split: thing-minder-invalidate.test.ts "tells of
+    the listing of a Thing with none under it, and of no listing above it" (one act, one assertion) and
+    thing-minder-reads.test.ts "caches a main gate the ask tracks stale only once its own notice arrives, never from
+    the get of the bank" (the assertion that it is absent, then present, is one before-and-after). Both are retitled.
+    "keeps … shut" became "will not unseal" or "will not unwrap" (ctx-bytes.test.ts, proving.test.ts).
   * gating.test.ts:218, "keeps its outcome when reading the passkey answer to zero it throws": the body asserts an
     `unexpected_error` that quotes no passphrase; the title's meaning is unclear, so it was left.
-  * `cheatHoldBank`'s doc now says "Make `bank` the bank this device's snapshot shows": the name no longer matches its
-    first line. A rename (`cheatShowBank`?) is the Coach's call.
-  * "keeps … shut" (ctx-bytes.test.ts:1 and its nine titles, proving.test.ts:560-578): maintain sense, left; "will not
-    unseal/unwrap" would be plainer.
+  * `cheatHoldBank`: left; "it will be removed" (the Coach, 2026-11-21).
   * Out of the ruled families, left for a later pass: "front door", key alone, "state", "Internal.", machinery and
     refusal catalogs in doc blocks, "lands", "goes back", "bump", "reach-in"/"hand-in" (gating.ts), "in the new core"
     (minder-bank.ts:1), `#openSealed`.
