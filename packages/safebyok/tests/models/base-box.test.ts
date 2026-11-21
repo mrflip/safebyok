@@ -125,11 +125,14 @@ describe("BaseBox.nextRevisionOf(donor, publicProps)", () => {
     expect(TH.thrownText(err)).to.include(Phrases.SidecarMissing)
   })
 
-  it("leaves the donor it was handed unchanged, and carries over none of a stored box's sealed whisper", () => {
+  it("leaves the donor it was handed unchanged", () => {
     const shell = TH.boxShellOf()
     const copy = structuredClone(shell)
     BaseBox.nextRevisionOf(shell, PublicProps)
     expect(shell).to.deep.equal(copy)
+  })
+
+  it("carries over none of a stored box's sealed whisper", () => {
     const stored = BaseBox.recordOf(liveRevisionOf(), Sealed)
     const next = BaseBox.nextRevisionOf(stored)
     expect(next).to.not.have.property('whisper_sealed')
