@@ -56,7 +56,8 @@ describe("ReplacePassphraseForm", () => {
     release()
     await screen.findByText('unlocked')
     for (const text of [Passphrase, NextPassphrase]) { TH.expectTextUnheld(text, container, world.client) }
-    expect(screen.getByLabelText<HTMLInputElement>('Current passphrase').value).to.eq('')
+    // React resets the form once the action settles, which may be after the stage shows `unlocked`.
+    await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>('Current passphrase').value).to.eq('') })
 
     act(() => { world.Bank.lock() })
     fireEvent.change(await screen.findByLabelText('Passphrase'), { target: { value: Passphrase } })
