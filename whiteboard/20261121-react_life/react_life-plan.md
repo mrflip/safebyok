@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 9 filed, out of draft, in one line: #797 → #798 → #799 → #800 → #802 → #801 → #803 → #804 → #805. Thread 11 (giver_surface) building, stacked on #805. Thread 10 (envman) waits on 11.
+* **Status:** running. Threads 1 to 9 filed, out of draft, in one line ending at #805. Thread 11 ready, in review (#806). Thread 10 (envman) building, stacked on #806. Thread 12 waits on 10. A Closer Look runs at #805's tip.
 
 ## The goal
 
@@ -340,6 +340,7 @@ written against the final names.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8 and 9, cut from the top of the two.
 * **Ready when:** a kit form renders bare under the provider and its tests pass; the old names are gone; a test makes
   a gating outside a hook and mutates through the standalone options.
+* *Orchestrator:* ready, #806, no compaction. `liveOf`, `err`, `delBoxOnce`; `fooGating` and `fooMutationOptions()` beside the hooks; the provider's `{ giver, bank }` context (`src/giver/giver-context.ts`, unexported), props as overrides, `bad_record` outside a provider; form keys carry the userid; `maskOf(text, { head, tail }?)`, default 7 and 4, the demo storing `tail: 0`. The dream's names updated on the sprint branch.
 
 ### 12. `lockable_whisper`: a locked view, and a callback on a stage change
 
@@ -363,6 +364,7 @@ choice ("they go lower in the list at a priority you choose").
   `useEffect` over `useBank((b) => b.stage)` itself; name it by STYLE.md. (c) both demos show the key as
   `withLockableWhisper` would: locked, the stored `tail: 0` mask from the sidecar; unlocked, a live `tail: 4` mask
   of the unsealed whisper. (d) envman clears its open draft on lock through (b), in the demo only, not in the kit.
+* *Orchestrator:* also: `PasskeyUnlockButton` defaults its `passkeyHeader` from the bank's `usePasskeyHeader()` through the provider's context (#806's leftover).
 * **Leaves out:** emptying typed text on lock in `useDraft` or the kit (the Coach: not by default, not in /kit).
 * **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 10.
 * **Ready when:** tests show `withLockableWhisper` taking each branch without waiting; the stage-change callback
