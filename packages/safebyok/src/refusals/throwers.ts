@@ -14,13 +14,16 @@ import type { DamagedThing } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: bankSwept, unlockDismissed, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot
+// == [Model Throwers]: bankSwept, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot
 
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
 
 /** A `dismissed` refusal: the wait for an `unlock` gating was dismissed. */
 export function unlockDismissed(): Errors.VaultError { return new Errors.VaultError('dismissed', Phrases.UnlockDismissed) }
+
+/** A `gating_concluded` refusal: the gating was attempted already. */
+export function gatingSpent(): Errors.VaultError { return new Errors.VaultError('gating_concluded', Phrases.GatingSpent) }
 
 /** A `bad_record` refusal: a tombstone's seal was given secret props. */
 export function tombstoneSecretsGiven(): Errors.VaultError { return new Errors.VaultError('bad_record', Phrases.TombstoneSecretsGiven) }

@@ -3,10 +3,10 @@
 import type * as Z from 'zod'
 import { NEVER } from 'zod'
 import { Consts, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
-import type { cloak } from '../helpers/cloak'
 import type { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import type { Bank } from '../models/bank'
 import type { Gate } from '../models/gate'
+import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
 import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
@@ -16,17 +16,17 @@ import { type GateRecord, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { BankMakeRecord } from './shapes-bankish'
 
-// == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, CloakCleartexts
+// == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, GatingCleartexts
 
 // A gate change's proof is named as an `unlock` gating's, `passphraseCleartext` or `passkeyCleartext`, and what it puts in place is named `next…`.
-/** The checks of what {@link Bank.birth}, {@link Bank.unlock}, {@link Bank.replacePassphrase}, {@link Bank.addPasskey}, {@link Bank.revokePasskey} and {@link cloak} are handed.
- * A cleartext is only ever checked in its gating (models/gating.ts): the cloak's check judges none.
+/** The checks of what {@link Bank.birth}, {@link Bank.unlock}, {@link Bank.replacePassphrase}, {@link Bank.addPasskey}, {@link Bank.revokePasskey} and a {@link Gating} are handed.
+ * A cleartext is only ever checked by its gating's body (models/gating.ts): a gating's own check at construction judges none.
  */
 export const CleartextChecks = Validator.Checkers('bad_record', ({ obj, unk }) => {
   const proof = { passphraseCleartext: GX.passphraseCleartext.optional(), passkeyCleartext: GX.passkeyAnswer.nullable().optional() }
   return {
-    // The cloak checks only that it knows each field: each verb checks the fields it takes.
-    cloakArgs:         obj({ passphraseCleartext: unk.optional(), passkeyCleartext: unk.optional(), nextPassphraseCleartext: unk.optional(), nextPasskeyCleartext: unk.optional() }).strict(),
+    // A gating checks only that it knows each field: each body checks the fields it takes.
+    gatingArgs:        obj({ passphraseCleartext: unk.optional(), passkeyCleartext: unk.optional(), nextPassphraseCleartext: unk.optional(), nextPasskeyCleartext: unk.optional() }).strict(),
     birth:             obj({ passphraseCleartext: GX.passphraseCleartext, passkeyCleartext: GX.freshPasskeyAnswer.nullable().optional() }).strict(),
     unlock:            obj(proof).strict().transform(oneProofOf),
     passphraseReplace: obj({ ...proof, nextPassphraseCleartext: GX.passphraseCleartext }).strict().transform(({ nextPassphraseCleartext, ...given }, ctx) => ({ proof: oneProofOf(given, ctx), nextPassphraseCleartext })),
@@ -58,8 +58,8 @@ export type PasskeyAddCleartexts = Z.input<typeof CleartextChecks.passkeyAdd>
 /** The cleartexts {@link Bank.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
 export type PasskeyRevokeCleartexts = Z.input<typeof CleartextChecks.passkeyRevoke>
 
-/** The cleartexts {@link cloak} adopts: any of the form verbs' fields. */
-export type CloakCleartexts = Partial<BirthCleartexts & UnlockCleartexts & PassphraseReplaceCleartexts & PasskeyAddCleartexts>
+/** The cleartexts a {@link Gating} adopts: any of the form verbs' fields. */
+export type GatingCleartexts = Partial<BirthCleartexts & UnlockCleartexts & PassphraseReplaceCleartexts & PasskeyAddCleartexts>
 
 /** One proof of a gate's way in, once checked: the passphrase, or the passkey's answer. */
 export type ProvedCleartexts = { passphraseCleartext: GX.PassphraseCleartext, passkeyCleartext?: never } | { passkeyCleartext: GX.PasskeyAnswer, passphraseCleartext?: never }
