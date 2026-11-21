@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 9 and 11 filed, out of draft, in one line ending at #806. Thread 10 (envman) building, stacked on #806. Thread 12 waits on 10. A Closer Look runs at #805's tip.
+* **Status:** running. Threads 1 to 9 and 11 filed, out of draft, in one line ending at #806. Thread 10 (envman) filed as #807, out of draft, stacked on #806. Thread 12 (lockable_whisper) building, stacked on #807. The Closer Look tab is up, awaiting the Coach's replies.
 
 ## The goal
 
@@ -315,6 +315,7 @@ Serves thread 10: envman's masked editor with save and undo. The Coach's text is
 * *Orchestrator:* envman stores its sidecar mask with the package's mask helper at `tail: 0` (no secret characters: the Coach, 2026-11-21); thread 12 adds the live reveal.
 * **Ready when:** add two records, reload and see them, back-date one and see it red, edit its value with save and
   undo.
+* *Review:* fixed (low, run at medium). The gear's Done no longer moves `last_rotated_at` to midnight UTC when only the title changes (`envFieldsOf`, new `env-form.test.ts`); the gear dialog submits by `onSubmit` so a refused entry keeps the typed fields; two doc blocks. Left: Save with a dirty value overwrites a same-draft back-date (Open Matters); `numberOr` accepts any finite number (app-written sidecar only); `local-vault-db.ts` and `SessionBar.tsx` carry Knock-Knock's quirks; loose helper exports against *Imports* (my call: leave); doc-block and test-gap list to the documentarian pass on *Finally*.
 
 ### 11. `giver_surface`: the Coach's rulings on the giver's surface
 
