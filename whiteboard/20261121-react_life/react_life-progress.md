@@ -90,3 +90,16 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   render or wait on it.
 * The provider world gained `pauseGets`, `pauseAnswers`, `counts.gets` and `_cheat_device()`.
 * The old giver is gone; `useBoxRecord` is now `useBox`.
+
+## Thread 6, kit_ways_in (#802, ready)
+
+* `safebyok-react-lean/kit` exports `ReplacePassphraseForm` (`giver={SOK} bank={Knock}`), `AddPasskeyForm`
+  (`bank={Knock} passkeyOpts={{ rp: { name, id? }, user: { name, displayName }, timeout? }}`), `RevokePasskeyForm`
+  (`bank={Knock}`, asks the passphrase), `PasskeyUnlockButton` (`bank={Knock} passkeyHeader askOpts={{ rpId?,
+  timeout? }}`; `rpId` must match the `rp.id` the passkey was made under), and `passkeysAvailable`, `createPasskey`,
+  `askPasskey`.
+* **Gap for thread 7:** no hook gives the bank's passkey header; the forms' doc blocks name
+  `Knock.usePasskeyHeader()`. Thread 7 adds it in `react-giver.tsx`, reading what the bank snapshot carries
+  (`slot.device?.bank?.maingate.passkey0?.toJSON()` is the worker's sketch, in its thread file).
+* `formActionOf`'s `cleartextsOf` may resolve null: nothing runs, the action resolves true (a dismissed prompt).
+* Tests: `tests/test-helpers/fake-authenticator.ts` stubs `navigator.credentials`; `_cheat_passkeyHeaderOf(world)`.

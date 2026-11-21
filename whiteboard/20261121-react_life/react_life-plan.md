@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 5 filed, out of draft (#797–#801; #800 and #801 are siblings on #799). Thread 6 building, stacked on #800. Thread 7 waits on 6, then a restack of #801 into the line.
+* **Status:** running. Threads 1 to 5 filed, out of draft (#797–#801; #800 and #801 siblings on #799). Thread 6 ready, in review (#802, on #800). Once it files, #801 is rebased onto #802 and thread 7 is cut from #801.
 
 ## The goal
 
@@ -251,6 +251,7 @@ Serves thread 7: the parts and kit Knock-Knock needs. The Coach's text is quoted
   `navigator.credentials`.
 * **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 5. **Beside:** 4.
 * **Ready when:** tests drive each form to its verb, and no passphrase is found after a submit.
+* *Orchestrator:* ready, #802, no compaction. Exports `ReplacePassphraseForm`, `AddPasskeyForm`, `RevokePasskeyForm`, `PasskeyUnlockButton`, and the ported `passkeysAvailable`, `createPasskey`, `askPasskey`. Gap for thread 7: no hook gives the bank's passkey header. My calls on Cleanup: `formActionOf`'s null `cleartextsOf`, the copied meter, no revoke-by-passkey.
 
 ### 7. `demo_knockknock`: the Knock-Knock app
 
