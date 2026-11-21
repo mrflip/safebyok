@@ -1,145 +1,198 @@
-# Sprint react_life: the provider, a startup order, and two apps that prove it
+# Sprint react_life: two apps running normally on the new core
 
 * **Date:** 2026-11-21. **Issued by:** the Coach. **Mode:** normal.
 * **Prepared by** the design session; **orchestrated by** another Opus session, which starts here.
-* **Default levels:** review `medium`; worker and reviewer on their agents' own model and effort; the style pass on
+* **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
 * **Status:** planned, no thread cut.
 
+## The goal
+
+Show that the library supports a best-practices React app, end to end: two basic apps, working normally, written to
+`dream_interface.md`. This is a proof, not production code: "we're proving that the library works end-to-end (well,
+end-to-middle, because no deleting vaults, vacate, etc)" (the Coach).
+
+The apps must **run**. Starting them the conventional way is welcome where it comes easily, and a cheat is as good
+where it does not.
+
 ## Read first
 
 * `react_life-design.md`, whole (it is short): what the Coach agreed, each item marked Agreed, Directed, Proposed or
-  Later. Where it and the code disagree, it is the intent.
-* `dream_interface.md`: what a host writes. The spec for hooks, parts and kit.
+  Later. Its *Ends, for later* section is background only: nothing in it is built here.
+* `dream_interface.md`: what a host writes. The spec for hooks, parts and kit. Where it describes something this
+  plan puts out of bounds (a second user, say), this sprint does not build it.
 * `survey-core.md` and `survey-app.md`, by the section a thread's gloss names. One correction: section 6 of
   `survey-core.md` says fetching the bank's records needs a Bank. It does not: an ask's `track` is optional
   (`shapes-asks.ts`, `trackGiven`), and the minder uses `rootBox` only for the shell of a box below the root.
 
+## What is in bounds, and what is not
+
+**In bounds:** starting up; lock and unlock; each gating verb but deleting the bank (birth, unlock, replace the
+passphrase, add a passkey, revoke a passkey); reading, writing and deleting a box; the hooks, parts and kit two apps
+need.
+
+**Out of bounds:** anything that takes a working instance to a non-working one, and anything built to cope with
+that. Examples:
+
+* **Ending an instance:** sweep, vacate, deleting a bank, a sign-out's teardown, a second userid arriving, the
+  provider unmounting, the page being hidden.
+* **Anything on a timer:** autolock, a check of a lease's expiry, caching a lease, the deviceDB.
+* **A crossing:** a record, notice or fetch that lands during or just after a lock, an unlock or a gating; two calls
+  of one verb at once; an error thrown in the middle of a transition; a second tab.
+* **Machinery for any of those:** counters, abort signals, timers, coordinating tokens, generation numbers,
+  "is this still current" flags, supervisors, queues.
+* **New core machinery in general.** We know of no call for a mechanism in the core that neither `safebyok` nor
+  `safebyok-big` already has. If a thread seems to need one, that is a sign to cheat.
+
+**The teardown code that exists stays as it is.** Leave `sweep`, `goodbye` and their tests alone: not extended, not
+renamed, not replaced by something new. New code does not call them.
+
+**When something out of bounds comes up, do the cheapest thing and carry on:**
+
+* A crossing gets a row in `notes/wontfix.md` and no code (CLAUDE.md, *Hours separate updates*).
+* A missing end is answered by the demo reloading the page, which is a browser's `process.exit`. To change user or
+  sign out, the demo clears its own session and reloads.
+* A startup knot is answered by a cheat: seed the records in the vaultDB, load them in a wrapper effect, or hardcode
+  the JSON. Mark it `// Cheat (react_life): …` and list it in the thread file.
+* None of these is a question for the Coach.
+
+### Why the line is drawn here
+
+A guard written for a gap nobody designed is new surface. The next review finds bugs in the guard, those earn more
+guards, and the sprint becomes the shoring-up of machinery nobody asked for. `notes/reference-timings.md` lists about
+twenty-five crossings that reviews found in one earlier sprint. The same note gives the timescales:
+
+| Event | Time |
+|---|---|
+| Read a value from IndexedDB | 0.5 to 5 ms |
+| A vaultDB round trip on Convex, connection warm | 50 to 300 ms |
+| The same, on a cold connection or a weak mobile signal | 500 to 2,000 ms |
+| Derive a key (Argon2id) | 650 ms; 1,300 to 3,250 ms on a phone |
+| A person types a passphrase | 5,000 to 30,000 ms |
+| Worst-case vaultDB requests, end to end, in a 30-day key rotation | about 1.3 million |
+
+Everything the machine does finishes in under a few seconds, and the slowest step in any flow is a person typing.
+Life events are days or weeks apart, so one landing inside another operation's millisecond window is rare enough to
+leave unspecified. The apps here are judged under normal conditions.
+
+### For the reviewer, and for the orchestrator reading a review
+
+A review in this sprint asks three things: does it run normally, can a secret reach somewhere it should not (the
+dream's rule 2), and is the code plain to read.
+
+A reviewer is built to imagine what could go wrong, and end states and crossings are where there is most to
+imagine. Such a finding may well be true. In this sprint it is still out of bounds: the reviewer lists it in one
+line under "Out of bounds, noted" and fixes nothing, and the orchestrator opens no rework and no Open Matters row
+for it. The one exception is CLAUDE.md's: something that could corrupt what the vaultDB stores, or put secret
+material where it should not be, is reported.
+
+Quote this section in each review handoff.
+
 ## Ground rules
 
-1. **This is a spike.** "Your goal is not production ready yet, we're proving that the library works end-to-end
-   (well, end-to-middle, because no deleting vaults, vacate, etc)" (the Coach). Take the shortest honest path. Mark
-   each cheat `// Cheat (react_life): …` and list it in your thread file.
-2. **The ending stages are out of scope:** `swept`, `vacate`, `delete`, `sweep`, `isEnded`. One thing ends a
-   device, a different userid arriving, and that teardown is `goodbye()`: it disables the instance, locks the bank,
-   and rejects calls waiting on an unlock. It has no stage, and an instance it ended is not started again.
-3. **`safebyok/core` stays the disciplined subset:** nothing from `minding/`, `Vault` or TanStack at runtime, as
-   `tests/index.test.ts` checks.
-4. **Dream rule 2 gets a test where a thread adds a path for a secret.** One test per new path a whisper or a
+1. **Dream rule 2 gets a test where a thread adds a path for a secret.** One test for each new path a whisper or a
    passphrase travels searches the rendered tree, the QueryClient's query and mutation caches, and any action state
    for it (`holdsText`, `secret-search.ts`).
-5. **One bank per giver; box labelpaths are flat,** and the giver adds the `box/` prefix.
-6. **Where the design and the code disagree on what your thread builds, follow the design.** For a Proposed item,
+2. **One bank per giver; box labelpaths are flat,** and the giver adds the `box/` prefix.
+3. **Where the design and the code disagree on what your thread builds, follow the design.** For a Proposed item,
    build this plan's default.
-7. **The old code is not this sprint's:** `safebyok-big`, `demos/safebyok-demo-react`, and `safebyok-react` beyond
-   what thread 2 moves out of it. Nothing published changes, so expect empty changesets.
-8. **Check with the Coach or your orchestrating agent before fanning out** to subagents.
+4. **The old code is not this sprint's:** `safebyok-big`, `demos/safebyok-demo-react`, and `safebyok-react` beyond
+   what thread 1 moves out of it. Nothing published changes, so expect empty changesets.
+5. **Check with the Coach or your orchestrating agent before fanning out** to subagents.
 
-## The startup order the spike builds
+## Who owns what (the Coach, 2026-11-21)
+
+* **The device owns the minder.** `safebyok` takes `@tanstack/query-core` as a peer dependency.
+* **The giver makes the bridge,** with the host's QueryClient. `safebyok-react-lean` takes `@tanstack/react-query`
+  as a peer dependency.
+* **The new React layer is `packages/safebyok-react-lean`,** private.
+* **A demo survives a reload** through the memory vaultDB saved to localStorage by a helper in the demo. The
+  Postgres adapter may work too; the focus is React.
+
+## The startup the spike aims for
 
 1. **Module scope.** `SOK = reactGiver({ banks: { knock: { vaultDB } }, keyDeriver })` holds config and an empty
    slot. `Knock = SOK.bank('knock')`.
 2. **The provider mounts,** inside the host's `QueryClientProvider`, and takes the QueryClient and its `vaultDB` and
-   `keyDeriver` overrides. In render it compares its prop with the slot's userid: an empty slot is `signed_out`, a
-   different user is `starting` in that same pass.
-3. **The `[userid]` effect** has no cleanup and is safe to run twice. If another user has the slot, the slot lets go
-   of it first: `device.goodbye()`, `minder.goodbye()`, the bridge stops, and our queries and form mutations under
-   the old bank's key are removed from the host's React Query. Then it makes the device, the minder with the device
-   as its friend, and the bridge.
-4. **`startDevice(device, minder)`,** outside core: `minder.hello()`, then the minder gets the bank, the gate and
-   the root box, then `device.bringUp(roots)`. A live bank becomes a `Bank`, stage `locked`. None stored is
-   `unborn`. A refusal is `failed`, with `lastErr`.
-5. **The vault** is made when the device first has a bank: `Vault.make(bank, minder)`.
-6. **Birth** hands the born, unlocked bank to its device, and the slot makes the vault.
+   `keyDeriver` overrides.
+3. **A userid arrives.** The provider's `[userid]` effect has no cleanup and is safe to run twice. It makes the
+   device, which makes its minder, and the giver makes the bridge. A null or undefined userid changes nothing.
+4. **The device starts.** Its minder says `hello()` and gets the bank, the gate and the root box. A stored bank
+   becomes a `Bank`, stage `locked`. None stored is `unborn`.
+5. **The vault** is made once the device has a bank: `Vault.make(bank, minder)`.
+6. **Birth** hands the born, unlocked bank to its device, and the vault is made then.
 
-**Cheats:** a fresh `device_tok` for each Device; no lease cache, so a reload lands locked; both demos run over
-`MemoryVaultDB`, saved to localStorage by a demo helper (ciphertext and sidecars only).
+If a step resists, cheat it and keep the later steps. Cheats already expected: a fresh `device_tok` for each Device;
+no lease cache, so a reload lands locked; the localStorage helper.
 
 ## Threads
 
-### 1. `no_swept`: remove the fake lifecycle
-
-> * remove hallucinatory lifecycle stages: we know what disables the program.
->   - do not implement the "ending" stages: vacate, delete, sweep.
-
-* **Builds:** the `swept` stage goes, leaving the design's six. `Device.sweep`, `Bank.sweep`, `Vault.sweep`,
-  `Lease.sweep`, `bankSwept` and its phrases, and `isEnded` and `endCause` in the snapshot go. What they did is one
-  `goodbye()` (ground rule 2), with one refusal for a call on a let-go instance. The restart wording on `hello` and
-  `goodbye` goes. VOCABULARY's **stage** row and the doc blocks that name `vacated` and `deleted` are brought to the
-  six.
-* **Leaves:** `isEnabled` and `demandEnabled`, which `goodbye()` now drives. `hostVault` may stay until thread 3
-  moves the minder out of the vault.
-* **Touches:** `models/{device,bank,vault,lease}.ts`, `shapes-bankish.ts`, throwers and phrases, `thing-minder.ts`
-  doc blocks; the bank, device, vault, lease and bank-forms tests (about 48 cases, `survey-core.md` section 3); one
-  line of `knock-knock-world.ts`.
-* **Levels:** `sonnet`, medium effort; review `low`. **Depends on:** nothing. **Beside:** 2.
-* **Look-ahead:** thread 3 restructures a smaller Device. **Size:** one feature, mechanical.
-* **Ready when:** `rg -n 'swept|sweep\(' packages/safebyok/src` finds no stage, verb or thrower.
-
-### 2. `react_lean_pkg`: a private package for the new React layer
+### 1. `react_lean_pkg`: a private package for the new React layer
 
 > * implement a spike of the provider and the pieces described.
 
 * **Builds:** `packages/safebyok-react-lean`, private at 0.0.0, packaged like `safebyok-react`, with entries `.`,
-  `./parts` and `./kit`. `git mv` the giver's sources, its tests and its three test worlds into it; copy
-  `secret-search.ts`, which old tests also use. `safebyok` becomes a real dependency and the eslint-disables that
-  excused it go. `safebyok-react` drops its devDependency on `safebyok`.
+  `./parts` and `./kit`, and `@tanstack/react-query` as a peer dependency. `git mv` the giver's sources, its tests
+  and its three test worlds into it; copy `secret-search.ts`, which old tests also use. `safebyok` becomes a real
+  dependency of it and the eslint-disables that excused it go. `safebyok-react` drops its devDependency on
+  `safebyok`. `safebyok` declares `@tanstack/query-core` a peer dependency.
 * **Leaves out:** any change of behaviour.
-* **Levels:** `sonnet`, low effort; review `low`. **Depends on:** nothing. **Beside:** 1; restacked onto 1 before
-  thread 3 is cut.
+* **Levels:** `sonnet`, low effort; review `low`. **Depends on:** nothing.
 * **Look-ahead:** every later thread writes here. **Size:** small.
 * **Ready when:** `pnpm --filter safebyok-react-lean test` passes the same 62 giver cases.
 
-### 3. `device_bring_up`: the core's startup order
+### 2. `device_bring_up`: the device starts its own bank
 
 > * implement a spike of the provider and the pieces described. There's still some fuzziness about who makes what in which order, but with the lifecycle now tied only to userid, the pressure is low. Cheat if you have to -- eg always seed in certain records, or something. Rip out existing cheat entrypoints once they're not needed (ignore any that exist for testing)
 
-* **Builds:** steps 4 to 6 of the startup order. `Device` gains its bank, `bringUp`, the `starting`, `unborn` and
-  `failed` stand-ins in its snapshot, and what a `MinderFriend` needs (its bank's once it has one, else asks with no
-  track and the root shell). `MinderFriend` becomes a structural interface. `Vault.make(bank, minder)`. `Bank`'s
-  constructor registers nothing, and drops `queryCacheOpts` and its import of `MinderChecks`. `startDevice` is
-  exported from the `safebyok` index. `cheatHoldBank`, `cheatDropBank`, `#thisIsTemporaryBank` and `#madeBanks` go.
-* **Leaves out:** leases, the deviceDB, minting a `device_tok` in core.
-* **Touches:** `models/{device,bank,vault}.ts`, `shapes-minder.ts`, `shapes-bankish.ts`, `index.ts`; device tests
-  (bring-up to unborn, locked and failed; birth adopts; `goodbye` rejects waiters), vault and bank tests,
-  `models-world.ts`, the new package's `knock-knock-world.ts`.
-* **Levels:** `opus`, high effort; review `high`. **Depends on:** 1 and 2, cut from the top of the two restacked.
-* **Look-ahead:** thread 4 needs the device's snapshot stages, `goodbye`, and `Vault.make(bank, minder)`.
-* **Size:** one feature in four files and their tests, at the limit.
-* **Ready when:** a test runs `startDevice` over a `MemoryVaultDB` that has a born bank and sees `starting` then
+* **Builds:** steps 4 to 6 of the startup. The device makes and owns its minder, and is the minder's friend
+  (`MinderFriend` becomes a structural interface). The device has its bank, and its snapshot shows `starting`,
+  `unborn`, `locked` and `unlocked`, and `failed` with `lastErr` where bring-up is refused, if that is cheap.
+  `Vault.make(bank, minder)`. `cheatHoldBank`, `cheatDropBank`, `#thisIsTemporaryBank` and `#madeBanks` go once
+  the device has its own bank; where the existing sweep code calls one, make the smallest edit that compiles.
+* **Leaves out:** leases, the deviceDB, minting a `device_tok` in core, and everything out of bounds.
+* **About `safebyok/core`:** the device now imports the minder. If the assertion in `tests/index.test.ts` that core
+  lacks the minder then fails, change the assertion and say so in the thread file. Keeping that subset free of
+  TanStack is not this sprint's.
+* **Touches:** `models/{device,bank,vault}.ts`, `shapes-minder.ts`, `shapes-bankish.ts`, `index.ts`; device, vault
+  and bank tests, `models-world.ts`, the new package's `knock-knock-world.ts`.
+* **Levels:** `opus`, high effort; review `medium`. **Depends on:** 1, cut from its tip.
+* **Look-ahead:** thread 3 needs the device's snapshot stages and `Vault.make(bank, minder)`.
+* **Size:** one feature in four files and their tests, at the limit. Its cheats are its overflow.
+* **Ready when:** a test starts a device over a `MemoryVaultDB` that has a born bank and sees `starting` then
   `locked`, and over an empty one sees `unborn`, then birth, then `unlocked`.
 
-### 4. `giver_slot`: the provider and the slot
+### 3. `giver_slot`: the provider and the slot
 
 > * implement a spike of the provider and the pieces described.
 > * focus first on getting a startup order and proving the library against two recognizeable use cases, demonstrating the dream hooks, parts and kit.
 
-* **Builds:** steps 1 to 3 of the startup order. `reactGiver(config)` and its slot; `SOK.Provider`; the slot's
-  letting go, which evicts our queries and mutations; `Knock.useBank(select?)` with the composed stage; the form
-  verbs with a synchronous `.gating`; `SOK.useStrengthVerdict`; `Knock.withWhisper`, `lock`, `dismissUnlock`. The
-  bridge is made per device. The provider's unmount does nothing.
+* **Builds:** steps 1 to 3 of the startup. `reactGiver(config)` and its slot; `SOK.Provider`; the bridge, made by
+  the giver; `Knock.useBank(select?)` with the composed stage; the form verbs with a synchronous `.gating`;
+  `SOK.useStrengthVerdict`; `Knock.withWhisper`, `lock`, `dismissUnlock`.
+* **Leaves out:** a second userid, the provider's unmount, and any eviction from the host's React Query.
 * **Tests:** the fake-world cases that only exercise `onBankStart` and `ensureBank` can be retired; port the ones
   that test behaviour a host sees. Write a provider world (the real giver, `MemoryVaultDB`, the test deriver): a
-  userid starts, null changes nothing, a switch evicts, StrictMode's double effect. Port `knock-knock.test` to it.
-* **Levels:** `opus`, high effort; review `high`. **Depends on:** 3.
-* **Look-ahead:** threads 5 and 6 read the slot's vault.
-* **Size:** the sprint's largest. If it runs long, `withWhisper`, `lock` and the knock-knock port move to thread 5.
-* **Ready when:** the ported test passes: unborn, birth, lock, `withWhisper` waits, unlock, it resumes, a user
-  switch gives `starting` then `locked`, with no secret found in the tree or either cache.
+  userid starts, null changes nothing, StrictMode's double effect starts once. Port `knock-knock.test` to it.
+* **Levels:** `opus`, high effort; review `medium`. **Depends on:** 2.
+* **Look-ahead:** threads 4 to 6 read the slot's vault.
+* **Size:** the sprint's largest. If it runs long, `withWhisper`, `lock` and the knock-knock port move to thread 4.
+* **Ready when:** the ported test passes: unborn, birth, lock, `withWhisper` waits, unlock, it resumes, with no
+  secret found in the tree or either cache.
 
-### 5. `giver_boxes`: reading and writing a box
+### 4. `giver_boxes`: reading and writing a box
 
 > * implement the react Knock-Knock app, with the hooks, parts and kit needed to do that, into safebyok-demo-knockknock.
 
 * **Builds:** `Knock.boxQuery`, `useBox`, `keys.under`; `SOK.useQueryOptions`; `nullifyThing` as the default
   `select`; `putBoxOnce`, `delBox`, `putBoxAction`. The bridge, minder-giver and react-bridge tests are ported.
 * **Leaves out:** listings, `putBox` with a revisor, suspense.
-* **Levels:** `opus`, medium effort; review `high`. **Depends on:** 4. **Beside:** 6.
+* **Levels:** `opus`, medium effort; review `low`. **Depends on:** 3. **Beside:** 5 and 6.
 * **Ready when:** a test shows `putBoxAction`, then `useBox` with the new sidecar, and no whisper in the action
   state, the mutation cache or the query cache.
 
-### 6. `parts_kit`: parts and kit
+### 5. `parts_kit`: parts, and the unlock and create-vault forms
 
 > You're inspired by the existing app and its functionality but hew strictly to best-in-class practices recommended by our dream_interface doc
 
@@ -147,24 +200,34 @@
   `SubmitButton` (`useFormStatus`). Kit `UnlockForm`, also as the dialog shown while an unlock is wanted, and
   `CreateVaultForm` with the strength meter. A private `formActionOf` helper, which deletes the field from the
   `FormData` before its first await.
-* **Leaves out:** passkey kit, the ways-in kit.
-* **Levels:** `opus`, high effort; review `high`. **Depends on:** 4; restacked onto 5 after. **Beside:** 5.
+* **Levels:** `opus`, high effort; review `medium`. **Depends on:** 3. **Beside:** 4.
 * **Ready when:** tests drive each kit form, and no passphrase or whisper is found after a submit.
+
+### 6. `kit_ways_in`: the other gating verbs
+
+> two apps, and yes the new-user flow, returning-user flow, lock and unlock; each gating verb except delete bank
+
+* **Builds:** kit forms for replacing the passphrase, adding a passkey and revoking a passkey, and a passkey unlock
+  button. Port `safebyok-react`'s `helpers/passkey.ts` rather than writing WebAuthn calls anew. Tests stub
+  `navigator.credentials`.
+* **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 5. **Beside:** 4.
+* **Ready when:** tests drive each form to its verb, and no passphrase is found after a submit.
 
 ### 7. `demo_knockknock`: the Knock-Knock app
 
 > * implement the react Knock-Knock app, with the hooks, parts and kit needed to do that, into safebyok-demo-knockknock. You're inspired by the existing app and its functionality but hew strictly to best-in-class practices recommended by our dream_interface doc
 
 * **Builds:** `demos/safebyok-demo-knockknock`: configs copied with `cp` from the old demo and edited where they name
-  the package, a `build` script, `pnpm demo:knockknock`. The app (`survey-app.md` section 1): fake sign-in and user switching, the stage
-  switch, the kit forms, the key editor (`putBoxAction` and `WhisperInput`, a mask in the sidecar), Show
-  (`WhisperText`), Delete (`delBox`), Lock, and the knock form (`useMutation` over `withWhisper`, with the unlock
-  dialog on demand). Sign-out calls `Knock.lock()`, since a null userid changes nothing. The localStorage helper
-  for `MemoryVaultDB`, in `src/lib/`.
-* **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 5 and 6, cut from the top of the two.
-* **Ready when:** `pnpm demo:knockknock` runs both flows by hand, and an integration test runs them with the SDK
-  stubbed: a new user creates a vault, saves a key, knocks, and gets a joke; a second user signs in and the first
-  returns to `locked`, knocks, unlocks in the dialog, and gets a joke.
+  the package, a `build` script, `pnpm demo:knockknock`. The app (`survey-app.md` section 1): fake sign-in, the
+  stage switch, the kit forms, the key editor (`putBoxAction` and `WhisperInput`, a mask in the sidecar), Show
+  (`WhisperText`), Delete (`delBox`), Lock, the ways-in forms, and the knock form (`useMutation` over
+  `withWhisper`, with the unlock dialog on demand). The localStorage helper for `MemoryVaultDB`, in `src/lib/`.
+  Changing user or signing out clears the demo's session and reloads the page.
+* **Levels:** `opus`, medium effort; review `low`. **Depends on:** 4, 5 and 6, cut from the top of the three.
+* **Ready when:** `pnpm demo:knockknock` runs these by hand, and an integration test runs them with the SDK
+  stubbed: a new user creates a vault, saves a key, knocks and gets a joke; after a reload the user is `locked`,
+  knocks, unlocks in the dialog and gets a joke; lock and unlock; replace the passphrase; add a passkey, unlock with
+  it, revoke it.
 
 **"Once that's reached" is reached here.**
 
@@ -175,7 +238,7 @@
 * **Builds:** `Knock.useBoxList()` over the root's listing, a list key under `keys`, and the bridge copying listing
   events, which it drops today.
 * **Leaves out:** `useBoxes`.
-* **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 7. **Beside:** 9.
+* **Levels:** `opus`, medium effort; review `low`. **Depends on:** 7. **Beside:** 9.
 * **Ready when:** a test adds a box and sees the listing grow, the same array until then.
 
 ### 9. `use_draft`: drafts
@@ -185,7 +248,7 @@
 * **Builds:** `useDraft(labelpath)`: `isDirty`, `isBehind`, `base`, `sidecar`, `setSidecar`, `whisperField('val')`
   (masked; focus reveals through `withWhisper` into the input's DOM value), `put`, `discard`.
 * **Leaves out:** `rebase`.
-* **Levels:** `opus`, high effort; review `high`. **Depends on:** 7. **Beside:** 8.
+* **Levels:** `opus`, high effort; review `medium`. **Depends on:** 7. **Beside:** 8.
 * **Ready when:** a test does focus, reveal, edit, put, and focus, edit, discard, with no secret found.
 
 ### 10. `demo_envman`: the envman app
@@ -197,28 +260,29 @@
   `useBox`); an add form (title, description, rotation period, `last_rotated_at`; the box's label is a minted id);
   the row editor (`useDraft`, save and undo); red when a record is older than its period; a gear modal that edits
   the sidecar. It imports public entries only, so it can be moved out later.
-* **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 8 and 9, cut from the top of the two.
+* **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8 and 9, cut from the top of the two.
 * **Ready when:** add two records, reload and see them, back-date one and see it red, edit its value with save and
   undo.
 
 ## What no thread builds
 
-Typed whispers, `whisperQuery`, `useSuspenseBox`, `useBoxes`, `putBox` with a revisor, a draft's `rebase`,
-`isWatching` and `heardAt`, passkey kit, `unlock.formAction` on the hooks, the bank boundary, a QueryClient made by
-the giver, nested labelpaths, an IndexedDB vaultDB, leases cached on the device.
+Everything out of bounds above. Also: typed whispers, `whisperQuery`, `useSuspenseBox`, `useBoxes`, `putBox` with a
+revisor, a draft's `rebase`, `isWatching` and `heardAt`, `unlock.formAction` on the hooks, the bank boundary, a
+QueryClient made by the giver, nested labelpaths, an IndexedDB vaultDB.
+
+The Coach's bullet "remove hallucinatory lifecycle stages" is met this way: the host-facing stage list is the six
+the program can reach, and the new React layer neither produces nor switches on `swept`, `vacated` or `deleted`. The
+core's existing `swept` code is left where it is (*What is in bounds*).
 
 ## Risks
 
-* **Thread 4 outgrows one context,** mostly through the 45 fake-world tests. It may retire those tied to the
-  removed interface, and has a named overflow into thread 5.
-* **Thread 3's test churn.** `Bank.make` stays a plain constructor, so only tests that read the device's snapshot
-  after it change.
-* **Restack conflicts** from thread 2 moving files that threads 1 and 3 edit. Thread 1 touches one line there, and
-  the two are restacked before thread 3 is cut.
+* **Thread 3 outgrows one context,** mostly through the 45 fake-world tests. It may retire those tied to the
+  removed interface, and has a named overflow into thread 4.
+* **Thread 2 meets a startup knot.** Its gloss says to cheat and keep going.
+* **A review pulls a thread toward end states.** *For the reviewer* above is quoted in each review handoff.
 * **Demo scaffolding eats context:** a 498-line eslint config, three tsconfigs, vite. Copying them with `cp` costs
   far less than reading them through.
 
 ## For the Coach
 
-The rows are in the sprint doc's *Open Matters*. Three would change what is built: where the new React layer
-lives (thread 2), who owns the minder (thread 3), and how a demo persists (thread 7).
+The remaining rows are in the sprint doc's *Open Matters*. None blocks a thread.

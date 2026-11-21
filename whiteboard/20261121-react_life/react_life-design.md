@@ -17,7 +17,14 @@ the thread file rather than carrying the code's behaviour over.
   end-to-middle, because no deleting vaults, vacate, etc)" (the Coach, 2026-11-21).
 * **Directed.** The lifecycle is tied only to the userid. Remove the hallucinatory lifecycle stages. Do not build the
   ending stages: no vacate, no delete, no sweep.
-* **Later.** Sign-out policy, vacate, delete, the userid-only discard, other tabs, lease expiry.
+* **Directed.** No work on features that touch life transitions. The goal is a basic app working normally: lock and
+  unlock are the only transitions, and nothing that takes a working instance to a non-working one is contemplated,
+  a second userid included. The teardown code that exists is neither removed nor replaced. A startup paradox is
+  cheated, not solved. `react_life-plan.md`, *What is in bounds*, has the examples.
+* **Directed.** The two use cases are the two apps, and between them: the new-user flow, the returning-user flow,
+  lock and unlock, and each gating verb but deleting the bank.
+* **Later.** Sign-out policy, vacate, delete, the userid-only discard, a second userid, other tabs, lease expiry,
+  autolock.
 
 ## The ladder: what exists when
 
@@ -45,8 +52,9 @@ the thread file rather than carrying the code's behaviour over.
 * **Agreed.** Nothing invokes a gating until the customer triggers it. So startup never needs the user.
 * **Agreed.** `hello()` starts an instance's asynchronous work, once, when it is known to be in use. Construction has
   no side effects. Nothing calls `hello()` on an ended instance: it is dropped and a new one made.
-* **Proposed.** If the core's Device is in the disciplined subset, it hosts the minder, TSQ and bridge through a
-  narrow interface, as the bank hosts a vault, so the subset imports no TanStack.
+* **Agreed.** The device owns the minder, and `safebyok` takes `@tanstack/query-core` as a peer dependency. The
+  giver makes the bridge, and `safebyok-react-lean`, the new private React package, takes `@tanstack/react-query`
+  as a peer dependency.
 
 ## The provider
 
@@ -60,7 +68,7 @@ the thread file rather than carrying the code's behaviour over.
   |---|---|
   | becomes a string, and nothing is running | start |
   | goes null or undefined | nothing |
-  | becomes a different user | the first user's device ends in memory, then the second starts |
+  | becomes a different user | the first user's device ends in memory, then the second starts (**Later**: not this sprint's) |
 
 * **Agreed.** In render the provider compares its prop with the device's userid. Children of a different user get
   `starting` in that same pass, never the first user's device.
