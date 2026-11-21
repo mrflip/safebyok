@@ -1,7 +1,7 @@
 /** What envman stores beside each secret, readable while the vault is locked: its title, description, rotation period and when it was last rotated. */
 
 import type { Sidecar } from 'safebyok'
-import { maskOf } from 'safebyok-react-lean'
+import { mask } from 'safebyok-react-lean'
 
 /** One day, in milliseconds. */
 export const DayMs = 24 * 60 * 60 * 1000
@@ -17,7 +17,7 @@ export type EnvSidecar = Readonly<{
   rotation_period_ms: number
   /** When the value was last replaced. */
   last_rotated_at:    number
-  /** The value's public prefix, from {@link valMaskOf}: no character of the secret. */
+  /** The value's mask, from {@link valMaskOf}: no character of its tail. */
   mask:               string
 }>
 
@@ -32,9 +32,12 @@ export function envSidecarOf(sidecar: Sidecar): EnvSidecar {
   }
 }
 
-// The sidecar is stored readable, so the mask keeps only a long value's public prefix (`sk-ant-…`) and never its tail.
+// The sidecar is stored readable, so the mask shows no character of the value's tail.
 /** The mask of the value `val` to store in the sidecar. */
-export function valMaskOf(val: string): string { return maskOf(val, { head: 7, tail: 0 }) }
+export function valMaskOf(val: string): string { return mask(val, { tail: 0 }) }
+
+/** The mask of the value `val` to show while the vault is unlocked: its last four characters, on a value long enough to spare them. */
+export function valRevealOf(val: string): string { return mask(val, { tail: 4 }) }
 
 /** True when the env was last rotated longer ago than its period, at `now`. */
 export function isOverdueAt(env: EnvSidecar, now: number): boolean {

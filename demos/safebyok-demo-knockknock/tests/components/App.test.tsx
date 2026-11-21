@@ -24,6 +24,12 @@ const NextPassphrase = 'brave walrus paints seven kites'
 /** Hue's Anthropic key, an obvious fake. */
 const ApiKey = 'sk-ant-fake-0123456789abcdef'
 
+/** The key's mask as its sidecar stores it, no character of its tail shown: what a locked page shows. */
+const StoredMask = 'sk**********************'
+
+/** The key's mask with its last four characters: what an unlocked page shows. */
+const LiveMask = 'sk******************cdef'
+
 /** What the fake Anthropic answers. */
 const Joke = "Lettuce who? Lettuce in, it's cold out here!"
 
@@ -66,7 +72,7 @@ async function saveKey(): Promise<void> {
   const keyPanel = region('Your Anthropic API key')
   fireEvent.change(within(keyPanel).getByLabelText('Anthropic API key'), { target: { value: ApiKey } })
   fireEvent.click(within(keyPanel).getByRole('button', { name: 'Save key' }))
-  await within(keyPanel).findByText('sk-ant-…')
+  await within(keyPanel).findByText(LiveMask)
 }
 
 /** Knock as Lettuce. */
@@ -114,7 +120,7 @@ describe("the Knock-Knock Machine", () => {
     await loadWithKey()
     const page = await loadPage()
     await screen.findByRole('heading', { name: 'Your vault is locked' })
-    await within(region('Your Anthropic API key')).findByText('sk-ant-…')
+    await within(region('Your Anthropic API key')).findByText(StoredMask)
     knock()
     const dialog = await screen.findByRole('dialog')
     unlockIn(dialog)
@@ -131,7 +137,7 @@ describe("the Knock-Knock Machine", () => {
     await loadWithKey()
     const page = await loadPage()
     await screen.findByRole('heading', { name: 'Your vault is locked' })
-    await within(region('Your Anthropic API key')).findByText('sk-ant-…')
+    await within(region('Your Anthropic API key')).findByText(StoredMask)
     knock()
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
@@ -141,13 +147,15 @@ describe("the Knock-Knock Machine", () => {
     expectUnheld(page)
   })
 
-  it("locks and unlocks", async () => {
+  it("locks and unlocks, showing the stored mask while locked and the key's last four characters while unlocked", async () => {
     const page = await loadWithKey()
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
     expect(within(region('Your Anthropic API key')).queryByLabelText('Anthropic API key')).to.be.null
+    await within(region('Your Anthropic API key')).findByText(StoredMask)
     unlockIn(locked)
     await screen.findByText('Your vault is unlocked.')
+    await within(region('Your Anthropic API key')).findByText(LiveMask)
     expectUnheld(page)
   })
 
