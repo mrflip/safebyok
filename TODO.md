@@ -4,14 +4,23 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
 
 * **Reevaluate keeping void and gone separate in the minder.** For a host they differ only in act names, and the
   cache decides nothing differently between them; only a birth's cited record differs, and the writer builds that from
-  the parent it holds. The minder makes up a shell for a void answer (`#shellAt`, `RootNotCached`, the `void` car) so
-  that a car's `newest` is always a record. Consider a void car that holds no record, or folding void into gone, and
+  the parent it holds. The minder makes up a shell for a void answer (`#shellAt`, `RootNotCached`) so that an item
+  always has a record. Consider an item that has no record for void, or folding void into gone, and
   making the shell only where a birth cites it.
 * **Give fine-grained invalidation in the minder's `get`, its fetch and `isStaleAt`.** A get has one `staleTime`
-  today. Let it say a sparse record is acceptable (`sparseOk`) apart from how old a record may be, and let invalidation
-  and a refused get count as stale, as TanStack counts them; and decide whether `'static'` has any use for a car, whose
-  newest the vaultDB can always replace (whiteboard/20261115-lean_buttonup, the staleTime table, 2026-11-18).
-* **Re-check the minder's cars after its watch lapses.** Nothing notices a lapse today: the watch contract has no
+  today. Let it say a sparse record is acceptable (`sparseOk`) apart from how old a record may be
+  (whiteboard/20261115-lean_buttonup, the staleTime table, 2026-11-18). Since soon_item, `isStaleAt` counts an invalidated
+  item stale, a refused get's among them, as TanStack does, and a staleTime of `'static'` is refused (the Coach,
+  2026-11-20): the vaultDB can always replace an item.
+* **`vault.editBoxRecord(labelpath, fn)`, the second kind of orchestrating method.** Read the box unsealed, as
+  `withWhisper` does, and seal what `fn` returns into a put ask citing the revision read. Its snapshot check, a
+  `#demandPuttableThing`, refuses `stale_write` where the item is behind at all, where `withWhisper`'s
+  `#demandReadableThing` answers an item behind within its life (the Coach, 2026-11-20, soon_item rework 5).
+* **A giver hook for a box's listing.** A host shows a vault's boxes, but the giver serves only box records: the
+  minder's listing events (`eventkind: 'list'`) reach no host entry. Mirror them into the host's React Query as the
+  bridge mirrors items, under the minder's listing key, with a hook beside `useBoxRecord` (the Coach, 2026-11-20,
+  soon_item).
+* **Re-check the minder's items after its watch lapses.** Nothing notices a lapse today: the watch contract has no
   signal for a drop or a resume, the minder's queries have no observers for TanStack's focus and reconnect refetches,
   and the host's entries never go stale. The minder fetches nothing itself. On TanStack's own `onlineManager` and
   `focusManager` hints, it invalidates its listings, all or under a key prefix, and tells `listen`. The bridge
@@ -21,19 +30,19 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   once. The root box and the main gate have no parent listing: the bank object gets them again as it wakes (the Coach,
   2026-11-19; whiteboard/20261116-react_backwards).
 * **A query key whose subtree is one prefix.** Interleave the labelpath's segments with `'/'`, and end the key with
-  `'.'` for the Thing's own car or `'L'` for its listing: `[…, 'box', '/', 'engineering', '.']`, `[…, 'box', '/',
-  'engineering', 'L']`. No label can be `'.'`, `'/'` or `'L'`. Then `[…, 'engineering', '/']` matches every car and
-  listing under the Thing and neither of its own; a listing is beside its Thing's car, and nowhere else (the Coach,
+  `'.'` for the Thing's own item or `'L'` for its listing: `[…, 'box', '/', 'engineering', '.']`, `[…, 'box', '/',
+  'engineering', 'L']`. No label can be `'.'`, `'/'` or `'L'`. Then `[…, 'engineering', '/']` matches every item and
+  listing under the Thing and neither of its own; a listing is beside its Thing's item, and nowhere else (the Coach,
   2026-11-19).
 * **A small list answer.** The vaultDB's list answers a sparse record for each child, where the minder's listing keeps
-  only labelpaths and each car keeps its own newest. Make it small: the parent's scope and life once, then for each
+  only labelpaths and each Thing's item and soon its own newest. Make it small: the parent's scope and life once, then for each
   child its label, revseq, revtok, lifeseq and `written_at`. Re-listing after a lapse then costs one small request per
   listing, where re-getting would cost one per box. Not for the giver_needs sprint: no proposal, no adapter change yet
   (the Coach, 2026-11-19).
 * **Drop a gone parent's subtree.** When a Thing is tombstoned, or a newer life of it is heard of (a lapse can hide the
   tombstone between), the minder removes every query under its subtree prefix; TanStack tells listeners of each removal
   at once. A get of a child under way is then cancelled, and `#doGet` reads any cancellation as `goodbye`, refusing
-  `disabled` while the minder is still minding: it needs a refusal of its own. The giver's `listenBoxCars` skips
+  `disabled` while the minder is still minding: it needs a refusal of its own. The giver's `listenBoxRecords` skips
   removals today; the bridge would reset the host's entry for each, so that a hook still showing one fetches again
   (the Coach, 2026-11-19).
 * **A pouch: display data in each box's sparse record, so every listing carries it** (internals.md F6, open matter 14).
@@ -42,10 +51,14 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   (`classifyListThings`' `Thing.sparseOf`), and its types and docs promise them (`vault-db.ts`); a get's tombstone is always
   whole. Send every tombstone whole, so that "sparse" means live and not whole, and the minder's `gotgone` answers a
   whole tombstone as the vaultDB's does.
-* **Redo `bestCarOf` for titles and sparse tombstones.** The vaultDB is to send only whole tombstones, and the void
-  sentinel counts as a tombstone, not gone (the Coach, 2026-11-18). `bestCarOf`, `carOf`, the car's checks and
-  `isTombstone` are written for sparse tombstones and for a tombstone that excludes the void sentinel; rename them for
-  what they test, and drop what a sparse tombstone needed.
+* **Redo the minder's landing for titles and sparse tombstones.** The vaultDB is to send only whole tombstones, and the
+  void sentinel counts as a tombstone, not gone (the Coach, 2026-11-18). `ThingMinder`'s landing, which sends a sparse
+  tombstone to the item, and `isTombstone` are written for sparse tombstones and for a tombstone that excludes the void
+  sentinel; rename them for what they test, and drop what a sparse tombstone needed.
+* **Remove the old life's item on a soon from a newer life, if possible.** The item keeps the old life's whole record,
+  invalidated, until a get (notes/wontfix.md). Removing it empties `at()`, but a host keeps showing the old life: the
+  bridge ignores a removal. Weigh it with *Drop a gone parent's subtree*, which needs the bridge to reset an entry on
+  removal too (soon_item, 2026-11-20).
 * **`cleartext` names two things.** VOCABULARY.md's cleartext is the passphrase or passkey answer a gating accepts.
   `BoxCleartexts`, in `shapes/shapes-sealers.ts`, uses it for what a seal ciphers: a box's whisper. One of them needs
   another name. Every other name tried so far has been worse.
