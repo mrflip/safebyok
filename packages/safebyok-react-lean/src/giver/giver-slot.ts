@@ -10,10 +10,10 @@ import { bridgeMinder } from './react-bridge'
 // == [Types]: GiverBanks, GiverConfig, SlotMount, GiverSlotSnapshot, SignedOutBank
 
 /** The one bank a giver serves, keyed by its banklabel: `{ knock: { vaultDB } }`. */
-export type GiverBanks = Readonly<Record<string, Readonly<{ vaultDB: VaultDB }>>>
+export type GiverBanks<BanklabelT extends string = string> = Readonly<Record<BanklabelT, Readonly<{ vaultDB: VaultDB }>>>
 
 /** A giver's config: its one bank and where that is stored, and the options of each device it makes. */
-export type GiverConfig = Readonly<{ banks: GiverBanks }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB'>>
+export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB'>>
 
 /** What a provider hands its slot: the host's QueryClient, and a vaultDB and key deriver that replace the config's for its mount. */
 export type SlotMount = Readonly<{

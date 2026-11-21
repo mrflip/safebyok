@@ -1,10 +1,9 @@
 /** What every giver supplies a host's React Query: the defaults of a box's query and of a form verb's mutation, and the keys. */
 
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
-import { type Gating, Thing, type ThingCited, ThingChecks, ThingMinder, newerThingOf } from 'safebyok'
-import type { RecordFields } from './shapes-giver'
+import { type Gating, type LiveOf, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, newerThingOf } from 'safebyok'
 
-// == [Query defaults]: recordQueryDefaults, newerOrSharedOf, isRecord, shownRecordOf
+// == [Query defaults]: recordQueryDefaults, newerOrSharedOf, isRecord, nullifyThing
 
 // A host may override anything the giver supplies here (the keys and each of these defaults), so nothing in the giver may
 // depend on one staying in place. The bridge copies each record into the host's item whatever that item's options say.
@@ -38,9 +37,17 @@ function isRecord(val: unknown): val is ThingCited & Readonly<{ labelpath: strin
   return ThingChecks.scopedCited.safeParse(val).success
 }
 
-/** The record a host shows: `record`, or null for a tombstone or the shell. */
-export function shownRecordOf<RecordT extends RecordFields>(record: RecordT): RecordT | null {
-  return Thing.isTombstone(record) ? null : record
+// A host's item never holds a sparse record: the minder's get answers whole ones. The case is here for a host's own
+// select over a record it found elsewhere, such as a soon.
+/** The record a host shows of `thing`: the record itself while live, null for a tombstone or the shell (nothing stored, or deleted), and undefined for a sparse record, whose body is not yet known.
+ * It is the default `select` of a box's query. Call it from a `select` of your own to start from what the default shows.
+ * @example
+ *   const title = useQuery({ ...sok.acme.box('openai'), select: (thing) => nullifyThing(thing)?.sidecar['title'] }).data
+ */
+export function nullifyThing<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tombstone<RecordT>): LiveOf<RecordT> | null | undefined {
+  if (Thing.isTombstone(thing)) { return null }
+  if (Thing.isSparse(thing))    { return undefined }
+  return thing as LiveOf<RecordT>
 }
 // --
 
@@ -65,15 +72,19 @@ async function attemptGating(gating: Gating): Promise<void> { await gating.attem
 function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
 // --
 
-// == [Keys]: boxRecordQueryKey, bankQueryKey
+// == [Keys]: boxQueryKeyOf, boxesQueryKeyUnder
 
-/** The host's React Query key for the record of the box at `labelpath`: the key the bank's minder caches its item under. */
-export function boxRecordQueryKey(scope: Readonly<{ userid: string, banklabel: string, labelpath: string }>): QueryKey {
-  return ThingMinder.itemQueryKeyOf(scope)
+// While nobody is signed in, a hook still needs a key: one of no user's, `null` where the userid goes, whose fetch is
+// skipped. It never matches a key the minder caches under.
+/** The host's React Query key for the record of the box at `labelpath`: the key the bank's minder caches its item under, or one of no user's while `userid` is null. */
+export function boxQueryKeyOf({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
+  return (userid === null) ? ['sok', null, banklabel, labelpath] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath })
 }
 
-/** The key every one of a bank's items in the host's React Query starts with. */
-export function bankQueryKey(scope: Readonly<{ userid: string, banklabel: string }>): QueryKey {
-  return ThingMinder.bankQueryKeyOf(scope)
+// An item's key is its labelpath's labels and then the mark '!', so the key less its mark starts the key of every box
+// under it, and of none beside it.
+/** The key that starts the host's React Query key of the box at `labelpath` and of every box under it: for `invalidateQueries`. While `userid` is null, the key that starts every one of no user's. */
+export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
+  return (userid === null) ? ['sok', null, banklabel] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
 }
 // --
