@@ -164,7 +164,7 @@ describe("the bridge's main gate", () => {
       await other.bank!.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })
-    expect(get.mock.contexts.filter((context) => context === minder)).to.have.length(0)
+    expect(get.mock.contexts.filter((context) => context === minder)).to.have.lengthOf(0)
     const stored = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
     TH.expectTextUnheld(stored.wayins.passkey0!.bank_key_wayin_wrapped.ciphertext_b64, container, world.client)
   })

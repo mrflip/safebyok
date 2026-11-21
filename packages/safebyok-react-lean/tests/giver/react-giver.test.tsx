@@ -376,7 +376,7 @@ describe("useGate", () => {
     const { container } = render(TH.providerTreeOf(world, <ShowGate />, { userid: TH.ProviderUser }))
     await waitFor(() => { expect(container.textContent).to.contain('"wayinkind":"passkey"') })
     const wraps = storedWrapsOf(world)
-    expect(wraps).to.have.length(2)
+    expect(wraps).to.have.lengthOf(2)
     for (const text of [...wraps, Passphrase]) { TH.expectTextUnheld(text, container, world.client) }
   })
 })
