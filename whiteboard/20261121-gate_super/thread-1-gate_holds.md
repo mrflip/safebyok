@@ -1,7 +1,8 @@
 # Thread 1: gate_holds (2026-11-21)
 
-Branch `20261121-gate_holds`, PR pending, on main (0dd292ea4, #811). Proved: safebyok 1347 tests, safebyok-react-lean
-251 tests, typecheck and lint of both; `pnpm justify` not yet run.
+Branch `20261121-gate_holds`, PR [#815](https://github.com/mrflip/safebyok/pull/815), on main (0dd292ea4, #811).
+Proved: safebyok 1357 tests, safebyok-react-lean 251 tests, typecheck and lint of both; `pnpm justify` after the
+catch-up (see the PR's **Tests:** line).
 
 * **Built**:
   - `models/thing.ts`: a Thing models one *life*. The fields fixed for a life stay non-configurable; `fmt`, `revtok`,
@@ -27,6 +28,12 @@ Branch `20261121-gate_holds`, PR pending, on main (0dd292ea4, #811). Proved: saf
     `GateOpts` is `{ device, vaultDB, bankStamp }`, `GateBank` and `BirthOpts` gone, `LeaseGate` replaces `LeaseBank`.
   - Callers: safebyok-react-lean's giver makes its gatings on `bank.gate`; its tests, and the knockknock and envman
     demos' tests, unlock through `bank.gate`. demos/safebyok-demo-react calls only safebyok-react (big): untouched.
+  - Tests: tests/models/bank-forms.test.ts is now gate-forms.test.ts (the form verbs are the gate's); gate.test.ts
+    gains the gate's own surface (fixed life fields, subscribe, seal/unseal, sweep's end cause); bank.test.ts gains the
+    four new box verbs.
+  - Notes: VOCABULARY's gate, lease and a new Thing row; `notes/security.md` (a new entry and two amendments, by the
+    sonnet subagent); `notes/guarantees-drift.md` amends the form_verbs entry (G9: the Gate keeps the lease);
+    `notes/wontfix.md` gains a row for a gate change landing while another gating unlocks; a changeset.
 * **Decisions made**:
   - **The bank's end cause reaches a waiter.** `bank.ensureUnlocked`'s contract (and its tests) rejects a waiter with
     *the bank's* `endCause`. The gate cannot know its bank, so `gate.sweep(endCause?)` takes an optional cause: the bank's
@@ -54,7 +61,10 @@ Branch `20261121-gate_holds`, PR pending, on main (0dd292ea4, #811). Proved: saf
   - **Small commits**: Thing's one life, and the box verbs of ruling 3, are their own commits. The pass-throughs,
     seal/unseal and the subscribe move are inside the main move: splitting them would need intermediate code that
     compiles, which costs more than a reversal would.
-* **Discoveries**: the birth's double unlock (birth gate, then the bank's gate) is the price of `Bank.make` still making
+* **Discoveries**:
+  - VOCABULARY's **bank** row (the Coach's) still says the bank "orchestrates all gating events": that is the gate's
+    now. Left as is, for the Coach.
+  - The birth's double unlock (birth gate, then the bank's gate) is the price of `Bank.make` still making
   its own gate; thread 2's `Bank.make(record, { …, gate })` deletes it.
 * **For the Coach** (Open matters):
   - **Startup fix**: make the birth hand its gate to `Bank.make(record, { device, vaultDB, gate })` and have
