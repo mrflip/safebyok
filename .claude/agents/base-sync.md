@@ -63,7 +63,7 @@ line.
 ts=$(date -u +%Y%m%dT%H%M%SZ); snap=<snapshot root>/$ts; mkdir -p "<snapshot root>"
 mkdir "$snap" || { echo "snapshot $snap exists: wait a second and start again"; exit 1; }
 mkdir "$snap/files" "$snap/tmp"; echo "snap=$snap"
-B=$(git symbolic-ref --short HEAD); old=$(git rev-parse HEAD); stash=
+B=$(git branch --show-current); old=$(git rev-parse HEAD); stash=
 printf 'ts=%q\nsnap=%q\nB=%q\nold=%q\n' "$ts" "$snap" "$B" "$old" > "$snap/vars"
 git status --short --untracked-files=all > "$snap/status"
 git diff --binary HEAD > "$snap/tracked.patch"; git diff --binary --cached > "$snap/staged.patch"

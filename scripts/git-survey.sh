@@ -295,7 +295,7 @@ closingMessage() {
   echo "Pointed at the PR's merged head: $(git log -1 --format='%h %s' "$target")"
 }
 
-git for-each-ref --format='%(refname:short)' refs/heads/ | grep -vxF main > "${scratch}/branches" || true
+git for-each-ref --format='%(refname:lstrip=2)' refs/heads/ | grep -vxF main > "${scratch}/branches" || true
 : > "${scratch}/verdicts"
 while IFS= read -r branch; do
   judge "$branch" >> "${scratch}/verdicts"

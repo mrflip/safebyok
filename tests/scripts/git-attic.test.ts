@@ -45,7 +45,7 @@ const makeRepo = (scratch: string): RepoT => {
     return git('rev-parse', 'HEAD')
   }
   const attic = (...args: string[]) => execFileSync(Script, ['--no-prs', ...args], { cwd: where, encoding: 'utf8', env })
-  const branches = () => git('for-each-ref', '--format=%(refname:short)', 'refs/heads/').split('\n').filter(Boolean)
+  const branches = () => git('for-each-ref', '--format=%(refname:lstrip=2)', 'refs/heads/').split('\n').filter(Boolean)
   const tags = () => git('tag').split('\n').filter(Boolean)
   return { where, git, commit, attic, branches, tags }
 }
@@ -149,6 +149,14 @@ describe('scripts/git-attic', () => {
     const hashed = `attic/rebased-${repo.git('rev-parse', '--short', rebasedTip)}`
     expect(repo.tags()).to.include(hashed)
     expect(repo.git('rev-list', '--max-count=1', hashed)).to.equal(rebasedTip)
+  })
+
+  it('retires a branch that shares its name with a tag at another commit', () => {
+    const { rebasedTip } = seedKinds(repo)
+    repo.git('tag', 'rebased', 'main')
+    expect(repo.attic('--apply')).to.include('retired  rebased -> attic/rebased')
+    expect(repo.branches()).not.to.include('rebased')
+    expect(repo.git('rev-list', '--max-count=1', 'attic/rebased')).to.equal(rebasedTip)
   })
 
   it('leaves alone a merged branch that a worktree has checked out', () => {
