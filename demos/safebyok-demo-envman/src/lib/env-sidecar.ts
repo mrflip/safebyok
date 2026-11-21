@@ -36,9 +36,6 @@ export function envSidecarOf(sidecar: Sidecar): EnvSidecar {
 /** The mask of the value `val` to store in the sidecar. */
 export function valMaskOf(val: string): string { return mask(val, { tail: 0 }) }
 
-/** The mask of the value `val` to show while the vault is unlocked: its last four characters, whatever its length. */
-export function valRevealOf(val: string): string { return mask(val, { tail: 4 }) }
-
 /** True when the env was last rotated longer ago than its period, at `now`. */
 export function isOverdueAt(env: EnvSidecar, now: number): boolean {
   return (now - env.last_rotated_at) > env.rotation_period_ms

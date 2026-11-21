@@ -176,6 +176,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
    * The first userid starts that user's device. A null or undefined userid changes nothing, and neither does unmounting.
    * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead.
    * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
+   * Render it in the browser only: on a server, one device would serve every request.
    */
   function Provider({ userid, vaultDB, keyDeriver, children }: ProviderProps) {
     const client = useQueryClient()
@@ -350,7 +351,7 @@ function makeBankGiver(friend: BankFriend) {
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
    * `opts` are React Query's own, as {@link useBox} takes them.
    * @example
-   *   const passkeyHeader = Knock.useGate({ select: (gate) => liveGateOf(gate)?.wayins.passkey0 ?? null }).data
+   *   const passkeyHeader = Knock.useGate({ select: passkeyHeaderOf }).data
    *   {(passkeyHeader === null) && <AddPasskeyForm username={user.email} />}
    */
   function useGate<SelT = GateSelected>(opts: BoxQueryOpts<GateShown, SelT> = {}): UseQueryResult<SelT> {
@@ -425,14 +426,11 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   /** Call `fn` with the box's whisper on an unlocked bank, and `opts.ifLocked` with its sealed record on a locked one, resolving what either resolves.
-   * Unlike {@link withWhisper}, it never waits for the unlock form. Key a query of it on `isLocked` and the box's `revtok`, so it answers again on a lock, an unlock or a write.
-   * Use the whisper only inside `fn`, and return only what is safe to retain.
+   * Unlike {@link withWhisper}, it never waits for the unlock form. Call it again after a lock, an unlock or a `putBox`.
+   * Use the whisper only inside `fn`. A result that shows any of the whisper belongs in the page, not in React's state or a query.
    * @example
-   *   const { data: shown } = useQuery({
-   *     queryKey: ['apiKeyMask', isLocked, box?.revtok],
-   *     enabled:  Boolean(box),
-   *     queryFn:  () => Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) }),
-   *   })
+   *   const shown = await Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) })
+   *   maskElement.textContent = shown
    */
   async function withLockableWhisper<ResultT>(
     labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>, opts: WithLockableWhisperOpts<ResultT>,

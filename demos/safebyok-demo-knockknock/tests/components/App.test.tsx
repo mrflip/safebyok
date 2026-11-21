@@ -154,6 +154,7 @@ describe("the Knock-Knock Machine", () => {
     expect(within(region('Your Anthropic API key')).queryByLabelText('Anthropic API key')).to.be.null
     await within(region('Your Anthropic API key')).findByText(StoredMask)
     TH.expectTextUnheld(ApiKey.slice(-4), page.container, page.client)
+    expect(document.body.textContent.includes(ApiKey.slice(-4))).to.eq(false)
     unlockIn(locked)
     await screen.findByText('Your vault is unlocked.')
     await within(region('Your Anthropic API key')).findByText(LiveMask)
@@ -210,6 +211,9 @@ describe("the Knock-Knock Machine", () => {
     fireEvent.click(within(region('Ways in')).getByRole('button', { name: 'Add passkey' }))
     await within(region('Ways in')).findByRole('button', { name: 'Remove passkey' })
     expect(authenticator.credentialIds()).to.have.lengthOf(1)
+    // The passkey shows once the gate is written, before the add's own unlock lands: a Lock before that leaves the bank
+    // unlocked (notes/wontfix.md, "A lock, a sweep or a second form verb while a form verb runs"). Let the add settle.
+    await waitFor(() => { expect(page.client.isMutating()).to.eq(0) })
 
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     const locked = await screen.findByRole('region', { name: 'Your vault is locked' })

@@ -2,7 +2,7 @@
 
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
 import {
-  type GateRecord, type Gating, Labelpath, type LiveOf, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
+  type GateRecord, type Gating, Labelpath, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
 } from 'safebyok'
 import type { GateShown, HeaderedGate } from './react-giver'
 
@@ -61,7 +61,7 @@ export function liveOf<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tom
 }
 // --
 
-// == [The gate shown]: gateShownOf, liveGateOf, wayinHeaderOf
+// == [The gate shown]: gateShownOf, liveGateOf, passkeyHeaderOf, wayinHeaderOf
 
 // The bridge and the gate's query both put a gate into the host's React Query through this, so the host's cache never
 // holds a wrapped bankKey. A gate is never deleted, so the only tombstone is the shell, which has no wayins.
@@ -77,6 +77,11 @@ export function gateShownOf(thing: GateRecord | Tombstone<GateRecord>): GateShow
 /** The gate {@link gateShownOf} shows, or null for the shell of a bank not yet born: the default `select` of `useGate`. */
 export function liveGateOf(gate: GateShown): HeaderedGate | null {
   return Thing.isTombstone(gate) ? null : gate
+}
+
+/** The header of the bank's passkey, or null while it has none or no bank is stored: a `select` of `useGate`. */
+export function passkeyHeaderOf(gate: GateShown): PasskeyWayinHeader | null {
+  return liveGateOf(gate)?.wayins.passkey0 ?? null
 }
 
 /** `wayin`'s header: its record, without the bankKey it wraps. */

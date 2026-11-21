@@ -4,9 +4,9 @@ import { type ReactNode, useActionState, useEffect } from 'react'
 import { type BankSnapshot, type BoxRecord, type GateRecord, type Gating, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { liveGateOf, liveOf } from '../../src/giver/giver-defaults'
+import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
 import { mask } from '../../src/index'
-import { type GateShown, type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
+import { type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const Passphrase = LeanTH.TestPassphrase
@@ -314,9 +314,6 @@ async function renderGate() {
   return rendered
 }
 
-/** The passkey header of a gate as `useGate` shows it, or null for none. */
-function passkeyHeaderOf(gate: GateShown) { return liveGateOf(gate)?.wayins.passkey0 ?? null }
-
 /** The ciphertext of each wrapped bankKey on the gate the world's vaultDB stores. */
 function storedWrapsOf(world: TH.ProviderWorld): string[] {
   const gate = world.vaultDB._cheat_things(LeanTH.WorldScope).get('gate') as GateRecord
@@ -476,26 +473,19 @@ describe("withLockableWhisper", () => {
   })
 
   // withLockableWhisper @example
-  it("shows a live mask while unlocked and the stored one while locked, holding the whisper nowhere", async () => {
-    const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    function KeyMask() {
-      const isLocked = world.Bank.useBank((bank) => bank.isLocked)
-      const { data: box } = world.Bank.useBox(TH.JokesPath)
-      const { data: shown = 'pending' } = useQuery({
-        queryKey: ['apiKeyMask', isLocked, box?.revtok],
-        enabled:  Boolean(box),
-        queryFn:  () => world.Bank.withLockableWhisper(TH.JokesPath, ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (stored) => stored.sidecar['service'] as string }),
-      })
-      return <p>{shown}</p>
+  it("resolves a live mask to write into the page while unlocked, and the stored one while locked", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const maskElement = document.createElement('code')
+    const showMask = async () => {
+      const shown = await world.Bank.withLockableWhisper(TH.JokesPath, ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => box.sidecar['service'] as string })
+      maskElement.textContent = shown
     }
-    const { container } = render(TH.providerTreeOf(world, <KeyMask />, { userid: TH.ProviderUser }))
-    await screen.findByText('jokes')
-    const device = world._cheat_device()
-    await act(async () => { await device.bank!.unlock({ passphraseCleartext: Passphrase }) })
-    await screen.findByText(mask(TH.JokesKey, { tail: 4 }))
-    TH.expectTextUnheld(TH.JokesKey, container, world.client)
-    act(() => { world.Bank.lock() })
-    await screen.findByText('jokes')
+    await showMask()
+    expect(maskElement.textContent).to.eq('jokes')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    await showMask()
+    expect(maskElement.textContent).to.eq(mask(TH.JokesKey, { tail: 4 }))
   })
 })
 

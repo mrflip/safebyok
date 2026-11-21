@@ -1,6 +1,6 @@
 export * from './giver/react-giver'
 export { type GiverBanks, type GiverConfig, SignedOutBank } from './giver/shapes-giver'
-export { liveGateOf, liveOf } from './giver/giver-defaults'
+export { liveGateOf, liveOf, passkeyHeaderOf } from './giver/giver-defaults'
 export type { BoxQueryOpts } from './giver/shapes-giver'
 export type { Draft, DraftPutOpts, WhisperFieldProps } from './giver/use-draft'
 // A box's sidecar keeps a whisper's mask: the core's, one binding across both packages.
