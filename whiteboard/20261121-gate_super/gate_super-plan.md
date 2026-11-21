@@ -6,7 +6,7 @@
 * **At once**: 3 (the line is two threads, stacked, so one runs at a time).
 * **Design**: `gate_super-design.md`, beside this file. It wins over this plan on the shape of the code.
 * **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 647; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
-* **Status**: thread 1 (#815) reworked: rebased onto #814 at 604772d6f, the seal surface per the Coach's final ruling; in a second review (f4e0d1333...457439bb0). Thread 2 building in /workspace/byok-bank_whole, cut from 457439bb0.
+* **Status**: thread 1 filed and ready for merge (#815 at 65027522f, stacked on #814); thread 2 building in /workspace/byok-bank_whole.
 
 ## Read first
 
@@ -82,7 +82,8 @@ fields by destructuring; `countCalls` through TH; proving.test.ts names. Left, m
 directly (row); the birth's post-store window (thread 2 narrows it); an orphaned lease if `adoptBornBank` throws (as
 main); Gate unfrozen (row, `preventExtensions`); `gate.device` / `gate.vaultDB` public; `Lease.sweep`'s doc;
 `adoptBornBank` replacing a held bank (pre-existing). *Rework:* rebased onto #814; Bank's four seal verbs, the rest on
-Vault; second review running.
+Vault. *Second review:* fixed (medium, opus): the vault's Boxes comment and `#sealedAsk`'s doc. Left: a tombstone's
+sidecar caught only at runtime (later); VOCABULARY's seal bullet (thread 2 trims it).
 
 ### 2. bank_whole
 
