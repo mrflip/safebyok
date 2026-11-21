@@ -1,6 +1,6 @@
 # Thread 11: giver_surface (2026-11-21)
 
-Branch `20261121-giver_surface`, PR (see below), stacked on #805. Proved: `safebyok-react-lean` lint, typecheck, 219
+Branch `20261121-giver_surface`, PR [#806](https://github.com/mrflip/safebyok/pull/806), stacked on #805. Proved: `safebyok-react-lean` lint, typecheck, 219
 tests (14 files); the Knock-Knock demo lint, typecheck, 26 tests. `pnpm justify` after the catch-up: see the PR's **Tests:** line.
 
 * **Built**, the Coach's five rulings on the giver's surface:
