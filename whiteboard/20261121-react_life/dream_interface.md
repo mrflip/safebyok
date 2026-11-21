@@ -62,7 +62,7 @@ const { data: box, isStale, isFetching, dataUpdatedAt, error } = useQuery(sok.ac
 //   A record overtaken by a newer revision shows until the newer one arrives.
 //   It renders at once from the minder's item where the minder has one (initialData), and fetches only where it has none.
 ?? const box = useSuspenseQuery(sok.acme.box('openai')).data          // suspends on the bank's start and the first get, never on a lock
-const title = useQuery({ ...sok.acme.box('openai'), select: (b) => nullifyThing(b)?.sidecar.title }).data   // nullifyThing is the default select; re-renders only when the title changes
+const title = useQuery({ ...sok.acme.box('openai'), select: (b) => liveOf(b)?.sidecar.title }).data   // liveOf is the default select; re-renders only when the title changes
 const box = use(useQuery(sok.acme.box('openai')).promise)          // React 19's way, TanStack's own stable promise, behind its `experimental_prefetchInRender` flag
 
 // The same, as sugar: each is the line above with the factory bound for you.
@@ -104,13 +104,13 @@ Acme.lock()
 // == Writing ==
 const [putState, putAction, isPutting] = useActionState(Acme.putBoxAction('openai', {
   whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
-  sidecarOf: (whisper) => ({ mask: mask(whisper.apiKey) }),
+  sidecarOf: (whisper) => ({ mask: maskOf(whisper.apiKey, { tail: 0 }) }),
 }), null)                                                  // made once: at module scope, or under useMemo
 <form action={putAction}><WhisperInput name="apiKey" /><SubmitButton /></form>   // WhisperInput is from parts, uncontrolled; SubmitButton reads useFormStatus()
 
 await Acme.putBox('counter', (stored) => ({ whisper: { n: (stored?.whisper.n ?? 0) + 1 } }))  // a revisor, run again on stale_write
 await Acme.putBoxOnce('openai', { sidecar }, { whisper })                                   // one try; a labelpath or a scoped record names the box, and the write cites the newest revision the minder has heard of there
-await Acme.delBox('openai')
+await Acme.delBoxOnce('openai')
 // By the time any of these resolves, every useBox showing that box shows what was written.
 // Never useMutation({ mutationFn: Acme.putBox }) with a whisper in its variables: see rule 2.
 
