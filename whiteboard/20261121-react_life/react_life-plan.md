@@ -149,6 +149,8 @@ no lease cache, so a reload lands locked; the localStorage helper.
 * **Builds:** steps 4 to 6 of the startup. The device makes and owns its minder, and is the minder's friend
   (`MinderFriend` becomes a structural interface). The device has its bank, and its snapshot shows `starting`,
   `unborn`, `locked` and `unlocked`, and `failed` with `lastErr` where bring-up is refused, if that is cheap.
+  `unborn` is a stand-in in that snapshot "as needed, but fake things or substitute a shim, or anything so that
+  startup questions don't get in the way of a working app" (the Coach).
   `Vault.make(bank, minder)`. `cheatHoldBank`, `cheatDropBank`, `#thisIsTemporaryBank` and `#madeBanks` go once
   the device has its own bank; where the existing sweep code calls one, make the smallest edit that compiles.
 * **Leaves out:** leases, the deviceDB, minting a `device_tok` in core, and everything out of bounds.
@@ -256,19 +258,27 @@ no lease cache, so a reload lands locked; the localStorage helper.
 > * Additionally a "doppler-lite" app well call "envman", in safebyok-demo-envman. It lets me add (in sidecar) a title, description, rotation period and last rotated timestamp. The whisper has a single text field, `val`. The editor shows the whisper masked when not editing; clicking into the text field unmasks. and exposes a "save" or "undo" button. records older than their rotation period are red; I can edit that, or rename, through a "gear" button opening a small modal.
 > it should probably be its own repo.
 
-* **Builds:** `demos/safebyok-demo-envman`, in this repo for now. The list (`useBoxList`, each row its own
-  `useBox`); an add form (title, description, rotation period, `last_rotated_at`; the box's label is a minted id);
-  the row editor (`useDraft`, save and undo); red when a record is older than its period; a gear modal that edits
-  the sidecar. It imports public entries only, so it can be moved out later.
+* **Builds:** `demos/safebyok-demo-envman`, a package in this repo (the Coach meant a package, not a repo). The
+  list (`useBoxList`, each row its own `useBox`); an add form (title, description, rotation period,
+  `last_rotated_at`; the box's label is a minted id); the row editor (`useDraft`, save and undo), where saving a new
+  `val` stamps `last_rotated_at`; red when a record is older than its period; a gear modal that edits the sidecar,
+  the title included, which is what "rename" means.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8 and 9, cut from the top of the two.
 * **Ready when:** add two records, reload and see them, back-date one and see it red, edit its value with save and
   undo.
 
 ## What no thread builds
 
-Everything out of bounds above. Also: typed whispers, `whisperQuery`, `useSuspenseBox`, `useBoxes`, `putBox` with a
-revisor, a draft's `rebase`, `isWatching` and `heardAt`, `unlock.formAction` on the hooks, the bank boundary, a
-QueryClient made by the giver, nested labelpaths, an IndexedDB vaultDB.
+Everything out of bounds above. Also, as nice-to-haves for now: typed whispers, `whisperQuery`, `useSuspenseBox`,
+a draft's `rebase`, `isWatching` and `heardAt`, `unlock.formAction` on the hooks (the kit's private helper serves
+until the demos show it earns its place), the bank boundary, a QueryClient made by the giver, nested labelpaths, an
+IndexedDB vaultDB.
+
+**Built when an app calls for it** (the Coach, 2026-11-21): "if writing the app basically means writing the feature
+named, implement the feature: I could easily envision useBoxes, putBox with a revisor, or an editBox equivalent of
+withWhisper that returns a sealed putAsk being called for." A thread that finds its app needs one of those three
+builds it beside the hook it extends (thread 4, 8 or 9) and says so in its thread file. `TODO.md` already describes
+`vault.editBoxRecord`.
 
 The Coach's bullet "remove hallucinatory lifecycle stages" is met this way: the host-facing stage list is the six
 the program can reach, and the new React layer neither produces nor switches on `swept`, `vacated` or `deleted`. The
@@ -285,4 +295,4 @@ core's existing `swept` code is left where it is (*What is in bounds*).
 
 ## For the Coach
 
-The remaining rows are in the sprint doc's *Open Matters*. None blocks a thread.
+Every row of the sprint doc's *Open Matters* is ruled and in *Resolved*. Nothing waits on the Coach.
