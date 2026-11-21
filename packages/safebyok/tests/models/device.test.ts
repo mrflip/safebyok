@@ -56,6 +56,11 @@ describe("Device.make(record, opts)", () => {
     expect(err.message).to.include('vaultDB: ')
   })
 
+  it("refuses a queryCacheOpts the minder refuses, and gives its minder the one it is given", () => {
+    TH.expectSyncRefusal(() => TH.makeDevice({}, { queryCacheOpts: { retry: 3 } } as never), 'bad_record')
+    expect(TH.makeDevice({}, { queryCacheOpts: { staleTime: 5 } }).minder).to.be.an('object')
+  })
+
   it("serializes as its scope and token alone, and is frozen", () => {
     const device = TH.makeDevice()
     expect(TH.jsonOf(device)).to.deep.equal({ ...TH.WorldScope, device_tok: TH.DeviceTok })
@@ -185,6 +190,15 @@ describe("device.hello()", () => {
     expect(shown.lastErr).to.include({ refusalkind: 'damaged_row' })
     expect(Object.isFrozen(shown.lastErr)).to.be.true
     expect(device.bank).to.be.null
+  })
+
+  it("shows failed, and does not reject, where its vaultDB cannot watch", async () => {
+    const vaultDB = new MemoryVaultDB()
+    vi.spyOn(vaultDB, 'watch').mockImplementation(() => { throw new Error('no watching here') })
+    const device = TH.makeDevice({}, { vaultDB })
+    await device.hello()
+    expect(device.getSnapshot().bank).to.include({ stage: 'failed' })
+    expect(device.getSnapshot().bank.lastErr).to.not.be.null
   })
 
   it("answers the same promise each time, and keeps a bank born on it before", async () => {

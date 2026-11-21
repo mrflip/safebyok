@@ -140,10 +140,8 @@ export class Device implements MinderFriend {
 
   // == [Starting]: hello, adoptBornBank, #bringUp, #hold
 
-  /** Start the minder, and bring up the bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'`. Never rejects.
-   * A bank stored becomes this device's bank, locked, and its vault is made. None stored shows `'unborn'`. A refused fetch
-   * or a broken record shows `'failed'`, with `lastErr`. Each later call resolves as the first, and starts nothing.
-   * A device that already has a bank, born on it before `hello`, keeps it.
+  /** Start the minder and bring up the bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
+   * Each later call resolves as the first. A device that already has a bank, born on it before `hello`, keeps it.
    */
   hello(): Promise<void> {
     this.#broughtUp ??= this.#bringUp()
@@ -151,7 +149,7 @@ export class Device implements MinderFriend {
   }
 
   // Cheat (react_life): the bank's birth hands the born bank over by calling this, a bank-to-device call, until birth's caller owns the handover.
-  /** Make `bank`, just born on this device, the device's bank, and make its vault. Internal: `Bank.birth` calls it. Returns `bank`. */
+  /** Make `bank`, just born on this device, the device's bank, and make its vault. Internal. Returns `bank`. */
   adoptBornBank(bank: Bank): Bank {
     Checks.bank.parse(bank)
     Validator.checkedConsistent(bank.scope, this.scope, { kind: 'record_conflict' })
@@ -159,12 +157,12 @@ export class Device implements MinderFriend {
     return bank
   }
 
-  /** Start the minder, then fetch the bank, its main gate and its root box through it, unless the device already has its bank. */
+  /** Bring up this device's bank, if it has none. */
   async #bringUp(): Promise<void> {
-    this.#minder.hello()
     // Cheat (react_life): tests birth a bank before they say hello, which a device's startup never does.
-    if (this.#bank !== null) { return }
     try {
+      this.#minder.hello()
+      if (this.#bank !== null) { return }
       const [bankRecord, maingate, rootBox] = await Promise.all([
         this.#minder.get({ ...this.scope, labelpath: 'bank' }),
         this.#minder.get({ ...this.scope, labelpath: Labelpath.MainGate }),
@@ -184,7 +182,7 @@ export class Device implements MinderFriend {
   }
 
   // The bank's own sweep clears its subscribers, so nothing here unsubscribes.
-  /** Make `bank` this device's bank, make its vault, and follow its snapshot. */
+  /** Make `bank` this device's bank. */
   #hold(bank: Bank): void {
     this.#bank  = bank
     this.#vault = Vault.make(bank, this.#minder)
