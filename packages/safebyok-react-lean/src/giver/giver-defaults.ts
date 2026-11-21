@@ -133,6 +133,7 @@ export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ 
 export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
   return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : ThingMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
 }
+
 /** The host's React Query key for the bank's main gate: the key the bank's minder caches its item under, or one of no user's while `userid` is null. */
 export function gateQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
   return (userid === null) ? ['sok', null, banklabel, Labelpath.MainGate] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath: Labelpath.MainGate })
