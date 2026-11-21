@@ -104,7 +104,7 @@ Acme.lock()
 // == Writing ==
 const [putState, putAction, isPutting] = useActionState(Acme.putBoxAction('openai', {
   whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
-  sidecarOf: (whisper) => ({ mask: maskOf(whisper.apiKey, { tail: 0 }) }),
+  sidecarOf: (whisper) => ({ mask: mask(whisper.apiKey, { tail: 0 }) }),
 }), null)                                                  // made once: at module scope, or under useMemo
 <form action={putAction}><WhisperInput name="apiKey" /><SubmitButton /></form>   // WhisperInput is from parts, uncontrolled; SubmitButton reads useFormStatus()
 

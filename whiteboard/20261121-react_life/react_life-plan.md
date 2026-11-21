@@ -365,6 +365,7 @@ choice ("they go lower in the list at a priority you choose").
   `withLockableWhisper` would: locked, the stored `tail: 0` mask from the sidecar; unlocked, a live `tail: 4` mask
   of the unsealed whisper. (d) envman clears its open draft on lock through (b), in the demo only, not in the kit.
 * *Orchestrator:* also: `PasskeyUnlockButton` defaults its `passkeyHeader` from the bank's `usePasskeyHeader()` through the provider's context (#806's leftover).
+* *Orchestrator:* also: replace thread 11's `maskOf` and its `MaskSchedule` with `safebyok-big`'s `mask(text, opts?)` (`packages/safebyok-big/src/helpers/mask.ts`, banded schedule with `head`/`tail` overrides), exported through `safebyok-big/internals` and re-exported from `safebyok-react-lean`, in both demos: CLAUDE.md, "re-export what big defines rather than redefining it… never reimplement it a different way", and the Coach's own words, "calling mask with tail:0". Also a ride-along test file for `src/giver/giver-context.ts` (`useGivenGiver`, the `giver` prop, outside-a-provider cases).
 * **Leaves out:** emptying typed text on lock in `useDraft` or the kit (the Coach: not by default, not in /kit).
 * **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 10.
 * **Ready when:** tests show `withLockableWhisper` taking each branch without waiting; the stage-change callback
