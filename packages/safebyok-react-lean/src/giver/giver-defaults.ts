@@ -1,7 +1,10 @@
 /** What every giver supplies a host's React Query: the defaults of a box's query and of a form verb's mutation, and the keys. */
 
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
-import { type Gating, type LiveOf, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, newerThingOf } from 'safebyok'
+import {
+  type GateRecord, type Gating, Labelpath, type LiveOf, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
+} from 'safebyok'
+import type { GateShown, HeaderedGate } from './react-giver'
 
 // == [Query defaults]: recordQueryDefaults, ListingQueryDefaults, newerOrSharedOf, isRecord, liveOf
 
@@ -58,6 +61,31 @@ export function liveOf<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tom
 }
 // --
 
+// == [The gate shown]: gateShownOf, liveGateOf, wayinHeaderOf
+
+// The bridge and the gate's query both put a gate into the host's React Query through this, so the host's cache never
+// holds a wrapped bankKey. A gate is never deleted, so the only tombstone is the shell, which has no wayins.
+/** The main gate as the host's React Query holds it: each wayin by its header, without the bankKey it wraps. */
+export function gateShownOf(thing: GateRecord | Tombstone<GateRecord>): GateShown {
+  if (Thing.isTombstone(thing)) { return Thing.sparseOf(thing) as Tombstone<HeaderedGate> }
+  const { main, passkey0 } = thing.wayins
+  return { ...thing, wayins: { main: wayinHeaderOf(main), passkey0: (passkey0 === null) ? null : wayinHeaderOf(passkey0) } } as HeaderedGate
+}
+
+// A headered gate fails the core's whole-gate check, which wants the wrapped bankKeys, so {@link liveOf} would read
+// it as a shell.
+/** The gate {@link gateShownOf} shows, or null for the shell of a bank not yet born: the default `select` of `useGate`. */
+export function liveGateOf(gate: GateShown): HeaderedGate | null {
+  return Thing.isTombstone(gate) ? null : gate
+}
+
+/** `wayin`'s header: its record, without the bankKey it wraps. */
+function wayinHeaderOf(wayin: WayinRecord): WayinHeader {
+  const { bank_key_wayin_wrapped: _wrapped, ...header } = wayin
+  return header
+}
+// --
+
 // == [Form mutations]: FormMutationDefaults, attemptGating, vacateGating
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
@@ -79,16 +107,11 @@ async function attemptGating(gating: Gating): Promise<void> { await gating.attem
 function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
 // --
 
-// == [Keys]: formMutationKeyOf, formMutationsKeyUnder, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf
+// == [Keys]: formMutationKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf, gateQueryKeyOf
 
 /** The host's React Query key for the mutation of the form verb `verb` in `userid`'s bank, `userid` null while nobody is signed in. */
 export function formMutationKeyOf({ userid, banklabel, verb }: Readonly<{ userid: Userid | null, banklabel: string, verb: string }>): QueryKey {
   return ['sok', userid, banklabel, verb]
-}
-
-/** The key that starts the key of every form verb's mutation in `userid`'s bank: for `useMutationState`'s filters. */
-export function formMutationsKeyUnder({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
-  return ['sok', userid, banklabel]
 }
 
 // While nobody is signed in, a hook still needs a key: one of no user's, `null` where the userid goes, whose fetch is
@@ -109,5 +132,9 @@ export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ 
 /** The host's React Query key for the listing of the root box's children: the key the bank's minder caches it under, or one of no user's while `userid` is null. */
 export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
   return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : ThingMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
+}
+/** The host's React Query key for the bank's main gate: the key the bank's minder caches its item under, or one of no user's while `userid` is null. */
+export function gateQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
+  return (userid === null) ? ['sok', null, banklabel, Labelpath.MainGate] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath: Labelpath.MainGate })
 }
 // --
