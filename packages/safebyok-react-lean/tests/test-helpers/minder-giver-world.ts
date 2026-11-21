@@ -62,7 +62,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
   }
   await LeanTH.expectGood(vaultDB.tryBirthBank(LeanTH.birthBankAskOf()))
 
-  const friend: MinderFriend = Object.freeze({
+  const friend = Object.freeze<MinderFriend>({
     scope:       LeanTH.ThingBank,
     rootBox:     { ...LeanTH.rootBoxOf(), am: 'a' },
     makeGetAsk:  minderGetAskOf,
