@@ -129,8 +129,7 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   const mintStamps = vi.spyOn(Bank, 'mintStamps').mockReturnValue({ bankStamp: WorldBankStamp, gateStamp: WorldGateStamp })
   const makeRecord = vi.spyOn(Bank, 'makeRecord')
   try {
-    const passkeyClear = passkeyCleartext && copyOfAnswer(passkeyCleartext)
-    const bank = await Bank.birth(device, { passphraseClear: TestPassphrase, passkeyClear })
+    const bank = await Bank.birth(device, { passphraseCleartext: TestPassphrase, passkeyCleartext: passkeyCleartext && copyOfAnswer(passkeyCleartext) })
     const record = makeRecord.mock.results.at(-1)!.value as BankMakeRecord
     const proving = await PassphraseProving.buildStored(device, bank.maingate, TestPassphrase)
     return { device, bank, record, proving }

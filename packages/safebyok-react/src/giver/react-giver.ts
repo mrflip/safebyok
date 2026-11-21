@@ -76,8 +76,8 @@ function vacateCloak(_data: unknown, _err: Error | null, cloaked: Cloak): void {
 // at each call claims nothing the verb does not judge.
 /** The cleartexts `cloaked` has, for one call of a form verb. */
 function cleartextsOf(cloaked: Cloak): CloakCleartexts {
-  const { passphraseClear, passkeyClear, nextPassphraseClear, nextPasskeyClear } = cloaked
-  const fields = Object.entries({ passphraseClear, passkeyClear, nextPassphraseClear, nextPasskeyClear })
+  const { passphraseCleartext, passkeyCleartext, nextPassphraseCleartext, nextPasskeyCleartext } = cloaked
+  const fields = Object.entries({ passphraseCleartext, passkeyCleartext, nextPassphraseCleartext, nextPasskeyCleartext })
   return Object.fromEntries(fields.filter(([, val]) => val !== undefined))
 }
 // --
@@ -230,7 +230,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
    * Every call waiting for the bank to be unlocked resumes. A wrong passphrase or passkey refuses, and the bank stays locked.
    * @example
    *   const unlock = Acme.useUnlock()
-   *   <form action={(form) => { unlock.mutate(cloak({ passphraseClear: String(form.get('passphrase')) })); form.delete('passphrase') }}>
+   *   <form action={(form) => { unlock.mutate(cloak({ passphraseCleartext: String(form.get('passphrase')) })); form.delete('passphrase') }}>
    */
   function unlockMutationOptions() {
     return mutationOptions({
@@ -264,13 +264,13 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   function useReplacePassphrase(): UseMutationResult<void, Error, Cloak> { return useMutation(replacePassphraseMutationOptions()) }
 
   /** React Query's options for the mutation that adds a passkey, proved by the passphrase, for your own `useMutation`.
-   * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it), and hand its PRF answer in as `nextPasskeyClear`.
+   * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it), and hand its PRF answer in as `nextPasskeyCleartext`.
    * It leaves the bank unlocked.
    * @example
    *   const addPasskey = Acme.useAddPasskey()
    *   async function onAdd() {
-   *     const nextPasskeyClear = await createPasskey()   // the host's WebAuthn create, with the PRF extension
-   *     addPasskey.mutate(cloak({ passphraseClear: passphraseField.value, nextPasskeyClear }))
+   *     const nextPasskeyCleartext = await createPasskey()   // the host's WebAuthn create, with the PRF extension
+   *     addPasskey.mutate(cloak({ passphraseCleartext: passphraseField.value, nextPasskeyCleartext }))
    *   }
    */
   function addPasskeyMutationOptions() {

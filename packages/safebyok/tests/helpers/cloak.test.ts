@@ -13,37 +13,37 @@ const FakeNextPassphrase = 'fake next passphrase'
 describe("cloak", () => {
   // cloak @example
   it("reads each cleartext it adopted through its getter", () => {
-    const cloaked = cloak({ passphraseClear: FakePassphrase, nextPassphraseClear: FakeNextPassphrase })
+    const cloaked = cloak({ passphraseCleartext: FakePassphrase, nextPassphraseCleartext: FakeNextPassphrase })
     expect(cloaked).to.be.instanceOf(Cloak)
-    expect([cloaked.passphraseClear, cloaked.nextPassphraseClear]).to.deep.equal([FakePassphrase, FakeNextPassphrase])
-    expect([cloaked.passkeyClear, cloaked.nextPasskeyClear]).to.deep.equal([undefined, undefined])
+    expect([cloaked.passphraseCleartext, cloaked.nextPassphraseCleartext]).to.deep.equal([FakePassphrase, FakeNextPassphrase])
+    expect([cloaked.passkeyCleartext, cloaked.nextPasskeyCleartext]).to.deep.equal([undefined, undefined])
   })
 
   it("reads a passkey answer of null as null", () => {
-    expect(cloak({ passphraseClear: FakePassphrase, passkeyClear: null }).passkeyClear).to.be.null
+    expect(cloak({ passphraseCleartext: FakePassphrase, passkeyCleartext: null }).passkeyCleartext).to.be.null
   })
 
   it("zeroes the PRF bytes of each passkey answer handed in, keeping a copy of its own", () => {
     const passkeyCleartext     = TH.passkeyAnswerOf()
     const nextPasskeyCleartext = TH.passkeyAnswerOf()
     const handed = [passkeyCleartext, nextPasskeyCleartext].map((answer) => ({ ...answer, prfBytes: new Uint8Array(answer.prfBytes) }))
-    const cloaked = cloak({ passkeyClear: passkeyCleartext, nextPasskeyClear: nextPasskeyCleartext })
+    const cloaked = cloak({ passkeyCleartext, nextPasskeyCleartext })
     expect([TH.isZeroed(passkeyCleartext.prfBytes), TH.isZeroed(nextPasskeyCleartext.prfBytes)]).to.deep.equal([true, true])
-    expect([cloaked.passkeyClear, cloaked.nextPasskeyClear]).to.deep.equal(handed)
+    expect([cloaked.passkeyCleartext, cloaked.nextPasskeyCleartext]).to.deep.equal(handed)
   })
 
   it("adopts a passkey answer from another realm", () => {
     const prfBytes = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
-    const cloaked = cloak({ passkeyClear: { ...TH.passkeyAnswerOf(), prfBytes } })
+    const cloaked = cloak({ passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes } })
     expect(TH.isZeroed(prfBytes)).to.be.true
-    expect([...cloaked.passkeyClear!.prfBytes]).to.deep.equal(Array.from({ length: 32 }, () => 7))
+    expect([...cloaked.passkeyCleartext!.prfBytes]).to.deep.equal(Array.from({ length: 32 }, () => 7))
   })
 
   it("hands out a fresh copy of a passkey answer at each read, so zeroing one leaves the next whole", () => {
-    const cloaked = cloak({ passkeyClear: TH.passkeyAnswerOf() })
-    const first = cloaked.passkeyClear!
+    const cloaked = cloak({ passkeyCleartext: TH.passkeyAnswerOf() })
+    const first = cloaked.passkeyCleartext!
     first.prfBytes.fill(0)
-    const second = cloaked.passkeyClear!
+    const second = cloaked.passkeyCleartext!
     expect(second).to.not.eq(first)
     expect(TH.isZeroed(second.prfBytes)).to.be.false
   })
@@ -55,12 +55,12 @@ describe("cloak", () => {
   })
 
   it("refuses a field no form verb takes, quoting nothing of it", () => {
-    const err = TH.expectSyncRefusal(() => cloak({ passphraseClear: FakePassphrase, passphrase: FakeNextPassphrase } as never), 'bad_record')
+    const err = TH.expectSyncRefusal(() => cloak({ passphraseCleartext: FakePassphrase, passphrase: FakeNextPassphrase } as never), 'bad_record')
     expect(TH.thrownText(err)).to.not.include(FakePassphrase).and.not.include(FakeNextPassphrase)
   })
 
   it("refuses cleartexts whose getter throws, keeping nothing of the throw", () => {
-    const cleartexts = { get passphraseClear(): string { throw new Error(FakePassphrase) } }
+    const cleartexts = { get passphraseCleartext(): string { throw new Error(FakePassphrase) } }
     const err = TH.expectSyncRefusal(() => cloak(cleartexts), 'unexpected_error')
     expect(TH.thrownText(err)).to.not.include(FakePassphrase)
   })
@@ -68,15 +68,15 @@ describe("cloak", () => {
 
 describe("Cloak.vacate", () => {
   it("empties every getter", () => {
-    const cloaked = cloak({ passphraseClear: FakePassphrase, passkeyClear: TH.passkeyAnswerOf(), nextPassphraseClear: FakeNextPassphrase, nextPasskeyClear: TH.passkeyAnswerOf() })
+    const cloaked = cloak({ passphraseCleartext: FakePassphrase, passkeyCleartext: TH.passkeyAnswerOf(), nextPassphraseCleartext: FakeNextPassphrase, nextPasskeyCleartext: TH.passkeyAnswerOf() })
     cloaked.vacate()
-    expect([cloaked.passphraseClear, cloaked.passkeyClear, cloaked.nextPassphraseClear, cloaked.nextPasskeyClear]).to.deep.equal([undefined, undefined, undefined, undefined])
+    expect([cloaked.passphraseCleartext, cloaked.passkeyCleartext, cloaked.nextPassphraseCleartext, cloaked.nextPasskeyCleartext]).to.deep.equal([undefined, undefined, undefined, undefined])
   })
 
   it("zeroes the PRF bytes the cloak had", () => {
     const handed  = TH.passkeyAnswerOf()
-    const cloaked = cloak({ passkeyClear: handed })
-    const copy    = cloaked.passkeyClear!
+    const cloaked = cloak({ passkeyCleartext: handed })
+    const copy    = cloaked.passkeyCleartext!
     const fill    = vi.spyOn(Uint8Array.prototype, 'fill')
     onTestFinished(() => { fill.mockRestore() })
     cloaked.vacate()
@@ -88,7 +88,7 @@ describe("Cloak.vacate", () => {
 })
 
 describe("a cloak's redaction", () => {
-  const cloaked = cloak({ passphraseClear: FakePassphrase, passkeyClear: TH.passkeyAnswerOf() })
+  const cloaked = cloak({ passphraseCleartext: FakePassphrase, passkeyCleartext: TH.passkeyAnswerOf() })
 
   it("serializes as the marker", () => {
     expect(JSON.stringify({ variables: cloaked })).to.eq('{"variables":"[cloaked]"}')

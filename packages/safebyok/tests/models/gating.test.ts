@@ -16,7 +16,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("births an unlocked bank of the device's scope, its main gate with the passphrase's wayin", async () => {
     const device = TH.makeDevice()
     const births = TH.spyBirths(device)
-    const bank = await birth(device, { passphraseClear: TH.TestPassphrase })
+    const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     expect(bank.isUnlocked).to.be.true
     expect(bank.scope).to.deep.equal(TH.ThingBank)
     expect(bank.device).to.equal(device)
@@ -29,7 +29,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("births the bank, its main gate and its root box in one call to the vaultDB, before it unlocks", async () => {
     const device = TH.makeDevice()
     const births = TH.spyBirths(device)
-    const bank = await birth(device, { passphraseClear: TH.TestPassphrase })
+    const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     expect(births.tryBirthBank).toHaveBeenCalledOnce()
     const [ask] = births.tryBirthBank.mock.calls[0]!
     expect(ask).to.deep.include({ op: 'birth', bank: bank.pickle(), gate: bank.maingate.pickle() })
@@ -40,7 +40,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("lays a passkey's wayin beside the passphrase's, wrapping the same bankKey", async () => {
     const answer = TH.passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
-    const bank = await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: answer })
+    const bank = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext: answer })
     expect(bank.maingate.passkey0).to.deep.include({ wayinkind: 'passkey', credential_id: answer.credential_id })
     const viaPassphrase = await TH._cheat_bankKeyBytesOf(bank.stamp, bank.maingate.stamp, bank.maingate.main, { passphrase: TH.TestPassphrase })
     expect(await TH._cheat_bankKeyBytesOf(bank.stamp, bank.maingate.stamp, bank.maingate.passkey0!, { prfBytes })).to.deep.equal(viaPassphrase)
@@ -48,8 +48,8 @@ describe("Bank.birth(device, cleartexts)", () => {
 
   // A birth reads nothing stored, so every bank it makes is in its first life.
   it("mints a new bank and main gate revision for each birth, in their first lives", async () => {
-    const one = await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase })
-    const two = await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase })
+    const one = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
+    const two = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
     expect([one.lifeseq, two.lifeseq, one.maingate.lifeseq, two.maingate.lifeseq]).to.deep.equal([TH.Life0, TH.Life0, TH.Life0, TH.Life0])
     expect(one.revtok).to.not.eq(two.revtok)
     expect(one.maingate.revtok).to.not.eq(two.maingate.revtok)
@@ -57,9 +57,9 @@ describe("Bank.birth(device, cleartexts)", () => {
 
   it("refuses where a live bank is stored at its scope, as made elsewhere, leaving the bank it made locked and the stored one as it was", async () => {
     const device = TH.makeDevice()
-    const stored = await birth(device, { passphraseClear: TH.TestPassphrase })
+    const stored = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const births = TH.spyBirths(device)
-    const err = await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase }), 'gate_made_elsewhere')
+    const err = await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'gate_made_elsewhere')
     expect(err.message).to.match(/another device/)
     expect(births.banks[0]!.isLocked).to.be.true
     const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
@@ -71,7 +71,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
     const device = TH.makeDevice()
     const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
-    const err = await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase }))
+    const err = await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }))
     expect(err).to.eq(refusal)
     expect(births.banks[0]!.isLocked).to.be.true
   })
@@ -79,22 +79,22 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("refuses 'weak_passphrase' before it makes a bank", async () => {
     const device = TH.makeDevice({}, { strengthChecker: () => ({ strong: false, reason: 'too short' }) })
     const births = TH.spyBirths(device)
-    await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase }), 'weak_passphrase')
+    await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'weak_passphrase')
     expect(births.banks).to.be.empty
     expect(births.tryBirthBank).not.toHaveBeenCalled()
   })
 
   it("finds every passphrase weak on a device with no strengthChecker, pointing the app's makers at the setting", async () => {
     const device = TH.makeDevice({}, { strengthChecker: undefined })
-    const err = await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase }), 'weak_passphrase')
+    const err = await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'weak_passphrase')
     expect(err.message).to.include('notes/configuration.md')
   })
 
   const CleartextsCases = [
-    [{ passphraseClear: TH.TestPassphrase, nextPassphraseClear: TH.TestPassphrase },       'cleartexts meant for another form verb'],
-    [{ passphraseClear: TH.TestPassphrase, stray: TH.TestPassphrase },                     'a stray field'],
-    [{ passkeyClear: null },                                                                'no passphrase'],
-    [{ passphraseClear: 42 },                                                              'a passphrase that is not a string'],
+    [{ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: TH.TestPassphrase },       'cleartexts meant for another form verb'],
+    [{ passphraseCleartext: TH.TestPassphrase, stray: TH.TestPassphrase },                     'a stray field'],
+    [{ passkeyCleartext: null },                                                                'no passphrase'],
+    [{ passphraseCleartext: 42 },                                                              'a passphrase that is not a string'],
     [null,                                                                                 'no cleartexts at all'],
   ] as const
 
@@ -110,11 +110,11 @@ describe("Bank.birth(device, cleartexts)", () => {
 
   it("refuses a passkey answer whose PRF bytes are zeroed already", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf({ prfBytes: new Uint8Array(32) })
-    await TH.expectRefusal(birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }))
+    await TH.expectRefusal(birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }))
   })
 
   it("keeps a passphrase out of the refusal when a getter on the cleartexts throws it", async () => {
-    const cleartexts = { get passphraseClear(): string { throw new Error(TH.TestPassphrase) } }
+    const cleartexts = { get passphraseCleartext(): string { throw new Error(TH.TestPassphrase) } }
     const err = await TH.expectRefusal(birth(TH.makeDevice(), cleartexts), 'unexpected_error')
     expect(err.cause).to.be.undefined
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
@@ -123,7 +123,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   it("seals the root box under the new lease, and holds the root box the vaultDB answers", async () => {
     const device = TH.makeDevice()
     const births = TH.spyBirths(device)
-    const bank = await birth(device, { passphraseClear: TH.TestPassphrase })
+    const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
     expect(answer).to.include({ ok: true, act: 'born' })
     if (! answer.ok) { throw answer.err }
@@ -140,7 +140,7 @@ describe("Bank.birth(device, cleartexts)", () => {
       const born = await tryBirthBank(ask)
       return born.ok ? { ...born, act: 'passed' } : born
     })
-    const bank = await birth(device, { passphraseClear: TH.TestPassphrase })
+    const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const answer = await (births.tryBirthBank.mock.results[0]!.value as Promise<BirthBankAnswer>)
     expect(answer).to.include({ ok: true, act: 'passed' })
     expect(bank.isUnlocked).to.be.true
@@ -149,18 +149,18 @@ describe("Bank.birth(device, cleartexts)", () => {
 
   it("evicts the lease it built where the bank stored is another's, or the vaultDB refuses", async () => {
     const device = TH.makeDevice()
-    await birth(device, { passphraseClear: TH.TestPassphrase })
+    await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const evict = vi.spyOn(Lease.prototype, 'evict')
-    await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase }), 'gate_made_elsewhere')
+    await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'gate_made_elsewhere')
     expect(evict).toHaveBeenCalledTimes(1)
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
     TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))
-    await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase }), 'storage_unavailable')
+    await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase }), 'storage_unavailable')
     expect(evict).toHaveBeenCalledTimes(2)
   })
 
   it("births a bank and root box whose records are first revisions, never shells", async () => {
-    const bank = await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase })
+    const bank = await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase })
     expect([bank.revtok, bank.rootBox.revtok]).to.not.include(SX.VoidRevisionTok)
     expect([bank.revseq, bank.rootBox.revseq]).to.deep.equal([0, 0])
   })
@@ -169,14 +169,14 @@ describe("Bank.birth(device, cleartexts)", () => {
 describe("Bank.birth(device, cleartexts): what it refuses before it derives a key", () => {
   it("refuses a device that is not a Device, vacating the passkey answer", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
-    await TH.expectRefusal(birth(TH.provingDeviceOf() as never, { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }), 'bad_record')
+    await TH.expectRefusal(birth(TH.provingDeviceOf() as never, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }), 'bad_record')
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
   it("judges the passphrase with the device's own strength check", async () => {
     const device = TH.makeDevice({}, { strengthChecker: (passphrase: string) => (passphrase === 'weak' ? { strong: false, reason: 'too short' } : { strong: true }) })
     expect(await device.judgeStrength('weak')).to.deep.equal({ strong: false, reason: 'too short' })
-    const err = await TH.expectRefusal(birth(device, { passphraseClear: 'weak' }), 'weak_passphrase')
+    const err = await TH.expectRefusal(birth(device, { passphraseCleartext: 'weak' }), 'weak_passphrase')
     expect(err.message).to.eq('too short')
   })
 })
@@ -184,40 +184,40 @@ describe("Bank.birth(device, cleartexts): what it refuses before it derives a ke
 describe("a gating's vacating of the passkey answers it is handed", () => {
   it("zeroes the answer once a birth lands", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
-    await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext })
+    await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext })
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
   it("zeroes the answer when the birth is refused", async () => {
     const device = TH.makeDevice({}, { strengthChecker: () => ({ strong: false, reason: 'too short' }) })
     const passkeyCleartext = TH.passkeyAnswerOf()
-    await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }), 'weak_passphrase')
+    await TH.expectRefusal(birth(device, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }), 'weak_passphrase')
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
   it("zeroes the answer when the cleartexts fail their check", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
-    await TH.expectRefusal(birth(TH.makeDevice(), { passkeyClear: passkeyCleartext, stray: true }), 'bad_record')
+    await TH.expectRefusal(birth(TH.makeDevice(), { passkeyCleartext, stray: true }), 'bad_record')
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
   it("zeroes a passkey answer from another realm", async () => {
     const prfBytes = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
     expect(prfBytes).to.not.be.instanceOf(Uint8Array)
-    await birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: { ...TH.passkeyAnswerOf(), prfBytes } })
+    await birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes } })
     expect(TH.isZeroed(prfBytes)).to.be.true
   })
 
   it("zeroes a passkey answer handed as a bare ArrayBuffer", async () => {
     const prfBuffer = new Uint8Array(32).fill(7).buffer
     // Whether the check accepts a bare buffer is not this test's subject: the bytes are vacated either way.
-    await Bank.tryBirth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } })
+    await Bank.tryBirth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } })
     expect(TH.isZeroed(new Uint8Array(prfBuffer))).to.be.true
   })
 
   it("keeps its outcome when reading the passkey answer to zero it throws", async () => {
     const passkeyCleartext = { ...TH.passkeyAnswerOf(), get prfBytes(): Uint8Array { throw new Error(TH.TestPassphrase) } }
-    const err = await TH.expectRefusal(birth(TH.makeDevice(), { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }), 'unexpected_error')
+    const err = await TH.expectRefusal(birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }), 'unexpected_error')
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
 })

@@ -164,7 +164,7 @@ describe("device.sweep()", () => {
     expect(await device.judgeStrength(TH.TestPassphrase)).to.deep.equal({ strong: true })
     const later = Bank.make(record, { device, vaultDB: device.vaultDB })
     expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
-    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(later.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
 
@@ -180,7 +180,7 @@ describe("device.sweep()", () => {
   it("sweeps every bank made on the device, an earlier one unlocked too", async () => {
     const { bank, device, record } = await TH.buildBornBank()
     const later = Bank.make(record, { device, vaultDB: device.vaultDB })
-    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(later.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
     const sweepLease = vi.spyOn(Lease.prototype, 'sweep')
     device.sweep()
     expect(sweepLease).toHaveBeenCalledTimes(2)
@@ -194,7 +194,7 @@ describe("device.sweep()", () => {
   it("does nothing on a device with no bank, which births one after it", async () => {
     const device = TH.makeDevice()
     device.sweep()
-    const bank = await Bank.birth(device, { passphraseClear: TH.TestPassphrase })
+    const bank = await Bank.birth(device, { passphraseCleartext: TH.TestPassphrase })
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
   })
 })
@@ -230,7 +230,7 @@ describe("device.lock()", () => {
   it("locks every bank made on the device, an earlier one too", async () => {
     const { bank, device, record } = await TH.buildBornBank()
     const later = Bank.make(record, { device, vaultDB: device.vaultDB })
-    await TH.expectGood(later.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(later.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
     expect(bank.isLocked).to.be.false
     expect(later.isLocked).to.be.false
     device.lock()
@@ -285,15 +285,15 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     bank.lock()
     const snapshots = snapshotsOf(device)
     const ensuring = bank.ensureUnlocked()
-    const passphraseClear = 'not the passphrase, though long enough'
-    await TH.expectRefusal(bank.unlock({ passphraseClear }), 'wrong_passphrase')
-    await bank.unlock({ passphraseClear: TH.TestPassphrase })
+    const passphraseCleartext = 'not the passphrase, though long enough'
+    await TH.expectRefusal(bank.unlock({ passphraseCleartext }), 'wrong_passphrase')
+    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
     await ensuring
     expect(snapshots.map(({ bank: { stage, isUnlockWanted } }) => ({ stage, isUnlockWanted }))).to.deep.equal([
       { stage: 'locked', isUnlockWanted: true },
       { stage: 'unlocked', isUnlockWanted: false },
     ])
-    expect(JSON.stringify(snapshots)).not.to.include(passphraseClear)
+    expect(JSON.stringify(snapshots)).not.to.include(passphraseCleartext)
   })
 
   it("shows the pending bank once its bank is swept, and tells its subscribers so", async () => {

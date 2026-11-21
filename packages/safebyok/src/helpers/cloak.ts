@@ -8,7 +8,7 @@ import * as Throwers from '../refusals/throwers'
 
 /** Wrap a form's cleartexts in a {@link Cloak}, to hand a giver's form mutation in their place.
  * The cloak keeps the only copy of a passkey answer's PRF bytes: those in the answer you pass are zeroed.
- * @example unlock.mutate(cloak({ passphraseClear: passphraseField.value }))
+ * @example unlock.mutate(cloak({ passphraseCleartext: passphraseField.value }))
  */
 export function cloak(cleartexts: CloakCleartexts): Cloak { return new Cloak(cleartexts) }
 
@@ -29,24 +29,24 @@ export class Cloak {
 
   constructor(cleartexts: CloakCleartexts) {
     const given = checkedCleartexts(cleartexts)
-    this.#passphraseCleartext     = given.passphraseClear
-    this.#passkeyCleartext        = adoptedAnswerOf(given.passkeyClear)
-    this.#nextPassphraseCleartext = given.nextPassphraseClear
-    this.#nextPasskeyCleartext    = adoptedAnswerOf(given.nextPasskeyClear)
+    this.#passphraseCleartext     = given.passphraseCleartext
+    this.#passkeyCleartext        = adoptedAnswerOf(given.passkeyCleartext)
+    this.#nextPassphraseCleartext = given.nextPassphraseCleartext
+    this.#nextPasskeyCleartext    = adoptedAnswerOf(given.nextPasskeyCleartext)
     Object.freeze(this)
   }
 
   /** The passphrase: a new bank's, or the proof of an `unlock` gating or a gate change. */
-  get passphraseClear(): string | undefined { return this.#passphraseCleartext }
+  get passphraseCleartext(): string | undefined { return this.#passphraseCleartext }
 
   /** A fresh copy of the passkey answer: a new bank's, or the proof of an `unlock` gating or a gate change. */
-  get passkeyClear(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#passkeyCleartext) }
+  get passkeyCleartext(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#passkeyCleartext) }
 
   /** The new passphrase. */
-  get nextPassphraseClear(): string | undefined { return this.#nextPassphraseCleartext }
+  get nextPassphraseCleartext(): string | undefined { return this.#nextPassphraseCleartext }
 
   /** A fresh copy of the new passkey's answer. */
-  get nextPasskeyClear(): GX.PasskeyAnswer | undefined { return copiedAnswerOf(this.#nextPasskeyCleartext) }
+  get nextPasskeyCleartext(): GX.PasskeyAnswer | undefined { return copiedAnswerOf(this.#nextPasskeyCleartext) }
 
   /** Zero the cloak's passkey answers and drop its passphrases: every getter returns undefined after. */
   vacate(): void {

@@ -47,7 +47,7 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   function UnlockForm() {
     const unlock = Acme.useUnlock()
     return (
-      <form action={(form) => { unlock.mutate(cloak({ passphraseClear: takeText(form, 'passphrase') })) }}>
+      <form action={(form) => { unlock.mutate(cloak({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
         <input name="passphrase" type="password" autoComplete="current-password" aria-label="Passphrase" />
         <button disabled={unlock.isPending}>Unlock</button>
         <button type="button" onClick={() => { void Acme.dismissUnlock() }}>Cancel</button>

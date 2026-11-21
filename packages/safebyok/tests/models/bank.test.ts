@@ -283,7 +283,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot()).to.equal(locked)
 
-    await TH.expectGood(bank.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
     expect(counter.calls).to.eq(2)
     expect(bank.getSnapshot()).to.deep.equal(unlocked)
 
@@ -301,7 +301,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(bank.getSnapshot()).to.equal(unlocked)
     bank.lock()
     bank.lock()
-    await TH.expectBad(bank.tryUnlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
+    await TH.expectBad(bank.tryUnlock({ passphraseCleartext: 'not the passphrase' }), 'wrong_passphrase')
     expect(counter.calls).to.eq(1)
     bank.sweep()
     bank.sweep()
@@ -429,7 +429,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
-    await bank.unlock({ passphraseClear: TH.TestPassphrase })
+    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
     const { whisper } = await bank.unsealBox(box)
     expect(whisper).to.deep.equal(TH.Whisper)
   })
