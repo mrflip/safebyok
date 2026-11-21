@@ -1,9 +1,11 @@
+import { type GateShown, liveGateOf } from 'safebyok-react-lean'
 import { AddPasskeyForm, ReplacePassphraseForm, RevokePasskeyForm, passkeysAvailable } from 'safebyok-react-lean/kit'
 import { Knock } from '../lib/sok'
 
 /** The ways into the vault: replace the passphrase, and add a passkey or remove the one there is. */
 export function WaysIn({ username }: Readonly<{ username: string | undefined }>) {
-  const passkeyHeader = Knock.usePasskeyHeader()
+  // Undefined until the gate is fetched, when neither form shows.
+  const passkeyHeader = Knock.useGate({ select: passkeyHeaderOf }).data
   return (
     <section aria-labelledby="ways-in-title" className="card">
       <h2 id="ways-in-title">Ways in</h2>
@@ -14,7 +16,10 @@ export function WaysIn({ username }: Readonly<{ username: string | undefined }>)
       {passkeysAvailable() && (passkeyHeader === null) && (
         <AddPasskeyForm username={username} passkeyOpts={{ rp: { name: 'Knock-Knock Machine' }, user: { name: username ?? 'knock', displayName: username ?? 'knock' } }} />
       )}
-      {passkeysAvailable() && (passkeyHeader !== null) && <RevokePasskeyForm username={username} />}
+      {passkeysAvailable() && (passkeyHeader !== null) && (passkeyHeader !== undefined) && <RevokePasskeyForm username={username} />}
     </section>
   )
 }
+
+/** The header of the gate's passkey, or null while it has none. */
+function passkeyHeaderOf(gate: GateShown) { return liveGateOf(gate)?.wayins.passkey0 ?? null }

@@ -21,8 +21,8 @@ pnpm demo:knockknock      # from the repo root: builds what the demo needs, then
   key's mask in its sidecar from `mask` (`tail: 0`), `WhisperText` to show it, and `Knock.delBoxOnce`. The mask shown
   comes from a `useQuery` over `Knock.withLockableWhisper`: the key's last four characters (`tail: 4`) while unlocked,
   the stored mask while locked.
-* `src/components/WaysIn.tsx`: `ReplacePassphraseForm`, and `AddPasskeyForm` or `RevokePasskeyForm` by
-  `Knock.usePasskeyHeader()`.
+* `src/components/WaysIn.tsx`: `ReplacePassphraseForm`, and `AddPasskeyForm` or `RevokePasskeyForm` by the main
+  gate's `wayins.passkey0`, from `Knock.useGate()`.
 
 ## Demo scaffolding
 
