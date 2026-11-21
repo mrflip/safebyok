@@ -49,6 +49,8 @@ switch (bank.stage) {                 // one field drives the screen
   case 'unlocked': return <App endsAt={bank.leaseEndsAt} />
   case 'failed':   return <ErrorPanel err={bank.lastErr} />
 }
+//   A screen that calls withWhisper renders at 'locked' and at 'unlocked' alike, at one place in the tree: an unlock
+//   from the dialog keeps it mounted, with the result its call was waiting on. One component per stage unmounts it.
 const locked = Acme.useBank((b) => b.isLocked)    // with a selector: re-renders only when the pick changes
 const wanted = Acme.useBank((b) => b.isUnlockWanted)   // a call is waiting on the user: show the unlock form, or Acme.dismissUnlock()
 const { isWatching, heardAt } = Acme.useBank()    // whether the vaultDB's watch is live, for "offline: showing what we had"
