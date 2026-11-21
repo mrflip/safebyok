@@ -1,11 +1,11 @@
 # Sprint react_life: two apps running normally on the new core
 
-* **Date:** 2026-11-21. **Issued by:** the Coach. **Mode:** normal.
+* **Date:** 2026-11-21. **Issued by:** the Coach. **Mode:** YOLO (the Coach, at the invocation), with `/turbochat`.
 * **Prepared by** the design session; **orchestrated by** another Opus session, which starts here.
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** planned, no thread cut.
+* **Status:** running. Thread 1 cut.
 
 ## The goal
 
@@ -15,6 +15,21 @@ end-to-middle, because no deleting vaults, vacate, etc)" (the Coach).
 
 The apps must **run**. Starting them the conventional way is welcome where it comes easily, and a cheat is as good
 where it does not.
+
+## The Coach's word at the invocation (2026-11-21)
+
+> Consider it a certainty that there will be design gaps around startup: who owns the bridge when this thing wants that as a constructor yada yada.
+> Standing back, you'll agree that if we have a working app that performs all its actions, the task of re-apportioning instance ownership becomes transformatively easier. In the other direction, axiomatizing a retrospectively poor design decision of when the minder is built could make everything that comes after it brittle.
+>
+> Focus just so: get the app working, elegantly if possible, by artifice if stymied, so that we may simplify in or after this sprint.
+>
+> Lastly, let us highlight a concurrency whizbang that might not be recognized as such: reinserting records or events from the bridge or another listener into the *minder's* TSQ cache, or dispatching from within that cache's dataflow to or from the cache or vaultDB, is strictly out of bounds. improvements in freshness, or avoidance of races, in the minder or react query are out of bounds.
+
+*Orchestrator:* what this means for the threads, as ground rules 6 to 8 below: who makes which instance, and when,
+is not settled by this sprint; a thread that meets an ownership knot picks whichever arrangement gets the app
+running with the least code, cheats where the clean one resists, and writes down which it chose, so it can be
+re-apportioned later. Nothing is built that other code would have to lean on the minder being made at one moment
+rather than another.
 
 ## Read first
 
@@ -100,6 +115,17 @@ Quote this section in each review handoff.
 4. **The old code is not this sprint's:** `safebyok-big`, `demos/safebyok-demo-react`, and `safebyok-react` beyond
    what thread 1 moves out of it. Nothing published changes, so expect empty changesets.
 5. **Check with the Coach or your orchestrating agent before fanning out** to subagents.
+6. **Startup ownership stays loose.** Who makes the minder, the bridge or the vault, and when, may be wrong today
+   and re-apportioned later. Get the app running: the elegant arrangement where it comes easily, a marked cheat
+   where it does not. Build nothing whose correctness depends on the minder being made at one particular moment, and
+   list each ownership choice and cheat in the thread file.
+7. **The minder's TSQ cache is fed only by the minder's own fetches and watches.** Never reinsert records or events
+   from the bridge, the giver or any other listener into the minder's cache, and never dispatch, from inside that
+   cache's dataflow (a subscriber, an observer callback, a query function's side effect), to the cache or the
+   vaultDB. The bridge reads the minder and writes only to the host's QueryClient.
+8. **No freshness or race work** in the minder or in React Query: no refetch-on-something, no invalidation added to
+   avoid a stale read, no dedup or ordering of in-flight fetches. A stale or racy read in normal use is a row in
+   `notes/wontfix.md`, if anything.
 
 ## Who owns what (the Coach, 2026-11-21)
 
