@@ -5,8 +5,8 @@
   `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **At once**: 3 (the line is two threads, stacked, so one runs at a time).
 * **Design**: `gate_super-design.md`, beside this file. It wins over this plan on the shape of the code.
-* **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 641; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
-* **Status**: thread 1 building in /workspace/byok-gate_holds (`thread-worker-400k`, opus), to the open matters' Recs, provisionally; thread 2 waits on it.
+* **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 643; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
+* **Status**: thread 1 ready (PR #815, no compactions), in a `high` review on opus; thread 2 waits on #815's review and on #813 (react_life's birth_verb, ready), which rewrites the same birth code.
 
 ## Read first
 
@@ -78,7 +78,10 @@ static on `Gate` (Rec 2) if that falls out naturally; leave the birth's order ot
 `Bank` from the records stored and hands it to `device.adoptBornBank`; a refused birth sweeps the gate.
 `Bank.make(record, { device, vaultDB, gate })`, `rootBox` readonly and always live, the shell refused;
 `BankMakeRecord`, `BankDna`, `BirthOpts` reshaped; `Device.#bringUp` makes the gate, then the bank; spyBirths and the
-device tests' "later" banks. *Levels*: defaults. *Depends on*: thread 1, stacked on its branch once it is ready.
+device tests' "later" banks. *Orchestrator:* thread 1 already made the birth gate-first (a gate of its own, a
+second unlock of the bank's gate, `rootBox` readonly, `BirthOpts` gone); thread 2 hands the birth's gate to
+`Bank.make` and has `#bringUp` make the gate, deleting the double unlock. Cut it after #813 merges, on
+`device.birthGating`. *Levels*: defaults. *Depends on*: thread 1, stacked on its branch once it is ready.
 *Size*: medium.
 
 ## For the Coach
