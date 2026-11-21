@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** threads 1 to 15 merged. Thread 16 (`birth_verb`, #813) filed and out of draft; thread 17 (`new_passphrase`, #814, stacked on #813) filing. Then: the sprint PR squashed and rebased on top with notes/security.md reconciled, and wrap-up.
+* **Status:** done (2026-11-21). Threads 1 to 15 merged; the open line is main → #813 → #814 → #796 (this sprint PR, squashed on top). Done note: `human/20261121-sprint_react_life_done.md`; rulings in `react_life-resolutions.md`; the Closer Look in `react_life-closerlook.md`.
 
 ## The goal
 
