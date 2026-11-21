@@ -73,3 +73,20 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   private in `src/kit/form-action.ts`, deletes every listed field before any await and resolves true or false.
 * Thread 5's file, *How a kit form is assembled from parts*, is the recipe for any later kit form.
 * Test helper `TH.expectTextUnheld` searches the tree and both caches.
+
+## Thread 4, giver_boxes (#801, ready)
+
+* **Reading:** `useBox`, `Knock.boxQuery`, `SOK.useQueryOptions()` share one factory, `boxQueryOf(userid, labelpath)`,
+  `select` `nullifyThing` (exported). Signed out: key `['sok', null, banklabel, 'box/<lp>']`, fetch `skipToken`.
+  `reactGiver` is generic over banklabels. `Knock.keys.box(lp)`, `Knock.keys.under(lp?)` (item keys only).
+* **Writing:** `putBoxOnce`, `delBox`, `putBoxAction` try once, cite the newest revision the minder has heard of,
+  and refuse `bank_locked` on a locked bank (no wait for the unlock form).
+* **For thread 7:** `useActionState(Knock.putBoxAction('jokes', { whisperOf, sidecarOf }), null)`, the action made at
+  module scope or under `useMemo`; it never rejects (`{ box, error: null }` or `{ box: null, error }`) and empties every
+  FormData field before its first await.
+* **For thread 8:** the minder's keys put the kind before the labels, so `keys.under` cannot cover listings: add a
+  list key (or a predicate) under `keys`; leave the minder's key grammar alone. Labelpaths are flat.
+* **For test writers:** React Query re-renders a hook only for the result fields read in render; read `data` in
+  render or wait on it.
+* The provider world gained `pauseGets`, `pauseAnswers`, `counts.gets` and `_cheat_device()`.
+* The old giver is gone; `useBoxRecord` is now `useBox`.
