@@ -1,6 +1,6 @@
 # Thread 17: new_passphrase (2026-11-21)
 
-Branch `20261121-new_passphrase`, PR #TBD, stacked on #813. Proved: safebyok-react-lean 251 tests, typecheck and lint
+Branch `20261121-new_passphrase`, PR #814, stacked on #813. Proved: safebyok-react-lean 251 tests, typecheck and lint
 green; knockknock 26, envman 24, every assertion unchanged.
 
 * **Built**:
@@ -40,3 +40,6 @@ green; knockknock 26, envman 24, every assertion unchanged.
 * **Discoveries**: no demo keeps a meter or a reveal of its own: both use the kit forms, `WhisperText` and `useDraft`.
   `notes/security.md` was not touched: no secret material moves (the passphrase stays in the inputs, the whisper's
   text reaches the DOM only inside `withWhisper`'s callback, as before).
+* **For the Coach**:
+  * **Export `useNewPassphrase`?** It is private to the kit, since it speaks the kit's phrases. Recommendation: keep
+    it private until a host writes its own new-passphrase form; `useStrengthVerdict` serves that host meanwhile.
