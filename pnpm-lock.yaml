@@ -419,9 +419,6 @@ importers:
 
   packages/safebyok:
     dependencies:
-      '@tanstack/query-core':
-        specifier: ^5.107.1
-        version: 5.107.1
       es-toolkit:
         specifier: ^1.53.2
         version: 1.53.2
@@ -441,6 +438,9 @@ importers:
       '@stylistic/eslint-plugin':
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.14.0)
+      '@tanstack/query-core':
+        specifier: ^5.107.1
+        version: 5.107.1
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
