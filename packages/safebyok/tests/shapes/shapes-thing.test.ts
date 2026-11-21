@@ -13,7 +13,7 @@ import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 
 const { Life0 } = TH
-/** What a strict check says of a field it does not accept, which it never names. */
+/** The message of a strict check on a field it does not accept, which it never names. */
 const Unaccepted = 'There is a field it does not accept'
 
 describe("Lifeseq.ofLifenum(lifenum) and Lifeseq.lifenumOf(lifeseq)", () => {

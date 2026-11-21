@@ -24,7 +24,7 @@ export type VaultDBRowCheats = {
   remove: (scope: ThingScope) => Helpers.Awaitable<void>
 }
 
-/** What a vaultDB hands {@link describeVaultDBBattery}: how to make one, and the backdoor to what it stores. */
+/** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the backdoor to what it stores. */
 export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   /** A fresh, empty vaultDB. A store may empty one database for each it makes: a case uses only the vaultDB it made last. */
   makeVaultDB:   () => Helpers.Awaitable<DBT>
@@ -44,7 +44,7 @@ const batteryOpts = Validator.objCheck(({ fn, bool }) => ({
 
 // == [The world the cases share]: VaultDBBatteryWorld, worldOf
 
-/** What each part of the battery is handed: vaultDBs made fresh or with Things in them, and the backdoor to any of them. */
+/** The world each part of the battery is handed: vaultDBs made fresh or with Things in them, and the backdoor to any of them. */
 export type VaultDBBatteryWorld = {
   /** A fresh, empty vaultDB. */
   fresh:     () => Promise<VaultDB>

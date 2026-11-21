@@ -81,7 +81,7 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   return { App, heard }
 }
 
-/** What the unlock form says of `err`, its last refusal: a condition the user can mend at the field, anything else as a banner. */
+/** The unlock form's alert for `err`, its last refusal: a condition the user can mend at the field, anything else as a banner. */
 function unlockAlertOf(err: unknown): string {
   if (! isVaultError(err) || (err.family !== 'condition')) { return 'Something went wrong. Please try again later.' }
   return (err.refusalkind === 'wrong_passphrase') ? 'That is not the passphrase.' : err.message

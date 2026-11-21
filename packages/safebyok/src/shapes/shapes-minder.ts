@@ -183,7 +183,7 @@ export type MinderEvent = ThingEvent | ListingEvent
 export type MinderEventOf<DataT> = Readonly<{
   /** `'updated'` when the query's state changed, `'removed'` when the cache dropped the query. */
   type:      'updated' | 'removed'
-  /** What changed the state, by TanStack's name for the action, or undefined for a removal:
+  /** The action that changed the state, by TanStack's name for it, or undefined for a removal:
    * - `'success'`    -- a record arrived
    * - `'error'`      -- a get was refused
    * - `'invalidate'` -- a listing was marked stale

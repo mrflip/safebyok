@@ -12,7 +12,7 @@ import * as Throwers from '../refusals/throwers'
  */
 export function cloak(cleartexts: CloakCleartexts): Cloak { return new Cloak(cleartexts) }
 
-/** What a cloak shows wherever it is serialized or printed. */
+/** The text a cloak shows wherever it is serialized or printed. */
 const CloakedMarker = '[cloaked]'
 
 // A form mutation's variables stay in React Query's mutation cache, its devtools and the `useMutation` hook's state; a

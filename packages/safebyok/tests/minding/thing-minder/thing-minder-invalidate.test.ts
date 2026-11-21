@@ -7,7 +7,7 @@ import { ThingFormat } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { listenerOf, minderWorldOf, storedBoxOf } from './world'
 
-/** What a listener is told when the listing of the Thing at `labelpath` is invalidated, as {@link toldOf} reads it. */
+/** The event a listener is told when the listing of the Thing at `labelpath` is invalidated, in {@link toldOf}'s form. */
 function invalidationOf(labelpath: Labelpath) {
   return { isThing: false, modelkind: (labelpath === 'gate') ? 'gate' : 'box', labelpath, action: 'invalidate', isInvalidated: true }
 }

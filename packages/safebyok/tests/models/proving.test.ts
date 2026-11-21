@@ -54,12 +54,12 @@ async function gateWithPassphrase(): Promise<Gate> {
 /** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
 function gateOf(record: unknown): Gate { return Gate.make(record as never, { bank: { stamp: TH.WorldBankStamp } }) }
 
-/** What a proving of `gate` is handed, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
+/** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
 function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): StampedGate {
   return { bankStamp: { ...TH.WorldBankStamp, ...moves.bank }, stamp: { ...TH.WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 
-/** What a bankKey is unwrapped as only to see that a wrap unwraps. */
+/** The usage a bankKey is unwrapped with only to see that a wrap unwraps. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 function findsWeak() { return { strong: false as const, reason: 'too short' } }

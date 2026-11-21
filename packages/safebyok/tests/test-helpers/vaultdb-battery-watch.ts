@@ -11,7 +11,7 @@ import {
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
 
-/** What a watch on `scope` hears: its notices, and its bad news. */
+/** The notices and the bad news a watch on `scope` hears. */
 function heardOf(vaultDB: VaultDB, scope: ThingWatchScope = ThingBank): { notices: ThingNotice[], badNews: Errors.VaultError[], stop: () => void } {
   const notices: ThingNotice[] = []
   const badNews: Errors.VaultError[] = []

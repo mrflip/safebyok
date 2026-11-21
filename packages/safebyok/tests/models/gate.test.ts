@@ -11,7 +11,7 @@ TH.useFakeClock()
 const ThingFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', 'am']
 const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
-/** What a gate is given of its bank: {@link TH.WorldBankStamp}'s stamp. */
+/** The part of its bank a gate is given: {@link TH.WorldBankStamp}'s stamp. */
 const WorldBank = Object.freeze({ stamp: TH.WorldBankStamp })
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }

@@ -84,7 +84,7 @@ function cleartextsOf(cloaked: Cloak): CloakCleartexts {
 
 // == [The giver]: ReactGiver, StrengthVerdictResult, BankGiver, makeReactGiver, Unjudged, makeBankGiver
 
-/** What {@link makeReactGiver} returns. */
+/** The hooks {@link makeReactGiver} returns. */
 export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGiver<CarT>>
 
 /** The result of a giver's `useStrengthVerdict`: the latest verdict on a new passphrase, and `judge` to ask for the next. */

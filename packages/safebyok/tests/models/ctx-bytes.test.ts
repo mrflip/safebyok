@@ -1,4 +1,4 @@
-/** What each wrap and cipher is bound to, byte for byte, and that a change to any field of a stamp keeps it shut. */
+/** The ctx each wrap and cipher is bound to, byte for byte, and that a change to any field of a stamp keeps it shut. */
 
 import { describe, expect, it } from 'vitest'
 import { Crypto } from 'safebyok-big/internals'
@@ -33,9 +33,9 @@ const SealTagFields = ['codectag', 'schematag'] as const
 /** The JSON text of a box's tags, as each ctx of its seal ends with them. */
 const BoxTagsText = '{"codectag":"json_v1","schematag":"whisper_v1"}'
 
-/** What a bankKey is unwrapped as only to see that a wrap unwraps. */
+/** The usage a bankKey is unwrapped with only to see that a wrap unwraps. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
-/** What a part key is unwrapped as. */
+/** The usage a part key is unwrapped with. */
 const DecipherUsage = { extractable: false, usage: ['decrypt'] } as const
 
 /** `val` changed, its type unchanged: a number one more, a string with a letter added. */

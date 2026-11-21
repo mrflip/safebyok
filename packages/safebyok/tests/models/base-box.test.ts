@@ -17,7 +17,7 @@ const Life0 = Lifeseq.ofLifenum(0)
 const Life1 = Lifeseq.ofLifenum(1)
 const Life2 = Lifeseq.ofLifenum(2)
 
-/** What a box's first seal takes in the clear: its sidecar. */
+/** The public props of a box's first seal: its sidecar. */
 const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 /** A live box at its first revision, without its sealed whisper: the first revision over {@link TH.boxShellOf}'s shell. */

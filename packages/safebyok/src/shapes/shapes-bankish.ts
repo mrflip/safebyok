@@ -74,7 +74,7 @@ export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, b
 /** A device's record: the bank scope it serves, and its token there. */
 export type DeviceRecord = Z.infer<typeof BankishChecks.deviceRecord>
 
-/** What `onBadNews` hears: a refusal no caller waits on, and the device it reached. */
+/** The argument of `onBadNews`: a refusal no caller waits on, and the device it reached. */
 export interface BadNews {
   readonly news:   Errors.VaultError
   readonly device: Device

@@ -43,22 +43,22 @@ function oneProofOf({ passphraseCleartext, passkeyCleartext }: { passphraseClear
   return NEVER
 }
 
-/** What {@link Bank.birth} is handed: the new passphrase, and a new passkey's answer or none. */
+/** The cleartexts {@link Bank.birth} is handed: the new passphrase, and a new passkey's answer or none. */
 export type BirthCleartexts = Z.input<typeof CleartextChecks.birth>
 
-/** What {@link Bank.unlock} is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
+/** The cleartexts {@link Bank.unlock} is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
 export type UnlockCleartexts = Z.input<typeof CleartextChecks.unlock>
 
-/** What {@link Bank.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
+/** The cleartexts {@link Bank.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
 export type PassphraseReplaceCleartexts = Z.input<typeof CleartextChecks.passphraseReplace>
 
-/** What {@link Bank.addPasskey} is handed: the passphrase, and the new passkey's answer. */
+/** The cleartexts {@link Bank.addPasskey} is handed: the passphrase, and the new passkey's answer. */
 export type PasskeyAddCleartexts = Z.input<typeof CleartextChecks.passkeyAdd>
 
-/** What {@link Bank.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
+/** The cleartexts {@link Bank.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
 export type PasskeyRevokeCleartexts = Z.input<typeof CleartextChecks.passkeyRevoke>
 
-/** What {@link cloak} adopts: the cleartexts of a form verb, any of whose fields it takes. */
+/** The cleartexts {@link cloak} adopts: any of the form verbs' fields. */
 export type CloakCleartexts = Partial<BirthCleartexts & UnlockCleartexts & PassphraseReplaceCleartexts & PasskeyAddCleartexts>
 
 /** One proof of a gate's way in, once checked: the passphrase, or the passkey's answer. */
@@ -110,7 +110,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) =
 /** A {@link GateStamp} with the `revtok` of one revision of the gate: the revision a lease is granted under. */
 export type GateRevisionedStamp = Z.infer<typeof GateishChecks.gateRevisionedStamp>
 
-/** What a proving is given of its device: the wrapped key deriver and strength checker, and the device's token. */
+/** The parts of its device a proving is given: the wrapped key deriver and strength checker, and the device's token. */
 export type ProvingDevice = Z.infer<typeof GateishChecks.provingDevice>
 
 /** The host's key deriver, wrapped by {@link guardKeyDeriver}. */

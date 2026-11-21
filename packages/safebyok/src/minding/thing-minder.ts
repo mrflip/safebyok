@@ -499,7 +499,7 @@ export class ThingMinder {
 
   // A key's mark says what its query caches: '!' a car, '#' and 'kids' a listing. A removed query still has its last state, but
   // no longer caches it, so its event carries no car or listing. A car's invalidation can't arise, as the minder invalidates none.
-  /** What a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for one it is not told of. */
+  /** The event a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for one it is not told of. */
   #minderEventOf(tsqEvent: unknown): MinderEvent | undefined {
     if (! isUsefulTSQEvent(tsqEvent)) { return undefined }
     const { queryKey }  = tsqEvent.query

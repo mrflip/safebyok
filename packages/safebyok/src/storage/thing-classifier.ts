@@ -321,7 +321,7 @@ export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWri
   return isRefusedAct(act) ? { ok: false, act, world: worldRecord, record, ...beside } : { ok: true, act, world: worldRecord, record, ...beside }
 }
 
-/** What {@link unwrittenWriteOf} answers for: the write, the act the act tables found, and the raw world the store fetched. */
+/** An unwritten write, for {@link unwrittenWriteOf}: the write, the act the act tables found, and the raw world the store fetched. */
 export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, world: WorldFetched }>
 
 /** Throw `bad_record` unless `ask` leaves unchanged the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */

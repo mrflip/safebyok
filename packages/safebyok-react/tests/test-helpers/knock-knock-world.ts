@@ -90,6 +90,6 @@ export function _cheat_giverDeviceOf(device: Device, vault: Vault): GiverDevice<
   })
 }
 
-/** What a subscription that hears nothing returns: a stop with nothing to stop. */
+/** Stop a subscription that hears nothing: there is nothing to stop. */
 function stopNothing(): void { /* nothing to stop */ }
 // --

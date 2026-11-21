@@ -17,7 +17,7 @@ export const thingkindVals = ['bank', 'gate', 'box'] as const
 /** A kind of Thing, one of {@link thingkindVals}. */
 export type Thingkind = typeof thingkindVals[number]
 
-/** What a model's `modelkind` getter answers: a kind of Thing, or one of the models that are never stored. */
+/** A model's `modelkind`: a kind of Thing, or one of the models that are never stored. */
 export type Modelkind = Thingkind | 'device' | 'wayin' | 'lease' | 'proving'
 
 /** The `fmt` of every Thing, of every kind: the kind is in its labelpath. Distinct from big's rows' fmts (3001, 4001, 5003), which are numbers. */

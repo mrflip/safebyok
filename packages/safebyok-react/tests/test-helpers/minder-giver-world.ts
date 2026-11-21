@@ -117,6 +117,6 @@ const NoFormVerbs = Object.freeze({
 /** Refuse a call this world cannot answer: it has no gate. */
 function refuseNoGate(): Promise<never> { return Promise.reject(new Error('The minder giver world has no gate')) }
 
-/** What a subscription that hears nothing returns: a stop with nothing to stop. */
+/** Stop a subscription that hears nothing: there is nothing to stop. */
 function unsubscribeNothing(): void { /* nothing to stop */ }
 // --

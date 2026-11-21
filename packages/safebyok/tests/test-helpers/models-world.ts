@@ -78,7 +78,7 @@ export const TestPassphrase = GX.passphraseCleartext.parse('correct horse batter
 /** The `device_tok` of every device made here. */
 export const DeviceTok = '00000000-0000-4000-8000-00000000000a'
 
-/** What a test may say of a {@link provingDeviceOf} device: the host's own deriver and checker, which it wraps as a device does. */
+/** The options of a {@link provingDeviceOf} device: the host's own deriver and checker, which it wraps with a device's guards. */
 export interface ProvingDeviceGiven {
   keyDeriver?:      Deriver.KeyDeriver | undefined
   strengthChecker?: StrengthChecker | undefined
@@ -106,7 +106,7 @@ export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { retur
 
 // == [A born bank]: BornBankGiven, BornBank, buildBornBank, BornVault, buildBornVault
 
-/** What a test may say of a {@link buildBornBank} bank. */
+/** The options of a {@link buildBornBank} bank. */
 export interface BornBankGiven {
   /** The passkey answer whose wayin the gate gets beside its passphrase's; none when left out. It is not vacated. */
   passkeyCleartext?: GX.PasskeyAnswer | undefined
@@ -156,7 +156,7 @@ export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVau
 
 // == [Births]: BirthSpy, spyBirths
 
-/** What {@link spyBirths} saw, in call order: each bank `Bank.make` made, and whether the bank was locked as its birth reached the vaultDB. */
+/** The births {@link spyBirths} saw, in call order: each bank `Bank.make` made, and whether the bank was locked as its birth reached the vaultDB. */
 export interface BirthSpy {
   banks:          Bank[]
   tryBirthBank:   MockInstance<VaultDB['tryBirthBank']>
@@ -232,7 +232,7 @@ export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte)
 
 // == [Backdoor]: WayinSecret, _cheat_bankKeyBytesOf, _cheat_bankKeyOf
 
-/** What unwraps a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes, for a passkey wayin. */
+/** The secret that unwraps a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
 /** A test backdoor: the raw bytes of the bankKey `wayin` wraps, unwrapped from outside the models from the secret, the wayin's header and the bank's and gate's stamps.

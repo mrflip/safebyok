@@ -17,7 +17,7 @@ const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gate_labelpath: 'gate'
 
 const Cleartexts = Object.freeze({ whisper: TH.Whisper })
 
-/** What a box's first seal takes in the clear: its sidecar. */
+/** The public props of a box's first seal: its sidecar. */
 const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 const SealerMembernames = [
