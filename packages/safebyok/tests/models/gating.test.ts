@@ -221,7 +221,7 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
 
   it("zeroes the answer when the gating's device is not a Device", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
-    await TH.expectRefusal(Bank.birthGating(TH.provingDeviceOf() as never, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }, keepNothing).attempt(), 'bad_record')
+    await TH.expectRefusal(Bank.birthGating(TH.provingDeviceOf() as never, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }, attachNothing).attempt(), 'bad_record')
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
@@ -242,16 +242,16 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
   })
 })
 
-describe("Bank.birthGating(device, cleartexts, keep)", () => {
-  it("hands `keep` the bank it births", async () => {
+describe("Bank.birthGating(device, cleartexts, attachBank)", () => {
+  it("hands `attachBank` the bank it births", async () => {
     const device = TH.makeDevice()
     await device.hello()
-    const keep = vi.fn()
-    const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }, keep).attempt()
-    expect(keep).toHaveBeenCalledExactlyOnceWith(bank)
+    const attachBank = vi.fn()
+    const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }, attachBank).attempt()
+    expect(attachBank).toHaveBeenCalledExactlyOnceWith(bank)
   })
 
-  it("births a bank its device does not show, where no `keep` is given", async () => {
+  it("births a bank its device does not show, where no `attachBank` is given", async () => {
     const device = TH.makeDevice()
     await device.hello()
     const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }).attempt()
@@ -259,8 +259,8 @@ describe("Bank.birthGating(device, cleartexts, keep)", () => {
     expect(device.bank).to.be.null
   })
 
-  it("refuses a `keep` that is not a function", () => {
-    TH.expectSyncRefusal(() => Bank.birthGating(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase }, 'keep' as never), 'bad_record')
+  it("refuses an `attachBank` that is not a function", () => {
+    TH.expectSyncRefusal(() => Bank.birthGating(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase }, 'attachBank' as never), 'bad_record')
   })
 })
 
@@ -270,11 +270,11 @@ const FakePassphrase = 'fake passphrase'
 /** A new passphrase, an obvious fake. */
 const FakeNextPassphrase = 'fake next passphrase'
 
-/** A birth gating's `keep` that keeps nothing: these gatings' banks are no device's. */
-function keepNothing(): void { /* Nothing keeps the bank. */ }
+/** A birth gating's `attachBank` that attaches the bank to nothing: these gatings' banks are no device's. */
+function attachNothing(): void { /* Nothing takes the bank. */ }
 
 /** A birth gating over `cleartexts` as the caller hands them, on a fresh device. */
-function gatingOf(cleartexts: unknown): BirthGating { return Bank.birthGating(TH.makeDevice(), cleartexts as never, keepNothing) }
+function gatingOf(cleartexts: unknown): BirthGating { return Bank.birthGating(TH.makeDevice(), cleartexts as never, attachNothing) }
 
 /** What a gating over `cleartexts` hands its body: a clone, taken in the body, before the attempt vacates what it adopted. */
 async function adoptedFrom(cleartexts: unknown): Promise<unknown> {
