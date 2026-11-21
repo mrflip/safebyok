@@ -176,7 +176,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
    * The first userid starts that user's device. A null or undefined userid changes nothing, and neither does unmounting.
    * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead.
    * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
-   * Render it in the browser only: the giver keeps the device it makes for the life of the module, so on a server the first request's user would keep it for every later request.
+   * Render it in the browser only: on a server, one device would serve every request.
    */
   function Provider({ userid, vaultDB, keyDeriver, children }: ProviderProps) {
     const client = useQueryClient()
@@ -426,8 +426,8 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   /** Call `fn` with the box's whisper on an unlocked bank, and `opts.ifLocked` with its sealed record on a locked one, resolving what either resolves.
-   * Unlike {@link withWhisper}, it never waits for the unlock form. Call it again on a lock, an unlock or a write to the box.
-   * Use the whisper only inside `fn`. Write what it resolves into the page, never into React's state or a query, where it shows any of the whisper: the parts' `WhisperMask` shows a field's mask so.
+   * Unlike {@link withWhisper}, it never waits for the unlock form. Call it again after a lock, an unlock or a `putBox`.
+   * Use the whisper only inside `fn`. A result that shows any of the whisper belongs in the page, not in React's state or a query.
    * @example
    *   const shown = await Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) })
    *   maskElement.textContent = shown

@@ -24,8 +24,8 @@ export interface WhisperMaskProps {
   onError?:  ((err: unknown) => void) | undefined
 }
 
-/** A field of a box's whisper, masked, written into the page and never into React's state: with its last `tail` characters while the bank is unlocked, and the stored mask while it is locked.
- * It is written again on a lock, an unlock or a write to the box.
+/** A field of a box's whisper, masked: its last `tail` characters while the bank is unlocked, the stored mask while it is locked.
+ * The mask is written into the page, never into React's state, and again on a lock, an unlock or a `putBox`.
  * @example
  *   <WhisperMask labelpath="openai" field="apiKey" tail={4} />
  */
