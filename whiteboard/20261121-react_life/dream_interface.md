@@ -116,7 +116,7 @@ await Acme.delBox('openai')
 
 // == Drafts: the nested editor ==
 const draft = Acme.useDraft('acme_api/prd/database_url')
-// { isDirty, isBehind, base, sidecar, setSidecar, whisperField('val') → props for WhisperInput, put, discard, rebase }, all stable
+// { isDirty, isBehind, base, sidecar, setSidecar, whisperField('val') → props for a plain <input>, put, discard, rebase }
 <input {...draft.whisperField('val')} />   // the field's value stays in the DOM; put() reads it from there
 
 // == Typed whispers ==
