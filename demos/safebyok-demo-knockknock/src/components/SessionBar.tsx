@@ -14,7 +14,7 @@ export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
     )
   }
   /** Sign in as the username typed, or say why it will not do. */
-  function action(form: FormData) {
+  const action = (form: FormData): void => {
     try {
       signIn(formTextOf(form, 'username'))
     } catch (err) {
