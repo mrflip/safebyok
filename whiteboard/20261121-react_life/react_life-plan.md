@@ -130,7 +130,7 @@ no lease cache, so a reload lands locked; the localStorage helper.
 
 ### 1. `react_lean_pkg`: a private package for the new React layer
 
-> * implement a spike of the provider and the pieces described.
+Serves threads 2 to 10, which all write in it.
 
 * **Builds:** `packages/safebyok-react-lean`, private at 0.0.0, packaged like `safebyok-react`, with entries `.`,
   `./parts` and `./kit`, and `@tanstack/react-query` as a peer dependency. `git mv` the giver's sources, its tests
@@ -167,7 +167,6 @@ no lease cache, so a reload lands locked; the localStorage helper.
 
 ### 3. `giver_slot`: the provider and the slot
 
-> * implement a spike of the provider and the pieces described.
 > * focus first on getting a startup order and proving the library against two recognizeable use cases, demonstrating the dream hooks, parts and kit.
 
 * **Builds:** steps 1 to 3 of the startup. `reactGiver(config)` and its slot; `SOK.Provider`; the bridge, made by
@@ -185,7 +184,7 @@ no lease cache, so a reload lands locked; the localStorage helper.
 
 ### 4. `giver_boxes`: reading and writing a box
 
-> * implement the react Knock-Knock app, with the hooks, parts and kit needed to do that, into safebyok-demo-knockknock.
+Serves thread 7: the hooks Knock-Knock's key editor needs. The Coach's text is quoted there.
 
 * **Builds:** `Knock.boxQuery`, `useBox`, `keys.under`; `SOK.useQueryOptions`; `nullifyThing` as the default
   `select`; `putBoxOnce`, `delBox`, `putBoxAction`. The bridge, minder-giver and react-bridge tests are ported.
@@ -196,7 +195,7 @@ no lease cache, so a reload lands locked; the localStorage helper.
 
 ### 5. `parts_kit`: parts, and the unlock and create-vault forms
 
-> You're inspired by the existing app and its functionality but hew strictly to best-in-class practices recommended by our dream_interface doc
+Serves thread 7: the parts and kit Knock-Knock needs. The Coach's text is quoted there.
 
 * **Builds:** parts `WhisperInput`, `WhisperText` (revealing writes to the DOM through a ref), `PassphraseInput`,
   `SubmitButton` (`useFormStatus`). Kit `UnlockForm`, also as the dialog shown while an unlock is wanted, and
@@ -235,7 +234,7 @@ no lease cache, so a reload lands locked; the localStorage helper.
 
 ### 8. `giver_box_list`: listings
 
-> * Additionally a "doppler-lite" app well call "envman", in safebyok-demo-envman.
+Serves thread 10: envman lists its records. The Coach's text is quoted there.
 
 * **Builds:** `Knock.useBoxList()` over the root's listing, a list key under `keys`, and the bridge copying listing
   events, which it drops today.
@@ -245,7 +244,7 @@ no lease cache, so a reload lands locked; the localStorage helper.
 
 ### 9. `use_draft`: drafts
 
-> The editor shows the whisper masked when not editing; clicking into the text field unmasks. and exposes a "save" or "undo" button.
+Serves thread 10: envman's masked editor with save and undo. The Coach's text is quoted there.
 
 * **Builds:** `useDraft(labelpath)`: `isDirty`, `isBehind`, `base`, `sidecar`, `setSidecar`, `whisperField('val')`
   (masked; focus reveals through `withWhisper` into the input's DOM value), `put`, `discard`.
@@ -256,10 +255,9 @@ no lease cache, so a reload lands locked; the localStorage helper.
 ### 10. `demo_envman`: the envman app
 
 > * Additionally a "doppler-lite" app well call "envman", in safebyok-demo-envman. It lets me add (in sidecar) a title, description, rotation period and last rotated timestamp. The whisper has a single text field, `val`. The editor shows the whisper masked when not editing; clicking into the text field unmasks. and exposes a "save" or "undo" button. records older than their rotation period are red; I can edit that, or rename, through a "gear" button opening a small modal.
-> it should probably be its own repo.
+> it should probably be its own package.
 
-* **Builds:** `demos/safebyok-demo-envman`, a package in this repo (the Coach meant a package, not a repo). The
-  list (`useBoxList`, each row its own `useBox`); an add form (title, description, rotation period,
+* **Builds:** `demos/safebyok-demo-envman`, a package of its own beside the Knock-Knock demo. The list (`useBoxList`, each row its own `useBox`); an add form (title, description, rotation period,
   `last_rotated_at`; the box's label is a minted id); the row editor (`useDraft`, save and undo), where saving a new
   `val` stamps `last_rotated_at`; red when a record is older than its period; a gear modal that edits the sidecar,
   the title included, which is what "rename" means.
