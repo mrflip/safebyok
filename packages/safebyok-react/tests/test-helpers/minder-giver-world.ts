@@ -14,7 +14,7 @@ function minderGetAskOf({ labelpath, ifAbsent }: Readonly<{ labelpath: string, i
 }
 // --
 
-// == [The world]: MinderGiverWorld, makeMinderGiverWorld, minderDeviceOf, unsubscribeNothing
+// == [The world]: MinderGiverWorld, makeMinderGiverWorld, minderDeviceOf, NoFormVerbs, refuseNoGate, unsubscribeNothing
 
 /** A Device over one started bank's minder, and the test's ways past it. */
 export interface MinderGiverWorld {
@@ -73,7 +73,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
   minder.hello()
 
   return {
-    device:          minderDeviceOf(minder, giverBankOfMinder(minder)),
+    device:          minderDeviceOf(minder, { ...giverBankOfMinder(minder), ...NoFormVerbs }),
     vaultDB,
     minder,
     counts,
@@ -91,17 +91,31 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
 function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxCar>): GiverDevice<BoxCar> {
   const snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank })
   return Object.freeze({
-    userid:      minder.userid,
-    banklabel:   minder.banklabel,
-    subscribe:   () => unsubscribeNothing,
-    getSnapshot: () => snapshot,
-    ensureBank:  () => Promise.resolve(bank),
-    onBankStart: (starter: (started: GiverBank<BoxCar>) => () => void) => {
+    userid:        minder.userid,
+    banklabel:     minder.banklabel,
+    subscribe:     () => unsubscribeNothing,
+    getSnapshot:   () => snapshot,
+    judgeStrength: refuseNoGate,
+    ensureBank:    () => Promise.resolve(bank),
+    onBankStart:   (starter: (started: GiverBank<BoxCar>) => () => void) => {
       starter(bank)
       return unsubscribeNothing
     },
   })
 }
+
+/** The form verbs of a bank object over a minder alone: each refuses, since this world has no gate to prove against. */
+const NoFormVerbs = Object.freeze({
+  birth:             refuseNoGate,
+  unlock:            refuseNoGate,
+  replacePassphrase: refuseNoGate,
+  addPasskey:        refuseNoGate,
+  revokePasskey:     refuseNoGate,
+  dismissUnlock:     unsubscribeNothing,
+})
+
+/** Refuse a call this world cannot answer: it has no gate. */
+function refuseNoGate(): Promise<never> { return Promise.reject(new Error('The minder giver world has no gate')) }
 
 /** What a subscription that hears nothing returns: a stop with nothing to stop. */
 function unsubscribeNothing(): void { /* nothing to stop */ }

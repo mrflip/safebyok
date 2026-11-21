@@ -1,11 +1,10 @@
 import { isEqual } from 'es-toolkit'
-import { Consts, Deriver, Errors, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
+import { Consts, Deriver, Errors, type GX, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import type { Bank } from './bank'
-import type { Gating } from './gating'
-import { guardKeyDeriver } from './proving'
+import { Proving, guardKeyDeriver } from './proving'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
-import type { AskUser, GuardedKeyDeriver, GuardedStrengthChecker, RequestCleartext, StrengthChecker } from '../shapes/shapes-gateish'
+import type { GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
@@ -17,11 +16,11 @@ import * as Throwers from '../refusals/throwers'
 /** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
-/** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and at most one open gating.
+/** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and the bank it holds.
  * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
  */
 export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, askUser, #onBadNews, #openGating, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -34,12 +33,9 @@ export class Device {
   readonly logger:             Logger.VaultLogger
   /** The autolock duration in milliseconds: how long a lease lasts on this device. */
   readonly leaseMillis:        number
-  /** The host's dialog, guarded, or null to leave the host to render `openGating` itself. */
-  readonly askUser:            AskUser | null
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  #openGating: Gating | null = null
   /** The last bank made on this device, or null for none. {@link lock} and {@link sweep} act on it, and the device's
    * snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
@@ -65,13 +61,10 @@ export class Device {
   }
   // --
 
-  // == [Getters]: scope, openGating, autolockMinutes, getSnapshot, subscribe
+  // == [Getters]: scope, autolockMinutes, getSnapshot, subscribe
 
   /** The bank scope this device serves. */
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
-
-  /** The gating open on this device, or null. */
-  get openGating(): Gating | null { return this.#openGating }
 
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
@@ -95,19 +88,26 @@ export class Device {
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
     checkSecureContext()
-    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, requestCleartext, onBadNews = DefaultOnBadNews } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, onBadNews = DefaultOnBadNews } } = Checks.deviceMakeArgs.parse({ record, opts })
     Object.assign(this, { userid, banklabel, device_tok })
     this.vaultDB = vaultDB
     this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
-    this.askUser = (requestCleartext === undefined) ? null : guardRequestCleartext(requestCleartext)
     this.#onBadNews = onBadNews
     this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
   }
+  // --
+
+  // == [Strength]: judgeStrength
+
+  /** The strength checker's verdict on a new passphrase: show it as the user types, and hold the submit until it is strong.
+   * `Bank.birth` and `bank.replacePassphrase` ask the same checker, and refuse `weak_passphrase` where it is not.
+   */
+  judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
   // == [Locking]: lock, cheatHoldBank
@@ -130,28 +130,12 @@ export class Device {
 
   // == [Ending]: sweep
 
-  /** Disable this device for good, dismissing its open gating and sweeping its bank. Never throws. */
+  /** Disable this device for good, and sweep its bank. Never throws. */
   sweep(): this {
     if (! this.isEnabled) { return this }
     this.#endCause = Throwers.deviceDisabled()
-    this.#openGating?.dismiss()
     this.#thisIsTemporaryBank?.sweep()
     return this
-  }
-  // --
-
-  // == [The one gating open]: attachGating, detachGating
-
-  /** Attach `gating` as this device's open gating. Refuses `already_asking` while another is open. */
-  attachGating(gating: Gating): void {
-    this.demandEnabled()
-    if (this.#openGating !== null) { throw Throwers.alreadyAsking() }
-    this.#openGating = gating
-  }
-
-  /** Detach `gating` if it is this device's open gating. */
-  detachGating(gating: Gating): void {
-    if (this.#openGating === gating) { this.#openGating = null }
   }
   // --
 
@@ -174,9 +158,7 @@ export class Device {
 
   /** A new snapshot of this device: its bank's snapshot. */
   #makeSnapshot(): DeviceSnapshot {
-    return Object.freeze({
-      bank: this.#thisIsTemporaryBank?.getSnapshot() ?? PendingBank,
-    })
+    return Object.freeze({ bank: this.#thisIsTemporaryBank?.getSnapshot() ?? PendingBank })
   }
   // --
 
@@ -237,21 +219,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: guardRequestCleartext, millisOf, checkSecureContext
-
-// What the dialog throws is dropped: it may quote what the user typed.
-/** Guard the host's `requestCleartext`: the guard resolves true when the host's resolves, and false when it throws, dropping the throw. */
-export function guardRequestCleartext(requestCleartext: RequestCleartext): AskUser {
-  const host = Checks.requestCleartext.parse(requestCleartext, { where: 'requestCleartext' })
-  return Consts.brandGuarded(async (gating: Gating): Promise<boolean> => {
-    try {
-      await host(gating)
-      return true
-    } catch {
-      return false
-    }
-  })
-}
+// == [Helpers]: millisOf, checkSecureContext
 
 // A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -267,7 +235,6 @@ function checkSecureContext(): void {
 
 /** The checks of {@link Device.make}'s arguments. */
 const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
-  requestCleartext: fn<RequestCleartext>(),
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
     opts:   Validator.objCheck(() => ({
@@ -276,7 +243,6 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       strengthChecker: custom<StrengthChecker>().optional(),
       logger:          custom<Logger.VaultLogger>().optional(),
       autolockMinutes: VX.positiveMinutes.optional(),
-      requestCleartext: custom<RequestCleartext>().optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
       // Ignored: the new core keeps no device database. Taken so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
       deviceDB:        custom<unknown>().optional(),

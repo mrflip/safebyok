@@ -1,242 +1,116 @@
-import { Consts, Crypto, EX, Errors, GX, Helpers, Outcome, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import { type EX, Errors, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
 import { Device } from './device'
-import { NOVEL, PasskeyProving, PassphraseProving, Proving } from './proving'
-import type { Banklabel, Userid } from '../shapes/primitives'
-import {
-  type AskUser, type BankGatingFriend, type BirthFriend, type CleartextsForGatingkind, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot, type Gatingkind, gatingkindVals,
-} from '../shapes/shapes-gateish'
-import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
-import type { Modelkind } from '../shapes/shapes-thing'
+import type { Gate } from './gate'
+import { NOVEL, PasskeyProving, PassphraseProving, type Proving } from './proving'
+import { type BankGatingFriend, type BirthGatingFriend, type GateDna, type ProvedCleartexts, CleartextChecks } from '../shapes/shapes-gateish'
+import type { PutAskDraft } from '../shapes/shapes-asks'
+import type { GateRecord } from '../shapes/shapes-thing'
 import * as Throwers from '../refusals/throwers'
 
-/** A request to the user for their passphrase or passkey, for the change `gatingkind` names.
- * A device has one open at a time. The dialog hands what the user typed to `attempt`, and closes when `whenConcluded` resolves.
- * The gating keeps no cleartext between attempts.
- */
-export class Gating<KindT extends Gatingkind = Gatingkind> {
-  // == [Props]: gatingkind, gatingTok, userid, banklabel, bank, passkeyHeader, #device, #attempt, #askUser, #concluded, #conclude, #outcome, #isLaunched, #isAttempting, #isLastAttempt
+// == [The gatings]: birthBank, unlockBank, replacePassphrase, addPasskey, revokePasskey
 
-  declare readonly gatingkind:    KindT
-  /** A random token unique to this gating. Key the dialog on it: the next gating's form then starts empty. */
-  declare readonly gatingTok:     string
-  declare readonly userid:        Userid
-  declare readonly banklabel:     Banklabel
-  declare readonly bank:          Bank | null
-  /** The header of the main gate's passkey wayin when the gating was made, or null for none.
-   * The dialog asks for that passkey by its `credential_id` and `prf_salt_b64`.
-   */
-  declare readonly passkeyHeader: GX.WayinHeader | null
+// Each gating checks its cleartexts, proves them, and makes its change through the bank's private verbs its friend carries.
+// A cleartext goes only to checkedCleartexts, a strength check and a Proving builder, and a proving never leaves the gating
+// that built it but for those verbs (G9). Each vacates its cleartexts whatever its outcome (G2), and changes nothing where it
+// refuses: a gate change writes the gate before it unlocks, so a refused write never unlocks.
+//
+// Two invariants hold of every gating:
+// * Gatings are pragmatically idempotent: a gating whose intent is demonstrably satisfied may resolve with success. It is not
+//   required to check that at every, or any, opportunity.
+// * A gating's contract is in its name: a gating whose intent is met may succeed even where its inputs would otherwise have
+//   been refused. (`revokePasskey` on a gate with no passkey proves, unlocks and writes nothing.)
 
-  /** The device this gating is open on, whose strength checker `judgeStrength` asks. */
-  readonly #device:    Device
-  readonly #attempt:   GatingAttempt
-  readonly #askUser:   AskUser | null
-  readonly #concluded: Promise<Outcome.Outcome<Bank>>
-  #conclude:     (outcome: Outcome.Outcome<Bank>) => void = () => undefined
-  #outcome:      Outcome.Outcome<Bank> | null = null
-  #isLaunched    = false
-  #isAttempting  = false
-  #isLastAttempt = false
-  // --
-
-  // == [Getters]: isOpen, whenConcluded, scope, toJSON
-
-  /** True until this gating concludes. */
-  get isOpen(): boolean { return this.#outcome === null }
-
-  /** Resolves with the outcome once this gating concludes, and never rejects.
-   * Close the dialog when it resolves.
-   */
-  get whenConcluded(): Promise<Outcome.Outcome<Bank>> { return this.#concluded }
-
-  /** This gating's bank scope. */
-  get scope(): BankScope { return StampChecks.bankScope.parse(this) }
-
-  /** This gating's {@link GatingSnapshot}. It never shows a cleartext. */
-  toJSON(): GatingSnapshot {
-    const { gatingkind, gatingTok } = this
-    return { gatingkind, gatingTok, ...this.scope }
-  }
-  // --
-
-  // == [Construction and launch]: make, constructor, launch, askHost
-
-  /** Make a gating of `record.gatingkind` on `opts.device`. It is not open until {@link launch}. */
-  static make<KindT extends Gatingkind>(record: GatingRecord<KindT>, opts: GatingOpts): Gating<KindT> { return new Gating(record, opts) }
-
-  private constructor(record: GatingRecord<KindT>, opts: GatingOpts) {
-    const { opts: { device, bank, attempt, askUser } } = Checks.gatingMakeArgs.parse({ record, opts })
-    Helpers.tattoo(this, { gatingkind: record.gatingkind, gatingTok: Crypto.randomId(), userid: device.userid, banklabel: device.banklabel })
-    Helpers.adorn(this, 'bank', bank)
-    Helpers.adorn(this, 'passkeyHeader', bank?.maingate.passkey0?.toJSON() ?? null)
-    this.#device    = device
-    this.#attempt   = attempt
-    this.#askUser   = askUser
-    this.#concluded = new Promise((resolve) => { this.#conclude = resolve })
-    Object.freeze(this)
-  }
-
-  /** Open this gating on its device and hand it to the host's dialog, resolving the bank once an attempt succeeds.
-   * Refuses `already_asking` while another gating is open on the device.
-   */
-  async launch(): Promise<Bank> {
-    // A gating concluded before its launch has nothing to ask: it rejects with its outcome, and never attaches to the device.
-    if (this.#outcome !== null) { return Outcome.valOf(this.#outcome) }
-    this.#device.attachGating(this)
-    this.#isLaunched = true
-    if (this.#askUser !== null) { void this.#askHost(this.#askUser) }
-    return Outcome.valOf(await this.#concluded)
-  }
-
-  /** Hand this gating to the host's dialog, concluding it if the dialog returns or throws first */
-  async #askHost(askUser: AskUser): Promise<void> {
-    this.#endAsking((await askUser(this)) ? Throwers.gatingDismissed() : Throwers.requestCleartextThrew())
-  }
-  // --
-
-  // == [The attempt]: judgeStrength, attempt, refusalOfAttempt, attemptOnce
-
-  /** The strength checker's verdict on `passphraseCleartext`, for a dialog to show as the user types. */
-  async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> {
-    return Proving.judgeStrength(this.#device, this.scope, passphraseCleartext)
-  }
-
-  /** Try what the user typed, resolving an outcome instead of throwing. Call {@link launch} first, and await one attempt before the next.
-   * A correctable refusal, such as `wrong_passphrase`, leaves the gating open for another attempt. Any other outcome concludes it.
-   * A passkey answer's PRF bytes are zeroed once handed in, except after a correctable refusal: hand them in again, or zero them yourself.
-   */
-  attempt(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome.Outcome<Bank>> {
-    const refusal = this.#refusalOfAttempt()
-    if (refusal !== null) {
-      // A cleartext is spent even when refused at the door.
-      spendCleartexts(cleartexts)
-      return Promise.resolve(Outcome.bad(refusal))
-    }
-    this.#isAttempting = true
-    return this.#attemptOnce(cleartexts)
-  }
-
-  /** Why an attempt now would be refused, or null */
-  #refusalOfAttempt(): Errors.VaultError | null {
-    if (this.#outcome !== null) { return Throwers.gatingConcluded() }
-    if (! this.#isLaunched)     { return Throwers.gatingUnlaunched() }
-    return this.#isAttempting ? Throwers.attemptInFlight() : null
-  }
-
-  /** Run the attempt's work on `cleartexts`, concluding unless the user can correct its refusal */
-  async #attemptOnce(cleartexts: CleartextsForGatingkind[KindT]): Promise<Outcome.Outcome<Bank>> {
-    const outcome = await Outcome.outcomeOf(() => this.#attempt(cleartexts))
-    this.#isAttempting = false
-    // A correctable refusal, short of the last attempt, leaves the cleartexts unspent for the next.
-    if (outcome.ok || (! isCorrectable(outcome.err)) || this.#isLastAttempt) {
-      spendCleartexts(cleartexts)
-      this.#concludeOnce(outcome)
-    }
-    return outcome
-  }
-  // --
-
-  // == [Concluding]: dismiss, endAsking, concludeOnce
-
-  /** Close this gating without the user's cleartext.
-   * It concludes `dismissed`, or if an attempt is under way, with that attempt's outcome.
-   */
-  dismiss(): void { this.#endAsking(Throwers.gatingDismissed()) }
-
-  /** Conclude with `refusal`, or, mid-attempt, make that attempt the last */
-  #endAsking(refusal: Errors.VaultError): void {
-    if (this.#isAttempting) {
-      this.#isLastAttempt = true
-      return
-    }
-    this.#concludeOnce(Outcome.bad(refusal))
-  }
-
-  /** Conclude with `outcome`, once, and let the device go */
-  #concludeOnce(outcome: Outcome.Outcome<Bank>): void {
-    if (this.#outcome !== null) { return }
-    this.#outcome = outcome
-    this.#device.detachGating(this)
-    this.#conclude(outcome)
-  }
-  // --
-
-  /** Always `'gating'`: this model's {@link Modelkind}. */
-  get modelkind(): 'gating' { return 'gating' satisfies Modelkind }
-}
-
-// == [The attempts]: birthBank, unlockBank, replacePassphrase, addPasskey, revokePasskey
-
-// Each attempt proves the cleartexts, then makes its change. A cleartext goes only to checkedCleartexts and a Proving
-// builder, and a proving never leaves the attempt that built it but for the bank's private verbs its friend carries (G9).
-
-/** Birth a bank of `device`'s scope from the user's passphrase and optional passkey: write it, and unlock it.
+/** Birth a bank of `device`'s scope from the user's new passphrase and optional passkey: write it, and unlock it.
  * Refuses `gate_made_elsewhere` if a live bank is already stored there.
  */
-export async function birthBank(device: Device, cleartexts: unknown, friend: BirthFriend): Promise<Bank> {
-  const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.bankBuildCleartexts, cleartexts)
-  // A birth's stamps are minted here, one pair per attempt.
-  const { bankStamp, gateStamp } = Bank.mintStamps(device)
-  const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
-  const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext) : null
+export async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
+  try {
+    Checks.device.parse(device).demandEnabled()
+    const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(CleartextChecks.birth, cleartexts)
+    // A birth's stamps are minted here, one pair per gating.
+    const { bankStamp, gateStamp } = Bank.mintStamps(device)
+    const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
+    const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext) : null
 
-  const main     = await passphraseProving.buildWayin(NOVEL)
-  const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
-  const bankRecord = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins: { main, passkey0 } } })
-  return friend.birth(bankRecord, passphraseProving)
+    const main     = await passphraseProving.buildWayin(NOVEL)
+    const passkey0 = await passkeyProving?.buildWayin(passphraseProving) ?? null
+    const bankRecord = Bank.makeRecord({ ...bankStamp, maingate: { ...gateStamp, wayins: { main, passkey0 } } })
+    return await friend.birth(bankRecord, passphraseProving)
+  } finally {
+    vacateCleartexts(cleartexts)
+  }
 }
 
 /** Unlock `bank` by its passphrase or its passkey. */
 export async function unlockBank(bank: Bank, cleartexts: unknown, friend: Pick<BankGatingFriend, 'unlockByProving'>): Promise<Bank> {
-  const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.bankUnlockCleartexts, cleartexts)
-  const gate   = bank.maingate
-  const proved = (passphraseCleartext === undefined)
-    ? await PasskeyProving.buildStored(gate, passkeyCleartext)
-    : await PassphraseProving.buildStored(bank.device, gate, passphraseCleartext)
-  return friend.unlockByProving(proved)
+  try {
+    bank.demandEnabled()
+    const proof  = checkedCleartexts(CleartextChecks.unlock, cleartexts)
+    const proved = await provingOf(bank.device, bank.maingate, proof)
+    return await friend.unlockByProving(proved)
+  } finally {
+    vacateCleartexts(cleartexts)
+  }
 }
 
 // Each gate change writes the main gate's next revision over the one it proved against, then unlocks the bank under a
 // lease citing the gate it wrote. The bankKey does not change.
 
-/** Replace the passphrase of `bank`, proved by the current one. */
+/** Replace the passphrase of `bank`, proved by the current passphrase or the passkey. */
 export async function replacePassphrase(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
-  const { antePassphraseClear: antePassphraseCleartext, nextPassphraseClear: nextPassphraseCleartext } = checkedCleartexts(GX.passphraseReplaceCleartexts, cleartexts)
-  if (antePassphraseCleartext === nextPassphraseCleartext) { throw Throwers.samePassphrase() }
-  const ante        = bank.maingate
-  const anteProving = await PassphraseProving.buildStored(bank.device, ante, antePassphraseCleartext)
-  const nextProving = await PassphraseProving.buildNovel(bank.device, bank.stamp, ante.stamp, nextPassphraseCleartext)
+  try {
+    bank.demandEnabled()
+    const { proof, nextPassphraseClear: nextPassphraseCleartext } = checkedCleartexts(CleartextChecks.passphraseReplace, cleartexts)
+    if (proof.passphraseClear === nextPassphraseCleartext) { throw Throwers.samePassphrase() }
+    await checkStrength(bank.device, nextPassphraseCleartext)
+    const ante        = bank.maingate
+    const proved      = await provingOf(bank.device, ante, proof)
+    const nextProving = await PassphraseProving.buildNovel(bank.device, bank.stamp, ante.stamp, nextPassphraseCleartext)
 
-  const main = await nextProving.buildWayin(anteProving)
-  await friend.putGate({ cited: ante.pickle(), record: ante.makeNextRecord({ main, passkey0: ante.passkey0 }), options: { policies: ['replace_passphrase'] } })
-  return friend.unlockByProving(anteProving)
+    const main = await nextProving.buildWayin(proved)
+    await friend.putGate(nextGateAsk(ante, { main, passkey0: ante.passkey0 }, 'replace_passphrase'))
+    return await friend.unlockByProving(proved)
+  } finally {
+    vacateCleartexts(cleartexts)
+  }
 }
 
-/** Add a passkey to `bank`, proved by its passphrase. */
+/** Add a passkey to `bank`, proved by its passphrase. Refuses while the gate has a passkey. */
 export async function addPasskey(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
-  const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(GX.passkeyAddCleartexts, cleartexts)
-  const ante           = bank.maingate
-  const proved         = await PassphraseProving.buildStored(bank.device, ante, passphraseCleartext)
-  const passkeyProving = await PasskeyProving.buildNovel(bank.device, bank.stamp, ante.stamp, passkeyCleartext)
+  try {
+    bank.demandEnabled()
+    const { passphraseClear: passphraseCleartext, nextPasskeyClear: nextPasskeyCleartext } = checkedCleartexts(CleartextChecks.passkeyAdd, cleartexts)
+    const ante = bank.maingate
+    ante.demandPasskeyAddable()
+    const proved         = await PassphraseProving.buildStored(bank.device, ante, passphraseCleartext)
+    const passkeyProving = await PasskeyProving.buildNovel(bank.device, bank.stamp, ante.stamp, nextPasskeyCleartext)
 
-  const passkey0 = await passkeyProving.buildWayin(proved)
-  await friend.putGate({ cited: ante.pickle(), record: ante.makeNextRecord({ main: ante.main, passkey0 }), options: { policies: ['add_passkey'] } })
-  return friend.unlockByProving(proved)
+    const passkey0 = await passkeyProving.buildWayin(proved)
+    await friend.putGate(nextGateAsk(ante, { main: ante.main, passkey0 }, 'add_passkey'))
+    return await friend.unlockByProving(proved)
+  } finally {
+    vacateCleartexts(cleartexts)
+  }
 }
 
-/** Revoke the passkey of `bank`, proved by its passphrase. */
+/** Revoke the passkey of `bank`, proved by its passphrase or the passkey. With no passkey, the proof unlocks the bank and nothing is written. */
 export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
-  const { passphraseClear: passphraseCleartext } = checkedCleartexts(GX.passkeyRevokeCleartexts, cleartexts)
-  const ante   = bank.maingate
-  const proved = await PassphraseProving.buildStored(bank.device, ante, passphraseCleartext)
+  try {
+    bank.demandEnabled()
+    const proof  = checkedCleartexts(CleartextChecks.passkeyRevoke, cleartexts)
+    const ante   = bank.maingate
+    const proved = await provingOf(bank.device, ante, proof)
 
-  await friend.putGate({ cited: ante.pickle(), record: ante.makeNextRecord({ main: ante.main, passkey0: null }), options: { policies: ['revoke_passkey'] } })
-  return friend.unlockByProving(proved)
+    if (ante.passkey0 !== null) { await friend.putGate(nextGateAsk(ante, { main: ante.main, passkey0: null }, 'revoke_passkey')) }
+    return await friend.unlockByProving(proved)
+  } finally {
+    vacateCleartexts(cleartexts)
+  }
 }
 // --
 
-// == [An attempt's helpers]: checkedCleartexts, isCorrectable, spendCleartexts
+// == [A gating's helpers]: checkedCleartexts, checkStrength, provingOf, nextGateAsk, vacateCleartexts, vacateAnswerAt
 
 /** Check `cleartexts` with `checker`.
  * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
@@ -249,32 +123,51 @@ function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) 
   }
 }
 
-/** True when the user can correct `err` and try again */
-function isCorrectable(err: Errors.VaultError): boolean { return (EX.correctablekindVals as readonly string[]).includes(err.refusalkind) }
+/** Refuse `weak_passphrase` unless `device`'s strength checker judges `passphraseCleartext` strong. */
+async function checkStrength(device: Device, passphraseCleartext: string): Promise<void> {
+  const verdict = await device.judgeStrength(passphraseCleartext)
+  if (! verdict.strong) { throw Throwers.weakPassphrase(verdict.reason) }
+}
 
-/** Zero the PRF bytes of the passkey answer in `cleartexts`, if it has one (G2). */
-function spendCleartexts(cleartexts: unknown): void {
-  // The reach-in may meet a getter or a proxy of the host's, which may throw: spending is best effort, and never replaces the outcome it follows.
-  // The cleartexts may be unchecked, as at the door, so nothing about them is assumed. An answer is single-use: once zeroed, a
+/** The proving of the way in of `gate` that `proof` is for: its passphrase wayin, or its passkey wayin. */
+function provingOf(device: Device, gate: Gate, proof: ProvedCleartexts): Promise<Proving> {
+  if (proof.passphraseClear === undefined) { return PasskeyProving.buildStored(gate, proof.passkeyClear) }
+  return PassphraseProving.buildStored(device, gate, proof.passphraseClear)
+}
+
+// The ask cites the gate the gating proved against, never the bank's main gate as it stands at the write: a gate change
+// landed meanwhile is refused as stale, and the proof unlocks nothing.
+/** The draft of the put that writes the next revision of `ante`, with `wayins`, over `ante`, under the storage policy of its change. */
+function nextGateAsk(ante: Gate, wayins: GateDna['wayins'], policy: EX.StoragePolicy): PutAskDraft<GateRecord> {
+  return { cited: ante.pickle(), record: ante.makeNextRecord(wayins), options: { policies: [policy] } }
+}
+
+/** Zero the PRF bytes of each passkey answer in `cleartexts`, the proof's and a new passkey's (G2). */
+function vacateCleartexts(cleartexts: unknown): void {
+  vacateAnswerAt(cleartexts, 'passkeyClear')
+  vacateAnswerAt(cleartexts, 'nextPasskeyClear')
+}
+
+/** Zero the PRF bytes of the passkey answer at `fieldname` in `cleartexts`, if it has one. */
+function vacateAnswerAt(cleartexts: unknown, fieldname: 'passkeyClear' | 'nextPasskeyClear'): void {
+  // The reach-in may meet a getter or a proxy of the host's, which may throw: vacating is best effort, and never replaces the outcome it follows.
+  // The cleartexts may be unchecked, as when the shape refuses, so nothing about them is assumed. An answer is single-use: once zeroed, a
   // second hand-in is refused by its all-zero bytes.
   try {
-    const prfBytes: unknown = (cleartexts as { passkeyClear?: { prfBytes?: unknown } | null } | null)?.passkeyClear?.prfBytes
+    const prfBytes: unknown = (cleartexts as Partial<Record<typeof fieldname, { prfBytes?: unknown } | null>> | null)?.[fieldname]?.prfBytes
     // A view, of this realm or another's (an iframe, jsdom): ArrayBuffer.isView reads the internal slot, where instanceof would miss it.
     if (ArrayBuffer.isView(prfBytes)) { new Uint8Array(prfBytes.buffer, prfBytes.byteOffset, prfBytes.byteLength).fill(0) }
     // A bare ArrayBuffer, as WebAuthn hands the PRF output, judged by its tag for the same reason.
     if (Object.prototype.toString.call(prfBytes) === '[object ArrayBuffer]') { new Uint8Array(prfBytes as ArrayBuffer).fill(0) }
-  } catch { /* nothing left to spend */ }
+  } catch { /* nothing left to vacate */ }
 }
 // --
 
 // == [Checks]: Checks
 
-// Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Gating.make}'s arguments. */
-const Checks = Validator.Checkers('bad_record', ({ obj, fn, custom, oneof }) => ({
-  gatingMakeArgs: obj({
-    record: obj({ gatingkind: oneof(gatingkindVals) }),
-    opts:   obj({ device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected), bank: custom<Bank | null>(), attempt: fn<GatingAttempt>(), askUser: custom<AskUser>(Consts.isGuarded, BigPhrases.GuardedExpected).nullable() }),
-  }),
+// Defined here, not with the shapes: it names a model class.
+/** The check of {@link birthBank}'s device, the one argument a bank's birth has no bank to vouch for. */
+const Checks = Validator.Checkers('bad_record', ({ custom }) => ({
+  device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
 }))
 // --

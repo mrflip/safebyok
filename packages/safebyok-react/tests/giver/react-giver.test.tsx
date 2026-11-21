@@ -1,12 +1,31 @@
-import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, type UseMutationOptions, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { PendingBank } from 'safebyok'
+import { type Cloak, PendingBank, VaultError, cloak } from 'safebyok'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const OpenaiPath = 'box/openai'
+
+type AcmeGiver = ReturnType<typeof setup>['Acme']
+
+/** A passkey answer, an obvious fake: what a WebAuthn ceremony with the PRF extension hands the host. A new one each call, as a cloak zeroes the bytes it adopts. */
+function fakePasskeyAnswer() { return { credential_id: 'fake-credential', prf_salt_b64: 'ZmFrZSBzYWx0', prfBytes: new Uint8Array(32).fill(7) } }
+
+/** Each form verb, its mutationOptions and its hook, and the cleartexts a form hands it, obvious fakes, new at each call. */
+const FormCases = [
+  ["birth",             (acme: AcmeGiver) => acme.birthMutationOptions(),             (acme: AcmeGiver) => acme.useBirth(),             () => ({ passphraseClear: "fake new passphrase" })],
+  ["unlock",            (acme: AcmeGiver) => acme.unlockMutationOptions(),            (acme: AcmeGiver) => acme.useUnlock(),            () => ({ passphraseClear: "fake passphrase" })],
+  ["replacePassphrase", (acme: AcmeGiver) => acme.replacePassphraseMutationOptions(), (acme: AcmeGiver) => acme.useReplacePassphrase(), () => ({ passkeyClear: fakePasskeyAnswer(), nextPassphraseClear: "fake new passphrase" })],
+  ["addPasskey",        (acme: AcmeGiver) => acme.addPasskeyMutationOptions(),        (acme: AcmeGiver) => acme.useAddPasskey(),        () => ({ passphraseClear: "fake passphrase", nextPasskeyClear: fakePasskeyAnswer() })],
+  ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     () => ({ passkeyClear: fakePasskeyAnswer() })],
+] as const
+
+/** True of a cloak that holds nothing. */
+function isVacated(cloaked: Cloak): boolean {
+  return [cloaked.passphraseClear, cloaked.passkeyClear, cloaked.nextPassphraseClear, cloaked.nextPasskeyClear].every((val) => val === undefined)
+}
 
 /** A fake world, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
 function setup() {
@@ -29,7 +48,11 @@ describe("makeReactGiver", () => {
   // makeReactGiver @example
   it("gives the hooks of the Device's bank, and refuses any other banklabel", () => {
     const { Giver } = setup()
-    expect(Object.keys(Giver.forBank('acme'))).to.deep.equal(['useBankSnapshot', 'useBoxRecord', 'boxCarQueryOptions'])
+    expect(Object.keys(Giver.forBank('acme'))).to.deep.equal([
+      'useBankSnapshot', 'useBoxRecord', 'boxCarQueryOptions',
+      'birthMutationOptions', 'useBirth', 'unlockMutationOptions', 'useUnlock', 'replacePassphraseMutationOptions', 'useReplacePassphrase',
+      'addPasskeyMutationOptions', 'useAddPasskey', 'revokePasskeyMutationOptions', 'useRevokePasskey', 'dismissUnlock',
+    ])
     for (const banklabel of ['other', '']) {
       TH.expectSyncRefusal(() => Giver.forBank(banklabel), 'bad_scope')
     }
@@ -62,6 +85,118 @@ describe("useBankSnapshot", () => {
     expect([result.current, renders]).to.deep.equal([false, 2])
     act(() => { world._cheat_setBank({ ...TH.UnlockedBank, leaseEndsAt: 1_900_000_000_000 }) })
     expect(renders).to.eq(2)
+  })
+})
+
+describe("the form mutations", () => {
+  for (const [verb, optionsOf, useForm, cleartextsOf] of FormCases) {
+    it(`runs the bank's ${verb} through its mutationOptions, with the cleartexts the cloak holds, and vacates the cloak`, async () => {
+      const { world, Acme, wrapper } = setup()
+      const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, Cloak>), { wrapper })
+      const cloaked = cloak(cleartextsOf())
+      await act(() => result.current.mutateAsync(cloaked))
+      expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
+      expect(isVacated(cloaked)).to.eq(true)
+    })
+
+    it(`runs the bank's ${verb} through its hook, with the cleartexts the cloak holds, and vacates the cloak`, async () => {
+      const { world, Acme, wrapper } = setup()
+      const { result } = renderHook(() => useForm(Acme), { wrapper })
+      const cloaked = cloak(cleartextsOf())
+      act(() => { result.current.mutate(cloaked) })
+      await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+      expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
+      expect(isVacated(cloaked)).to.eq(true)
+    })
+  }
+
+  it("reports the verb's refusal as the mutation's error, and vacates the cloak", async () => {
+    const { world, Acme, wrapper } = setup()
+    const refusal = new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.')
+    world.refuseFormVerbs(refusal)
+    const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
+    const cloaked = cloak({ passphraseClear: 'fake wrong passphrase' })
+    act(() => { result.current.mutate(cloaked) })
+    await waitFor(() => { expect(result.current.error).to.eq(refusal) })
+    expect([refusal.family, isVacated(cloaked)]).to.deep.equal(['condition', true])
+  })
+
+  it("runs the verb once under a host's default of retrying mutations, and vacates the cloak once settled", async () => {
+    const { world, Acme } = setup()
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
+    onTestFinished(() => { client.clear() })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
+    const refusal = new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.')
+    world.refuseFormVerbs(refusal)
+    const { result } = renderHook(() => Acme.useRevokePasskey(), { wrapper: Wrapper })
+    const cloaked = cloak({ passkeyClear: fakePasskeyAnswer() })
+    act(() => { result.current.mutate(cloaked) })
+    await waitFor(() => { expect(result.current.error).to.eq(refusal) })
+    const handed = { verb: 'revokePasskey', cleartexts: { passkeyClear: fakePasskeyAnswer() } }
+    expect(world.formCalls).to.deep.equal([handed])
+    expect(isVacated(cloaked)).to.eq(true)
+  })
+
+  it("keys each form mutation under the bank", () => {
+    const { Acme } = setup()
+    expect(Acme.unlockMutationOptions().mutationKey).to.deep.equal(['sok', 'u1', 'acme', 'unlock'])
+    expect(Acme.addPasskeyMutationOptions().mutationKey).to.deep.equal(['sok', 'u1', 'acme', 'addPasskey'])
+  })
+})
+
+describe("dismissUnlock", () => {
+  it("dismisses the bank's wait for an unlock", async () => {
+    const { world, Acme } = setup()
+    await Acme.dismissUnlock()
+    expect(world.formCalls).to.deep.equal([{ verb: 'dismissUnlock', cleartexts: undefined }])
+  })
+})
+
+describe("useStrengthVerdict", () => {
+  it("judges a new passphrase, pending until the verdict lands", async () => {
+    const { world, Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, false])
+    const release = world.pauseVerdicts()
+    let judging: Promise<void> = Promise.resolve()
+    act(() => { judging = result.current.judge('short') })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, true])
+    release()
+    await act(() => judging)
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.fakeVerdictOf('short'), false])
+    await act(() => result.current.judge('a fake passphrase long enough'))
+    expect(result.current.verdict).to.deep.equal({ strong: true })
+  })
+
+  it("keeps the last verdict while the next is judged", async () => {
+    const { world, Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    await act(() => result.current.judge('short'))
+    const release = world.pauseVerdicts()
+    let judging: Promise<void> = Promise.resolve()
+    act(() => { judging = result.current.judge('a fake passphrase long enough') })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.fakeVerdictOf('short'), true])
+    release()
+    await act(() => judging)
+    expect(result.current.verdict).to.deep.equal({ strong: true })
+  })
+
+  it("keeps one judge across renders", async () => {
+    const { Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    const { judge } = result.current
+    await act(() => result.current.judge('short'))
+    expect(result.current.judge).to.eq(judge)
+  })
+
+  it("reports the checker's refusal as lastErr, with no verdict", async () => {
+    const { world, Giver, wrapper } = setup()
+    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    await act(() => result.current.judge('short'))
+    const refusal = new VaultError('unexpected_error', 'The strength checker failed.')
+    world.refuseVerdicts(refusal)
+    await act(() => result.current.judge('a fake passphrase long enough'))
+    expect([result.current.verdict, result.current.isJudging, result.current.lastErr]).to.deep.equal([null, false, refusal])
   })
 })
 

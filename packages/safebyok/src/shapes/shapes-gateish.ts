@@ -1,12 +1,12 @@
-/** The checks and types of the gate: its gatings, provings, leases and the host's strength checker. */
+/** The checks and types of the gate: the form verbs' cleartexts, provings, leases and the host's strength checker. */
 
 import type * as Z from 'zod'
+import { NEVER } from 'zod'
 import { Consts, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
+import type { cloak } from '../helpers/cloak'
 import type { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import type { Bank } from '../models/bank'
-import type { Device } from '../models/device'
 import type { Gate } from '../models/gate'
-import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
 import type { Proving, guardKeyDeriver } from '../models/proving'
 import type { Wayin } from '../models/wayin'
@@ -16,61 +16,64 @@ import { type GateRecord, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
 import type { BankMakeRecord } from './shapes-bankish'
 
-// == [The gating's forms]: gatingkindVals, Gatingkind, GatingSnapshot, CleartextsForGatingkind
+// == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, CloakCleartexts
 
-/** The kinds of gating: what each asks the user to prove, and for what. */
-export const gatingkindVals = ['birth_bank', 'unlock_bank', 'replace_passphrase', 'add_passkey', 'revoke_passkey'] as const
-/** A kind of gating, one of {@link gatingkindVals}. */
-export type Gatingkind = typeof gatingkindVals[number]
+// A gate change's proof is named as an unlock's, `passphraseClear` or `passkeyClear`, and what it puts in place is named `next…`.
+/** The checks of what {@link Bank.birth}, {@link Bank.unlock}, {@link Bank.replacePassphrase}, {@link Bank.addPasskey}, {@link Bank.revokePasskey} and {@link cloak} are handed.
+ * A cleartext is only ever checked in its gating (models/gating.ts): the cloak's check judges none.
+ */
+export const CleartextChecks = Validator.Checkers('bad_record', ({ obj, unk }) => {
+  const proof = { passphraseClear: GX.passphraseCleartext.optional(), passkeyClear: GX.passkeyAnswer.nullable().optional() }
+  return {
+    // The cloak checks only that it knows each field: each verb checks the fields it takes.
+    cloakArgs:         obj({ passphraseClear: unk.optional(), passkeyClear: unk.optional(), nextPassphraseClear: unk.optional(), nextPasskeyClear: unk.optional() }).strict(),
+    birth:             GX.bankBuildCleartexts,
+    unlock:            GX.bankUnlockCleartexts,
+    passphraseReplace: obj({ ...proof, nextPassphraseClear: GX.passphraseCleartext }).strict().transform(({ nextPassphraseClear, ...given }, ctx) => ({ proof: oneProofOf(given, ctx), nextPassphraseClear })),
+    passkeyAdd:        obj({ passphraseClear: GX.passphraseCleartext, nextPasskeyClear: GX.freshPasskeyAnswer }).strict(),
+    passkeyRevoke:     obj(proof).strict().transform((given, ctx) => oneProofOf(given, ctx)),
+  }
+})
 
-/** A gating as a host's dialog renders it: its kind, its token and its bank scope. */
-export type GatingSnapshot = BankScope & { readonly gatingkind: Gatingkind, readonly gatingTok: string }
-
-/** The cleartexts a dialog hands `attempt`, by kind of gating. */
-export interface CleartextsForGatingkind {
-  birth_bank:         Z.input<typeof GX.bankBuildCleartexts>
-  unlock_bank:        Z.input<typeof GX.bankUnlockCleartexts>
-  replace_passphrase: Z.input<typeof GX.passphraseReplaceCleartexts>
-  add_passkey:        Z.input<typeof GX.passkeyAddCleartexts>
-  revoke_passkey:     Z.input<typeof GX.passkeyRevokeCleartexts>
+/** The one proof among `given`: its passphrase where it has one, else its passkey answer. Neither is an issue on `ctx`. */
+function oneProofOf({ passphraseClear, passkeyClear }: { passphraseClear?: GX.PassphraseCleartext | undefined, passkeyClear?: GX.PasskeyAnswer | null | undefined }, ctx: Z.RefinementCtx): ProvedCleartexts {
+  if (passphraseClear !== undefined) { return { passphraseClear } }
+  if (passkeyClear) { return { passkeyClear } }
+  ctx.addIssue({ code: 'custom', message: BigPhrases.CleartextMissing })
+  return NEVER
 }
+
+/** What {@link Bank.birth} is handed: the new passphrase, and a new passkey's answer or none. */
+export type BirthCleartexts = Z.input<typeof CleartextChecks.birth>
+
+/** What {@link Bank.unlock} is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
+export type UnlockCleartexts = Z.input<typeof CleartextChecks.unlock>
+
+/** What {@link Bank.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
+export type PassphraseReplaceCleartexts = Z.input<typeof CleartextChecks.passphraseReplace>
+
+/** What {@link Bank.addPasskey} is handed: the passphrase, and the new passkey's answer. */
+export type PasskeyAddCleartexts = Z.input<typeof CleartextChecks.passkeyAdd>
+
+/** What {@link Bank.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
+export type PasskeyRevokeCleartexts = Z.input<typeof CleartextChecks.passkeyRevoke>
+
+/** What {@link cloak} adopts: the cleartexts of a form verb, any of whose fields it takes. */
+export type CloakCleartexts = Partial<BirthCleartexts & UnlockCleartexts & PassphraseReplaceCleartexts & PasskeyAddCleartexts & PasskeyRevokeCleartexts>
+
+/** One proof of a gate's way in, once checked: the passphrase, or the passkey's answer. */
+export type ProvedCleartexts = { passphraseClear: GX.PassphraseCleartext, passkeyClear?: never } | { passkeyClear: GX.PasskeyAnswer, passphraseClear?: never }
 // --
 
-// == [Given to a gating]: GatingAttempt, RequestCleartext, AskUser, GatingOpts, GatingRecord, BirthFriend, BankGatingFriend
+// == [Given to a gating]: BirthGatingFriend, BankGatingFriend
 
-/** An attempt's work: prove the user's cleartexts, then make the change its gating is for. */
-export type GatingAttempt = (cleartexts: unknown) => Promise<Bank>
-
-/** The host's dialog: show `gating`, and hand what the user types to `gating.attempt`. */
-export type RequestCleartext = (gating: Gating) => unknown
-
-/** The host's `requestCleartext`, guarded: it resolves true when the host's dialog returns, and false when it throws. */
-export type AskUser = (gating: Gating) => Promise<boolean>
-
-/** The options of {@link Gating.make}, beside its record. */
-export interface GatingOpts {
-  /** The device the gating opens on. */
-  device: Device
-  /** The bank the gating is for; null for a `birth_bank` gating, whose bank does not exist yet. */
-  bank:    Bank | null
-  /** The work each attempt does on the cleartexts it is handed. */
-  attempt: GatingAttempt
-  /** The host's dialog as `guardRequestCleartext` wraps it, or null to wait for the host's own `attempt` or `dismiss`. */
-  askUser: AskUser | null
-}
-
-/** A gating's record: its kind. */
-export interface GatingRecord<KindT extends Gatingkind = Gatingkind> {
-  gatingkind: KindT
-}
-
-/** The private birth `Bank.launchBirthBankPrompt` hands the `birth_bank` attempt. Internal. */
-export interface BirthFriend {
+/** The private birth {@link Bank.birth} hands its gating. Internal. */
+export interface BirthGatingFriend {
   /** Write the bank of `record`, and resolve it unlocked under a lease `proving` builds. */
   birth: (record: BankMakeRecord, proving: Proving) => Promise<Bank>
 }
 
-/** The private verbs a bank hands the attempt of a gating on it. Internal. */
+/** The private verbs a bank hands the gating of a form verb on it. Internal. */
 export interface BankGatingFriend {
   /** Unlock the bank under a lease `proved` builds, citing its main gate. */
   unlockByProving: (proved: Proving) => Promise<Bank>
@@ -148,8 +151,8 @@ export interface LeaseOpts {
 
 /** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link GX.PassphraseVerdict}.
  * It is given the passphrase as typed, and the bank's scope, `{ userid, banklabel }`: words a guesser who knows the user tries first.
- * It runs on each new passphrase before any key is derived: the one a `birth_bank` gating births the bank
- * with, and the one a `replace_passphrase` gating puts in place. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
+ * It runs on each new passphrase before any key is derived: the one `Bank.birth` births the bank with, and the one
+ * `bank.replacePassphrase` puts in place. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
  * throws, or returns no verdict, refuses its call.
  *
  * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never quote
@@ -160,7 +163,7 @@ export interface LeaseOpts {
  * it has succeeded, and forget a failure.
  *
  * `safebyok-big/browser` ships `zxcvbnStrengthChecker`, or pass your own (notes/configuration.md). To judge as
- * the user types, call `gating.judgeStrength(typed)`. With no checker, every new passphrase is judged weak
+ * the user types, call `device.judgeStrength(typed)`. With no checker, every new passphrase is judged weak
  * ({@link DefaultStrengthChecker}).
  *
  * @example
@@ -185,8 +188,6 @@ const StrengthChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, BigPhrases.StrengthCheckerShape),
 }))
 
-/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, a {@link LeaseBank} and a host's {@link StrengthChecker}.
- * Also `gatingkindVals`, the kinds of gating.
- */
-export const GateishChecks = Object.freeze({ ...RawChecks, ...StrengthChecks, gatingkindVals })
+/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, a {@link LeaseBank} and a host's {@link StrengthChecker}. */
+export const GateishChecks = Object.freeze({ ...RawChecks, ...StrengthChecks })
 // --
