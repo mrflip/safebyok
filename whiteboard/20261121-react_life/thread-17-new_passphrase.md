@@ -1,7 +1,8 @@
 # Thread 17: new_passphrase (2026-11-21)
 
-Branch `20261121-new_passphrase`, PR #814, stacked on #813. Proved: safebyok-react-lean 251 tests, typecheck and lint
-green; knockknock 26, envman 24, every assertion unchanged.
+Branch `20261121-new_passphrase`, PR #814, stacked on #813. Proved: `pnpm justify` green after the catch-up onto #813's
+tip (safebyok 1346, safebyok-react-lean 251, knockknock 26, envman 24, e2e 576, the rest as before); no assertion
+changed.
 
 * **Built**:
   * **`useNewPassphrase(giver)`** (`packages/safebyok-react-lean/src/kit/use-new-passphrase.ts`, private to the kit):
