@@ -13,7 +13,7 @@ import type { ProviderWorld } from './provider-world'
  */
 export type FakeAuthenticatorOpts = { prf?: boolean, prfAtCreate?: boolean }
 
-/** How the kit's tests name a new passkey to {@link installFakeAuthenticator}'s fake. */
+/** The options the kit's tests give `createPasskey` or a passkey form, which {@link installFakeAuthenticator}'s fake answers. */
 export const PasskeyMaking = { rp: { name: 'Acme' }, user: { name: 'u1 (main vault)', displayName: 'u1' } }
 
 /** Install a fake WebAuthn authenticator for one test, as `navigator.credentials` and `PublicKeyCredential`. The same passkey and salt always give the same answer.

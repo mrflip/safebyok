@@ -87,6 +87,17 @@ describe("AddPasskeyForm", () => {
     expect(world.deriver.heard).to.eq(0)
   })
 
+  it("drops a wrong-passphrase message when the next attempt ends at a dismissed prompt", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    await renderWorld('add')
+    submitPassphrase(WrongPassphrase, 'Add passkey')
+    expect(await alertText()).to.eq('That is not the passphrase.')
+    authenticator.refuseNext('NotAllowedError')
+    submitPassphrase(Passphrase, 'Add passkey')
+    await waitFor(() => { expect(authenticator.calls.create).to.have.lengthOf(2) })
+    await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq('') })
+  })
+
   it("says why an authenticator without PRF cannot make one, and adds nothing", async () => {
     TH.installFakeAuthenticator({ prf: false })
     const { world, container } = await renderWorld('add')
@@ -176,6 +187,19 @@ describe("PasskeyUnlockButton", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Unlock with a passkey' }))
     expect(await alertText()).to.eq(KitPhrases.wrongPasskey)
     expect(screen.getByText('locked')).to.exist
+  })
+
+  it("drops a wrong-passkey message when the next attempt ends at a dismissed prompt", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    const { world, passkeyHeader } = await buildPasskeyWorld()
+    const otherSalt = toB64(crypto.getRandomValues(new Uint8Array(PasskeySaltSize)))
+    await renderWorld('unlock', world, { ...passkeyHeader!, prf_salt_b64: otherSalt } as WayinHeader)
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock with a passkey' }))
+    expect(await alertText()).to.eq(KitPhrases.wrongPasskey)
+    authenticator.refuseNext('NotAllowedError')
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock with a passkey' }))
+    await waitFor(() => { expect(authenticator.calls.get).to.have.lengthOf(2) })
+    await waitFor(() => { expect(screen.getByRole('alert').textContent).to.eq('') })
   })
 
   it("says why, when the browser fails to ask", async () => {

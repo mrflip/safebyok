@@ -24,7 +24,7 @@ export interface AddPasskeyFormProps {
 
 /** The form that adds a passkey, proved by the passphrase: the browser offers to make the passkey once the passphrase is submitted.
  * Show it while the bank has no passkey, `Knock.usePasskeyHeader()` null. The bank is left unlocked.
- * A dismissed prompt leaves the form as it was; a browser or authenticator that cannot make one shows why in the form.
+ * A dismissed prompt adds nothing and says nothing; the passphrase field empties as after any submit. A browser or authenticator that cannot make a passkey shows why in the form.
  * @example
  *   <AddPasskeyForm bank={Knock} passkeyOpts={{ rp: { name: 'Knock-Knock' }, user: { name: user.email, displayName: user.name } }} />
  */
@@ -40,6 +40,7 @@ export function AddPasskeyForm({ bank, passkeyOpts, username }: Readonly<AddPass
   /** Add a passkey under the form's passphrase, handing focus back to its field on a refusal. */
   async function action(form: FormData) {
     setCeremonyErr(null)
+    add.reset()
     if (! await addAction(form)) { fieldRef.current?.focus() }
   }
   const refusal = ceremonyErr ?? add.error
@@ -137,6 +138,7 @@ export function PasskeyUnlockButton({ bank, passkeyHeader, askOpts }: Readonly<P
   /** Ask the passkey, and unlock the bank with its answer. */
   async function action(form: FormData) {
     setCeremonyErr(null)
+    unlock.reset()
     await unlockAction(form)
   }
   if (! passkeysAvailable() || (passkeyHeader?.wayinkind !== 'passkey')) { return null }
