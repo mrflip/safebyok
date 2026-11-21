@@ -1,6 +1,6 @@
 /** A Device for the giver's tests over the new core's minder: one bank, born in a memory vaultDB, already started. */
 
-import { type BoxCar, type DeviceSnapshot, type MinderFriend, PendingBank, ThingMinder } from 'safebyok'
+import { type DeviceSnapshot, type MinderFriend, type Tombstone, PendingBank, ThingMinder } from 'safebyok'
 import { type BoxRecord, type GetAsk, type ThingRecord, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { giverBankOfMinder } from '../../src/giver/minder-bank'
@@ -18,7 +18,7 @@ function minderGetAskOf({ labelpath, ifAbsent }: Readonly<{ labelpath: string, i
 
 /** A Device over one started bank's minder, and the test's ways past it. */
 export interface MinderGiverWorld {
-  device:    GiverDevice<BoxCar>
+  device:    GiverDevice<BoxRecord | Tombstone<BoxRecord>>
   vaultDB:   MemoryVaultDB
   minder:    ThingMinder
   /** How many gets the vaultDB has answered. */
@@ -88,7 +88,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
 }
 
 /** A Device of `minder`'s user and bank, its one bank object `bank`, never ending. */
-function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxCar>): GiverDevice<BoxCar> {
+function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxRecord | Tombstone<BoxRecord>>): GiverDevice<BoxRecord | Tombstone<BoxRecord>> {
   const snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank })
   return Object.freeze({
     userid:        minder.userid,
@@ -97,7 +97,7 @@ function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxCar>): GiverDevi
     getSnapshot:   () => snapshot,
     judgeStrength: refuseNoGate,
     ensureBank:    () => Promise.resolve(bank),
-    onBankStart:   (starter: (started: GiverBank<BoxCar>) => () => void) => {
+    onBankStart:   (starter: (started: GiverBank<BoxRecord | Tombstone<BoxRecord>>) => () => void) => {
       starter(bank)
       return unsubscribeNothing
     },

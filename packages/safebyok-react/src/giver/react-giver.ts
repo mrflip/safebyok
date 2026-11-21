@@ -1,59 +1,59 @@
-/** The giver: React hooks over a Device and its bank. This tab's state comes from the Device; stored records come through the host's React Query. */
+/** The giver: React hooks over a Device and its bank. This tab's state comes from the Device; stored records come through the host's React Query.
+ * The giver turns the bank minder's events into what a host and its user most likely want to see. It puts records and
+ * their metadata in the host's React Query cache, and supplies default options a host may override, then leaves the cache
+ * to work as React Query and the host's options say.
+ */
 
 import {
-  type Query, type QueryKey, type UseMutationResult, type UseQueryResult, mutationOptions, queryOptions, replaceEqualDeep, useMutation, useQuery, useQueryClient,
+  type QueryKey, type UseMutationResult, type UseQueryResult, mutationOptions, queryOptions, replaceEqualDeep, useMutation, useQuery, useQueryClient,
 } from '@tanstack/react-query'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import {
   type BankSnapshot, type BirthCleartexts, type Gating, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict,
-  type UnlockCleartexts, PendingBank, ThingMinder, dbHasNewer,
+  type UnlockCleartexts, PendingBank, Thing, type ThingCited, ThingChecks, ThingMinder, newerThingOf,
 } from 'safebyok'
 import { bridgeDevice } from './react-bridge'
-import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeChecks } from './shapes-giver'
+import { type BoxQueryOpts, type GiverBank, type GiverDevice, type RecordFields, Checks, ScopeChecks } from './shapes-giver'
 
-// == [Query defaults]: carQueryDefaults, carStaleTimeOf, newerCarOf, isCar, fullestOf
+// == [Query defaults]: recordQueryDefaults, newerOrSharedOf, isRecord, shownRecordOf
 
-// A host may override anything the giver supplies here (the keys, each of these defaults, and the `select` that picks
-// `fullest`), so nothing in the giver may depend on one staying in place. The bridge copies each car into the host's item
-// whatever that item's options say.
-/** The giver's defaults for the query of a box's car in the host's React Query. */
-function carQueryDefaults<CarT extends CarFields>() {
+// A host may override anything the giver supplies here (the keys and each of these defaults), so nothing in the giver may
+// depend on one staying in place. The bridge copies each record into the host's item whatever that item's options say.
+// The host's item is stale only on evidence: while the bank's minder has heard of a newer revision than its own item.
+// The bridge keeps it current otherwise, so nothing ages it, and a host fetch that resolves while the minder's item is
+// behind leaves it stale.
+/** The giver's defaults for the query of a box's record in the host's React Query, stale while `isBehind` answers true. */
+function recordQueryDefaults(isBehind: () => boolean) {
   return {
     // The fetch asks the bank's minder, not the network, and the minder answers from its cache while offline.
     networkMode:       'always',
-    staleTime:         carStaleTimeOf<CarT>,
-    structuralSharing: newerCarOf,
+    staleTime:         () => (isBehind() ? 0 : Infinity),
+    structuralSharing: newerOrSharedOf,
   } as const
 }
 
-/** The staleTime of the host's item of a box: 0 where the vaultDB is known to have a newer whole record, else Infinity (the bridge keeps it current). */
-function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>): number {
-  const car = entry.state.data
-  return ((car !== undefined) && dbHasNewer(car)) ? 0 : Infinity
+// TanStack shares structure through this both between a query's records and between what a host's `select` returns from
+// them, so a value that is not a record gets TanStack's own default. When a hook's key changes, it shares the last key's
+// selected value with the new key's, so records of two boxes get the default too. A select run again over the same
+// revision may return a record-shaped value that differs, so two of one revision get the default as well. Without this,
+// a host fetch that read an older record and resolved after the bridge copied a newer one would put the older record back.
+/** Structural sharing for the host's item of a box: of two records of one box at different revisions, the newer. Anything else goes to TanStack's default, `replaceEqualDeep`. */
+function newerOrSharedOf(prior: unknown, next: unknown): unknown {
+  if (! (isRecord(prior) && isRecord(next) && (prior.labelpath === next.labelpath))) { return replaceEqualDeep(prior, next) }
+  if (Thing.cmp(prior, next) === 0) { return replaceEqualDeep(prior, next) }
+  return newerThingOf(prior, next)
 }
 
-// TanStack shares structure through this both between a query's cars and between what `select` returns from them, so a
-// value that is not a car gets TanStack's own default. When a hook's key changes, it shares the last key's selected value
-// with the new key's, so cars of two boxes get the default too: their agerank says nothing of which to show. A box's cars
-// never go back, so the newer car has everything the older one has, and nothing needs merging. Without this, a fetch
-// that read an older car and resolved after the bridge copied a newer one would put the older car back.
-/** Structural sharing for the host's item of a box: of two cars of one box, the one with the greater agerank, `prior` on a tie.
- * Anything else goes to TanStack's default, `replaceEqualDeep`.
- */
-function newerCarOf(prior: unknown, next: unknown): unknown {
-  if (! (isCar(prior) && isCar(next) && (prior.newest.labelpath === next.newest.labelpath))) { return replaceEqualDeep(prior, next) }
-  return (next.agerank > prior.agerank) ? next : prior
+/** True when `val` carries a Thing's scope and revision, as every record, tombstone and shell does. */
+function isRecord(val: unknown): val is ThingCited & Readonly<{ labelpath: string }> {
+  return ThingChecks.scopedCited.safeParse(val).success
 }
 
-/** True when `val` carries an agerank and its newest record's labelpath, as every car does. */
-function isCar(val: unknown): val is CarFields {
-  const car = val as Partial<CarFields> | null
-  return (typeof car === 'object') && (car !== null) && (typeof car.agerank === 'string') && (typeof car.newest?.labelpath === 'string')
+/** The record a host shows: `record`, or null for a tombstone or the shell. */
+function shownRecordOf<RecordT extends RecordFields>(record: RecordT): RecordT | null {
+  return Thing.isTombstone(record) ? null : record
 }
-
-/** The fullest record a car has */
-function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return car.fullest }
 // --
 
 // == [Form mutations]: FormMutationDefaults, attemptGating, vacateGating, FormMutationResult
@@ -86,7 +86,7 @@ export type FormMutationResult<CleartextsT> = UseMutationResult<void, Error, Gat
 // == [The giver]: ReactGiver, StrengthVerdictResult, BankGiver, makeReactGiver, Unjudged, makeBankGiver
 
 /** The hooks {@link makeReactGiver} returns. */
-export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGiver<CarT>>
+export type ReactGiver<RecordT extends RecordFields> = ReturnType<typeof makeReactGiver<RecordT>>
 
 /** The result of a giver's `useStrengthVerdict`: the latest verdict on a new passphrase, and `judge` to ask for the next. */
 export type StrengthVerdictResult = Readonly<{
@@ -110,14 +110,20 @@ export type StrengthVerdictResult = Readonly<{
  * mutation defaults does not run for it.
  * A form mutation never retries. Disable the submit while it is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
  */
-export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
+export type BankGiver<RecordT extends RecordFields> = ReturnType<typeof makeBankGiver<RecordT>>
 
 /** Make the React hooks for `device`. Make them once, at module scope, beside the Device.
  * The objects a vaultDB answers with are deep-frozen when cached, so a vaultDB must never change an object after answering with it.
  * @example export const Giver = makeReactGiver(device)
  */
-export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
+export function makeReactGiver<RecordT extends RecordFields>(device: GiverDevice<RecordT>) {
   Checks.device.parse(device)
+  // A staleTime is answered at once, so the giver keeps the bank object started now: none until one starts.
+  let startedBank: GiverBank<RecordT> | null = null
+  device.onBankStart((bank) => {
+    startedBank = bank
+    return () => { startedBank = null }
+  })
 
   /** Keeps the host's React Query items of the bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
   function useBridge(): void {
@@ -158,7 +164,7 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
     /** The hooks for the Device's bank, refusing any other banklabel. Name the result in PascalCase (`const Acme = Giver.forBank('acme')`), so the rules-of-hooks lint checks `Acme.useBoxRecord()`. */
     forBank: (banklabel: string) => {
       ScopeChecks.bankScoped.parseConsistent({ banklabel }, { banklabel: device.banklabel })
-      return makeBankGiver(device)
+      return makeBankGiver(device, (labelpath) => startedBank?.isBoxRecordBehind(labelpath) ?? false)
     },
   })
 }
@@ -166,8 +172,8 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
 /** The fields of a {@link StrengthVerdictResult} before anything is judged. */
 const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null })
 
-/** The hooks for `device`'s bank. */
-function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
+/** The hooks for `device`'s bank, under which the host's item of a box is stale while `isBoxRecordBehind` answers true of its labelpath. */
+function makeBankGiver<RecordT extends RecordFields>(device: GiverDevice<RecordT>, isBoxRecordBehind: (labelpath: string) => boolean) {
   const bankHead = bankQueryKey(device)
 
   /** This tab's state of the bank: its stage, whether it is locked, and when its lease ends. Synchronous: it never waits and never suspends.
@@ -180,31 +186,37 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
     return useSyncExternalStore(device.subscribe, () => pick(device.getSnapshot().bank), () => pick(PendingBank))
   }
 
-  /** React Query's options for the box's whole car, for your own `useQuery`, `queryClient.query` or route loader.
-   * `data` is the car: the newest revision received, beside the fullest record. Its defaults, any of which you may override:
-   * - fresh until the bridge copies a newer car, and stale while the vaultDB is known to have a newer revision
+  /** React Query's options for the box's whole record, for your own `useQuery`, `queryClient.query` or route loader.
+   * `data` is the whole record, the box's tombstone, or its shell where none is stored. Its defaults, any of which you may override:
+   * - stale while the bank's minder has heard of a newer revision than its record, and fresh otherwise: the bridge copies
+   *   in each newer record the minder caches
    * - fetches even while offline
-   * - never replaces a car with an older one
+   * - never replaces a record with an older one
    */
-  function boxCarQueryOptions(labelpath: string) {
-    const labelpathC = Checks.labelpath.parse(labelpath)
-    return queryOptions({
-      ...carQueryDefaults<CarT>(),
-      queryKey: boxCarQueryKey({ userid: device.userid, banklabel: device.banklabel, labelpath: labelpathC }),
-      queryFn:  async () => {
-        const bank = await device.ensureBank()
-        return bank.getBoxCar(labelpathC)
-      },
-    })
+  function boxRecordQueryOptions(labelpath: string) {
+    return queryOptions({ ...recordQueryDefaults(() => isBoxRecordBehind(labelpath)), ...boxRecordQueryOf(labelpath) })
   }
 
-  /** The box's fullest stored record, through React Query, its whisper still sealed.
-   * `data` is the record to show, null when none is stored or it was deleted, and undefined while pending. A record
-   * overtaken by a newer revision shows until the newer one arrives. Mount the giver's `useBridge` for it to follow changes.
-   * `opts` are React Query's own, and override {@link boxCarQueryOptions}'s. A `select` given there is handed the whole car.
+  /** The key and fetch of the box's record. */
+  function boxRecordQueryOf(labelpath: string) {
+    const labelpathC = Checks.labelpath.parse(labelpath)
+    return {
+      queryKey: boxRecordQueryKey({ userid: device.userid, banklabel: device.banklabel, labelpath: labelpathC }),
+      queryFn:  async () => {
+        const bank = await device.ensureBank()
+        return bank.getBoxRecord(labelpathC)
+      },
+    }
+  }
+
+  /** The box's stored record, through React Query, its whisper still sealed.
+   * `data` is the record, null when none is stored or it was deleted, and undefined while pending. A record overtaken by a
+   * newer revision shows until the newer one arrives. Mount the giver's `useBridge` for it to follow changes.
+   * `opts` are React Query's own, and override {@link boxRecordQueryOptions}'s. A `select` given there is handed the whole
+   * record, the box's tombstone, or its shell where none is stored.
    */
-  function useBoxRecord<SelT = CarT['fullest']>(labelpath: string, opts: BoxQueryOpts<CarT, SelT> = {}): UseQueryResult<SelT> {
-    return useQuery({ ...boxCarQueryOptions(labelpath), select: fullestOf as (car: CarT) => SelT, ...opts })
+  function useBoxRecord<SelT = RecordT | null>(labelpath: string, opts: BoxQueryOpts<RecordT, SelT> = {}): UseQueryResult<SelT> {
+    return useQuery<RecordT, Error, SelT>({ ...recordQueryDefaults(() => isBoxRecordBehind(labelpath)), ...boxRecordQueryOf(labelpath), select: shownRecordOf as (record: RecordT) => SelT, ...opts })
   }
 
   // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
@@ -305,7 +317,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   }
 
   return Object.freeze({
-    useBankSnapshot, useBoxRecord, boxCarQueryOptions,
+    useBankSnapshot, useBoxRecord, boxRecordQueryOptions,
     birthGating, birthMutationOptions, useBirth, unlockGating, unlockMutationOptions, useUnlock,
     replacePassphraseGating, replacePassphraseMutationOptions, useReplacePassphrase, addPasskeyGating, addPasskeyMutationOptions, useAddPasskey,
     revokePasskeyGating, revokePasskeyMutationOptions, useRevokePasskey, dismissUnlock,
@@ -313,11 +325,11 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
 }
 // --
 
-// == [Keys]: boxCarQueryKey, bankQueryKey
+// == [Keys]: boxRecordQueryKey, bankQueryKey
 
-/** The host's React Query key for the car of the box at `labelpath`: the key the bank's minder caches it under. */
-export function boxCarQueryKey(scope: Readonly<{ userid: string, banklabel: string, labelpath: string }>): QueryKey {
-  return ThingMinder.queryKeyOf(scope)
+/** The host's React Query key for the record of the box at `labelpath`: the key the bank's minder caches its item under. */
+export function boxRecordQueryKey(scope: Readonly<{ userid: string, banklabel: string, labelpath: string }>): QueryKey {
+  return ThingMinder.itemQueryKeyOf(scope)
 }
 
 /** The key every one of a bank's items in the host's React Query starts with. */
