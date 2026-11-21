@@ -18,9 +18,9 @@ import { type BoxQueryOpts, ScopeChecks } from './shapes-giver'
 export type ProviderProps = Readonly<{
   /** The signed-in user's id. The first one starts that user's device; null or undefined changes nothing. */
   userid:      string | null | undefined
-  /** The vaultDB to use in place of the config's, for this mount: a test's `MemoryVaultDB`, say. */
+  /** The vaultDB to use in place of the config's: a test's `MemoryVaultDB`, say. Only the one present when the first userid arrives is used. */
   vaultDB?:    VaultDB | undefined
-  /** The key deriver to use in place of the config's, for this mount. */
+  /** The key deriver to use in place of the config's. Only the one present when the first userid arrives is used. */
   keyDeriver?: KeyDeriver | undefined
   children?:   ReactNode
 }>
@@ -85,7 +85,7 @@ export function reactGiver(config: GiverConfig) {
     return <UseridContext value={userid}>{children}</UseridContext>
   }
 
-  /** What `pick` reads of the slot's snapshot, as a hook under the provider sees it: stage `starting`, and no userid, while the slot's device is not the prop's user's. */
+  /** What `pick` reads of the slot's snapshot, as the provider's children see it: `starting`, with no userid, while the device is not the prop's user's. */
   function useShownSnapshot<SelT>(pick: (snap: GiverSlotSnapshot) => SelT): SelT {
     const userid = useContext(UseridContext)
     const shownOf = () => {
@@ -147,8 +147,8 @@ const StartingSlot: GiverSlotSnapshot = Object.freeze({ userid: null, bank: Pend
 function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: GiverSlotSnapshot) => SelT) => SelT) {
   const { banklabel } = slot
 
-  /** The bank's stage, whether it is locked, whether a call waits on the unlock form, and when its lease ends. Synchronous: it never waits and never suspends.
-   * Its `stage` is the one field a screen switches on: `signed_out`, `starting`, `unborn`, `locked`, `unlocked` or `failed`.
+  /** The bank's snapshot. Synchronous: it never waits and never suspends.
+   * Switch a screen on its `stage`.
    * Given `select`, it re-renders only when what `select` returns changes: return a field of the snapshot or a primitive, never a new object.
    */
   function useBank(): BankSnapshot

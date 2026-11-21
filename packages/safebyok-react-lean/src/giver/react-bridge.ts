@@ -6,8 +6,7 @@ import { bankQueryKey, boxRecordQueryKey } from './giver-defaults'
 import type { GiverDevice, GiverEvent } from './shapes-giver'
 
 /** Keep the host's React Query items of the boxes `minder` minds in step with it. Returns the function that stops it.
- * Start it before the minder's first get: a record cached before is copied only when it next changes. Each record the minder caches is copied into the host's item for it, wherever a hook has made one. The host's item is marked
- * stale when the minder hears of a newer revision. A refused get marks it stale too, without refetching it.
+ * Start it before the minder's first get: a record cached before is copied only when it next changes.
  */
 export function bridgeMinder(client: QueryClient, minder: ThingMinder): () => void {
   return minder.listen((event) => {

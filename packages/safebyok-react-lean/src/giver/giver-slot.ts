@@ -50,8 +50,11 @@ export class GiverSlot {
 
   /** The current snapshot, which {@link getSnapshot} returns. */
   #snapshot: GiverSlotSnapshot = SignedOutSlot
+  /** The listeners to tell when the snapshot changes. */
   readonly #subscribers = new Set<() => void>()
+  /** {@link getSnapshot}'s function, bound once. */
   readonly #getSnapshot = (): GiverSlotSnapshot => this.#snapshot
+  /** {@link subscribe}'s function, bound once. */
   readonly #subscribe = (listener: () => void): (() => void) => {
     this.#subscribers.add(listener)
     return () => { this.#subscribers.delete(listener) }
@@ -86,8 +89,8 @@ export class GiverSlot {
 
   // == [Starting]: start, demandDevice, demandBank, demandVault
 
-  /** Make `userid`'s device, bridge its minder to the host's QueryClient, and bring its bank up. Does nothing once the slot has a device.
-   * `mount`'s vaultDB and key deriver, where given, replace the config's.
+  /** Start `userid`'s device and its bank. Does nothing once the slot has a device.
+   * `mount`'s vaultDB and key deriver, where given, replace the config's; its client is the one the minder's records are bridged into.
    */
   start(userid: string, { client, vaultDB, keyDeriver }: SlotMount): void {
     if (this.#device !== null) { return }
