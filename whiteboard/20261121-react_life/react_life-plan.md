@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 9 and 11 filed, out of draft, in one line ending at #806. Thread 10 (envman) filed as #807, out of draft, stacked on #806. Thread 12 (lockable_whisper) ready as #808, stacked on #807, in review (medium). The Closer Look tab is up, awaiting the Coach's replies.
+* **Status:** all threads filed. Threads 1 to 12 filed and out of draft, in one line ending at #808 (10 as #807, 12 as #808). Waiting on the Coach: Closer Look replies, browser click-throughs of both demos, and Open Matters rows; then base-sync and wrap-up.
 
 ## The goal
 
