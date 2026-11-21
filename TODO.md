@@ -120,5 +120,4 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   same things. With the device keeping only the lease and reading those records from the minder, only locked and
   unlocked would live in a store, and starting, unborn and failed could come from the bank record's fetch instead of
   stand-in snapshots. "this fits with upcoming changes, but it needs more design before anything should be
-  rewritten, so leave the shim"; and "the lease shouldn't go to the device so it needs more design" (the Coach,
-  2026-11-21, react_life, survey after thread 12). Part of the ownership work, with Closer Look E11.
+  rewritten, so leave the shim" (the Coach, 2026-11-21, react_life, survey after thread 12). Part of the ownership work, with Closer Look E11.
