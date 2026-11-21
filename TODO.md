@@ -105,3 +105,8 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   discard that ends at the minder's cache and the host's React Query does not reach it. Not yet checked against any
   adapter: for each, find whether its client caches what it fetches, and have its `vacate` clear that
   (the Coach, 2026-11-21, `whiteboard/20261121-react_life/`).
+* **A smarter policy in `mask` for a caller's tail.** `mask(text, { tail })` takes the caller's tail at every length,
+  so the demos' live reveal, `mask(val, { tail: 4 })`, shows four characters of a value of 12 or fewer, and all of a
+  four-character one, where the schedule shows none of short text. The flaw is in `mask`, not its callers: "make mask
+  have smarter policy for a locked/stored [use] case" (the Coach, 2026-11-21, react_life #808). `mask` is
+  safebyok-big's helper, re-exported by the core; broaden it there.
