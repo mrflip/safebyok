@@ -1,6 +1,6 @@
 # Thread 13: giver_device (2026-11-21)
 
-Branch `20261121-giver_device`, PR #TBD, stacked on #808. Proved: `pnpm --filter safebyok-react-lean test` 243 passed, typecheck and lint clean; knockknock demo typecheck, lint, 26 tests.
+Branch `20261121-giver_device`, PR #809, stacked on #808. Proved: `pnpm --filter safebyok-react-lean test` 242 passed, typecheck and lint clean; knockknock demo typecheck, lint, 26 tests.
 
 * **Built**:
   * `GiverSlot` is gone (`src/giver/giver-slot.ts` deleted). `reactGiver`'s closure holds `let device` and plain functions: `deviceOf`, `demandDevice`, `demandBank`, `demandVault`, each refusal unchanged. `SlotMount` became `GiverMount`; the config's parsing (`ConfigChecks.giverConfig`, `isOneBank`) moved to `shapes-giver.ts`. The second store is gone.
