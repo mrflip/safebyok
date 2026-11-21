@@ -5,7 +5,7 @@
   `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **At once**: 3 (the line is two threads, stacked, so one runs at a time).
 * **Design**: `gate_super-design.md`, beside this file. It wins over this plan on the shape of the code.
-* **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 2; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
+* **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 641; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
 * **Status**: thread 1 building in /workspace/byok-gate_holds (`thread-worker-400k`, opus), to the open matters' Recs, provisionally; thread 2 waits on it.
 
 ## Read first
@@ -23,9 +23,17 @@
 * **One `Gate` class.** "There remains just the class Gate, and its properties update when the mutation returns. Use
   the private method `#adopt` to set updated props and private vars as they arrive. Don't implement anything extra
   around a change in behavior at life change yet." (the Coach, 2026-11-21). No `GateRevision`, no second class.
-* **The open matters are provisional.** The design's four open matters are with the Coach in the sprint doc. Build to
-  each **Rec**; a ruling that differs reaches you as a directive. Keep what a ruling could change (the delegators on
-  `Bank`, `gate.seal` / `gate.unseal`, `gate.subscribe`) in small, separate commits so a reversal is cheap.
+* **The open matters are ruled** (the Coach, 2026-11-21; *Resolved* in the sprint doc has the words):
+  1. The verbs and makers live on `Gate`; `Bank` keeps one-line pass-throughs for `lock`, `ensureUnlocked`,
+     `dismissUnlock`, `isLocked`, `isUnlocked`, and the birth.
+  2. `Gate.birthGating` makes the birth's gating. A bank capability the gate needs comes through a friend it is
+     given, and the gating's friend closes over the gate's own private methods, each an honest method calling that
+     friend: `#gateFriend() { return { m: () => this.#m() } }`, `#m() { return this.bankFriend.m() }`.
+  3. `gate.seal` / `gate.unseal` underneath; `Bank` serves `sealBox` / `unsealBox` with `trySealBox` /
+     `tryUnsealBox`, and `sealBoxEnsuringUnlock` / `unsealBoxEnsuringUnlock`, which await `ensureUnlocked()` first.
+     The names are back with the Coach (the answer was cut off).
+  4. The change signal is built into `Thing`: `subscribe`, bound, and a protected way to tell subscribers; `Gate` and
+     `Bank` both use it.
 * **No crossing guards** (`#no-slop-crossings`). A gating reads what it needs of the gate before its first await, as
   it does today; nothing more guards a gate change landing mid-gating. A crossing you notice is a `notes/wontfix.md`
   row, not code.
@@ -33,6 +41,10 @@
   tests/models/ctx-bytes.test.ts passes unchanged. Nothing changes what is stored.
 * **Callers outside the core** are `safebyok-react-lean` (its giver and kit, and their tests) and the React demo
   where it calls the new core. `safebyok-react` and the adapters build on `safebyok-big`: leave them.
+* **Startup is next for redesign** (the Coach, 2026-11-21): "the startup sequence is all intertwingled and next for
+  redesign; if it looks wrong it probably is, propose a fix rather than heroics." Where `Device.hello` / `#bringUp`,
+  `Bank.make`'s order or `device.adoptBornBank` fights the work, change it as little as gets the thread green, and
+  write the proposed fix as an open matter.
 * **Check with your orchestrating agent before fanning out** to subagents beyond the ones your agent file names.
 
 ## Threads
