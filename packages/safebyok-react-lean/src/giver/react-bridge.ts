@@ -7,13 +7,14 @@ import type { GiverEvent } from './shapes-giver'
 
 /** Keep the host's React Query items of the boxes and the main gate `minder` minds, and its listing of the boxes, in step with it. Returns the function that stops it.
  * Start it before the minder's first get: a record cached before is copied only when it next changes.
+ * What a delivery throws goes to `tellBadNews`, as what a listener throws goes to the bank's.
  */
-export function bridgeMinder(client: QueryClient, minder: ThingMinder): () => void {
+export function bridgeMinder(client: QueryClient, minder: ThingMinder, tellBadNews: (badnews: readonly unknown[]) => void): () => void {
   return minder.listen((event) => {
     // Delivered a microtask later, out of the minder's own notification: an invalidation here runs the host's queryFn,
     // whose get would otherwise start inside it. Without it the get still works. A pragmatic fix, to go if it causes
-    // other problems. #not-a-crossing #pragmatic-fix
-    queueMicrotask(() => { deliver(client, minder, event) })
+    // other problems. Out of the minder's own try/catch, so it has one of its own. #not-a-crossing #pragmatic-fix
+    queueMicrotask(() => { try { deliver(client, minder, event) } catch (err) { tellBadNews([err]) } })
   }, MinderEventFormat)
 }
 

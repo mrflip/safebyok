@@ -146,10 +146,11 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     if (device !== null) { return device }
     const opts = { ...configDeviceOpts, vaultDB: vaultDB ?? configVaultDB, ...(keyDeriver && { keyDeriver }) }
     // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
-    device = Device.make({ userid, banklabel, device_tok: globalThis.crypto.randomUUID() }, opts)
+    const made = Device.make({ userid, banklabel, device_tok: globalThis.crypto.randomUUID() }, opts)
+    device = made
     // Nothing ends a device yet, so the bridge is never stopped.
-    bridgeMinder(client, device.minder)
-    return device
+    bridgeMinder(client, made.minder, (badnews) => { made.tellBadNews(badnews) })
+    return made
   }
 
   /** The signed-in user's device. Refuses `absent_vault` while nobody is signed in. */

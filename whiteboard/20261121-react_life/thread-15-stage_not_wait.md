@@ -24,6 +24,11 @@ Branch `20261121-stage_not_wait`, PR #811, stacked on #810. Proved: `pnpm justif
     * `bridgeMinder` delivers each minder event through `queueMicrotask`, so no host queryFn's get starts inside the
       minder's own notification. It is flagged `#pragmatic-fix`, to go if it causes other problems, and carries E3's
       `#not-a-crossing`.
+    * **Rework (review, Coach's directive 2026-11-21: bad news to the bridge, try/catch on every delivery):**
+      `bridgeMinder(client, minder, tellBadNews)` takes a third argument, and each deferred delivery has one try/catch
+      that reports `[err]` to it, since the microtask runs outside `ThingMinder.listen`'s own catch. The giver passes
+      `(badnews) => { made.tellBadNews(badnews) }`, the device's, which the bank's `tellBadNews` itself reaches.
+      One test in `react-bridge.test.tsx` (a stub client whose `setQueryData` throws).
     * The bridge also skips a *bare* listing (`minder.isListingBareAt`), the one the minder's `hello` seeds.
   * **WhisperMask**: its effect keeps React's stale-result flag (`isCurrent`, set false in cleanup), so an answer that
     lands after the next stage, revision or prop is dropped. Its wontfix row is gone.
