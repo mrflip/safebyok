@@ -266,45 +266,20 @@ Reasoning for wontfix: it needs a write from another device inside the moment be
 is written is what the user typed, over the newest revision. Catching it would mean a base pinned on every focus, or the
 whisper held outside its callback. Written by the react_life thread 9 worker, 2026-11-21, awaiting a ruling.
 
-### A lock that lands while `withLockableWhisper` takes its unlocked branch waits for the unlock form
+### A lock that lands while `withLockableWhisper` takes its unlocked branch refuses `bank_locked`
 
-* current outcome: in `safebyok-react-lean`, `Knock.withLockableWhisper` reads whether the bank is unlocked once, then
-  either unseals the box through `withWhisper` or hands its stored record to `ifLocked`. A `lock()` that lands after
-  that read, but before `withWhisper` finds the bank unlocked, makes the call wait for the unlock form, as `withWhisper`
-  does, rather than answer through `ifLocked`. An unlock that lands after a locked read answers through `ifLocked` on an
-  unlocked bank.
+* current outcome: in `safebyok-react-lean`, `Knock.withLockableWhisper` reads the stage once. At unlocked it unseals
+  the box through the vault's `withUnlockedWhisper`, which never waits for an unlock. A `lock()` that lands after that
+  read, while the box is being got, rejects the call `bank_locked` rather than answer through `ifLocked`. A lock that
+  lands after the unseal lets the callback answer. An unlock that lands after a locked read answers through `ifLocked`.
 * alternatives:
-  - read the stage again inside `withWhisper`'s wait and fall back to `ifLocked`: a check for a crossing in the
-    unseal's path, and a way out of `ensureUnlocked` that no other caller has.
+  - catch the refusal and fall back to `ifLocked`: a branch in the unseal's path for a crossing.
   - hold a lock across the read and the unseal: a lock where none was needed.
 * workaround: none needed: a caller that asks again on a stage change, as the parts' `WhisperMask` does, answers under
-  the new stage. A user who meets the unlock form can cancel it.
+  the new stage.
 
-Steps to reproduce: call `withLockableWhisper` on an unlocked bank, with the vault's `withWhisper` stubbed to call
-`lock()` before it calls through.
+Steps to reproduce: call `withLockableWhisper` on an unlocked bank, and call `lock()` while the vaultDB's get is held.
 
-Reasoning for wontfix: a lock comes a few times a day, and the gap between the read and the unseal is a microtask or
-two (CLAUDE.md, *Hours separate updates*). Nothing is written, and no whisper is shown that the user did not ask for.
-A guard would sit in the unseal's path for a crossing. Written by the react_life thread 12 worker, 2026-11-21, awaiting
-a ruling.
-
-### A `WhisperMask` write in flight when the bank locks can leave the live tail in the page
-
-* current outcome: in `safebyok-react-lean`, the parts' `WhisperMask` empties its element and asks `withLockableWhisper`
-  again on each stage change or new revision of the box, and writes what resolves into the element. Where an unlocked
-  answer is still in flight when the bank locks, the two answers race: the live mask, with the field's last characters,
-  can land after the stored one and stay in the page until the next stage change or write. A write to the box can
-  likewise leave the older revision's mask showing.
-* alternatives:
-  - drop a superseded answer by a flag the effect's cleanup sets: state kept for a crossing, in every mask's path.
-  - have the lock empty every mask in flight: a lifecycle call reaching across a callback.
-* workaround: none needed: the next lock, unlock or write writes the mask again. What shows is a mask of the field, not
-  the field, and it lives in the page alone, held by no React state or cache.
-
-Steps to reproduce: render a `WhisperMask` on an unlocked bank, and call `lock()` while the box is being unsealed, with
-the key deriver or the vaultDB's get held.
-
-Reasoning for wontfix: a lock comes a few times a day, and an unseal is in flight for milliseconds (CLAUDE.md, *Hours
-separate updates*). Nothing is written to storage, and no more of the whisper shows than the user saw a moment before.
-A guard would be a token in the mask's path for a crossing. Written by the react_life thread 14 worker, 2026-11-21,
-awaiting a ruling.
+Reasoning for wontfix: a lock comes a few times a day, and a get is in flight for milliseconds (CLAUDE.md, *Hours
+separate updates*, `#no-slop-crossings`). Nothing is written, and the refusal shows no whisper. Written by the react_life
+thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruling.

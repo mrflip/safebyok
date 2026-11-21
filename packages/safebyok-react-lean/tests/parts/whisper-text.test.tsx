@@ -82,8 +82,9 @@ describe("WhisperText", () => {
   it("stays masked and reports the refusal when the unlock is dismissed", async () => {
     const onError = vi.fn<(err: unknown) => void>()
     await renderKey(onError)
-    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Show' }).disabled).to.eq(true)
+    const show = screen.getByRole<HTMLButtonElement>('button', { name: 'Show' })
+    fireEvent.click(show)
+    expect(show.disabled).to.eq(true)
     await screen.findByRole('dialog')
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
     await waitFor(() => { expect(onError).toHaveBeenCalledOnce() })

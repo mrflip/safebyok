@@ -2,6 +2,7 @@ import { act, render, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { type BoxRecord, type GateRecord, MinderEventFormat, type PasskeyWayinHeader, ThingMinder } from 'safebyok'
 import { passkeyHeaderOf } from '../../src/index'
+import { bridgeMinder } from '../../src/giver/react-bridge'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as TH from '../test-helpers'
@@ -96,6 +97,18 @@ describe("the bridge", () => {
     const { world } = await setupShown()
     await act(() => world._cheat_otherVault!.putBoxOnce('box/puns', { sidecar: { service: 'puns' } }, { whisper: LeanTH.Whisper }))
     expect(world.client.getQueryData(ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box/puns' }))).to.be.undefined
+  })
+
+  it("tells bad news what a delivery to the host's item throws", async () => {
+    const delivered = new Error("setQueryData broke")
+    const client = { getQueryCache: () => ({ find: () => ({}) }), setQueryData: () => { throw delivered } }
+    let listener: ((event: unknown) => void) | undefined
+    const minder = { listen: (fn: (event: unknown) => void) => { listener = fn; return vi.fn() } }
+    const tellBadNews = vi.fn<(badnews: readonly unknown[]) => void>()
+    bridgeMinder(client as never, minder as never, tellBadNews)
+    listener!({ eventkind: 'item', modelkind: 'box', type: 'updated', action: { type: 'success' }, queryKey: ['box'], userid: 'u', banklabel: 'b', labelpath: 'box/x', state: { data: {}, dataUpdatedAt: 1 } })
+    await Promise.resolve()
+    expect(tellBadNews.mock.calls).to.deep.equal([[[delivered]]])
   })
 })
 

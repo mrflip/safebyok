@@ -452,7 +452,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(bank.isUnlocked).to.be.true
   })
 
-  it("on a locked bank, gets the box once, while the user is asked", async () => {
+  it("on a locked bank, gets the box once, after the unlock lands", async () => {
     const onBadNews = vi.fn()
     const { bank, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -462,7 +462,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
     const using = other.withWhisper(Openai, ({ revseq }) => revseq)
     await vi.advanceTimersByTimeAsync(0)
-    expect(boxGetsOf(asked)).to.equal(1)
+    expect(boxGetsOf(asked)).to.equal(0)
     expect(bank.getSnapshot().isUnlockWanted).to.be.true
     await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal(0)
@@ -547,6 +547,50 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await TH.expectRefusal(vault.withWhisper(Openai, 'apiKey' as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper('gate' as never, () => undefined), 'bad_record')
     expect(bank.getSnapshot().isUnlockWanted).to.be.false
+  })
+})
+
+describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
+  it("calls fn with the box unsealed on an unlocked bank, and resolves what fn resolves", async () => {
+    // withUnlockedWhisper @example
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(bank.isUnlocked).to.be.true
+    expect(await vault.withUnlockedWhisper(Openai, ({ whisper }) => `asked with ${String(whisper['apiKey'])}`)).to.equal('asked with sk-test-0000')
+  })
+
+  it("refuses 'bank_locked' on a locked bank, wanting no unlock", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'bank_locked')
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+    expect(boxGetsOf(asked)).to.equal(0)
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("refuses once the device is swept, never calling fn", async () => {
+    const { device, vault } = await TH.buildBornVault()
+    await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    device.sweep()
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'disabled')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("refuses 'absent_box' for a box never stored, never calling fn", async () => {
+    const { vault } = await TH.buildBornVault()
+    const fn = vi.fn()
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, fn), 'absent_box')
+    expect(fn).not.toHaveBeenCalled()
+  })
+
+  it("refuses an fn that is not a function, or a labelpath that is not a box's", async () => {
+    const { vault } = await TH.buildBornVault()
+    await TH.expectRefusal(vault.withUnlockedWhisper(Openai, undefined as never), 'bad_record')
+    await TH.expectRefusal(vault.withUnlockedWhisper('gate' as never, () => undefined), 'bad_record')
   })
 })
 

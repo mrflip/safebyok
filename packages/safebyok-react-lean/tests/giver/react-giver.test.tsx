@@ -7,6 +7,7 @@ import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
 import { mask } from '../../src/index'
 import { type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
+import * as Phrases from '../../src/giver/phrases-giver'
 import * as TH from '../test-helpers'
 
 const Passphrase = LeanTH.TestPassphrase
@@ -23,6 +24,16 @@ async function renderUnder<ResultT>(hook: (world: TH.ProviderWorld) => ResultT, 
   function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, treeOpts) }
   const rendered = renderHook(() => hook(world), { wrapper: Wrapper })
   return { world, treeOpts, ...rendered }
+}
+
+/** `hook` and the bank's stage over a world with the joke service's key stored, rendered while the bank is still starting: its gets wait until `release` is called. */
+async function renderStarting<ResultT>(hook: (world: TH.ProviderWorld) => ResultT) {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  const release = world.pauseGets()
+  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+  const rendered = renderHook(() => ({ stage: world.Bank.useBank((bank) => bank.stage), hooked: hook(world) }), { wrapper: Wrapper })
+  onTestFinished(release)
+  return { world, release, ...rendered }
 }
 
 /** The bank's stage, read by `useBank`, and every stage it rendered with, the first among them. */
@@ -458,6 +469,15 @@ describe("withLockableWhisper", () => {
     await TH.expectRefusal(world.Bank.withLockableWhisper('other', unlockedFn, { ifLocked }), 'absent_box')
   })
 
+  it("refuses while the bank is starting, calling neither function", async () => {
+    const { world, result } = await renderStarting(() => null)
+    expect(result.current.stage).to.eq('starting')
+    const [fn, ifLockedHere] = [vi.fn(), vi.fn()]
+    const err = await TH.expectRefusal(world.Bank.withLockableWhisper(TH.JokesPath, fn, { ifLocked: ifLockedHere }), 'absent_vault')
+    expect(err.message).to.eq(Phrases.BankNotStarted)
+    expect([fn, ifLockedHere].map((each) => each.mock.calls.length)).to.deep.equal([0, 0])
+  })
+
   it("refuses for a user with no bank stored", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage))
     await waitFor(() => { expect(result.current).to.eq('unborn') })
@@ -525,6 +545,13 @@ describe("useBox", () => {
     treeOpts.userid = TH.ProviderUser
     rerender()
     await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+  })
+
+  it("fetches nothing while the bank is starting, and the stored record once it shows locked", async () => {
+    const { release, result } = await renderStarting((world) => world.Bank.useBox(TH.JokesPath))
+    expect([result.current.stage, result.current.hooked.fetchStatus]).to.deep.equal(['starting', 'idle'])
+    release()
+    await waitFor(() => { expect(result.current.hooked.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
   })
 
   it("answers null for a box none is stored at", async () => {

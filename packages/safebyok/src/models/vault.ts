@@ -107,7 +107,7 @@ export class Vault {
   }
   // --
 
-  // == [Using whispers]: forceTimelyUnlocked, withWhisper, #demandReadableThing
+  // == [Using whispers]: forceTimelyUnlocked, withWhisper, withUnlockedWhisper, #demandReadableThing
 
   /** Get the box at `labelpath` and wait for the bank to be unlocked, both at once; resolve once the box can be unsealed.
    * The get runs under `opts.staleTime` where given, else as the minder schedules it.
@@ -125,7 +125,21 @@ export class Vault {
   }
 
   /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
-   * On a locked bank, it waits for an `unlock` gating while it gets the box, and rejects if that wait is dismissed or the bank ends.
+   * On a locked bank, it first waits for an `unlock` gating, and rejects if that wait is dismissed or the bank ends.
+   * Then it gets and unseals the box as {@link withUnlockedWhisper} does, refusing as it refuses.
+   * @example
+   *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))
+   */
+  async withWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
+    // Checked before the wait, so a call that would refuse never asks the user to unlock.
+    this.#scopeAt(labelpath)
+    Checks.fn.parse(fn)
+    await this.#bank.ensureUnlocked()
+    return await this.withUnlockedWhisper(labelpath, fn)
+  }
+
+  /** Call `fn` with the box at `labelpath` unsealed, on an unlocked bank, and resolve what `fn` resolves.
+   * It never waits for an `unlock` gating: on a locked bank it refuses `bank_locked`. Call it where the bank shows unlocked, or call {@link withWhisper}.
    * A refused get rejects with its own refusal where nothing at all is cached for the box, and otherwise rejects nothing by itself.
    * `fn` gets the whole box, in a revision stored at a moment during the call: its whisper, its sidecar and its record's fields.
    * That box may be behind a revision of the same life heard of since.
@@ -133,15 +147,16 @@ export class Vault {
    * of the box is cached, and `absent_box` for a box deleted or never stored.
    * Nothing of the unsealed box is retained, and what `fn` throws is rethrown unchanged. Use the whisper only inside `fn`, and return only what is safe to retain.
    * @example
-   *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))
+   *   if (vault.bank.isUnlocked) { reply = await vault.withUnlockedWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question)) }
    */
-  async withWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
+  async withUnlockedWhisper<ResultT>(labelpath: BoxLabelpath, fn: (box: BoxUnsealed) => Helpers.Awaitable<ResultT>): Promise<ResultT> {
     const scope = this.#scopeAt(labelpath)
     Checks.fn.parse(fn)
-    const [unlocked, got] = await Promise.allSettled([this.#bank.ensureUnlocked(), this.#minder.tryGet(scope)])
-    if (unlocked.status === 'rejected') { throw unlocked.reason }
+    this.#bank.demandEnabled()
+    if (this.#bank.isLocked) { throw Throwers.needUnlocked() }
+    const got = await this.#minder.tryGet(scope)
     // A refused get is thrown only where nothing is cached for the box: otherwise the demand judges what this device holds at the last moment.
-    if ((got.status === 'fulfilled') && (! got.value.ok) && (this.#minder.at(scope) === undefined) && (this.#minder.soonAt(scope) === undefined)) { throw got.value.err }
+    if ((! got.ok) && (this.#minder.at(scope) === undefined) && (this.#minder.soonAt(scope) === undefined)) { throw got.err }
     return await fn(await this.#bank.unsealBox(this.#demandReadableThing(scope)))
   }
 
@@ -185,7 +200,7 @@ function isOfNewerLife(item: Pick<BoxRecord, 'lifepath' | 'revseq'>, soon: Pick<
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Vault.make}'s arguments, and of {@link Vault.withWhisper}'s `fn`. */
+/** The checks of {@link Vault.make}'s arguments, and of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
   vaultMakeArgs: obj({
     bank:   custom<Bank>((val) => val instanceof Bank, Phrases.VaultBankExpected),

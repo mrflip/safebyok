@@ -1,21 +1,30 @@
 /** The bridge: keeps the host's React Query items of a Device's boxes and main gate, and its listing of the boxes, current with its bank's minder. */
 
 import type { QueryClient } from '@tanstack/react-query'
-import { type GateRecord, type ListingEvent, MinderEventFormat, ThingMinder } from 'safebyok'
+import { type GateRecord, type ListingEvent, type MinderEvent, MinderEventFormat, ThingMinder } from 'safebyok'
 import { gateShownOf } from './giver-defaults'
 import type { GiverEvent } from './shapes-giver'
 
 /** Keep the host's React Query items of the boxes and the main gate `minder` minds, and its listing of the boxes, in step with it. Returns the function that stops it.
  * Start it before the minder's first get: a record cached before is copied only when it next changes.
+ * What a delivery throws goes to `tellBadNews`, as what a listener throws goes to the bank's.
  */
-export function bridgeMinder(client: QueryClient, minder: ThingMinder): () => void {
+export function bridgeMinder(client: QueryClient, minder: ThingMinder, tellBadNews: (badnews: readonly unknown[]) => void): () => void {
   return minder.listen((event) => {
-    if (event.eventkind === 'list') {
-      if (event.modelkind === 'box') { deliverListing(client, event) }
-      return
-    }
-    if (event.modelkind === 'box') { deliverEvent(client, event, boxShownOfData) } else if (event.modelkind === 'gate') { deliverEvent(client, event, gateShownOfData) }
+    // Delivered a microtask later, out of the minder's own notification: an invalidation here runs the host's queryFn,
+    // whose get would otherwise start inside it. Without it the get still works. A pragmatic fix, to go if it causes
+    // other problems. Out of the minder's own try/catch, so it has one of its own. #not-a-crossing #pragmatic-fix
+    queueMicrotask(() => { try { deliver(client, minder, event) } catch (err) { tellBadNews([err]) } })
   }, MinderEventFormat)
+}
+
+/** Hand the minder's event to the host's item it concerns, if any. */
+function deliver(client: QueryClient, minder: ThingMinder, event: MinderEvent): void {
+  if (event.eventkind === 'list') {
+    if ((event.modelkind === 'box') && (! minder.isListingBareAt(event))) { deliverListing(client, event) }
+    return
+  }
+  if (event.modelkind === 'box') { deliverEvent(client, event, boxShownOfData) } else if (event.modelkind === 'gate') { deliverEvent(client, event, gateShownOfData) }
 }
 
 /** A box's record as the host's item holds it: whole. */
@@ -48,7 +57,8 @@ function deliverEvent(client: QueryClient, event: GiverEvent, shownOf: (record: 
 }
 
 // A listing's key is the host's key for it too, and its listed time is when a list last set it, which a box joining
-// leaves as it was.
+// leaves as it was. A bare listing, seeded by the minder's `hello` before any list, is not delivered: the host's item
+// stays pending until its own fetch lists the whole of it.
 /** Put the listing in the host's item of it, if a hook made one, or invalidate that item where the minder marked the listing stale. */
 function deliverListing(client: QueryClient, event: ListingEvent): void {
   const { type, action, queryKey, state: { data: labelpaths, dataUpdatedAt } } = event
