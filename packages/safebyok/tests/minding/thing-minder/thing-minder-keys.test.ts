@@ -46,12 +46,14 @@ describe("ThingMinder keys", () => {
     const minder = minderWithoutStart()
     for (const scope of [TH.GateScope, TH.RootScope, TH.BoxScope, TH.BankScope]) {
       expect(ThingMinder.itemQueryKeyOf(scope)).to.deep.equal(minder.itemQueryKey(scope))
+      expect(ThingMinder.listQueryKeyOf(scope)).to.deep.equal(minder.listQueryKey(scope))
     }
     expect(ThingMinder.bankQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme'])
   })
 
   it("made without a minder, refuse a scope that is not one", () => {
     TH.expectSyncRefusal(() => ThingMinder.itemQueryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
+    TH.expectSyncRefusal(() => ThingMinder.listQueryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
     TH.expectSyncRefusal(() => ThingMinder.bankQueryKeyOf({ userid: 'u1' } as never), 'bad_record')
   })
 })

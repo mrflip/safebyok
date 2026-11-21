@@ -3,7 +3,7 @@
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
 import { type Gating, type LiveOf, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, newerThingOf } from 'safebyok'
 
-// == [Query defaults]: recordQueryDefaults, newerOrSharedOf, isRecord, nullifyThing
+// == [Query defaults]: recordQueryDefaults, ListingQueryDefaults, newerOrSharedOf, isRecord, nullifyThing
 
 // A host may override anything the giver supplies here (the keys and each of these defaults), so nothing in the giver may
 // depend on one staying in place. The bridge copies each record into the host's item whatever that item's options say.
@@ -19,6 +19,13 @@ export function recordQueryDefaults(isBehind: () => boolean) {
     structuralSharing: newerOrSharedOf,
   } as const
 }
+
+// The bridge copies each listing the minder sets into the host's item, so nothing ages it.
+/** The giver's defaults for the query of a listing in the host's React Query. */
+export const ListingQueryDefaults = {
+  networkMode: 'always',
+  staleTime:   Infinity,
+} as const
 
 // TanStack shares structure through this both between a query's records and between what a host's `select` returns from
 // them, so a value that is not a record gets TanStack's own default. When a hook's key changes, it shares the last key's
@@ -72,7 +79,7 @@ async function attemptGating(gating: Gating): Promise<void> { await gating.attem
 function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
 // --
 
-// == [Keys]: boxQueryKeyOf, boxesQueryKeyUnder
+// == [Keys]: boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf
 
 // While nobody is signed in, a hook still needs a key: one of no user's, `null` where the userid goes, whose fetch is
 // skipped. It never matches a key the minder caches under.
@@ -86,5 +93,11 @@ export function boxQueryKeyOf({ userid, banklabel, labelpath }: Readonly<{ useri
 /** The key that starts the host's React Query key of the box at `labelpath` and of every box under it: for `invalidateQueries`. While `userid` is null, the key that starts every one of no user's. */
 export function boxesQueryKeyUnder({ userid, banklabel, labelpath }: Readonly<{ userid: Userid | null, banklabel: string, labelpath: string }>): QueryKey {
   return (userid === null) ? ['sok', null, banklabel] : ThingMinder.itemQueryKeyOf({ userid, banklabel, labelpath }).slice(0, -1)
+}
+
+// The minder's keys put the kind of entry before the labels, so no key that starts a box's also starts a listing's.
+/** The host's React Query key for the listing of the root box's children: the key the bank's minder caches it under, or one of no user's while `userid` is null. */
+export function boxListQueryKeyOf({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
+  return (userid === null) ? ['sok', null, banklabel, 'box', '#', 'kids'] : ThingMinder.listQueryKeyOf({ userid, banklabel, labelpath: 'box' })
 }
 // --

@@ -9,7 +9,7 @@ import {
   type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
   type TombstoneOf, type UnlockCleartexts, type Userid, type VaultDB, type Whisper,
 } from 'safebyok'
-import { FormMutationDefaults, boxQueryKeyOf, boxesQueryKeyUnder, nullifyThing, recordQueryDefaults } from './giver-defaults'
+import { FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, nullifyThing, recordQueryDefaults } from './giver-defaults'
 import { type GiverConfig, type GiverSlotSnapshot, GiverSlot } from './giver-slot'
 import { type BoxQueryOpts, ScopeChecks } from './shapes-giver'
 
@@ -268,6 +268,32 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(userid, labelpath), select: nullifyThing as (thing: BoxShown) => SelT, ...opts })
   }
 
+  /** The signed-in user's listing of the root box's children. */
+  async function getBoxListing(): Promise<readonly Labelpath[]> {
+    const device = slot.demandDevice()
+    await device.hello()
+    await device.minder.list(RootBoxLabelpath)
+    // The minder caches the root box's listing from `hello`, so there is always one to read.
+    return device.minder.listingAt({ ...device.scope, labelpath: RootBoxLabelpath })!
+  }
+
+  /** The labelpaths of the bank's boxes, through React Query, for a list that renders each one by {@link useBox}.
+   * `data` is the labelpaths in labelpath order, and undefined while pending or while nobody is signed in. It is the same array until a box joins.
+   * A deleted box stays listed, and its `useBox` answers null. A box this device writes or hears of joins at once.
+   * @example
+   *   const { data: labelpaths } = Knock.useBoxList()
+   *   labelpaths?.map((labelpath) => <JokeRow key={labelpath} labelpath={labelpath} />)
+   */
+  function useBoxList(): UseQueryResult<readonly string[]> {
+    const userid = useShownSnapshot((snap) => snap.userid)
+    return useQuery({
+      ...ListingQueryDefaults,
+      queryKey: boxListQueryKeyOf({ userid, banklabel }),
+      queryFn:  (userid === null) ? skipToken : getBoxListing,
+      select:   hostLabelpathsOf,
+    })
+  }
+
   /** The keys of the signed-in user's boxes in the host's React Query, reading whoever is signed in when called. */
   const keys = Object.freeze({
     /** The key of the box at `labelpath`'s query. */
@@ -277,6 +303,8 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
      *   void queryClient.invalidateQueries({ queryKey: Knock.keys.under('jokes') })
      */
     under: (labelpath?: string): QueryKey => boxesQueryKeyUnder({ userid: slot.device?.userid ?? null, banklabel, labelpath: (labelpath === undefined) ? RootBoxLabelpath : boxLabelpathOf(labelpath) }),
+    /** The key of {@link useBoxList}'s query, which no key from `under` starts. */
+    boxList: (): QueryKey => boxListQueryKeyOf({ userid: slot.device?.userid ?? null, banklabel }),
   })
 
   /** Call `fn` with the box's whisper, and resolve what `fn` resolves. On a locked bank, it first waits for the unlock form.
@@ -417,14 +445,14 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
   }
 
   const bankGiver = Object.freeze({
-    useBank, usePasskeyHeader, useBox, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, lock, dismissUnlock,
+    useBank, usePasskeyHeader, useBox, useBoxList, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
   })
   return { bankGiver, boxQueryOf }
 }
 // --
 
-// == [Helpers]: RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, emptyForm, Checks
+// == [Helpers]: RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, emptyForm, Checks
 
 /** The core's labelpath of the root box, which every box is under. */
 const RootBoxLabelpath = 'box' as BoxLabelpath
@@ -437,6 +465,12 @@ function boxLabelpathOf(labelpath: string): BoxLabelpath {
 /** The core's labelpath of the box `boxNamed` names: the host's labelpath under `box/`, or a scoped object's own. */
 function boxLabelpathOfNamed(boxNamed: BoxNamed): BoxLabelpath {
   return (typeof boxNamed === 'string') ? boxLabelpathOf(boxNamed) : Checks.boxScoped.parse(boxNamed).labelpath
+}
+
+// Labelpaths are flat: a box's label is the host's labelpath.
+/** The host's labelpaths of the boxes the core lists at `boxLabelpaths`. */
+function hostLabelpathsOf(boxLabelpaths: readonly Labelpath[]): readonly string[] {
+  return boxLabelpaths.map((boxLabelpath) => Labelpath.labelOf(boxLabelpath))
 }
 
 /** Delete every field of `form`. */
