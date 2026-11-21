@@ -17,7 +17,7 @@ const CloakedMarker = '[cloaked]'
 
 // A form mutation's variables stay in React Query's mutation cache, its devtools and the `useMutation` hook's state; a
 // cloak there shows none of its cleartexts, and is vacated once the mutation settles. A passkey answer's getter hands out
-// a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own bytes until it is vacated.
+// a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own bytes intact until it is vacated.
 /** A form's cleartexts, each read through its getter, until {@link Cloak.vacate} empties the cloak.
  * A spread copies none of them, and JSON, `String()` and Node's inspect show only `'[cloaked]'`.
  */

@@ -89,7 +89,7 @@ export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | '
 // == [The car]: ThingCar, BankCar, BoxCar, GateCar, ThingAt, CarAt, DeliverableThing, carLivenessVals
 
 // The vaultDB has a newer whole record when liveness is 'bhnd' or 'bare' (dbHasNewer).
-/** A ThingMinder's cache value for a Thing, deeply frozen: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
+/** A ThingMinder's cache value for a Thing, deeply frozen: of the records the minder has received, it carries the newest (perhaps sparse), and the fullest (perhaps null, or undefined for "exists, but nothing useful cached").
  * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
  * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
  * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)

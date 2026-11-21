@@ -366,7 +366,7 @@ describe("device.tellBadNews(badnews)", () => {
 })
 
 describe("tellBadNewsTo", () => {
-  it("calls the handler with each news and its device", async () => {
+  it("calls the handler with each item of news and its device", async () => {
     const device = TH.makeDevice()
     const onBadNews = vi.fn()
     const news = [new Errors.VaultError('storage_unavailable', "Down."), new Errors.VaultError('absent_box', "Gone.")]

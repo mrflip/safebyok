@@ -463,7 +463,7 @@ export class ThingMinder {
     return ThingChecks.thingScope.parseConsistent(labelpathed, this.scope)
   }
 
-  /** `record`, refused where the vaultDB delivered it of another bank, or of another labelpath than `scoped` names. */
+  /** `record`, refused where it is of another bank, or of another labelpath than `scoped` names. */
   #checkedDelivered<RecordT extends DeliverableThing>(record: RecordT, scoped: ThingWatchScope): RecordT {
     DeliveredChecks.thingScope.parseConsistent(record, scoped, { message: Phrases.DeliveredOfOtherScope })
     return record

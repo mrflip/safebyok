@@ -88,7 +88,7 @@ describe("BaseBox.nextRevisionOf(donor, publicProps)", () => {
     expect(next.revtok).to.not.eq(shell.revtok)
   })
 
-  it("writes it at the written_at given, born then in a new life", () => {
+  it("makes the revision at the written_at given, born then in a new life", () => {
     const next = BaseBox.nextRevisionOf(TH.boxShellOf(), { ...PublicProps, written_at: TH.T0 - 5 })
     expect(next).to.include({ written_at: TH.T0 - 5, born_at: TH.T0 - 5 })
   })

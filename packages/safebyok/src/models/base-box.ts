@@ -108,7 +108,7 @@ Object.freeze(BaseBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
 // == [Helpers]: nextLifeOf, deserializeWhisper
 
-/** The lifeseq and lifepath of the life after the given box's */
+/** The lifeseq and lifepath of the life after the given box's life. */
 function nextLifeOf({ lifeseq, lifepath }: Pick<BoxRecord, 'lifeseq' | 'lifepath'>): Pick<BoxRecord, 'lifeseq' | 'lifepath'> {
   const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
   return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }

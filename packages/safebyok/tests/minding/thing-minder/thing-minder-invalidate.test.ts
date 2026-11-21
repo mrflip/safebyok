@@ -12,7 +12,7 @@ function invalidationOf(labelpath: Labelpath) {
   return { isThing: false, modelkind: (labelpath === 'gate') ? 'gate' : 'box', labelpath, action: 'invalidate', isInvalidated: true }
 }
 
-/** Whether each event `heard` was told is a car's, and its scope, action and staleness. */
+/** For each event `heard` was told: whether it is a car's, and its scope, action and staleness. */
 function toldOf(heard: ReturnType<typeof listenerOf>) {
   return heard.mock.calls.map(([event]: [MinderEvent]) => {
     const { modelkind, labelpath, action, state } = event

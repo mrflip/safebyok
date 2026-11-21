@@ -246,7 +246,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     expect(rowsOf(bank).get(Openai)).to.include({ revtok: stored.revtok })
   })
 
-  it("refuses a newest cached sparse when the patch gives no sidecar", async () => {
+  it("refuses a sparse cached newest record when the patch gives no sidecar", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: stored } = await bank.sealBox(first, {}, { whisper: TH.Whisper })
@@ -488,7 +488,7 @@ function carsOnAnswer(bank: Bank, minder: ThingMinder, labelpath: string): (stri
 }
 
 // Bank.put and the gate verbs write through the vaultDB, not the minder. Every adapter built on AdapterVaultDB (the
-// MemoryVaultDB here, and Postgres's) tells each watch of the bank of the bank, main gate and root box records a write
+// MemoryVaultDB here, and Postgres's) tells each watch of the bank about the bank, main gate and root box records a write
 // answers with, before the write's answer reaches its caller (VaultDB.watch): so a minder of the bank has the bank or
 // gate record a verb wrote before the verb resumes. A box's good write is no tracked record: the caller lands it.
 describe("a vault's minder, beside the bank's own writes", () => {

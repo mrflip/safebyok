@@ -169,7 +169,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   const bankHead = bankQueryKey(device)
 
   /** This tab's state of the bank: its stage, whether it is locked, and when its lease ends. Synchronous: it never waits and never suspends.
-   * Given `select`, it re-renders only when what `select` returns changes, which must be a field of the snapshot or a primitive, never a new object.
+   * Given `select`, it re-renders only when what `select` returns changes: return a field of the snapshot or a primitive, never a new object.
    */
   function useBankSnapshot(): BankSnapshot
   function useBankSnapshot<SelT>(select: (snap: BankSnapshot) => SelT): SelT
