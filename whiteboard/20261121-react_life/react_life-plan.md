@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 12 filed and out of draft, in one line ending at #808. Thread 13 (giver_device) building, stacked on #808. A survey of where the hooks underuse React Query runs beside it. Waiting on the Coach: Closer Look replies, browser click-throughs, Open Matters rows.
+* **Status:** running. Threads 1 to 12 filed and out of draft, in one line ending at #808. Thread 13 (giver_device) ready as #809, stacked on #808, in review (medium, opus). Closer Look triage and answers are in the tab, awaiting the Coach.
 
 ## The goal
 

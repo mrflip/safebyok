@@ -28,7 +28,7 @@
    of ours to ask "is this current?".
 
 ```ts
-// == Once, at module scope: the giver, before any user. Static config and one slot, the current device ==
+// == Once, at module scope: the giver, before any user. Static config, and the current device once a userid arrives ==
 export const SOK  = Safebyok.reactGiver({ banks: { acme: { vaultDB } }, keyDeriver: argon2idDeriver() })
 // PascalCase, so the rules-of-hooks lint checks Acme.useBox() as a hook.
 export const Acme = SOK.bank('acme')

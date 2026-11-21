@@ -30,12 +30,12 @@ the thread file rather than carrying the code's behaviour over.
 
 | When | What exists |
 |---|---|
-| module scope | the giver: static config (banks, vaultDB, keyDeriver, whisper schemas) and one mutable slot, the current device |
+| module scope | the giver: static config (banks, vaultDB, keyDeriver, whisper schemas) and the current device, none until a userid arrives (*Orchestrator:* thread 13: no slot; the giver keeps its device itself) |
 | the provider mounts | the host's QueryClient is in hand, and is given to the giver |
 | a userid arrives | the device, which owns the vaultDB, the TSQ cache, the minder and the bridge |
 | the bank and gate records are in hand | the bank, then the vault; the lease loads after |
 
-* **Agreed.** The giver predates the user and holds no user state. Everything a hook reads goes through its slot.
+* **Agreed.** The giver predates the user and holds no user state but the current device. A hook reads the device through its provider's context (*Orchestrator:* thread 13).
 * **Agreed.** A device cannot exist before its userid, and has it from construction.
 * **Agreed.** The device owns the minder's lifecycle; the minder co-lives with the vaultDB, the TSQ and the bridge.
 * **Agreed.** The TSQ cache is made at the userid boundary, so only one user's data is ever in it. If that gets in the
@@ -58,9 +58,9 @@ the thread file rather than carrying the code's behaviour over.
 
 ## The provider
 
-* **Agreed.** One `<SOK.Provider userid>`, replacing `SOK.useSignIn` and `SOK.useBridge`. It fills the giver's slot,
+* **Agreed.** One `<SOK.Provider userid>`, replacing `SOK.useSignIn` and `SOK.useBridge`. It starts the giver's device,
   and may override `vaultDB` and `keyDeriver` for its mount, which is what lets a test render the real giver over a
-  memory vaultDB. One provider is mounted at a time. Functions outside render read the slot when called.
+  memory vaultDB. One provider is mounted at a time. Functions outside render read the giver's device when called.
 * **Agreed.** The host's QueryClient is given through the provider, any time before the vault is made.
 * **Agreed.** What the `userid` prop does:
 
@@ -85,9 +85,9 @@ the thread file rather than carrying the code's behaviour over.
 
 * **Directed.** Only what the program can reach: `signed_out`, `starting`, `unborn`, `locked`, `unlocked`, `failed`.
   `swept`, `vacated` and `deleted` go.
-* **Agreed.** `signed_out`, `starting` and `failed` are states of a slot, not of a bank object. The flat `stage` that
+* **Agreed.** `signed_out`, `starting` and `failed` are states of what the provider shows, not of a bank object. The flat `stage` that
   `Acme.useBank()` answers is the composed view.
-* **Proposed.** `unborn` is a state of the slot too: no bank object, and birth fills it.
+* **Proposed.** `unborn` is a state of what the provider shows too: no bank object, and birth fills it.
 
 ## Rules for the hooks, parts and kit
 
