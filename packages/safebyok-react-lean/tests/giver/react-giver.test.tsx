@@ -270,7 +270,7 @@ describe("withWhisper", () => {
     act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
     await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
     const thrown = new TypeError('The joke service is down')
-    await expect(world.Bank.withWhisper(TH.JokesPath, () => { throw thrown })).rejects.toBe(thrown)
+    await expect(world.Bank.withWhisper(TH.JokesPath, () => { throw thrown })).rejects.to.eq(thrown)
   })
 
   it("refuses while nobody is signed in", async () => {
