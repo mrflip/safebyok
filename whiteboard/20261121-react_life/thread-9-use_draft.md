@@ -1,7 +1,7 @@
 # Thread 9: use_draft (2026-11-21)
 
-Branch `20261121-use_draft`, PR [#805](https://github.com/mrflip/safebyok/pull/805), stacked on #803. Proved: `safebyok-react-lean` lint, typecheck, and tests
-(13 files, 200 tests, 11 of them `tests/giver/use-draft.test.tsx`).
+Branch `20261121-use_draft`, PR [#805](https://github.com/mrflip/safebyok/pull/805), stacked on #803. Proved: `pnpm justify` green after the catch-up onto
+`ef1cc6873`; `safebyok-react-lean` 200 tests, 11 of them `tests/giver/use-draft.test.tsx`.
 
 * **Built**: `Knock.useDraft(labelpath)`, in `packages/safebyok-react-lean/src/giver/use-draft.ts`, wired onto the bank
   giver by one line in `makeBankGiver` (`makeUseDraft(slot, { useBank, useBox, withWhisper })`). It answers `isDirty`,
