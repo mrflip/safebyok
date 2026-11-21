@@ -62,5 +62,4 @@ export function WhisperText({ bank, labelpath, field, masked = PartsPhrases.mask
     </span>
   )
 }
-
 // --
