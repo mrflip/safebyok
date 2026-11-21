@@ -181,7 +181,8 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     const client = useQueryClient()
     // The device is made during render, so the first render with a userid shows it, and a selecting hook renders no
     // more than its selection changes. Each later call, StrictMode's or a discarded render's, answers the one device.
-    // `hello` reads the vaultDB, so it waits for the effect; it has no cleanup, as the device lives for the page.
+    // `hello` fetches the bank, its main gate and root box through the minder, so it waits for the effect; it has no
+    // cleanup, as the device lives for the page.
     const made = (typeof userid === 'string') ? ensureDevice(userid, { client, vaultDB, keyDeriver }) : device
     useEffect(() => { void made?.hello() }, [made])
     const shown = useMemo(() => shownOf(made, userid), [made, userid])
