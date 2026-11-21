@@ -176,6 +176,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
    * The first userid starts that user's device. A null or undefined userid changes nothing, and neither does unmounting.
    * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead.
    * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
+   * Render it in the browser only: the giver keeps the device it makes for the life of the module, so on a server the first request's user would keep it for every later request.
    */
   function Provider({ userid, vaultDB, keyDeriver, children }: ProviderProps) {
     const client = useQueryClient()
@@ -350,7 +351,7 @@ function makeBankGiver(friend: BankFriend) {
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
    * `opts` are React Query's own, as {@link useBox} takes them.
    * @example
-   *   const passkeyHeader = Knock.useGate({ select: (gate) => liveGateOf(gate)?.wayins.passkey0 ?? null }).data
+   *   const passkeyHeader = Knock.useGate({ select: passkeyHeaderOf }).data
    *   {(passkeyHeader === null) && <AddPasskeyForm username={user.email} />}
    */
   function useGate<SelT = GateSelected>(opts: BoxQueryOpts<GateShown, SelT> = {}): UseQueryResult<SelT> {

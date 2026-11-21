@@ -4,9 +4,9 @@ import { type ReactNode, useActionState, useEffect } from 'react'
 import { type BankSnapshot, type BoxRecord, type GateRecord, type Gating, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { liveGateOf, liveOf } from '../../src/giver/giver-defaults'
+import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
 import { mask } from '../../src/index'
-import { type GateShown, type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
+import { type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
 const Passphrase = LeanTH.TestPassphrase
@@ -313,9 +313,6 @@ async function renderGate() {
   await waitFor(() => { expect(rendered.result.current.gate.data).to.not.be.undefined })
   return rendered
 }
-
-/** The passkey header of a gate as `useGate` shows it, or null for none. */
-function passkeyHeaderOf(gate: GateShown) { return liveGateOf(gate)?.wayins.passkey0 ?? null }
 
 /** The ciphertext of each wrapped bankKey on the gate the world's vaultDB stores. */
 function storedWrapsOf(world: TH.ProviderWorld): string[] {

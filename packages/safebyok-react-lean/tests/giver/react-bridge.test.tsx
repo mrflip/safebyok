@@ -1,7 +1,7 @@
 import { act, render, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { type BoxRecord, type GateRecord, MinderEventFormat, type PasskeyWayinHeader, ThingMinder } from 'safebyok'
-import { liveGateOf } from '../../src/index'
+import { passkeyHeaderOf } from '../../src/index'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import * as TH from '../test-helpers'
@@ -149,7 +149,7 @@ describe("the bridge's main gate", () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     let header: PasskeyWayinHeader | null | undefined
     function GateProbe() {
-      header = world.Bank.useGate({ select: (gate) => liveGateOf(gate)?.wayins.passkey0 ?? null }).data
+      header = world.Bank.useGate({ select: passkeyHeaderOf }).data
       return <p>{header?.wayinkind ?? 'none'}</p>
     }
     const { container } = render(TH.providerTreeOf(world, <GateProbe />, { userid: TH.ProviderUser }))

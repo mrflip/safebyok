@@ -1,10 +1,10 @@
 /** The passkey's forms: `AddPasskeyForm`, `RevokePasskeyForm`, and `PasskeyUnlockButton`, which unlocks the bank by its passkey. */
 
 import { useId, useRef, useState } from 'react'
-import { type PasskeyAnswer, type PasskeyWayinHeader, type VaultError, type WayinHeader, isVaultError } from 'safebyok'
-import { liveGateOf } from '../giver/giver-defaults'
+import { type PasskeyAnswer, type VaultError, type WayinHeader, isVaultError } from 'safebyok'
+import { passkeyHeaderOf } from '../giver/giver-defaults'
 import { useGivenBank } from '../giver/giver-context'
-import type { BankGiver, GateShown } from '../giver/react-giver'
+import type { BankGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
@@ -79,9 +79,10 @@ export interface RevokePasskeyFormProps {
 
 // Proved by the passphrase, never the passkey: a user revoking a passkey may have lost it.
 /** The form that removes the bank's passkey, here and on every other device, proved by the passphrase. The bank is left unlocked.
- * Show it while the bank has a passkey, `Knock.useGate()`'s `wayins.passkey0` not null.
+ * Show it while the bank has a passkey, the gate's header that {@link passkeyHeaderOf} finds.
  * @example
- *   {(Knock.useGate().data?.wayins.passkey0 != null) && <RevokePasskeyForm username={user.email} />}
+ *   const passkeyHeader = Knock.useGate({ select: passkeyHeaderOf }).data
+ *   {(passkeyHeader !== null) && (passkeyHeader !== undefined) && <RevokePasskeyForm username={user.email} />}
  */
 export function RevokePasskeyForm({ bank: bankProp, username }: Readonly<RevokePasskeyFormProps>) {
   const bank = useGivenBank(bankProp)
@@ -159,12 +160,7 @@ export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHead
 }
 // --
 
-// == [Helpers]: passkeyHeaderOf, heardCeremony
-
-/** The header of `gate`'s passkey, or null while it has none or no bank is stored. */
-function passkeyHeaderOf(gate: GateShown): PasskeyWayinHeader | null {
-  return liveGateOf(gate)?.wayins.passkey0 ?? null
-}
+// == [Helpers]: heardCeremony
 
 /** The answer `ceremony` resolves, or null where the user dismissed it or it refused a condition, handed to `hear`.
  * Any other refusal, such as options the host got wrong, is rethrown.

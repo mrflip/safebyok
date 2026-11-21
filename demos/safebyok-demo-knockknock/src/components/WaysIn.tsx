@@ -1,4 +1,4 @@
-import { type GateShown, liveGateOf } from 'safebyok-react-lean'
+import { passkeyHeaderOf } from 'safebyok-react-lean'
 import { AddPasskeyForm, ReplacePassphraseForm, RevokePasskeyForm, passkeysAvailable } from 'safebyok-react-lean/kit'
 import { Knock } from '../lib/sok'
 
@@ -20,6 +20,3 @@ export function WaysIn({ username }: Readonly<{ username: string | undefined }>)
     </section>
   )
 }
-
-/** The header of the gate's passkey, or null while it has none. */
-function passkeyHeaderOf(gate: GateShown) { return liveGateOf(gate)?.wayins.passkey0 ?? null }
