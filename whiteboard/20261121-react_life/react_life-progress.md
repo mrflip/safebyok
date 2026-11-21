@@ -118,3 +118,10 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   `expectTextUnheld`, `holdsText`, `reactTreeOf`, `installFakeAuthenticator`. `LocalStorageVaultDB` in the demo's
   `src/lib/` (cheat: `_cheat_things`).
 * **Planning lesson:** a stalled worker shows as a stale ohai heartbeat; resume it by message, never relaunch.
+
+## Rulings, 2026-11-21, second batch
+
+* **Standalone gating makers and mutation options come back**, beside the hooks: "Both approaches are wanted".
+* **The kit's bank prop is right for now, not in the end:** the provider's context serves it; thread 11.
+* **Box-hook names follow STYLE.md:** `nullifyThing` → a `fooOf` name, `PutBoxActionResult.error` → `err`,
+  `delBox` → `delBoxOnce`; thread 11, before envman.

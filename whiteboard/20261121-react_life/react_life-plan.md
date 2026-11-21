@@ -305,9 +305,30 @@ Serves thread 10: envman's masked editor with save and undo. The Coach's text is
   `last_rotated_at`; the box's label is a minted id); the row editor (`useDraft`, save and undo), where saving a new
   `val` stamps `last_rotated_at`; red when a record is older than its period; a gear modal that edits the sidecar,
   the title included, which is what "rename" means.
-* **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8 and 9, cut from the top of the two.
+* **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8, 9 and 11, cut from 11 (*Orchestrator:* 11 added before it).
 * **Ready when:** add two records, reload and see them, back-date one and see it red, edit its value with save and
   undo.
+
+### 11. `giver_surface`: the Coach's rulings on the giver's surface
+
+*Orchestrator:* added 2026-11-21 from three Open Matters rulings; runs after 8 and 9 and before 10, so envman is
+written against the final names.
+
+> Standalone gating makers dropped → "add them back; what does the dream_interface file prescribe you use? Both approaches are wanted i was told"
+> Parts and kit take the bank as a prop → "im pretty sure we dont want this in the end but getting it working is right. the context doesnt help?"
+> Three box-hook names against STYLE.md → "yes correct the names to what style says"
+
+* **Builds:** (a) the standalone gating makers and mutation options back on the bank giver, beside the five form
+  hooks and their `.gating` (the dream prescribes the hook form; this adds the TanStack-idiomatic
+  `useMutation(Knock.unlockMutationOptions())` route and a gating built outside a hook); (b) `SOK.Provider` puts its
+  giver and its one bank in a package-level context the parts and kit read, so `<UnlockForm />` and
+  `<WhisperText labelpath field />` work bare, as the dream writes them; `bank` and `giver` props stay as overrides;
+  (c) the renames STYLE.md asks for: `nullifyThing` to a pure-derivation `fooOf` name, `PutBoxActionResult.error` to
+  `err`, `delBox` to `delBoxOnce`; (d) the Knock-Knock demo drops its `bank={Knock}` props where the context serves,
+  and the dream's examples follow the new names.
+* **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8 and 9, cut from the top of the two.
+* **Ready when:** a kit form renders bare under the provider and its tests pass; the old names are gone; a test makes
+  a gating outside a hook and mutates through the standalone options.
 
 ## What no thread builds
 
