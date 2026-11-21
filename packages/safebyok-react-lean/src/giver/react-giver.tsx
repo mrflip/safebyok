@@ -268,7 +268,7 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(userid, labelpath), select: nullifyThing as (thing: BoxShown) => SelT, ...opts })
   }
 
-  /** The signed-in user's listing of the root box's children, through the device's minder, once a list of the vaultDB has set it. */
+  /** The signed-in user's listing of the root box's children. */
   async function getBoxListing(): Promise<readonly Labelpath[]> {
     const device = slot.demandDevice()
     await device.hello()

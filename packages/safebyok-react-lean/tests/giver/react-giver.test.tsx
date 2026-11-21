@@ -467,6 +467,7 @@ describe("useBoxList", () => {
     expect(result.current.data).to.deep.equal([])
   })
 
+  // useBoxList @example
   it("grows when a box is written, the same array until then", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBoxList().data)
     await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath]) })
