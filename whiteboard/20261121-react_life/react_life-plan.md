@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Thread 1 filed, out of draft (#797). Thread 2 ready, in review (#798; one compaction, before its readiness check). Thread 3 building, stacked on #798.
+* **Status:** running. Threads 1 and 2 filed, out of draft (#797, #798). Thread 3 building, stacked on #798.
 
 ## The goal
 
@@ -193,6 +193,7 @@ Serves threads 2 to 10, which all write in it.
 * **Ready when:** a test starts a device over a `MemoryVaultDB` that has a born bank and sees `starting` then
   `locked`, and over an empty one sees `unborn`, then birth, then `unlocked`.
 * *Orchestrator:* ready, #798. One compaction, six minutes in, before its readiness check. Cheats: birth hands the bank to the device from inside `Bank.birthGating` (`device.adoptBornBank`); `hello` skips its fetch when the device already has a bank. Deviation: five sweep and lock tests dropped and one rewritten, because a swept device now shows the swept bank. Two Open Matters rows.
+* *Review:* fixed (medium). `hello` starts the minder inside its `try`, so a throwing watch shows `failed` rather than rejecting; doc blocks trimmed; a `queryCacheOpts` test. Left: `safebyok/core` now pulls in the minder and TanStack through `Device` (an Open Matters row); a tombstoned bank row reads as `unborn`; `#hold` sets the bank before the vault (only reachable via a swept bank). Four out-of-bounds findings noted.
 
 ### 3. `giver_slot`: the provider and the slot
 
