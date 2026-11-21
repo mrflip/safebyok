@@ -1,6 +1,6 @@
 # Thread 10: demo_envman (2026-11-21)
 
-Branch `20261121-demo_envman`, PR #TBD, stacked on #806. Proved: `safebyok-demo-envman` lint, typecheck, test (3 files,
+Branch `20261121-demo_envman`, PR #807, stacked on #806. Proved: `safebyok-demo-envman` lint, typecheck, test (3 files,
 18: the app's integration test 5, `local-vault-db` 4, `session` 9); `safebyok-react-lean` lint and typecheck. `pnpm justify`
 after the catch-up: see the PR's **Tests:** line. Nobody has clicked through the page in a real browser.
 
