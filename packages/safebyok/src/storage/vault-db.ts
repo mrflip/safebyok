@@ -80,7 +80,7 @@ export interface VaultDB {
   tryGetThing(ask: GetAsk): Promise<GetThingAnswer>
   /** Write `ask.record` over the Thing stored, if it matches `ask.cited`.
    * - The write is stored when its preconditions hold: the exact revision cited and, for a put that replaces a live Thing, the
-   *   born_at kept and the storage policies it names. Nothing else of the Thing stored is checked.
+   *   born_at left unchanged and the storage policies it names. Nothing else of the Thing stored is checked.
    * - Where several refusals apply at once, the answer is one of them, but which is unspecified, and may differ between stores
    *   and between versions. A Thing stored too damaged to check the preconditions against may refuse `damaged_row`,
    *   `storage_issue`, or the failed precondition's own refusal.

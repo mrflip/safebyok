@@ -118,7 +118,7 @@ describe("ThingMinder.get", () => {
     [(vaultDB: MemoryVaultDB) => { vaultDB._cheat_things(TH.ThingBank).delete(TH.BoxScope.labelpath) },                            'nothing stored'],
   ] as const
   for (const [goBack, blurb] of BackwardCases) {
-    it(`refuses 'stale_read' a get answered with ${blurb}, behind the record cached before it, and keeps that record untimely`, async () => {
+    it(`refuses 'stale_read' a get answered with ${blurb}, behind the record cached before it, and leaves that record untimely`, async () => {
       const vaultDB = new MemoryVaultDB()
       const box0    = await storedBoxOf(vaultDB)
       const box1    = TH.nextOf(box0)
@@ -278,7 +278,7 @@ describe("ThingMinder.list", () => {
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(box))
   })
 
-  it("leaves a box the cache holds whole as it is, and timely", async () => {
+  it("leaves a whole box in the cache unchanged, and timely", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)

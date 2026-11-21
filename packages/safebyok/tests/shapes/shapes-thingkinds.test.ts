@@ -5,7 +5,7 @@ import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../../src/sh
 import * as TH from '../test-helpers'
 
 describe("BankChecks, GateChecks and BoxChecks", () => {
-  it("carry each kind's stamp and ask checks as the same checks StampChecks and AskChecks hold", () => {
+  it("carry each kind's stamp and ask checks, the same checks StampChecks and AskChecks have", () => {
     expect(BankChecks.stamp).to.eq(StampChecks.bankStamp)
     expect(BankChecks.birthAsk).to.eq(AskChecks.birthBankAsk)
     expect(GateChecks.stamp).to.eq(StampChecks.gateStamp)

@@ -22,7 +22,7 @@ const FormCases = [
   ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     () => ({ passkeyCleartext: fakePasskeyAnswer() })],
 ] as const
 
-/** True of a cloak that holds nothing. */
+/** True of a cloak that contains nothing. */
 function isVacated(cloaked: Cloak): boolean {
   return [cloaked.passphraseCleartext, cloaked.passkeyCleartext, cloaked.nextPassphraseCleartext, cloaked.nextPasskeyCleartext].every((val) => val === undefined)
 }
@@ -60,7 +60,7 @@ describe("makeReactGiver", () => {
 })
 
 describe("useBankSnapshot", () => {
-  it("reads as starting and locked before the Device holds a bank object", () => {
+  it("reads as starting and locked before the Device has a bank object", () => {
     const { Acme, wrapper } = setup()
     const { result } = renderHook(() => Acme.useBankSnapshot(), { wrapper })
     expect(result.current).to.eq(PendingBank)
@@ -90,7 +90,7 @@ describe("useBankSnapshot", () => {
 
 describe("the form mutations", () => {
   for (const [verb, optionsOf, useForm, cleartextsOf] of FormCases) {
-    it(`runs the bank's ${verb} through its mutationOptions, with the cleartexts the cloak holds, and vacates the cloak`, async () => {
+    it(`runs the bank's ${verb} through its mutationOptions, with the cleartexts the cloak has, and vacates the cloak`, async () => {
       const { world, Acme, wrapper } = setup()
       const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, Cloak>), { wrapper })
       const cloaked = cloak(cleartextsOf())
@@ -99,7 +99,7 @@ describe("the form mutations", () => {
       expect(isVacated(cloaked)).to.eq(true)
     })
 
-    it(`runs the bank's ${verb} through its hook, with the cleartexts the cloak holds, and vacates the cloak`, async () => {
+    it(`runs the bank's ${verb} through its hook, with the cleartexts the cloak has, and vacates the cloak`, async () => {
       const { world, Acme, wrapper } = setup()
       const { result } = renderHook(() => useForm(Acme), { wrapper })
       const cloaked = cloak(cleartextsOf())
@@ -168,7 +168,7 @@ describe("useStrengthVerdict", () => {
     expect(result.current.verdict).to.deep.equal({ strong: true })
   })
 
-  it("keeps the last verdict while the next is judged", async () => {
+  it("still shows the last verdict while the next is judged", async () => {
     const { world, Giver, wrapper } = setup()
     const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
     await act(() => result.current.judge('short'))
@@ -181,7 +181,7 @@ describe("useStrengthVerdict", () => {
     expect(result.current.verdict).to.deep.equal({ strong: true })
   })
 
-  it("keeps one judge across renders", async () => {
+  it("returns the same judge across renders", async () => {
     const { Giver, wrapper } = setup()
     const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
     const { judge } = result.current
@@ -217,7 +217,7 @@ describe("useBoxRecord", () => {
     expect(result.current.data).to.be.null
   })
 
-  it("stays fresh while the car is whole, and goes stale while the vaultDB holds a newer revision", async () => {
+  it("stays fresh while the car is whole, and goes stale while the vaultDB has a newer revision", async () => {
     const { world, Acme, client, wrapper } = setup()
     const first = TH.fakeBoxRecordOf(OpenaiPath, 1)
     world.stored.set(OpenaiPath, TH.fullCarOf(first))

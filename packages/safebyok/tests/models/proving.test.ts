@@ -96,7 +96,7 @@ describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
 
-  it("replaces what a throwing checker threw with a refusal quoting none of it and keeping no cause", async () => {
+  it("replaces what a throwing checker threw with a refusal quoting none of it and with no cause", async () => {
     function strengthChecker(): never { throw new Error(`weak: ${TH.TestPassphrase}`) }
     const err = await TH.expectRefusal(Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), TH.WorldScope, TH.TestPassphrase))
     expect(err.cause).to.be.undefined
@@ -175,7 +175,7 @@ describe("PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseC
     expect(TH.isZeroed(handed)).to.be.true
   })
 
-  it("replaces what a throwing keyDeriver threw with a refusal quoting none of it and keeping no cause", async () => {
+  it("replaces what a throwing keyDeriver threw with a refusal quoting none of it and with no cause", async () => {
     const keyDeriver = deriverHanding(() => { throw new Error(`cannot derive ${TH.TestPassphrase}`) })
     const err = await TH.expectRefusal(novelPassphrase(TH.provingDeviceOf({ keyDeriver })))
     expect(err.cause).to.be.undefined
@@ -349,7 +349,7 @@ describe("PasskeyProving.buildStored(gate, passkeyCleartext)", () => {
 })
 
 describe("guardKeyDeriver(hostDeriver)", () => {
-  it("keeps the deriver's label and salt length, and marks the result as guarded", () => {
+  it("has the deriver's label and salt length, and marks the result as guarded", () => {
     const guarded = guardKeyDeriver(TH.testDeriver)
     expect(guarded).to.include({ key_deriver_label: TH.testDeriver.key_deriver_label, salt_size: TH.testDeriver.salt_size })
     expect(Object.isFrozen(guarded)).to.be.true

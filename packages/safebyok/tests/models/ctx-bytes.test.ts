@@ -38,7 +38,7 @@ const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 /** What a part key is unwrapped as. */
 const DecipherUsage = { extractable: false, usage: ['decrypt'] } as const
 
-/** `val` changed, keeping its type: a number one more, a string with a letter added. */
+/** `val` changed, its type unchanged: a number one more, a string with a letter added. */
 function changed(val: unknown): unknown { return ((typeof val === 'number') ? val + 1 : `${String(val)}x`) }
 
 /** A born bank, a box it sealed, the box's stamp as the seal binds it, and the bankKey, read through the backdoor. */

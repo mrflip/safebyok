@@ -316,7 +316,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: bank.endCause })
   })
 
-  it("keeps its snapshot once swept, telling no subscriber of a lock or of its device's sweep", async () => {
+  it("leaves its snapshot unchanged once swept, telling no subscriber of a lock or of its device's sweep", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.sweep()
     const swept = bank.getSnapshot()
@@ -405,7 +405,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     expect(Object.isFrozen(unsealed)).to.be.true
   })
 
-  it("seals the next revision of a live box, keeping its life, from the stored box with a new sidecar", async () => {
+  it("seals the next revision of a live box, in the same life, from the stored box with a new sidecar", async () => {
     // sealBox @example
     const { bank } = await TH.buildBornBank()
     const { record: first } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -708,7 +708,7 @@ function nextBankThingOf(bank: Bank) {
 }
 
 describe("bank.track, and the asks the bank builds", () => {
-  it("track the revseq and lifepath this object holds of the bank, its main gate and its root box", async () => {
+  it("track the revseq and lifepath this object has of the bank, its main gate and its root box", async () => {
     const { bank } = await TH.buildBornBank()
     expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.maingate.pickle(), bank.rootBox as never))
   })
@@ -724,7 +724,7 @@ describe("bank.track, and the asks the bank builds", () => {
     expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track })
   })
 
-  it("track what this object holds, though the bank stored has moved on: the answer's tracked says so", async () => {
+  it("track what this object has, though the bank stored has moved on: the answer's tracked says so", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     await bank.put({ cited: bank.pickle(), record })

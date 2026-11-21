@@ -23,7 +23,7 @@ describe("cloak", () => {
     expect(cloak({ passphraseCleartext: FakePassphrase, passkeyCleartext: null }).passkeyCleartext).to.be.null
   })
 
-  it("zeroes the PRF bytes of each passkey answer handed in, keeping a copy of its own", () => {
+  it("zeroes the PRF bytes of each passkey answer handed in, after copying them for itself", () => {
     const passkeyCleartext     = TH.passkeyAnswerOf()
     const nextPasskeyCleartext = TH.passkeyAnswerOf()
     const handed = [passkeyCleartext, nextPasskeyCleartext].map((answer) => ({ ...answer, prfBytes: new Uint8Array(answer.prfBytes) }))
@@ -59,7 +59,7 @@ describe("cloak", () => {
     expect(TH.thrownText(err)).to.not.include(FakePassphrase).and.not.include(FakeNextPassphrase)
   })
 
-  it("refuses cleartexts whose getter throws, keeping nothing of the throw", () => {
+  it("refuses cleartexts whose getter throws, carrying nothing of the throw", () => {
     const cleartexts = { get passphraseCleartext(): string { throw new Error(FakePassphrase) } }
     const err = TH.expectSyncRefusal(() => cloak(cleartexts), 'unexpected_error')
     expect(TH.thrownText(err)).to.not.include(FakePassphrase)

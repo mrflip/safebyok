@@ -324,7 +324,7 @@ export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWri
 /** What {@link unwrittenWriteOf} answers for: the write, the act the act tables found, and the raw world the store fetched. */
 export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, world: WorldFetched }>
 
-/** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
+/** Throw `bad_record` unless `ask` leaves unchanged the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
 export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
   if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
   throw Throwers.bornAtNotStored(storedThingOf(ask, raw))

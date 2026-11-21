@@ -18,7 +18,7 @@ import { describeVaultDBTracked } from './vaultdb-battery-tracked'
 
 /** A vaultDB's stored Things, past its verbs: the backdoor the battery plants a damaged Thing by, or takes one away. */
 export type VaultDBRowCheats = {
-  /** Stores `raw` as the Thing at `scope`, unchecked. A store that cannot keep `raw` throws. */
+  /** Stores `raw` as the Thing at `scope`, unchecked. A store that cannot write `raw` throws. */
   plant:  (scope: ThingScope, raw: unknown) => Helpers.Awaitable<void>
   /** Takes away the Thing at `scope`, if any, unchecked. */
   remove: (scope: ThingScope) => Helpers.Awaitable<void>

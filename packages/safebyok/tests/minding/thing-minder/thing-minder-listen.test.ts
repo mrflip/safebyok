@@ -198,7 +198,7 @@ describe("ThingMinder.listen", () => {
     expect(heard.mock.calls.at(-1)?.[0]).to.have.nested.property('state.data', minder.listingAt(TH.RootScope))
   })
 
-  it("tells no labelpaths for a listing goodbye removes, though its query keeps them", async () => {
+  it("tells no labelpaths for a listing goodbye removes, though its query still has them", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)

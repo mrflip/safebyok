@@ -14,12 +14,12 @@ import * as Throwers from '../refusals/throwers'
 /** Any sealer, whatever it seals. */
 type AnySealer = Sealers.Sealer<never, never>
 
-/** The fieldnames that hold a cleartext. */
+/** The fieldnames that contain a cleartext. */
 const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
 
 /** A grant that lets this device seal and unseal under its bank's key without asking the user, for one revision of the bank's gate.
  * The bankKey stays wrapped under a non-extractable leaseKey: each seal or unseal unwraps it for that call alone, and nothing hands it out.
- * The sealer passed to each call, such as `BaseBox`, decides what is sealed and how. The lease itself knows only which fieldnames hold secrets.
+ * The sealer passed to each call, such as `BaseBox`, decides what is sealed and how. The lease itself knows only which fieldnames contain secrets.
  * A bankKey that will not unwrap locks the bank, and refuses `damaged_lease`.
  * Once evicted, or once its device is swept, it refuses every seal and unseal, even one in flight.
  */
@@ -171,7 +171,7 @@ export class Lease implements LeaseStamp {
     return Crypto.cipherCtx([BankChecks.stamp.parse(this.#bank.stamp), stamp], purpose, tags)
   }
 
-  /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing keeps it between calls. */
+  /** The bankKey for this call alone, non-extractable, with `usage` its only usage. Nothing retains it between calls. */
   async #bankKey(usage: 'wrapKey' | 'unwrapKey'): Promise<CryptoKey> {
     this.demandEnabled()
     // demandEnabled refuses an evicted lease, whose record is null.
@@ -181,7 +181,7 @@ export class Lease implements LeaseStamp {
     try {
       return await Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, { extractable: false, usage: [usage] })
     } catch {
-      // The bank drops its lease as it locks; this one is evicted too, should the bank hold another.
+      // The bank drops its lease as it locks; this one is evicted too, should the bank have another.
       this.#bank.lock()
       this.evict()
       throw Throwers.damagedLease()

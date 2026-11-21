@@ -32,7 +32,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, arr, lit, unk, oneof,
   const modelkind       = oneof(ThingChecks.thingkindVals)
   const thingWatchScope = ThingChecks.thingScope.pick({ userid: true, banklabel: true })
   const thingOptions    = obj({
-    /** The storage policies the write must keep, each over the Thing stored. */
+    /** The storage policies the write must meet, each over the Thing stored. */
     policies: arr(oneof(EX.storagePolicyVals)),
   }).strict()
   const trackPair       = obj({ revseq: ThingChecks.sparse.shape.revseq, lifepath: ThingChecks.sparse.shape.lifepath }).strict()
@@ -168,7 +168,7 @@ function checkWriteInvariants(ask: WriteAsk): void {
   if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw Throwers.lifepathNotKept(ask) }
   const isLifeFlipped = (record.am !== cited.am)
   if (Lifeseq.lifenumOf(record.lifeseq) !== Lifeseq.lifenumOf(Lifeseq.ofLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw Throwers.lifeseqNotNext(ask) }
-  // A live record over a live one keeps the stored born_at: the store checks that, against the Thing it has.
+  // A live record over a live one leaves the stored born_at unchanged: the store checks that, against the Thing it has.
   if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw Throwers.bornAtNotNow(ask) }
   if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw Throwers.testimonyMissing(ask) }
 }

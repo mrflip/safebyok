@@ -23,10 +23,11 @@ export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 /** The verdict on a blank new passphrase, which no checker hears. */
 const BlankVerdict: GX.PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
-// A blank passphrase is weak before the host's checker hears it. A throw is replaced, as the checker heard the passphrase;
-// a failed `load` keeps its throw as the cause, as it heard nothing; a VaultError it throws passes as it came (G1, G8, G9).
-/** Wrap `hostChecker` so that it keeps its contract, whatever it does.
- * Anything the checker throws is replaced by a refusal that keeps nothing of the throw.
+// A blank passphrase is judged weak without asking the host's checker. What the checker throws is replaced, since it was given
+// the passphrase; what a failed `load` throws becomes the cause, since `load` is given nothing, and a VaultError `load` throws
+// passes unchanged (G1, G8, G9).
+/** Wrap `hostChecker` so that it meets its contract, whatever it does.
+ * Anything the checker throws is replaced by a refusal that carries nothing of the throw.
  */
 export function guardStrengthChecker(hostChecker: StrengthChecker): GuardedStrengthChecker {
   const host = GateishChecks.strengthChecker.parse(hostChecker, { where: 'strengthChecker' })

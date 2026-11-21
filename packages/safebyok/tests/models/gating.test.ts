@@ -120,7 +120,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
 
-  it("seals the root box under the new lease, and holds the root box the vaultDB answers", async () => {
+  it("seals the root box under the new lease, and adopts the root box the vaultDB answers", async () => {
     const device = TH.makeDevice()
     const births = TH.spyBirths(device)
     const bank = await birth(device, { passphraseCleartext: TH.TestPassphrase })

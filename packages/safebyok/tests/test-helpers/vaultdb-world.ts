@@ -125,9 +125,9 @@ export function birthBankAskOf(overrides: Partial<BirthBankAsk> = {}): BirthBank
   return { ...ThingBank, op: 'birth', bank: bankThingOf(), gate: gateThingOf(), root: rootBoxOf(), ...overrides }
 }
 
-/** The track of a sender that holds the main gate of another life. */
+/** The track of a sender with the main gate of another life. */
 export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: Lifeseq.ofLifenum(2) }))
-/** The track of a sender that holds the bank at another revision. */
+/** The track of a sender with the bank at another revision. */
 export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
-/** The track of a sender that holds the root box at another revision. */
+/** The track of a sender with the root box at another revision. */
 export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))

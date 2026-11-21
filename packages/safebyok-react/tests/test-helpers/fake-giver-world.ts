@@ -61,9 +61,9 @@ export interface FakeGiverWorld {
   counts:  { gets: number }
   /** Each form verb the bank objects have heard, in order, with the cleartexts it was handed. */
   formCalls: Readonly<{ verb: FakeFormVerb, cleartexts: unknown }>[]
-  /** Hold each car the vaultDB reads from now on until the function returned is called: it then answers what it read. */
+  /** Pause each car the vaultDB reads from now on until the function returned is called: it then answers what it read. */
   pauseAnswers(): () => void
-  /** Hold each strength verdict from now on until the function returned is called. */
+  /** Pause each strength verdict from now on until the function returned is called. */
   pauseVerdicts(): () => void
   /** Have each form verb from now on reject with `err`, or resolve again for null. */
   refuseFormVerbs(err: Error | null): void
@@ -109,7 +109,7 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
     for (const listener of carListeners) { listener(event) }
   }
 
-  // As the minder's get does, a car in hand that the vaultDB is not known to hold newer than answers at once.
+  // As the minder's get does, a car in hand answers at once, unless the vaultDB is known to have a newer one.
   async function getBoxCar(labelpath: string): Promise<FakeBoxCar> {
     const held = cached.get(labelpath)
     if ((held !== undefined) && (held.liveness !== 'bhnd') && (held.liveness !== 'bare')) { return held }

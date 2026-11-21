@@ -107,13 +107,13 @@ export function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT,
   return { vaultDB, bank, minder, receive }
 }
 
-/** `vaultDB`, holding a born bank: its roots at revision 0, the asks above track. */
+/** `vaultDB` with a born bank, its roots at revision 0, which the asks above track. */
 export async function bornOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT): Promise<VaultDBT> {
   await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
   return vaultDB
 }
 
-/** A vaultDB holding a born bank with its main gate at revision `revseq`, and the gate it holds. */
+/** A vaultDB with a born bank, its main gate at revision `revseq`, and that gate. */
 export async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<GateRecord> {
   let gate = TH.gateThingOf()
   await bornOf(vaultDB)
@@ -125,7 +125,7 @@ export async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Prom
   return gate
 }
 
-/** A vaultDB holding a born bank and the box under its root box, and the box. */
+/** A vaultDB with a born bank and the box under its root box, and that box. */
 export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['val']> {
   await bornOf(vaultDB)
   const box   = TH.boxThingOf()

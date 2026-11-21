@@ -83,7 +83,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** The root box: its shell until the bank is born, then its stored record. Every box of this bank is under it. */
   get rootBox(): LiveOf<BoxRecord> | ShellOf<BoxRecord> { return this.#rootBox }
 
-  /** The revseq and lifepath this object holds of the bank, its main gate and its root box, which every ask it makes tracks. */
+  /** The revseq and lifepath this object has of the bank, its main gate and its root box, which every ask it makes tracks. */
   get track(): Track {
     return { bank: trackPairOf(this), [Labelpath.MainGate]: trackPairOf(this.#maingate), [Labelpath.RootBox]: trackPairOf(this.#rootBox) }
   }
@@ -102,7 +102,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, with its main gate and root box, on `opts.device`, keeping its boxes in `opts.vaultDB`. */
+  /** Make the bank of `record`, with its main gate and root box, on `opts.device`, with its boxes in `opts.vaultDB`. */
   static make(record: BankMakeRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
@@ -262,7 +262,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
     if (this.isUnlocked) { return this }
-    // Held here: a subscriber told by the align may dismiss the wait or sweep the bank, which clears #unlockWait.
+    // Read here: a subscriber told by the align may dismiss the wait or sweep the bank, which clears #unlockWait.
     const wait = (this.#unlockWait ??= makeWait())
     this.#align()
     await wait.promise
@@ -312,7 +312,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Write `ask.record`, the main gate's next revision, over `ask.cited`, and hold the gate written as this bank's main gate. Resolves that gate. */
+  /** Write `ask.record`, the main gate's next revision, over `ask.cited`, and make the gate written this bank's main gate. Resolves that gate. */
   async #putGate(ask: PutAskDraft<GateRecord>): Promise<Gate> {
     this.demandEnabled()
     const answer = await this.#vaultDB.tryWriteThing({ ...this.makePutAsk(ask), modelkind: 'gate' })
@@ -501,7 +501,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
 // == [Helpers]: trackPairOf, Wait, makeWait
 
-/** The revseq and lifepath of a Thing, as a `track` holds them. */
+/** The revseq and lifepath of a Thing, as a `track` has them. */
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
 
 /** A promise, beside the functions that settle it. */

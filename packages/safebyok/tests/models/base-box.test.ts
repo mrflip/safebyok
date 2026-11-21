@@ -36,14 +36,14 @@ describe("BaseBox", () => {
 })
 
 describe("BaseBox.donorPropsOf(donor), publicPropsOf(publicProps) and secretPropsOf(secretProps)", () => {
-  it("keeps a donor's Thing fields and sidecar, dropping its whisper, sealed or not, and any other field", () => {
+  it("carries over a donor's Thing fields and sidecar, dropping its whisper, sealed or not, and any other field", () => {
     const live = liveRevisionOf()
     const donor = { ...live, whisper: TH.Whisper, whisper_sealed: Sealed, notes: 'dropped' }
     expect(BaseBox.donorPropsOf(donor)).to.deep.equal(live)
     expect(BaseBox.donorPropsOf(TH.boxShellOf())).to.deep.equal(TH.boxShellOf())
   })
 
-  it("keeps the sidecar, am and written_at of publicProps, and the whisper of secretProps", () => {
+  it("has the sidecar, am and written_at of publicProps, and the whisper of secretProps", () => {
     expect(BaseBox.publicPropsOf({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0 })).to.deep.equal({ sidecar: TH.Sidecar, am: 'x', written_at: TH.T0 })
     expect(BaseBox.secretPropsOf({ whisper: TH.Whisper })).to.deep.equal({ whisper: TH.Whisper })
   })
@@ -80,7 +80,7 @@ describe("BaseBox.donorPropsOf(donor), publicPropsOf(publicProps) and secretProp
 })
 
 describe("BaseBox.nextRevisionOf(donor, publicProps)", () => {
-  it("starts the first life over the shell: born now, at revseq 0, keeping the shell's root lifeseq", () => {
+  it("starts the first life over the shell: born now, at revseq 0, with the shell's root lifeseq", () => {
     vi.setSystemTime(TH.T0 + 3)
     const shell = TH.boxShellOf()
     const next = BaseBox.nextRevisionOf(shell, PublicProps)
@@ -93,7 +93,7 @@ describe("BaseBox.nextRevisionOf(donor, publicProps)", () => {
     expect(next).to.include({ written_at: TH.T0 - 5, born_at: TH.T0 - 5 })
   })
 
-  it("keeps the donor's sidecar unless publicProps gives one, which wins", () => {
+  it("carries over the donor's sidecar unless publicProps gives one", () => {
     const live = liveRevisionOf()
     expect(BaseBox.nextRevisionOf(live).sidecar).to.deep.equal(TH.Sidecar)
     expect(BaseBox.nextRevisionOf(live, { sidecar: { account: 'home' } }).sidecar).to.deep.equal({ account: 'home' })
@@ -104,7 +104,7 @@ describe("BaseBox.nextRevisionOf(donor, publicProps)", () => {
     expect(TH.thrownText(err)).to.include(Phrases.SidecarMissing)
   })
 
-  it("keeps a live box's life, at the next revision, written now", () => {
+  it("stays in a live box's life, at the next revision, written now", () => {
     const live = liveRevisionOf()
     vi.setSystemTime(TH.T0 + 5)
     const next = BaseBox.nextRevisionOf(live)
@@ -185,7 +185,7 @@ describe("BaseBox.tombstoneOf(donor)", () => {
     TH.expectSyncRefusal(() => BaseBox.tombstoneOf(liveRevisionOf(), { am: 'a' }), 'bad_record')
   })
 
-  it("never keeps the donor's sidecar, given `{}` or none", () => {
+  it("never carries over the donor's sidecar, given `{}` or none", () => {
     const live = liveRevisionOf()
     expect(live.sidecar).to.not.deep.equal({})
     expect(BaseBox.tombstoneOf(live).sidecar).to.deep.equal({})

@@ -32,7 +32,7 @@ export function giverBankOfVault(vault: Vault): GiverBank<BoxCar> {
 }
 
 /** The box reads of a giver's bank over the boxes `minder` minds, from its `hello` until its `goodbye`.
- * A get answers at once from a car the minder holds timely, and asks the vaultDB otherwise. It takes only a box's labelpath.
+ * A get answers at once from a timely car the minder has, and asks the vaultDB otherwise. It takes only a box's labelpath.
  */
 export function giverBankOfMinder(minder: ThingMinder): Pick<GiverBank<BoxCar>, 'getBoxCar' | 'listenBoxCars'> {
   Checks.minder.parse(minder)

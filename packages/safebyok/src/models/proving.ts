@@ -28,7 +28,7 @@ const CheckUsage = Object.freeze({ extractable: false, usage: ['wrapKey'] as con
 
 /** A passphrase or a passkey answer, made into the wayinKey of one wayin.
  * Build one with a subclass's `buildStored`, to prove the wayin a gate has, or `buildNovel`, for a new wayin.
- * Only a proving has a wayinKey, and it hands no bankKey to its caller. It keeps no cleartext, and leaves a
+ * Only a proving has a wayinKey, and it hands no bankKey to its caller. It retains no cleartext, and leaves a
  * passkey answer's bytes for its caller to zero.
  */
 export abstract class Proving<HeaderT extends GX.WayinHeader = GX.WayinHeader> {
@@ -250,8 +250,8 @@ function mintPasskeyHeader({ device_tok }: ProvingDevice, { credential_id, prf_s
 // == [The key deriver]: guardKeyDeriver, deriveKeyBytes
 
 // Its interface and its salt length are checked, never its other choices (#the-host-is-not-our-threat-model): what its key bytes must be is
-// checked where they are received, in passphraseKeyOf. A failed `load` keeps its throw as the cause, as it heard nothing;
-// a VaultError `load` throws passes as it came.
+// checked where they are received, in passphraseKeyOf. What a failed `load` throws becomes the cause, since `load` is
+// given no passphrase; a VaultError `load` throws passes unchanged.
 /** Wrap `hostDeriver`, checking its interface, so no error it throws can quote the passphrase. */
 export function guardKeyDeriver(hostDeriver: Deriver.KeyDeriver): GuardedKeyDeriver {
   const { key_deriver_label, salt_size } = CX.keyDeriverShape.parse(hostDeriver, { where: 'keyDeriver' })
@@ -266,7 +266,7 @@ export function guardKeyDeriver(hostDeriver: Deriver.KeyDeriver): GuardedKeyDeri
   return ConstsX.brandGuarded<GuardedKeyDeriver>({ key_deriver_label, salt_size, deriveKeyBytes: (passphrase, saltBytes) => deriveKeyBytes(hostDeriver, passphrase, saltBytes), load })
 }
 
-// The key deriver hears the passphrase here (guarantees-big.md, G1 and G8): what it throws may quote it, so it is replaced, not kept as a cause.
+// The key deriver is given the passphrase here (guarantees-big.md, G1 and G8): what it throws may quote it, so it is replaced, never made the cause.
 /** The key bytes `hostDeriver` derives from `passphrase` */
 async function deriveKeyBytes(hostDeriver: Deriver.KeyDeriver, passphrase: GX.PassphraseCleartext, saltBytes: Uint8Array): Promise<unknown> {
   try {

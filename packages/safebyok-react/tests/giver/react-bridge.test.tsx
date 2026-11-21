@@ -69,7 +69,7 @@ describe("the bridge", () => {
     expect(world.counts.gets).to.eq(2)
   })
 
-  it("keeps an older car a late fetch answers from replacing a newer one it copied", async () => {
+  it("never lets an older car a late fetch answers replace a newer one it copied", async () => {
     const { world, client, renderShowing } = setup()
     const answer = world.pauseAnswers()
     const { result } = renderShowing()

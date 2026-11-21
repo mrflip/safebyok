@@ -87,7 +87,7 @@ function unlockAlertOf(err: unknown): string {
   return (err.refusalkind === 'wrong_passphrase') ? 'That is not the passphrase.' : err.message
 }
 
-// React keeps the FormData a form action is handed after the action ends: as the form's pending status, and in the
+// React retains the FormData a form action is handed after the action ends: as the form's pending status, and in the
 // action's queued update. A field taken out before the first await is never in either.
 /** Take the text of `form`'s field `fieldname` out of it, or '' for none. */
 function takeText(form: FormData, fieldname: string): string {
@@ -104,7 +104,7 @@ async function renderKnockKnock() {
   onTestFinished(() => { client.clear() })
   const { container } = render(<QueryClientProvider client={client}><app.App /></QueryClientProvider>)
   const derivedBefore = world.deriver.heard
-  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React holds of the tree, and in no entry of the host's React Query. */
+  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React has of the tree, and in no query of the host's React Query. */
   function expectUnheld(passphrase: string): void {
     expect(world.snapshots.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
     expect(TH.holdsText(TH.reactTreeOf(container), passphrase)).to.eq(false)

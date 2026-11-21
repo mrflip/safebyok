@@ -77,7 +77,7 @@ export interface BirthGatingFriend {
 export interface BankGatingFriend {
   /** Unlock the bank under a lease `proved` builds, citing its main gate. */
   unlockByProving: (proved: Proving) => Promise<Bank>
-  /** Write the main gate's next revision, and hold the gate written as the bank's main gate. */
+  /** Write the main gate's next revision, and make the gate written the bank's main gate. */
   putGate:         (ask: PutAskDraft<GateRecord>) => Promise<Gate>
 }
 // --
@@ -137,7 +137,7 @@ export interface ProvingOpts {
 /** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
-/** A field that holds a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
+/** A field that contains a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
 export type SecretFieldname = 'whisper' | `${string}_sealed`
 
 /** The options of {@link Lease.make}, beside its record. */
@@ -155,7 +155,7 @@ export interface LeaseOpts {
  * `bank.replacePassphrase` puts in place. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
  * throws, or returns no verdict, refuses its call.
  *
- * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never quote
+ * It is given the passphrase in cleartext: it should retain nothing, send nothing anywhere, and never quote
  * it, not even in its `reason`, which becomes the refusal's message.
  *
  * A checker that needs something fetched or built first, such as a dictionary, carries it as `load`.
@@ -177,7 +177,7 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** The host's strength checker as a device keeps it, wrapped by {@link guardStrengthChecker}. */
+/** The host's strength checker as a device has it, wrapped by {@link guardStrengthChecker}. */
 export type GuardedStrengthChecker = {
   (passphrase: string, scope: BankScope): Promise<GX.PassphraseVerdict>
   readonly load: () => Promise<void>

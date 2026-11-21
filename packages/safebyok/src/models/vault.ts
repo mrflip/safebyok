@@ -108,7 +108,7 @@ export class Vault {
   /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
    * On a locked bank, it first waits for an `unlock` gating ({@link Bank.ensureUnlocked}), and rejects if that wait is dismissed or the bank ends.
    * `fn` gets the box whole, as {@link ThingMinder.get} answers it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
-   * Nothing of the unsealed box is kept, and what `fn` throws is rethrown unchanged. Keep the whisper inside `fn`, and return only what is safe to hold.
+   * Nothing of the unsealed box is retained, and what `fn` throws is rethrown unchanged. Use the whisper only inside `fn`, and return only what is safe to retain.
    * @example
    *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))
    */

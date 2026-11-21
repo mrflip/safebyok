@@ -16,7 +16,7 @@ export function bridgeDevice<CarT extends CarFields>(client: QueryClient, device
   const stopStarting = device.onBankStart((bank) => {
     const stopListening = bank.listenBoxCars((event) => { deliverEvent(client, event) })
     // Listening comes first, in the same synchronous step: a car that changes after the catch-up is heard, and none can change
-    // between. The minder answers the refetch of a car it holds timely at once, without asking the vaultDB. An entry still
+    // between. The minder answers the refetch of a timely car it has at once, without asking the vaultDB. An entry still
     // waiting on its fetch is left to it: the minder answers that with the car it has then.
     void client.invalidateQueries({ queryKey: bankHead, predicate: (entry) => entry.state.data !== undefined }, { cancelRefetch: false })
     stopsListening.add(stopListening)
@@ -33,8 +33,8 @@ export function bridgeDevice<CarT extends CarFields>(client: QueryClient, device
   }
 }
 
-// A removal is the minder letting go of a car it no longer needs, not news of the vaultDB, so the host's entry keeps what it
-// shows: the host's cache keeps what the host's options say, and a mounted hook does not flicker back to pending.
+// A removal is the minder letting go of a car it no longer needs, not news of the vaultDB, so the host's query goes on showing
+// its car: the host's cache retains it as long as the host's options say, and a mounted hook does not flicker back to pending.
 /** Put the event's car in the host's entry for it, if a hook made one.
  * A `bare` car, with no record to show, is fetched instead. A `bhnd` car shows while the newer record is fetched.
  */

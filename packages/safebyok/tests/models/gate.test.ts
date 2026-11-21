@@ -157,7 +157,7 @@ describe("what a gate shows", () => {
     expect(() => { (gate as { banklabel: unknown }).banklabel = 'other' }).to.throw(TypeError)
   })
 
-  it("keeps the bank's stamp it was given, and its own", async () => {
+  it("has the bank's stamp it was given, and its own", async () => {
     const record = await gateRecordOf()
     const gate = Gate.make(record, { bank: WorldBank })
     expect(gate.bankStamp).to.deep.equal(TH.WorldBankStamp)

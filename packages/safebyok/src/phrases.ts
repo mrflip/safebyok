@@ -71,7 +71,7 @@ export const CitedHalfShell = "What a write cites is the shell, at revseq -1, a 
 /** A sealable box that matches the shell in some of its revseq, lifeseq and revtok, but not all three. */
 export const SealableHalfShell = "A box a revision is made from is the shell, at revseq -1, a lifeseq of '-000000001' and the void revtok, in all three or in none."
 
-/** A live box's revision made with no sidecar, given or kept. */
+/** A live box's revision made with no sidecar, given or carried over. */
 export const SidecarMissing = "A live box has a sidecar: give one, or make the revision from a box that has one."
 
 /** A tombstone made of a tombstone or the shell. */
@@ -90,16 +90,16 @@ export const RecordOfOtherScope = "A write's record is at the scope its ask name
 export const TombstoneOverTombstone = "A tombstone is never written over a tombstone."
 
 /** A write that changes the leading lifeseqs of the cited lifepath. */
-export const LifepathNotKept = "A write's record keeps the leading lifeseqs of the lifepath it cites: only the last, its own, may change."
+export const LifepathNotKept = "A write's record leaves the leading lifeseqs of the lifepath it cites unchanged: only the last, its own, may change."
 
 /** A write whose lifeseq does not follow. */
-export const LifeseqNotNext = "A write's record keeps the cited lifeseq when am stays, and has the next one when am flips."
+export const LifeseqNotNext = "A write's record has the cited lifeseq when am stays, and the next one when am flips."
 
 /** A birth whose born_at is not its written_at. */
 export const BornAtNotNow = "A write over a tombstone or none is a birth: its born_at is its written_at."
 
 /** A write over a live Thing that changes its born_at. */
-export const BornAtNotStored = "A write over a live Thing keeps the stored Thing's born_at."
+export const BornAtNotStored = "A write over a live Thing leaves the stored Thing's born_at unchanged."
 
 /** A deleted main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
@@ -135,8 +135,8 @@ export const BankExpected = 'A ThingMinder is made with the Bank it minds Things
 /** A minder read or written through before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it or writing through it.'
 
-/** A get that storage answered older than the record the minder held when it began. */
-export const StaleRead = 'Storage answered with a revision older than one this device already held. The newer record stays cached, and a later get asks again.'
+/** A get that storage answered older than the record the minder had cached when it began. */
+export const StaleRead = 'Storage answered with a revision older than one this device already had. The newer record stays cached, and a later get asks again.'
 
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'

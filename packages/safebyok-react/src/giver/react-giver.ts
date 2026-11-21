@@ -27,7 +27,7 @@ function carQueryDefaults<CarT extends CarFields>() {
   } as const
 }
 
-/** The staleTime of a car's entry: 0 where the vaultDB is known to hold a newer whole record, else Infinity (the bridge keeps it current). */
+/** The staleTime of a car's query: 0 where the vaultDB is known to have a newer whole record, else Infinity (the bridge keeps it current). */
 function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>): number {
   const car = entry.state.data
   return ((car !== undefined) && dbHasNewer(car)) ? 0 : Infinity
@@ -36,7 +36,7 @@ function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>)
 // TanStack shares structure through this both between a query's cars and between what `select` returns from them, so a
 // value that is not a car takes TanStack's own default. When a hook's key changes, it shares the last key's selected value
 // with the new key's, so cars of two boxes take the default too: their agerank says nothing of which to show. A box's cars
-// never go back, so the newer car holds everything the older one does, and nothing needs merging. Without this, a fetch
+// never go back, so the newer car has everything the older one has, and nothing needs merging. Without this, a fetch
 // that read an older car and resolved after the bridge copied a newer one would put the older car back.
 /** Structural sharing for a car's entry: of two cars of one box, the one with the greater agerank, `prior` on a tie.
  * Anything else goes to TanStack's default, `replaceEqualDeep`.
@@ -52,14 +52,14 @@ function isCar(val: unknown): val is CarFields {
   return (typeof car === 'object') && (car !== null) && (typeof car.agerank === 'string') && (typeof car.newest?.labelpath === 'string')
 }
 
-/** The fullest record a car holds */
+/** The fullest record a car has */
 function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return car.fullest }
 // --
 
 // == [Form mutations]: FormMutationDefaults, vacateCloak, cleartextsOf
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
-// the mutation would keep its cloak full, and an `unlock` gating that needs no network would wait for one.
+// the mutation would leave its cloak full, and an `unlock` gating that needs no network would wait for one.
 /** The giver's defaults for a form verb's mutation: it runs offline, never retries, and vacates its cloak once it settles. */
 const FormMutationDefaults = {
   networkMode: 'always',
@@ -106,7 +106,7 @@ export type StrengthVerdictResult = Readonly<{
 /** The hooks of a giver's `forBank`, for the Device's bank.
  * Hand each form mutation a {@link Cloak}: the mutation vacates it once it settles. An `onSettled` of your own in its
  * options replaces that, so vacate the cloak there too. One in your QueryClient's mutation defaults does not run for it.
- * A form mutation never retries. Hold the submit while it is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
+ * A form mutation never retries. Disable the submit while it is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
  */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
@@ -125,8 +125,8 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
 
   // Only the verdict of the latest call to `judge` lands: an earlier one, such as a checker's first while it loads its
   // dictionary, may resolve after a later one, and would show the strength of what the user typed before.
-  /** The strength checker's verdict on a new passphrase, for a meter beside its field. Hold the form's submit until `verdict.strong`.
-   * The verb judges the passphrase again, and refuses `weak_passphrase` where it is weak. The hook keeps the verdict, never the passphrase.
+  /** The strength checker's verdict on a new passphrase, for a meter beside its field. Disable the form's submit until `verdict.strong`.
+   * The verb judges the passphrase again, and refuses `weak_passphrase` where it is weak. The hook retains the verdict, never the passphrase.
    * @example
    *   const strength = Giver.useStrengthVerdict()
    *   <input name="nextPassphrase" type="password" onChange={(event) => { void strength.judge(event.target.value) }} />
@@ -180,7 +180,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
 
   /** React Query's options for the box's whole car, for your own `useQuery`, `queryClient.query` or route loader.
    * `data` is the car: the newest revision heard of, beside the fullest record. Its defaults, any of which you may override:
-   * - fresh until the bridge copies a newer car, and stale while the vaultDB is known to hold a newer revision
+   * - fresh until the bridge copies a newer car, and stale while the vaultDB is known to have a newer revision
    * - fetches even while offline
    * - never replaces a car with an older one
    */
@@ -210,7 +210,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
 
   /** React Query's options for the mutation that births the bank, for your own `useMutation`.
    * Hand it the user's new passphrase and optional passkey. It leaves the bank unlocked.
-   * Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
+   * Disable the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
    */
   function birthMutationOptions() {
     return mutationOptions({
@@ -247,7 +247,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   function useUnlock(): UseMutationResult<void, Error, Cloak> { return useMutation(unlockMutationOptions()) }
 
   /** React Query's options for the mutation that replaces the passphrase, proved by the current passphrase or the passkey, for your own `useMutation`.
-   * It leaves the bank unlocked. Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the new passphrase strong.
+   * It leaves the bank unlocked. Disable the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the new passphrase strong.
    */
   function replacePassphraseMutationOptions() {
     return mutationOptions({

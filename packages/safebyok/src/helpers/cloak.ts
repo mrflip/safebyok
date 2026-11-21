@@ -7,7 +7,7 @@ import * as Throwers from '../refusals/throwers'
 // == [The cloak]: cloak, Cloak, CloakedMarker
 
 /** Wrap a form's cleartexts in a {@link Cloak}, to hand a giver's form mutation in their place.
- * The cloak keeps the only copy of a passkey answer's PRF bytes: those in the answer you pass are zeroed.
+ * The cloak has the only copy of a passkey answer's PRF bytes: those in the answer you pass are zeroed.
  * @example unlock.mutate(cloak({ passphraseCleartext: passphraseField.value }))
  */
 export function cloak(cleartexts: CloakCleartexts): Cloak { return new Cloak(cleartexts) }
@@ -74,7 +74,7 @@ export class Cloak {
 // == [The cloak's helpers]: checkedCleartexts, isAnswerish, copiedAnswerOf, adoptedAnswerOf, zeroAnswer
 
 /** Check `cleartexts` for {@link cloak}: an object of the form verbs' fields, their values unjudged.
- * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
+ * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
  */
 function checkedCleartexts(cleartexts: unknown): CloakCleartexts {
   try {

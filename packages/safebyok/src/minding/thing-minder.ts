@@ -106,7 +106,7 @@ export class ThingMinder {
     Object.freeze(this)
   }
 
-  /** The QueryClient whose cache holds this minder's cars, its query defaults set. */
+  /** The QueryClient whose cache has this minder's cars, its query defaults set. */
   #makeTSQ(): TSQ.QueryClient {
     const tsq = new TSQ.QueryClient({ defaultOptions: { queries: {
       ...this.#queryCacheOpts,
@@ -314,7 +314,7 @@ export class ThingMinder {
   /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
   async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
     const fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
-    // TanStack resolves with what the queryFn returned, not what structural sharing kept: a notice that landed during the
+    // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: a notice that landed during the
     // get may have left the cache a later record.
     const car = this.#cachedAt(scoped) ?? fetched
     this.#joinParentListing(car.newest)
@@ -326,7 +326,7 @@ export class ThingMinder {
    * Refuses a record of another Thing than `ask`'s.
    */
   async #fetchCar(ask: GetAsk): Promise<ThingCar<ThingRecord>> {
-    // Held before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
+    // Read before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
     const prior  = this.#cachedAt(ask)
     const answer = await this.#vaultDB.tryGetThing(ask)
     // Thrown as it came. The `dbhas` is delivered through the watch, never from here.
@@ -379,8 +379,8 @@ export class ThingMinder {
   }
 
   // Each record that lands joins its parent's listing here, whatever its source. A shell is stored nowhere, so it is no
-  // one's child; and a root's parent, '', is never listed. A join is not a list, so the listing keeps the time a list
-  // last set it, as TanStack keeps data derived from another query at that query's time: a bare listing stays bare.
+  // one's child; and a root's parent, '', is never listed. A join is not a list, so the listing's time stays the time a list
+  // last set it, as TanStack dates data derived from another query at that query's time: a bare listing stays bare.
   /** Add `record`'s labelpath to its parent's listing, where one is cached that lacks it. */
   #joinParentListing(record: DeliverableThing): void {
     if (Thing.isVoidSentinel(record)) { return }
@@ -497,8 +497,8 @@ export class ThingMinder {
     }
   }
 
-  // A key's mark says what its query caches: '!' a car, '#' and 'kids' a listing. A removed query keeps its last state, but
-  // no longer caches it, so its event tells no data. A car's invalidation can't arise, as the minder invalidates none.
+  // A key's mark says what its query caches: '!' a car, '#' and 'kids' a listing. A removed query still has its last state, but
+  // no longer caches it, so its event carries no car or listing. A car's invalidation can't arise, as the minder invalidates none.
   /** What a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for one it is not told of. */
   #minderEventOf(tsqEvent: unknown): MinderEvent | undefined {
     if (! isUsefulTSQEvent(tsqEvent)) { return undefined }
@@ -594,7 +594,7 @@ function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Re
 
 /** A listing of every labelpath in `prior` and in `labelpaths`, once each, in labelpath order. */
 function listingOf(prior: readonly Labelpath[], labelpaths: readonly Labelpath[]): Labelpath[] {
-  // Labelpaths sort by code unit, as the vaultDB lists them; the union holds no two alike. The rule's `one - other` is for numbers.
+  // Labelpaths sort by code unit, as the vaultDB lists them; the union has no two alike. The rule's `one - other` is for numbers.
   return union(prior, labelpaths).toSorted((one: Labelpath, other: Labelpath) => ((one < other) ? -1 : 1)) // eslint-disable-line unicorn/prefer-simple-sort-comparator
 }
 

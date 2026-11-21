@@ -48,7 +48,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   }).strict()
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
-  // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
+  // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once.
   const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
@@ -135,7 +135,7 @@ export const carLivenessVals = ['full', 'bhnd', 'bare', 'gone', 'void'] as const
 
 // == [A minder's answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer, ScopeAt
 
-// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
+// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage has nothing.
 // A timely car is full, gone or void: a bhnd or bare car is never timely.
 /** A get's answer, read from the cache. Beside a get's own acts:
  * - `vacant`   -- nothing is cached
@@ -174,7 +174,7 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 
 // == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, MinderEventOf
 
-// Each event spreads TanStack Query's cache event into our own, and keeps TanStack's field names (`type`, `action.type`,
+// Each event spreads TanStack Query's cache event into our own, under TanStack's field names (`type`, `action.type`,
 // `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` takes.
 /** An event a minder's `listen` tells: a car's query changed, or a listing's. {@link ThingMinder.isThingEvent} tells them apart. */
 export type MinderEvent = ThingEvent | ListingEvent

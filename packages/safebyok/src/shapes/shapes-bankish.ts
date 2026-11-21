@@ -111,7 +111,7 @@ export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unl
  * - `'starting'`   -- signed in, and the bank is being brought up
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
  * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
- * - `'unlocked'`   -- the bank holds a lease, and whispers can be read and written
+ * - `'unlocked'`   -- the bank has a lease, and whispers can be read and written
  * - `'swept'`      -- everything was unloaded, and nothing follows until the host acts
  * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
  */
@@ -144,14 +144,14 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device shows before it holds a bank object. */
+/** The bank snapshot a device shows before it has a bank object. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
 /** A device's state, for a host to render. */
 export interface DeviceSnapshot {
-  /** The snapshot of the bank this device holds, or {@link PendingBank} while it holds none. */
+  /** The snapshot of this device's bank, or {@link PendingBank} while it has none. */
   readonly bank: BankSnapshot
 }
 // --

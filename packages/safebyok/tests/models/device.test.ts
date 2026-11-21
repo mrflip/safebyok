@@ -47,7 +47,7 @@ describe("Device.make(record, opts)", () => {
     expect(device).to.not.have.property('deviceDB')
   })
 
-  it("keeps the vaultDB it is given, for each bank made on it", () => {
+  it("gives each bank made on it the vaultDB it is given", () => {
     const vaultDB = new MemoryVaultDB()
     expect(TH.makeDevice({}, { vaultDB }).vaultDB).to.equal(vaultDB)
   })
@@ -64,7 +64,7 @@ describe("Device.make(record, opts)", () => {
     expect(Object.isFrozen(device)).to.be.true
   })
 
-  it("wraps each of the host's functions, keeping none of the host's own on a property", () => {
+  it("wraps each of the host's functions, leaving none of the host's own on a property", () => {
     const device = TH.makeDevice()
     for (const guarded of [device.keyDeriver, device.strengthChecker]) { expect(Consts.isGuarded(guarded)).to.be.true }
     expect(Object.values(device)).to.not.include.members([TH.testDeriver, TH.anyStrengthChecker])
@@ -158,7 +158,7 @@ describe("device.sweep()", () => {
     expect(await TH.expectRefusal(ensuring, 'disabled')).to.equal(bank.endCause)
   })
 
-  it("leaves the device to judge a passphrase and hold the next bank made on it", async () => {
+  it("leaves the device able to judge a passphrase and show the next bank made on it", async () => {
     const { device, record } = await TH.buildBornBank()
     device.sweep()
     expect(await device.judgeStrength(TH.TestPassphrase)).to.deep.equal({ strong: true })
@@ -246,7 +246,7 @@ describe("device.lock()", () => {
   })
 })
 
-/** A listener on `device`'s snapshot that keeps each snapshot it reads. */
+/** A listener on `device`'s snapshot that records each snapshot it reads. */
 function snapshotsOf(device: Device): DeviceSnapshot[] {
   const snapshots: DeviceSnapshot[] = []
   device.subscribe(() => { snapshots.push(device.getSnapshot()) })
@@ -304,7 +304,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     expect(snapshots.at(-1)).to.equal(device.getSnapshot())
   })
 
-  it("keeps the bank it holds when an earlier bank made on it is swept", async () => {
+  it("still shows its bank when an earlier bank made on it is swept", async () => {
     const { bank, device, record } = await TH.buildBornBank()
     const later = Bank.make(record, { device, vaultDB: device.vaultDB })
     const snapshots = snapshotsOf(device)

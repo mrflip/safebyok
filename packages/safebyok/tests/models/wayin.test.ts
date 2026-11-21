@@ -83,7 +83,7 @@ describe("wayin.pickle()", () => {
     expect(Object.isFrozen(pickle.bank_key_wayin_wrapped)).to.be.true
   })
 
-  it("is a copy: the record handed in is neither frozen nor kept", () => {
+  it("is a copy: the record handed in is neither frozen nor retained", () => {
     const record = passkeyRecord()
     const pickle = Wayin.make(record as never).pickle()
     expect(pickle).to.not.equal(record)

@@ -38,7 +38,7 @@ describe("ThingMinder.make", () => {
 })
 
 describe("ThingMinder.hello", () => {
-  it("keeps a car timely for the staleTime the minder was made with, an hour by default", async () => {
+  it("counts a car timely for the staleTime the minder was made with, an hour by default", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = await bornOf(new MemoryVaultDB())
@@ -111,7 +111,7 @@ describe("ThingMinder.hello", () => {
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(shell))
   })
 
-  it("keeps every cached car and listing until goodbye, however long after", async () => {
+  it("has every cached car and listing until goodbye, however long after", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()

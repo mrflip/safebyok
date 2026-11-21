@@ -41,7 +41,7 @@ const BoxSealerBag = Object.freeze({
   recordOf:         BaseBox.recordOf.bind(BaseBox),
 })
 
-/** A passphrase proving of {@link TH.WorldGateStamp} with a wayin under a new bankKey: each lease it builds holds that bankKey. */
+/** A passphrase proving of {@link TH.WorldGateStamp} with a wayin under a new bankKey: each lease it builds has that bankKey. */
 async function provingWithWayin(): Promise<PassphraseProving> {
   const proving = await PassphraseProving.buildNovel(TH.provingDeviceOf(), TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase)
   await proving.buildWayin(NOVEL)
@@ -320,7 +320,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
 })
 
 describe("withoutSecrets(bag)", () => {
-  it("drops the whisper and every field ending _sealed, keeping the rest", () => {
+  it("drops the whisper and every field ending _sealed, leaving the rest", () => {
     const bag = { label: 'k', whisper: TH.Whisper, whisper_sealed: 'sealed', notes_sealed: 'sealed notes', notes: 'kept', sealed_at: 1 }
     expect(withoutSecrets(bag)).to.deep.equal({ label: 'k', notes: 'kept', sealed_at: 1 })
   })

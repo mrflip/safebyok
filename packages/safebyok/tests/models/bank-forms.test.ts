@@ -137,7 +137,7 @@ describe("bank.unlock(cleartexts)", () => {
 })
 
 describe("bank.replacePassphrase(cleartexts)", () => {
-  it("writes the main gate's next revision with the new passphrase's wayin, holds it, and unlocks under a lease citing it", async () => {
+  it("writes the main gate's next revision with the new passphrase's wayin, makes it the main gate, and unlocks under a lease citing it", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
     const { bank } = await TH.buildBornBank({ passkeyCleartext })
     bank.lock()
@@ -216,7 +216,7 @@ describe("bank.replacePassphrase(cleartexts)", () => {
     await TH.expectRefusal(bank.replacePassphrase({ nextPassphraseCleartext: NextPassphrase }), 'bad_record')
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere, holding the gate it had and staying locked", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere, leaving the bank locked with the gate it had", async () => {
     const { bank, elsewhere } = await bankAndElsewhere()
     await elsewhere.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     const ante = bank.maingate
@@ -227,7 +227,7 @@ describe("bank.replacePassphrase(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("throws the vaultDB's refusal as it came, keeping the main gate and the lease it had", async () => {
+  it("throws the vaultDB's refusal unchanged, leaving the main gate and the lease it had", async () => {
     const { bank, device } = await TH.buildBornBank()
     const ante = bank.maingate
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
@@ -290,7 +290,7 @@ describe("bank.addPasskey(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere, holding the gate it had and staying locked", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere, leaving the bank locked with the gate it had", async () => {
     const { bank, elsewhere } = await bankAndElsewhere()
     await elsewhere.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     const ante = bank.maingate
@@ -351,7 +351,7 @@ describe("bank.revokePasskey(cleartexts)", () => {
     expect(bank.isLocked).to.be.true
   })
 
-  it("refuses 'stale_write' over a gate changed elsewhere, holding the gate it had and staying locked", async () => {
+  it("refuses 'stale_write' over a gate changed elsewhere, leaving the bank locked with the gate it had", async () => {
     const { bank, elsewhere } = await bankAndElsewhere({ passkeyCleartext: TH.passkeyAnswerOf() })
     await elsewhere.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     const ante = bank.maingate

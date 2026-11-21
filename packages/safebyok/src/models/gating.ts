@@ -117,7 +117,7 @@ export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: Ban
 // == [A gating's helpers]: checkedCleartexts, checkStrength, provingOf, nextGateAsk, vacateCleartexts, vacateAnswerAt
 
 /** Check `cleartexts` with `checker`.
- * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
+ * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
  */
 function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT {
   try {

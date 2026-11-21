@@ -97,7 +97,7 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     })
   }
 
-  it("leave each vault's minder to start again at a hello, on a vaultDB the host keeps", async () => {
+  it("leave each vault's minder to start again at a hello, on a vaultDB the host still has", async () => {
     const { bank, minder } = await TH.buildBornVault()
     await minder.get(scopeAt(bank, Openai))
     bank.sweep()
@@ -216,7 +216,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     expect(await bank.unsealBox(box)).to.deep.include({ whisper: TH.Whisper, sidecar: TH.Sidecar })
   })
 
-  it("given a labelpath, writes over the newest revision cached, keeping its sidecar", async () => {
+  it("given a labelpath, writes over the newest revision cached, carrying over its sidecar", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const next = await vault.putBoxOnce(Openai, {}, { whisper: { apiKey: 'sk-test-1111' } })
@@ -349,7 +349,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(await vault.withWhisper(Openai, ({ sidecar }) => sidecar)).to.deep.equal(TH.Sidecar)
   })
 
-  it("unseals the newest revision stored, where the minder holds it only sparse", async () => {
+  it("unseals the newest revision stored, where the minder has it only sparse", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     const first = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: stored } = await bank.sealBox(first, {}, { whisper: { apiKey: 'sk-test-1111' } })
@@ -489,10 +489,10 @@ function carsOnAnswer(bank: Bank, minder: ThingMinder, labelpath: string): (stri
 
 // Bank.put and the gate verbs write through the vaultDB, not the minder. Every adapter built on AdapterVaultDB (the
 // MemoryVaultDB here, and Postgres's) tells each watch of the bank of the bank, main gate and root box records a write
-// answers with, before the write's answer reaches its caller (VaultDB.watch): so a minder of the bank holds the bank or
+// answers with, before the write's answer reaches its caller (VaultDB.watch): so a minder of the bank has the bank or
 // gate record a verb wrote before the verb resumes. A box's good write is no tracked record: the caller lands it.
 describe("a vault's minder, beside the bank's own writes", () => {
-  it("holds the bank's Thing that bank.put wrote before it resolves", async () => {
+  it("has cached the bank's Thing that bank.put wrote before it resolves", async () => {
     const { bank, minder } = await TH.buildBornVault()
     const seen = carsOnAnswer(bank, minder, 'bank')
     const written = await bank.put({ cited: bank.pickle(), record: { ...bank.pickle(), revtok: TH.revtokOf('bank1'), revseq: bank.revseq + 1, written_at: bank.written_at + 1 } })
@@ -500,7 +500,7 @@ describe("a vault's minder, beside the bank's own writes", () => {
     expect(minder.at(scopeAt(bank, 'bank'))?.newest).to.include({ revtok: written.revtok, revseq: 1 })
   })
 
-  it("holds the main gate a gate verb wrote before the verb resolves", async () => {
+  it("has cached the main gate a gate verb wrote before the verb resolves", async () => {
     const { bank, minder } = await TH.buildBornVault()
     const seen = carsOnAnswer(bank, minder, 'gate')
     const after = await bank.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })

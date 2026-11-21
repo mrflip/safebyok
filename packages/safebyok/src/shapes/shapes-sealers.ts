@@ -41,7 +41,7 @@ export type RevisionOf<RecordT, CleartextsT> = RecordT extends unknown ? Omit<Re
 export type BodyOf<RecordT, CleartextsT> = Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord> | keyof SealedPartsOf<CleartextsT>>
 
 /** The record of `RecordT`'s kind that a seal makes the next revision from: whole, sparse or unsealed, live, a tombstone or the shell.
- * The seal keeps its Thing fields and its body, and never its secrets.
+ * The seal carries over its Thing fields and its body, and never its secrets.
  */
 export type Sealable<RecordT extends Sparse<ThingRecord>> = Omit<Sparse<RecordT>, 'am'> & Readonly<{ am: Sparse<ThingRecord>['am'] }> & Partial<Omit<LiveOf<RecordT>, keyof Sparse<ThingRecord>>>
 
@@ -97,7 +97,7 @@ export interface Sealer<RecordT extends Sparse<ThingRecord>, CleartextsT> {
   readonly purposes: SealPurposes
   /** `cleartexts` as the text to cipher. */
   encode(cleartexts: CleartextsT): string
-  /** The cleartexts in `text`. Refuses as damaged when the text does not parse or check. A refusal must not quote `text`, which holds cleartext. */
+  /** The cleartexts in `text`. Refuses as damaged when the text does not parse or check. A refusal must not quote `text`, which contains cleartext. */
   decode(text: string): CleartextsT
   /** The sealed part of `record`. Refuses as damaged when its tags are not this sealer's. */
   sealedOf(record: RecordT): Sealed

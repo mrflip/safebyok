@@ -78,7 +78,7 @@ export function gateIssue(stored: ThingRecord | null, why: string): Errors.Vault
   return new Errors.VaultError('gate_issue', BigPhrases.gateIssue(why), { rows: { dbhas: stored }, meta: PoliciedMeta })
 }
 
-/** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it does not keep. */
+/** A `bad_record` refusal of a write over `stored`, the live Thing whose born_at it changes. */
 export function bornAtNotStored(stored: ThingRecord | null): Errors.VaultError {
   return new Errors.VaultError('bad_record', Phrases.BornAtNotStored, { rows: { dbhas: stored }, meta: PoliciedMeta })
 }

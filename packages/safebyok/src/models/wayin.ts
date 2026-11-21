@@ -23,7 +23,7 @@ export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateSt
 }
 // --
 
-/** One way into a bank, kept in its gate: its passphrase or its passkey. */
+/** One way into a bank, recorded in its gate: its passphrase or its passkey. */
 export class Wayin {
   // == [Props]: wayinkind, wayinlabel, device_tok, registered_at, bank_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
 
