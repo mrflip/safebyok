@@ -60,7 +60,8 @@
   "peerDependencies": {
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@tanstack/react-query": "^5.107.1"
+    "@tanstack/react-query": "^5.107.1",
+    "vitest": "^5.0.0"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -81,6 +82,11 @@
       "import": "./dist/parts/index.js",
       "require": "./dist/parts/index.cjs"
     },
+    "./testing": {
+      "@safebyok/source": "./tests/testing.ts",
+      "import": "./dist/testing.js",
+      "require": "./dist/testing.cjs"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
@@ -100,6 +106,10 @@
         "import": "./dist/parts/index.js",
         "require": "./dist/parts/index.cjs"
       },
+      "./testing": {
+        "import": "./dist/testing.js",
+        "require": "./dist/testing.cjs"
+      },
       "./package.json": "./package.json"
     }
   },
@@ -110,7 +120,15 @@
       ],
       "kit": [
         "./dist/kit/index.d.cts"
+      ],
+      "testing": [
+        "./dist/testing.d.cts"
       ]
+    }
+  },
+  "peerDependenciesMeta": {
+    "vitest": {
+      "optional": true
     }
   }
 }
