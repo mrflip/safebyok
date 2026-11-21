@@ -39,8 +39,8 @@ function isRecord(val: unknown): val is ThingCited & Readonly<{ labelpath: strin
 
 // A host's item never holds a sparse record: the minder's get answers whole ones. The case is here for a host's own
 // select over a record it found elsewhere, such as a soon.
-/** The record a host shows of `thing`: the record itself while live, null for a tombstone or the shell (nothing stored, or deleted), and undefined for a sparse record, whose body is not yet known.
- * It is the default `select` of a box's query. Call it from a `select` of your own to start from what the default shows.
+/** The record a host shows of `thing`: itself while live, null for a tombstone or the shell, undefined for a sparse record.
+ * The shell is nothing stored, or deleted; a sparse record's body is not yet known. It is the default `select` of a box's query. Call it from a `select` of your own to start from what the default shows.
  * @example
  *   const title = useQuery({ ...sok.acme.box('openai'), select: (thing) => nullifyThing(thing)?.sidecar['title'] }).data
  */

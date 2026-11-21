@@ -310,7 +310,8 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
 
   // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.
   // Emptied before the first await, it holds the whisper during no render.
-  /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does. Make it at module scope, or under `useMemo`, so its checks run once.
+  /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
+   * Make it at module scope, or under `useMemo`, so its checks run once.
    * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then empties the form of every field before it writes.
    * It never rejects: it resolves the box stored, or the error that stopped it, a refusal or what `whisperOf` or `sidecarOf` threw, as thrown.
    * @example
