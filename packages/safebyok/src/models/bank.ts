@@ -180,20 +180,23 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // verbs: no public method accepts a proving (G9). Each verb attempts the gating its maker makes, which is vacated
   // whatever its outcome, and changes nothing where it refuses.
 
-  /** The gating of {@link birth} over `cleartexts`, for a form mutation to attempt. */
-  static birthGating(device: Device, cleartexts: BirthCleartexts): BirthGating {
+  /** The gating of {@link birth} over `cleartexts`, which hands `keep` the bank it births. Internal: {@link Device.birthGating} makes it, to keep that bank. */
+  static birthGating(device: Device, cleartexts: BirthCleartexts, keep: (bank: Bank) => void): BirthGating {
     const friend = {
-      // Cheat (react_life): birth hands the born bank to its device itself, until birth's caller does.
-      birth: async (record: BankMakeRecord, proving: Proving) => device.adoptBornBank(await Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving })),
+      birth: async (record: BankMakeRecord, proving: Proving) => {
+        const bank = await Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving })
+        keep(bank)
+        return bank
+      },
     }
     return new BirthGating(device, cleartexts, friend)
   }
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
-   * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
+   * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set. Until the device's `hello` answers, it refuses `disabled`.
    */
-  static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await this.birthGating(device, cleartexts).attempt() }
+  static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await Checks.device.parse(device).birthGating(cleartexts).attempt() }
 
   /** {@link birth}, resolving an `Outcome` instead of throwing. */
   static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
@@ -538,8 +541,9 @@ function makeWait(): Wait {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, and of {@link Bank.hostVault}'s vault. */
+/** The checks of {@link Bank.make}'s arguments, {@link Bank.birth}'s device, and {@link Bank.hostVault}'s vault. */
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
+  device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
   hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({

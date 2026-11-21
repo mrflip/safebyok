@@ -364,6 +364,7 @@ describe("bank.revokePasskey(cleartexts)", () => {
 describe("the try forms: tryUnlock, tryReplacePassphrase, tryAddPasskey, tryRevokePasskey, Bank.tryBirth", () => {
   it("each resolves a good outcome of the bank on success", async () => {
     const device = TH.makeDevice()
+    await device.hello()
     const bank = await TH.expectGood(Bank.tryBirth(device, { passphraseCleartext: TH.TestPassphrase }))
     bank.lock()
     expect(await TH.expectGood(bank.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))).to.equal(bank)

@@ -7,6 +7,7 @@ import { Consts, Errors, Phrases } from 'safebyok-big/internals'
 import { browserOpts } from '../../src/browser'
 import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
+import { BirthGating } from '../../src/models/gating'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
@@ -172,7 +173,7 @@ describe("device.hello()", () => {
     expect(device.getSnapshot().bank).to.include({ stage: 'unborn', isLocked: true, lastErr: null })
     expect(device.bank).to.be.null
     expect(device.vault).to.be.null
-    const bank = await Bank.birth(device, { passphraseCleartext: TH.TestPassphrase })
+    const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
     expect(stages).to.deep.equal(['starting', 'unborn', 'unlocked'])
     expect(device.bank).to.equal(bank)
     expect(device.vault!.bank).to.equal(bank)
@@ -201,7 +202,7 @@ describe("device.hello()", () => {
     expect(device.getSnapshot().bank.lastErr).to.not.be.null
   })
 
-  it("answers the same promise each time, and keeps a bank born on it before", async () => {
+  it("answers the same promise each time, and keeps the bank born on it since", async () => {
     const { bank, device } = await TH.buildBornBank()
     const helloing = device.hello()
     expect(device.hello()).to.equal(helloing)
@@ -210,13 +211,21 @@ describe("device.hello()", () => {
   })
 })
 
-describe("device.adoptBornBank(bank)", () => {
-  it("refuses anything but a bank, or a bank of another scope", async () => {
-    const { bank } = await TH.buildBornBank()
-    const device = TH.makeDevice({ banklabel: 'other' })
-    TH.expectSyncRefusal(() => device.adoptBornBank({} as never), 'bad_record')
-    TH.expectSyncRefusal(() => device.adoptBornBank(bank), 'record_conflict')
+describe("device.birthGating(cleartexts)", () => {
+  it("refuses until `hello` answers", async () => {
+    const device = TH.makeDevice()
+    const helloing = device.hello()
+    TH.expectSyncRefusal(() => device.birthGating({ passphraseCleartext: TH.TestPassphrase }), 'disabled')
+    await helloing
+    expect(device.birthGating({ passphraseCleartext: TH.TestPassphrase })).to.be.instanceOf(BirthGating)
+  })
+
+  it("keeps no bank where the birth is refused", async () => {
+    const device = TH.makeDevice({}, { strengthChecker: () => ({ strong: false, reason: 'too short' }) })
+    await device.hello()
+    await TH.expectRefusal(device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt(), 'weak_passphrase')
     expect(device.bank).to.be.null
+    expect(device.getSnapshot().bank).to.include({ stage: 'unborn' })
   })
 })
 
@@ -247,8 +256,9 @@ describe("device.sweep()", () => {
 
   it("does nothing on a device with no bank, which births one after it", async () => {
     const device = TH.makeDevice()
+    await device.hello()
     device.sweep()
-    const bank = await Bank.birth(device, { passphraseCleartext: TH.TestPassphrase })
+    const bank = await device.birthGating({ passphraseCleartext: TH.TestPassphrase }).attempt()
     expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
   })
 })

@@ -79,7 +79,7 @@ export class Gating {
 
 // == [The form verbs' gatings]: BirthGating, UnlockGating, ReplacePassphraseGating, AddPasskeyGating, RevokePasskeyGating
 
-/** A {@link Bank.birth} to attempt: make one with {@link Bank.birthGating}. */
+/** A {@link Bank.birth} to attempt: make one with {@link Device.birthGating}. */
 export class BirthGating extends Gating {
   constructor(device: Device, cleartexts: BirthCleartexts, friend: BirthGatingFriend) { super(cleartexts, (given) => birthBank(device, given, friend)) }
 }
