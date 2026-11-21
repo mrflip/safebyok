@@ -289,7 +289,7 @@ describe("boxCarQueryOptions", () => {
     expect(Acme.boxCarQueryOptions(OpenaiPath).queryKey).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '!'])
   })
 
-  it("lets a fetch ahead of render fill the entry that useBoxRecord then shows at once", async () => {
+  it("lets a fetch ahead of render fill the item that useBoxRecord then shows at once", async () => {
     const { world, Acme, client, wrapper } = setup()
     const record = TH.fakeBoxRecordOf(OpenaiPath, 1)
     world.stored.set(OpenaiPath, TH.fullCarOf(record))

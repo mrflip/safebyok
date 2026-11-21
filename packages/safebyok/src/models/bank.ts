@@ -88,7 +88,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return { bank: trackPairOf(this), [Labelpath.MainGate]: trackPairOf(this.#maingate), [Labelpath.RootBox]: trackPairOf(this.#rootBox) }
   }
 
-  /** The defaults this bank's minders set on their TanStack Query cache entries. */
+  /** The defaults this bank's minders set on their items and lists in TanStack Query's cache. */
   get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
 
   /** This bank's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes. */

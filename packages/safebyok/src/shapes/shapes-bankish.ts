@@ -47,7 +47,7 @@ export interface BankOpts {
   device:  Device
   /** Where the bank's boxes are stored. */
   vaultDB: VaultDB
-  /** The defaults this bank's minders set on their TanStack Query cache entries. A missing field defaults from {@link DefaultQueryCacheOpts}. */
+  /** The defaults this bank's minders set on their items and lists in TanStack Query's cache. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 

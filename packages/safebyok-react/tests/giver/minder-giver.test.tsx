@@ -109,7 +109,7 @@ describe("the giver over a minder", () => {
 
 // == [In any order]: OrderStep, settleInOrder, WatchedOrders, UnwatchedOrders
 
-/** One thing that happens to the host's entry: its fetch answers, the minder receives the next revision from the watch or a list, or the bridge starts. */
+/** One thing that happens to the host's item: its fetch answers, the minder receives the next revision from the watch or a list, or the bridge starts. */
 type OrderStep = 'fetch' | 'notice' | 'list' | 'bridge'
 
 /** A world over a real minder with the box at revision 1, a hook showing it whose fetch has read revision 1 and waits, then `steps` in order.

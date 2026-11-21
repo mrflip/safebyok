@@ -15,8 +15,8 @@ import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeCheck
 // == [Query defaults]: carQueryDefaults, carStaleTimeOf, newerCarOf, isCar, fullestOf
 
 // A host may override anything the giver supplies here (the keys, each of these defaults, and the `select` that picks
-// `fullest`), so nothing in the giver may depend on one staying in place. The bridge copies each car into the host's entry
-// whatever that entry's options say.
+// `fullest`), so nothing in the giver may depend on one staying in place. The bridge copies each car into the host's item
+// whatever that item's options say.
 /** The giver's defaults for the query of a box's car in the host's React Query. */
 function carQueryDefaults<CarT extends CarFields>() {
   return {
@@ -27,7 +27,7 @@ function carQueryDefaults<CarT extends CarFields>() {
   } as const
 }
 
-/** The staleTime of a car's query: 0 where the vaultDB is known to have a newer whole record, else Infinity (the bridge keeps it current). */
+/** The staleTime of the host's item of a box: 0 where the vaultDB is known to have a newer whole record, else Infinity (the bridge keeps it current). */
 function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>): number {
   const car = entry.state.data
   return ((car !== undefined) && dbHasNewer(car)) ? 0 : Infinity
@@ -38,7 +38,7 @@ function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>)
 // with the new key's, so cars of two boxes take the default too: their agerank says nothing of which to show. A box's cars
 // never go back, so the newer car has everything the older one has, and nothing needs merging. Without this, a fetch
 // that read an older car and resolved after the bridge copied a newer one would put the older car back.
-/** Structural sharing for a car's entry: of two cars of one box, the one with the greater agerank, `prior` on a tie.
+/** Structural sharing for the host's item of a box: of two cars of one box, the one with the greater agerank, `prior` on a tie.
  * Anything else goes to TanStack's default, `replaceEqualDeep`.
  */
 function newerCarOf(prior: unknown, next: unknown): unknown {
@@ -117,7 +117,7 @@ export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<
 export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   Checks.device.parse(device)
 
-  /** Keeps the host's React Query entries of the bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
+  /** Keeps the host's React Query items of the bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
   function useBridge(): void {
     const client = useQueryClient()
     useEffect(() => bridgeDevice(client, device), [client])
@@ -327,7 +327,7 @@ export function boxCarQueryKey(scope: Readonly<{ userid: string, banklabel: stri
   return ThingMinder.queryKeyOf(scope)
 }
 
-/** The key every one of a bank's entries in the host's React Query starts with. */
+/** The key every one of a bank's items in the host's React Query starts with. */
 export function bankQueryKey(scope: Readonly<{ userid: string, banklabel: string }>): QueryKey {
   return ThingMinder.bankQueryKeyOf(scope)
 }

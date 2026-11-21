@@ -43,7 +43,7 @@ describe("the bridge", () => {
     expect(world.counts.gets).to.eq(1)
   })
 
-  it("dates the host's entry by when the minder received the car", async () => {
+  it("dates the host's item by when the minder received the car", async () => {
     const { world, result } = await setupShowing()
     act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2)), 1_700_000_000_000) })
     await waitFor(() => { expect(result.current.dataUpdatedAt).to.eq(1_700_000_000_000) })
@@ -82,13 +82,13 @@ describe("the bridge", () => {
     expect(result.current.data).to.deep.equal(second)
   })
 
-  it("leaves the host's entry showing its car when the minder lets go of it", async () => {
+  it("leaves the host's item showing its car when the minder lets go of it", async () => {
     const { world, first, client, result } = await setupShowing()
     act(() => { world._cheat_hearRemoved(OpenaiPath) })
     expect([result.current.data, client.getQueryData(OpenaiKey)]).to.deep.equal([first, TH.fullCarOf(first)])
   })
 
-  it("copies no car into an entry no hook has made", async () => {
+  it("copies no car into an item no hook has made", async () => {
     const { world, client } = await setupShowing()
     const otherPath = 'box/anthropic'
     act(() => { world._cheat_hear(otherPath, TH.fullCarOf(TH.fakeBoxRecordOf(otherPath, 1))) })

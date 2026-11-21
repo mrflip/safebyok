@@ -104,7 +104,7 @@ async function renderKnockKnock() {
   onTestFinished(() => { client.clear() })
   const { container } = render(<QueryClientProvider client={client}><app.App /></QueryClientProvider>)
   const derivedBefore = world.deriver.heard
-  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React has of the tree, and in no query of the host's React Query. */
+  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React has of the tree, and in no item or mutation of the host's React Query. */
   function expectUnheld(passphrase: string): void {
     expect(world.snapshots.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
     expect(TH.holdsText(TH.reactTreeOf(container), passphrase)).to.eq(false)
