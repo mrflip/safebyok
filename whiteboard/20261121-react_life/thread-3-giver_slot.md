@@ -1,6 +1,6 @@
 # Thread 3: giver_slot (2026-11-21)
 
-Branch `20261121-giver_slot`, PR #799, stacked on #798. Proved: `safebyok-react-lean` test (5 files, 107), lint, typecheck.
+Branch `20261121-giver_slot`, PR #799, stacked on #798. Proved: `pnpm justify` green after the catch-up onto #798 at 209a9a11d (`safebyok-react-lean` 107 tests in 5 files; `safebyok` 1338; e2e 576).
 
 * **Built** (all in `packages/safebyok-react-lean/src/giver/`)
   - `react-giver.tsx`: `reactGiver(config)` returns `{ Provider, useStrengthVerdict, bank }`. `SOK.bank('acme')` (other banklabels refuse `bad_scope`) gives `useBank(select?)`, `useBoxRecord(labelpath, opts?)`, `withWhisper(labelpath, fn)`, `lock()`, `dismissUnlock()`, and the form hooks `useBirth`, `useUnlock`, `useReplacePassphrase`, `useAddPasskey`, `useRevokePasskey`, each a `useMutation` with a synchronous `.gating(cleartexts)`. Exported from the package's `.` entry with its types, `GiverConfig`, `GiverBanks`, `GiverSlotSnapshot`, `SignedOutBank`.
@@ -38,6 +38,7 @@ Branch `20261121-giver_slot`, PR #799, stacked on #798. Proved: `safebyok-react-
 
 * **Discoveries**
   - The bridge's `deliverEvent` invalidates the host's item from inside the minder's cache subscriber, which refetches it. The refetch's `minder.get` now runs after an `await device.hello()`, a microtask later, so it no longer dispatches to the minder's cache from inside that cache's notification. Thread 4 porting the bridge should keep it so (rule 7).
+  - With the giver's types now naming `DeviceOpts` and the like, tsdown followed safebyok's declarations into safebyok-big's, "detected" idb-keyval as bundled (nothing of it is), and wrote `inlinedDependencies` into the package's `package.json` at every build. `tsdown.config.ts` now keeps `safebyok-big` external; the built output is unchanged.
   - The provider must be inside a `QueryClientProvider`; `useQueryClient()` throws otherwise (tested). The dream's "where a host has none, the giver makes one" is not built.
 
 * **Looked up**: the plan's ground rules and threads 3 to 7, and the progress document.
