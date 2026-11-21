@@ -110,3 +110,8 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   four-character one, where the schedule shows none of short text. The flaw is in `mask`, not its callers: "make mask
   have smarter policy for a locked/stored [use] case" (the Coach, 2026-11-21, react_life #808). `mask` is
   safebyok-big's helper, re-exported by the core; broaden it there.
+* **Make the lean giver's device on the client only.** The provider makes the giver's device during render, at the
+  giver's module scope (react_life #809). Under server rendering, the first request's userid would keep a device for
+  the server process, bridged to that request's QueryClient, and `keys.*`, `boxQuery` and the `fooMutationOptions`
+  in later requests' server code would answer that first user's keys. It never says hello, so it fetches nothing and
+  holds no secret. When server-rendering hosts are in scope, make the device only on the client (a hydration flag, say).

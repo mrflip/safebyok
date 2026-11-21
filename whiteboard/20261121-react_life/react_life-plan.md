@@ -401,6 +401,7 @@ choice ("they go lower in the list at a priority you choose").
 * **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 12.
 * **Ready when:** no `slot` left in the package; a hook under the provider reads a non-null device; `useGate` shows a
   passkey added and revoked without a reload; the host's cache holds no wrapped bankKey and no secret (rule 2).
+* *Review:* fixed (medium, opus). `deviceOf` became `ensureDevice`; two test and spacing style fixes; the Provider's comment and `GiverEvent`'s doc block. The device made during render judged sound in the browser (idempotent; no second device or bridge under StrictMode or a discarded render). Left: SSR would keep the first request's device on the server (a TODO entry; a client-only line in the Provider's doc block rides along on 14); a `passkeyHeaderOf` export for a selector copied four times (rides along on 14); `useGate` takes the box-named `BoxQueryOpts` (rename when the bank record follows `useGate`'s shape); `PasskeyUnlockButton` shows nothing until the gate query resolves; a vague `OfData` suffix in the bridge.
 
 ### 14. `whisper_mask`: a part that shows a whisper's live mask, written into the page
 
