@@ -101,7 +101,12 @@ describe("ThingMinder.hello", () => {
     expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
-  it("is made before its bank is born, refuses until the bank is stored, then answers under the root box the birth's notice delivers", async () => {
+  it("refuses a get until its bank is stored, when made before the bank is born", async () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB(), { isRootHeard: false })
+    await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
+  })
+
+  it("answers under the root box the birth's notice delivers, after a get was refused", async () => {
     const vaultDB = new MemoryVaultDB()
     const { minder, receive } = minderWorldOf(vaultDB, { isRootHeard: false })
     await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
@@ -140,19 +145,35 @@ describe("ThingMinder.hello", () => {
   })
 })
 
+/** A minder that has fetched the main gate, over its vaultDB and the gate stored; goodbye not yet said. */
+async function fetchedWorldOf() {
+  const vaultDB = new MemoryVaultDB()
+  const gate0   = await storedGateOf(vaultDB, 0)
+  const { minder } = minderWorldOf(vaultDB)
+  await minder.get(TH.GateScope)
+  expect(minder.at(TH.RootScope)).to.have.property('liveness', 'full')
+  return { minder, vaultDB, gate0 }
+}
+
 describe("ThingMinder.goodbye", () => {
-  it("empties the cache, stops watching, and refuses later reads", async () => {
-    const vaultDB = new MemoryVaultDB()
-    const gate0   = await storedGateOf(vaultDB, 0)
-    const { minder } = minderWorldOf(vaultDB)
-    await minder.get(TH.GateScope)
-    expect(minder.at(TH.RootScope)).to.have.property('liveness', 'full')
+  it("empties the cache", async () => {
+    const { minder } = await fetchedWorldOf()
     minder.goodbye()
     expect([minder.at(TH.RootScope), minder.at(TH.GateScope)]).to.deep.equal([undefined, undefined])
+  })
+
+  it("stops watching the vaultDB", async () => {
+    const { minder, vaultDB, gate0 } = await fetchedWorldOf()
+    minder.goodbye()
     const gate1 = TH.nextGateOf(gate0)
     await TH.expectGood(vaultDB.tryWriteThing(TH.replaceAskOf(gate0, gate1)))
     await TH.wakeupAtNextTick()
     expect(minder.at(TH.GateScope)).to.be.undefined
+  })
+
+  it("refuses later reads", async () => {
+    const { minder } = await fetchedWorldOf()
+    minder.goodbye()
     await TH.expectBad(minder.tryAt(TH.GateScope), 'disabled')
     await TH.expectRefusal(minder.get(TH.GateScope), 'disabled')
   })

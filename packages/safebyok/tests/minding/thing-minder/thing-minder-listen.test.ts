@@ -212,7 +212,8 @@ describe("ThingMinder.listen", () => {
     expect(removed[0]?.state).to.deep.include({ data: undefined, status: 'success' })
   })
 
-  it("tells the bank's onBadNews what a listener throws, as unexpected_error, and tells the listeners after it", async () => {
+  /** A minder whose first listener throws and whose second is `later`, once it has fetched the main gate; the bank and the gate it stored. */
+  async function throwingListenerWorldOf() {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder, bank } = minderWorldOf(vaultDB)
@@ -220,9 +221,18 @@ describe("ThingMinder.listen", () => {
     minder.listen(() => { throw new Error('listener broke') }, ThingFormat)
     minder.listen(later, ThingFormat)
     await minder.get(TH.GateScope)
-    expect(later.mock.calls.map(([event]) => event.state.data)).to.deep.include(carOf(gate))
+    return { bank, gate, later }
+  }
+
+  it("tells the bank's onBadNews what a listener throws", async () => {
+    const { bank } = await throwingListenerWorldOf()
     expect(badnewsOf(bank)).to.deep.equal(['unexpected_error'])
     expect(bank.tellBadNews.mock.calls[0]?.[0][0]).to.have.nested.property('cause.message', 'listener broke')
+  })
+
+  it("tells the listeners after one that throws", async () => {
+    const { gate, later } = await throwingListenerWorldOf()
+    expect(later.mock.calls.map(([event]) => event.state.data)).to.deep.include(carOf(gate))
   })
 
   it("refuses a listener that is not a function", () => {

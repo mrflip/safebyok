@@ -45,7 +45,7 @@ describe("ThingMinder.invalidate", () => {
     for (const ask of asked) { expect(ask.mock.calls).to.have.lengthOf(0) }
   })
 
-  it("tells of the listings under a labelpath alone, and of the listing of a Thing with none under it", async () => {
+  it("tells of the listing of a Thing with none under it, and of no listing above it", async () => {
     const { minder, heard } = await listedWorldOf()
     minder.listen(heard, ThingFormat)
     minder.invalidate('box/openai', { list: 'all' })

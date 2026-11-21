@@ -75,7 +75,7 @@ describe("ThingMinder.get", () => {
     expect(asked.mock.calls).to.have.lengthOf(2)
   })
 
-  it("caches nothing of the world beside the record, and a main gate the ask tracks stale comes to the minder as its own notice", async () => {
+  it("caches a main gate the ask tracks stale only once its own notice arrives, never from the get of the bank", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate1   = await storedGateOf(vaultDB, 1)
     const { minder } = minderWorldOf(vaultDB)
