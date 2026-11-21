@@ -139,10 +139,10 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   /** The device the nearest provider of this giver shows its children, or signed out outside every one. */
   const ShownContext = createContext<Shown>(SignedOutShown)
 
-  /** Make `userid`'s device, and answer it. Answers the device already made, whatever `userid`, once there is one.
+  /** The giver's device: `userid`'s, made now, or the one already made, whatever `userid`.
    * `mount`'s vaultDB and key deriver, where given, replace the config's; its client is the one the minder's records are bridged into.
    */
-  function deviceOf(userid: string, { client, vaultDB, keyDeriver }: GiverMount): Device {
+  function ensureDevice(userid: string, { client, vaultDB, keyDeriver }: GiverMount): Device {
     if (device !== null) { return device }
     const opts = { ...configDeviceOpts, vaultDB: vaultDB ?? configVaultDB, ...(keyDeriver && { keyDeriver }) }
     // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
@@ -182,7 +182,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     // The device is made during render, so the first render with a userid shows it, and a selecting hook renders no
     // more than its selection changes. Each later call, StrictMode's or a discarded render's, answers the one device.
     // `hello` reads the vaultDB, so it waits for the effect; it has no cleanup, as the device lives for the page.
-    const made = (typeof userid === 'string') ? deviceOf(userid, { client, vaultDB, keyDeriver }) : device
+    const made = (typeof userid === 'string') ? ensureDevice(userid, { client, vaultDB, keyDeriver }) : device
     useEffect(() => { void made?.hello() }, [made])
     const shown = useMemo(() => shownOf(made, userid), [made, userid])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
