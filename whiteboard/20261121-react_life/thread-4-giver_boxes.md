@@ -1,6 +1,6 @@
 # Thread 4: giver_boxes (2026-11-21)
 
-Branch `20261121-giver_boxes`, PR #NNN, stacked on #799. Proved: `safebyok-react-lean` lint, typecheck, test (3 files, 102: `react-giver` 87, `react-bridge` 9, `knock-knock` 6).
+Branch `20261121-giver_boxes`, PR #801, stacked on #799. Proved: `safebyok-react-lean` lint, typecheck, test (3 files, 102: `react-giver` 87, `react-bridge` 9, `knock-knock` 6).
 
 * **Built** (`packages/safebyok-react-lean/src/giver/`)
   - **One query factory**, `boxQueryOf(userid, labelpath)` in `makeBankGiver`, over `boxQueryBaseOf` (key, fetch, defaults) plus `select: nullifyThing`. Three doors onto it:
