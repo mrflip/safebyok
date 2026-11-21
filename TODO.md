@@ -100,3 +100,8 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   that a host's object is a `VaultDB`, a device store or a query client by sampling its member names. Gathered in one
   module they would leave the files that hold them now, if the imports allow it without a cycle. Optional: one sitting
   alone in `ThingChecks` is fine (the Coach, 2026-11-18).
+* **Have `vaultDB.vacate` clear what an adapter's own client caches.** A vaultDB whose transport has a client cache
+  of its own (Apollo's and Convex's clients can) is one more place that holds a user's records on the device, and a
+  discard that ends at the minder's cache and the host's React Query does not reach it. Not yet checked against any
+  adapter: for each, find whether its client caches what it fetches, and have its `vacate` clear that
+  (the Coach, 2026-11-21, `whiteboard/20261121-react_life/`).
