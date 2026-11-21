@@ -180,7 +180,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // verbs: no public method accepts a proving (G9). Each verb attempts the gating its maker makes, which is vacated
   // whatever its outcome, and changes nothing where it refuses.
 
-  /** The gating of {@link birth} over `cleartexts`, which hands `keep` the bank it births. Internal: {@link Device.birthGating} makes it, to keep that bank. */
+  /** The gating of {@link birth} over `cleartexts`, handing `keep` the bank it births. Internal: make a birth's gating with {@link Device.birthGating}. */
   static birthGating(device: Device, cleartexts: BirthCleartexts, keep: (bank: Bank) => void): BirthGating {
     const friend = {
       birth: async (record: BankMakeRecord, proving: Proving) => {
@@ -194,7 +194,8 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked. The device's bank is then this one.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
-   * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set. Until the device's `hello` answers, it refuses `disabled`.
+   * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
+   * Call it once the device's `hello` shows the stage `'unborn'`.
    */
   static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await Checks.device.parse(device).birthGating(cleartexts).attempt() }
 

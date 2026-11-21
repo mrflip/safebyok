@@ -150,7 +150,7 @@ export class Device implements MinderFriend {
   }
 
   /** The gating of a birth of this device's bank, for a form mutation to attempt: the bank it births is then this device's, unlocked.
-   * Call it once `hello` shows the stage `'unborn'`: until `hello` answers, it refuses `disabled`. See {@link Bank.birth} for what the birth refuses.
+   * Call it once `hello` shows the stage `'unborn'`. See {@link Bank.birth} for what the birth refuses.
    */
   birthGating(cleartexts: BirthCleartexts): BirthGating {
     if (this.#snapshot.bank.stage === 'starting') { throw Throwers.bankNotBroughtUp() }
