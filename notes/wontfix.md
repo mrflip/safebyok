@@ -108,10 +108,13 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
 ### A lock, a sweep or a second form verb while a form verb runs
 
 * current outcome, as built, and promised nowhere:
-  - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an unlock or a gate
+  - A lock while a form verb's attempt is in flight lands wherever the attempt's steps have reached: an `unlock` gating or a gate
     change that attaches its lease after the lock leaves the bank unlocked.
   - A sweep while an attempt is in flight: the attempt's write, if it has not yet begun, refuses `disabled`; one already
     sent lands in storage, and the lease the attempt then builds is evicted and the verb refuses `disabled`.
+  - A `device.sweep()` while a `Bank.birth` on that device is in flight sweeps each bank made on the device then:
+    a birth whose bank is not yet made goes on, and the device holds the bank it makes. A device stays usable after
+    its sweep, so the birth is not refused.
   - Two gate changes on one bank at once each cite the gate they proved against: the first to reach the vaultDB is
     written, and the second refuses `stale_write`, changes nothing and unlocks nothing. Until the bank observes itself,
     its main gate stays the one it last wrote, so a gate change made on another device refuses `stale_write` here too.
@@ -125,7 +128,9 @@ write. Ruled by the Coach, 2026-11-20, vault_snapper W2: "A put needs unlock any
   `stale_write`, the host makes the bank again from what is stored.
 
 Steps to reproduce: call `bank.unlock(...)` and, before it resolves, `bank.lock()`: the bank ends unlocked. Or call
-`bank.replacePassphrase(...)` twice without awaiting the first: the second refuses `stale_write`.
+`bank.replacePassphrase(...)` twice without awaiting the first: the second refuses `stale_write`. Or call
+`Bank.birth(device, ...)` and, while its passphrase is still being stretched, `device.sweep()`: the birth resolves a
+bank, and the device holds it.
 
 Reasoning for wontfix: each case is two of the host's own calls crossing over one bank, which the host sequences; what
 lands is what the calls amount to in the order they ran, nothing is left inconsistent in storage, and a refused gate
@@ -138,7 +143,8 @@ lifecycle: new machinery in a primitive's critical path, for crossings the host 
   answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may join its Thing
   to the new root box's listing. What a get still waiting at `goodbye` refuses, even with no `hello`, is unspecified.
   A list sets its listing and caches its sparse records, and a good write caches the record written, as though
-  begun after the `hello`. Each answers its caller as the vaultDB answered it.
+  begun after the `hello`. Each answers its caller as the vaultDB answered it. A bank's sweep calls `goodbye` on the
+  minder of each vault made on it, so an answer crossing that sweep is this case too.
 * alternatives:
   - a token for each stretch of minding, compared as each answer lands: a new state, and a check in the critical path
     of every get, list and write, for a crossing.

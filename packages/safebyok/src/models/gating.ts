@@ -21,8 +21,8 @@ import * as Throwers from '../refusals/throwers'
 // * A gating's contract is in its name: a gating whose intent is met may succeed even where its inputs would otherwise have
 //   been refused. (`revokePasskey` on a gate with no passkey proves, unlocks and writes nothing.)
 
-/** Birth a bank of `device`'s scope from the user's new passphrase and optional passkey: write it, and unlock it.
- * Refuses `gate_made_elsewhere` if a live bank is already stored there.
+/** Store a new bank of `device`'s scope, with the user's new passphrase and optional passkey, and resolve it unlocked.
+ * Refuses `gate_made_elsewhere` where a live bank is already stored.
  */
 export async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
   try {
@@ -76,7 +76,9 @@ export async function replacePassphrase(bank: Bank, cleartexts: unknown, friend:
   }
 }
 
-/** Add a passkey to `bank`, proved by its passphrase. Refuses while the gate has a passkey. */
+/** Add a passkey to `bank`, proved by its passphrase.
+ * Refuses while the gate already has a passkey.
+ */
 export async function addPasskey(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
   try {
     bank.demandEnabled()
@@ -94,7 +96,9 @@ export async function addPasskey(bank: Bank, cleartexts: unknown, friend: BankGa
   }
 }
 
-/** Revoke the passkey of `bank`, proved by its passphrase or the passkey. With no passkey, the proof unlocks the bank and nothing is written. */
+/** Revoke the passkey of `bank`, proved by its passphrase or the passkey.
+ * With no passkey, the proof unlocks the bank and nothing is written.
+ */
 export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
   try {
     bank.demandEnabled()
@@ -129,7 +133,7 @@ async function checkStrength(device: Device, passphraseCleartext: string): Promi
   if (! verdict.strong) { throw Throwers.weakPassphrase(verdict.reason) }
 }
 
-/** The proving of the way in of `gate` that `proof` is for: its passphrase wayin, or its passkey wayin. */
+/** The proving of `proof`, built against `gate`'s passphrase wayin or its passkey wayin, whichever `proof` is for. */
 function provingOf(device: Device, gate: Gate, proof: ProvedCleartexts): Promise<Proving> {
   if (proof.passphraseClear === undefined) { return PasskeyProving.buildStored(gate, proof.passkeyClear) }
   return PassphraseProving.buildStored(device, gate, proof.passphraseClear)
@@ -137,7 +141,7 @@ function provingOf(device: Device, gate: Gate, proof: ProvedCleartexts): Promise
 
 // The ask cites the gate the gating proved against, never the bank's main gate as it stands at the write: a gate change
 // landed meanwhile is refused as stale, and the proof unlocks nothing.
-/** The draft of the put that writes the next revision of `ante`, with `wayins`, over `ante`, under the storage policy of its change. */
+/** The draft put ask that writes `ante`'s next revision, with `wayins`, over `ante`, under the storage `policy`. */
 function nextGateAsk(ante: Gate, wayins: GateDna['wayins'], policy: EX.StoragePolicy): PutAskDraft<GateRecord> {
   return { cited: ante.pickle(), record: ante.makeNextRecord(wayins), options: { policies: [policy] } }
 }
@@ -165,8 +169,9 @@ function vacateAnswerAt(cleartexts: unknown, fieldname: 'passkeyClear' | 'nextPa
 
 // == [Checks]: Checks
 
-// Defined here, not with the shapes: it names a model class.
-/** The check of {@link birthBank}'s device, the one argument a bank's birth has no bank to vouch for. */
+// Defined here, not with the shapes: it names a model class. Only a birth needs it: every other gating takes a bank,
+// whose device is already checked.
+/** The check of {@link birthBank}'s device. */
 const Checks = Validator.Checkers('bad_record', ({ custom }) => ({
   device: custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
 }))

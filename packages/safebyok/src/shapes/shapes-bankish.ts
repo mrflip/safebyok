@@ -39,7 +39,7 @@ export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbse
 export type SealedBoxAsk<RecordT extends BoxRecord = BoxRecord> = BoxWriteAsk & Readonly<{ record: RecordT }>
 // --
 
-// == [The bank's making]: BankOpts, BirthOpts
+// == [The bank's making]: BankOpts, BirthOpts, HostedVault
 
 /** The options of {@link Bank.make}, beside its record. */
 export interface BankOpts {
@@ -51,9 +51,16 @@ export interface BankOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
-/** The options of a bank's birth, beside its record: {@link BankOpts}, and the `proving` of the main gate, built in the birth's gating underway. */
+/** The options of a bank's birth, beside its record: {@link BankOpts}, plus the `proving` of the main gate that the birth's gating built. */
 export interface BirthOpts extends BankOpts {
   proving: Proving
+}
+
+// `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
+/** A vault a bank hosts: the bank's sweep sweeps it. */
+export interface HostedVault {
+  /** End the vault, as its bank ends. */
+  sweep(): unknown
 }
 // --
 
@@ -130,21 +137,21 @@ export interface BankSnapshot {
   readonly leaseEndsAt: EpochMillis | null
   /** Why the bank failed to come up, at stage `'failed'`, or null at every other stage. */
   readonly lastErr:     RefusalSnapshot | null
-  /** True while a call waits for the bank to be unlocked ({@link Bank.ensureUnlocked}): render the unlock form.
-   * It goes false once the bank is unlocked, the wait is dismissed ({@link Bank.dismissUnlock}), or the bank ends.
+  /** True while a call waits in {@link Bank.ensureUnlocked}: render the unlock form while it is.
+   * It goes false when the bank is unlocked, {@link Bank.dismissUnlock} is called, or the bank ends.
    */
-  readonly unlockWanted: boolean
+  readonly isUnlockWanted: boolean
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
 /** The bank snapshot a device shows before it holds a bank object. */
 export const PendingBank: BankSnapshot = Object.freeze({
-  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, unlockWanted: false,
+  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
 /** A device's state, for a host to render. */
 export interface DeviceSnapshot {
-  /** The snapshot of the bank on this device, or {@link PendingBank} before one is made. */
+  /** The snapshot of the bank this device holds, or {@link PendingBank} while it holds none. */
   readonly bank: BankSnapshot
 }
 // --

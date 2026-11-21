@@ -31,15 +31,29 @@ export class Vault {
 
   // == [Construction]: make, constructor
 
-  /** Make the vault of `bank`'s boxes, with a minder of its own. The minder does nothing until its `hello`. */
+  /** Make the vault of `bank`'s boxes, with a minder of its own that does nothing until its `hello`.
+   * The bank's sweep sweeps the vault too. Refuses a swept bank.
+   */
   static make(bank: Bank): Vault {
-    return new Vault(Checks.bank.parse(bank))
+    const vault = new Vault(Checks.bank.parse(bank))
+    bank.hostVault(vault)
+    return vault
   }
 
   private constructor(bank: Bank) {
     this.#bank   = bank
     this.#minder = ThingMinder.make({ vaultDB: bank.vaultDB, queryCacheOpts: bank.queryCacheOpts }, bank)
     Object.freeze(this)
+  }
+  // --
+
+  // == [Ending]: sweep
+
+  /** Stop this vault's minder and empty its cache ({@link ThingMinder.goodbye}). Never throws. */
+  sweep(): this {
+    // The watch's stop is the host's vaultDB code: what it throws is news, and the bank's sweep goes on.
+    try { this.#minder.goodbye() } catch (err) { this.#bank.tellBadNews([err]) }
+    return this
   }
   // --
 
@@ -92,7 +106,7 @@ export class Vault {
   // == [Using whispers]: withWhisper
 
   /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
-   * On a locked bank, it first waits for an unlock ({@link Bank.ensureUnlocked}), and rejects if that wait is dismissed or the bank ends.
+   * On a locked bank, it first waits for an `unlock` gating ({@link Bank.ensureUnlocked}), and rejects if that wait is dismissed or the bank ends.
    * `fn` gets the box whole, as {@link ThingMinder.get} answers it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
    * Nothing of the unsealed box is kept, and what `fn` throws is rethrown unchanged. Keep the whisper inside `fn`, and return only what is safe to hold.
    * @example

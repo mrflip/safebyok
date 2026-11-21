@@ -173,16 +173,6 @@ describe("Bank.birth(device, cleartexts): what it refuses before it derives a ke
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
-  it("refuses on a swept device, writing nothing and vacating the passkey answer", async () => {
-    const device = TH.makeDevice()
-    const births = TH.spyBirths(device)
-    device.sweep()
-    const passkeyCleartext = TH.passkeyAnswerOf()
-    await TH.expectRefusal(birth(device, { passphraseClear: TH.TestPassphrase, passkeyClear: passkeyCleartext }), 'disabled')
-    expect(births.banks).to.be.empty
-    expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
-  })
-
   it("judges the passphrase with the device's own strength check", async () => {
     const device = TH.makeDevice({}, { strengthChecker: (passphrase: string) => (passphrase === 'weak' ? { strong: false, reason: 'too short' } : { strong: true }) })
     expect(await device.judgeStrength('weak')).to.deep.equal({ strong: false, reason: 'too short' })

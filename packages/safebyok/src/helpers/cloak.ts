@@ -1,4 +1,4 @@
-/** The cloak: a form's cleartexts, out of sight of anything that serializes, prints or walks an object, until vacated. */
+/** The cloak: a form's cleartexts, hidden from anything that serializes, prints or spreads an object, until vacated. */
 
 import { Errors, type GX, Validator } from 'safebyok-big/internals'
 import { type CloakCleartexts, CleartextChecks } from '../shapes/shapes-gateish'
@@ -6,8 +6,8 @@ import * as Throwers from '../refusals/throwers'
 
 // == [The cloak]: cloak, Cloak, CloakedMarker
 
-/** Adopt a form's cleartexts into a {@link Cloak}, to hand a giver's form mutation in their place.
- * A passkey answer's PRF bytes are copied in, and the answer's own zeroed: the cloak has the only copy.
+/** Wrap a form's cleartexts in a {@link Cloak}, to hand a giver's form mutation in their place.
+ * The cloak keeps the only copy of a passkey answer's PRF bytes: those in the answer you pass are zeroed.
  * @example unlock.mutate(cloak({ passphraseClear: passphraseField.value }))
  */
 export function cloak(cleartexts: CloakCleartexts): Cloak { return new Cloak(cleartexts) }
@@ -17,9 +17,9 @@ const CloakedMarker = '[cloaked]'
 
 // A form mutation's variables stay in React Query's mutation cache, its devtools and the `useMutation` hook's state; a
 // cloak there shows none of its cleartexts, and is vacated once the mutation settles. A passkey answer's getter hands out
-// a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own for a retry.
+// a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own bytes until it is vacated.
 /** A form's cleartexts, each read through its getter, until {@link Cloak.vacate} empties the cloak.
- * It has no enumerable field, and JSON, `String()` and Node's inspect show it as `'[cloaked]'`.
+ * A spread copies none of them, and JSON, `String()` and Node's inspect show only `'[cloaked]'`.
  */
 export class Cloak {
   #passphraseCleartext:     string | undefined
@@ -36,19 +36,19 @@ export class Cloak {
     Object.freeze(this)
   }
 
-  /** The passphrase: a new bank's, an unlock's, or a gate change's proof. */
+  /** The passphrase: a new bank's, or the proof of an `unlock` gating or a gate change. */
   get passphraseClear(): string | undefined { return this.#passphraseCleartext }
 
-  /** A copy of the passkey's answer: a new bank's, an unlock's, or a gate change's proof. */
+  /** A fresh copy of the passkey answer: a new bank's, or the proof of an `unlock` gating or a gate change. */
   get passkeyClear(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#passkeyCleartext) }
 
   /** The new passphrase. */
   get nextPassphraseClear(): string | undefined { return this.#nextPassphraseCleartext }
 
-  /** A copy of the new passkey's answer. */
+  /** A fresh copy of the new passkey's answer. */
   get nextPasskeyClear(): GX.PasskeyAnswer | undefined { return copiedAnswerOf(this.#nextPasskeyCleartext) }
 
-  /** Zero the cloak's passkey answers and drop its passphrases: every getter reads undefined after. */
+  /** Zero the cloak's passkey answers and drop its passphrases: every getter returns undefined after. */
   vacate(): void {
     zeroAnswer(this.#passkeyCleartext)
     zeroAnswer(this.#nextPasskeyCleartext)
@@ -90,13 +90,13 @@ function isAnswerish(answer: unknown): answer is GX.PasskeyAnswer {
   return (typeof answer === 'object') && (answer !== null) && Validator.isBytes((answer as { prfBytes?: unknown }).prfBytes)
 }
 
-/** A copy of `answer` with PRF bytes of its own; anything else as given, for the verb to refuse. */
+/** A copy of `answer` with PRF bytes of its own, or anything else as given, for the verb to refuse. */
 function copiedAnswerOf<AnswerT extends GX.PasskeyAnswer | null | undefined>(answer: AnswerT): AnswerT {
   if (! isAnswerish(answer)) { return answer }
   return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) }
 }
 
-/** A copy of `answer`, its own PRF bytes zeroed (G2), so the copy is the only one; anything else as given. */
+/** A copy of `answer`, with the PRF bytes of `answer` itself zeroed (G2), or anything else as given. */
 function adoptedAnswerOf<AnswerT extends GX.PasskeyAnswer | null | undefined>(answer: AnswerT): AnswerT {
   const adopted = copiedAnswerOf(answer)
   zeroAnswer(answer)

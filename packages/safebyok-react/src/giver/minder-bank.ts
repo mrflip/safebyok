@@ -15,8 +15,8 @@ const Checks = Checkers('bad_record', ({ custom }) => ({
 
 // == [The bank]: giverBankOfVault, giverBankOfMinder
 
-/** The giver's bank over `vault`: its boxes through its minder, and the form verbs of its bank.
- * A birth births a new bank on the vault bank's device, and so refuses while that bank is stored.
+/** The giver's bank over `vault`: its boxes, through its minder, and the form verbs of its bank.
+ * Its `birth` makes another Bank object on the same device, and refuses `gate_made_elsewhere` where a live bank is already stored.
  */
 export function giverBankOfVault(vault: Vault): GiverBank<BoxCar> {
   const { bank, minder } = Checks.vault.parse(vault)
@@ -32,7 +32,7 @@ export function giverBankOfVault(vault: Vault): GiverBank<BoxCar> {
 }
 
 /** The box reads of a giver's bank over the boxes `minder` minds, from its `hello` until its `goodbye`.
- * A get answers at once from a car the minder holds timely, and asks the vaultDB for any other. It gets only a box's labelpath.
+ * A get answers at once from a car the minder holds timely, and asks the vaultDB otherwise. It takes only a box's labelpath.
  */
 export function giverBankOfMinder(minder: ThingMinder): Pick<GiverBank<BoxCar>, 'getBoxCar' | 'listenBoxCars'> {
   Checks.minder.parse(minder)

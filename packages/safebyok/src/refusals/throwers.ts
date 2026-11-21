@@ -19,7 +19,7 @@ export * from 'safebyok-big/refusals/throwers'
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
 
-/** A `dismissed` refusal: the wait for an unlock was dismissed. */
+/** A `dismissed` refusal: the wait for an `unlock` gating was dismissed. */
 export function unlockDismissed(): Errors.VaultError { return new Errors.VaultError('dismissed', Phrases.UnlockDismissed) }
 
 /** A `bad_record` refusal: a tombstone's seal was given secret props. */

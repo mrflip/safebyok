@@ -324,7 +324,7 @@ export const { ctxStamp, leaseFromCacheArgs, leaseGrantedArgs, provingLeaseArgs,
 
 // --
 
-// == [The gating's forms]: gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, bankDelCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
+// == [The gating's forms]: gatingkind, bankBuildCleartexts, bankUnlockCleartexts, oneProofOf, ProvedCleartexts, passphraseReplaceCleartexts, passkeyAddCleartexts, passkeyRevokeCleartexts, bankDelCleartexts, gatingLaunchOnArgs, gatingLaunchBirthArgs, CleartextsForGatingkind
 
 // A cleartext is only ever checked here, in the attempt's own call.
 /** The checks of what the user hands an attempt, by the kind of gating. */
@@ -332,17 +332,23 @@ export const { gatingkind, bankBuildCleartexts, bankUnlockCleartexts, passphrase
   gatingkind:              oneof(EX.gatingkindVals),
   bankBuildCleartexts:         obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer.nullable().optional() }).strict(),
   bankUnlockCleartexts:        obj({ passphraseClear: passphraseCleartext.optional(), passkeyClear: passkeyAnswer.nullable().optional() }).strict()
-    .transform(({ passphraseClear, passkeyClear }, ctx) => {
-      if (passphraseClear !== undefined) { return { passphraseClear } }
-      if (passkeyClear) { return { passkeyClear } }
-      ctx.addIssue({ code: 'custom', message: Phrases.CleartextMissing })
-      return NEVER
-    }),
+    .transform(oneProofOf),
   passphraseReplaceCleartexts: obj({ antePassphraseClear: passphraseCleartext, nextPassphraseClear: passphraseCleartext }).strict(),
   passkeyAddCleartexts:        obj({ passphraseClear: passphraseCleartext, passkeyClear: freshPasskeyAnswer }).strict(),
   passkeyRevokeCleartexts:     obj({ passphraseClear: passphraseCleartext }).strict(),
   bankDelCleartexts:           obj({ passphraseClear: passphraseCleartext }).strict(),
 }))
+
+/** The one proof among `given`: its passphrase where it has one, else its passkey answer. Neither is an issue on `ctx`. */
+export function oneProofOf({ passphraseClear, passkeyClear }: { passphraseClear?: PassphraseCleartext | undefined, passkeyClear?: PasskeyAnswer | null | undefined }, ctx: Z.RefinementCtx): ProvedCleartexts {
+  if (passphraseClear !== undefined) { return { passphraseClear } }
+  if (passkeyClear) { return { passkeyClear } }
+  ctx.addIssue({ code: 'custom', message: Phrases.CleartextMissing })
+  return NEVER
+}
+
+/** One proof of a gate's way in, once checked: the passphrase, or the passkey's answer. */
+export type ProvedCleartexts = { passphraseClear: PassphraseCleartext, passkeyClear?: never } | { passkeyClear: PasskeyAnswer, passphraseClear?: never }
 
 /** The arguments that launch a gating on a stored bank: its kind, the bank, the bank's `unlockByProving`, and the device's dialog or null. */
 export const gatingLaunchOnArgs = objStrict(({ oneof, custom, fn }) => ({

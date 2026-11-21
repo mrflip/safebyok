@@ -231,11 +231,29 @@ describe("bank.lock() and bank.sweep()", () => {
     await TH.expectRefusal(bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) }), 'disabled')
   })
 
-  it("is disabled once its device is swept, with the device's refusal", async () => {
+  it("hosts only a vault, with a sweep to call, and only while enabled", async () => {
+    const { bank } = await TH.buildBornBank()
+    TH.expectSyncRefusal(() => { bank.hostVault({} as never) }, 'bad_record')
+    TH.expectSyncRefusal(() => { bank.hostVault(null as never) }, 'bad_record')
+    bank.sweep()
+    TH.expectSyncRefusal(() => { bank.hostVault({ sweep: vi.fn() }) }, 'disabled')
+  })
+
+  it("sweeps each vault it hosts once, as it is swept, and lets them go", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const hosted = { sweep: vi.fn(() => { expect(bank.isEnabled).to.be.false }) }
+    bank.hostVault(hosted)
+    bank.sweep()
+    device.sweep()
+    expect(hosted.sweep).toHaveBeenCalledOnce()
+  })
+
+  it("is swept once its device is swept, the device staying enabled", async () => {
     const { bank, device } = await TH.buildBornBank()
     device.sweep()
     expect(bank.isEnabled).to.be.false
-    expect(bank.endCause).to.equal(device.endCause)
+    expect(bank.endCause).to.include({ refusalkind: 'disabled' })
+    expect(device.isEnabled).to.be.true
   })
 })
 
@@ -249,11 +267,11 @@ function countCalls(subscribe: (listener: () => void) => unknown): { readonly ca
 describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
   it("shows a born bank unlocked, its lease ending the device's lease length after it was proved", async () => {
     const { bank, device } = await TH.buildBornBank()
-    expect(bank.getSnapshot()).to.deep.equal({ stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: TH.T0 + device.leaseMillis, lastErr: null, unlockWanted: false })
+    expect(bank.getSnapshot()).to.deep.equal({ stage: 'unlocked', isLocked: false, isEnded: false, endCause: null, leaseEndsAt: TH.T0 + device.leaseMillis, lastErr: null, isUnlockWanted: false })
     expect(Object.isFrozen(bank.getSnapshot())).to.be.true
   })
 
-  it("tells its subscribers once each for a lock, an unlock and a sweep, the snapshot the same object between them", async () => {
+  it("tells its subscribers once each for a lock, an `unlock` gating and a sweep, the snapshot the same object between them", async () => {
     const { bank } = await TH.buildBornBank()
     const counter = countCalls(bank.subscribe)
     const unlocked = bank.getSnapshot()
@@ -262,7 +280,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     bank.lock()
     const locked = bank.getSnapshot()
     expect(counter.calls).to.eq(1)
-    expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, unlockWanted: false })
+    expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot()).to.equal(locked)
 
     await TH.expectGood(bank.tryUnlock({ passphraseClear: TH.TestPassphrase }))
@@ -271,7 +289,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
 
     bank.sweep()
     expect(counter.calls).to.eq(3)
-    expect(bank.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, unlockWanted: false })
+    expect(bank.getSnapshot()).to.deep.equal({ stage: 'swept', isLocked: true, isEnded: true, endCause: bank.endCause, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot().endCause).to.equal(bank.endCause).and.include({ refusalkind: 'disabled' })
   })
 
@@ -290,15 +308,15 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(counter.calls).to.eq(2)
   })
 
-  it("shows the bank swept once its device is swept, its end cause the device's", async () => {
+  it("shows the bank swept once its device is swept", async () => {
     const { bank, device } = await TH.buildBornBank()
     const counter = countCalls(bank.subscribe)
     device.sweep()
     expect(counter.calls).to.eq(1)
-    expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: device.endCause })
+    expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: bank.endCause })
   })
 
-  it("keeps its snapshot once swept, telling no subscriber of a lock or of its device's sweep: its end cause stays its own", async () => {
+  it("keeps its snapshot once swept, telling no subscriber of a lock or of its device's sweep", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.sweep()
     const swept = bank.getSnapshot()
@@ -307,7 +325,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     device.sweep()
     expect(counter.calls).to.eq(0)
     expect(bank.getSnapshot()).to.equal(swept)
-    expect(swept.endCause).to.equal(bank.endCause).and.not.equal(device.endCause)
+    expect(swept.endCause).to.equal(bank.endCause)
   })
 
   it("shows only stages that bankStageVals lists", async () => {
@@ -749,12 +767,12 @@ describe("bank.put(args)", () => {
     expect(got).to.deep.include({ ok: true, val: bank.pickle() })
   })
 
-  it("refuses on a swept device, before it reaches the vaultDB", async () => {
+  it("refuses once its device is swept, before it reaches the vaultDB", async () => {
     const { bank, device } = await TH.buildBornBank()
     const tryWriteThing = vi.spyOn(device.vaultDB, 'tryWriteThing')
     device.sweep()
     const err = await TH.expectRefusal(bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) }), 'disabled')
-    expect(err).to.equal(device.endCause)
+    expect(err).to.equal(bank.endCause)
     expect(tryWriteThing).not.toHaveBeenCalled()
   })
 })

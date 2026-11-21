@@ -17,10 +17,10 @@ import * as Throwers from '../refusals/throwers'
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 /** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and the bank it holds.
- * Make it with `Device.make(record, opts)`. A `sweep()` ends it for good.
+ * Make it with `Device.make(record, opts)`. A `sweep()` ends every bank made on it, and the device stays usable for the next.
  */
 export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #madeBanks, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -36,13 +36,16 @@ export class Device {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The last bank made on this device, or null for none. {@link lock} and {@link sweep} act on it, and the device's
-   * snapshot carries its snapshot, or {@link PendingBank} while there is none.
+  /** The last bank made on this device, or null for none or once it is swept.
+   * The device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
    */
   #thisIsTemporaryBank: Bank | null = null
+  /** Every bank made on this device and not yet swept. */
+  readonly #madeBanks = new Set<Bank>()
   /** Ends this device's subscription to the bank it holds. */
   #unsubscribeBank: () => void = () => undefined
-  /** Why a sweep disabled the device, or null while it is enabled. */
+  // Nothing ends a device yet: its sweep ends only its banks.
+  /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
 
   /** The current snapshot, which {@link getSnapshot} returns. */
@@ -110,31 +113,44 @@ export class Device {
   judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Locking]: lock, cheatHoldBank
+  // == [Locking]: lock, cheatHoldBank, cheatDropBank
 
-  /** Lock this device's bank, if it holds one. Never throws. */
+  /** Lock every bank made on this device. Never throws. */
   lock(): this {
-    this.#thisIsTemporaryBank?.lock()
+    for (const bank of this.#madeBanks) { bank.lock() }
     return this
   }
 
-  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is kept.
-  /** Hold `bank` as this device's bank, the one {@link lock}, {@link sweep} and the snapshot act on. Internal. */
+  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one held.
+  /** Hold `bank` as the bank this device's snapshot shows, and as one its lock and sweep reach. Internal.
+   * The bank held before stays as it was.
+   */
   cheatHoldBank(bank: Bank): void {
+    this.#madeBanks.add(bank)
     this.#unsubscribeBank()
     this.#thisIsTemporaryBank = bank
     this.#unsubscribeBank = bank.subscribe(this.#align)
+    this.#align()
+  }
+
+  /** Let go of `bank`, and show {@link PendingBank} if it is the bank this device's snapshot shows. Internal. */
+  cheatDropBank(bank: Bank): void {
+    this.#madeBanks.delete(bank)
+    if (bank !== this.#thisIsTemporaryBank) { return }
+    this.#unsubscribeBank()
+    this.#unsubscribeBank = () => undefined
+    this.#thisIsTemporaryBank = null
     this.#align()
   }
   // --
 
   // == [Ending]: sweep
 
-  /** Disable this device for good, and sweep its bank. Never throws. */
+  /** Sweep every bank made on this device. Never throws.
+   * The device stays usable: it judges passphrases, and a bank may be made on it again.
+   */
   sweep(): this {
-    if (! this.isEnabled) { return this }
-    this.#endCause = Throwers.deviceDisabled()
-    this.#thisIsTemporaryBank?.sweep()
+    for (const bank of this.#madeBanks) { bank.sweep() }
     return this
   }
   // --
@@ -165,7 +181,7 @@ export class Device {
   // == [Telling the host]: tellBadNews
 
   /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
-   * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device is disabled, the
+   * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device ends, the
    * default handler hears instead of the host's.
    */
   tellBadNews(badnews: readonly unknown[]): void {
@@ -177,10 +193,10 @@ export class Device {
 
   // == [Guards]: isEnabled, endCause, demandEnabled
 
-  /** True from `Device.make` until a sweep, and never again. */
+  /** True from `Device.make` until the device ends, and never again. */
   get isEnabled(): boolean { return this.#endCause === null }
 
-  /** The refusal every call on this device meets after a sweep, or null while it is enabled. */
+  /** The refusal every call on this device meets once it ends, or null while it is enabled. */
   get endCause(): Errors.VaultError | null { return this.#endCause }
 
   /** Throw unless {@link isEnabled}. */
