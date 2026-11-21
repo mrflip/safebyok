@@ -31,7 +31,7 @@ changed.
     React's own idiom for latest-wins over an imperative async call.
   * **The errors leave `showWhisper` as a rejection**, not as state in the hook: `WhisperText` hands it to `onError`,
     `useDraft` keeps it as `lastErr`. Two channels for one error would be harder to read.
-  * **The hooks are private**: neither is exported from an entry. `useNewPassphrase` speaks the kit's phrases.
+  * **`useReveal` is private.** `useNewPassphrase` was too, until the Coach's ruling below.
 * **Deviations**:
   * `useDraft` now marks a field revealed inside `withWhisper`'s callback (under `flushSync`, just before writing the
     input's value) rather than after `withWhisper` resolves, since `WhisperText` needs its element mounted before the
@@ -45,6 +45,22 @@ changed.
 * **Discoveries**: no demo keeps a meter or a reveal of its own: both use the kit forms, `WhisperText` and `useDraft`.
   `notes/security.md` was not touched: no secret material moves (the passphrase stays in the inputs, the whisper's
   text reaches the DOM only inside `withWhisper`'s callback, as before).
-* **For the Coach**:
-  * **Export `useNewPassphrase`?** It is private to the kit, since it speaks the kit's phrases. Recommendation: keep
-    it private until a host writes its own new-passphrase form; `useStrengthVerdict` serves that host meanwhile.
+* **Rework on the Coach's rulings (2026-11-21)**, each its own commit:
+  * **`keep` is `attachBank`.** `Bank.birthGating(device, cleartexts, attachBank?)` (thread 16's), its checker
+    `Checks.attachBank`, the tests (`attachNothing` for `keepNothing`), #813's changeset and the drift note; the
+    device's `#hold(bank)` is `#attachBank(bank)`. It also makes the device's vault from the bank, subscribes to it
+    and aligns the snapshot, which is what making the bank the device's amounts to, so the name stands. Its two
+    callers are `birthGating`'s callback and `#bringUp`. `notes/security.md` named `keep` on its birth_verb line: a
+    `sonnet` subagent renamed it.
+  * **A refused field check zeroes the gating's copies** (`adoptedCleartextsOf`, `gating.ts`, G2). The two copies
+    are `let`s declared above the `try` and zeroed in its `catch`, which also covers a second answer's getter throwing
+    after the first was copied. A nested try around the check alone was the other shape, set aside as less plain. New
+    test *zeroes the PRF bytes it copied when the cleartexts fail their check* (spies `fill`, filters out the host's
+    buffer), red without the fix. No drift line named the gap; `notes/security.md`'s cloak entry carries a one-line
+    `new_passphrase` amendment.
+  * **`useNewPassphrase` is exported** from `safebyok-react-lean/kit`, with `NewPassphrase` and
+    `NewPassphraseFieldProps`, and a doc block for a host's own form. Its labels are still the kit's phrases.
+  * **`WhisperFieldAttributes`'s keys** (`safebyok-big/src/helpers/whisper-field.ts`) are quoted with `"`; nothing
+    else in big moved.
+  * Proved: `pnpm --filter` lint, typecheck and test for safebyok (1352), safebyok-react-lean (252) and safebyok-big
+    (2946), then `pnpm justify` at the tip.
