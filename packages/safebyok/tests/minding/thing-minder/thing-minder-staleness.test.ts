@@ -49,7 +49,7 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(TH.BoxScope, { staleTime: Infinity })).to.be.false
   })
 
-  it("counts a full car whose last get was refused stale under a staleTime of Infinity, and timely under 'static', as a get does", async () => {
+  it("counts a full car whose last get was refused the same way a get does: stale under a staleTime of Infinity, timely under 'static'", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate1   = await storedGateOf(vaultDB, 1)
     const { minder } = minderWorldOf(vaultDB)
@@ -109,7 +109,7 @@ describe("ThingMinder's watch", () => {
     expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate))
   })
 
-  it("keeps the main gate's car when the watch tells of it again, and tells a listener each time", async () => {
+  it("still has the main gate's car when the watch notifies it again, and tells a listener each time", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
     const staleGet = { ...TH.getAskAt('box'), track: TH.GateStaleTrack }

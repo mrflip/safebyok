@@ -304,7 +304,8 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     }
   })
 
-  it("accepts a box's birth citing its whole shell, as a bank gives it", () => {
+  // A bank cites a box's whole shell.
+  it("accepts a box's birth citing its whole shell", () => {
     const ask = TH.birthAskOf(box, TH.boxShellOf({ labelpath: box.labelpath, label: box.label }))
     expect(checkedWriteAsk(ask)).to.deep.equal(ask)
   })

@@ -55,7 +55,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(one.maingate.revtok).to.not.eq(two.maingate.revtok)
   })
 
-  it("refuses where a live bank is stored at its scope, as made elsewhere, leaving the bank it made locked and the stored one as it was", async () => {
+  it("refuses where a live bank is stored at its scope, leaving the bank it made locked and the stored one unchanged", async () => {
     const device = TH.makeDevice()
     const stored = await birth(device, { passphraseCleartext: TH.TestPassphrase })
     const births = TH.spyBirths(device)
@@ -67,7 +67,7 @@ describe("Bank.birth(device, cleartexts)", () => {
     expect(answer.ok && answer.val.bank).to.deep.equal(stored.pickle())
   })
 
-  it("passes any refusal of the vaultDB as it came, leaving the bank locked", async () => {
+  it("passes any refusal of the vaultDB on unchanged, leaving the bank locked", async () => {
     const refusal = new Errors.VaultError('storage_unavailable', 'the disk is full')
     const device = TH.makeDevice()
     const births = TH.spyBirths(device, (ask) => Promise.resolve({ ok: false, ask, act: 'unclassified_storing', world: null, dbhas: null, err: refusal }))

@@ -146,7 +146,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(Object.isFrozen(opened)).to.be.true
   })
 
-  it("answers a copy of the record as the sealer checks it: a field beside the record refuses", async () => {
+  it("answers a checked copy of the record: a field beside the record refuses", async () => {
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const { whisper_sealed: _sealed, ...unsealed } = sealed
@@ -216,13 +216,13 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     await TH.expectRefusal(lease.unseal(BaseBox, { ...tombstone, written_at: TH.T0 + 8 }), 'damaged_whisper')
   })
 
-  it("refuses a tombstone given a sidecar other than `{}`, as BaseBox makes it", async () => {
+  it("refuses a BaseBox tombstone given a sidecar other than `{}`", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await TH.expectRefusal(lease.seal(BaseBox, live, { am: 'x', sidecar: TH.Sidecar }), 'bad_record')
   })
 
-  it("writes a tombstone given the sidecar `{}`, a tombstone's own, as BaseBox makes it", async () => {
+  it("writes a BaseBox tombstone given the sidecar `{}`, a tombstone's own", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const tombstone = await lease.seal(BaseBox, live, { am: 'x', sidecar: {} })

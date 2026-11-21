@@ -49,7 +49,7 @@ describe("ThingMinder.listen", () => {
     expectTypeOf<typeof ThingMinder.isThingEvent>().guards.toEqualTypeOf<ThingEvent>()
   })
 
-  it("tells TanStack's state as it stands, in a frozen copy, and never the query itself", async () => {
+  it("tells a frozen copy of TanStack's current state, never the query itself", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
@@ -139,7 +139,7 @@ describe("ThingMinder.listen", () => {
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.error.refusalkind', 'stale_read')
   })
 
-  it("tells no car for a first get that is refused, as for a removed one", async () => {
+  it("tells no car for a first get that is refused", async () => {
     const vaultDB = await bornOf(new DownVaultDB())
     const { minder } = minderWorldOf(vaultDB)
     const heard = listenerOf()

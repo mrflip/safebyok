@@ -175,7 +175,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
 })
 
 describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
-  it("answers the box as stored, already in its car", async () => {
+  it("answers the stored box, already in its car", async () => {
     // tryPutBoxOnce @example
     const { bank, vault, minder } = await TH.buildBornVault()
     const { ok, val: box, err } = await vault.tryPutBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -206,7 +206,7 @@ describe("vault.tryPutBoxOnce(cited, patch, secrets)", () => {
 })
 
 describe("vault.putBoxOnce(cited, patch, secrets)", () => {
-  it("resolves a birth with the box as stored already in its car and in its parent's listing", async () => {
+  it("resolves a birth with the stored box already in its car and in its parent's listing", async () => {
     // putBoxOnce @example
     const { bank, vault, minder } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -299,7 +299,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
 })
 
 describe("vault.tryDelBoxOnce(labelpath)", () => {
-  it("answers the tombstone as stored", async () => {
+  it("answers the stored tombstone", async () => {
     const { vault } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(await TH.expectGood(vault.tryDelBoxOnce(Openai))).to.include({ labelpath: Openai, am: 'x', revseq: box.revseq + 1 })
@@ -441,7 +441,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     expect(fn).not.toHaveBeenCalled()
   })
 
-  it("rethrows what fn throws, as it came", async () => {
+  it("rethrows what fn throws unchanged", async () => {
     const { vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const thrown = new Error('the host could not reach the model')

@@ -205,7 +205,7 @@ describe("the knock-knock app", () => {
     expectUnheld(Passphrase)
   })
 
-  it("refuses the joke as dismissed when Hue cancels the dialog, and leaves the vault locked", async () => {
+  it("refuses the joke without unlocking when Hue cancels the dialog", async () => {
     const { heard, derivations } = await renderKnockKnock()
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })

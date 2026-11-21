@@ -434,7 +434,8 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     expect(whisper).to.deep.equal(TH.Whisper)
   })
 
-  it("unseals with its sidecar altered, as the seal leaves the sidecar out", async () => {
+  // The seal leaves the sidecar out.
+  it("unseals with its sidecar altered", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const unsealed = await bank.unsealBox({ ...box, sidecar: { account: 'home' } })
@@ -744,7 +745,7 @@ describe("bank.tellBadNews(badnews)", () => {
 })
 
 describe("bank.put(args)", () => {
-  it("writes the bank's next revision, answering it as stored, and leaves the bank in hand as it was", async () => {
+  it("writes the bank's next revision, answering the stored bank, and leaves the bank it was called on unchanged", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     expect(await bank.put({ cited: bank.pickle(), record })).to.deep.equal(record)
@@ -753,7 +754,7 @@ describe("bank.put(args)", () => {
     expect(got).to.deep.include({ ok: true, val: record })
   })
 
-  it("throws the vaultDB's refusal, as for a revision it does not cite", async () => {
+  it("throws the vaultDB's refusal of a revision it does not cite", async () => {
     const { bank } = await TH.buildBornBank()
     await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), revtok: TH.revtokOf('stale') }, record: nextBankThingOf(bank) }))
     expect(await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })).to.include({ revseq: 1 })

@@ -337,7 +337,7 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
 })
 
 describe("device.tellBadNews(badnews)", () => {
-  it("tells a refusal as it is and anything else thrown as an unexpected error, and drops the news of a thing disabled", async () => {
+  it("passes a refusal on unchanged, wraps anything else thrown as an unexpected error, and drops the news of a thing disabled", async () => {
     const onBadNews = vi.fn()
     const device = TH.makeDevice({}, { onBadNews })
     device.tellBadNews([new Errors.VaultError('storage_unavailable', "Down."), new Error("Thrown."), new Errors.VaultError('disabled', "Gone.")])

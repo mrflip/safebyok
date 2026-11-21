@@ -48,7 +48,7 @@ describe("AdapterVaultDB, a step that throws", () => {
     expect(answer.ask).to.deep.include(TH.GateScope)
   })
 
-  it("answers a refusal as it is", async () => {
+  it("answers a refusal unchanged", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw new Errors.VaultError('identity_revoked', 'The backend no longer serves this user.') })
     await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'identity_revoked')
   })

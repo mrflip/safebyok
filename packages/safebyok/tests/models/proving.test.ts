@@ -411,7 +411,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
     expect(err.cause).to.eq(chunkLost)
   })
 
-  it("passes a refusal the load throws as it came", async () => {
+  it("passes on unchanged a refusal the load throws", async () => {
     const refusal = new Errors.VaultError('storage_unavailable', 'offline')
     const err = await TH.expectRefusal(guardKeyDeriver({ ...TH.testDeriver, load: () => Promise.reject(refusal) }).load())
     expect(err).to.eq(refusal)

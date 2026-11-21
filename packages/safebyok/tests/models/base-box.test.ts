@@ -125,7 +125,7 @@ describe("BaseBox.nextRevisionOf(donor, publicProps)", () => {
     expect(TH.thrownText(err)).to.include(Phrases.SidecarMissing)
   })
 
-  it("leaves the donor it was handed as it was, and keeps none of a stored box's sealed whisper", () => {
+  it("leaves the donor it was handed unchanged, and carries over none of a stored box's sealed whisper", () => {
     const shell = TH.boxShellOf()
     const copy = structuredClone(shell)
     BaseBox.nextRevisionOf(shell, PublicProps)
@@ -172,7 +172,8 @@ describe("BaseBox.tombstoneOf(donor)", () => {
     expect(next).to.deep.include({ am: 'x', written_at: TH.T0 - 3, sidecar: {} })
   })
 
-  it("refuses any other sidecar given, as a tombstone's is always `{}`", () => {
+  // A tombstone's sidecar is always `{}`.
+  it("refuses any other sidecar given", () => {
     const err = TH.expectSyncRefusal(() => BaseBox.tombstoneOf(liveRevisionOf(), { sidecar: { account: 'home' } }), 'bad_record')
     expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarNotEmpty)
   })
@@ -181,7 +182,8 @@ describe("BaseBox.tombstoneOf(donor)", () => {
     expect(BaseBox.tombstoneOf(liveRevisionOf(), { am: 'x' })).to.include({ am: 'x' })
   })
 
-  it("refuses the am `'a'` given, as a tombstone's is always `'x'`", () => {
+  // A tombstone's am is always `'x'`.
+  it("refuses the am `'a'` given", () => {
     TH.expectSyncRefusal(() => BaseBox.tombstoneOf(liveRevisionOf(), { am: 'a' }), 'bad_record')
   })
 

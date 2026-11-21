@@ -67,7 +67,7 @@ describe("ThingMinder.invalidate", () => {
     expect(heard.mock.calls).to.have.lengthOf(0)
   })
 
-  it("leaves every car and what each listing lists as it was", async () => {
+  it("leaves every car and what each listing lists unchanged", async () => {
     const { minder, heard } = await listedWorldOf()
     const car     = await minder.get(TH.GateScope)
     const listing = minder.listingAt(TH.RootScope)
