@@ -287,3 +287,24 @@ Reasoning for wontfix: who stops the minder belongs to how ownership is apportio
 is settled when the ends (vacate, delete, goodbye) are built; moving the `goodbye` now would build half of that design
 ahead of it. Nothing stored changes, and no secret material is involved. Ruled by the Coach, 2026-11-21, react_life's
 E5: "a note, no code, thanks"; then "lgtm".
+
+### A gate change that lands while another gating unlocks leaves the lease citing the later revision
+
+* current outcome: a gating unlocks the gate under a lease citing the revision the `Gate` object models when the lease
+  is built. A gate change on this device that lands between a gating's proof and its unlock (a second gate verb, run
+  concurrently) leaves the gate unlocked under a lease that cites the newer revision, though the proof was against the
+  older one's wayins. The bankKey is the same in both, so every seal and unseal works as it would have. A gate change's
+  own write still cites the revision it proved against, so two concurrent gate changes never both land: the later is
+  refused as stale.
+* alternatives:
+  - have the unlock cite the revision read before the gating's first await: a second revision to carry to the unlock,
+    and a lease citing a revision the gate no longer models.
+  - refuse the unlock when the revision moved: a check, and a refusal the user did nothing to earn, in the unlock's path.
+* workaround: none needed: the lease opens what the bank's key opens, whichever revision it cites.
+
+Steps to reproduce: start `gate.unlock` and `gate.addPasskey` on one gate at once, and let the passkey's write land
+while the unlock's lease is being built.
+
+Reasoning for wontfix: a gate change comes a few times a day, and a lease is built in milliseconds (CLAUDE.md, *Hours
+separate updates*, `#no-slop-crossings`). Nothing stored changes, and no secret moves. Written by the gate_super thread 1
+worker, 2026-11-21, awaiting a ruling.
