@@ -198,24 +198,6 @@ Reasoning for wontfix: it is a crossing of a get and a list or notice, which the
 retry, lock or abort may settle in a primitive's critical path; what each answer says is a revision the vaultDB did store,
 and the cache marks itself behind before any later call reads it. Ruled by the orchestrator, 2026-11-20, soon_item.
 
-### A bank born on a device while its `hello` still fetches
-
-* current outcome: the birth makes the born bank, unlocked, the device's bank. If `hello`'s gets then answer with the
-  bank the birth stored, `hello` makes a second Bank of it, locked, and the device shows that one instead: the user
-  unlocks again. If they answer with no bank, the device keeps the born bank. Nothing stored changes either way.
-* alternatives:
-  - have `hello` give way to a bank held once its gets answer: a branch on a common path, for a birth the startup
-    offers only once `hello` has shown `'unborn'`.
-  - have birth wait on `hello`: couples birth to bring-up, a sequencing the host already does.
-* workaround: unlock again, or reload the page.
-
-Steps to reproduce: make a device over an empty vaultDB; call `hello()`, and birth a bank on the device before it
-resolves, with the vaultDB's gets slowed until the birth has stored.
-
-Reasoning for wontfix: a host that births before the device shows `'unborn'` has skipped the startup's order, and the
-outcome asks only for a second unlock. Mending it puts a guard on bring-up's path for a crossing (CLAUDE.md, *Hours
-separate updates*). Written by the react_life thread 2 worker, 2026-11-21, awaiting a ruling.
-
 ### A box joining between the host's listing fetch reading `listingAt` and TanStack storing the answer
 
 * current outcome: `Knock.useBoxList`'s fetch answers `minder.listingAt` as read just after `minder.list`. A box that joins the minder's listing in the microtask or two before TanStack stores that answer is overwritten by it, and shows at the next join or fetch of the listing.
@@ -283,3 +265,25 @@ Steps to reproduce: call `withLockableWhisper` on an unlocked bank, and call `lo
 Reasoning for wontfix: a lock comes a few times a day, and a get is in flight for milliseconds (CLAUDE.md, *Hours
 separate updates*, `#no-slop-crossings`). Nothing is written, and the refusal shows no whisper. Written by the react_life
 thread 12 worker, rewritten by the thread 15 worker, 2026-11-21, awaiting a ruling.
+
+### A bank's sweep stops its device's minder, which the device owns
+
+* current outcome: `bank.sweep()` sweeps each vault made on the bank, and `Vault.sweep` calls `goodbye` on the vault's
+  minder. That minder is the device's: the device makes it at `Device.make` and hands it to the vault of its bank, and its
+  `hello` starts it, once. After a sweep of the device's bank (`device.sweep()`, or `bank.sweep()` itself), the device
+  stays enabled, but its minder is not minding: each `minder.get` or `minder.list` refuses `disabled`, and a second
+  `device.hello()` answers the first and starts nothing.
+* alternatives:
+  - have `Vault.sweep` leave the minder be, and `device.sweep` stop it: the device then decides when its minder stops,
+    which is part of the ends work below, not of this note.
+  - have the device restart its minder after a sweep: a new path through bring-up for a device whose bank was swept,
+    which nothing yet needs.
+* workaround: make a new device after a sweep, as a page reload does.
+
+Steps to reproduce: bring up a device whose bank is stored, sweep it with `device.sweep()`, then call
+`device.minder.get` on the root box: it refuses `disabled`.
+
+Reasoning for wontfix: who stops the minder belongs to how ownership is apportioned among device, bank and vault, which
+is settled when the ends (vacate, delete, goodbye) are built; moving the `goodbye` now would build half of that design
+ahead of it. Nothing stored changes, and no secret material is involved. Ruled by the Coach, 2026-11-21, react_life's
+E5: "a note, no code, thanks"; then "lgtm".
