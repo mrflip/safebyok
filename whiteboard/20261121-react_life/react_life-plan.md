@@ -312,6 +312,7 @@ Serves thread 10: envman's masked editor with save and undo. The Coach's text is
   `val` stamps `last_rotated_at`; red when a record is older than its period; a gear modal that edits the sidecar,
   the title included, which is what "rename" means.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8, 9 and 11, cut from 11 (*Orchestrator:* 11 added before it).
+* *Orchestrator:* envman stores its sidecar mask with the package's mask helper at `tail: 0` (no secret characters: the Coach, 2026-11-21); thread 12 adds the live reveal.
 * **Ready when:** add two records, reload and see them, back-date one and see it red, edit its value with save and
   undo.
 
@@ -339,6 +340,33 @@ written against the final names.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8 and 9, cut from the top of the two.
 * **Ready when:** a kit form renders bare under the provider and its tests pass; the old names are gone; a test makes
   a gating outside a hook and mutates through the standalone options.
+
+### 12. `lockable_whisper`: a locked view, and a callback on a stage change
+
+*Orchestrator:* added 2026-11-21 from two of the Coach's feature requests, placed after envman at the orchestrator's
+choice ("they go lower in the list at a priority you choose").
+
+> Unsaved typing survives a lock → "is there an ergonomic hook or snapshot capability to run a callback when the stage changes? (by ergonomic I mean that if e.g. we provide the snapshot but you have to do other work to get the callback, the ergonomic version has us also offer the second)
+>
+> don't empty it by default, but use such a callback to demonstrate how a customer might themselves clear the form on lock. Don't build that in to our /kit components"
+>
+> Coach note → "I hadn't quite realized your point was that the masked text hits storage.
+> Add withLockableWhisper that takes, in the second opts bag, a callback ifLocked. rather than calling ensureLocked, the function uses the main callback when unlocked, the other when locked.
+>
+> The value stored in the sidecar is as you proposed -- no secret characters, by calling mask with tail:0; when locked, that's what's rendered.
+> If unlocked, the first callback is used: it calls mask with tail:4 and you see a helpful reveal"
+
+* **Builds:** (a) `Knock.withLockableWhisper(labelpath, callback, { ifLocked })`: on an unlocked bank it calls
+  `callback` with the unsealed whisper, as `withWhisper` does; on a locked bank it calls `ifLocked` (with the sealed
+  box: its sidecar) instead of waiting for the unlock form. (b) an ergonomic stage-change callback beside
+  `useBank`'s snapshot, e.g. `Knock.useStageChange((stage, prevStage) => …)` (a hook), so a host need not write the
+  `useEffect` over `useBank((b) => b.stage)` itself; name it by STYLE.md. (c) both demos show the key as
+  `withLockableWhisper` would: locked, the stored `tail: 0` mask from the sidecar; unlocked, a live `tail: 4` mask
+  of the unsealed whisper. (d) envman clears its open draft on lock through (b), in the demo only, not in the kit.
+* **Leaves out:** emptying typed text on lock in `useDraft` or the kit (the Coach: not by default, not in /kit).
+* **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 10.
+* **Ready when:** tests show `withLockableWhisper` taking each branch without waiting; the stage-change callback
+  fires once per change; envman's draft clears on lock in its own test; no secret found.
 
 ## What no thread builds
 

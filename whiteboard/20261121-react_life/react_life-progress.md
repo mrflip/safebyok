@@ -151,3 +151,10 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   uses `putBoxOnce` or `putBoxAction`.
 * `put` cites the base (refuses `stale_write` when behind) and goes through `withWhisper` (waits for unlock).
 * Expect a one-line conflict with #804 in `react-giver.test.tsx`'s list of bank-giver keys.
+
+## Rulings, 2026-11-21, third batch
+
+* **The stored sidecar mask carries no secret characters** (`tail: 0`). The `tail: 4` reveal is computed live from the
+  unsealed whisper while unlocked, through `withLockableWhisper` (thread 12). Thread 11 was told; envman follows it.
+* **A stage-change callback** beside `useBank`, and envman clearing its draft on lock with it, in the demo only, not
+  the kit: thread 12, after envman.
