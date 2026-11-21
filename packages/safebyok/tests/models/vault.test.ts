@@ -559,7 +559,7 @@ describe("vault.withUnlockedWhisper(labelpath, fn)", () => {
     expect(await vault.withUnlockedWhisper(Openai, ({ whisper }) => `asked with ${String(whisper['apiKey'])}`)).to.equal('asked with sk-test-0000')
   })
 
-  it("refuses 'bank_locked' on a locked bank, asking for no unlock and getting nothing, never calling fn", async () => {
+  it("refuses 'bank_locked' on a locked bank, wanting no unlock", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
