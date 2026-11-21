@@ -1,6 +1,6 @@
 # Thread 6: kit_ways_in (2026-11-21)
 
-Branch `20261121-kit_ways_in`, PR #TBD, stacked on #800 (parts_kit). Proved: `safebyok-react-lean` test 187 (53 new), typecheck and lint clean; `pnpm justify` after the catch-up, below.
+Branch `20261121-kit_ways_in`, PR #802, stacked on #800 (parts_kit). Proved: `safebyok-react-lean` test 187 (53 new), typecheck and lint clean; `pnpm justify` after the catch-up onto #800, counts in the PR body.
 
 * **Built** (`packages/safebyok-react-lean/src/kit/`, all exported from `safebyok-react-lean/kit`):
   * `ReplacePassphraseForm` (`replace-passphrase-form.tsx`): current passphrase, new one with the strength verdict, confirmation; submit disabled until strong and matching. `bank.useReplacePassphrase`.
