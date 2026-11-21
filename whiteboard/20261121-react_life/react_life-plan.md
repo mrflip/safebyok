@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 5 filed, out of draft (#797–#801; #800 and #801 siblings on #799). Thread 6 ready, in review (#802, on #800). Once it files, #801 is rebased onto #802 and thread 7 is cut from #801.
+* **Status:** running. Threads 1 to 6 filed, out of draft, in one line: #797 → #798 → #799 → #800 → #802 → #801. Thread 7 building, stacked on #801.
 
 ## The goal
 
@@ -252,6 +252,8 @@ Serves thread 7: the parts and kit Knock-Knock needs. The Coach's text is quoted
 * **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 5. **Beside:** 4.
 * **Ready when:** tests drive each form to its verb, and no passphrase is found after a submit.
 * *Orchestrator:* ready, #802, no compaction. Exports `ReplacePassphraseForm`, `AddPasskeyForm`, `RevokePasskeyForm`, `PasskeyUnlockButton`, and the ported `passkeysAvailable`, `createPasskey`, `askPasskey`. Gap for thread 7: no hook gives the bank's passkey header. My calls on Cleanup: `formActionOf`'s null `cleartextsOf`, the copied meter, no revoke-by-passkey.
+* *Review:* fixed (medium). The passkey forms clear the last refusal when an attempt starts, with two tests; a style fix and two doc corrections. The core's gating zeroes the passkey answer, so `attemptThenZero` is rightly not ported. Left: docs name the missing `Knock.usePasskeyHeader()` (thread 7 adds it); `createPasskey`'s follow-up `get()` may need a fresh gesture on a real browser; naming and long docs for a documentarian pass.
+* *Orchestrator:* after filing, #801 (thread 4) was rebased onto #802 so the line is straight; one conflict, in `tests/test-helpers.ts` (keep the fake authenticator, drop the deleted worlds); `pnpm justify` green at the tip.
 
 ### 7. `demo_knockknock`: the Knock-Knock app
 
@@ -268,6 +270,8 @@ Serves thread 7: the parts and kit Knock-Knock needs. The Coach's text is quoted
   stubbed: a new user creates a vault, saves a key, knocks and gets a joke; after a reload the user is `locked`,
   knocks, unlocks in the dialog and gets a joke; lock and unlock; replace the passphrase; add a passkey, unlock with
   it, revoke it.
+
+*Orchestrator:* cut from #801, the top of the line, on `thread-worker-400k`. Also adds `Knock.usePasskeyHeader()` to the giver (thread 6's gap).
 
 **"Once that's reached" is reached here.**
 
