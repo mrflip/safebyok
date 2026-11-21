@@ -1,6 +1,6 @@
 # Thread 15: stage_not_wait (2026-11-21)
 
-Branch `20261121-stage_not_wait`, PR #TBD, stacked on #810. Proved: safebyok 1343 tests, safebyok-react-lean 250,
+Branch `20261121-stage_not_wait`, PR #811, stacked on #810. Proved: safebyok 1343 tests, safebyok-react-lean 250,
 both demos 9 each, tsc and eslint clean on the packages touched; `pnpm justify` at ready.
 
 * **Built**:
