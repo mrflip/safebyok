@@ -179,7 +179,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   }
 
   /** React Query's options for the box's whole car, for your own `useQuery`, `queryClient.query` or route loader.
-   * `data` is the car: the newest revision heard of, beside the fullest record. Its defaults, any of which you may override:
+   * `data` is the car: the newest revision received, beside the fullest record. Its defaults, any of which you may override:
    * - fresh until the bridge copies a newer car, and stale while the vaultDB is known to have a newer revision
    * - fetches even while offline
    * - never replaces a car with an older one

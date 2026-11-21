@@ -152,7 +152,7 @@ export interface LeaseOpts {
 /** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link GX.PassphraseVerdict}.
  * It is given the passphrase as typed, and the bank's scope, `{ userid, banklabel }`: words a guesser who knows the user tries first.
  * It runs on each new passphrase before any key is derived: the one `Bank.birth` births the bank with, and the one
- * `bank.replacePassphrase` puts in place. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
+ * `bank.replacePassphrase` puts in place. It is never asked to judge a blank passphrase, which is weak without it. It should not throw: one that
  * throws, or returns no verdict, refuses its call.
  *
  * It is given the passphrase in cleartext: it should retain nothing, send nothing anywhere, and never quote

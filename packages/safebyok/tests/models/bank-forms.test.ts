@@ -30,7 +30,7 @@ async function bankAndElsewhere(given: TH.BornBankGiven = {}) {
   return { ...born, elsewhere }
 }
 
-/** A {@link TH.buildBornBank} bank, locked, on a device whose key deriver is watched: `deriveKeyBytes` hears each derivation from the birth on. */
+/** A {@link TH.buildBornBank} bank, locked, on a device whose key deriver is watched: `deriveKeyBytes` is called for each derivation from the birth on. */
 async function bankDerivingWatched({ strengthChecker = TH.anyStrengthChecker, passkeyCleartext }: { strengthChecker?: StrengthChecker, passkeyCleartext?: TH.BornBankGiven['passkeyCleartext'] } = {}) {
   const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
   const device = TH.makeDevice({}, { keyDeriver: { ...TH.testDeriver, deriveKeyBytes }, strengthChecker })

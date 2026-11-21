@@ -8,7 +8,7 @@ import type { GiverBank, GiverDevice } from '../../src/giver/shapes-giver'
 
 // == [The key deriver]: HeldDeriver, makeHeldDeriver
 
-/** A key deriver over the core's one-SHA-256 test deriver that counts what it hears, and that a test can hold mid-derivation. */
+/** A key deriver over the core's one-SHA-256 test deriver that counts the passphrases it is given, and that a test can hold mid-derivation. */
 export interface HeldDeriver extends KeyDeriver {
   /** How many passphrases it has derived from. */
   readonly heard: number

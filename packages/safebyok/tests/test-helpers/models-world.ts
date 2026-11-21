@@ -1,5 +1,5 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
- * a bank born unlocked, a spy on births, a box's shell, a fake of the bank a lease hears, and the loudly named
+ * a bank born unlocked, a spy on births, a box's shell, a fake of the bank a lease is given, and the loudly named
  * backdoors that unwrap a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
@@ -205,7 +205,7 @@ export function boxShellOf(overrides: Partial<ShellOf<BoxRecord>> = {}): ShellOf
 
 // == [Leases]: FakeLeaseBank, fakeLeaseBankOf, _cheat_grantedLease
 
-/** A fake of a bank as a lease hears it: its stamp, a spy for `lock`, and an enabled check that always passes. */
+/** A fake of the bank a lease is given: its stamp, a spy for `lock`, and an enabled check that always passes. */
 export type FakeLeaseBank = LeaseBank & { lock: Mock<() => void> }
 
 /** A {@link FakeLeaseBank} of {@link WorldBankStamp}, as `overrides` moves it. */

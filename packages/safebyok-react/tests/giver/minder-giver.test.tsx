@@ -75,7 +75,7 @@ describe("the giver over a minder", () => {
     expect(result.current.data).to.be.null
   })
 
-  it("shows a newer revision the vaultDB tells of, without the host fetching again", async () => {
+  it("shows a newer revision the vaultDB notifies, without the host fetching again", async () => {
     const box = LeanTH.boxThingOf('openai')
     const { world, result } = await setupShowing(OpenaiPath)
     await act(() => world._cheat_birthBox(box))
@@ -109,11 +109,11 @@ describe("the giver over a minder", () => {
 
 // == [In any order]: OrderStep, settleInOrder, WatchedOrders, UnwatchedOrders
 
-/** One thing that happens to the host's entry: its fetch answers, the minder hears the next revision by the watch or a list, or the bridge starts. */
+/** One thing that happens to the host's entry: its fetch answers, the minder receives the next revision from the watch or a list, or the bridge starts. */
 type OrderStep = 'fetch' | 'notice' | 'list' | 'bridge'
 
 /** A world over a real minder with the box at revision 1, a hook showing it whose fetch has read revision 1 and waits, then `steps` in order.
- * Watched, the `notice` step puts revision 2; unwatched, revision 2 is put before the steps, and only a list tells the minder of it.
+ * Watched, the `notice` step puts revision 2; unwatched, revision 2 is put before the steps, and only a list brings it to the minder.
  * Returns the hook's result, and revision 2.
  */
 async function settleInOrder(steps: readonly OrderStep[], { isWatching }: Readonly<{ isWatching: boolean }>) {
@@ -147,7 +147,7 @@ async function settleInOrder(steps: readonly OrderStep[], { isWatching }: Readon
   return { result, next }
 }
 
-// Each order of three steps: the host's fetch answering what it read before revision 2, the minder hearing of revision 2,
+// Each order of three steps: the host's fetch answering what it read before revision 2, the minder receiving revision 2,
 // and the bridge starting.
 const WatchedOrders = [
   ["fetch",  "notice", "bridge"],

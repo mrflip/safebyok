@@ -121,8 +121,8 @@ export class ThingMinder {
 
   // == [Starting and ending]: hello, goodbye
 
-  /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB tells of. A second call does nothing.
-   * It caches the root box's listing empty and bare: each box heard of joins it, and it is bare until a list sets it.
+  /** Start minding: until `goodbye`, answer gets, and cache each change the vaultDB notifies. A second call does nothing.
+   * It caches the root box's listing empty and bare: each box received joins it, and it is bare until a list sets it.
    */
   hello(): void {
     if (this.#isReady) { return }
@@ -153,7 +153,7 @@ export class ThingMinder {
   }
 
   /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
-   * A bare listing lists only the children heard of since `hello` ({@link isListingBareAt}).
+   * A bare listing lists only the children received since `hello` ({@link isListingBareAt}).
    */
   listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
     return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(scoped)))
@@ -241,7 +241,7 @@ export class ThingMinder {
     return (! isTimelyQuery(carQuery, opts.staleTime ?? this.#queryCacheOpts.staleTime))
   }
 
-  /** Call `listener` with each change the cache tells of, as a {@link MinderEvent}. Returns the function that stops it.
+  /** Call `listener` with each change of the cache, as a {@link MinderEvent}. Returns the function that stops it.
    * Pass `ThingFormat` as `version`, the version of the event shape `listener` was written for; any other refuses.
    * It tells a {@link ThingEvent} each time a record arrives in a car (even one that changes nothing), a get of it is refused,
    * or it is removed. It tells a {@link ListingEvent} each time a list sets a listing (even to the labelpaths it had), a labelpath

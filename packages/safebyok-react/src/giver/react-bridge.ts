@@ -41,7 +41,7 @@ export function bridgeDevice<CarT extends CarFields>(client: QueryClient, device
 function deliverEvent(client: QueryClient, event: GiverEvent<CarFields>): void {
   const { type, queryKey, state: { data: car, dataUpdatedAt } } = event
   if ((type === 'removed') || (car === undefined) || (client.getQueryCache().find({ queryKey, exact: true }) === undefined)) { return }
-  // When the minder heard of the car, not when it reached the host.
+  // When the minder received the car, not when it reached the host.
   if (car.liveness !== 'bare') { client.setQueryData(queryKey, car, { updatedAt: dataUpdatedAt }) }
   if (dbHasNewer(car)) { void client.invalidateQueries({ queryKey, exact: true }) }
 }

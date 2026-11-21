@@ -34,7 +34,7 @@ export interface MinderGiverWorld {
 }
 
 /** A Device signed in as the user of the core's test bank ({@link LeanTH.ThingBank}), that bank born with no box under its root, and the bank object started.
- * Unless `isWatching` is false, the minder hears each write to the vaultDB.
+ * Unless `isWatching` is false, the minder is notified of each write to the vaultDB.
  */
 export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<MinderGiverWorld> {
   const vaultDB = new MemoryVaultDB()

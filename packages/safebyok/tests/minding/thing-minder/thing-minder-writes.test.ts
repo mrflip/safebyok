@@ -26,7 +26,7 @@ describe("ThingMinder.tryWrite", () => {
     expect([minder.at(TH.BankScope), minder.at(TH.GateScope), minder.at(TH.RootScope)]).to.deep.equal([undefined, undefined, undefined])
   })
 
-  it("hears of a tracked main gate the answer reports stored from the vaultDB's watch alone", async () => {
+  it("receives a tracked main gate the answer reports stored from the vaultDB's watch alone", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
     await minder.tryWrite({ ...boxBirthAskOf(), track: TH.GateStaleTrack })

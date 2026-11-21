@@ -75,7 +75,7 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   expect(await opener.unseal(BaseBox, sealed)).to.deep.include({ whisper: { apiKey: 'sk-test-5678' } })
 }
 
-/** A checker whose answer throws the passphrase it heard, when its verdict is read. */
+/** A checker whose answer throws the passphrase it was given, when its verdict is read. */
 function answersThrowingGetter(passphrase: string) { return { get strong(): true { throw new Error(passphrase) } } }
 
 describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {

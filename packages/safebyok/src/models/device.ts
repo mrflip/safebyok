@@ -182,7 +182,7 @@ export class Device {
 
   /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
    * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device ends, the
-   * default handler hears instead of the host's.
+   * default handler is called instead of the host's.
    */
   tellBadNews(badnews: readonly unknown[]): void {
     const refusals = badnews.map((news) => (Errors.isVaultError(news) ? news : Throwers.unexpectedError(news)))
@@ -223,7 +223,7 @@ export const DefaultOnBadNews: BadNewsHandler = ({ news, device }) => {
 export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews: readonly Errors.VaultError[]): void {
   Checks.tellBadNewsToArgs.parse({ onBadNews, device, badnews })
   for (const news of badnews) {
-    // Any answer is heard out, a thenable among them: none is awaited.
+    // Whatever the handler returns is ignored, a thenable among them: none is awaited.
     void (async () => {
       try {
         await onBadNews({ news, device })

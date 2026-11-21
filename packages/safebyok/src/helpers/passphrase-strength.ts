@@ -20,7 +20,7 @@ export const DefaultStrengthChecker: StrengthChecker = () => DefaultVerdict
 
 // == [The guard]: guardStrengthChecker
 
-/** The verdict on a blank new passphrase, which no checker hears. */
+/** The verdict on a blank new passphrase, which no checker is asked to judge. */
 const BlankVerdict: GX.PassphraseVerdict = Object.freeze({ strong: false, reason: "A new passphrase can't be empty or only spaces: a few words together make a strong one, and easy to remember." })
 
 // A blank passphrase is judged weak without asking the host's checker. What the checker throws is replaced, since it was given

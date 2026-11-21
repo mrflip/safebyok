@@ -60,7 +60,7 @@ describe("ThingMinder.at", () => {
 })
 
 describe("ThingMinder.listingAt", () => {
-  it("lists each box heard of before the root box's first list", async () => {
+  it("lists each box received before the root box's first list", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB, { isRootHeard: false })
@@ -82,7 +82,7 @@ describe("ThingMinder.listingAt", () => {
     expect(Object.isFrozen(listing)).to.be.true
   })
 
-  it("adds a box a get or a notice tells of, live or gone, but never a shell", async () => {
+  it("adds a box a get or a notice delivers, live or gone, but never a shell", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB)

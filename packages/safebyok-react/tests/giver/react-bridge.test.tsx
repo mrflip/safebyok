@@ -43,7 +43,7 @@ describe("the bridge", () => {
     expect(world.counts.gets).to.eq(1)
   })
 
-  it("dates the host's entry by when the minder heard of the car", async () => {
+  it("dates the host's entry by when the minder received the car", async () => {
     const { world, result } = await setupShowing()
     act(() => { world._cheat_hear(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 2)), 1_700_000_000_000) })
     await waitFor(() => { expect(result.current.dataUpdatedAt).to.eq(1_700_000_000_000) })
@@ -110,7 +110,7 @@ describe("the bridge", () => {
     expect(client.getQueryData(OpenaiKey)).to.deep.equal(TH.fullCarOf(first))
   })
 
-  it("shows a revision the minder heard before the bridge mounted, without asking the vaultDB again", async () => {
+  it("shows a revision the minder received before the bridge mounted, without asking the vaultDB again", async () => {
     const { world, Acme, client, renderShowing } = setup()
     // A route loader fetches the box before any component mounts.
     await client.query(Acme.boxCarQueryOptions(OpenaiPath))

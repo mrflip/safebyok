@@ -14,7 +14,7 @@ const Passphrase = LeanTH.TestPassphrase
 /** A passphrase one letter off Hue's. */
 const WrongPassphrase = 'correct horse battery stable'
 
-/** Hue's app over `world`, as a host would write it beside its Device: the joke form, the unlock dialog, and every line the joke service heard with its key. */
+/** Hue's app over `world`, as a host would write it beside its Device: the joke form, the unlock dialog, and every line sent to the joke service with its key. */
 function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   const { vault } = world
   const Giver = makeReactGiver(world.giverDevice)
@@ -111,7 +111,7 @@ async function renderKnockKnock() {
     const entries = [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()]
     expect(TH.holdsText(entries.map((entry) => entry.state), passphrase)).to.eq(false)
   }
-  /** How many passphrases the key deriver has heard since the app was rendered. */
+  /** How many passphrases the key deriver has been given since the app was rendered. */
   function derivations(): number { return world.deriver.heard - derivedBefore }
   return { world, heard: app.heard, derivations, expectUnheld }
 }

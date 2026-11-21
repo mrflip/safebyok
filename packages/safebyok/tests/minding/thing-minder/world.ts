@@ -94,7 +94,7 @@ export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   receive: (notice: ThingNotice) => void
 }
 
-/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false, after which it has heard the root box's notice unless `isRootHeard` is false. */
+/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false, after which it has received the root box's notice unless `isRootHeard` is false. */
 export function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true, isRootHeard = true } = {}): MinderWorld<VaultDBT> {
   const bank     = fakeBankOf()
   const watching = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
