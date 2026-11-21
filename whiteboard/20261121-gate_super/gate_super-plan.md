@@ -34,8 +34,9 @@
      Superseded in chat (the Coach, 2026-11-21, correcting a first wording): "any sugar or orchestration around
      unsealing: put that on vault where it already is/was/will be; Use gate to offer primitives (seal / unseal), bank
      has passthrough seal/unseal and wrapped trySeal/tryUnseal, vault has withWhisper and anything fancier than the
-     four bank methods". So `Bank` has exactly `seal`, `unseal`, `trySeal`, `tryUnseal`; `sealBox`, `tombstoneBox`,
-     `unsealBox` and the `…EnsuringUnlock` pair go to `Vault` or go.
+     four bank methods". Then: "trySealBox and tryUnsealBox are better". So `Bank` has exactly `sealBox`, `unsealBox`,
+     `trySealBox`, `tryUnsealBox`, passing through to `gate.seal` / `gate.unseal`; the asks `sealBox` built today,
+     `tombstoneBox` and the `…EnsuringUnlock` pair go to `Vault` or go.
   4. The change signal is built into `Thing`: `subscribe`, bound, and a protected way to tell subscribers; `Gate` and
      `Bank` both use it.
 * **No crossing guards** (`#no-slop-crossings`). A gating reads what it needs of the gate before its first await, as
