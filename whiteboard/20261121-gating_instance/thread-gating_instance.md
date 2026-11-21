@@ -1,8 +1,8 @@
 # Thread gating_instance: a gating is an instance (2026-11-21)
 
 Branch `20261121-gating_instance`, PR [#794](https://github.com/mrflip/safebyok/pull/794), stacked on #793 (plain_words). Design: `gating_instance-design.md` beside
-this file, agreed with the Coach 2026-11-21. Proved: safebyok 1357 tests, safebyok-react 360, lint and typecheck of both
-clean; `pnpm justify` green (safebyok-big 2946, safebyok 1357, safebyok-react 360, e2e 576, every other package green), after the catch-up onto #793's rework 1.
+this file, agreed with the Coach 2026-11-21. Proved: safebyok 1356 tests, safebyok-react 360, lint and typecheck of both
+clean (after rework 1); `pnpm justify` green before it (safebyok-big 2946, safebyok 1357, safebyok-react 360, e2e 576, every other package green), after the catch-up onto #793's rework 1.
 
 * **Built**:
   * `packages/safebyok/src/models/gating.ts` (288 lines): the base `Gating` and one subclass per form verb
