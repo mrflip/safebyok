@@ -13,7 +13,8 @@ const saveKeyAction = Knock.putBoxAction(KeyLabelpath, {
     if (apiKey === '') { throw new Error('Paste your Anthropic API key first.') }
     return { apiKey }
   },
-  sidecarOf: (whisper) => ({ mask: maskOf(String(whisper['apiKey'])) }),
+  // The sidecar is stored readable, so its mask keeps only the key's public prefix: no character of the secret.
+  sidecarOf: (whisper) => ({ mask: maskOf(String(whisper['apiKey']), { head: 7, tail: 0 }) }),
 })
 
 /** The saved key: its mask, Show, and, while unlocked, the editor and Delete. */

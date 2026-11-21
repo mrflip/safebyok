@@ -18,7 +18,7 @@ pnpm demo:knockknock      # from the repo root: builds what the demo needs, then
   `UnlockForm`, `PasskeyUnlockButton` and `UnlockDialog`, each finding its bank through the provider.
 * `src/components/KnockForm.tsx`: a `useMutation` over `Knock.withWhisper`; on a locked vault the unlock dialog asks.
 * `src/components/KeyPanel.tsx`: `Knock.putBoxAction` under `useActionState` with the parts' `WhisperInput`, the
-  key's mask in its sidecar from `maskOf`, `WhisperText` to show it, and `Knock.delBoxOnce`.
+  key's public prefix in its sidecar from `maskOf` (`tail: 0`), `WhisperText` to show it, and `Knock.delBoxOnce`.
 * `src/components/WaysIn.tsx`: `ReplacePassphraseForm`, and `AddPasskeyForm` or `RevokePasskeyForm` by
   `Knock.usePasskeyHeader()`.
 

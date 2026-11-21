@@ -66,7 +66,7 @@ async function saveKey(): Promise<void> {
   const keyPanel = region('Your Anthropic API key')
   fireEvent.change(within(keyPanel).getByLabelText('Anthropic API key'), { target: { value: ApiKey } })
   fireEvent.click(within(keyPanel).getByRole('button', { name: 'Save key' }))
-  await within(keyPanel).findByText('sk-ant-…cdef')
+  await within(keyPanel).findByText('sk-ant-…')
 }
 
 /** Knock as Lettuce. */
@@ -114,7 +114,7 @@ describe("the Knock-Knock Machine", () => {
     await loadWithKey()
     const page = await loadPage()
     await screen.findByRole('heading', { name: 'Your vault is locked' })
-    await within(region('Your Anthropic API key')).findByText('sk-ant-…cdef')
+    await within(region('Your Anthropic API key')).findByText('sk-ant-…')
     knock()
     const dialog = await screen.findByRole('dialog')
     unlockIn(dialog)
@@ -131,7 +131,7 @@ describe("the Knock-Knock Machine", () => {
     await loadWithKey()
     const page = await loadPage()
     await screen.findByRole('heading', { name: 'Your vault is locked' })
-    await within(region('Your Anthropic API key')).findByText('sk-ant-…cdef')
+    await within(region('Your Anthropic API key')).findByText('sk-ant-…')
     knock()
     fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
     await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })

@@ -22,11 +22,14 @@ tests (14 files); the Knock-Knock demo lint, typecheck, 26 tests. `pnpm justify`
   * **Form mutation keys** are `['sok', userid, banklabel, verb]`, userid null while signed out, built by
     `formMutationKeyOf` in `giver-defaults.ts`; `usePasskeyHeader` watches `formMutationsKeyUnder({ userid, banklabel })`.
   * **`maskOf(text, schedule?)`**, `src/mask.ts`, exported from `.` with `MaskSchedule` and `DefaultMaskSchedule`
-    (`{ head: 7, tail: 4 }`). The demo's own `maskOf` is gone; it imports this one.
-  * **The demo** drops its `bank={Knock}` and `giver={SOK}` props, reads `saved.err`, and imports `maskOf`.
+    (`{ head: 7, tail: 4 }`). The demo's own `maskOf` is gone; it imports this one, and stores its sidecar mask with
+    `{ head: 7, tail: 0 }` (`sk-ant-…`): by the Coach's later ruling, the value stored in the sidecar carries no secret
+    character. Thread 12's `withLockableWhisper` is to show a live `tail: 4` reveal while unlocked; not built here.
+  * **The demo** drops its `bank={Knock}` and `giver={SOK}` props, reads `saved.err`, and imports `maskOf`; its tests
+    expect `sk-ant-…` where they expected `sk-ant-…cdef`.
 
 * **Final names, for envman (thread 10)**: from `safebyok-react-lean`: `reactGiver`, `liveOf`, `maskOf`,
-  `DefaultMaskSchedule`, `MaskSchedule`; on the bank giver: `useBank`, `usePasskeyHeader`, `useBox`, `useBoxList`,
+  `DefaultMaskSchedule`, `MaskSchedule` (store a sidecar mask with `tail: 0`, as the demo does); on the bank giver: `useBank`, `usePasskeyHeader`, `useBox`, `useBoxList`,
   `boxQuery`, `keys`, `withWhisper`, `putBoxOnce`, `delBoxOnce`, `putBoxAction` (resolves `{ box, err }`), `useDraft`,
   `lock`, `dismissUnlock`, the five `useFoo` form hooks, the five `fooGating`, the five `fooMutationOptions`. Render the
   kit and parts bare under `SOK.Provider`.
