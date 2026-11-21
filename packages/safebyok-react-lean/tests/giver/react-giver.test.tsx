@@ -251,12 +251,12 @@ async function renderPasskeyHeader() {
 describe("usePasskeyHeader", () => {
   it("answers null while nobody is signed in", async () => {
     const { result } = await renderUnder((world) => world.Bank.usePasskeyHeader(), {}, { userid: null })
-    expect(result.current).to.eq(null)
+    expect(result.current).to.be.null
   })
 
   it("answers null for a bank with no passkey", async () => {
     const { result } = await renderPasskeyHeader()
-    expect(result.current.header).to.eq(null)
+    expect(result.current.header).to.be.null
   })
 
   // usePasskeyHeader @example
@@ -266,13 +266,13 @@ describe("usePasskeyHeader", () => {
     await waitFor(() => { expect(result.current.header?.wayinkind).to.eq('passkey') })
     expect(result.current.header).to.deep.equal(await TH._cheat_passkeyHeaderOf(world))
     act(() => { result.current.revoke.mutate(result.current.revoke.gating({ passphraseCleartext: Passphrase })) })
-    await waitFor(() => { expect(result.current.header).to.eq(null) })
+    await waitFor(() => { expect(result.current.header).to.be.null })
   })
 
   it("answers the same header at each render until the passkey changes", async () => {
     const { result, rerender } = await renderPasskeyHeader()
     act(() => { result.current.add.mutate(result.current.add.gating({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })) })
-    await waitFor(() => { expect(result.current.header).to.not.eq(null) })
+    await waitFor(() => { expect(result.current.header).to.not.be.null })
     const { header } = result.current
     rerender()
     expect(result.current.header).to.eq(header)
