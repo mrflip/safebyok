@@ -745,13 +745,19 @@ describe("bank.tellBadNews(badnews)", () => {
 })
 
 describe("bank.put(args)", () => {
-  it("writes the bank's next revision, answering the stored bank, and leaves the bank it was called on unchanged", async () => {
+  it("writes the bank's next revision, answering the stored bank", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     expect(await bank.put({ cited: bank.pickle(), record })).to.deep.equal(record)
-    expect(bank.revtok).to.not.eq(record.revtok)
     const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank' }))
     expect(got).to.deep.include({ ok: true, val: record })
+  })
+
+  it("leaves the bank it was called on unchanged", async () => {
+    const { bank } = await TH.buildBornBank()
+    const record = nextBankThingOf(bank)
+    await bank.put({ cited: bank.pickle(), record })
+    expect(bank.revtok).to.not.eq(record.revtok)
   })
 
   it("throws the vaultDB's refusal of a revision it does not cite", async () => {
