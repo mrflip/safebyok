@@ -2,17 +2,18 @@
  * Its provider says who is signed in. Its hooks read the slot the provider fills, and records come through the host's React Query.
  */
 
-import { type QueryKey, type UseMutationResult, type UseQueryResult, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { type DataTag, type QueryKey, type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  Bank, type BankSnapshot, type BirthCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, type Gating, type KeyDeriver, Labelpath, type PasskeyAddCleartexts,
-  type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Tombstone, type UnlockCleartexts, type VaultDB, type Whisper,
+  Bank, type BankSnapshot, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, type Gating, type KeyDeriver, Labelpath, type LiveOf,
+  type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
+  type TombstoneOf, type UnlockCleartexts, type Userid, type VaultDB, type Whisper,
 } from 'safebyok'
-import { FormMutationDefaults, boxRecordQueryKey, recordQueryDefaults, shownRecordOf } from './giver-defaults'
+import { FormMutationDefaults, boxQueryKeyOf, boxesQueryKeyUnder, nullifyThing, recordQueryDefaults } from './giver-defaults'
 import { type GiverConfig, type GiverSlotSnapshot, GiverSlot } from './giver-slot'
 import { type BoxQueryOpts, ScopeChecks } from './shapes-giver'
 
-// == [Types]: ProviderProps, BoxShown, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, BoxQueryOptions, BoxQueries, PutBoxActionOpts, PutBoxActionResult, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
@@ -27,6 +28,32 @@ export type ProviderProps = Readonly<{
 
 /** A box's record as the giver fetches it: the whole record, its tombstone, or its shell where none is stored. */
 export type BoxShown = BoxRecord | Tombstone<BoxRecord>
+
+/** What names a box to a bank's writes: the host's labelpath, such as `'openai'`, or an object scoped to the box, such as its record. */
+export type BoxNamed = string | Readonly<{ labelpath: string }>
+
+/** What a box's query answers by default: the live record, null where none is stored or it was deleted, or undefined. */
+export type BoxSelected = LiveOf<BoxRecord> | null | undefined
+
+/** The `queryOptions` of a box, for `useQuery`, `useQueries`, `queryClient.query` and the rest. */
+export type BoxQueryOptions = UseQueryOptions<BoxShown, Error, BoxSelected> & Readonly<{ queryKey: DataTag<QueryKey, BoxShown, Error> }>
+
+/** The query factories of the signed-in user's bank, from `SOK.useQueryOptions()`. */
+export type BoxQueries = Readonly<{
+  /** The `queryOptions` of the box at `labelpath`. */
+  box: (labelpath: string) => BoxQueryOptions
+}>
+
+/** How a {@link BankGiver.putBoxAction} reads the form it is handed. */
+export type PutBoxActionOpts = Readonly<{
+  /** The box's whisper, read from the form's fields. */
+  whisperOf:  (form: FormData) => Whisper
+  /** The box's sidecar, from the whisper read and the form's fields. Left out, the box keeps the sidecar it has, and a box written for the first time refuses for want of one. */
+  sidecarOf?: ((whisper: Whisper, form: FormData) => Sidecar) | undefined
+}>
+
+/** What a {@link BankGiver.putBoxAction} resolves, for `useActionState` to keep: the box stored, or why it was not. */
+export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, error: null }> | Readonly<{ box: null, error: unknown }>
 
 /** A form verb's mutation, through `useMutation`, with `gating` to make what its `mutate` is handed. */
 export type FormMutationResult<CleartextsT> = UseMutationResult<void, Error, Gating> & Readonly<{
@@ -51,7 +78,7 @@ export type StrengthVerdictResult = Readonly<{
 }>
 
 /** What {@link reactGiver} returns: the provider, the strength hook, and `bank` for the bank's own hooks. */
-export type ReactGiver = ReturnType<typeof reactGiver>
+export type ReactGiver<BanklabelT extends string = string> = ReturnType<typeof reactGiver<BanklabelT>>
 
 /** The hooks and calls of a giver's bank, from `SOK.bank(banklabel)`. */
 export type BankGiver = ReturnType<ReactGiver['bank']>
@@ -66,7 +93,7 @@ export type BankGiver = ReturnType<ReactGiver['bank']>
  *   export const SOK   = reactGiver({ banks: { knock: { vaultDB } }, keyDeriver })
  *   export const Knock = SOK.bank('knock')
  */
-export function reactGiver(config: GiverConfig) {
+export function reactGiver<BanklabelT extends string>(config: GiverConfig<BanklabelT>) {
   const slot = GiverSlot.make(config)
   /** The provider's userid prop, for the hooks under it to compare with the slot's device. */
   const UseridContext = createContext<string | null | undefined>(undefined)
@@ -122,12 +149,29 @@ export function reactGiver(config: GiverConfig) {
     return { ...judged, judge }
   }
 
-  const bankGiver = makeBankGiver(slot, useShownSnapshot)
+  const { bankGiver, boxQueryOf } = makeBankGiver(slot, useShownSnapshot)
+
+  /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin.
+   * Every key it makes is the user's: it re-renders when the user changes, so each query made from it changes key with them.
+   * While nobody is signed in, a query from it fetches nothing.
+   * @example
+   *   const sok = SOK.useQueryOptions()
+   *   const { data: box } = useQuery(sok.knock.box('jokes'))
+   */
+  function useQueryOptions(): Readonly<Record<BanklabelT, BoxQueries>> {
+    const userid = useShownSnapshot((snap) => snap.userid)
+    return useMemo(() => {
+      const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(userid, labelpath) })
+      return Object.freeze({ [slot.banklabel]: queries }) as Record<BanklabelT, BoxQueries>
+    }, [userid])
+  }
+
   return Object.freeze({
     Provider,
     useStrengthVerdict,
+    useQueryOptions,
     /** The hooks and calls of the giver's bank, refusing any other banklabel. Name the result in PascalCase (`const Knock = SOK.bank('knock')`), so the rules-of-hooks lint checks `Knock.useBank()`. */
-    bank: (banklabel: string) => {
+    bank: (banklabel: BanklabelT) => {
       ScopeChecks.bankScoped.parseConsistent({ banklabel }, { banklabel: slot.banklabel })
       return bankGiver
     },
@@ -170,24 +214,55 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     return await device.minder.get({ ...device.scope, labelpath })
   }
 
+  // One factory serves render and the calls outside it: a hook hands it the userid it shows, `boxQuery` the slot's.
+  /** The `queryOptions` of the box at `labelpath` in `userid`'s bank, skipping the fetch while `userid` is null. */
+  function boxQueryOf(userid: Userid | null, labelpath: string): BoxQueryOptions {
+    return queryOptions({ ...boxQueryBaseOf(userid, labelpath), select: nullifyThing<BoxRecord> })
+  }
+
+  /** {@link boxQueryOf}, less its `select`. */
+  function boxQueryBaseOf(userid: Userid | null, labelpath: string): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
+    const boxLabelpath = boxLabelpathOf(labelpath)
+    return {
+      ...recordQueryDefaults(() => isBehind(boxLabelpath)),
+      queryKey: boxQueryKeyOf({ userid, banklabel, labelpath: boxLabelpath }),
+      queryFn:  (userid === null) ? skipToken : () => getBoxShown(boxLabelpath),
+    }
+  }
+
+  /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader, a prefetch, or `useQuery` outside the provider's reach.
+   * Its `data` is what {@link useBox} answers. While nobody is signed in, it fetches nothing, and `queryClient.query` rejects.
+   * @example
+   *   loader: () => queryClient.query(Knock.boxQuery('jokes'))
+   */
+  function boxQuery(labelpath: string): BoxQueryOptions {
+    return boxQueryOf(slot.device?.userid ?? null, labelpath)
+  }
+
   /** The box's stored record, through React Query, its whisper still sealed.
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or while nobody is signed in.
    * A record overtaken by a newer revision shows until the newer one arrives.
    * `opts` are React Query's own, and override the giver's. A `select` given there is handed the whole record, the box's
-   * tombstone, or its shell where none is stored.
+   * tombstone, or its shell where none is stored: {@link nullifyThing} is the default.
+   * @example
+   *   const { data: box } = Knock.useBox('jokes')
+   *   const mask = Knock.useBox('jokes', { select: (thing) => nullifyThing(thing)?.sidecar['mask'] }).data
    */
-  function useBoxRecord<SelT = BoxRecord | null>(labelpath: string, opts: BoxQueryOpts<BoxShown, SelT> = {}): UseQueryResult<SelT> {
-    const boxLabelpath = boxLabelpathOf(labelpath)
+  function useBox<SelT = BoxSelected>(labelpath: string, opts: BoxQueryOpts<BoxShown, SelT> = {}): UseQueryResult<SelT> {
     const userid = useShownSnapshot((snap) => snap.userid)
-    const queryKey: QueryKey = (userid === null) ? ['sok', null, banklabel, boxLabelpath] : boxRecordQueryKey({ userid, banklabel, labelpath: boxLabelpath })
-    return useQuery<BoxShown, Error, SelT>({
-      ...recordQueryDefaults(() => isBehind(boxLabelpath)),
-      queryKey,
-      queryFn: (userid === null) ? skipToken : () => getBoxShown(boxLabelpath),
-      select:  shownRecordOf as (record: BoxShown) => SelT,
-      ...opts,
-    })
+    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(userid, labelpath), select: nullifyThing as (thing: BoxShown) => SelT, ...opts })
   }
+
+  /** The keys of the signed-in user's boxes in the host's React Query, reading whoever is signed in when called. */
+  const keys = Object.freeze({
+    /** The key of the box at `labelpath`'s query. */
+    box:   (labelpath: string): QueryKey => boxQueryKeyOf({ userid: slot.device?.userid ?? null, banklabel, labelpath: boxLabelpathOf(labelpath) }),
+    /** The key that starts the key of the box at `labelpath` and of every box under it, or of every box when left out: for `invalidateQueries`.
+     * @example
+     *   void queryClient.invalidateQueries({ queryKey: Knock.keys.under('jokes') })
+     */
+    under: (labelpath?: string): QueryKey => boxesQueryKeyUnder({ userid: slot.device?.userid ?? null, banklabel, labelpath: (labelpath === undefined) ? RootBoxLabelpath : boxLabelpathOf(labelpath) }),
+  })
 
   /** Call `fn` with the box's whisper, and resolve what `fn` resolves. On a locked bank, it first waits for the unlock form.
    * While it waits, `useBank((bank) => bank.isUnlockWanted)` is true: show the unlock form, or call {@link dismissUnlock}, which rejects the wait `dismissed`.
@@ -202,6 +277,70 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     const device = slot.demandDevice()
     await device.hello()
     return await slot.demandVault().withWhisper(boxLabelpath, (box) => fn(box.whisper, box))
+  }
+
+  // Each write tries once. By the time it resolves, the minder has cached what was written, and the bridge has copied it
+  // into the host's item of the box, wherever a hook made one.
+
+  /** Seal and write the next revision of the box `boxNamed` names, applying `patch` and encrypting `secrets`. Resolves the stored box, its whisper sealed.
+   * The write cites the newest revision the minder has heard of at that labelpath, whatever revision a record handed it is at.
+   * It tries once: where another revision is stored meanwhile, it refuses `stale_write`. A box written for the first time, or over a deleted one, needs `patch.sidecar`.
+   * On a locked bank it refuses `bank_locked`: unlike {@link withWhisper}, it does not wait for the unlock form.
+   * @example
+   *   await Knock.putBoxOnce('jokes', { sidecar: { mask: 'sk-…f00d' } }, { whisper: { apiKey } })
+   */
+  async function putBoxOnce(boxNamed: BoxNamed, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
+    return await putBoxOnceAt(boxLabelpathOfNamed(boxNamed), patch, secrets)
+  }
+
+  /** {@link putBoxOnce} of the box at `boxLabelpath`. */
+  async function putBoxOnceAt(boxLabelpath: BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
+    await slot.demandDevice().hello()
+    return await slot.demandVault().putBoxOnce(boxLabelpath, patch, secrets)
+  }
+
+  /** Delete the box `boxNamed` names, resolving its stored tombstone. It tries once, over the newest revision the minder has heard of.
+   * A {@link useBox} showing the box then answers null.
+   */
+  async function delBox(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
+    const boxLabelpath = boxLabelpathOfNamed(boxNamed)
+    await slot.demandDevice().hello()
+    return await slot.demandVault().delBoxOnce(boxLabelpath)
+  }
+
+  // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.
+  // Emptied before the first await, it holds the whisper during no render.
+  /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
+   * Make it at module scope, or under `useMemo`, so its checks run once.
+   * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then empties the form of every field before it writes.
+   * It never rejects: it resolves the box stored, or the error that stopped it, a refusal or what `whisperOf` or `sidecarOf` threw, as thrown.
+   * @example
+   *   const [put, putAction, isPutting] = useActionState(useMemo(() => Knock.putBoxAction('jokes', {
+   *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
+   *     sidecarOf: (whisper) => ({ mask: maskOf(String(whisper['apiKey'])) }),
+   *   }), []), null)
+   *   <form action={putAction}><input name="apiKey" type="password" /><button disabled={isPutting}>Save</button></form>
+   */
+  function putBoxAction(boxNamed: BoxNamed, opts: PutBoxActionOpts): (prior: PutBoxActionResult | null, form: FormData) => Promise<PutBoxActionResult> {
+    const boxLabelpath = boxLabelpathOfNamed(boxNamed)
+    const { whisperOf, sidecarOf } = Checks.putBoxActionOpts.parse(opts)
+    /** The patch and the secrets of the write, read from `form`, which is left empty whether or not they could be read. */
+    function takeForm(form: FormData): [LivePublicPropsOf<BoxRecord, BoxCleartexts>, BoxCleartexts] {
+      try {
+        const whisper = whisperOf(form)
+        return [sidecarOf ? { sidecar: sidecarOf(whisper, form) } : {}, { whisper }]
+      } finally {
+        emptyForm(form)
+      }
+    }
+    return async (_prior, form) => {
+      try {
+        const [patch, secrets] = takeForm(Checks.form.parse(form))
+        return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), error: null }
+      } catch (err) {
+        return { box: null, error: err }
+      }
+    }
   }
 
   /** Lock the bank, dropping its keys: a whisper needs the unlock form again. Does nothing while there is no bank. */
@@ -262,24 +401,45 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     return useFormMutation('revokePasskey', (cleartexts: PasskeyRevokeCleartexts) => slot.demandBank().revokePasskeyGating(cleartexts))
   }
 
-  return Object.freeze({
-    useBank, useBoxRecord, withWhisper, lock, dismissUnlock,
+  const bankGiver = Object.freeze({
+    useBank, useBox, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
   })
+  return { bankGiver, boxQueryOf }
 }
 // --
 
-// == [Helpers]: boxLabelpathOf, Checks
+// == [Helpers]: RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, emptyForm, Checks
+
+/** The core's labelpath of the root box, which every box is under. */
+const RootBoxLabelpath = 'box' as BoxLabelpath
 
 /** The core's labelpath of the host's box `labelpath`, under `box/`. */
 function boxLabelpathOf(labelpath: string): BoxLabelpath {
   return Checks.boxLabelpath.parse(`box/${Checks.labelpath.parse(labelpath)}`)
 }
 
+/** The core's labelpath of the box `boxNamed` names: the host's labelpath under `box/`, or a scoped object's own. */
+function boxLabelpathOfNamed(boxNamed: BoxNamed): BoxLabelpath {
+  return (typeof boxNamed === 'string') ? boxLabelpathOf(boxNamed) : Checks.boxScoped.parse(boxNamed).labelpath
+}
+
+/** Delete every field of `form`. */
+function emptyForm(form: FormData): void {
+  const fieldnames = new Set(form.keys())
+  for (const fieldname of fieldnames) { form.delete(fieldname) }
+}
+
 /** The checks of what a host hands a bank's hooks and calls. */
-const Checks = Checkers('bad_record', ({ str, fn, custom }) => ({
-  labelpath:    str.min(1),
-  boxLabelpath: custom<BoxLabelpath>((val) => (typeof val === 'string') && Labelpath.isBox(val), 'Expected the labelpath of a box, such as `openai`'),
-  fn:           fn(),
-}))
+const Checks = Checkers('bad_record', ({ obj, str, fn, custom }) => {
+  const boxLabelpath = custom<BoxLabelpath>((val) => (typeof val === 'string') && Labelpath.isBox(val), 'Expected the labelpath of a box, such as `openai`')
+  return {
+    labelpath:        str.min(1),
+    boxLabelpath,
+    boxScoped:        obj({ labelpath: boxLabelpath }).loose(),
+    fn:               fn(),
+    putBoxActionOpts: obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional() }),
+    form:             custom<FormData>((val) => val instanceof FormData, 'Expected the FormData a form action is handed'),
+  }
+})
 // --

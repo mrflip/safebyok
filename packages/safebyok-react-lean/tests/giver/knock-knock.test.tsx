@@ -81,7 +81,7 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
 
   /** The app once the vault exists: whether it is locked, whether its key is stored, the joke form, Lock, and the unlock dialog. */
   function Vault({ isLocked }: Readonly<{ isLocked: boolean }>) {
-    const { data: record } = Knock.useBoxRecord(TH.JokesPath)
+    const { data: record } = Knock.useBox(TH.JokesPath)
     return (
       <main>
         <p>{isLocked ? 'Locked' : 'Unlocked'}</p>
