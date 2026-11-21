@@ -19,7 +19,7 @@ export {
   StampChecks,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
-export { Cloak, cloak } from './helpers/cloak'
+export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type ListThingsAnswer, type ListedBeside,
@@ -31,7 +31,7 @@ export {
   BankishChecks, PendingBank, bankStageVals,
 } from './shapes/shapes-bankish'
 export {
-  type BankGatingFriend, type BirthCleartexts, type BirthGatingFriend, type CloakCleartexts, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GuardedKeyDeriver, type GuardedStrengthChecker,
+  type BankGatingFriend, type BirthCleartexts, type BirthGatingFriend, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingCleartexts, type GuardedKeyDeriver, type GuardedStrengthChecker,
   type LeaseBank, type LeaseOpts, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type ProvedCleartexts, type ProvingDevice, type ProvingOpts, type ProvingParts,
   type SecretFieldname, type StrengthChecker, type UnlockCleartexts, CleartextChecks, GateishChecks,
 } from './shapes/shapes-gateish'

@@ -1,11 +1,14 @@
-/** The gatings behind the bank's form verbs: `Bank.birth` over real provings and its device's MemoryVaultDB, and how every gating vacates the passkey answers it is handed, whatever its outcome. */
+/** The gatings behind the bank's form verbs: `Bank.birth` over real provings and its device's MemoryVaultDB, how a gating adopts, redacts and vacates its cleartexts, and its single attempt. */
 
+import { inspect } from 'node:util'
 import { runInNewContext } from 'node:vm'
-import { describe, expect, it, vi } from 'vitest'
-import { Errors, SX } from 'safebyok-big/internals'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { Errors, GX, SX } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import type { Device } from '../../src/models/device'
+import { BirthGating, Gating, UnlockGating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
+import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
@@ -214,10 +217,155 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
     await Bank.tryBirth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } })
     expect(TH.isZeroed(new Uint8Array(prfBuffer))).to.be.true
   })
+})
 
-  it("keeps its outcome when reading the passkey answer to zero it throws", async () => {
-    const passkeyCleartext = { ...TH.passkeyAnswerOf(), get prfBytes(): Uint8Array { throw new Error(TH.TestPassphrase) } }
-    const err = await TH.expectRefusal(birth(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }), 'unexpected_error')
-    expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
+/** A passphrase, an obvious fake. */
+const FakePassphrase = 'fake passphrase'
+
+/** A new passphrase, an obvious fake. */
+const FakeNextPassphrase = 'fake next passphrase'
+
+/** A birth gating over `cleartexts` as the caller hands them, on a fresh device. */
+function gatingOf(cleartexts: unknown): BirthGating { return Bank.birthGating(TH.makeDevice(), cleartexts as never) }
+
+/** What a gating over `cleartexts` hands its body: a clone, taken in the body, before the attempt vacates what it adopted. */
+async function adoptedFrom(cleartexts: unknown): Promise<unknown> {
+  let adopted: unknown
+  await TH._cheat_gatingOf(cleartexts, (given) => { adopted = structuredClone(given); return Promise.resolve() }).attempt()
+  return adopted
+}
+
+describe("Bank.birthGating(device, cleartexts): what a gating adopts", () => {
+  it("is a Gating", () => {
+    expect(gatingOf({ passphraseCleartext: FakePassphrase })).to.be.instanceOf(Gating)
+  })
+
+  it("hands its body each cleartext it adopted, and no field it was not given", async () => {
+    expect(await adoptedFrom({ passphraseCleartext: FakePassphrase, nextPassphraseCleartext: FakeNextPassphrase })).to.deep.equal({ passphraseCleartext: FakePassphrase, nextPassphraseCleartext: FakeNextPassphrase })
+  })
+
+  it("hands its body a passkey answer of null as null", async () => {
+    expect(await adoptedFrom({ passphraseCleartext: FakePassphrase, passkeyCleartext: null })).to.deep.equal({ passphraseCleartext: FakePassphrase, passkeyCleartext: null })
+  })
+
+  it("zeroes the PRF bytes of each passkey answer handed in, after copying them for itself", async () => {
+    const passkeyCleartext     = TH.passkeyAnswerOf()
+    const nextPasskeyCleartext = TH.passkeyAnswerOf()
+    const handed = [passkeyCleartext, nextPasskeyCleartext].map((answer) => ({ ...answer, prfBytes: new Uint8Array(answer.prfBytes) }))
+    const adopted = await adoptedFrom({ passkeyCleartext, nextPasskeyCleartext })
+    expect([TH.isZeroed(passkeyCleartext.prfBytes), TH.isZeroed(nextPasskeyCleartext.prfBytes)]).to.deep.equal([true, true])
+    expect(adopted).to.deep.equal({ passkeyCleartext: handed[0], nextPasskeyCleartext: handed[1] })
+  })
+
+  it("adopts a passkey answer from another realm", async () => {
+    const prfBytes = runInNewContext('new Uint8Array(32).fill(7)') as Uint8Array
+    const adopted = await adoptedFrom({ passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes } }) as { passkeyCleartext: GX.PasskeyAnswer }
+    expect(TH.isZeroed(prfBytes)).to.be.true
+    expect([...adopted.passkeyCleartext.prfBytes]).to.deep.equal(Array.from({ length: 32 }, () => 7))
+  })
+
+  it("refuses what is not an object", () => {
+    for (const notObject of [null, undefined, FakePassphrase, 42, [FakePassphrase]]) {
+      TH.expectSyncRefusal(() => gatingOf(notObject), 'bad_record')
+    }
+  })
+
+  it("refuses a field no form verb takes, quoting nothing of it", () => {
+    const err = TH.expectSyncRefusal(() => gatingOf({ passphraseCleartext: FakePassphrase, passphrase: FakeNextPassphrase }), 'bad_record')
+    expect(TH.thrownText(err)).to.not.include(FakePassphrase).and.not.include(FakeNextPassphrase)
+  })
+
+  it("refuses cleartexts whose getter throws, carrying nothing of the throw", () => {
+    const cleartexts = { get passphraseCleartext(): string { throw new Error(FakePassphrase) } }
+    const err = TH.expectSyncRefusal(() => gatingOf(cleartexts), 'unexpected_error')
+    expect(TH.thrownText(err)).to.not.include(FakePassphrase)
+  })
+
+  it("refuses a passkey answer whose PRF bytes' getter throws, carrying nothing of the throw", () => {
+    const passkeyCleartext = { ...TH.passkeyAnswerOf(), get prfBytes(): Uint8Array { throw new Error(FakePassphrase) } }
+    const err = TH.expectSyncRefusal(() => gatingOf({ passphraseCleartext: FakePassphrase, passkeyCleartext }), 'unexpected_error')
+    expect(TH.thrownText(err)).to.not.include(FakePassphrase)
+  })
+})
+
+describe("gating.attempt()", () => {
+  it("makes the verb's change: a bank's unlockGating unlocks it", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.lock()
+    const gating = bank.unlockGating({ passphraseCleartext: TH.TestPassphrase })
+    expect(gating).to.be.instanceOf(UnlockGating)
+    expect(await gating.attempt()).to.equal(bank)
+    expect(bank.isUnlocked).to.be.true
+  })
+
+  it("zeroes the PRF bytes it adopted once it lands, and once it is refused", async () => {
+    const adopted: GX.PasskeyAnswer[] = []
+    const bodyOf = (isRefused: boolean) => (given: GatingCleartexts) => {
+      adopted.push(given.passkeyCleartext!)
+      return isRefused ? Promise.reject(new Error('refused')) : Promise.resolve()
+    }
+    await TH._cheat_gatingOf({ passkeyCleartext: TH.passkeyAnswerOf() }, bodyOf(false)).attempt()
+    await expect(TH._cheat_gatingOf({ passkeyCleartext: TH.passkeyAnswerOf() }, bodyOf(true)).attempt()).rejects.toThrow('refused')
+    expect(adopted.map((answer) => TH.isZeroed(answer.prfBytes))).to.deep.equal([true, true])
+  })
+
+  it("refuses a second attempt, deriving no key", async () => {
+    const deriveKeyBytes = vi.fn((passphrase: string, saltBytes: Uint8Array) => TH.testDeriver.deriveKeyBytes(passphrase, saltBytes))
+    const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { keyDeriver: { ...TH.testDeriver, deriveKeyBytes } }) })
+    bank.lock()
+    const gating = bank.unlockGating({ passphraseCleartext: 'not the passphrase' })
+    await TH.expectRefusal(gating.attempt(), 'wrong_passphrase')
+    deriveKeyBytes.mockClear()
+    await TH.expectRefusal(gating.attempt(), 'gating_concluded')
+    expect(deriveKeyBytes).not.toHaveBeenCalled()
+    expect(bank.isLocked).to.be.true
+  })
+
+  it("refuses once the gating is vacated", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.lock()
+    const gating = bank.unlockGating({ passphraseCleartext: TH.TestPassphrase })
+    gating.vacate()
+    await TH.expectRefusal(gating.attempt(), 'gating_concluded')
+    expect(bank.isLocked).to.be.true
+  })
+})
+
+describe("gating.tryAttempt()", () => {
+  it("resolves a good outcome of the bank, or the refusal attempt throws", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.lock()
+    await TH.expectBad(bank.unlockGating({ passphraseCleartext: 'not the passphrase' }).tryAttempt(), 'wrong_passphrase')
+    expect(await TH.expectGood(bank.unlockGating({ passphraseCleartext: TH.TestPassphrase }).tryAttempt())).to.equal(bank)
+  })
+})
+
+describe("gating.vacate()", () => {
+  it("zeroes the PRF bytes the gating had", () => {
+    const handed = TH.passkeyAnswerOf()
+    const gating = gatingOf({ passkeyCleartext: handed })
+    const fill   = vi.spyOn(Uint8Array.prototype, 'fill')
+    onTestFinished(() => { fill.mockRestore() })
+    gating.vacate()
+    // The bytes zeroed are the gating's own, not the host's, zeroed at adoption.
+    expect(fill.mock.calls).to.deep.equal([[0]])
+    const [zeroed] = fill.mock.contexts as Uint8Array[]
+    expect([zeroed === handed.prfBytes, TH.isZeroed(zeroed!)]).to.deep.equal([false, true])
+  })
+})
+
+describe("a gating's redaction", () => {
+  const gating = gatingOf({ passphraseCleartext: FakePassphrase, passkeyCleartext: TH.passkeyAnswerOf() })
+
+  it("serializes as the marker", () => {
+    expect(JSON.stringify({ variables: gating })).to.eq('{"variables":"[gating]"}')
+  })
+
+  it("prints as the marker", () => {
+    expect([String(gating), inspect(gating), inspect({ variables: gating })]).to.deep.equal(['[gating]', '[gating]', '{ variables: [gating] }'])
+  })
+
+  it("has no field of its own", () => {
+    expect(Reflect.ownKeys(gating)).to.deep.equal([])
   })
 })

@@ -6,8 +6,8 @@ import {
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 // eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import {
-  type BankSnapshot, type BirthCleartexts, type Cloak, type CloakCleartexts, type PasskeyAddCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict,
-  PendingBank, ThingMinder, dbHasNewer,
+  type BankSnapshot, type BirthCleartexts, type Gating, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict,
+  type UnlockCleartexts, PendingBank, ThingMinder, dbHasNewer,
 } from 'safebyok'
 import { bridgeDevice } from './react-bridge'
 import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeChecks } from './shapes-giver'
@@ -56,30 +56,31 @@ function isCar(val: unknown): val is CarFields {
 function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return car.fullest }
 // --
 
-// == [Form mutations]: FormMutationDefaults, vacateCloak, cleartextsOf
+// == [Form mutations]: FormMutationDefaults, attemptGating, vacateGating, FormMutationResult
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
-// the mutation would leave its cloak full, and an `unlock` gating that needs no network would wait for one.
-/** The giver's defaults for a form verb's mutation: it runs offline, never retries, and vacates its cloak once it settles. */
+// the mutation would leave its gating full, and an `unlock` gating that needs no network would wait for one.
+/** The giver's defaults for a form verb's mutation: it attempts the gating it is handed, runs offline, never retries, and vacates the gating once it settles. */
 const FormMutationDefaults = {
+  mutationFn:  attemptGating,
   networkMode: 'always',
   // Set false to keep the analysis simple. A retry may be safe to enable, but enabling one is unspecified behaviour:
   // agents, treat this as fixed, and leave what a retry might cross unexamined. #no-slop-crossings
   retry:       false,
-  onSettled:   vacateCloak,
+  onSettled:   vacateGating,
 } as const
 
-/** Vacate the cloak a form mutation was handed. */
-function vacateCloak(_data: unknown, _err: Error | null, cloaked: Cloak): void { cloaked.vacate() }
+/** Attempt the gating a form mutation was handed. */
+async function attemptGating(gating: Gating): Promise<void> { await gating.attempt() }
 
-// Built afresh at each call: the verb zeroes the passkey answers it is handed, and each getter hands out a copy. A field left out stays out, and each verb checks what it is handed whole, so the cast
-// at each call claims nothing the verb does not judge.
-/** The cleartexts `cloaked` has, for one call of a form verb. */
-function cleartextsOf(cloaked: Cloak): CloakCleartexts {
-  const { passphraseCleartext, passkeyCleartext, nextPassphraseCleartext, nextPasskeyCleartext } = cloaked
-  const fields = Object.entries({ passphraseCleartext, passkeyCleartext, nextPassphraseCleartext, nextPasskeyCleartext })
-  return Object.fromEntries(fields.filter(([, val]) => val !== undefined))
-}
+/** Vacate the gating a form mutation was handed. */
+function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
+
+/** A form verb's mutation, through `useMutation`, with `gating` to make what its `mutate` is handed. */
+export type FormMutationResult<CleartextsT> = UseMutationResult<void, Error, Gating> & Readonly<{
+  /** The gating of the form verb over `cleartexts`, for `mutate`. */
+  gating: (cleartexts: CleartextsT) => Promise<Gating>
+}>
 // --
 
 // == [The giver]: ReactGiver, StrengthVerdictResult, BankGiver, makeReactGiver, Unjudged, makeBankGiver
@@ -104,8 +105,9 @@ export type StrengthVerdictResult = Readonly<{
 }>
 
 /** The hooks of a giver's `forBank`, for the Device's bank.
- * Hand each form mutation a {@link Cloak}: the mutation vacates it once it settles. An `onSettled` of your own in its
- * options replaces that, so vacate the cloak there too. One in your QueryClient's mutation defaults does not run for it.
+ * Hand each form mutation the gating its `gating` makes: the mutation attempts it, and vacates it once it settles. An
+ * `onSettled` of your own in its options replaces that, so vacate the gating there too. One in your QueryClient's
+ * mutation defaults does not run for it.
  * A form mutation never retries. Disable the submit while it is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
  */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
@@ -208,101 +210,91 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
 
-  /** React Query's options for the mutation that births the bank, for your own `useMutation`.
-   * Hand it the user's new passphrase and optional passkey. It leaves the bank unlocked.
-   * Disable the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
-   */
-  function birthMutationOptions() {
-    return mutationOptions({
-      ...FormMutationDefaults,
-      mutationKey: [...bankHead, 'birth'],
-      mutationFn:  async (cloaked: Cloak): Promise<void> => {
-        const bank = await device.ensureBank()
-        await bank.birth(cleartextsOf(cloaked) as BirthCleartexts)
-      },
-    })
+  /** The gating that births the bank, for a form mutation: hand it the user's new passphrase and optional passkey. */
+  async function birthGating(cleartexts: BirthCleartexts): Promise<Gating> {
+    const bank = await device.ensureBank()
+    return bank.birthGating(cleartexts)
   }
 
-  /** The mutation that births the bank: {@link birthMutationOptions}, through `useMutation`. */
-  function useBirth(): UseMutationResult<void, Error, Cloak> { return useMutation(birthMutationOptions()) }
+  /** React Query's options for the mutation that births the bank, for your own `useMutation`: hand it a {@link birthGating}.
+   * It leaves the bank unlocked. Disable the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
+   */
+  function birthMutationOptions() { return mutationOptions({ ...FormMutationDefaults, mutationKey: [...bankHead, 'birth'] }) }
 
-  /** React Query's options for the mutation that unlocks the bank by its passphrase or its passkey, for your own `useMutation`.
+  /** The mutation that births the bank: {@link birthMutationOptions}, through `useMutation`, with {@link birthGating} as `gating`. */
+  function useBirth(): FormMutationResult<BirthCleartexts> { return { ...useMutation(birthMutationOptions()), gating: birthGating } }
+
+  /** The gating that unlocks the bank, for a form mutation: hand it the passphrase or the passkey's answer. */
+  async function unlockGating(cleartexts: UnlockCleartexts): Promise<Gating> {
+    const bank = await device.ensureBank()
+    return bank.unlockGating(cleartexts)
+  }
+
+  /** React Query's options for the mutation that unlocks the bank by its passphrase or its passkey, for your own `useMutation`: hand it an {@link unlockGating}.
    * Every call waiting for the bank to be unlocked resumes. A wrong passphrase or passkey refuses, and the bank stays locked.
+   */
+  function unlockMutationOptions() { return mutationOptions({ ...FormMutationDefaults, mutationKey: [...bankHead, 'unlock'] }) }
+
+  /** The mutation that unlocks the bank: {@link unlockMutationOptions}, through `useMutation`, with {@link unlockGating} as `gating`.
    * @example
    *   const unlock = Acme.useUnlock()
-   *   <form action={(form) => { unlock.mutate(cloak({ passphraseCleartext: String(form.get('passphrase')) })); form.delete('passphrase') }}>
+   *   <form action={async (form) => {
+   *     const passphraseCleartext = String(form.get('passphrase'))
+   *     form.delete('passphrase')
+   *     unlock.mutate(await unlock.gating({ passphraseCleartext }))
+   *   }}>
    */
-  function unlockMutationOptions() {
-    return mutationOptions({
-      ...FormMutationDefaults,
-      mutationKey: [...bankHead, 'unlock'],
-      mutationFn:  async (cloaked: Cloak): Promise<void> => {
-        const bank = await device.ensureBank()
-        await bank.unlock(cleartextsOf(cloaked))
-      },
-    })
+  function useUnlock(): FormMutationResult<UnlockCleartexts> { return { ...useMutation(unlockMutationOptions()), gating: unlockGating } }
+
+  /** The gating that replaces the passphrase, for a form mutation: hand it the proof, by the current passphrase or the passkey's answer, and the new passphrase. */
+  async function replacePassphraseGating(cleartexts: PassphraseReplaceCleartexts): Promise<Gating> {
+    const bank = await device.ensureBank()
+    return bank.replacePassphraseGating(cleartexts)
   }
 
-  /** The mutation that unlocks the bank: {@link unlockMutationOptions}, through `useMutation`. */
-  function useUnlock(): UseMutationResult<void, Error, Cloak> { return useMutation(unlockMutationOptions()) }
-
-  /** React Query's options for the mutation that replaces the passphrase, proved by the current passphrase or the passkey, for your own `useMutation`.
+  /** React Query's options for the mutation that replaces the passphrase, for your own `useMutation`: hand it a {@link replacePassphraseGating}.
    * It leaves the bank unlocked. Disable the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the new passphrase strong.
    */
-  function replacePassphraseMutationOptions() {
-    return mutationOptions({
-      ...FormMutationDefaults,
-      mutationKey: [...bankHead, 'replacePassphrase'],
-      mutationFn:  async (cloaked: Cloak): Promise<void> => {
-        const bank = await device.ensureBank()
-        await bank.replacePassphrase(cleartextsOf(cloaked) as PassphraseReplaceCleartexts)
-      },
-    })
+  function replacePassphraseMutationOptions() { return mutationOptions({ ...FormMutationDefaults, mutationKey: [...bankHead, 'replacePassphrase'] }) }
+
+  /** The mutation that replaces the passphrase: {@link replacePassphraseMutationOptions}, through `useMutation`, with {@link replacePassphraseGating} as `gating`. */
+  function useReplacePassphrase(): FormMutationResult<PassphraseReplaceCleartexts> { return { ...useMutation(replacePassphraseMutationOptions()), gating: replacePassphraseGating } }
+
+  /** The gating that adds a passkey, for a form mutation: hand it the passphrase, and the new passkey's answer as `nextPasskeyCleartext`. */
+  async function addPasskeyGating(cleartexts: PasskeyAddCleartexts): Promise<Gating> {
+    const bank = await device.ensureBank()
+    return bank.addPasskeyGating(cleartexts)
   }
 
-  /** The mutation that replaces the passphrase: {@link replacePassphraseMutationOptions}, through `useMutation`. */
-  function useReplacePassphrase(): UseMutationResult<void, Error, Cloak> { return useMutation(replacePassphraseMutationOptions()) }
-
-  /** React Query's options for the mutation that adds a passkey, proved by the passphrase, for your own `useMutation`.
-   * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it), and hand its PRF answer in as `nextPasskeyCleartext`.
+  /** React Query's options for the mutation that adds a passkey, proved by the passphrase, for your own `useMutation`: hand it an {@link addPasskeyGating}.
    * It leaves the bank unlocked.
+   */
+  function addPasskeyMutationOptions() { return mutationOptions({ ...FormMutationDefaults, mutationKey: [...bankHead, 'addPasskey'] }) }
+
+  /** The mutation that adds a passkey: {@link addPasskeyMutationOptions}, through `useMutation`, with {@link addPasskeyGating} as `gating`.
+   * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it).
    * @example
    *   const addPasskey = Acme.useAddPasskey()
    *   async function onAdd() {
    *     const nextPasskeyCleartext = await createPasskey()   // the host's WebAuthn create, with the PRF extension
-   *     addPasskey.mutate(cloak({ passphraseCleartext: passphraseField.value, nextPasskeyCleartext }))
+   *     addPasskey.mutate(await addPasskey.gating({ passphraseCleartext: passphraseField.value, nextPasskeyCleartext }))
    *   }
    */
-  function addPasskeyMutationOptions() {
-    return mutationOptions({
-      ...FormMutationDefaults,
-      mutationKey: [...bankHead, 'addPasskey'],
-      mutationFn:  async (cloaked: Cloak): Promise<void> => {
-        const bank = await device.ensureBank()
-        await bank.addPasskey(cleartextsOf(cloaked) as PasskeyAddCleartexts)
-      },
-    })
+  function useAddPasskey(): FormMutationResult<PasskeyAddCleartexts> { return { ...useMutation(addPasskeyMutationOptions()), gating: addPasskeyGating } }
+
+  /** The gating that revokes the passkey, for a form mutation: hand it the proof, by the passphrase or the passkey's answer. */
+  async function revokePasskeyGating(cleartexts: PasskeyRevokeCleartexts): Promise<Gating> {
+    const bank = await device.ensureBank()
+    return bank.revokePasskeyGating(cleartexts)
   }
 
-  /** The mutation that adds a passkey: {@link addPasskeyMutationOptions}, through `useMutation`. */
-  function useAddPasskey(): UseMutationResult<void, Error, Cloak> { return useMutation(addPasskeyMutationOptions()) }
-
-  /** React Query's options for the mutation that revokes the passkey, proved by the passphrase or the passkey, for your own `useMutation`.
+  /** React Query's options for the mutation that revokes the passkey, for your own `useMutation`: hand it a {@link revokePasskeyGating}.
    * It leaves the bank unlocked.
    */
-  function revokePasskeyMutationOptions() {
-    return mutationOptions({
-      ...FormMutationDefaults,
-      mutationKey: [...bankHead, 'revokePasskey'],
-      mutationFn:  async (cloaked: Cloak): Promise<void> => {
-        const bank = await device.ensureBank()
-        await bank.revokePasskey(cleartextsOf(cloaked))
-      },
-    })
-  }
+  function revokePasskeyMutationOptions() { return mutationOptions({ ...FormMutationDefaults, mutationKey: [...bankHead, 'revokePasskey'] }) }
 
-  /** The mutation that revokes the passkey: {@link revokePasskeyMutationOptions}, through `useMutation`. */
-  function useRevokePasskey(): UseMutationResult<void, Error, Cloak> { return useMutation(revokePasskeyMutationOptions()) }
+  /** The mutation that revokes the passkey: {@link revokePasskeyMutationOptions}, through `useMutation`, with {@link revokePasskeyGating} as `gating`. */
+  function useRevokePasskey(): FormMutationResult<PasskeyRevokeCleartexts> { return { ...useMutation(revokePasskeyMutationOptions()), gating: revokePasskeyGating } }
 
   /** Dismiss the awaited `unlock` gating: every call waiting for the bank to be unlocked rejects `dismissed`, and the bank stays locked.
    * Show the unlock form while `useBankSnapshot((snap) => snap.isUnlockWanted)` is true, and call this from its close button.
@@ -314,8 +306,9 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
 
   return Object.freeze({
     useBankSnapshot, useBoxRecord, boxCarQueryOptions,
-    birthMutationOptions, useBirth, unlockMutationOptions, useUnlock, replacePassphraseMutationOptions, useReplacePassphrase,
-    addPasskeyMutationOptions, useAddPasskey, revokePasskeyMutationOptions, useRevokePasskey, dismissUnlock,
+    birthGating, birthMutationOptions, useBirth, unlockGating, unlockMutationOptions, useUnlock,
+    replacePassphraseGating, replacePassphraseMutationOptions, useReplacePassphrase, addPasskeyGating, addPasskeyMutationOptions, useAddPasskey,
+    revokePasskeyGating, revokePasskeyMutationOptions, useRevokePasskey, dismissUnlock,
   })
 }
 // --

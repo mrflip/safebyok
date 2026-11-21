@@ -25,12 +25,21 @@ what differs from big, in a sentence or two.
   `Gating`, `Proving` and `Lease` hold a pre-image). The host's PRF bytes are zeroed at adoption, each attempt still
   zeroes the copy it is handed, and `vacate()` zeroes the cloak's own. A host's `onSettled` in a form mutation's options
   replaces the vacate, and the cloak then keeps its cleartexts until it is let go.
+  amended 2026-11-21 (gating_instance): the cloak is gone. A form verb's gating is an instance, `Gating`
+  (`packages/safebyok/src/models/gating.ts`), which a bank's maker (`bank.unlockGating` and its siblings) makes over the
+  form's cleartexts, adopting them as the cloak did; the host hands it to the form mutation, which attempts it once and
+  vacates it. A passphrase is still held in a private field until the gating is attempted or vacated (G1), and the copy
+  of a passkey answer's PRF bytes is the gating's, which G9's "only `Gating`, `Proving` and `Lease`" covers again. The
+  host's PRF bytes are zeroed at adoption, before the cleartexts' fields are checked, and the gating's copy in its
+  attempt's `finally`. The gating has no getter: its cleartexts leave it only to its verb's body.
 
 * 2026-11-20 (form_verbs), G2: **A passkey answer is vacated after every attempt.** In big an attempt refused with a
   correctable refusal, short of its gating's last, left the answer's PRF bytes un-zeroed for the host to hand in again.
   The new core has no gating to try again in: each attempt (`packages/safebyok/src/models/gating.ts`) zeroes every
   passkey answer it is handed, the proof's (`passkeyClear`) and a new passkey's (`nextPasskeyClear`), in a `finally`,
   whatever its outcome. G2 is tightened: the caveat that leaves the zeroing to the host no longer applies.
+  amended 2026-11-21 (gating_instance): the host's answers are zeroed when the gating is made, the cleartexts refused or
+  not, and the gating's own copies when its single attempt ends, whatever its outcome, or at `gating.vacate()`.
 
 * 2026-11-19 (bank_gatings), the leaseKey's access chain: **A device's sweep evicts no lease.** In big, the device's
   sweep reaches `bank.lock()`, which evicts the lease. The new core's `Device` holds no handle to its banks, so
@@ -65,3 +74,7 @@ what differs from big, in a sentence or two.
   bank's private `#putGate`, `#unlockByProving` and `#birthByProving` through a friend. So G9's "only `Gating`,
   `Proving` and `Lease`" reads, in the new core, "only `gating.ts`'s attempts, `Proving` and `Lease`"; no public method
   accepts a proving, and G1 and G9 hold in substance.
+  amended 2026-11-21 (gating_instance): the Bank's makers (`Bank.birthGating`, `bank.unlockGating` and its siblings)
+  hand the cleartexts, unread, to a `Gating` subclass's constructor with the friend; its `attempt` runs the body that
+  was the attempt function. The entry points export the gating classes as types only, as big exports `Gating`, so the
+  published surface has no constructor a host could hand a friend of its own.

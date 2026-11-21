@@ -26,6 +26,9 @@ export const BankSwept = 'This bank was swept, so it answers nothing more: make 
 /** A call that waited for an `unlock` gating, when the wait was dismissed. */
 export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed locked and the call waiting on it was not made: try again when you want it.'
 
+/** A gating attempted a second time. */
+export const GatingSpent = 'This gating was attempted already, and a gating is attempted once: make another for the next try.'
+
 /** A vault made without a bank. */
 export const VaultBankExpected = 'A Vault is made with the Bank whose boxes it carries.'
 

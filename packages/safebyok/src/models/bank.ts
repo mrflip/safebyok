@@ -5,7 +5,7 @@ import { Thing } from './thing'
 import { BaseBox } from './base-box'
 import { Device } from './device'
 import { Gate } from './gate'
-import * as Gatings from './gating'
+import { AddPasskeyGating, BirthGating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './gating'
 import type { Lease } from './lease'
 import type { Proving } from './proving'
 import type { BankGatingFriend, BirthCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, PassphraseReplaceCleartexts, UnlockCleartexts } from '../shapes/shapes-gateish'
@@ -180,63 +180,79 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Form verbs]: birth, tryBirth, unlock, tryUnlock, replacePassphrase, tryReplacePassphrase, addPasskey, tryAddPasskey, revokePasskey, tryRevokePasskey, gatingFriend
-  // Each hands the cleartexts a form collected, unread, to its gating in gating.ts, with a friend of this bank's private
-  // verbs: no public method accepts a proving (G9). Each vacates the cleartexts whatever its outcome, and changes nothing where it refuses.
+  // == [Form verbs]: birthGating, birth, tryBirth, unlockGating, unlock, tryUnlock, replacePassphraseGating, replacePassphrase, tryReplacePassphrase, addPasskeyGating, addPasskey, tryAddPasskey, revokePasskeyGating, revokePasskey, tryRevokePasskey, gatingFriend
+  // Each maker hands the cleartexts a form collected, unread, to a gating in gating.ts, with a friend of this bank's private
+  // verbs: no public method accepts a proving (G9). Each verb attempts the gating its maker makes, which is vacated
+  // whatever its outcome, and changes nothing where it refuses.
+
+  /** The gating of {@link birth} over `cleartexts`, for a form mutation to attempt. */
+  static birthGating(device: Device, cleartexts: BirthCleartexts): BirthGating {
+    const friend = {
+      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving }),
+    }
+    return new BirthGating(device, cleartexts, friend)
+  }
 
   /** Birth the bank of `device`'s scope with the user's new passphrase and optional passkey, and resolve it unlocked.
    * A weak passphrase refuses `weak_passphrase`: show {@link Device.judgeStrength}'s verdict as the user types.
    * Where a live bank is already stored, it refuses `gate_made_elsewhere`, and the passphrase is not set.
    */
-  static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> {
-    const friend = {
-      birth: (record: BankMakeRecord, proving: Proving) => Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving }),
-    }
-    return Gatings.birthBank(device, cleartexts, friend)
-  }
+  static async birth(device: Device, cleartexts: BirthCleartexts): Promise<Bank> { return await this.birthGating(device, cleartexts).attempt() }
 
   /** {@link birth}, resolving an `Outcome` instead of throwing. */
   static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
+
+  /** The gating of {@link unlock} over `cleartexts`, for a form mutation to attempt. */
+  unlockGating(cleartexts: UnlockCleartexts): UnlockGating { return new UnlockGating(this, cleartexts, this.#gatingFriend()) }
 
   /** Unlock this bank by its passphrase or its passkey, resuming every call waiting in {@link ensureUnlocked}.
    * A wrong one refuses `wrong_passphrase` or `wrong_passkey`, and the bank is unchanged.
    */
   async unlock(cleartexts: UnlockCleartexts): Promise<this> {
-    await Gatings.unlockBank(this, cleartexts, this.#gatingFriend())
+    await this.unlockGating(cleartexts).attempt()
     return this
   }
 
   /** {@link unlock}, resolving an `Outcome` instead of throwing. */
   tryUnlock(cleartexts: UnlockCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.unlock(cleartexts)) }
 
+  /** The gating of {@link replacePassphrase} over `cleartexts`, for a form mutation to attempt. */
+  replacePassphraseGating(cleartexts: PassphraseReplaceCleartexts): ReplacePassphraseGating { return new ReplacePassphraseGating(this, cleartexts, this.#gatingFriend()) }
+
   /** Replace the passphrase, proved by the current passphrase or the passkey, and leave the bank unlocked.
    * The passkey stays, and the bankKey does not change.
    * A new passphrase that is weak, or the same as the current one, refuses (`weak_passphrase`, `same_passphrase`).
    */
   async replacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<this> {
-    await Gatings.replacePassphrase(this, cleartexts, this.#gatingFriend())
+    await this.replacePassphraseGating(cleartexts).attempt()
     return this
   }
 
   /** {@link replacePassphrase}, resolving an `Outcome` instead of throwing. */
   tryReplacePassphrase(cleartexts: PassphraseReplaceCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.replacePassphrase(cleartexts)) }
 
+  /** The gating of {@link addPasskey} over `cleartexts`, for a form mutation to attempt. */
+  addPasskeyGating(cleartexts: PasskeyAddCleartexts): AddPasskeyGating { return new AddPasskeyGating(this, cleartexts, this.#gatingFriend()) }
+
   /** Add a passkey, proved by the passphrase, and leave the bank unlocked.
    * A gate has one passkey at most, so this refuses while it has one: revoke that one first.
    */
   async addPasskey(cleartexts: PasskeyAddCleartexts): Promise<this> {
-    await Gatings.addPasskey(this, cleartexts, this.#gatingFriend())
+    await this.addPasskeyGating(cleartexts).attempt()
     return this
   }
 
   /** {@link addPasskey}, resolving an `Outcome` instead of throwing. */
   tryAddPasskey(cleartexts: PasskeyAddCleartexts): Promise<Outcome.Outcome<this>> { return Outcome.outcomeOf(() => this.addPasskey(cleartexts)) }
 
+  /** The gating of {@link revokePasskey} over `cleartexts`, for a form mutation to attempt. */
+  revokePasskeyGating(cleartexts: PasskeyRevokeCleartexts): RevokePasskeyGating { return new RevokePasskeyGating(this, cleartexts, this.#gatingFriend()) }
+
   /** Revoke the passkey, proved by the passphrase or the passkey itself, and leave the bank unlocked.
    * With no passkey, the proof only unlocks the bank. The bankKey does not change.
    */
   async revokePasskey(cleartexts: PasskeyRevokeCleartexts): Promise<this> {
-    await Gatings.revokePasskey(this, cleartexts, this.#gatingFriend())
+    await this.revokePasskeyGating(cleartexts).attempt()
     return this
   }
 

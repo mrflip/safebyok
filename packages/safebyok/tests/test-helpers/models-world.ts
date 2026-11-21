@@ -1,5 +1,5 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
- * a bank born unlocked, a spy on births, a box's shell, a fake of the bank a lease is given, and the loudly named
+ * a bank born unlocked, a spy on births, a gating with no bank behind it, a box's shell, a fake of the bank a lease is given, and the loudly named
  * cheats that unwrap a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
@@ -13,6 +13,7 @@ import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
 import { Device } from '../../src/models/device'
+import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import { Vault } from '../../src/models/vault'
 import type { ThingMinder } from '../../src/minding/thing-minder'
@@ -21,7 +22,7 @@ import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankMakeRecord, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BoxRecord } from '../../src/shapes/shapes-thing'
-import type { GateRevisionedStamp, LeaseBank, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
+import type { GateRevisionedStamp, GatingCleartexts, LeaseBank, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
@@ -180,6 +181,17 @@ export function spyBirths(device: Device, answer?: (ask: BirthBankAsk) => Promis
     return answer ? answer(ask) : tryBirthBank(ask)
   })
   return { banks, tryBirthBank: spy, lockedAtBirths }
+}
+// --
+
+// == [Gatings]: _cheat_gatingOf, CheatGating
+
+/** A gating over `cleartexts` whose attempt calls `body` with the cleartexts it adopted, in place of a verb's: a form mutation's test with no bank behind it. */
+export function _cheat_gatingOf(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<unknown>): Gating { return new CheatGating(cleartexts, body) }
+
+/** A gating whose body is any function, made by {@link _cheat_gatingOf}. */
+class CheatGating extends Gating {
+  constructor(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<unknown>) { super(cleartexts, body as (cleartexts: GatingCleartexts) => Promise<Bank>) }
 }
 // --
 

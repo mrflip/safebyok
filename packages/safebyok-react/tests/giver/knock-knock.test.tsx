@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider, useMutation } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { cloak, isVaultError } from 'safebyok'
+import { isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
@@ -47,7 +47,7 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   function UnlockForm() {
     const unlock = Acme.useUnlock()
     return (
-      <form action={(form) => { unlock.mutate(cloak({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
+      <form action={async (form) => { unlock.mutate(await unlock.gating({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
         <input name="passphrase" type="password" autoComplete="current-password" aria-label="Passphrase" />
         <button disabled={unlock.isPending}>Unlock</button>
         <button type="button" onClick={() => { void Acme.dismissUnlock() }}>Cancel</button>
