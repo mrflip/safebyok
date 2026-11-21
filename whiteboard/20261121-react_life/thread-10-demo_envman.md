@@ -2,7 +2,7 @@
 
 Branch `20261121-demo_envman`, PR #807, stacked on #806. Proved: `safebyok-demo-envman` lint, typecheck, test (3 files,
 18: the app's integration test 5, `local-vault-db` 4, `session` 9); `safebyok-react-lean` lint and typecheck. `pnpm justify`
-after the catch-up: see the PR's **Tests:** line. Nobody has clicked through the page in a real browser.
+green after the catch-up onto #806's tip (bad537cb6). Nobody has clicked through the page in a real browser.
 
 * **Built**
   * **`demos/safebyok-demo-envman`**, a package of its own. Shell copied with `cp` from Knock-Knock (configs,
@@ -48,6 +48,8 @@ after the catch-up: see the PR's **Tests:** line. Nobody has clicked through the
   * **No delete**: not asked for. Nothing built beside the giver's hooks; envman needed none of `useBoxes`, a revisor, or `editBox`.
 
 * **Discoveries**
+  * **Wait on Undo, not Save, for a draft's write to land**: Save is disabled while pending as well as when clean, so a
+    test waiting on it can reload before the write. The first justify caught this; the test now waits for Undo to disable.
   * Every hook the handoff named worked as described the first time; the only giver-side change was the export.
   * `maskOf`'s schedule takes both `head` and `tail`: `{ tail: 0 }` alone does not typecheck, hence `{ head: 7, tail: 0 }`.
     Thread 12's `mask` swap goes through `valMaskOf` alone.
