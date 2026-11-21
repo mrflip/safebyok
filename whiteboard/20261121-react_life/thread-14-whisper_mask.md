@@ -1,6 +1,6 @@
 # Thread 14: whisper_mask (2026-11-21)
 
-Branch `20261121-whisper_mask`, PR #TBD, stacked on #809. Proved: safebyok-react-lean 247 tests, lint and typecheck
+Branch `20261121-whisper_mask`, PR #810, stacked on #809. Proved: safebyok-react-lean 247 tests, lint and typecheck
 clean; knockknock 26, envman 24, each lint and typecheck clean; `pnpm justify` pending.
 
 * **Built**: `WhisperMask` (`packages/safebyok-react-lean/src/parts/whisper-mask.tsx`, exported from the parts), the
