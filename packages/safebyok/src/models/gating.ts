@@ -219,14 +219,20 @@ function nextGateAsk(ante: Gate, wayins: GateDna['wayins'], policy: EX.StoragePo
  * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
  */
 function adoptedCleartextsOf(cleartexts: unknown): GatingCleartexts {
+  // Declared outside the try, so a refusal zeroes the gating's copies of the passkey answers too (G2).
+  let passkeyCleartext:     unknown
+  let nextPasskeyCleartext: unknown
   try {
     // The passkey answers are adopted before the fields are checked, so a refusal leaves none of the host's PRF bytes unzeroed.
-    const { passkeyCleartext, nextPasskeyCleartext } = (cleartexts ?? {}) as GatingCleartexts
-    const adoptedAnswers = { passkeyCleartext: adoptedAnswerOf(passkeyCleartext), nextPasskeyCleartext: adoptedAnswerOf(nextPasskeyCleartext) }
+    const handed = (cleartexts ?? {}) as GatingCleartexts
+    passkeyCleartext     = adoptedAnswerOf(handed.passkeyCleartext)
+    nextPasskeyCleartext = adoptedAnswerOf(handed.nextPasskeyCleartext)
     // Typed as the host declared them: each body judges the values it takes.
     const given = CleartextChecks.gatingArgs.parse(cleartexts)
-    return omitBy({ ...given, ...adoptedAnswers }, (val) => val === undefined) as GatingCleartexts
+    return omitBy({ ...given, passkeyCleartext, nextPasskeyCleartext }, (val) => val === undefined) as GatingCleartexts
   } catch (err) {
+    zeroAnswer(passkeyCleartext)
+    zeroAnswer(nextPasskeyCleartext)
     throw Errors.isVaultError(err) ? err : Throwers.cleartextsThrew()
   }
 }

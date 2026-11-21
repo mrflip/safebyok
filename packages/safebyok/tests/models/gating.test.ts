@@ -312,6 +312,16 @@ describe("Bank.birthGating(device, cleartexts): what a gating adopts", () => {
     expect([...adopted.passkeyCleartext.prfBytes]).to.deep.equal(Array.from({ length: 32 }, () => 7))
   })
 
+  it("zeroes the PRF bytes it copied when the cleartexts fail their check", () => {
+    const handed = TH.passkeyAnswerOf()
+    const fill   = vi.spyOn(Uint8Array.prototype, 'fill')
+    onTestFinished(() => { fill.mockRestore() })
+    TH.expectSyncRefusal(() => gatingOf({ passkeyCleartext: handed, stray: true }), 'bad_record')
+    // The host's bytes are zeroed through a view of their own buffer; the gating's copy has a buffer of its own.
+    const copies = (fill.mock.contexts as Uint8Array[]).filter((bytes) => bytes.buffer !== handed.prfBytes.buffer)
+    expect(copies.map((bytes) => TH.isZeroed(bytes))).to.deep.equal([true])
+  })
+
   it("refuses what is not an object", () => {
     for (const notObject of [null, undefined, FakePassphrase, 42, [FakePassphrase]]) {
       TH.expectSyncRefusal(() => gatingOf(notObject), 'bad_record')
