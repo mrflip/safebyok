@@ -1,10 +1,6 @@
-import { omit, pick } from 'es-toolkit'
 import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
 import type { ThingRecord } from '../shapes/shapes-thing'
-
-/** The Thing fields that change from one revision to the next of a life: a newer record of the same life sets them again. */
-const RevisionFieldnames = ['fmt', 'revtok', 'revseq', 'written_at', 'am'] as const satisfies readonly (keyof ThingRecord)[]
 
 // TypeScript cannot type a static `make` here that returns the subclass while its constructor is private, so each
 // subclass declares its own: `make(record, opts[, friend])`, which parses what it is given.
@@ -29,16 +25,16 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT> extends
   protected constructor(record: RecordT) {
     super()
     this.#record = Object.freeze(record)
-    const sparse = BaseThing.sparseOf(record)
-    Helpers.tattoo(this, omit(sparse, RevisionFieldnames), { configurable: false })
-    Helpers.tattoo(this, pick(sparse, RevisionFieldnames))
+    const { lifeFields, revisionFields } = fieldsOf(record)
+    Helpers.tattoo(this, lifeFields, { configurable: false })
+    Helpers.tattoo(this, revisionFields)
   }
 
   // The fields fixed for a life stay as they were: `record` is taken to be of this Thing's life, and nothing checks it.
   /** Make `record`, a newer revision of this Thing's life, the one this Thing models. */
   protected adoptRecord(record: RecordT): void {
     this.#record = Object.freeze(record)
-    Helpers.tattoo(this, pick(BaseThing.sparseOf(record), RevisionFieldnames))
+    Helpers.tattoo(this, fieldsOf(record).revisionFields)
   }
   // --
 
@@ -76,3 +72,12 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT> extends
   protected dropSubscribers(): void { this.#subscribers.clear() }
   // --
 }
+
+// == [Helpers]: fieldsOf
+
+/** The Thing fields of `record`: those fixed for its life, and those a newer revision of the life sets again. */
+function fieldsOf(record: ThingRecord) {
+  const { fmt, revtok, revseq, written_at, am, ...lifeFields } = BaseThing.sparseOf(record)
+  return { lifeFields, revisionFields: { fmt, revtok, revseq, written_at, am } }
+}
+// --
