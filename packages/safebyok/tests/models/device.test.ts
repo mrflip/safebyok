@@ -175,7 +175,7 @@ describe("device.hello()", () => {
   })
 
   it("shows the refusal as failed where its bank cannot be read, and never rejects", async () => {
-    const born   = await TH.buildBornBank()
+    const born    = await TH.buildBornBank()
     const vaultDB = born.device.vaultDB as MemoryVaultDB
     vaultDB._cheat_things(born.bank.scope).set('bank', { mangled: true })
     const device = TH.makeDevice({}, { vaultDB })
