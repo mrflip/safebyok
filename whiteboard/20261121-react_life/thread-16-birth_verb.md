@@ -1,6 +1,6 @@
 # Thread 16: birth_verb (2026-11-21)
 
-Branch `20261121-birth_verb`, PR #TBD, cut from #811 (since merged; the PR's base is main). Proved: before the catch-up,
+Branch `20261121-birth_verb`, PR #813, cut from #811 (since merged; the PR's base is main). Proved: before the catch-up,
 safebyok 1346, safebyok-react-lean 251, knockknock 26, envman 24, each with lint and typecheck; `pnpm justify` pending.
 
 * **Built**:
