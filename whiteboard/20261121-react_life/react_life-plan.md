@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** thread 15 (`stage_not_wait`) building, stacked on #810. Threads 1 to 14 filed and out of draft, in one line ending at #810. Waiting on the Coach: Open Matters rows, the Closer Look triage, browser click-throughs of both demos; then base-sync and wrap-up.
+* **Status:** thread 15 (`stage_not_wait`, #811, stacked on #810) ready, in review; one compaction before its readiness check. Threads 1 to 14 filed and out of draft, in one line ending at #810. Waiting on the Coach: Open Matters rows, the Closer Look triage, browser click-throughs of both demos; then base-sync and wrap-up.
 
 ## The goal
 
