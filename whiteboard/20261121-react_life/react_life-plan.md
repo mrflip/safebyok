@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 8 filed, out of draft (line ends #803, #804 on it). Thread 9 ready, in review (#805, on #803). Then #805 restacks onto #804, thread 11 is cut from the top, and thread 10 after it.
+* **Status:** running. Threads 1 to 9 filed, out of draft, in one line: #797 → #798 → #799 → #800 → #802 → #801 → #803 → #804 → #805. Thread 11 (giver_surface) building, stacked on #805. Thread 10 (envman) waits on 11.
 
 ## The goal
 
@@ -299,6 +299,8 @@ Serves thread 10: envman's masked editor with save and undo. The Coach's text is
 * **Levels:** `opus`, high effort; review `medium`. **Depends on:** 7. **Beside:** 8.
 * **Ready when:** a test does focus, reveal, edit, put, and focus, edit, discard, with no secret found.
 * *Orchestrator:* ready, #805, no compaction. `Knock.useDraft` in `src/giver/use-draft.ts`; answers `isDirty`, `isWhisperDirty`, `isBehind`, `base`, `sidecar`, `setSidecar`, `whisperField(fieldname)` (props for a plain `<input>`), `put(opts?)` with `sidecarOf`, `discard`, `lastErr`. `put` cites the base (`stale_write` when behind) and waits for unlock. `es-toolkit` added as a runtime dependency. Two wontfix rows. My calls on Cleanup; the dream's comment amended.
+* *Review:* fixed (medium). `put` no longer writes a field empty when its typed-into input has left the page (refuses `bad_record`); the tests now search for the keys while shown and while typed, not only after; a wontfix row and two style fixes. Left: typed text survives a lock (an Open Matters row; `notes/security.md` records the reveal path); doc blocks; `DraftFriend` unexported; a few untested cases. Out of bounds, noted: four crossings.
+* *Orchestrator:* after filing, #805 was rebased onto #804 (conflicts: both wontfix rows kept, the bank-giver key lists joined); `pnpm justify` green at the tip.
 
 ### 10. `demo_envman`: the envman app
 
