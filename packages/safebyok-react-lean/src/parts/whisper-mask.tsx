@@ -4,7 +4,7 @@ import { useEffect, useEffectEvent, useRef } from 'react'
 import { type BoxRecord, type LiveOf, mask } from 'safebyok'
 import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver, WithLockableWhisperOpts } from '../giver/react-giver'
-import { whisperTextOf } from '../giver/use-draft'
+import { whisperTextOf } from '../giver/use-reveal'
 
 // == [The mask]: WhisperMaskProps, WhisperMask, storedMaskOf
 

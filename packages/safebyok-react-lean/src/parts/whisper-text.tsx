@@ -1,10 +1,9 @@
 /** `WhisperText`, a field of a box's whisper, masked until the user asks to see it. */
 
-import { type ReactNode, useRef, useState } from 'react'
-import { flushSync } from 'react-dom'
+import { type ReactNode, useRef } from 'react'
 import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
-import { whisperTextOf } from '../giver/use-draft'
+import { useReveal } from '../giver/use-reveal'
 import { PartsPhrases } from './phrases-parts'
 
 // == [The text]: WhisperTextProps, WhisperText
@@ -30,21 +29,15 @@ export interface WhisperTextProps {
  */
 export function WhisperText({ bank: bankProp, labelpath, field, masked = PartsPhrases.masked, onError }: Readonly<WhisperTextProps>) {
   const bank = useGivenBank(bankProp)
-  const isLocked = bank.useBank((snap) => snap.isLocked)
-  const [reveal, setReveal] = useState<'hidden' | 'revealing' | 'shown'>('hidden')
+  const reveal = useReveal(bank, labelpath)
   const textRef = useRef<HTMLSpanElement>(null)
-  if (isLocked && (reveal === 'shown')) { setReveal('hidden') }
+  const isRevealing = (reveal.fieldname !== null) && (! reveal.isRevealed)
 
-  /** Show the text: mount its element, then write the field into it, inside the bank's callback. */
+  /** Show the text, written into its element inside the bank's callback. */
   async function show() {
-    setReveal('revealing')
     try {
-      await bank.withWhisper(labelpath, (whisper) => {
-        flushSync(() => { setReveal('shown') })
-        if (textRef.current !== null) { textRef.current.textContent = whisperTextOf(whisper[field]) }
-      })
+      await reveal.showWhisper(field, (text) => { if (textRef.current !== null) { textRef.current.textContent = text } })
     } catch (err) {
-      setReveal('hidden')
       onError?.(err)
     }
   }
@@ -52,14 +45,14 @@ export function WhisperText({ bank: bankProp, labelpath, field, masked = PartsPh
   // The shown text lives in an element React renders empty and unmounts on Hide, taking the text with it.
   return (
     <span className="whisper-text">
-      {(reveal === 'shown') ? <span ref={textRef} /> : <span>{masked}</span>}
+      {reveal.isRevealed ? <span ref={textRef} /> : <span>{masked}</span>}
       <button
         type="button"
-        aria-pressed={reveal === 'shown'}
-        disabled={reveal === 'revealing'}
-        onClick={() => { if (reveal === 'shown') { setReveal('hidden') } else { void show() } }}
+        aria-pressed={reveal.isRevealed}
+        disabled={isRevealing}
+        onClick={() => { if (reveal.isRevealed) { reveal.mask() } else { void show() } }}
       >
-        {(reveal === 'shown') ? PartsPhrases.hideButton : PartsPhrases.showButton}
+        {reveal.isRevealed ? PartsPhrases.hideButton : PartsPhrases.showButton}
       </button>
     </span>
   )
