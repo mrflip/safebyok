@@ -231,7 +231,7 @@ describe("gate.subscribe(listener)", () => {
   it("tells every subscriber when one throws, and passes the throw to the device's onBadNews", async () => {
     const onBadNews = vi.fn()
     const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { onBadNews }) })
-    bank.gate.subscribe(() => { throw new Error('a bug in the host') })
+    bank.gate.subscribe(() => { throw new Error("a bug in the host") })
     const listener = vi.fn()
     bank.gate.subscribe(listener)
     bank.gate.lock()
@@ -269,12 +269,12 @@ describe("gate.sweep(endCause)", () => {
     const { bank } = await TH.buildBornBank()
     const { gate } = bank
     gate.lock()
-    const endCause = new Errors.VaultError('disabled', 'the bank was swept')
+    const endCause = new Errors.VaultError('disabled', "the bank was swept")
     const ensuring = TH.expectRefusal(gate.ensureUnlocked(), 'disabled')
     gate.sweep(endCause)
     expect(await ensuring).to.equal(endCause)
     expect([gate.isEnabled, gate.isLocked, gate.endCause]).to.deep.equal([false, true, endCause])
-    gate.sweep(new Errors.VaultError('disabled', 'a second sweep'))
+    gate.sweep(new Errors.VaultError('disabled', "a second sweep"))
     expect(gate.endCause).to.equal(endCause)
     expect(bank.isEnabled).to.be.true
   })
@@ -294,7 +294,7 @@ describe("gate.sweep(endCause)", () => {
 
   it("refuses an end cause that is not a VaultError, leaving the gate enabled", async () => {
     const gate = Gate.make(await gateRecordOf(), worldOpts())
-    TH.expectSyncRefusal(() => gate.sweep(new Error('not a refusal') as never), 'bad_record')
+    TH.expectSyncRefusal(() => gate.sweep(new Error("not a refusal") as never), 'bad_record')
     expect(gate.isEnabled).to.be.true
   })
 })

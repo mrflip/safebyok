@@ -27,7 +27,7 @@ export const BankSwept = 'This bank was swept, so it answers nothing more: make 
 export const BankNotBroughtUp = "This device's bank is not brought up yet: call `hello`, and birth the bank once the stage shows `'unborn'`."
 
 /** A call on a gate after its sweep. */
-export const GateSwept = 'This gate was swept, so it answers nothing more: make its bank again with Bank.make.'
+export const GateSwept = "This gate was swept, so it answers nothing more: make its bank again with Bank.make."
 
 /** A call that waited for an `unlock` gating, when the wait was dismissed. */
 export const UnlockDismissed = 'The unlock was dismissed, so the bank stayed locked and the call waiting on it was not made: try again when you want it.'
