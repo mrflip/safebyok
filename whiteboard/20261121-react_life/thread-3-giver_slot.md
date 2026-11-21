@@ -1,6 +1,6 @@
 # Thread 3: giver_slot (2026-11-21)
 
-Branch `20261121-giver_slot`, PR #TBD, stacked on #798. Proved: `safebyok-react-lean` test (5 files, 107), lint, typecheck.
+Branch `20261121-giver_slot`, PR #799, stacked on #798. Proved: `safebyok-react-lean` test (5 files, 107), lint, typecheck.
 
 * **Built** (all in `packages/safebyok-react-lean/src/giver/`)
   - `react-giver.tsx`: `reactGiver(config)` returns `{ Provider, useStrengthVerdict, bank }`. `SOK.bank('acme')` (other banklabels refuse `bad_scope`) gives `useBank(select?)`, `useBoxRecord(labelpath, opts?)`, `withWhisper(labelpath, fn)`, `lock()`, `dismissUnlock()`, and the form hooks `useBirth`, `useUnlock`, `useReplacePassphrase`, `useAddPasskey`, `useRevokePasskey`, each a `useMutation` with a synchronous `.gating(cleartexts)`. Exported from the package's `.` entry with its types, `GiverConfig`, `GiverBanks`, `GiverSlotSnapshot`, `SignedOutBank`.
