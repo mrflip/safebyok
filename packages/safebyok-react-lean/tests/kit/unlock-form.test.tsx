@@ -1,0 +1,106 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
+import { UnlockDialog, UnlockForm } from '../../src/kit'
+import * as TH from '../test-helpers'
+
+const Passphrase = TH.TestPassphrase
+
+/** A passphrase one letter off the stored one. */
+const WrongPassphrase = 'correct horse battery stable'
+
+/** The bank's stage as a line of text, with the unlock form while it is locked. */
+function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
+  const stage = world.Bank.useBank((snap) => snap.stage)
+  return (stage === 'locked') ? <UnlockForm bank={world.Bank} username="hue@example.com" /> : <p>{stage}</p>
+}
+
+/** The bank's stage as a line of text, beside the unlock dialog. */
+function DialogScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
+  const stage = world.Bank.useBank((snap) => snap.stage)
+  return <><p>{stage}</p><UnlockDialog bank={world.Bank} /></>
+}
+
+/** A world with a bank stored, rendered with `children` under its provider, once it shows `shown`. */
+async function renderWorld(children: (world: TH.ProviderWorld) => React.ReactNode, shown: string) {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  const { container } = render(TH.providerTreeOf(world, children(world), { userid: TH.ProviderUser }))
+  await screen.findByText(shown)
+  return { world, container }
+}
+
+/** Type `passphrase` into the passphrase field and press Unlock. */
+function typePassphrase(passphrase: string): void {
+  fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: passphrase } })
+  fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+}
+
+describe("UnlockForm", () => {
+  it("unlocks the bank by its passphrase, holding it nowhere", async () => {
+    const { world, container } = await renderWorld((world) => <StageScreen world={world} />, 'Unlock')
+    typePassphrase(Passphrase)
+    await screen.findByText('unlocked')
+    TH.expectTextUnheld(Passphrase, container, world.client)
+  })
+
+  it("keeps Unlock disabled while the unlock runs, with the passphrase out of the form's status", async () => {
+    const { world, container } = await renderWorld((world) => <StageScreen world={world} />, 'Unlock')
+    const release = world.deriver.hold()
+    typePassphrase(Passphrase)
+    const pending = await screen.findByRole<HTMLButtonElement>('button', { name: 'Unlocking…' })
+    expect(pending.disabled).to.eq(true)
+    TH.expectTextUnheld(Passphrase, container, world.client)
+    release()
+    await screen.findByText('unlocked')
+    expect(world.deriver.heard).to.eq(1)
+  })
+
+  it("says a wrong passphrase is wrong, empties the field and hands it focus", async () => {
+    const { world, container } = await renderWorld((world) => <StageScreen world={world} />, 'Unlock')
+    typePassphrase(WrongPassphrase)
+    const alert = await screen.findByRole('alert')
+    await waitFor(() => { expect(alert.textContent).to.eq('That is not the passphrase.') })
+    const field = screen.getByLabelText<HTMLInputElement>('Passphrase')
+    await waitFor(() => { expect(field.value).to.eq('') })
+    expect(document.activeElement).to.eq(field)
+    expect(field.getAttribute('aria-invalid')).to.eq('true')
+    TH.expectTextUnheld(WrongPassphrase, container, world.client)
+
+    typePassphrase(Passphrase)
+    await screen.findByText('unlocked')
+  })
+
+  it("carries the username for a password manager, and no Cancel unless given one", async () => {
+    const { container } = await renderWorld((world) => <StageScreen world={world} />, 'Unlock')
+    const username = container.querySelector<HTMLInputElement>('input[name="username"]')
+    expect(username?.value).to.eq('hue@example.com')
+    expect(username?.autocomplete).to.eq('username')
+    expect(screen.queryByRole('button', { name: 'Cancel' })).to.be.null
+  })
+})
+
+describe("UnlockDialog", () => {
+  it("opens while a withWhisper waits, and resumes it once unlocked", async () => {
+    const { world, container } = await renderWorld((world) => <DialogScreen world={world} />, 'locked')
+    expect(screen.queryByRole('dialog')).to.be.null
+    const asked = world.Bank.withWhisper(TH.JokesPath, ({ apiKey }) => apiKey as string)
+    await screen.findByRole('dialog', { name: 'Unlock your vault' })
+    typePassphrase(Passphrase)
+    expect(await asked).to.eq(TH.JokesKey)
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    expect(screen.getByText('unlocked')).to.exist
+    TH.expectTextUnheld(Passphrase, container, world.client)
+  })
+
+  for (const [closer, blurb] of [["Cancel", 'dismisses the wait on Cancel'], ["Escape", 'dismisses the wait on Escape']] as const) {
+    it(blurb, async () => {
+      const { world } = await renderWorld((world) => <DialogScreen world={world} />, 'locked')
+      const asked = world.Bank.withWhisper(TH.JokesPath, ({ apiKey }) => apiKey as string)
+      const dialog = await screen.findByRole('dialog', { name: 'Unlock your vault' })
+      if (closer === 'Cancel') { fireEvent.click(screen.getByRole('button', { name: 'Cancel' })) } else { fireEvent(dialog, new Event('cancel', { cancelable: true })) }
+      await expect(asked).rejects.toThrow(expect.objectContaining({ refusalkind: 'dismissed' }))
+      await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+      expect(screen.getByText('locked')).to.exist
+      expect(world.deriver.heard).to.eq(0)
+    })
+  }
+})
