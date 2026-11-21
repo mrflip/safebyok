@@ -11,7 +11,7 @@ export type NewPassphrase = Readonly<{
   /** The props of the new passphrase's field, to spread onto a `PassphraseInput` beside its `name`. */
   field:        NewPassphraseFieldProps
   /** The props of the confirmation's field, to spread onto a `PassphraseInput` beside its `name`. */
-  confirmField: NewPassphraseFieldProps & Readonly<{ 'aria-invalid': true | undefined }>
+  confirmField: NewPassphraseFieldProps & Readonly<{ "aria-invalid": true | undefined }>
   /** The id of the meter's line, which the new passphrase's field is described by. */
   verdictId:    string
   /** The meter's line: the checker's reason while the passphrase is weak, that it is strong enough, or nothing while the field is empty. */
@@ -28,13 +28,13 @@ export type NewPassphrase = Readonly<{
 
 /** The props {@link useNewPassphrase} gives one of its fields. */
 export type NewPassphraseFieldProps = Readonly<{
-  'ref':              RefObject<HTMLInputElement | null>
-  'autoComplete':     'new-password'
-  'aria-label':       string
-  'placeholder':      string
-  'required':         true
-  'aria-describedby': string
-  'onChange':         (event: ChangeEvent<HTMLInputElement>) => void
+  "ref":              RefObject<HTMLInputElement | null>
+  "autoComplete":     'new-password'
+  "aria-label":       string
+  "placeholder":      string
+  "required":         true
+  "aria-describedby": string
+  "onChange":         (event: ChangeEvent<HTMLInputElement>) => void
 }>
 // --
 
@@ -74,16 +74,16 @@ export function useNewPassphrase(giver: Pick<ReactGiver, 'useStrengthVerdict'>):
   return {
     field: {
       ...fieldPropsOf(KitPhrases.newPassphraseField),
-      'ref':              chosenRef,
-      'aria-describedby': verdictId,
-      'onChange':         (event) => { hearChosen(event.target.value) },
+      "ref":              chosenRef,
+      "aria-describedby": verdictId,
+      "onChange":         (event) => { hearChosen(event.target.value) },
     },
     confirmField: {
       ...fieldPropsOf(KitPhrases.confirmField),
-      'ref':              confirmRef,
-      'aria-invalid':     (confirmation === 'differs') || undefined,
-      'aria-describedby': matchId,
-      'onChange':         compare,
+      "ref":              confirmRef,
+      "aria-invalid":     (confirmation === 'differs') || undefined,
+      "aria-describedby": matchId,
+      "onChange":         compare,
     },
     verdictId,
     verdictText: isChosenTyped ? strengthTextOf(strength) : '',
@@ -102,7 +102,7 @@ type Confirmation = 'untyped' | 'differs' | 'matches'
 
 /** The props every field of a new passphrase shares, labelled `label`. */
 function fieldPropsOf(label: string) {
-  return { 'autoComplete': 'new-password', 'aria-label': label, 'placeholder': label, 'required': true } as const
+  return { "autoComplete": 'new-password', "aria-label": label, "placeholder": label, "required": true } as const
 }
 
 /** The meter's line for `strength`: the verdict's reason while weak, or that it is strong enough. */
