@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 and 2 filed, out of draft (#797, #798). Thread 3 ready, in review (#799). Threads 4 and 5 building side by side, stacked on #799.
+* **Status:** running. Threads 1 to 3 filed, out of draft (#797, #798, #799). Threads 4 and 5 building side by side, stacked on #799.
 
 ## The goal
 
@@ -211,6 +211,7 @@ Serves threads 2 to 10, which all write in it.
 * **Size:** the sprint's largest. If it runs long, `withWhisper`, `lock` and the knock-knock port move to thread 4.
 * *Orchestrator:* run on `thread-worker-400k` (opus, high), since thread 2 compacted after six minutes and this thread is larger.
 * *Orchestrator:* ready, #799, no compaction, nothing moved to thread 4. The old giver (`old-giver.ts`, `minder-bank.ts`, the fake and minder-giver worlds) stays unexported for thread 4 to port and delete. Two Open Matters rows (form mutation keys without the userid; standalone gating makers dropped); the provider effect's wider deps are my call.
+* *Review:* fixed (medium). The bridge holds rule 7: it writes only to the host's QueryClient, and the host refetch reaches `minder.get` after `await device.hello()`, outside the minder's subscriber; keep that `await`. Style and doc-block fixes. Left: three `@example` blocks without twin tests; `giver-defaults.ts` tested only indirectly. Out of bounds, noted: a second userid or a null userid after sign-in leaves the first device live (the demos reload).
 * **Ready when:** the ported test passes: unborn, birth, lock, `withWhisper` waits, unlock, it resumes, with no
   secret found in the tree or either cache.
 
