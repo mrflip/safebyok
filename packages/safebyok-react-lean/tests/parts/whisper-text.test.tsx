@@ -1,0 +1,94 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import { isVaultError } from 'safebyok'
+import { UnlockDialog } from '../../src/kit'
+import { WhisperText } from '../../src/parts'
+import * as TH from '../test-helpers'
+
+/** The bank's stage as a line of text, the joke service's key as a `WhisperText`, and the unlock dialog. */
+function KeyScreen({ world, onError }: Readonly<{ world: TH.ProviderWorld, onError?: ((err: unknown) => void) | undefined }>) {
+  const stage = world.Bank.useBank((snap) => snap.stage)
+  return (
+    <>
+      <p>{stage}</p>
+      <WhisperText bank={world.Bank} labelpath={TH.JokesPath} field="apiKey" onError={onError} />
+      <UnlockDialog bank={world.Bank} />
+    </>
+  )
+}
+
+/** A world with the joke service's key stored, rendered under its provider, once it shows the bank locked. */
+async function renderKey(onError?: (err: unknown) => void) {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  const { container } = render(TH.providerTreeOf(world, <KeyScreen world={world} onError={onError} />, { userid: TH.ProviderUser }))
+  await screen.findByText('locked')
+  return { world, container }
+}
+
+/** True while the page shows the joke service's key. */
+function isKeyShown(): boolean {
+  return document.body.textContent.includes(TH.JokesKey)
+}
+
+/** Press Show, then unlock the dialog it opens with the stored passphrase, once the key shows. */
+async function showAndUnlock(): Promise<void> {
+  fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+  await screen.findByRole('dialog')
+  fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: TH.TestPassphrase } })
+  fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+  await waitFor(() => { expect(isKeyShown()).to.eq(true) })
+}
+
+describe("WhisperText", () => {
+  it("shows the field masked until Show, then asks for the unlock and writes it into the page, holding it nowhere", async () => {
+    const { world, container } = await renderKey()
+    expect(screen.getByText('••••••••')).to.exist
+    expect(isKeyShown()).to.eq(false)
+    await showAndUnlock()
+    expect(screen.getByRole('button', { name: 'Hide' }).getAttribute('aria-pressed')).to.eq('true')
+    TH.expectTextUnheld(TH.JokesKey, container, world.client)
+  })
+
+  it("takes the text out of the page on Hide", async () => {
+    await renderKey()
+    await showAndUnlock()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide' }))
+    expect(isKeyShown()).to.eq(false)
+    expect(screen.getByText('••••••••')).to.exist
+  })
+
+  it("takes the text out of the page when the bank locks", async () => {
+    const { world } = await renderKey()
+    await showAndUnlock()
+    world.Bank.lock()
+    await screen.findByText('locked')
+    expect(isKeyShown()).to.eq(false)
+    expect(screen.getByRole('button', { name: 'Show' })).to.exist
+  })
+
+  it("shows the text at once on an unlocked bank", async () => {
+    const { world } = await renderKey()
+    const asked = world.Bank.withWhisper(TH.JokesPath, () => null)
+    await screen.findByRole('dialog')
+    fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: TH.TestPassphrase } })
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    await asked
+    await screen.findByText('unlocked')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    await waitFor(() => { expect(isKeyShown()).to.eq(true) })
+    expect(screen.queryByRole('dialog')).to.be.null
+  })
+
+  it("stays masked and reports the refusal when the unlock is dismissed", async () => {
+    const onError = vi.fn<(err: unknown) => void>()
+    await renderKey(onError)
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Show' }).disabled).to.eq(true)
+    await screen.findByRole('dialog')
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(onError).toHaveBeenCalledOnce() })
+    expect(isVaultError(onError.mock.calls[0]?.[0], 'dismissed')).to.eq(true)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Show' }).disabled).to.eq(false)
+    expect(isKeyShown()).to.eq(false)
+  })
+})

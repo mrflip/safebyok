@@ -2,7 +2,7 @@
 
 import { type BankSnapshot, type DeviceSnapshot, type Gating, type PassphraseVerdict, PendingBank, Shell } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
-import { boxRecordQueryKey } from '../../src/giver/react-giver'
+import { boxRecordQueryKey } from '../../src/giver/giver-defaults'
 import type { GiverBank, GiverDevice, GiverEvent } from '../../src/giver/shapes-giver'
 
 /** A box record as the fake vaultDB stores it: a Thing's scope and revision, enough for the giver to tell revisions apart. */

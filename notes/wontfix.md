@@ -197,3 +197,21 @@ box anew; let the get answer.
 Reasoning for wontfix: it is a crossing of a get and a list or notice, which the host does not sequence and which no
 retry, lock or abort may settle in a primitive's critical path; what each answer says is a revision the vaultDB did store,
 and the cache marks itself behind before any later call reads it. Ruled by the orchestrator, 2026-11-20, soon_item.
+
+### A bank born on a device while its `hello` still fetches
+
+* current outcome: the birth makes the born bank, unlocked, the device's bank. If `hello`'s gets then answer with the
+  bank the birth stored, `hello` makes a second Bank of it, locked, and the device shows that one instead: the user
+  unlocks again. If they answer with no bank, the device keeps the born bank. Nothing stored changes either way.
+* alternatives:
+  - have `hello` give way to a bank held once its gets answer: a branch on a common path, for a birth the startup
+    offers only once `hello` has shown `'unborn'`.
+  - have birth wait on `hello`: couples birth to bring-up, a sequencing the host already does.
+* workaround: unlock again, or reload the page.
+
+Steps to reproduce: make a device over an empty vaultDB; call `hello()`, and birth a bank on the device before it
+resolves, with the vaultDB's gets slowed until the birth has stored.
+
+Reasoning for wontfix: a host that births before the device shows `'unborn'` has skipped the startup's order, and the
+outcome asks only for a second unlock. Mending it puts a guard on bring-up's path for a crossing (CLAUDE.md, *Hours
+separate updates*). Written by the react_life thread 2 worker, 2026-11-21, awaiting a ruling.
