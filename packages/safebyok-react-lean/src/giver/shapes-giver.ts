@@ -22,9 +22,9 @@ export type GiverMount = Readonly<{
 /** The bank snapshot a giver's hooks show while nobody is signed in. */
 export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
 
-/** The fields the giver reads of a minder's event about a box's item or its soon. A minder's `ThingEvent` or `SoonEvent` of a box has them all. */
+/** The fields the giver reads of a minder's event about the item or soon of a box or the main gate. A minder's `ThingEvent` or `SoonEvent` of either has them all. */
 export type GiverEvent = Readonly<{
-  /** Whether the event is of the box's item or of its soon. */
+  /** Whether the event is of the Thing's item or of its soon. */
   eventkind: 'item' | 'soon'
   type:      'added' | 'updated' | 'removed'
   /** What changed the item or soon, or undefined where it was added or removed: `'invalidate'` when the item fell behind a newer revision heard of. */
