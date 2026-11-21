@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 3 filed, out of draft (#797, #798, #799). Thread 5 ready, in review (#800). Threads 4 and 6 building, 4 stacked on #799 and 6 on #800.
+* **Status:** running. Threads 1, 2, 3 and 5 filed, out of draft (#797, #798, #799, #800). Threads 4 and 6 building, 4 stacked on #799 and 6 on #800.
 
 ## The goal
 
@@ -238,6 +238,7 @@ Serves thread 7: the parts and kit Knock-Knock needs. The Coach's text is quoted
 * **Levels:** `opus`, high effort; review `medium`. **Depends on:** 3. **Beside:** 4.
 * **Ready when:** tests drive each kit form, and no passphrase or whisper is found after a submit.
 * *Orchestrator:* ready, #800, no compaction. Parts and kit take the bank as a prop (`bank={Knock}`, `giver={SOK}`), against the dream's bare `<UnlockForm />`: an Open Matters row. `CreateVaultForm` gained a confirmation field and a hidden `username` field, ported from the old kit. Kit words are English constants (my call: leave until a host asks).
+* *Review:* fixed (medium). A revealed `WhisperInput` now re-masks at each submit, as `PassphraseInput` does, with a test. Rule 2 traced path by path: no secret in the tree, props, state or caches. Left: `formActionOf` treats every rejection as a refusal; four live regions in `CreateVaultForm`; `textOf` → `takeText` (handed to thread 6); long doc blocks, no `@example` twins, a few missing cases (Cleanup). Out of bounds, noted: an unmount inside `withWhisper`'s callback.
 
 ### 6. `kit_ways_in`: the other gating verbs
 
