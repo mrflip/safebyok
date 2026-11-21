@@ -177,7 +177,7 @@ export class Vault {
 
   // == [Helpers]: #sealedAsk, #scopeAt, #soonestAt
 
-  /** The ask writing the box `donorProps`'s next revision over it, sealed by the bank ({@link Bank.sealBox}): a put, or a del for a tombstone. */
+  /** The put ask of `donorProps`'s next revision, or the del ask of its tombstone. */
   async #sealedAsk(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxWriteAsk> {
     const record = await this.#bank.sealBox(donorProps, publicProps, secretProps)
     const cited  = Thing.sparseOf(donorProps)
