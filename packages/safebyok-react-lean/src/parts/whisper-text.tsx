@@ -3,6 +3,7 @@
 import { type ReactNode, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import type { BankGiver } from '../giver/react-giver'
+import { whisperTextOf } from '../giver/use-draft'
 import { PartsPhrases } from './phrases-parts'
 
 // == [The text]: WhisperTextProps, WhisperText
@@ -38,7 +39,7 @@ export function WhisperText({ bank, labelpath, field, masked = PartsPhrases.mask
     try {
       await bank.withWhisper(labelpath, (whisper) => {
         flushSync(() => { setReveal('shown') })
-        if (textRef.current !== null) { textRef.current.textContent = textOf(whisper[field]) }
+        if (textRef.current !== null) { textRef.current.textContent = whisperTextOf(whisper[field]) }
       })
     } catch (err) {
       setReveal('hidden')
@@ -60,11 +61,5 @@ export function WhisperText({ bank, labelpath, field, masked = PartsPhrases.mask
       </button>
     </span>
   )
-}
-
-/** The text of a whisper's field `val`: a string as it is, nothing for none, and anything else as JSON. */
-function textOf(val: unknown): string {
-  if (typeof val === 'string') { return val }
-  return (val === undefined) ? '' : JSON.stringify(val)
 }
 // --

@@ -1165,6 +1165,9 @@ importers:
 
   packages/safebyok-react-lean:
     dependencies:
+      es-toolkit:
+        specifier: ^1.53.2
+        version: 1.53.2
       safebyok:
         specifier: workspace:*
         version: link:../safebyok
