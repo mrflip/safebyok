@@ -40,6 +40,9 @@ what differs from big, in a sentence or two.
   whatever its outcome. G2 is tightened: the caveat that leaves the zeroing to the host no longer applies.
   amended 2026-11-21 (gating_instance): the host's answers are zeroed when the gating is made, the cleartexts refused or
   not, and the gating's own copies when its single attempt ends, whatever its outcome, or at `gating.vacate()`.
+  amended 2026-11-21 (birth_verb): a refusal made before any gating exists zeroes nothing, and leaves the answer to the
+  host: `Bank.birth` handed no `Device`, and `Bank.birth` or `device.birthGating` (`packages/safebyok/src/models/device.ts`)
+  before the device's `hello` answers. The giver's makers already refused so before reaching a bank.
 
 * 2026-11-19 (bank_gatings), the leaseKey's access chain: **A device's sweep evicts no lease.** In big, the device's
   sweep reaches `bank.lock()`, which evicts the lease. The new core's `Device` holds no handle to its banks, so
