@@ -38,6 +38,17 @@ function heardOver(vaultDB: ScriptedVaultDB): ThingRecord[] {
 /** A value that throws on any look at it: what a broken backend might throw, or a broken host might ask. */
 const Booby = new Proxy({}, { get() { throw new Error('boom') }, getPrototypeOf() { throw new Error('boom') }, has() { throw new Error('boom') } })
 
+/** A watch whose handler throws on its first notice, after two notices were received; what the handler heard and what onBadNews was told. */
+function watchWithThrowingHandler() {
+  const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
+  const heard: ThingNotice[] = []
+  const badNews: Errors.VaultError[] = []
+  vaultDB.watch(TH.ThingBank, (notice) => { heard.push(notice); if (heard.length === 1) { throw new Error('host bug') } }, (news) => { badNews.push(news) })
+  vaultDB.receive?.({ record: TH.boxThingOf(), world: null })
+  vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
+  return { heard, badNews }
+}
+
 describe("AdapterVaultDB, a step that throws", () => {
   it("answers storage_unavailable for a backend's own error, with the verb and the loggable ask", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw new Error('connection reset') })
@@ -48,7 +59,7 @@ describe("AdapterVaultDB, a step that throws", () => {
     expect(answer.ask).to.deep.include(TH.GateScope)
   })
 
-  it("answers a refusal as it is", async () => {
+  it("answers a refusal unchanged", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw new Errors.VaultError('identity_revoked', 'The backend no longer serves this user.') })
     await TH.expectBad(vaultDB.tryGetThing(TH.getGateAskOf()), 'identity_revoked')
   })
@@ -133,14 +144,13 @@ describe("AdapterVaultDB.watch(scope, onNotice, onBadNews)", () => {
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['storage_issue'])
   })
 
-  it("tells onBadNews of a notice handler that throws, as an unexpected error, and hears on", () => {
-    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotvoid', world: null, record: null }))
-    const heard: ThingNotice[] = []
-    const badNews: Errors.VaultError[] = []
-    vaultDB.watch(TH.ThingBank, (notice) => { heard.push(notice); if (heard.length === 1) { throw new Error('host bug') } }, (news) => { badNews.push(news) })
-    vaultDB.receive?.({ record: TH.boxThingOf(), world: null })
-    vaultDB.receive?.({ record: TH.gateThingOf(), world: null })
+  it("tells onBadNews of a notice handler that throws", () => {
+    const { badNews } = watchWithThrowingHandler()
     expect(badNews.map((news) => news.refusalkind)).to.deep.equal(['unexpected_error'])
+  })
+
+  it("keeps telling the handler of later notices after it throws", () => {
+    const { heard } = watchWithThrowingHandler()
     expect(heard.map(({ val }) => val.labelpath)).to.deep.equal(['box/openai', 'gate'])
   })
 

@@ -83,7 +83,7 @@ function paddedSeqOf(seqnum: number): string {
 // --
 
 // == [Device]: DeviceTok, EpochMillis
-/** A UUID the host keeps for a device (`device_tok`). */
+/** A device's UUID, from the host (`device_tok`). */
 export type DeviceTok = string
 /** An instant: whole UTC epoch milliseconds, as `Date.now()` gives. */
 export type EpochMillis = CX.EpochMillis

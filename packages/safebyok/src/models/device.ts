@@ -16,7 +16,7 @@ import * as Throwers from '../refusals/throwers'
 /** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
-/** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and the bank it holds.
+/** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and its bank.
  * Make it with `Device.make(record, opts)`. A `sweep()` ends every bank made on it, and the device stays usable for the next.
  */
 export class Device {
@@ -42,7 +42,7 @@ export class Device {
   #thisIsTemporaryBank: Bank | null = null
   /** Every bank made on this device and not yet swept. */
   readonly #madeBanks = new Set<Bank>()
-  /** Ends this device's subscription to the bank it holds. */
+  /** Ends this device's subscription to its bank. */
   #unsubscribeBank: () => void = () => undefined
   // Nothing ends a device yet: its sweep ends only its banks.
   /** Why the device ended, or null while it is enabled. */
@@ -107,7 +107,7 @@ export class Device {
 
   // == [Strength]: judgeStrength
 
-  /** The strength checker's verdict on a new passphrase: show it as the user types, and hold the submit until it is strong.
+  /** The strength checker's verdict on a new passphrase: show it as the user types, and disable the submit until it is strong.
    * `Bank.birth` and `bank.replacePassphrase` ask the same checker, and refuse `weak_passphrase` where it is not.
    */
   judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
@@ -121,9 +121,9 @@ export class Device {
     return this
   }
 
-  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one held.
-  /** Hold `bank` as the bank this device's snapshot shows, and as one its lock and sweep reach. Internal.
-   * The bank held before stays as it was.
+  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one its snapshot shows.
+  /** Make `bank` the bank this device's snapshot shows, and one its lock and sweep reach. Internal.
+   * The bank shown before is unchanged.
    */
   cheatHoldBank(bank: Bank): void {
     this.#madeBanks.add(bank)
@@ -182,7 +182,7 @@ export class Device {
 
   /** Tell the host's `onBadNews` of failures no caller is waiting on. Never throws.
    * Anything but a refusal is told as `unexpected_error`, and a `disabled` refusal is dropped. Once the device ends, the
-   * default handler hears instead of the host's.
+   * default handler is called instead of the host's.
    */
   tellBadNews(badnews: readonly unknown[]): void {
     const refusals = badnews.map((news) => (Errors.isVaultError(news) ? news : Throwers.unexpectedError(news)))
@@ -223,7 +223,7 @@ export const DefaultOnBadNews: BadNewsHandler = ({ news, device }) => {
 export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews: readonly Errors.VaultError[]): void {
   Checks.tellBadNewsToArgs.parse({ onBadNews, device, badnews })
   for (const news of badnews) {
-    // Any answer is heard out, a thenable among them: none is awaited.
+    // Whatever the handler returns is ignored, a thenable among them: none is awaited.
     void (async () => {
       try {
         await onBadNews({ news, device })
@@ -237,7 +237,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 
 // == [Helpers]: millisOf, checkSecureContext
 
-// A host's Infinity minutes, for never, is kept as ForeverMillis: past the entrypoint, nothing is infinite.
+// A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
 function millisOf(minutes: number | undefined, fallback: number): number { return (minutes === undefined ? fallback : Math.min(Math.round(minutes * Consts.MinuteMillis), Consts.ForeverMillis)) }
 
@@ -260,7 +260,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       logger:          custom<Logger.VaultLogger>().optional(),
       autolockMinutes: VX.positiveMinutes.optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
-      // Ignored: the new core keeps no device database. Taken so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
+      // Ignored: the new core has no device database. Accepted so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
   }),

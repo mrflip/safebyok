@@ -47,7 +47,7 @@ export interface BankOpts {
   device:  Device
   /** Where the bank's boxes are stored. */
   vaultDB: VaultDB
-  /** The defaults this bank's minders set on their TanStack Query cache entries. A missing field defaults from {@link DefaultQueryCacheOpts}. */
+  /** The defaults this bank's minders set on their items and lists in TanStack Query's cache. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
@@ -74,7 +74,7 @@ export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, b
 /** A device's record: the bank scope it serves, and its token there. */
 export type DeviceRecord = Z.infer<typeof BankishChecks.deviceRecord>
 
-/** What `onBadNews` hears: a refusal no caller waits on, and the device it reached. */
+/** The argument of `onBadNews`: a refusal no caller waits on, and the device it reached. */
 export interface BadNews {
   readonly news:   Errors.VaultError
   readonly device: Device
@@ -104,14 +104,14 @@ export interface DeviceOpts {
 
 // == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, DeviceSnapshot
 
-/** The stages of a bank, as {@link BankStage} describes each. */
+/** The stages of a bank, each described at {@link BankStage}. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
 /** Where the user stands with their bank, for a host's screen to switch on:
  * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
  * - `'starting'`   -- signed in, and the bank is being brought up
  * - `'unborn'`     -- no bank is stored for this user, or it was deleted
  * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
- * - `'unlocked'`   -- the bank holds a lease, and whispers can be read and written
+ * - `'unlocked'`   -- the bank has a lease, and whispers can be read and written
  * - `'swept'`      -- everything was unloaded, and nothing follows until the host acts
  * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
  */
@@ -144,14 +144,14 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device shows before it holds a bank object. */
+/** The bank snapshot a device shows before it has a bank object. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
 /** A device's state, for a host to render. */
 export interface DeviceSnapshot {
-  /** The snapshot of the bank this device holds, or {@link PendingBank} while it holds none. */
+  /** The snapshot of this device's bank, or {@link PendingBank} while it has none. */
   readonly bank: BankSnapshot
 }
 // --

@@ -14,7 +14,7 @@ const Passphrase = LeanTH.TestPassphrase
 /** A passphrase one letter off Hue's. */
 const WrongPassphrase = 'correct horse battery stable'
 
-/** Hue's app over `world`, as a host would write it beside its Device: the joke form, the unlock dialog, and every line the joke service heard with its key. */
+/** Hue's app over `world`, as a host would write it beside its Device: the joke form, the unlock dialog, and every line sent to the joke service with its key. */
 function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   const { vault } = world
   const Giver = makeReactGiver(world.giverDevice)
@@ -47,7 +47,7 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   function UnlockForm() {
     const unlock = Acme.useUnlock()
     return (
-      <form action={(form) => { unlock.mutate(cloak({ passphraseClear: takeText(form, 'passphrase') })) }}>
+      <form action={(form) => { unlock.mutate(cloak({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
         <input name="passphrase" type="password" autoComplete="current-password" aria-label="Passphrase" />
         <button disabled={unlock.isPending}>Unlock</button>
         <button type="button" onClick={() => { void Acme.dismissUnlock() }}>Cancel</button>
@@ -81,14 +81,14 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
   return { App, heard }
 }
 
-/** What the unlock form says of `err`, its last refusal: a condition the user can mend at the field, anything else as a banner. */
+/** The unlock form's alert for `err`, its last refusal: a condition the user can mend at the field, anything else as a banner. */
 function unlockAlertOf(err: unknown): string {
   if (! isVaultError(err) || (err.family !== 'condition')) { return 'Something went wrong. Please try again later.' }
   return (err.refusalkind === 'wrong_passphrase') ? 'That is not the passphrase.' : err.message
 }
 
-// React keeps the FormData a form action is handed after the action ends: as the form's pending status, and in the
-// action's queued update. A field taken out before the first await is never in either.
+// React retains the FormData a form action is handed after the action ends: as the form's pending status, and in the
+// action's queued update. A field removed before the first await is never in either.
 /** Take the text of `form`'s field `fieldname` out of it, or '' for none. */
 function takeText(form: FormData, fieldname: string): string {
   const val = form.get(fieldname)
@@ -104,14 +104,14 @@ async function renderKnockKnock() {
   onTestFinished(() => { client.clear() })
   const { container } = render(<QueryClientProvider client={client}><app.App /></QueryClientProvider>)
   const derivedBefore = world.deriver.heard
-  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React holds of the tree, and in no entry of the host's React Query. */
+  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React has of the tree, and in no item or mutation of the host's React Query. */
   function expectUnheld(passphrase: string): void {
     expect(world.snapshots.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
     expect(TH.holdsText(TH.reactTreeOf(container), passphrase)).to.eq(false)
     const entries = [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()]
     expect(TH.holdsText(entries.map((entry) => entry.state), passphrase)).to.eq(false)
   }
-  /** How many passphrases the key deriver has heard since the app was rendered. */
+  /** How many passphrases the key deriver has been given since the app was rendered. */
   function derivations(): number { return world.deriver.heard - derivedBefore }
   return { world, heard: app.heard, derivations, expectUnheld }
 }
@@ -205,7 +205,7 @@ describe("the knock-knock app", () => {
     expectUnheld(Passphrase)
   })
 
-  it("refuses the joke as dismissed when Hue cancels the dialog, and leaves the vault locked", async () => {
+  it("refuses the joke without unlocking when Hue cancels the dialog", async () => {
     const { heard, derivations } = await renderKnockKnock()
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })

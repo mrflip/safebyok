@@ -7,12 +7,12 @@ import { ThingFormat } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { listenerOf, minderWorldOf, storedBoxOf } from './world'
 
-/** What a listener is told when the listing of the Thing at `labelpath` is invalidated, as {@link toldOf} reads it. */
+/** The event a listener is told when the listing of the Thing at `labelpath` is invalidated, in {@link toldOf}'s form. */
 function invalidationOf(labelpath: Labelpath) {
   return { isThing: false, modelkind: (labelpath === 'gate') ? 'gate' : 'box', labelpath, action: 'invalidate', isInvalidated: true }
 }
 
-/** Whether each event `heard` was told is a car's, and its scope, action and staleness. */
+/** For each event `heard` was told: whether it is a car's, and its scope, action and staleness. */
 function toldOf(heard: ReturnType<typeof listenerOf>) {
   return heard.mock.calls.map(([event]: [MinderEvent]) => {
     const { modelkind, labelpath, action, state } = event
@@ -20,7 +20,7 @@ function toldOf(heard: ReturnType<typeof listenerOf>) {
   })
 }
 
-/** A minder that has listed the root box, the box under it, and the main gate, over a store holding the box. */
+/** A minder that has listed the root box, the box under it, and the main gate, over a store with the box. */
 async function listedWorldOf() {
   const vaultDB = new MemoryVaultDB()
   await storedBoxOf(vaultDB)
@@ -45,7 +45,7 @@ describe("ThingMinder.invalidate", () => {
     for (const ask of asked) { expect(ask.mock.calls).to.have.lengthOf(0) }
   })
 
-  it("tells of the listings under a labelpath alone, and of the listing of a Thing with none under it", async () => {
+  it("tells of the listing of a Thing with none under it, and of no listing above it", async () => {
     const { minder, heard } = await listedWorldOf()
     minder.listen(heard, ThingFormat)
     minder.invalidate('box/openai', { list: 'all' })
@@ -67,7 +67,7 @@ describe("ThingMinder.invalidate", () => {
     expect(heard.mock.calls).to.have.lengthOf(0)
   })
 
-  it("leaves every car and what each listing lists as it was", async () => {
+  it("leaves every car and what each listing lists unchanged", async () => {
     const { minder, heard } = await listedWorldOf()
     const car     = await minder.get(TH.GateScope)
     const listing = minder.listingAt(TH.RootScope)

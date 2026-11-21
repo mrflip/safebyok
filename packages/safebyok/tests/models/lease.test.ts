@@ -17,7 +17,7 @@ const Stamped = { ...TH.WorldBankStamp, fmt: LeaseFormat, gate_labelpath: 'gate'
 
 const Cleartexts = Object.freeze({ whisper: TH.Whisper })
 
-/** What a box's first seal takes in the clear: its sidecar. */
+/** The public props of a box's first seal: its sidecar. */
 const PublicProps = Object.freeze({ sidecar: TH.Sidecar })
 
 const SealerMembernames = [
@@ -41,7 +41,7 @@ const BoxSealerBag = Object.freeze({
   recordOf:         BaseBox.recordOf.bind(BaseBox),
 })
 
-/** A passphrase proving of {@link TH.WorldGateStamp} with a wayin under a new bankKey: each lease it builds holds that bankKey. */
+/** A passphrase proving of {@link TH.WorldGateStamp} with a wayin under a new bankKey: each lease it builds has that bankKey. */
 async function provingWithWayin(): Promise<PassphraseProving> {
   const proving = await PassphraseProving.buildNovel(TH.provingDeviceOf(), TH.WorldBankStamp, TH.WorldGateStamp, TH.TestPassphrase)
   await proving.buildWayin(NOVEL)
@@ -146,7 +146,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(Object.isFrozen(opened)).to.be.true
   })
 
-  it("answers a copy of the record as the sealer checks it: a field beside the record refuses", async () => {
+  it("answers a checked copy of the record: a field beside the record refuses", async () => {
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const { whisper_sealed: _sealed, ...unsealed } = sealed
@@ -192,7 +192,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(encode).not.toHaveBeenCalled()
   })
 
-  it("writes the box at the written_at given, and signs it: a box whose written_at moved will not unseal", async () => {
+  it("writes the box at the written_at given, and seals it: a box whose written_at moved will not unseal", async () => {
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), { ...PublicProps, written_at: TH.T0 - 5 }, Cleartexts)
     expect(sealed).to.include({ written_at: TH.T0 - 5, born_at: TH.T0 - 5 })
@@ -207,7 +207,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     await TH.expectRefusal(lease.seal(BaseBox, TH.boxShellOf(), { am: 'x' }), 'bad_record')
   })
 
-  it("writes a tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {
+  it("writes a tombstone at the written_at given, and seals it: a tombstone whose written_at moved will not unseal", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const tombstone = await lease.seal(BaseBox, live, { am: 'x', written_at: TH.T0 + 7 })
@@ -216,13 +216,13 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     await TH.expectRefusal(lease.unseal(BaseBox, { ...tombstone, written_at: TH.T0 + 8 }), 'damaged_whisper')
   })
 
-  it("refuses a tombstone given a sidecar other than `{}`, as BaseBox makes it", async () => {
+  it("refuses a BaseBox tombstone given a sidecar other than `{}`", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await TH.expectRefusal(lease.seal(BaseBox, live, { am: 'x', sidecar: TH.Sidecar }), 'bad_record')
   })
 
-  it("writes a tombstone given the sidecar `{}`, a tombstone's own, as BaseBox makes it", async () => {
+  it("writes a BaseBox tombstone given the sidecar `{}`, a tombstone's own", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const tombstone = await lease.seal(BaseBox, live, { am: 'x', sidecar: {} })
@@ -283,7 +283,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(TH.isZeroed(openedBytes)).to.be.true
   })
 
-  it("takes any value with a sealer's members, as it takes the class", async () => {
+  it("accepts any value with a sealer's members, as well as the class", async () => {
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(BoxSealerBag, TH.boxShellOf(), PublicProps, Cleartexts)
     expect(await lease.unseal(BoxSealerBag, sealed)).to.deep.include(Cleartexts)
@@ -320,7 +320,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
 })
 
 describe("withoutSecrets(bag)", () => {
-  it("drops the whisper and every field ending _sealed, keeping the rest", () => {
+  it("drops the whisper and every field ending _sealed, leaving the rest", () => {
     const bag = { label: 'k', whisper: TH.Whisper, whisper_sealed: 'sealed', notes_sealed: 'sealed notes', notes: 'kept', sealed_at: 1 }
     expect(withoutSecrets(bag)).to.deep.equal({ label: 'k', notes: 'kept', sealed_at: 1 })
   })

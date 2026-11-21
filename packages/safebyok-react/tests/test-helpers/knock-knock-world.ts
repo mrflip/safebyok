@@ -1,4 +1,4 @@
-/** The knock-knock app's world: the real core's Device, its bank born over a memory vaultDB and locked, the vault holding the joke service's key, and the giver's view of that Device. */
+/** The knock-knock app's world: the real core's Device, its bank born over a memory vaultDB and locked, the vault with the joke service's key, and the giver's view of that Device. */
 
 import { onTestFinished } from 'vitest'
 import type { Bank, BoxCar, Device, DeviceSnapshot, KeyDeriver, Vault } from 'safebyok'
@@ -8,7 +8,7 @@ import type { GiverBank, GiverDevice } from '../../src/giver/shapes-giver'
 
 // == [The key deriver]: HeldDeriver, makeHeldDeriver
 
-/** A key deriver over the core's one-SHA-256 test deriver that counts what it hears, and that a test can hold mid-derivation. */
+/** A key deriver over the core's one-SHA-256 test deriver that counts the passphrases it is given, and that a test can hold mid-derivation. */
 export interface HeldDeriver extends KeyDeriver {
   /** How many passphrases it has derived from. */
   readonly heard: number
@@ -40,7 +40,7 @@ export function makeHeldDeriver(): HeldDeriver {
 
 // == [The world]: JokesPath, JokesKey, KnockKnockWorld, buildKnockKnockWorld, _cheat_giverDeviceOf, stopNothing
 
-/** The labelpath of the box holding the joke service's key. */
+/** The labelpath of the box with the joke service's key. */
 export const JokesPath = 'box/jokes'
 
 /** The joke service's key, an obvious fake: the whisper of the box at {@link JokesPath}. */
@@ -90,6 +90,6 @@ export function _cheat_giverDeviceOf(device: Device, vault: Vault): GiverDevice<
   })
 }
 
-/** What a subscription that hears nothing returns: a stop with nothing to stop. */
+/** Stop a subscription that hears nothing: there is nothing to stop. */
 function stopNothing(): void { /* nothing to stop */ }
 // --

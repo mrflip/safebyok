@@ -15,7 +15,7 @@ describe("ThingMinder.get", () => {
     await TH.expectRefusal(minder.get({ ...TH.GateScope, banklabel: 'zz' }), 'bad_record')
   })
 
-  it("takes a staleTime given as undefined as the minder's own", async () => {
+  it("treats a staleTime given as undefined as the minder's own", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
@@ -75,7 +75,7 @@ describe("ThingMinder.get", () => {
     expect(asked.mock.calls).to.have.lengthOf(2)
   })
 
-  it("caches nothing of the world beside the record, and a main gate the ask tracks stale comes to the minder as its own notice", async () => {
+  it("caches a main gate the ask tracks stale only once its own notice arrives, never from the get of the bank", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate1   = await storedGateOf(vaultDB, 1)
     const { minder } = minderWorldOf(vaultDB)
@@ -118,7 +118,7 @@ describe("ThingMinder.get", () => {
     [(vaultDB: MemoryVaultDB) => { vaultDB._cheat_things(TH.ThingBank).delete(TH.BoxScope.labelpath) },                            'nothing stored'],
   ] as const
   for (const [goBack, blurb] of BackwardCases) {
-    it(`refuses 'stale_read' a get answered with ${blurb}, behind the record cached before it, and keeps that record untimely`, async () => {
+    it(`refuses 'stale_read' a get answered with ${blurb}, behind the record cached before it, and leaves that record untimely`, async () => {
       const vaultDB = new MemoryVaultDB()
       const box0    = await storedBoxOf(vaultDB)
       const box1    = TH.nextOf(box0)
@@ -278,7 +278,7 @@ describe("ThingMinder.list", () => {
     expect(await minder.get(TH.BoxScope)).to.deep.equal(carOf(box))
   })
 
-  it("leaves a box the cache holds whole as it is, and timely", async () => {
+  it("leaves a whole box in the cache unchanged, and timely", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)

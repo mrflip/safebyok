@@ -22,7 +22,7 @@ import * as Throwers from '../refusals/throwers'
  */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 
-/** A watch the adapter keeps: its bank, and the function that tells it of one raw Thing. */
+/** One of the adapter's watches: its bank, and the function that tells it of one raw Thing. */
 type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void }
 
 /** The answer a verb gives for its store's report: `record` becomes `val` when good, `dbhas` when refused.
@@ -46,7 +46,7 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
 function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked } { return (tracked === undefined) ? {} : { tracked } }
 // --
 
-/** The base class of a vaultDB that keeps its Things in a datastore. A subclass writes the `do*` calls, each one atomic step.
+/** The base class of a vaultDB whose Things are in a datastore. A subclass writes the `do*` calls, each one atomic step.
  * The class checks each ask and classifies what a `do*` call fetches, per the act tables in `notes/answer-contract.md`.
  * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, and of a refused answer's `dbhas` where it is a Thing.
  */
@@ -58,7 +58,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
   // A subclass's `do*` calls these. A store that reaches some of the verdict itself overrides them to read it. Each
-  // takes the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
+  // is given the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
   protected classifyGetThing(ask: GetAsk, raw: unknown, world: WorldFetched): Actual<EX.GotAct> { return Classifier.classifyGetThing(ask, raw, world) }
@@ -197,7 +197,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Failures]: answerForThrown
 
   // All the error treatment of the verbs is here, and it has its own try/catch, so a verb never throws.
-  /** The refused answer for a verb that threw. A refusal is kept, and anything else becomes `storage_unavailable`.
+  /** The refused answer for a verb that threw. A refusal passes through unchanged, and anything else becomes `storage_unavailable`.
    * Its act is the one in the refusal's meta, else `unclassified_storing`.
    * Override it to tell one of your datastore's errors from another.
    */
@@ -222,7 +222,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // also compares it with the bank and main gate the world is read from, and with the root box read beside them, and reports
   // that as the answer's `tracked` (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
   //
-  // A write checks only its preconditions of the Thing stored: the revision cited, the born_at a live Thing keeps, and the
+  // A write checks only its preconditions of the Thing stored: the revision cited, the born_at a live Thing leaves unchanged, and the
   // storage policies it names (`classifyWriteThing` reads no more). Where several refusals apply at once, any one of them
   // may be the answer: all else equal the likelier is preferred, and `damaged_row` is the least likely, but no code is
   // written to rank them. The record carries every field, so a store may write it by replacing the Thing stored whole.

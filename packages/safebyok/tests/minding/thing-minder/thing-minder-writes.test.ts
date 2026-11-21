@@ -26,7 +26,7 @@ describe("ThingMinder.tryWrite", () => {
     expect([minder.at(TH.BankScope), minder.at(TH.GateScope), minder.at(TH.RootScope)]).to.deep.equal([undefined, undefined, undefined])
   })
 
-  it("hears of a tracked main gate the answer reports stored from the vaultDB's watch alone", async () => {
+  it("receives a tracked main gate the answer reports stored from the vaultDB's watch alone", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
     await minder.tryWrite({ ...boxBirthAskOf(), track: TH.GateStaleTrack })
@@ -34,7 +34,7 @@ describe("ThingMinder.tryWrite", () => {
     expect(minder.at(TH.GateScope)).to.deep.equal(carOf(TH.gateThingOf()))
   })
 
-  it("holds the record a stale_write reports stored once it answers, as the watch told a listener first", async () => {
+  it("has cached the record a stale_write reports stored before the write answers", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)

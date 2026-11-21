@@ -31,8 +31,8 @@ describe("the front door, safebyok", () => {
     expect(Front.HostErrorSanitizer.refusalFor).to.eq(HostErrorSanitizer.refusalFor)
   })
 
-  // `Proving.buildLease` is public, so a host holding a proving could build a lease outside any gating, and a host making a
-  // gating could open one the bank's prompts did not. Keeping both classes off every entry holds that line.
+  // `Proving.buildLease` is public, so a host with a proving could build a lease outside any gating, and a host making a
+  // gating could open one the bank's prompts did not. Leaving both classes off every entry point prevents that.
   it("exports no proving or gating class from any entry", () => {
     const entries = { Front, Core, Storage, Browser }
     for (const [entryname, entry] of Object.entries(entries)) {

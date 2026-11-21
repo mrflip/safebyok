@@ -13,7 +13,7 @@ import * as Phrases from '../../src/phrases'
 import * as TH from '../test-helpers'
 
 const { Life0 } = TH
-/** What a strict check says of a field it does not accept, which it never names. */
+/** The message of a strict check on a field it does not accept, which it never names. */
 const Unaccepted = 'There is a field it does not accept'
 
 describe("Lifeseq.ofLifenum(lifenum) and Lifeseq.lifenumOf(lifeseq)", () => {
@@ -304,7 +304,8 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     }
   })
 
-  it("accepts a box's birth citing its whole shell, as a bank gives it", () => {
+  // A bank cites a box's whole shell.
+  it("accepts a box's birth citing its whole shell", () => {
     const ask = TH.birthAskOf(box, TH.boxShellOf({ labelpath: box.labelpath, label: box.label }))
     expect(checkedWriteAsk(ask)).to.deep.equal(ask)
   })
@@ -384,7 +385,7 @@ describe("the ask builders", () => {
     expect(getAskOf({ ...TH.GateScope, ifAbsent: 'fail' })).to.deep.equal(TH.getGateAskOf('fail'))
   })
 
-  it("fill in a put's ifAbsent 'add' and ifPresent 'repl', keeping its policies, at its record's scope", () => {
+  it("fill in a put's ifAbsent 'add' and ifPresent 'repl', leaving its policies as given, at its record's scope", () => {
     const next = TH.nextGateOf(TH.gateThingOf())
     const ask  = putAskOf({ cited: TH.gateThingOf(), record: next, options: { policies: ['add_passkey'] } })
     expect(ask).to.deep.equal({ ...TH.GateScope, op: 'put', modelkind: 'gate', cited: TH.gateThingOf(), record: next, ifAbsent: 'add', ifPresent: 'repl', options: { policies: ['add_passkey'] } })
@@ -431,7 +432,7 @@ describe("BoxChecks.sealable", () => {
     expect(BoxChecks.sealable.parse(shell)).to.deep.equal(shell)
   })
 
-  it("keeps a sidecar on the shell, and strips a whisper in the clear", () => {
+  it("leaves a sidecar on the shell, and strips a whisper in the clear", () => {
     expect(BoxChecks.sealable.parse({ ...shell, sidecar: { account: 'work' }, whisper: { apiKey: 'sk-test' } })).to.deep.equal({ ...shell, sidecar: { account: 'work' } })
   })
 
@@ -453,14 +454,14 @@ describe("BoxChecks.sealable", () => {
 })
 
 describe("loggableAskOf(ask)", () => {
-  it("keeps the scope, the flags and what each record cites, and drops a gate's wayins", () => {
+  it("carries over the scope, the flags and what each record cites, and drops a gate's wayins", () => {
     const loggable = loggableAskOf(TH.birthAskOf())
     expect(loggable).to.deep.include({ op: 'put', modelkind: 'gate', ...TH.GateScope, ifAbsent: 'add', ifPresent: 'fail' })
     expect(loggable.record).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })
     expect(JSON.stringify(loggable)).to.not.include(TH.BW.mainWayin.salt_b64)
   })
 
-  it("keeps what a bank's birth cites of each root, and drops their bodies", () => {
+  it("carries over what a bank's birth cites of each root, and drops their bodies", () => {
     const loggable = loggableAskOf(TH.birthBankAskOf())
     expect(loggable).to.deep.include({ op: 'birth', ...TH.ThingBank })
     expect(loggable.root).to.deep.equal({ revtok: TH.revtokOf('0'), revseq: 0, am: 'a', lifepath: Life0 })

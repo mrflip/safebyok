@@ -157,7 +157,7 @@ describe("Thing.haveSameScope(ante, post)", () => {
 })
 
 describe("Thing.sparseOf(record)", () => {
-  it("keeps a Thing's fields and drops its body", () => {
+  it("carries over a Thing's fields and drops its body", () => {
     const { sidecar: _sidecar, whisper_sealed: _sealed, ...thingFields } = TH.boxThingOf()
     expect(Thing.sparseOf(TH.boxThingOf())).to.deep.equal(thingFields)
   })

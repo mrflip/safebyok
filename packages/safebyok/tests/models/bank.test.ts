@@ -38,7 +38,7 @@ describe("Bank.mintStamps(scope)", () => {
     expect([two.bankStamp.born_at, two.gateStamp.born_at]).to.deep.equal([TH.T0 + 5, TH.T0 + 5])
   })
 
-  it("takes the scope of anything that has one, such as a device", () => {
+  it("accepts the scope of anything that has one, such as a device", () => {
     const { bankStamp } = Bank.mintStamps(TH.makeDevice())
     expect(bankStamp).to.include(TH.ThingBank)
     expect(bankStamp).to.not.have.property('device_tok')
@@ -283,7 +283,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot()).to.equal(locked)
 
-    await TH.expectGood(bank.tryUnlock({ passphraseClear: TH.TestPassphrase }))
+    await TH.expectGood(bank.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
     expect(counter.calls).to.eq(2)
     expect(bank.getSnapshot()).to.deep.equal(unlocked)
 
@@ -301,7 +301,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(bank.getSnapshot()).to.equal(unlocked)
     bank.lock()
     bank.lock()
-    await TH.expectBad(bank.tryUnlock({ passphraseClear: 'not the passphrase' }), 'wrong_passphrase')
+    await TH.expectBad(bank.tryUnlock({ passphraseCleartext: 'not the passphrase' }), 'wrong_passphrase')
     expect(counter.calls).to.eq(1)
     bank.sweep()
     bank.sweep()
@@ -316,7 +316,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: bank.endCause })
   })
 
-  it("keeps its snapshot once swept, telling no subscriber of a lock or of its device's sweep", async () => {
+  it("leaves its snapshot unchanged once swept, telling no subscriber of a lock or of its device's sweep", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.sweep()
     const swept = bank.getSnapshot()
@@ -405,7 +405,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     expect(Object.isFrozen(unsealed)).to.be.true
   })
 
-  it("seals the next revision of a live box, keeping its life, from the stored box with a new sidecar", async () => {
+  it("seals the next revision of a live box, in the same life, from the stored box with a new sidecar", async () => {
     // sealBox @example
     const { bank } = await TH.buildBornBank()
     const { record: first } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
@@ -429,12 +429,13 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
-    await bank.unlock({ passphraseClear: TH.TestPassphrase })
+    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
     const { whisper } = await bank.unsealBox(box)
     expect(whisper).to.deep.equal(TH.Whisper)
   })
 
-  it("unseals with its sidecar altered, as the seal leaves the sidecar out", async () => {
+  // The seal leaves the sidecar out.
+  it("unseals with its sidecar altered", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const unsealed = await bank.unsealBox({ ...box, sidecar: { account: 'home' } })
@@ -614,7 +615,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     expect(BoxChecks.record.parse(tombstone)).to.deep.equal(tombstone)
   })
 
-  it("writes the tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {
+  it("writes the tombstone at the written_at given, and seals it: a tombstone whose written_at moved will not unseal", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: tombstone } = await bank.tombstoneBox(box, { written_at: TH.T0 + 21 })
@@ -669,8 +670,8 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     await TH.expectRefusal(bank.tombstoneBox(TH.boxShellOf()), 'bad_record')
   })
 
-  // A tombstone's signature is its sealed empty whisper, and the unseal is its check.
-  it("refuses 'damaged_whisper' for a tombstone made up without the bankKey, or signed by its live box's seal", async () => {
+  // A tombstone's seal is its sealed empty whisper, and the unseal is its check.
+  it("refuses 'damaged_whisper' for a tombstone made up without the bankKey, or sealed with its live box's seal", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const madeUp = { ...box, sidecar: {}, revtok: TH.revtokOf('madeup'), revseq: box.revseq + 1, am: 'x', lifeseq: Life1, lifepath: `${Life0}/${Life1}`, whisper_sealed: TH.FakeSealed } as const
@@ -678,7 +679,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     await TH.expectRefusal(bank.unsealBox({ ...madeUp, whisper_sealed: box.whisper_sealed }), 'damaged_whisper')
   })
 
-  it("refuses 'damaged_whisper' for a tombstone carrying another tombstone's signature", async () => {
+  it("refuses 'damaged_whisper' for a tombstone carrying another tombstone's seal", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: one } = await bank.tombstoneBox(box)
@@ -708,7 +709,7 @@ function nextBankThingOf(bank: Bank) {
 }
 
 describe("bank.track, and the asks the bank builds", () => {
-  it("track the revseq and lifepath this object holds of the bank, its main gate and its root box", async () => {
+  it("track the revseq and lifepath this object has of the bank, its main gate and its root box", async () => {
     const { bank } = await TH.buildBornBank()
     expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.maingate.pickle(), bank.rootBox as never))
   })
@@ -724,7 +725,7 @@ describe("bank.track, and the asks the bank builds", () => {
     expect(bank.makeDelAsk({ cited: box, record: TH.boxTombOf(box) })).to.deep.include({ ...scope, op: 'del', modelkind: 'box', ifAbsent: 'fail', track })
   })
 
-  it("track what this object holds, though the bank stored has moved on: the answer's tracked says so", async () => {
+  it("track what this object has, though the bank stored has moved on: the answer's tracked says so", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     await bank.put({ cited: bank.pickle(), record })
@@ -744,16 +745,22 @@ describe("bank.tellBadNews(badnews)", () => {
 })
 
 describe("bank.put(args)", () => {
-  it("writes the bank's next revision, answering it as stored, and leaves the bank in hand as it was", async () => {
+  it("writes the bank's next revision, answering the stored bank", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
     expect(await bank.put({ cited: bank.pickle(), record })).to.deep.equal(record)
-    expect(bank.revtok).to.not.eq(record.revtok)
     const got = await device.vaultDB.tryGetThing(getAskOf({ ...bank.scope, labelpath: 'bank' }))
     expect(got).to.deep.include({ ok: true, val: record })
   })
 
-  it("throws the vaultDB's refusal, as for a revision it does not cite", async () => {
+  it("leaves the bank it was called on unchanged", async () => {
+    const { bank } = await TH.buildBornBank()
+    const record = nextBankThingOf(bank)
+    await bank.put({ cited: bank.pickle(), record })
+    expect(bank.revtok).to.not.eq(record.revtok)
+  })
+
+  it("throws the vaultDB's refusal of a revision it does not cite", async () => {
     const { bank } = await TH.buildBornBank()
     await TH.expectRefusal(bank.put({ cited: { ...bank.pickle(), revtok: TH.revtokOf('stale') }, record: nextBankThingOf(bank) }))
     expect(await bank.put({ cited: bank.pickle(), record: nextBankThingOf(bank) })).to.include({ revseq: 1 })

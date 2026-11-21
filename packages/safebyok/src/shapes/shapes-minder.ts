@@ -28,7 +28,7 @@ export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ s
 /** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, is never retried, and its car stays cached until `goodbye`. */
 export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry: false, gcTime: Infinity } as const)
 
-// TanStack Query passes a finite staleTime to a timer as it is, and a timer longer than 2^31 - 1 milliseconds
+// TanStack Query passes a finite staleTime to a timer unchanged, and a timer longer than 2^31 - 1 milliseconds
 // fires at once, in every JavaScript runtime. The bound is a whole number of hours, below that limit.
 /** The longest finite staleTime, in hours: 24.5 days. Give `Infinity` for a longer one. */
 export const MaxTimerHours = 588
@@ -48,7 +48,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   }).strict()
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
-  // A live object passes whole where these hold of it: parsing it would hand back a copy, its getters read once.
+  // A live object passes whole where these checks pass: parsing it would hand back a copy, its getters read once.
   const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
@@ -89,7 +89,7 @@ export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | '
 // == [The car]: ThingCar, BankCar, BoxCar, GateCar, ThingAt, CarAt, DeliverableThing, carLivenessVals
 
 // The vaultDB has a newer whole record when liveness is 'bhnd' or 'bare' (dbHasNewer).
-/** A ThingMinder's cache value for a Thing, deeply frozen: among records we've seen, carries its newest (perhaps sparse), and its fullest (perhaps null, or undefined for "exists, but nothing useful cached").
+/** A ThingMinder's cache value for a Thing, deeply frozen: of the records the minder has received, it carries the newest (perhaps sparse), and the fullest (perhaps null, or undefined for "exists, but nothing useful cached").
  * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
  * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
  * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
@@ -135,7 +135,7 @@ export const carLivenessVals = ['full', 'bhnd', 'bare', 'gone', 'void'] as const
 
 // == [A minder's answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer, ScopeAt
 
-// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage holds nothing.
+// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage has nothing.
 // A timely car is full, gone or void: a bhnd or bare car is never timely.
 /** A get's answer, read from the cache. Beside a get's own acts:
  * - `vacant`   -- nothing is cached
@@ -174,8 +174,8 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 
 // == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, MinderEventOf
 
-// Each event spreads TanStack Query's cache event into our own, and keeps TanStack's field names (`type`, `action.type`,
-// `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` takes.
+// Each event spreads TanStack Query's cache event into our own, under TanStack's field names (`type`, `action.type`,
+// `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` is given.
 /** An event a minder's `listen` tells: a car's query changed, or a listing's. {@link ThingMinder.isThingEvent} tells them apart. */
 export type MinderEvent = ThingEvent | ListingEvent
 
@@ -183,7 +183,7 @@ export type MinderEvent = ThingEvent | ListingEvent
 export type MinderEventOf<DataT> = Readonly<{
   /** `'updated'` when the query's state changed, `'removed'` when the cache dropped the query. */
   type:      'updated' | 'removed'
-  /** What changed the state, by TanStack's name for the action, or undefined for a removal:
+  /** The action that changed the state, by TanStack's name for it, or undefined for a removal:
    * - `'success'`    -- a record arrived
    * - `'error'`      -- a get was refused
    * - `'invalidate'` -- a listing was marked stale

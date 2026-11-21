@@ -83,12 +83,12 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   /** The root box: its shell until the bank is born, then its stored record. Every box of this bank is under it. */
   get rootBox(): LiveOf<BoxRecord> | ShellOf<BoxRecord> { return this.#rootBox }
 
-  /** The revseq and lifepath this object holds of the bank, its main gate and its root box, which every ask it makes tracks. */
+  /** The revseq and lifepath this object has of the bank, its main gate and its root box, which every ask it makes tracks. */
   get track(): Track {
     return { bank: trackPairOf(this), [Labelpath.MainGate]: trackPairOf(this.#maingate), [Labelpath.RootBox]: trackPairOf(this.#rootBox) }
   }
 
-  /** The defaults this bank's minders set on their TanStack Query cache entries. */
+  /** The defaults this bank's minders set on their items and lists in TanStack Query's cache. */
   get queryCacheOpts(): Readonly<QueryCacheOpts> { return this.#queryCacheOpts }
 
   /** This bank's snapshot getter, already bound, as `useSyncExternalStore` wants it: the same frozen object until the snapshot changes. */
@@ -102,7 +102,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, with its main gate and root box, on `opts.device`, keeping its boxes in `opts.vaultDB`. */
+  /** Make the bank of `record`, with its main gate and root box, on `opts.device`, with its boxes in `opts.vaultDB`. */
   static make(record: BankMakeRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
@@ -199,7 +199,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
 
   /** Unlock this bank by its passphrase or its passkey, resuming every call waiting in {@link ensureUnlocked}.
-   * A wrong one refuses `wrong_passphrase` or `wrong_passkey`, and the bank stays as it was.
+   * A wrong one refuses `wrong_passphrase` or `wrong_passkey`, and the bank is unchanged.
    */
   async unlock(cleartexts: UnlockCleartexts): Promise<this> {
     await Gatings.unlockBank(this, cleartexts, this.#gatingFriend())
@@ -262,7 +262,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   async ensureUnlocked(): Promise<this> {
     this.demandEnabled()
     if (this.isUnlocked) { return this }
-    // Held here: a subscriber told by the align may dismiss the wait or sweep the bank, which clears #unlockWait.
+    // Read here: a subscriber told by the align may dismiss the wait or sweep the bank, which clears #unlockWait.
     const wait = (this.#unlockWait ??= makeWait())
     this.#align()
     await wait.promise
@@ -312,7 +312,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return this
   }
 
-  /** Write `ask.record`, the main gate's next revision, over `ask.cited`, and hold the gate written as this bank's main gate. Resolves that gate. */
+  /** Write `ask.record`, the main gate's next revision, over `ask.cited`, and make the gate written this bank's main gate. Resolves that gate. */
   async #putGate(ask: PutAskDraft<GateRecord>): Promise<Gate> {
     this.demandEnabled()
     const answer = await this.#vaultDB.tryWriteThing({ ...this.makePutAsk(ask), modelkind: 'gate' })
@@ -448,7 +448,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
-   * It authenticates the box, all but its sidecar. For a tombstone, that checks its signature.
+   * It authenticates the box, all but its sidecar. For a tombstone, that checks its seal.
    */
   async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
     const lease = this.#demandLease()
@@ -501,7 +501,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
 // == [Helpers]: trackPairOf, Wait, makeWait
 
-/** The revseq and lifepath of a Thing, as a `track` holds them. */
+/** The revseq and lifepath of a Thing: the pair a `track` has. */
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
 
 /** A promise, beside the functions that settle it. */

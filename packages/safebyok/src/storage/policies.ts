@@ -7,7 +7,7 @@ import type { GateWriteAsk } from '../shapes/shapes-asks'
 
 // == [Policies]: GatePolicies, policyRefusalOf
 // Each runs once the put table has found the write would replace the live gate. Each line is one row of its policy's table
-// in notes/storage-policies.md, in the same order, less big's registered_at row: every live-over-live write keeps its born_at.
+// in notes/storage-policies.md, in the same order, less big's registered_at row: every live-over-live write leaves its born_at unchanged.
 
 /** The storage policies, each a check of a gate write ask against the wayins stored. Each returns why it refuses, or null to allow the write. */
 const GatePolicies = {

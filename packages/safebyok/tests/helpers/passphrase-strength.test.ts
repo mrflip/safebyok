@@ -207,7 +207,7 @@ describe("DefaultStrengthChecker, and the notes/configuration.md section its rea
     expect(configuration).to.include('\n## Pluggable Passphrase Strength Checker\n')
   })
 
-  it("keeps its AI prompt's last reason word for word", () => {
+  it("contains its AI prompt's last reason word for word", () => {
     expect(configuration).to.include("it's too annoying and I just want it to let everything through, I understand the risks, you're not the boss of me")
   })
 })

@@ -233,8 +233,8 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 // --
 
 // == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, classifyBirthBank
-// Each takes the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
-// a birth takes the bank's three roots, and where it is born, reports the world its puts wrote.
+// Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
+// a birth is given the bank's three roots, and where it is born, reports the world its puts wrote.
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
 export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {
@@ -321,10 +321,10 @@ export function unwrittenWriteOf(raw: unknown, { ask, act, world }: UnwrittenWri
   return isRefusedAct(act) ? { ok: false, act, world: worldRecord, record, ...beside } : { ok: true, act, world: worldRecord, record, ...beside }
 }
 
-/** What {@link unwrittenWriteOf} answers for: the write, the act the act tables found, and the raw world the store fetched. */
+/** An unwritten write, for {@link unwrittenWriteOf}: the write, the act the act tables found, and the raw world the store fetched. */
 export type UnwrittenWrite = Readonly<{ ask: WriteAsk, act: Exclude<EX.PutAct | EX.DelAct | EX.RefusedAct, EX.WriteAct>, world: WorldFetched }>
 
-/** Throw `bad_record` unless `ask` keeps the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
+/** Throw `bad_record` unless `ask` leaves unchanged the born_at of the live Thing it replaces, the raw Thing a store fetched at its scope. */
 export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
   if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
   throw Throwers.bornAtNotStored(storedThingOf(ask, raw))

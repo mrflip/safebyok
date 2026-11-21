@@ -16,13 +16,13 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(TH.GateScope, { staleTime: 0 })).to.be.true
   })
 
-  it("takes a staleTime given as undefined as the minder's own", async () => {
+  it("treats a staleTime given as undefined as the minder's own", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.GateScope)
     expect(minder.isStaleAt(TH.GateScope, { staleTime: undefined })).to.be.false
   })
 
-  it("takes an ask or a record as its scope", async () => {
+  it("accepts an ask or a record as its scope", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
@@ -49,7 +49,7 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(TH.BoxScope, { staleTime: Infinity })).to.be.false
   })
 
-  it("counts a full car whose last get was refused stale under a staleTime of Infinity, and timely under 'static', as a get does", async () => {
+  it("counts a full car whose last get was refused the same way a get does: stale under a staleTime of Infinity, timely under 'static'", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate1   = await storedGateOf(vaultDB, 1)
     const { minder } = minderWorldOf(vaultDB)
@@ -68,7 +68,7 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(TH.GateScope, { staleTime: Infinity })).to.be.false
   })
 
-  it("takes a staleTime up to MaxTimerMillis", async () => {
+  it("accepts a staleTime up to MaxTimerMillis", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.GateScope)
     expect(minder.isStaleAt(TH.GateScope, { staleTime: MaxTimerMillis })).to.be.false
@@ -88,6 +88,20 @@ describe("ThingMinder.isStaleAt", () => {
     })
   }
 })
+
+/** A minder holding the main gate's car and a listener, after the watch has notified the gate a second time; the minder, the car it held before, and the listener. */
+async function renotifiedWorldOf() {
+  const vaultDB = await bornOf(new MemoryVaultDB())
+  const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
+  const staleGet = { ...TH.getAskAt('box'), track: TH.GateStaleTrack }
+  await TH.expectGood(vaultDB.tryGetThing(staleGet))
+  const car = minder.at(TH.GateScope)
+  expect(car).to.deep.equal(carOf(TH.gateThingOf()))
+  const listener = listenerOf()
+  minder.listen(listener, ThingFormat)
+  await TH.expectGood(vaultDB.tryGetThing(staleGet))
+  return { minder, car, listener }
+}
 
 describe("ThingMinder's watch", () => {
   it("caches each gate written", async () => {
@@ -109,17 +123,13 @@ describe("ThingMinder's watch", () => {
     expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate))
   })
 
-  it("keeps the main gate's car when the watch tells of it again, and tells a listener each time", async () => {
-    const vaultDB = await bornOf(new MemoryVaultDB())
-    const { minder } = minderWorldOf(vaultDB, { isRootHeard: false })
-    const staleGet = { ...TH.getAskAt('box'), track: TH.GateStaleTrack }
-    await TH.expectGood(vaultDB.tryGetThing(staleGet))
-    const car = minder.at(TH.GateScope)
-    expect(car).to.deep.equal(carOf(TH.gateThingOf()))
-    const listener = listenerOf()
-    minder.listen(listener, ThingFormat)
-    await TH.expectGood(vaultDB.tryGetThing(staleGet))
+  it("still has the main gate's car when the watch notifies it again", async () => {
+    const { minder, car } = await renotifiedWorldOf()
     expect(minder.at(TH.GateScope)).to.eq(car)
+  })
+
+  it("tells a listener each time the watch notifies the main gate", async () => {
+    const { listener } = await renotifiedWorldOf()
     expect(toldOf(listener)).to.deep.equal([['gate', 'full']])
   })
 

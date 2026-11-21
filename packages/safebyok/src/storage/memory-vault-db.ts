@@ -12,7 +12,7 @@ import type { Actual, BirthBankActual, ListThingsActual } from './vault-db'
 /** A watch: the bank it follows, the function called with each change, and the one called with any trouble. */
 export type Watcher = { scope: ThingWatchScope, receive: (received: Received) => void, onBadNews: (news: Errors.VaultError) => void }
 
-/** A vaultDB kept in this tab's memory, gone when the tab closes. */
+/** A vaultDB in this tab's memory, gone when the tab closes. */
 export class MemoryVaultDB extends AdapterVaultDB {
   // == [Props]: #banks, #watchers
 

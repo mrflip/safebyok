@@ -29,7 +29,7 @@ export type BankScope   = Z.infer<typeof StampChecks.bankScope>
 export type BankStamp   = Z.infer<typeof StampChecks.bankStamp>
 /** A gate's stamp: its scope, and the lifeseq and `born_at` of its life. A wayin's wrapped bankKey is bound to it. */
 export type GateStamp   = Z.infer<typeof StampChecks.gateStamp>
-/** A gate's stamp, its bank's stamp, and its wayins: what a proving of a stored wayin takes. */
+/** A gate's stamp, its bank's stamp, and its wayins: what a proving of a stored wayin is given. */
 export type StampedGate = Z.infer<typeof StampChecks.stampedGate>
 /** A box's stamp: its Thing fields, not its sidecar or its sealed whisper.
  * Its whisper's seal is bound to it: the whisper unseals only within the revision it was sealed in.

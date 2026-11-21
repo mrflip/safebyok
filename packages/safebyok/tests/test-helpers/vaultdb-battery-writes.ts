@@ -231,7 +231,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       expect(await vaultDB.tryGetThing(getAskAt(box.labelpath))).to.deep.include({ ok: true, act: 'gotlive', val: reborn })
     })
 
-    it("replaces a live box it expects, keeping its sidecar as sent", async () => {
+    it("replaces a live box it expects, with its sidecar as sent", async () => {
       const vaultDB = await fresh()
       await boxesBorn(vaultDB, box)
       const next = nextOf(box)

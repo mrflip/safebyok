@@ -50,7 +50,7 @@ export function bestCarOf(prior: unknown, delivered: unknown): ThingCar<ThingRec
   const [newestTag,  newest]  = tagBestNewestSL(prior,  delivered)
   const [fullestTag, fullest] = tagBestFullestSL(prior, delivered)
   if ((newestTag === 'prior') && (fullestTag === 'prior')) { return prior }
-  // Only a whole record has parts worth sharing, and a newer one can come only from `delivered`. A full car's newest is its fullest, so it takes the shared record too.
+  // Only a whole record has parts worth sharing, and a newer one can come only from `delivered`. A full car's newest is its fullest, so it gets the shared record too.
   const shared = (((fullestTag === 'delivered') && prior.fullest) ? TSQ.replaceEqualDeep(prior.fullest, fullest) : fullest) as ThingRecord | undefined
   return carOf((newest === fullest) ? shared! : newest, shared)
 }
@@ -92,7 +92,7 @@ export function dbHasNewer(car: Pick<ThingCar<ThingRecord>, 'liveness'>): boolea
 
 // It joins with `~` the newest's lifepath and revseq, the liveness, and the revseq of `fullest ?? newest`. Each field is of
 // fixed width for one Thing, so two ageranks are settled before either reaches a '~'. The liveness tags, all four letters,
-// sort void > gone > full > bhnd > bare. A bare car has no fullest, and takes NoFullestRevseq, below every revseq. The
+// sort void > gone > full > bhnd > bare. A bare car has no fullest, and gets NoFullestRevseq, below every revseq. The
 // fullest's revseq settles two bhnd cars with the same newest.
 /** The agerank of a sound car of a Thing: a string that compares above the agerank of each older car of that Thing. */
 export function agerankOf(car: Pick<ThingCar<ThingRecord>, 'liveness' | 'newest' | 'fullest'>): string {
@@ -112,7 +112,7 @@ function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing
 
 // == [Checks]: CarChecks, CarOfChecks
 
-/** The checks of a car's invariants, as {@link ThingCar} states them, each liveness by name. A car that fails one is a bug in safebyok. */
+/** The checks of the invariants {@link ThingCar} states, each liveness by name. A car that fails one is a bug in safebyok. */
 const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom, str }) => {
   // Its records pass through as they are, so that a refinement can compare them by reference.
   const cited = custom<Sparse<ThingRecord>>((val) => ThingChecks.scopedCited.safeParse(val).success, Phrases.CarRecordShape)

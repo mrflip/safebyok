@@ -39,7 +39,7 @@ export const GateChecks = Object.freeze({
 })
 
 /** The checks of a box's Thing: its record, its citation and what is stored of it, the storage policies it may name (none), and its labelpath.
- * Also its sealable, its `live` record, its `liveOrShell` record, which a bank keeps of its root box, and its `stamp`.
+ * Also its sealable, its `live` record, its `liveOrShell` record, which a bank has of its root box, and its `stamp`.
  */
 export const BoxChecks = Object.freeze({
   record:       PerKindChecks.boxThing,
@@ -59,6 +59,6 @@ const byModelkind = Object.freeze({ bank: BankChecks, gate: GateChecks, box: Box
 /** The bundle for the kind of Thing at `labelpath`, which must be sound. */
 function ofLabelpath(labelpath: Labelpath): typeof byModelkind[Thingkind] { return byModelkind[Labelpath.modelkindOf(labelpath)] }
 
-/** Each kind's bundle, for a caller that holds a Thing of any kind: `byModelkind` gives it by modelkind, and `ofLabelpath` by labelpath. */
+/** Each kind's bundle, for a caller with a Thing of any kind: `byModelkind` gives it by modelkind, and `ofLabelpath` by labelpath. */
 export const ThingkindChecks = Object.freeze({ byModelkind, ofLabelpath })
 // --

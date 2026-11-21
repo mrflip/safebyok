@@ -7,7 +7,7 @@ import * as TH from '../../test-helpers'
 import { Hours24, GateGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
 
 describe("ThingMinder.at", () => {
-  it("holds nothing before any get", () => {
+  it("has nothing before any get", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     expect(minder.at(TH.GateScope)).to.be.undefined
   })
@@ -36,7 +36,7 @@ describe("ThingMinder.at", () => {
     })
   }
 
-  it("holds the car of every kind of Thing in the bank", async () => {
+  it("has the car of every kind of Thing in the bank", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
@@ -60,7 +60,7 @@ describe("ThingMinder.at", () => {
 })
 
 describe("ThingMinder.listingAt", () => {
-  it("lists each box heard of before the root box's first list", async () => {
+  it("lists each box received before the root box's first list", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB, { isRootHeard: false })
@@ -71,7 +71,7 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
   })
 
-  it("holds the labelpaths a list answers, tombstones included, in labelpath order, frozen", async () => {
+  it("has the labelpaths a list answers, tombstones included, in labelpath order, frozen", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     cheatBox(vaultDB, TH.boxTombOf(TH.boxThingOf('anthropic')))
@@ -82,7 +82,7 @@ describe("ThingMinder.listingAt", () => {
     expect(Object.isFrozen(listing)).to.be.true
   })
 
-  it("adds a box a get or a notice tells of, live or gone, but never a shell", async () => {
+  it("adds a box a get or a notice delivers, live or gone, but never a shell", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB)
@@ -96,7 +96,7 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/mistral', 'box/openai'])
   })
 
-  it("keeps a listed box whose tombstone arrives", async () => {
+  it("still lists a box whose tombstone arrives", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB)
@@ -106,7 +106,7 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
   })
 
-  it("keeps a labelpath a later list does not answer", async () => {
+  it("still lists a labelpath a later list does not answer", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
@@ -116,7 +116,7 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
   })
 
-  it("keeps the same array until a labelpath joins it", async () => {
+  it("returns the same array until a labelpath joins it", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder, receive } = minderWorldOf(vaultDB)
@@ -143,7 +143,7 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
   })
 
-  it("holds another Thing's listing only once it is listed", async () => {
+  it("has another Thing's listing only once it is listed", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
@@ -162,7 +162,7 @@ describe("ThingMinder.listingAt", () => {
     expect(minder.listingAt(TH.RootScope)).to.be.undefined
   })
 
-  it("keeps the root box's listing until goodbye, however long after", async () => {
+  it("has the root box's listing until goodbye, however long after", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()
@@ -257,7 +257,7 @@ describe("ThingMinder.isListingBareAt", () => {
 })
 
 describe("ThingMinder.tryAt", () => {
-  it("answers vacant where the cache holds nothing", () => {
+  it("answers vacant where the cache has nothing", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'vacant', val: undefined, car: undefined, isTimely: false, refreshedAt: 0, isFetching: false, lastErr: null })
   })
@@ -270,7 +270,7 @@ describe("ThingMinder.tryAt", () => {
     expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'gotlive', val: gate, car: carOf(gate), isTimely: true, isFetching: false, lastErr: null })
   })
 
-  it("takes options given as undefined as no opinion", async () => {
+  it("treats options given as undefined as left out", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
@@ -310,7 +310,7 @@ describe("ThingMinder.tryAt", () => {
     expect(answer).to.have.property('refreshedAt').above(0)
   })
 
-  it("answers gotvoid, with a null val, where storage holds nothing", async () => {
+  it("answers gotvoid, with a null val, where storage has nothing", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.BoxScope)
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotvoid', val: null, isTimely: true })

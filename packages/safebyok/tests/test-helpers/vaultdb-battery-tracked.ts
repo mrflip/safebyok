@@ -17,7 +17,7 @@ export function describeVaultDBTracked({ fresh, bornBank }: VaultDBBatteryWorld)
       expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: trackOf() })).to.deep.include({ ok: true, tracked: { bank: 'same', gate: 'same', box: 'same' } })
     })
 
-    it("is the Thing as stored where its revseq or lifepath is not the one tracked, the bank without its main gate", async () => {
+    it("is the stored Thing where its revseq or lifepath is not the one tracked, the bank without its main gate", async () => {
       const vaultDB = await bornBank()
       expect(await vaultDB.tryGetThing({ ...getAskAt('box'), track: GateStaleTrack })).to.deep.include({ tracked: { bank: 'same', gate: gateThingOf(), box: 'same' } })
       expect(await vaultDB.tryListThings({ ...listAskAt('box'), track: BankStaleTrack })).to.deep.include({ ok: true, tracked: { bank: bankThingOf(), gate: 'same', box: 'same' } })

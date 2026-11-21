@@ -15,8 +15,8 @@ import { type BoxQueryOpts, type CarFields, type GiverDevice, Checks, ScopeCheck
 // == [Query defaults]: carQueryDefaults, carStaleTimeOf, newerCarOf, isCar, fullestOf
 
 // A host may override anything the giver supplies here (the keys, each of these defaults, and the `select` that picks
-// `fullest`), so nothing in the giver may depend on one staying in place. The bridge copies each car into the host's entry
-// whatever that entry's options say.
+// `fullest`), so nothing in the giver may depend on one staying in place. The bridge copies each car into the host's item
+// whatever that item's options say.
 /** The giver's defaults for the query of a box's car in the host's React Query. */
 function carQueryDefaults<CarT extends CarFields>() {
   return {
@@ -27,18 +27,18 @@ function carQueryDefaults<CarT extends CarFields>() {
   } as const
 }
 
-/** The staleTime of a car's entry: 0 where the vaultDB is known to hold a newer whole record, else Infinity (the bridge keeps it current). */
+/** The staleTime of the host's item of a box: 0 where the vaultDB is known to have a newer whole record, else Infinity (the bridge keeps it current). */
 function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>): number {
   const car = entry.state.data
   return ((car !== undefined) && dbHasNewer(car)) ? 0 : Infinity
 }
 
 // TanStack shares structure through this both between a query's cars and between what `select` returns from them, so a
-// value that is not a car takes TanStack's own default. When a hook's key changes, it shares the last key's selected value
-// with the new key's, so cars of two boxes take the default too: their agerank says nothing of which to show. A box's cars
-// never go back, so the newer car holds everything the older one does, and nothing needs merging. Without this, a fetch
+// value that is not a car gets TanStack's own default. When a hook's key changes, it shares the last key's selected value
+// with the new key's, so cars of two boxes get the default too: their agerank says nothing of which to show. A box's cars
+// never go back, so the newer car has everything the older one has, and nothing needs merging. Without this, a fetch
 // that read an older car and resolved after the bridge copied a newer one would put the older car back.
-/** Structural sharing for a car's entry: of two cars of one box, the one with the greater agerank, `prior` on a tie.
+/** Structural sharing for the host's item of a box: of two cars of one box, the one with the greater agerank, `prior` on a tie.
  * Anything else goes to TanStack's default, `replaceEqualDeep`.
  */
 function newerCarOf(prior: unknown, next: unknown): unknown {
@@ -52,14 +52,14 @@ function isCar(val: unknown): val is CarFields {
   return (typeof car === 'object') && (car !== null) && (typeof car.agerank === 'string') && (typeof car.newest?.labelpath === 'string')
 }
 
-/** The fullest record a car holds */
+/** The fullest record a car has */
 function fullestOf<CarT extends CarFields>(car: CarT): CarT['fullest'] { return car.fullest }
 // --
 
 // == [Form mutations]: FormMutationDefaults, vacateCloak, cleartextsOf
 
 // A form verb proves the user's cleartexts on this device, and asks the vaultDB only to write a gate: paused while offline,
-// the mutation would keep its cloak full, and an `unlock` gating that needs no network would wait for one.
+// the mutation would leave its cloak full, and an `unlock` gating that needs no network would wait for one.
 /** The giver's defaults for a form verb's mutation: it runs offline, never retries, and vacates its cloak once it settles. */
 const FormMutationDefaults = {
   networkMode: 'always',
@@ -76,15 +76,15 @@ function vacateCloak(_data: unknown, _err: Error | null, cloaked: Cloak): void {
 // at each call claims nothing the verb does not judge.
 /** The cleartexts `cloaked` has, for one call of a form verb. */
 function cleartextsOf(cloaked: Cloak): CloakCleartexts {
-  const { passphraseClear, passkeyClear, nextPassphraseClear, nextPasskeyClear } = cloaked
-  const fields = Object.entries({ passphraseClear, passkeyClear, nextPassphraseClear, nextPasskeyClear })
+  const { passphraseCleartext, passkeyCleartext, nextPassphraseCleartext, nextPasskeyCleartext } = cloaked
+  const fields = Object.entries({ passphraseCleartext, passkeyCleartext, nextPassphraseCleartext, nextPasskeyCleartext })
   return Object.fromEntries(fields.filter(([, val]) => val !== undefined))
 }
 // --
 
 // == [The giver]: ReactGiver, StrengthVerdictResult, BankGiver, makeReactGiver, Unjudged, makeBankGiver
 
-/** What {@link makeReactGiver} returns. */
+/** The hooks {@link makeReactGiver} returns. */
 export type ReactGiver<CarT extends CarFields> = ReturnType<typeof makeReactGiver<CarT>>
 
 /** The result of a giver's `useStrengthVerdict`: the latest verdict on a new passphrase, and `judge` to ask for the next. */
@@ -106,7 +106,7 @@ export type StrengthVerdictResult = Readonly<{
 /** The hooks of a giver's `forBank`, for the Device's bank.
  * Hand each form mutation a {@link Cloak}: the mutation vacates it once it settles. An `onSettled` of your own in its
  * options replaces that, so vacate the cloak there too. One in your QueryClient's mutation defaults does not run for it.
- * A form mutation never retries. Hold the submit while it is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
+ * A form mutation never retries. Disable the submit while it is pending (`disabled={unlock.isPending}`), so a double press runs the verb once.
  */
 export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<CarT>>
 
@@ -117,7 +117,7 @@ export type BankGiver<CarT extends CarFields> = ReturnType<typeof makeBankGiver<
 export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   Checks.device.parse(device)
 
-  /** Keeps the host's React Query entries of the bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
+  /** Keeps the host's React Query items of the bank's boxes current while mounted. Call it once, near the root, inside the host's `QueryClientProvider`. */
   function useBridge(): void {
     const client = useQueryClient()
     useEffect(() => bridgeDevice(client, device), [client])
@@ -125,8 +125,8 @@ export function makeReactGiver<CarT extends CarFields>(device: GiverDevice<CarT>
 
   // Only the verdict of the latest call to `judge` lands: an earlier one, such as a checker's first while it loads its
   // dictionary, may resolve after a later one, and would show the strength of what the user typed before.
-  /** The strength checker's verdict on a new passphrase, for a meter beside its field. Hold the form's submit until `verdict.strong`.
-   * The verb judges the passphrase again, and refuses `weak_passphrase` where it is weak. The hook keeps the verdict, never the passphrase.
+  /** The strength checker's verdict on a new passphrase, for a meter beside its field. Disable the form's submit until `verdict.strong`.
+   * The verb judges the passphrase again, and refuses `weak_passphrase` where it is weak. The hook retains the verdict, never the passphrase.
    * @example
    *   const strength = Giver.useStrengthVerdict()
    *   <input name="nextPassphrase" type="password" onChange={(event) => { void strength.judge(event.target.value) }} />
@@ -169,7 +169,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   const bankHead = bankQueryKey(device)
 
   /** This tab's state of the bank: its stage, whether it is locked, and when its lease ends. Synchronous: it never waits and never suspends.
-   * Given `select`, it re-renders only when what `select` returns changes, which must be a field of the snapshot or a primitive, never a new object.
+   * Given `select`, it re-renders only when what `select` returns changes: return a field of the snapshot or a primitive, never a new object.
    */
   function useBankSnapshot(): BankSnapshot
   function useBankSnapshot<SelT>(select: (snap: BankSnapshot) => SelT): SelT
@@ -179,8 +179,8 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   }
 
   /** React Query's options for the box's whole car, for your own `useQuery`, `queryClient.query` or route loader.
-   * `data` is the car: the newest revision heard of, beside the fullest record. Its defaults, any of which you may override:
-   * - fresh until the bridge copies a newer car, and stale while the vaultDB is known to hold a newer revision
+   * `data` is the car: the newest revision received, beside the fullest record. Its defaults, any of which you may override:
+   * - fresh until the bridge copies a newer car, and stale while the vaultDB is known to have a newer revision
    * - fetches even while offline
    * - never replaces a car with an older one
    */
@@ -210,7 +210,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
 
   /** React Query's options for the mutation that births the bank, for your own `useMutation`.
    * Hand it the user's new passphrase and optional passkey. It leaves the bank unlocked.
-   * Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
+   * Disable the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the passphrase strong.
    */
   function birthMutationOptions() {
     return mutationOptions({
@@ -230,7 +230,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
    * Every call waiting for the bank to be unlocked resumes. A wrong passphrase or passkey refuses, and the bank stays locked.
    * @example
    *   const unlock = Acme.useUnlock()
-   *   <form action={(form) => { unlock.mutate(cloak({ passphraseClear: String(form.get('passphrase')) })); form.delete('passphrase') }}>
+   *   <form action={(form) => { unlock.mutate(cloak({ passphraseCleartext: String(form.get('passphrase')) })); form.delete('passphrase') }}>
    */
   function unlockMutationOptions() {
     return mutationOptions({
@@ -247,7 +247,7 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   function useUnlock(): UseMutationResult<void, Error, Cloak> { return useMutation(unlockMutationOptions()) }
 
   /** React Query's options for the mutation that replaces the passphrase, proved by the current passphrase or the passkey, for your own `useMutation`.
-   * It leaves the bank unlocked. Hold the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the new passphrase strong.
+   * It leaves the bank unlocked. Disable the submit until {@link makeReactGiver}'s `useStrengthVerdict` judges the new passphrase strong.
    */
   function replacePassphraseMutationOptions() {
     return mutationOptions({
@@ -264,13 +264,13 @@ function makeBankGiver<CarT extends CarFields>(device: GiverDevice<CarT>) {
   function useReplacePassphrase(): UseMutationResult<void, Error, Cloak> { return useMutation(replacePassphraseMutationOptions()) }
 
   /** React Query's options for the mutation that adds a passkey, proved by the passphrase, for your own `useMutation`.
-   * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it), and hand its PRF answer in as `nextPasskeyClear`.
+   * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it), and hand its PRF answer in as `nextPasskeyCleartext`.
    * It leaves the bank unlocked.
    * @example
    *   const addPasskey = Acme.useAddPasskey()
    *   async function onAdd() {
-   *     const nextPasskeyClear = await createPasskey()   // the host's WebAuthn create, with the PRF extension
-   *     addPasskey.mutate(cloak({ passphraseClear: passphraseField.value, nextPasskeyClear }))
+   *     const nextPasskeyCleartext = await createPasskey()   // the host's WebAuthn create, with the PRF extension
+   *     addPasskey.mutate(cloak({ passphraseCleartext: passphraseField.value, nextPasskeyCleartext }))
    *   }
    */
   function addPasskeyMutationOptions() {
@@ -327,7 +327,7 @@ export function boxCarQueryKey(scope: Readonly<{ userid: string, banklabel: stri
   return ThingMinder.queryKeyOf(scope)
 }
 
-/** The key every one of a bank's entries in the host's React Query starts with. */
+/** The key every one of a bank's items in the host's React Query starts with. */
 export function bankQueryKey(scope: Readonly<{ userid: string, banklabel: string }>): QueryKey {
   return ThingMinder.bankQueryKeyOf(scope)
 }

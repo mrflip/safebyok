@@ -1,6 +1,7 @@
 /** The checks and types of the gate: the form verbs' cleartexts, provings, leases and the host's strength checker. */
 
 import type * as Z from 'zod'
+import { NEVER } from 'zod'
 import { Consts, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import type { cloak } from '../helpers/cloak'
 import type { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
@@ -17,43 +18,51 @@ import type { BankMakeRecord } from './shapes-bankish'
 
 // == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, CloakCleartexts
 
-// A gate change's proof is named as an `unlock` gating's, `passphraseClear` or `passkeyClear`, and what it puts in place is named `next…`.
+// A gate change's proof is named as an `unlock` gating's, `passphraseCleartext` or `passkeyCleartext`, and what it puts in place is named `next…`.
 /** The checks of what {@link Bank.birth}, {@link Bank.unlock}, {@link Bank.replacePassphrase}, {@link Bank.addPasskey}, {@link Bank.revokePasskey} and {@link cloak} are handed.
  * A cleartext is only ever checked in its gating (models/gating.ts): the cloak's check judges none.
  */
 export const CleartextChecks = Validator.Checkers('bad_record', ({ obj, unk }) => {
-  const proof = { passphraseClear: GX.passphraseCleartext.optional(), passkeyClear: GX.passkeyAnswer.nullable().optional() }
+  const proof = { passphraseCleartext: GX.passphraseCleartext.optional(), passkeyCleartext: GX.passkeyAnswer.nullable().optional() }
   return {
     // The cloak checks only that it knows each field: each verb checks the fields it takes.
-    cloakArgs:         obj({ passphraseClear: unk.optional(), passkeyClear: unk.optional(), nextPassphraseClear: unk.optional(), nextPasskeyClear: unk.optional() }).strict(),
-    birth:             GX.bankBuildCleartexts,
-    unlock:            GX.bankUnlockCleartexts,
-    passphraseReplace: obj({ ...proof, nextPassphraseClear: GX.passphraseCleartext }).strict().transform(({ nextPassphraseClear, ...given }, ctx) => ({ proof: GX.oneProofOf(given, ctx), nextPassphraseClear })),
-    passkeyAdd:        obj({ passphraseClear: GX.passphraseCleartext, nextPasskeyClear: GX.freshPasskeyAnswer }).strict(),
-    passkeyRevoke:     obj(proof).strict().transform((given, ctx) => GX.oneProofOf(given, ctx)),
+    cloakArgs:         obj({ passphraseCleartext: unk.optional(), passkeyCleartext: unk.optional(), nextPassphraseCleartext: unk.optional(), nextPasskeyCleartext: unk.optional() }).strict(),
+    birth:             obj({ passphraseCleartext: GX.passphraseCleartext, passkeyCleartext: GX.freshPasskeyAnswer.nullable().optional() }).strict(),
+    unlock:            obj(proof).strict().transform(oneProofOf),
+    passphraseReplace: obj({ ...proof, nextPassphraseCleartext: GX.passphraseCleartext }).strict().transform(({ nextPassphraseCleartext, ...given }, ctx) => ({ proof: oneProofOf(given, ctx), nextPassphraseCleartext })),
+    passkeyAdd:        obj({ passphraseCleartext: GX.passphraseCleartext, nextPasskeyCleartext: GX.freshPasskeyAnswer }).strict(),
+    passkeyRevoke:     obj(proof).strict().transform(oneProofOf),
   }
 })
 
-/** What {@link Bank.birth} is handed: the new passphrase, and a new passkey's answer or none. */
+/** The one proof among `given`: its passphrase where it has one, else its passkey answer. Neither is an issue on `ctx`. */
+function oneProofOf({ passphraseCleartext, passkeyCleartext }: { passphraseCleartext?: GX.PassphraseCleartext | undefined, passkeyCleartext?: GX.PasskeyAnswer | null | undefined }, ctx: Z.RefinementCtx): ProvedCleartexts {
+  if (passphraseCleartext !== undefined) { return { passphraseCleartext } }
+  if (passkeyCleartext) { return { passkeyCleartext } }
+  ctx.addIssue({ code: 'custom', message: BigPhrases.CleartextMissing })
+  return NEVER
+}
+
+/** The cleartexts {@link Bank.birth} is handed: the new passphrase, and a new passkey's answer or none. */
 export type BirthCleartexts = Z.input<typeof CleartextChecks.birth>
 
-/** What {@link Bank.unlock} is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
+/** The cleartexts {@link Bank.unlock} is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
 export type UnlockCleartexts = Z.input<typeof CleartextChecks.unlock>
 
-/** What {@link Bank.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
+/** The cleartexts {@link Bank.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
 export type PassphraseReplaceCleartexts = Z.input<typeof CleartextChecks.passphraseReplace>
 
-/** What {@link Bank.addPasskey} is handed: the passphrase, and the new passkey's answer. */
+/** The cleartexts {@link Bank.addPasskey} is handed: the passphrase, and the new passkey's answer. */
 export type PasskeyAddCleartexts = Z.input<typeof CleartextChecks.passkeyAdd>
 
-/** What {@link Bank.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
+/** The cleartexts {@link Bank.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
 export type PasskeyRevokeCleartexts = Z.input<typeof CleartextChecks.passkeyRevoke>
 
-/** What {@link cloak} adopts: the cleartexts of a form verb, any of whose fields it takes. */
-export type CloakCleartexts = Partial<BirthCleartexts & UnlockCleartexts & PassphraseReplaceCleartexts & PasskeyAddCleartexts & PasskeyRevokeCleartexts>
+/** The cleartexts {@link cloak} adopts: any of the form verbs' fields. */
+export type CloakCleartexts = Partial<BirthCleartexts & UnlockCleartexts & PassphraseReplaceCleartexts & PasskeyAddCleartexts>
 
 /** One proof of a gate's way in, once checked: the passphrase, or the passkey's answer. */
-export type ProvedCleartexts = GX.ProvedCleartexts
+export type ProvedCleartexts = { passphraseCleartext: GX.PassphraseCleartext, passkeyCleartext?: never } | { passkeyCleartext: GX.PasskeyAnswer, passphraseCleartext?: never }
 // --
 
 // == [Given to a gating]: BirthGatingFriend, BankGatingFriend
@@ -68,7 +77,7 @@ export interface BirthGatingFriend {
 export interface BankGatingFriend {
   /** Unlock the bank under a lease `proved` builds, citing its main gate. */
   unlockByProving: (proved: Proving) => Promise<Bank>
-  /** Write the main gate's next revision, and hold the gate written as the bank's main gate. */
+  /** Write the main gate's next revision, and make the gate written the bank's main gate. */
   putGate:         (ask: PutAskDraft<GateRecord>) => Promise<Gate>
 }
 // --
@@ -101,7 +110,7 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) =
 /** A {@link GateStamp} with the `revtok` of one revision of the gate: the revision a lease is granted under. */
 export type GateRevisionedStamp = Z.infer<typeof GateishChecks.gateRevisionedStamp>
 
-/** What a proving is given of its device: the wrapped key deriver and strength checker, and the device's token. */
+/** The parts of its device a proving is given: the wrapped key deriver and strength checker, and the device's token. */
 export type ProvingDevice = Z.infer<typeof GateishChecks.provingDevice>
 
 /** The host's key deriver, wrapped by {@link guardKeyDeriver}. */
@@ -128,7 +137,7 @@ export interface ProvingOpts {
 /** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
 export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
-/** A field that holds a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
+/** A field that contains a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
 export type SecretFieldname = 'whisper' | `${string}_sealed`
 
 /** The options of {@link Lease.make}, beside its record. */
@@ -143,10 +152,10 @@ export interface LeaseOpts {
 /** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link GX.PassphraseVerdict}.
  * It is given the passphrase as typed, and the bank's scope, `{ userid, banklabel }`: words a guesser who knows the user tries first.
  * It runs on each new passphrase before any key is derived: the one `Bank.birth` births the bank with, and the one
- * `bank.replacePassphrase` puts in place. It never hears a blank passphrase, which is judged weak without it. It should not throw: one that
+ * `bank.replacePassphrase` puts in place. It is never asked to judge a blank passphrase, which is weak without it. It should not throw: one that
  * throws, or returns no verdict, refuses its call.
  *
- * It hears the passphrase in plain text: it should keep nothing, send nothing anywhere, and never quote
+ * It is given the passphrase in cleartext: it should retain nothing, send nothing anywhere, and never quote
  * it, not even in its `reason`, which becomes the refusal's message.
  *
  * A checker that needs something fetched or built first, such as a dictionary, carries it as `load`.
@@ -168,7 +177,7 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** The host's strength checker as a device keeps it, wrapped by {@link guardStrengthChecker}. */
+/** The host's strength checker, wrapped by {@link guardStrengthChecker} for a device. */
 export type GuardedStrengthChecker = {
   (passphrase: string, scope: BankScope): Promise<GX.PassphraseVerdict>
   readonly load: () => Promise<void>

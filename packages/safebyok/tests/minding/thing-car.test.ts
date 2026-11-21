@@ -115,7 +115,7 @@ describe("bestCarOf", () => {
     // tombstones and lives:
     [bhndOf(Box1, Box0),    carOf(BoxGone),             carOf(BoxGone),              'a whole tombstone replaces the older whole record'],
     [bhndOf(Box1, Box0),    carOf(Thing.sparseOf(BoxGone)),   carOf(Thing.sparseOf(BoxGone)),    'a sparse tombstone replaces the older whole record'],
-    [carOf(Box2),           carOf(Thing.sparseOf(BoxReborn)), carOf(Thing.sparseOf(BoxReborn)),  'a later life heard sparse has no whole record of the earlier life'],
+    [carOf(Box2),           carOf(Thing.sparseOf(BoxReborn)), carOf(Thing.sparseOf(BoxReborn)),  'a later life received sparse has no whole record of the earlier life'],
     [carOf(BoxShell),       carOf(Thing.sparseOf(Box0)),      carOf(Thing.sparseOf(Box0)),       'any record replaces the void sentinel'],
   ] as const
   for (const [prior, delivered, expected, blurb] of MergeCases) {
@@ -139,7 +139,7 @@ describe("bestCarOf", () => {
     })
   }
 
-  // Of equal revisions, the merge keeps the first heard, so a tombstone heard sparse then whole stays sparse: only the revisions are order-free.
+  // Of equal revisions, the merge prefers the first received, so a tombstone received sparse then whole stays sparse: only the revisions are order-free.
   it("makes a car of the same liveness and revisions whichever of two cars arrives first", () => {
     const cars = [...MergeCases, ...PriorWinsCases].flatMap(([prior, delivered]) => [prior, delivered])
     for (const one of cars) {
@@ -176,7 +176,7 @@ describe("bestCarOf", () => {
       expect((merged.fullest as BoxRecord).whisper_sealed).to.eq(Box0.whisper_sealed)
     })
 
-    it("keeping the newer record's changed parts its own", () => {
+    it("while the newer record's changed parts stay its own", () => {
       // A live box, which alone has a sidecar.
       const later  = TH.nextOf(Box0, { sidecar: { account: 'home' } })
       const merged = bestCarOf(carOf(Box0), carOf(structuredClone(later)))
@@ -308,7 +308,7 @@ describe("agerankOf", () => {
     expect(new Set(oldestFirst).size).to.equal(oldestFirst.length)
   })
 
-  it("ranks a gone car heard sparse and heard whole alike", () => {
+  it("ranks a gone car received sparse and received whole alike", () => {
     expect(carOf(Thing.sparseOf(BoxGone)).agerank).to.equal(carOf(BoxGone).agerank)
   })
 })

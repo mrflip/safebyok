@@ -44,7 +44,7 @@ export {
   type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
-// A bank is made with the defaults its minders set on their cache entries; the minder itself is on the front door.
+// A bank is made with the defaults its minders set on their cached items and lists; the minder itself is on the front door.
 export type { QueryCacheOpts } from './shapes/shapes-minder'
 
 // From safebyok-big, re-exported so that each stays one binding across both packages: its refusals and logger, what a

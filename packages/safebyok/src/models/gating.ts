@@ -27,7 +27,7 @@ import * as Throwers from '../refusals/throwers'
 export async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatingFriend): Promise<Bank> {
   try {
     Checks.device.parse(device).demandEnabled()
-    const { passphraseClear: passphraseCleartext, passkeyClear: passkeyCleartext } = checkedCleartexts(CleartextChecks.birth, cleartexts)
+    const { passphraseCleartext, passkeyCleartext } = checkedCleartexts(CleartextChecks.birth, cleartexts)
     // A birth's stamps are minted here, one pair per gating.
     const { bankStamp, gateStamp } = Bank.mintStamps(device)
     const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
@@ -61,8 +61,8 @@ export async function unlockBank(bank: Bank, cleartexts: unknown, friend: Pick<B
 export async function replacePassphrase(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
   try {
     bank.demandEnabled()
-    const { proof, nextPassphraseClear: nextPassphraseCleartext } = checkedCleartexts(CleartextChecks.passphraseReplace, cleartexts)
-    if (proof.passphraseClear === nextPassphraseCleartext) { throw Throwers.samePassphrase() }
+    const { proof, nextPassphraseCleartext } = checkedCleartexts(CleartextChecks.passphraseReplace, cleartexts)
+    if (proof.passphraseCleartext === nextPassphraseCleartext) { throw Throwers.samePassphrase() }
     await checkStrength(bank.device, nextPassphraseCleartext)
     const ante        = bank.maingate
     const proved      = await provingOf(bank.device, ante, proof)
@@ -82,7 +82,7 @@ export async function replacePassphrase(bank: Bank, cleartexts: unknown, friend:
 export async function addPasskey(bank: Bank, cleartexts: unknown, friend: BankGatingFriend): Promise<Bank> {
   try {
     bank.demandEnabled()
-    const { passphraseClear: passphraseCleartext, nextPasskeyClear: nextPasskeyCleartext } = checkedCleartexts(CleartextChecks.passkeyAdd, cleartexts)
+    const { passphraseCleartext, nextPasskeyCleartext } = checkedCleartexts(CleartextChecks.passkeyAdd, cleartexts)
     const ante = bank.maingate
     ante.demandPasskeyAddable()
     const proved         = await PassphraseProving.buildStored(bank.device, ante, passphraseCleartext)
@@ -117,7 +117,7 @@ export async function revokePasskey(bank: Bank, cleartexts: unknown, friend: Ban
 // == [A gating's helpers]: checkedCleartexts, checkStrength, provingOf, nextGateAsk, vacateCleartexts, vacateAnswerAt
 
 /** Check `cleartexts` with `checker`.
- * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
+ * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
  */
 function checkedCleartexts<CleartextsT>(checker: { parse: (cleartexts: unknown) => CleartextsT }, cleartexts: unknown): CleartextsT {
   try {
@@ -135,8 +135,8 @@ async function checkStrength(device: Device, passphraseCleartext: string): Promi
 
 /** The proving of `proof`, built against `gate`'s passphrase wayin or its passkey wayin, whichever `proof` is for. */
 function provingOf(device: Device, gate: Gate, proof: ProvedCleartexts): Promise<Proving> {
-  if (proof.passphraseClear === undefined) { return PasskeyProving.buildStored(gate, proof.passkeyClear) }
-  return PassphraseProving.buildStored(device, gate, proof.passphraseClear)
+  if (proof.passphraseCleartext === undefined) { return PasskeyProving.buildStored(gate, proof.passkeyCleartext) }
+  return PassphraseProving.buildStored(device, gate, proof.passphraseCleartext)
 }
 
 // The ask cites the gate the gating proved against, never the bank's main gate as it stands at the write: a gate change
@@ -148,12 +148,12 @@ function nextGateAsk(ante: Gate, wayins: GateDna['wayins'], policy: EX.StoragePo
 
 /** Zero the PRF bytes of each passkey answer in `cleartexts`, the proof's and a new passkey's (G2). */
 function vacateCleartexts(cleartexts: unknown): void {
-  vacateAnswerAt(cleartexts, 'passkeyClear')
-  vacateAnswerAt(cleartexts, 'nextPasskeyClear')
+  vacateAnswerAt(cleartexts, 'passkeyCleartext')
+  vacateAnswerAt(cleartexts, 'nextPasskeyCleartext')
 }
 
 /** Zero the PRF bytes of the passkey answer at `fieldname` in `cleartexts`, if it has one. */
-function vacateAnswerAt(cleartexts: unknown, fieldname: 'passkeyClear' | 'nextPasskeyClear'): void {
+function vacateAnswerAt(cleartexts: unknown, fieldname: 'passkeyCleartext' | 'nextPasskeyCleartext'): void {
   // The reach-in may meet a getter or a proxy of the host's, which may throw: vacating is best effort, and never replaces the outcome it follows.
   // The cleartexts may be unchecked, as when the shape refuses, so nothing about them is assumed. An answer is single-use: once zeroed, a
   // second hand-in is refused by its all-zero bytes.

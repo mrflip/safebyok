@@ -9,7 +9,7 @@ import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBo
 
 // == [Listings in any order]: ListingStep, OrdersWithoutWrite, ListingOrders, listingAfter
 
-/** One way the minder hears of a box under the root box: a list, a get, a write's answer, or the watch's notice. */
+/** One way the minder receives a box under the root box: a list, a get, a write's answer, or the watch's notice. */
 type ListingStep = 'list' | 'get' | 'write' | 'notice'
 
 // Each order of a list, a get and a notice, with the write at each place in it: every order of the four.
@@ -23,9 +23,9 @@ const OrdersWithoutWrite: readonly (readonly ListingStep[])[] = [
 ]
 const ListingOrders = OrdersWithoutWrite.flatMap((steps) => [0, 1, 2, 3].map((ii) => steps.toSpliced(ii, 0, 'write')))
 
-/** The root box's listing after `steps`, in order, over a store holding the boxes openai, anthropic and mistral.
+/** The root box's listing after `steps`, in order, over a store with the boxes openai, anthropic and mistral.
  * The get is of anthropic, the notice of mistral, and the write births cohere. Under `isListStale`, the list step answers
- * what the store held before the steps, openai alone: only the get, the write and the notice tell of the other three.
+ * what the store had before the steps, openai alone: only the get, the write and the notice bring the other three.
  * Listed before, the root box's listing has openai alone before the steps. Its watch tells nothing: the notice step
  * hands the minder its one notice.
  */
@@ -82,15 +82,15 @@ describe("a ThingMinder's listing is the same, in any order", () => {
 
 // == [Events in any order]: Openai, Reborn, eventsAfter, backwardCars, isForwardCar, fullestRecordOf, shrunkListings
 
-/** The box openai, as the store holds it at the start. */
+/** The box openai, as the store has it at the start. */
 const Openai = TH.boxThingOf()
 
 /** The box openai, deleted and born again in a later life on another device. */
 const Reborn = TH.boxRebornOf(TH.boxTombOf(TH.nextOf(Openai)))
 
-/** Each event a listener is told while `steps` run, in order, over a store holding the box openai at revision 0, and the
+/** Each event a listener is told while `steps` run, in order, over a store with the box openai at revision 0, and the
  * refusalkind of each get refused. The get and the list read the store, the write replaces openai with its revision 1,
- * and the notice tells of {@link Reborn}, which the store never holds: a get after it is refused.
+ * and the notice carries {@link Reborn}, which the store never has: a get after it is refused.
  */
 async function eventsAfter(steps: readonly ListingStep[]) {
   const vaultDB = new QuietVaultDB()

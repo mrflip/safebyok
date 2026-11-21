@@ -24,7 +24,7 @@ export abstract class BaseBox extends Thing<BoxRecord, ThingScope, BoxStamp> {
   static override readonly modelkind = 'box'
   // --
 
-  // == [What a seal takes]: donorPropsOf, publicPropsOf, secretPropsOf, tombstoneSecrets
+  // == [A seal's inputs]: donorPropsOf, publicPropsOf, secretPropsOf, tombstoneSecrets
 
   /** The Thing fields and sidecar of `donorProps`, which may be a live box, a tombstone or the shell.
    * Every other field is dropped, including a whisper, sealed or not.
@@ -108,13 +108,13 @@ Object.freeze(BaseBox satisfies Sealer<BoxRecord, BoxCleartexts>)
 
 // == [Helpers]: nextLifeOf, deserializeWhisper
 
-/** The lifeseq and lifepath of the life after the given box's */
+/** The lifeseq and lifepath of the life after the given box's life. */
 function nextLifeOf({ lifeseq, lifepath }: Pick<BoxRecord, 'lifeseq' | 'lifepath'>): Pick<BoxRecord, 'lifeseq' | 'lifepath'> {
   const nextLifeseq = Lifeseq.ofLifenum(Lifeseq.lifenumOf(lifeseq) + 1)
   return { lifeseq: nextLifeseq, lifepath: `${lifepath.slice(0, lifepath.lastIndexOf('/') + 1)}${nextLifeseq}` }
 }
 
-// What JSON.parse throws is replaced, never kept as a cause: a SyntaxError can quote the text it failed on.
+// What JSON.parse throws is replaced, never made the cause: a SyntaxError can quote the text it failed on.
 /** The whisper in the JSON `text`, or throw `damaged_whisper` */
 function deserializeWhisper(text: string): CX.Whisper {
   let jsonVal: unknown
@@ -131,7 +131,7 @@ function deserializeWhisper(text: string): CX.Whisper {
 
 // == [Checks]: Checks
 
-/** Checks for what a box's seal takes: a live sealable for a tombstone, the public props of a revision and of a tombstone, and the secret props. */
+/** Checks for the inputs of a box's seal: a live sealable for a tombstone, the public props of a revision and of a tombstone, and the secret props. */
 const Checks = Validator.Checkers('bad_record', ({ obj, lit, oneof, epochMillis }) => ({
   liveBoxSealable:      BoxChecks.sealable.refine(({ am }) => am === 'a', Phrases.TombstoneOfLiveOnly),
   // Strict, since a misspelt key in any of these bags would otherwise be dropped without a word.

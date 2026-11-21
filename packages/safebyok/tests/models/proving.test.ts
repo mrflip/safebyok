@@ -54,12 +54,12 @@ async function gateWithPassphrase(): Promise<Gate> {
 /** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
 function gateOf(record: unknown): Gate { return Gate.make(record as never, { bank: { stamp: TH.WorldBankStamp } }) }
 
-/** What a proving of `gate` is handed, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
+/** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
 function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): StampedGate {
   return { bankStamp: { ...TH.WorldBankStamp, ...moves.bank }, stamp: { ...TH.WorldGateStamp, ...moves.gate }, wayins: gate.wayins }
 }
 
-/** What a bankKey is unwrapped as only to see that a wrap unwraps. */
+/** The usage a bankKey is unwrapped with only to see that a wrap unwraps. */
 const CheckUsage = { extractable: false, usage: ['wrapKey'] } as const
 
 function findsWeak() { return { strong: false as const, reason: 'too short' } }
@@ -75,7 +75,7 @@ async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
   expect(await opener.unseal(BaseBox, sealed)).to.deep.include({ whisper: { apiKey: 'sk-test-5678' } })
 }
 
-/** A checker whose answer throws the passphrase it heard, when its verdict is read. */
+/** A checker whose answer throws the passphrase it was given, when its verdict is read. */
 function answersThrowingGetter(passphrase: string) { return { get strong(): true { throw new Error(passphrase) } } }
 
 describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {
@@ -96,7 +96,7 @@ describe("Proving.judgeStrength(device, scope, passphraseCleartext)", () => {
     expect(TH.thrownText(err)).to.not.include(TH.TestPassphrase)
   })
 
-  it("replaces what a throwing checker threw with a refusal quoting none of it and keeping no cause", async () => {
+  it("replaces what a throwing checker threw with a refusal quoting none of it and with no cause", async () => {
     function strengthChecker(): never { throw new Error(`weak: ${TH.TestPassphrase}`) }
     const err = await TH.expectRefusal(Proving.judgeStrength(TH.provingDeviceOf({ strengthChecker }), TH.WorldScope, TH.TestPassphrase))
     expect(err.cause).to.be.undefined
@@ -175,7 +175,7 @@ describe("PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseC
     expect(TH.isZeroed(handed)).to.be.true
   })
 
-  it("replaces what a throwing keyDeriver threw with a refusal quoting none of it and keeping no cause", async () => {
+  it("replaces what a throwing keyDeriver threw with a refusal quoting none of it and with no cause", async () => {
     const keyDeriver = deriverHanding(() => { throw new Error(`cannot derive ${TH.TestPassphrase}`) })
     const err = await TH.expectRefusal(novelPassphrase(TH.provingDeviceOf({ keyDeriver })))
     expect(err.cause).to.be.undefined
@@ -349,7 +349,7 @@ describe("PasskeyProving.buildStored(gate, passkeyCleartext)", () => {
 })
 
 describe("guardKeyDeriver(hostDeriver)", () => {
-  it("keeps the deriver's label and salt length, and marks the result as guarded", () => {
+  it("has the deriver's label and salt length, and marks the result as guarded", () => {
     const guarded = guardKeyDeriver(TH.testDeriver)
     expect(guarded).to.include({ key_deriver_label: TH.testDeriver.key_deriver_label, salt_size: TH.testDeriver.salt_size })
     expect(Object.isFrozen(guarded)).to.be.true
@@ -411,7 +411,7 @@ describe("guardKeyDeriver(hostDeriver)", () => {
     expect(err.cause).to.eq(chunkLost)
   })
 
-  it("passes a refusal the load throws as it came", async () => {
+  it("passes on unchanged a refusal the load throws", async () => {
     const refusal = new Errors.VaultError('storage_unavailable', 'offline')
     const err = await TH.expectRefusal(guardKeyDeriver({ ...TH.testDeriver, load: () => Promise.reject(refusal) }).load())
     expect(err).to.eq(refusal)
@@ -557,25 +557,25 @@ const HeaderCases = [
 
 describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of StampCases) {
-    it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
+    it(`a passphrase wayin will not unwrap under ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
       await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf(), movedGate(gate, altered), TH.TestPassphrase), 'wrong_passphrase')
     })
 
-    it(`keeps a passkey wayin shut under ${blurb}`, async () => {
+    it(`a passkey wayin will not unwrap under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
       await TH.expectRefusal(PasskeyProving.buildStored(movedGate(gate, altered), answerOf()), 'wrong_passkey')
     })
   }
 
   for (const [altered, blurb] of HeaderCases) {
-    it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
+    it(`a passphrase wayin will not unwrap under ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
       const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, main: { ...gate.wayins.main, ...altered } } })
       await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf(), moved, TH.TestPassphrase), 'wrong_passphrase')
     })
 
-    it(`keeps a passkey wayin shut under ${blurb}`, async () => {
+    it(`a passkey wayin will not unwrap under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
       const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
       await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')

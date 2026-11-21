@@ -17,7 +17,7 @@ export const thingkindVals = ['bank', 'gate', 'box'] as const
 /** A kind of Thing, one of {@link thingkindVals}. */
 export type Thingkind = typeof thingkindVals[number]
 
-/** What a model's `modelkind` getter answers: a kind of Thing, or one of the models that are never stored. */
+/** A model's `modelkind`: a kind of Thing, or one of the models that are never stored. */
 export type Modelkind = Thingkind | 'device' | 'wayin' | 'lease' | 'proving'
 
 /** The `fmt` of every Thing, of every kind: the kind is in its labelpath. Distinct from big's rows' fmts (3001, 4001, 5003), which are numbers. */
@@ -184,7 +184,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     .refine(isShellCitable,   Phrases.CitedHalfShell)
     .refine(isParityRight,  Phrases.LifeseqParity)
 
-  // A box's sealable keeps only its Thing fields and sidecar, so a whisper given with it, sealed or not, is dropped. The
+  // A box's sealable has only its Thing fields and sidecar, so a whisper given with it, sealed or not, is dropped. The
   // shell has no stored row, so its revseq, lifeseq and lifepath may be the shell's.
   const boxSealable  = obj({
     ...sparse.shape,
@@ -201,7 +201,7 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     .refine(isParityRight,  Phrases.LifeseqParity)
     .refine(isShellCitable,   Phrases.SealableHalfShell)
 
-  // A bank keeps its root box whole: live once the bank is born, and its shell before.
+  // A bank has its root box whole: live once the bank is born, and its shell before.
   const boxRecord    = boxLive
     .refine(isLabelLast,    Phrases.LabelNotLast)
     .refine(isLifeseqOwn,   Phrases.LifeseqNotOwn)
@@ -244,9 +244,9 @@ export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, Thing
 export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
 /** A write's citation of the Thing it expects to find: its revision, life and liveness, the only fields the store compares. The shell may be cited. */
 export type ThingCited   = Readonly<Z.infer<typeof ThingChecks.thingCited>>
-/** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace keeps. */
+/** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace leaves unchanged. */
 export type StoredCited  = Readonly<Z.infer<typeof ThingChecks.storedCited>>
-/** The name of a Thing field: the fields every kind of Thing has, which the store reads. The rest of a record is its body. */
+/** The name of a Thing field: one of the fields every kind of Thing has, which the store reads. The rest of a record is its body. */
 export type ThingFieldname = keyof Z.infer<typeof ThingChecks.sparse>
 /** The bank, as a Thing. */
 export type BankRecord   = Readonly<Z.infer<typeof PerKindChecks.bankThing>>
@@ -271,7 +271,7 @@ export type Sparse<RecordT extends Sparse<ThingRecord>> = Pick<RecordT, ThingFie
 // A shell is made only from the void: each of its fixed fields defaults to the shell's, and refuses any other value.
 
 /** A shell, whole: every Thing field of a tombstone and no body, its revseq -1.
- * What a ThingMinder's cache holds for a scope that stores nothing.
+ * A ThingMinder caches it for a scope with nothing stored.
  */
 export type VoidSentinel = ShellOf<ThingRecord>
 

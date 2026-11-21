@@ -5,7 +5,7 @@ import { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from '../../src/sh
 import * as TH from '../test-helpers'
 
 describe("BankChecks, GateChecks and BoxChecks", () => {
-  it("carry each kind's stamp and ask checks as the same checks StampChecks and AskChecks hold", () => {
+  it("carry each kind's stamp and ask checks, the same checks StampChecks and AskChecks have", () => {
     expect(BankChecks.stamp).to.eq(StampChecks.bankStamp)
     expect(BankChecks.birthAsk).to.eq(AskChecks.birthBankAsk)
     expect(GateChecks.stamp).to.eq(StampChecks.gateStamp)
@@ -17,7 +17,7 @@ describe("BankChecks, GateChecks and BoxChecks", () => {
     for (const bundle of [BankChecks, GateChecks, BoxChecks, ThingkindChecks]) { expect(Object.isFrozen(bundle)).to.be.true }
   })
 
-  it("take a box's stamp out of its record, dropping its sidecar and sealed whisper", () => {
+  it("extract a box's stamp from its record, dropping its sidecar and sealed whisper", () => {
     const { sidecar: _sidecar, whisper_sealed: _whisperSealed, ...thing } = TH.boxThingOf()
     expect(BoxChecks.stamp.parse(TH.boxThingOf())).to.deep.equal(thing)
   })

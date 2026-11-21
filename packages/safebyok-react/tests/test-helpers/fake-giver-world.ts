@@ -1,4 +1,4 @@
-/** A fake Device for the giver's tests: its bank started on demand, box cars the test stores and announces, and form verbs that record what they hear. */
+/** A fake Device for the giver's tests: its bank started on demand, box cars the test stores and announces, and form verbs that record what they are handed. */
 
 import { type BankSnapshot, type DeviceSnapshot, type PassphraseVerdict, PendingBank } from 'safebyok'
 import { boxCarQueryKey } from '../../src/giver/react-giver'
@@ -59,11 +59,11 @@ export interface FakeGiverWorld {
   stored:  Map<string, FakeBoxCar>
   /** How many cars the bank objects have asked the vaultDB for. */
   counts:  { gets: number }
-  /** Each form verb the bank objects have heard, in order, with the cleartexts it was handed. */
+  /** Each form verb called on the bank objects, in order, with the cleartexts it was handed. */
   formCalls: Readonly<{ verb: FakeFormVerb, cleartexts: unknown }>[]
-  /** Hold each car the vaultDB reads from now on until the function returned is called: it then answers what it read. */
+  /** Pause each car the vaultDB reads from now on until the function returned is called: it then answers what it read. */
   pauseAnswers(): () => void
-  /** Hold each strength verdict from now on until the function returned is called. */
+  /** Pause each strength verdict from now on until the function returned is called. */
   pauseVerdicts(): () => void
   /** Have each form verb from now on reject with `err`, or resolve again for null. */
   refuseFormVerbs(err: Error | null): void
@@ -95,7 +95,7 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
   // For each starter, the function it returned for the bank object it was handed, or null for none.
   const endings         = new Map<Starter, (() => void) | null>()
   const stored          = new Map<string, FakeBoxCar>()
-  // Each labelpath's car as the minder last cached it: by a get, or heard.
+  // Each labelpath's car as the minder last cached it: by a get, or from a notice.
   const cached          = new Map<string, FakeBoxCar>()
   const counts          = { gets: 0 }
   const formCalls: FakeGiverWorld['formCalls'] = []
@@ -109,7 +109,7 @@ export function makeFakeGiverWorld(): FakeGiverWorld {
     for (const listener of carListeners) { listener(event) }
   }
 
-  // As the minder's get does, a car in hand that the vaultDB is not known to hold newer than answers at once.
+  // As the minder's get does, a car in hand answers at once, unless the vaultDB is known to have a newer one.
   async function getBoxCar(labelpath: string): Promise<FakeBoxCar> {
     const held = cached.get(labelpath)
     if ((held !== undefined) && (held.liveness !== 'bhnd') && (held.liveness !== 'bare')) { return held }

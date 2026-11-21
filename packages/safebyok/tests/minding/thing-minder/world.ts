@@ -94,7 +94,7 @@ export interface MinderWorld<VaultDBT extends MemoryVaultDB> {
   receive: (notice: ThingNotice) => void
 }
 
-/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false, after which it has heard the root box's notice unless `isRootHeard` is false. */
+/** The minder of a bank over `vaultDB`, made, and started unless `isStarted` is false, after which it has received the root box's notice unless `isRootHeard` is false. */
 export function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT, { isStarted = true, isRootHeard = true } = {}): MinderWorld<VaultDBT> {
   const bank     = fakeBankOf()
   const watching = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
@@ -107,13 +107,13 @@ export function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT,
   return { vaultDB, bank, minder, receive }
 }
 
-/** `vaultDB`, holding a born bank: its roots at revision 0, the asks above track. */
+/** `vaultDB` with a born bank, its roots at revision 0, which the asks above track. */
 export async function bornOf<VaultDBT extends MemoryVaultDB>(vaultDB: VaultDBT): Promise<VaultDBT> {
   await TH.expectGood(vaultDB.tryBirthBank(TH.birthBankAskOf()))
   return vaultDB
 }
 
-/** A vaultDB holding a born bank with its main gate at revision `revseq`, and the gate it holds. */
+/** A vaultDB with a born bank, its main gate at revision `revseq`, and that gate. */
 export async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Promise<GateRecord> {
   let gate = TH.gateThingOf()
   await bornOf(vaultDB)
@@ -125,7 +125,7 @@ export async function storedGateOf(vaultDB: MemoryVaultDB, revseq: number): Prom
   return gate
 }
 
-/** A vaultDB holding a born bank and the box under its root box, and the box. */
+/** A vaultDB with a born bank and the box under its root box, and that box. */
 export async function storedBoxOf(vaultDB: MemoryVaultDB): Promise<ThingNotice['val']> {
   await bornOf(vaultDB)
   const box   = TH.boxThingOf()

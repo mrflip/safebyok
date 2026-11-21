@@ -7,17 +7,17 @@ import * as Throwers from '../refusals/throwers'
 // == [The cloak]: cloak, Cloak, CloakedMarker
 
 /** Wrap a form's cleartexts in a {@link Cloak}, to hand a giver's form mutation in their place.
- * The cloak keeps the only copy of a passkey answer's PRF bytes: those in the answer you pass are zeroed.
- * @example unlock.mutate(cloak({ passphraseClear: passphraseField.value }))
+ * The cloak has the only copy of a passkey answer's PRF bytes: those in the answer you pass are zeroed.
+ * @example unlock.mutate(cloak({ passphraseCleartext: passphraseField.value }))
  */
 export function cloak(cleartexts: CloakCleartexts): Cloak { return new Cloak(cleartexts) }
 
-/** What a cloak shows wherever it is serialized or printed. */
+/** The text a cloak shows wherever it is serialized or printed. */
 const CloakedMarker = '[cloaked]'
 
 // A form mutation's variables stay in React Query's mutation cache, its devtools and the `useMutation` hook's state; a
 // cloak there shows none of its cleartexts, and is vacated once the mutation settles. A passkey answer's getter hands out
-// a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own bytes until it is vacated.
+// a fresh copy, so a verb's zeroing of what it is handed leaves the cloak's own bytes intact until it is vacated.
 /** A form's cleartexts, each read through its getter, until {@link Cloak.vacate} empties the cloak.
  * A spread copies none of them, and JSON, `String()` and Node's inspect show only `'[cloaked]'`.
  */
@@ -29,24 +29,24 @@ export class Cloak {
 
   constructor(cleartexts: CloakCleartexts) {
     const given = checkedCleartexts(cleartexts)
-    this.#passphraseCleartext     = given.passphraseClear
-    this.#passkeyCleartext        = adoptedAnswerOf(given.passkeyClear)
-    this.#nextPassphraseCleartext = given.nextPassphraseClear
-    this.#nextPasskeyCleartext    = adoptedAnswerOf(given.nextPasskeyClear)
+    this.#passphraseCleartext     = given.passphraseCleartext
+    this.#passkeyCleartext        = adoptedAnswerOf(given.passkeyCleartext)
+    this.#nextPassphraseCleartext = given.nextPassphraseCleartext
+    this.#nextPasskeyCleartext    = adoptedAnswerOf(given.nextPasskeyCleartext)
     Object.freeze(this)
   }
 
   /** The passphrase: a new bank's, or the proof of an `unlock` gating or a gate change. */
-  get passphraseClear(): string | undefined { return this.#passphraseCleartext }
+  get passphraseCleartext(): string | undefined { return this.#passphraseCleartext }
 
   /** A fresh copy of the passkey answer: a new bank's, or the proof of an `unlock` gating or a gate change. */
-  get passkeyClear(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#passkeyCleartext) }
+  get passkeyCleartext(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#passkeyCleartext) }
 
   /** The new passphrase. */
-  get nextPassphraseClear(): string | undefined { return this.#nextPassphraseCleartext }
+  get nextPassphraseCleartext(): string | undefined { return this.#nextPassphraseCleartext }
 
   /** A fresh copy of the new passkey's answer. */
-  get nextPasskeyClear(): GX.PasskeyAnswer | undefined { return copiedAnswerOf(this.#nextPasskeyCleartext) }
+  get nextPasskeyCleartext(): GX.PasskeyAnswer | undefined { return copiedAnswerOf(this.#nextPasskeyCleartext) }
 
   /** Zero the cloak's passkey answers and drop its passphrases: every getter returns undefined after. */
   vacate(): void {
@@ -74,7 +74,7 @@ export class Cloak {
 // == [The cloak's helpers]: checkedCleartexts, isAnswerish, copiedAnswerOf, adoptedAnswerOf, zeroAnswer
 
 /** Check `cleartexts` for {@link cloak}: an object of the form verbs' fields, their values unjudged.
- * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that keeps nothing of it.
+ * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
  */
 function checkedCleartexts(cleartexts: unknown): CloakCleartexts {
   try {
