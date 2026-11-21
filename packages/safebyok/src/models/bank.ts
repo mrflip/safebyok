@@ -264,7 +264,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox
   // The gate's seal and unseal, for this bank's own boxes: only the bank knows its root box, whose lifeseq begins each box's
-  // lifepath. A vault writes what they seal, and waits for the unlock where its verb does.
+  // lifepath. A vault writes what they seal, refusing a locked bank; only its withWhisper waits for the unlock.
 
   /** Seal and return the next revision of the box `donorProps`. Needs the bank unlocked.
    * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
