@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1, 2, 3 and 5 filed, out of draft (#797–#800). Thread 4 ready, in review (#801; one compaction, at its end). Thread 6 building, stacked on #800. Thread 7 waits on 4 and 6, then a restack into one line.
+* **Status:** running. Threads 1 to 5 filed, out of draft (#797–#801; #800 and #801 are siblings on #799). Thread 6 building, stacked on #800. Thread 7 waits on 6, then a restack of #801 into the line.
 
 ## The goal
 
@@ -224,6 +224,7 @@ Serves thread 7: the hooks Knock-Knock's key editor needs. The Coach's text is q
 * **Leaves out:** listings, `putBox` with a revisor, suspense.
 * *Orchestrator:* also ports or retires the old giver's three test files (`react-bridge`, `minder-giver`, `old-giver`: 50 cases) and deletes the old giver and its worlds, which thread 3 left. Run on `thread-worker-400k`.
 * *Orchestrator:* ready, #801. One compaction at ~262k, after proving, just before ready. The old giver and its worlds are deleted; `useBoxRecord` gave way to `useBox`. Three of its leftovers are my calls on Cleanup (emptying every FormData field; the signed-out `boxQuery` error; listings' key goes to thread 8).
+* *Review:* fixed (low). Two doc blocks tidied. Rules 2, 7 and 8 checked, nothing to change. Left: three exported names against STYLE.md (`nullifyThing`, `PutBoxActionResult.error`, `delBox`: an Open Matters row); `@example` twins unmarked (Cleanup). Out of bounds, noted: a late `putBoxAction` result after a lock.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 3. **Beside:** 5 and 6.
 * **Ready when:** a test shows `putBoxAction`, then `useBox` with the new sidecar, and no whisper in the action
   state, the mutation cache or the query cache.
