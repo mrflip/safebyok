@@ -173,6 +173,12 @@ describe('scripts/git-survey.sh', () => {
     expect(rows.get('landed')?.verdict).to.equal('close')
   })
 
+  it('judges a branch that shares its name with a tag at another commit', () => {
+    seedKinds(repo)
+    repo.git('tag', 'opened', 'main')
+    expect(rowsOf(repo.survey()).get('opened')).to.deep.equal({ verdict: 'active', rest: ['#5', 'open'] })
+  })
+
   it('notes an open PR whose head is not the local tip', () => {
     seedKinds(repo)
     repo.git('switch', '--quiet', 'opened')
