@@ -58,9 +58,9 @@
     "vitest": "^5.1.0"
   },
   "peerDependencies": {
+    "@tanstack/react-query": "^5.107.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@tanstack/react-query": "^5.107.1",
     "vitest": "^5.0.0"
   },
   "main": "./dist/index.cjs",
@@ -90,6 +90,7 @@
     "./package.json": "./package.json"
   },
   "dependencies": {
+    "es-toolkit": "^1.53.2",
     "safebyok": "workspace:*"
   },
   "publishConfig": {
