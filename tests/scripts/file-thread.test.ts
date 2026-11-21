@@ -108,6 +108,14 @@ describe('scripts/file-thread', () => {
     expect(git('rev-parse', `origin/${Branch}`)).to.eq(review)
   })
 
+  it('files a thread whose branch shares its name with a tag at another commit', () => {
+    cutAndBuild('origin/main')
+    git('tag', Branch, 'main')
+    const result = file('true')
+    expect(result.status, String(result.stderr)).to.eq(0)
+    expect(git('rev-parse', `refs/remotes/origin/${Branch}`)).to.eq(git('rev-parse', `refs/heads/${Branch}`))
+  })
+
   it("leaves a stacked thread that records no base branch on the thread it stands on", () => {
     git('switch', '--quiet', '--create', 'vault_split')
     const below = commit(main, 'vault.ts', 'export {}\n')
