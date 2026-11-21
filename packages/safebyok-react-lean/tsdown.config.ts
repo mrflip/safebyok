@@ -18,8 +18,10 @@ export default defineConfig({
   sourcemap:  true,
   clean:      true,
   // A checker's declared type refers to zod's types, through safebyok's validators. zod is a peer dependency
-  // of safebyok, so any host that has the core already has it. Keep it external, like safebyok.
-  deps:       { neverBundle: [/^zod(\/|$)/, /^@tanstack\//] },
+  // of safebyok, so any host that has the core already has it. Keep it external, like safebyok. safebyok's
+  // declarations re-export safebyok-big's types: followed, they report idb-keyval as bundled, though nothing of
+  // it is, and tsdown writes it into package.json as an inlined dependency at each build.
+  deps:       { neverBundle: [/^zod(\/|$)/, /^@tanstack\//, /^safebyok-big(\/|$)/] },
   exports:    { devExports: '@safebyok/source' },
   publint:    { level: 'warning' },
   attw:       { profile: 'strict', level: 'error' },
