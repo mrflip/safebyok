@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, GotOtherThanBox, BankSwept
+// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, VaultBankExpected
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -20,11 +20,11 @@ export const TombstoneSecretsGiven = "A tombstone seals no secrets: give `{ am: 
 /** A box whose lifepath is not under the bank's root box. */
 export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its bank's root box: this one is of another life of the root."
 
-/** A box get answered with a Thing of another kind: the vaultDB is broken. */
-export const GotOtherThanBox = 'A box get was answered with a Thing that is not a box: the vaultDB is broken.'
-
 /** A call on a bank after its sweep. */
 export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
+
+/** A vault made without a bank. */
+export const VaultBankExpected = 'A Vault is made with the Bank whose boxes it carries.'
 // --
 
 // == [Things]: the sentences of a Thing's checks, of a shell's, and of a vaultDB's asks
@@ -120,7 +120,7 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, GcTimeShape, StaleTimeShape, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBehindOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: BankExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotACar, CarRecordShape, CarFullestShape, CarFullSplit, CarNewestNotSparse, CarBhndOfOtherRevision, CarNewestNotGone, CarVoidNotShell, CarAgerankNotOwn, CarsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a bank. */
 export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
@@ -132,11 +132,11 @@ export const MinderNotStarted = 'This ThingMinder is not minding: call hello bef
 /** A get that storage answered older than the record the minder held when it began. */
 export const StaleRead = 'Storage answered with a revision older than one this device already held. The newer record stays cached, and a later get asks again.'
 
-/** A gcTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
-export const GcTimeShape = 'A gcTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
-
 /** A staleTime that is not Infinity or a whole number of milliseconds up to MaxTimerMillis. */
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
+
+/** A minder's `listen` given a feed version other than `ThingFormat`. */
+export const FeedVersionOther = "A ThingMinder's listen is given the version of the feed its listener reads, ThingFormat, and this listener was written for another: its events are not shaped as it expects."
 
 /** A value in a minder's query that is not a car. */
 export const NotACar = "A ThingMinder's structural sharing was given a value that is not a ThingCar: only cars belong in its cache."
@@ -150,17 +150,20 @@ export const CarFullestShape = "A ThingCar's fullest record is not whole: this i
 /** A full car with two records, or a tombstone. */
 export const CarFullSplit = "A full ThingCar has one live record in both its newest and fullest, and this one does not: this is a bug in safebyok."
 
-/** A behind or bare car whose newest is whole, or a tombstone. */
-export const CarNewestNotSparse = "A behind or bare ThingCar's newest record is live and sparse, and this one's is not: this is a bug in safebyok."
+/** A bhnd or bare car whose newest is whole, or a tombstone. */
+export const CarNewestNotSparse = "A bhnd or bare ThingCar's newest record is live and sparse, and this one's is not: this is a bug in safebyok."
 
-/** A behind car whose fullest is not an earlier revision of its newest's life. */
-export const CarBehindOfOtherRevision = "A behind ThingCar's fullest record is an earlier revision of its newest's Thing and life, and this one's is not: this is a bug in safebyok."
+/** A bhnd car whose fullest is not an earlier revision of its newest's life. */
+export const CarBhndOfOtherRevision = "A bhnd ThingCar's fullest record is an earlier revision of its newest's Thing and life, and this one's is not: this is a bug in safebyok."
 
 /** A gone car whose newest is not gone: a live record, or the void sentinel. */
 export const CarNewestNotGone = "A gone ThingCar's newest record is the tombstone of a deleted Thing, and this one's is a live record or the void sentinel: this is a bug in safebyok."
 
 /** A void car whose newest is not the void sentinel. */
 export const CarVoidNotShell = "A void ThingCar's newest record is the void sentinel, and this one's is not: this is a bug in safebyok."
+
+/** A car whose agerank does not match its records and liveness. */
+export const CarAgerankNotOwn = "A ThingCar's agerank is made of its records and liveness, and this one's is not: this is a bug in safebyok."
 
 /** Two cars of different Things given to a minder's structural sharing. */
 export const CarsOfOtherThings = "A ThingMinder's structural sharing was given the cars of two different Things: this is a bug in safebyok."

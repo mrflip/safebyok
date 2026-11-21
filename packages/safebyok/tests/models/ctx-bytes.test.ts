@@ -44,7 +44,7 @@ function changed(val: unknown): unknown { return ((typeof val === 'number') ? va
 /** A born bank, a box it sealed, the box's stamp as the seal binds it, and the bankKey, read through the backdoor. */
 async function sealedWorld() {
   const { bank } = await TH.buildBornBank()
-  const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+  const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
   return { bank, box, boxStamp: BaseBox.stampOf(box), bankKey: await TH._cheat_bankKeyOf(bank) }
 }
 
@@ -100,7 +100,7 @@ describe("each ctx, byte for byte", () => {
 
   it("binds a lease's wrap of the bankKey to the bank's stamp and its own", async () => {
     const record = await leaseRecordOf()
-    const leaseText = `{"banklabel":"acme","born_at":${String(TH.T0)},"fmt":${String(LeaseFormat)},"gate_labelpath":"gate","gate_lifeseq":"0000000000","gate_revtok":"${TH.WorldGate.revtok}","lifeseq":"0000000000","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
+    const leaseText = `{"banklabel":"acme","born_at":${String(TH.T0)},"fmt":"${LeaseFormat}","gate_labelpath":"gate","gate_lifeseq":"0000000000","gate_revtok":"${TH.WorldGate.revtok}","lifeseq":"0000000000","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
     const ctx = textBytes(`[${BankStampText},${leaseText},"bank_key_lease_wrapped"]`)
     expect(await Crypto.unwrapKeyUnder(record.lease_key, record.bank_key_lease_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })

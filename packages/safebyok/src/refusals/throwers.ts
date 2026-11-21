@@ -3,11 +3,10 @@
 // The rules for a refusal, its thrower and its phrase are at the top of safebyok-big's refusals/throwers.ts.
 
 import { Errors, Phrases as BigPhrases } from 'safebyok-big/internals'
-import type { EX } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
 import { type ThingRecord } from '../shapes/shapes-thing'
 import { type GetAsk, type ListAsk, type WriteAsk, loggableAskOf } from '../shapes/shapes-asks'
-import type { DamagedThing, GoodAnswer } from '../storage/vault-db'
+import type { DamagedThing } from '../storage/vault-db'
 
 // == [Big's Throwers]: every thrower of safebyok-big, re-exported
 
@@ -15,7 +14,7 @@ import type { DamagedThing, GoodAnswer } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: bankSwept, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, otherThanBox
+// == [Model Throwers]: bankSwept, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot
 
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
@@ -28,12 +27,6 @@ export function sidecarMissing(): Errors.VaultError { return new Errors.VaultErr
 
 /** A `record_conflict` refusal: a box's lifepath is of another life of its bank's root box. */
 export function boxOfOtherRoot(): Errors.VaultError { return new Errors.VaultError('record_conflict', Phrases.BoxOfOtherRoot) }
-
-// The row goes on the refusal's rows, which reach an answer and never a log: a gate's row has its wrapped bankKeys.
-/** A `storage_issue` refusal of `answer`, the vaultDB's to a box's get, whose Thing is not a box. */
-export function otherThanBox({ ask, val }: GoodAnswer<ThingRecord, EX.GotAct>): Errors.VaultError {
-  return new Errors.VaultError('storage_issue', Phrases.GotOtherThanBox, { meta: { ask, act: 'unclassified_storing' }, rows: { dbhas: val } })
-}
 // --
 
 // == [Write Throwers]: opNotOfRecord, revseqNotNext, revtokNotNew, recordOfOtherScope, tombstoneOverTombstone, lifepathNotKept, lifeseqNotNext, bornAtNotNow, testimonyMissing

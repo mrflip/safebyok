@@ -23,3 +23,5 @@ what differs from big, in a sentence or two.
   its lease refuses every seal and unseal, but the lease keeps its leaseKey until the `Bank` is let go.
   `bank.sweep()` (`packages/safebyok/src/models/bank.ts`) evicts it through `lease.sweep()`; nothing calls it from the
   device yet.
+  amended 2026-11-20 (snapshots, #773): `device.sweep()` now reaches the last `Bank` made on the device, through
+  `device.cheatHoldBank`, and sweeps its lease; a `Bank` made earlier on the same device still keeps its leaseKey.

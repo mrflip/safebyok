@@ -1,10 +1,10 @@
 /** A Device for the giver's tests over the new core's minder: one bank, born in a memory vaultDB, already started. */
 
-import { type BoxCar, type MinderFriend, ThingMinder } from 'safebyok'
+import { type BoxCar, type DeviceSnapshot, type MinderFriend, PendingBank, ThingMinder } from 'safebyok'
 import { type BoxRecord, type GetAsk, type ThingRecord, MemoryVaultDB, Shell, getAskOf, listAskOf } from 'safebyok/storage'
 import * as LeanTH from 'safebyok/testing'
 import { giverBankOfMinder } from '../../src/giver/minder-bank'
-import type { DeviceSnapshot, GiverBank, GiverDevice } from '../../src/giver/react-giver'
+import type { GiverBank, GiverDevice } from '../../src/giver/shapes-giver'
 
 // == [Asks]: minderGetAskOf
 
@@ -73,7 +73,7 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
   minder.hello()
 
   return {
-    device:          minderDeviceOf(giverBankOfMinder(minder)),
+    device:          minderDeviceOf(minder, giverBankOfMinder(minder)),
     vaultDB,
     minder,
     counts,
@@ -87,15 +87,16 @@ export async function makeMinderGiverWorld({ isWatching = true } = {}): Promise<
   }
 }
 
-/** A Device signed in as `bank`'s user, its one bank object `bank`, never ending. */
-function minderDeviceOf(bank: GiverBank<BoxCar>): GiverDevice<BoxCar> {
-  const snapshot: DeviceSnapshot = Object.freeze({ userid: bank.userid, banks: Object.freeze({}) })
+/** A Device of `minder`'s user and bank, its one bank object `bank`, never ending. */
+function minderDeviceOf(minder: ThingMinder, bank: GiverBank<BoxCar>): GiverDevice<BoxCar> {
+  const snapshot: DeviceSnapshot = Object.freeze({ bank: PendingBank })
   return Object.freeze({
-    subscribe:         () => unsubscribeNothing,
-    getSnapshot:       () => snapshot,
-    getServerSnapshot: () => snapshot,
-    ensureBank:        () => Promise.resolve(bank),
-    onBankStart:       (starter: (started: GiverBank<BoxCar>) => () => void) => {
+    userid:      minder.userid,
+    banklabel:   minder.banklabel,
+    subscribe:   () => unsubscribeNothing,
+    getSnapshot: () => snapshot,
+    ensureBank:  () => Promise.resolve(bank),
+    onBankStart: (starter: (started: GiverBank<BoxCar>) => () => void) => {
       starter(bank)
       return unsubscribeNothing
     },

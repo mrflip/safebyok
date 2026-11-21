@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { giverBankOfMinder } from '../../src/giver/minder-bank'
 import { makeReactGiver } from '../../src/giver/react-giver'
+import { ThingMinder } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import * as TH from '../test-helpers'
 
@@ -39,14 +40,15 @@ describe("giverBankOfMinder", () => {
     }
   })
 
-  it("tells each box car the minder caches, and no other kind's car, nor a removed one", async () => {
+  it("passes on each event of the minder about a box's car, and none about another kind's", async () => {
     const { minder } = await TH.makeMinderGiverWorld()
-    const told: [string, string][] = []
-    giverBankOfMinder(minder).listenBoxCars((labelpath, car) => { told.push([labelpath, car.liveness]) })
+    const told: unknown[][] = []
+    giverBankOfMinder(minder).listenBoxCars((event) => { told.push([event.type, event.queryKey, event.state.data?.liveness]) })
     await minder.get({ ...minder.scope, labelpath: 'gate' })
     await minder.get({ ...minder.scope, labelpath: OpenaiPath })
     minder.goodbye()
-    expect(told).to.deep.equal([[OpenaiPath, 'void']])
+    const queryKey = ThingMinder.queryKeyOf({ ...minder.scope, labelpath: OpenaiPath })
+    expect(told).to.deep.equal([['updated', queryKey, 'void'], ['removed', queryKey, undefined]])
   })
 })
 

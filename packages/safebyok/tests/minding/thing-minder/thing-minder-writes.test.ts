@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { carOf } from '../../../src/minding/thing-car'
 import { ThingMinder } from '../../../src/minding/thing-minder'
-import { Shell } from '../../../src/shapes/shapes-thing'
+import { Shell, ThingFormat } from '../../../src/shapes/shapes-thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
 import { QuietVaultDB, LateWriteVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, cheatBox, listenerOf, boxBirthAskOf } from './world'
@@ -44,8 +44,8 @@ describe("ThingMinder.tryWrite", () => {
     let isResolved = false
     const told: { isResolved: boolean, car: unknown }[] = []
     minder.listen((event) => {
-      if ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.car }) }
-    })
+      if (ThingMinder.isThingEvent(event) && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.state.data }) }
+    }, ThingFormat)
     const mine = TH.nextOf(box0, { revtok: TH.revtokOf('mine') })
     const answer = await minder.tryWrite(TH.replaceAskOf(box0, mine))
     isResolved = true
@@ -74,7 +74,7 @@ describe("ThingMinder.tryWrite", () => {
     const { minder } = minderWorldOf(vaultDB)
     await minder.list('box')
     const heard = listenerOf()
-    minder.listen(heard)
+    minder.listen(heard, ThingFormat)
     vaultDB.hold()
     const writing = minder.tryWrite(boxBirthAskOf())
     await TH.eventually(() => vaultDB.isHolding)
@@ -93,8 +93,8 @@ describe("ThingMinder.tryWrite", () => {
     let isResolved = false
     const told: { isResolved: boolean, car: unknown }[] = []
     minder.listen((event) => {
-      if ((event.carkind === 'thing') && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.car }) }
-    })
+      if (ThingMinder.isThingEvent(event) && (event.labelpath === TH.BoxScope.labelpath)) { told.push({ isResolved, car: event.state.data }) }
+    }, ThingFormat)
     await minder.tryWrite(boxBirthAskOf())
     isResolved = true
     expect(told).to.deep.equal([{ isResolved: false, car: carOf(TH.boxThingOf()) }])
@@ -147,11 +147,12 @@ describe("ThingMinder.tryWrite", () => {
     const minder = ThingMinder.make({ vaultDB: device.vaultDB }, bank)
     minder.hello()
     const shell  = Shell.of({ ...bank.scope, labelpath: TH.BoxScope.labelpath }, bank.rootBox)
-    const box    = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    await TH.expectGood(minder.tryWrite(bank.makePutAsk({ cited: shell, record: box })))
+    const putAsk = await bank.sealBox(shell, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    await TH.expectGood(minder.tryWrite(putAsk))
     await minder.list('box')
-    const tombstone = await bank.tombstoneBox(box)
-    await TH.expectGood(minder.tryWrite(bank.makeDelAsk({ cited: box, record: tombstone })))
+    const { record: tombstone, ...delAsk } = await bank.tombstoneBox(putAsk.record)
+    expect(delAsk).to.include({ op: 'del' })
+    await TH.expectGood(minder.tryWrite({ ...delAsk, record: tombstone }))
     expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(tombstone))
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/openai'])
   })
@@ -199,4 +200,29 @@ describe("ThingMinder.tryWrite", () => {
       expect(written.mock.calls).to.have.lengthOf(0)
     })
   }
+})
+
+describe("ThingMinder.write", () => {
+  it("returns the record written, once it is in its car", async () => {
+    const vaultDB = await bornOf(new QuietVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    expect(await minder.write(boxBirthAskOf())).to.deep.equal(TH.boxThingOf())
+    expect(minder.at(TH.BoxScope)).to.deep.equal(carOf(TH.boxThingOf()))
+  })
+
+  it("throws the vaultDB's refusal", async () => {
+    const vaultDB = await bornOf(new QuietVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.write(boxBirthAskOf())
+    await TH.expectRefusal(minder.write(boxBirthAskOf()), 'stale_write')
+  })
+
+  it("throws, and asks the vaultDB nothing, while not minding", async () => {
+    const vaultDB = await bornOf(new QuietVaultDB())
+    const { minder } = minderWorldOf(vaultDB)
+    minder.goodbye()
+    const written = vi.spyOn(vaultDB, 'tryWriteThing')
+    await TH.expectRefusal(minder.write(boxBirthAskOf()), 'disabled')
+    expect(written.mock.calls).to.have.lengthOf(0)
+  })
 })

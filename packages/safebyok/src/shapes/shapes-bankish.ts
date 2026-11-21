@@ -5,14 +5,14 @@ import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from '
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
 import type { Proving } from '../models/proving'
-import type { BadAnswer, GoodAnswer, VaultDB } from '../storage/vault-db'
+import type { VaultDB } from '../storage/vault-db'
 import type { GateDna, RequestCleartext, StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealers'
 import type { BankStamp } from './shapes-stamps'
 import type { BoxRecord } from './shapes-thing'
-import type { GetAsk, ListAsk, WorldRecord } from './shapes-asks'
-import type { Labelpath } from './primitives'
+import type { BoxWriteAsk, GetAsk, ListAsk, WorldRecord } from './shapes-asks'
+import type { EpochMillis, Labelpath } from './primitives'
 
 // == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed
 
@@ -28,20 +28,15 @@ export type BankDna = BankStamp & { maingate: GateDna }
 export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 // --
 
-// == [The bank's drafts and answers]: GetBoxAskDraft, BankAskDraft, GetBoxAnswer
-
-/** The draft of a box's get ask, for {@link Bank.tryGetBox}: the box's labelpath, and `ifAbsent`, the answer when none is stored (default `'nil'`).
- * The bank fills in the rest of the {@link GetAsk}.
- */
-export type GetBoxAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent | 'shell' }>
+// == [The bank's drafts and asks]: BankAskDraft, SealedBoxAsk
 
 /** The draft of a get or list ask, for {@link Bank.makeGetAsk} or {@link Bank.makeListAsk}: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
  * The bank fills in the rest of the {@link GetAsk} or {@link ListAsk}.
  */
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
 
-/** The answer of {@link Bank.tryGetBox}: the box, live or a tombstone; `VoidT` under `gotvoid`, when none is stored; or a refusal. */
-export type GetBoxAnswer<VoidT = null> = GoodAnswer<BoxRecord, 'gotlive' | 'gotgone'> | GoodAnswer<VoidT, 'gotvoid'> | BadAnswer
+/** The write ask {@link Bank.sealBox} returns, carrying the sealed `record`: a put for a live box, or a del for a tombstone. */
+export type SealedBoxAsk<RecordT extends BoxRecord = BoxRecord> = BoxWriteAsk & Readonly<{ record: RecordT }>
 // --
 
 // == [The bank's making]: BankOpts, BirthOpts
@@ -99,5 +94,55 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
+}
+// --
+
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, DeviceSnapshot
+
+/** The stages of a bank, as {@link BankStage} describes each. */
+export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
+/** Where the user stands with their bank, for a host's screen to switch on:
+ * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of
+ * - `'starting'`   -- signed in, and the bank is being brought up
+ * - `'unborn'`     -- no bank is stored for this user, or it was deleted
+ * - `'locked'`     -- the bank is stored, and needs the passphrase or passkey before a whisper can be read
+ * - `'unlocked'`   -- the bank holds a lease, and whispers can be read and written
+ * - `'swept'`      -- everything was unloaded, and nothing follows until the host acts
+ * - `'failed'`     -- bringing the bank up failed, as `lastErr` says
+ */
+export type BankStage = typeof bankStageVals[number]
+
+/** A refusal, for a snapshot to show. None of its fields carries secret material. */
+export interface RefusalSnapshot {
+  readonly refusalkind: Errors.Refusalkind
+  readonly family:      Errors.RefusalFamily
+  readonly message:     string
+}
+
+/** A bank's state, for a host to render. */
+export interface BankSnapshot {
+  readonly stage:       BankStage
+  /** True at every stage but `'unlocked'`. */
+  readonly isLocked:    boolean
+  /** True once the bank has ended. An ended bank refuses every call, and its stage says where the user stands. */
+  readonly isEnded:     boolean
+  /** The refusal every call meets once the bank has ended, or null before then. */
+  readonly endCause:    Errors.VaultError | null
+  /** When the lease ends, in epoch milliseconds, or null while locked. */
+  readonly leaseEndsAt: EpochMillis | null
+  /** Why the bank failed to come up, at stage `'failed'`, or null at every other stage. */
+  readonly lastErr:     RefusalSnapshot | null
+}
+
+// isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
+/** The bank snapshot a device shows before it holds a bank object. */
+export const PendingBank: BankSnapshot = Object.freeze({
+  stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null,
+})
+
+/** A device's state, for a host to render. */
+export interface DeviceSnapshot {
+  /** The snapshot of the bank on this device, or {@link PendingBank} before one is made. */
+  readonly bank: BankSnapshot
 }
 // --

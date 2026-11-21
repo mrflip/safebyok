@@ -9,7 +9,7 @@ import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, guardRequestCleartext, tellBadNewsTo } from '../../src/models/device'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { Gating } from '../../src/models/gating'
-import type { BadNews } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
 
 describe("a page that is not a secure context", () => {
@@ -220,6 +220,80 @@ describe("device.sweep()", () => {
     device.sweep()
     await TH.expectRefusal(Bank.launchBirthBankPrompt(device), 'disabled')
     expect(device.openGating).to.be.null
+  })
+})
+
+describe("device.lock()", () => {
+  it("locks the bank made on the device, and never throws", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    expect(device.lock()).to.equal(device)
+    expect(bank.isLocked).to.be.true
+    expect(device.lock()).to.equal(device)
+    expect(bank.isLocked).to.be.true
+  })
+
+  it("does nothing on a device with no bank, or a swept one", () => {
+    const device = TH.makeDevice()
+    expect(device.lock()).to.equal(device)
+    device.sweep()
+    expect(device.lock()).to.equal(device)
+  })
+})
+
+/** A listener on `device`'s snapshot that keeps each snapshot it reads. */
+function snapshotsOf(device: Device): DeviceSnapshot[] {
+  const snapshots: DeviceSnapshot[] = []
+  device.subscribe(() => { snapshots.push(device.getSnapshot()) })
+  return snapshots
+}
+
+describe("device.getSnapshot() and device.subscribe(listener)", () => {
+  it("shows the pending bank before a bank is made", () => {
+    const device = TH.makeDevice()
+    expect(device.getSnapshot()).to.deep.equal({ bank: PendingBank })
+    expect(Object.isFrozen(device.getSnapshot())).to.be.true
+  })
+
+  it("carries the bank's own snapshot, and tells its subscribers of each change to it", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const snapshots = snapshotsOf(device)
+    expect(device.getSnapshot().bank).to.equal(bank.getSnapshot())
+    bank.lock()
+    bank.lock()
+    expect(snapshots).to.have.lengthOf(1)
+    expect(snapshots[0]!.bank).to.equal(bank.getSnapshot())
+    expect(snapshots[0]!.bank).to.include({ stage: 'locked' })
+  })
+
+  it("follows the last bank made on it, and no longer the one before", async () => {
+    const { bank, device, record } = await TH.buildBornBank()
+    const later = Bank.make(record, { device, vaultDB: device.vaultDB })
+    const snapshots = snapshotsOf(device)
+    bank.lock()
+    expect(snapshots).to.have.lengthOf(0)
+    expect(device.getSnapshot().bank).to.equal(later.getSnapshot())
+  })
+
+  it("tells every subscriber when one throws, and passes the throw to onBadNews", async () => {
+    const onBadNews = vi.fn()
+    const { bank, device } = await TH.buildBornBank({ device: TH.makeDevice({}, { onBadNews }) })
+    device.subscribe(() => { throw new Error('a bug in the host') })
+    const listener = vi.fn()
+    device.subscribe(listener)
+    bank.lock()
+    expect(listener).toHaveBeenCalledOnce()
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+    expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
+  })
+
+  it("stops telling a listener once it unsubscribes, and refuses one that is not a function", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    const listener = vi.fn()
+    const unsubscribe = device.subscribe(listener)
+    unsubscribe()
+    bank.lock()
+    expect(listener).not.toHaveBeenCalled()
+    TH.expectSyncRefusal(() => device.subscribe(null as never), 'bad_record')
   })
 })
 

@@ -2,11 +2,12 @@ import type { Thingkind } from 'safebyok/storage'
 
 // == [Names]: TableVersion, SqlRevision, VaultFunctionNames
 
-// Bump TableVersion when any table's columns, CHECKs or stored record format change: functions built for other tables
-// will not work. Bump SqlRevision when a function's behaviour or signature changes over the same tables, and reset it to
-// 0 when TableVersion moves. Each pair names a new set of functions; the older sets stay installed beside it.
-/** The head of every vault function's name: the tables these functions are built for. */
-export const TableVersion = 1
+// TableVersion is safebyok's ThingFormat, spelled out because safebyok is private and a published package never imports it
+// at runtime; a test holds them equal. Bump both when any table's columns, CHECKs or stored record format change: functions
+// built for other tables will not work. Bump SqlRevision when a function's behaviour or signature changes over
+// the same tables, and reset it to 0 when TableVersion moves. Each pair names a new set of functions; the older sets stay installed beside it.
+/** The head of every vault function's name: the tables these functions are built for, and the `fmt` of the Things in them. */
+export const TableVersion = 'a010501'
 /** The tail of every vault function's name: the revision of these functions over the same tables. */
 export const SqlRevision  = 0
 
@@ -16,10 +17,10 @@ const VaultFunctionStems = [
   'replace_passphrase_ok', 'add_passkey_ok', 'revoke_passkey_ok', 'gate_policies_ok', 'write_bank', 'write_gate', 'write_box', 'birth_roots',
 ] as const
 
-// The two fields are zero-padded so that the names sort by version.
-/** The name of each vault function under {@link TableVersion} and {@link SqlRevision}, such as `safebyok_t01_r000_write_box`. */
+// The revision is zero-padded so that the names sort by it.
+/** The name of each vault function under {@link TableVersion} and {@link SqlRevision}, such as `safebyok_a010501_r000_write_box`. */
 export const VaultFunctionNames = Object.freeze(Object.fromEntries(VaultFunctionStems.map((stem) => (
-  [stem, `safebyok_t${String(TableVersion).padStart(2, '0')}_r${String(SqlRevision).padStart(3, '0')}_${stem}`]
+  [stem, `safebyok_${TableVersion}_r${String(SqlRevision).padStart(3, '0')}_${stem}`]
 )))) as Readonly<Record<typeof VaultFunctionStems[number], string>>
 // --
 

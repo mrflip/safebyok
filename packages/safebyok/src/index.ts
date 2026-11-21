@@ -1,4 +1,4 @@
-// safebyok, the front door: everything `safebyok/core` and `safebyok/storage` export, the ThingMinder the layers above the
+// safebyok, the front door: everything `safebyok/core` and `safebyok/storage` export, the ThingMinder and Vault the layers above the
 // core build on, the strength checkers, and what a host or an adapter reaches for that safebyok-big defines, re-exported
 // so that each stays one binding across both packages. The browser's deriver and checker are on `safebyok/browser`.
 // The proving classes are on no entry as values: see core.ts.
@@ -10,10 +10,11 @@ export * from './storage'
 /* eslint-enable import-x/export */
 export {
   type BankCar, type BoxCar, type CarAt, type CarFreshness, type DeliverableThing, type GateCar, type GotAnswer, type MinderOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, carLivenessVals,
-  type InvalidationEvent, type ListingEvent, type MinderEvent, type ThingEvent,
+  type ListingEvent, type MinderEvent, type MinderEventOf, type ThingEvent,
   DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis, MinderChecks, type MinderFriend, type MinderGetOpts, type MinderInvalidateOpts, type MinderTryAtOpts, type TsqStaleTime,
 } from './shapes/shapes-minder'
-export { ThingMinder } from './minding/thing-minder'
+export { type Labelpathed, ThingMinder } from './minding/thing-minder'
+export { Vault } from './models/vault'
 export { carOf, dbHasNewer } from './minding/thing-car'
 export { DefaultStrengthChecker, guardStrengthChecker } from './helpers/passphrase-strength'
 

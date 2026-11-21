@@ -1,4 +1,4 @@
-// safebyok/core: the device, bank, gate, gating, wayin and lease, the bank's methods that put its Things through its vaultDB,
+// safebyok/core: the device, bank, gate, gating, wayin and lease, the bank's methods that seal its boxes and put its Things,
 // and every type their signatures name; no caching, so neither the ThingMinder nor TanStack Query. Private while it is built.
 // The proving and gating classes are exported as types alone: a proving's `buildLease` is public, and a gating is made only
 // by the bank's prompts, which hand its attempt the bank's private verbs.
@@ -20,14 +20,15 @@ export {
   StampChecks,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
-export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq } from './shapes/primitives'
+export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type Answer, type BadAct, type BadAnswer, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer, type ListThingsAnswer, type ListedBeside,
   type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
 export {
-  type BadNews, type BadNewsHandler, type BankAskDraft, type BankDna, type BankMakeRecord, type BankOpts, type BirthOpts, type BoxUnsealed, type DeviceOpts, type DeviceRecord, type GetBoxAnswer,
-  type GetBoxAskDraft, BankishChecks,
+  type BadNews, type BadNewsHandler, type BankAskDraft, type BankDna, type BankMakeRecord, type BankOpts, type BankSnapshot, type BankStage, type BirthOpts, type BoxUnsealed, type DeviceOpts, type DeviceRecord,
+  type DeviceSnapshot, type RefusalSnapshot, type SealedBoxAsk,
+  BankishChecks, PendingBank, bankStageVals,
 } from './shapes/shapes-bankish'
 export {
   type AskUser, type BankGatingFriend, type BirthFriend, type CleartextsForGatingkind, type GateBank, type GateDna, type GateOpts, type GateRevisionedStamp, type GatingAttempt, type GatingOpts, type GatingRecord, type GatingSnapshot,

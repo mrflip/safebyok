@@ -20,8 +20,8 @@ export type Thingkind = typeof thingkindVals[number]
 /** What a model's `modelkind` getter answers: a kind of Thing, or one of the models that are never stored. */
 export type Modelkind = Thingkind | 'device' | 'gating' | 'wayin' | 'lease' | 'proving'
 
-/** The `fmt` of every Thing, of every kind: the kind is in its labelpath. Distinct from big's rows' fmts (3001, 4001, 5003). */
-export const ThingFormat = 100_501
+/** The `fmt` of every Thing, of every kind: the kind is in its labelpath. Distinct from big's rows' fmts (3001, 4001, 5003), which are numbers. */
+export const ThingFormat = 'a010501'
 
 /** True when `labelpath` is one of some kind of Thing's. */
 function isLabelpath(labelpath: Labelpath): boolean { return thingkindVals.some((modelkind) => Labelpath.isOfModelkind(labelpath, modelkind)) }
@@ -91,7 +91,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   // A Thing's scope and citation: what every record and tombstone has, sparse or whole. Its revseq is the shell's -1
   // only beside the void revtok and lifeseq, and they only beside it.
   const scopedCited  = obj({ ...thingScope.shape, ...thingCited.shape }).refine(isShellCitable, Phrases.CitedHalfShell)
-  const sparse       = obj({ ...thingScope.shape, label, fmt: uint, ...revisioned })
+  const sparse       = obj({ ...thingScope.shape, label, fmt: lit(ThingFormat), ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
   // The store checks only the shape of a sealed part: what is inside is the sealer's.

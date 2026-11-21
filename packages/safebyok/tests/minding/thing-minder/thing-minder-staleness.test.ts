@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { carOf } from '../../../src/minding/thing-car'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
+import { ThingFormat } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { badnewsOf, listenerOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, revtokAt, toldOf } from './world'
 
@@ -29,7 +30,7 @@ describe("ThingMinder.isStaleAt", () => {
     expect([minder.isStaleAt(TH.GateScope), minder.isStaleAt(gate)]).to.deep.equal([false, false])
   })
 
-  it("counts a bare or behind car stale under a staleTime of Infinity or 'static', and a get under Infinity fetches it", async () => {
+  it("counts a bare or bhnd car stale under a staleTime of Infinity or 'static', and a get under Infinity fetches it", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
@@ -40,7 +41,7 @@ describe("ThingMinder.isStaleAt", () => {
     const box1 = TH.nextOf(box0)
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, box1)
     await minder.list('box')
-    expect(minder.at(TH.BoxScope)).to.have.property('liveness', 'behind')
+    expect(minder.at(TH.BoxScope)).to.have.property('liveness', 'bhnd')
     for (const staleTime of [Infinity, 'static'] as const) { expect(minder.isStaleAt(TH.BoxScope, { staleTime })).to.be.true }
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     expect(await minder.get(TH.BoxScope, { staleTime: Infinity })).to.deep.equal(carOf(box1))
@@ -116,7 +117,7 @@ describe("ThingMinder's watch", () => {
     const car = minder.at(TH.GateScope)
     expect(car).to.deep.equal(carOf(TH.gateThingOf()))
     const listener = listenerOf()
-    minder.listen(listener)
+    minder.listen(listener, ThingFormat)
     await TH.expectGood(vaultDB.tryGetThing(staleGet))
     expect(minder.at(TH.GateScope)).to.eq(car)
     expect(toldOf(listener)).to.deep.equal([['gate', 'full']])
