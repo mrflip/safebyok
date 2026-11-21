@@ -277,8 +277,8 @@ whisper held outside its callback. Written by the react_life thread 9 worker, 20
   - read the stage again inside `withWhisper`'s wait and fall back to `ifLocked`: a check for a crossing in the
     unseal's path, and a way out of `ensureUnlocked` that no other caller has.
   - hold a lock across the read and the unseal: a lock where none was needed.
-* workaround: none needed: a query keyed on `isLocked`, as the doc block's example is, asks again under the new stage,
-  and the answer from the old stage is filed under the old key. A user who meets the unlock form can cancel it.
+* workaround: none needed: a caller that asks again on a stage change, as the parts' `WhisperMask` does, answers under
+  the new stage. A user who meets the unlock form can cancel it.
 
 Steps to reproduce: call `withLockableWhisper` on an unlocked bank, with the vault's `withWhisper` stubbed to call
 `lock()` before it calls through.
@@ -287,3 +287,24 @@ Reasoning for wontfix: a lock comes a few times a day, and the gap between the r
 two (CLAUDE.md, *Hours separate updates*). Nothing is written, and no whisper is shown that the user did not ask for.
 A guard would sit in the unseal's path for a crossing. Written by the react_life thread 12 worker, 2026-11-21, awaiting
 a ruling.
+
+### A `WhisperMask` write in flight when the bank locks can leave the live tail in the page
+
+* current outcome: in `safebyok-react-lean`, the parts' `WhisperMask` empties its element and asks `withLockableWhisper`
+  again on each stage change or new revision of the box, and writes what resolves into the element. Where an unlocked
+  answer is still in flight when the bank locks, the two answers race: the live mask, with the field's last characters,
+  can land after the stored one and stay in the page until the next stage change or write. A write to the box can
+  likewise leave the older revision's mask showing.
+* alternatives:
+  - drop a superseded answer by a flag the effect's cleanup sets: state kept for a crossing, in every mask's path.
+  - have the lock empty every mask in flight: a lifecycle call reaching across a callback.
+* workaround: none needed: the next lock, unlock or write writes the mask again. What shows is a mask of the field, not
+  the field, and it lives in the page alone, held by no React state or cache.
+
+Steps to reproduce: render a `WhisperMask` on an unlocked bank, and call `lock()` while the box is being unsealed, with
+the key deriver or the vaultDB's get held.
+
+Reasoning for wontfix: a lock comes a few times a day, and an unseal is in flight for milliseconds (CLAUDE.md, *Hours
+separate updates*). Nothing is written to storage, and no more of the whisper shows than the user saw a moment before.
+A guard would be a token in the mask's path for a crossing. Written by the react_life thread 14 worker, 2026-11-21,
+awaiting a ruling.

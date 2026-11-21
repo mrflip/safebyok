@@ -154,6 +154,7 @@ describe("the Knock-Knock Machine", () => {
     expect(within(region('Your Anthropic API key')).queryByLabelText('Anthropic API key')).to.be.null
     await within(region('Your Anthropic API key')).findByText(StoredMask)
     TH.expectTextUnheld(ApiKey.slice(-4), page.container, page.client)
+    expect(document.body.textContent.includes(ApiKey.slice(-4))).to.eq(false)
     unlockIn(locked)
     await screen.findByText('Your vault is unlocked.')
     await within(region('Your Anthropic API key')).findByText(LiveMask)

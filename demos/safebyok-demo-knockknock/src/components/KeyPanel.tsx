@@ -1,8 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useActionState } from 'react'
 import type { Whisper } from 'safebyok'
 import { mask } from 'safebyok-react-lean'
-import { SubmitButton, WhisperInput, WhisperText } from 'safebyok-react-lean/parts'
+import { SubmitButton, WhisperInput, WhisperMask, WhisperText } from 'safebyok-react-lean/parts'
 import { formTextOf } from '../lib/form-text'
 import { KeyLabelpath, Knock } from '../lib/sok'
 
@@ -28,28 +28,13 @@ export function KeyPanel() {
       {(box === null) && <p className="quiet">No key saved yet.</p>}
       {(box !== null) && (box !== undefined) && (
         <p className="row">
-          Saved key: <WhisperText labelpath={KeyLabelpath} field="apiKey" masked={<KeyMask revtok={box.revtok} isLocked={isLocked} />} />
+          Saved key: <WhisperText labelpath={KeyLabelpath} field="apiKey" masked={<WhisperMask labelpath={KeyLabelpath} field="apiKey" tail={4} />} />
           {! isLocked && <DeleteKeyButton />}
         </p>
       )}
       {! isLocked && <KeyEditor isReplacing={(box !== null) && (box !== undefined)} />}
     </section>
   )
-}
-
-/** The saved key's mask: its last four characters while unlocked, the stored mask from its sidecar while locked.
- * Keyed on the stage and the box's `revtok`, it answers again on a lock, an unlock or a save.
- */
-function KeyMask({ revtok, isLocked }: Readonly<{ revtok: string, isLocked: boolean }>) {
-  const { data: shown = '…' } = useQuery({
-    queryKey: ['keyMask', isLocked, revtok],
-    // The unlocked answer shows the key's last four characters: gcTime 0 drops it from the cache as the page locks, rather than keeping it five minutes.
-    gcTime:   0,
-    queryFn:  () => Knock.withLockableWhisper(KeyLabelpath, (whisper) => mask(String(whisper['apiKey']), { tail: 4 }), {
-      ifLocked: (stored) => (typeof stored.sidecar['mask'] === 'string') ? stored.sidecar['mask'] : '…',
-    }),
-  })
-  return <code>{shown}</code>
 }
 
 /** The form that saves a new key, or replaces the saved one. */

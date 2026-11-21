@@ -130,7 +130,8 @@ describe("Envman", () => {
     expect(within(database).getByText('Last rotated 2020-01-01.', { exact: false })).to.exist
     expect(database.className).to.contain('overdue')
     expect(openai.className).not.to.contain('overdue')
-    expect(valInputOf(openai, 'OPENAI_API_KEY')).to.include({ type: 'password', value: '', placeholder: StoredMask })
+    expect(valInputOf(openai, 'OPENAI_API_KEY')).to.include({ type: 'password', value: '' })
+    await within(openai).findByText(StoredMask)
     expectUnheld(reloaded)
   })
 
@@ -165,22 +166,23 @@ describe("Envman", () => {
     await screen.findByText('Your vault is unlocked.')
     const reloadedRow = await rowOf('DATABASE_URL')
     expect(reloadedRow.className).not.to.contain('overdue')
-    await waitFor(() => { expect(valInputOf(reloadedRow, 'DATABASE_URL').placeholder).to.eq(NextLiveMask) })
+    await within(reloadedRow).findByText(NextLiveMask)
     await revealIn(valInputOf(reloadedRow, 'DATABASE_URL'), NextOpenaiKey)
     expectUnheld(reloaded)
   })
 
   it("shows a value's last four characters while unlocked, and the stored mask while locked", async () => {
     const page = await loadWithEnvs()
-    const input = valInputOf(await rowOf('OPENAI_API_KEY'), 'OPENAI_API_KEY')
-    await waitFor(() => { expect(input.placeholder).to.eq(LiveMask) })
+    const row = await rowOf('OPENAI_API_KEY')
+    await within(row).findByText(LiveMask)
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
-    await waitFor(() => { expect(input.placeholder).to.eq(StoredMask) })
+    await within(row).findByText(StoredMask)
+    expect(document.body.textContent.includes(OpenaiKey.slice(-4))).to.eq(false)
     TH.expectTextUnheld(OpenaiKey.slice(-4), page.container, page.client)
     unlockIn(locked)
     await screen.findByText('Your vault is unlocked.')
-    await waitFor(() => { expect(input.placeholder).to.eq(LiveMask) })
+    await within(row).findByText(LiveMask)
     expectUnheld(page)
   })
 

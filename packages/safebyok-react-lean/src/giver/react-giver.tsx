@@ -425,14 +425,11 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   /** Call `fn` with the box's whisper on an unlocked bank, and `opts.ifLocked` with its sealed record on a locked one, resolving what either resolves.
-   * Unlike {@link withWhisper}, it never waits for the unlock form. Key a query of it on `isLocked` and the box's `revtok`, so it answers again on a lock, an unlock or a write.
-   * Use the whisper only inside `fn`, and return only what is safe to retain.
+   * Unlike {@link withWhisper}, it never waits for the unlock form. Call it again on a lock, an unlock or a write to the box.
+   * Use the whisper only inside `fn`. Write what it resolves into the page, never into React's state or a query, where it shows any of the whisper: the parts' `WhisperMask` shows a field's mask so.
    * @example
-   *   const { data: shown } = useQuery({
-   *     queryKey: ['apiKeyMask', isLocked, box?.revtok],
-   *     enabled:  Boolean(box),
-   *     queryFn:  () => Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) }),
-   *   })
+   *   const shown = await Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) })
+   *   maskElement.textContent = shown
    */
   async function withLockableWhisper<ResultT>(
     labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>, opts: WithLockableWhisperOpts<ResultT>,

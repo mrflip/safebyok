@@ -476,26 +476,19 @@ describe("withLockableWhisper", () => {
   })
 
   // withLockableWhisper @example
-  it("shows a live mask while unlocked and the stored one while locked, holding the whisper nowhere", async () => {
-    const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    function KeyMask() {
-      const isLocked = world.Bank.useBank((bank) => bank.isLocked)
-      const { data: box } = world.Bank.useBox(TH.JokesPath)
-      const { data: shown = 'pending' } = useQuery({
-        queryKey: ['apiKeyMask', isLocked, box?.revtok],
-        enabled:  Boolean(box),
-        queryFn:  () => world.Bank.withLockableWhisper(TH.JokesPath, ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (stored) => stored.sidecar['service'] as string }),
-      })
-      return <p>{shown}</p>
+  it("resolves a live mask to write into the page while unlocked, and the stored one while locked", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const maskElement = document.createElement('code')
+    const showMask = async () => {
+      const shown = await world.Bank.withLockableWhisper(TH.JokesPath, ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => box.sidecar['service'] as string })
+      maskElement.textContent = shown
     }
-    const { container } = render(TH.providerTreeOf(world, <KeyMask />, { userid: TH.ProviderUser }))
-    await screen.findByText('jokes')
-    const device = world._cheat_device()
-    await act(async () => { await device.bank!.unlock({ passphraseCleartext: Passphrase }) })
-    await screen.findByText(mask(TH.JokesKey, { tail: 4 }))
-    TH.expectTextUnheld(TH.JokesKey, container, world.client)
-    act(() => { world.Bank.lock() })
-    await screen.findByText('jokes')
+    await showMask()
+    expect(maskElement.textContent).to.eq('jokes')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    await showMask()
+    expect(maskElement.textContent).to.eq(mask(TH.JokesKey, { tail: 4 }))
   })
 })
 
