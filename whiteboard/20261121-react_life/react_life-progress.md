@@ -135,3 +135,6 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
 * `Knock.keys.boxList()` is the minder's own listing key, via the new core static `ThingMinder.listQueryKeyOf(scope)`;
   `keys.under()` does not cover it.
 * No opts, no `boxListQuery`, no `useQueryOptions().boxList` yet.
+* **Form mutation keys carry the userid** (`['sok', userid, banklabel, verb]`): thread 11.
+* **The sidecar mask is tuneable, one schedule for everyone**, default first 7 and last 4 characters; revealing a few
+  is by design (which key, was it rotated). Thread 11 adds the helper; `notes/security.md` records it.

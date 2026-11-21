@@ -319,6 +319,8 @@ written against the final names.
 > Standalone gating makers dropped → "add them back; what does the dream_interface file prescribe you use? Both approaches are wanted i was told"
 > Parts and kit take the bank as a prop → "im pretty sure we dont want this in the end but getting it working is right. the context doesnt help?"
 > Three box-hook names against STYLE.md → "yes correct the names to what style says"
+> Form mutation keys leave out the userid → (took the revised Rec: add the userid)
+> The key's mask leaks its last four characters → "the amount masked should be tuneable. It's by design that a small number of characters are revealed so you know which particular key you typed in ; perhaps it was rotated, etc. If four makes you nervous but two or three will do, change the mask schedule for everyone."
 
 * **Builds:** (a) the standalone gating makers and mutation options back on the bank giver, beside the five form
   hooks and their `.gating` (the dream prescribes the hook form; this adds the TanStack-idiomatic
@@ -327,7 +329,9 @@ written against the final names.
   `<WhisperText labelpath field />` work bare, as the dream writes them; `bank` and `giver` props stay as overrides;
   (c) the renames STYLE.md asks for: `nullifyThing` to a pure-derivation `fooOf` name, `PutBoxActionResult.error` to
   `err`, `delBox` to `delBoxOnce`; (d) the Knock-Knock demo drops its `bank={Knock}` props where the context serves,
-  and the dream's examples follow the new names.
+  and the dream's examples follow the new names. (e) the form mutation keys carry the userid: `['sok', userid, banklabel, verb]`, null while
+  signed out, as the box keys do. (f) a tuneable mask helper, exported from the package (the dream's `mask(whisper.apiKey)`),
+  with one default schedule: the first 7 and last 4 characters; the Knock-Knock demo uses it, and envman will.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 8 and 9, cut from the top of the two.
 * **Ready when:** a kit form renders bare under the provider and its tests pass; the old names are gone; a test makes
   a gating outside a hook and mutates through the standalone options.
