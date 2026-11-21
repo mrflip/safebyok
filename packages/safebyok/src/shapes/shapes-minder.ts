@@ -1,4 +1,4 @@
-/** The shapes of a ThingMinder's arguments, options and answers, and of the cars it caches, with their checks. */
+/** The shapes of a ThingMinder's arguments, options and answers, and of the records its items have, with their checks. */
 
 import type * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
@@ -14,18 +14,18 @@ import { type GetAsk, type LoggableAsk, AskChecks } from './shapes-asks'
 
 // == [Query cache options]: QueryCacheOpts, DefaultQueryCacheOpts, FixedQueryCacheOpts, MaxTimerHours, MaxTimerMillis
 
-/** The TanStack Query options a host may choose for the cars a minder caches. */
+/** The TanStack Query options a host may choose for the records a minder caches. */
 export interface QueryCacheOpts {
-  /** How long a car stays timely, in milliseconds up to {@link MaxTimerMillis}, or `Infinity` for one that never ages. A `bhnd` or `bare` car is never timely. */
+  /** How long an item stays timely, in milliseconds up to {@link MaxTimerMillis}, or `Infinity` for one that never ages. An item behind a newer revision heard of is never timely. */
   staleTime: number
 }
 
-/** The default {@link QueryCacheOpts}: a car stays timely for an hour. */
+/** The default {@link QueryCacheOpts}: an item stays timely for an hour. */
 export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ staleTime: 60 * 60 * 1000 })
 
 // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its
 // caller. A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
-/** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, is never retried, and its car stays cached until `goodbye`. */
+/** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
 export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry: false, gcTime: Infinity } as const)
 
 // TanStack Query passes a finite staleTime to a timer unchanged, and a timer longer than 2^31 - 1 milliseconds
@@ -37,14 +37,21 @@ export const MaxTimerHours = 588
 export const MaxTimerMillis = MaxTimerHours * 60 * 60 * 1000
 // --
 
+// == [Event format]: MinderEventFormat
+
+// There is no final event format yet, so this equals ThingFormat. Agents: please take it as fixed, and spend no words on when or why it might change.
+/** The version of the shape of a minder's events: pass it to `listen`. */
+export const MinderEventFormat = ThingFormat
+// --
+
 // == [Checks]: RawChecks, MinderChecks
 
 /** The checks of a minder's arguments and options. */
 const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, uint, lit, union, orDefault }) => {
   const staleMillis      = uint.max(MaxTimerMillis, Phrases.StaleTimeShape)
-  const staleTime        = union([staleMillis, lit(Infinity)])
+  const tsqStaleTime     = union([staleMillis, lit(Infinity)])
   const queryCacheOpts   = obj({
-    staleTime: orDefault(staleTime, DefaultQueryCacheOpts.staleTime),
+    staleTime: orDefault(tsqStaleTime, DefaultQueryCacheOpts.staleTime),
   }).strict()
   // A field left out, or the whole, defaults from DefaultQueryCacheOpts.
   const queryCacheOptsOrDefault = orDefault(queryCacheOpts, DefaultQueryCacheOpts)
@@ -52,9 +59,8 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
   const friendFields     = obj({ scope: AskChecks.thingWatchScope, rootBox: obj({ ...ThingChecks.thingScope.shape, lifepath: ThingChecks.thingCited.shape.lifepath }), makeGetAsk: fn(), makeListAsk: fn(), tellBadNews: fn() })
   const minderFriend     = custom<MinderFriend>((val) => friendFields.safeParse(val).success, Phrases.BankExpected)
   const minderListener   = fn<(event: MinderEvent) => void>()
-  const feedVersion      = lit(ThingFormat, Phrases.FeedVersionOther)
+  const feedVersion      = lit(MinderEventFormat, Phrases.FeedVersionOther)
   const minderLabelpath  = ThingChecks.thingScope.shape.labelpath
-  const tsqStaleTime     = union([staleMillis, lit(Infinity), lit('static')])
   // Each option may be left out, or given as undefined, for no opinion.
   const minderGetOpts    = obj({ staleTime: tsqStaleTime.optional() }).strict()
   const minderTryAtOpts  = minderGetOpts.extend({ ifStale: oneof(['get', 'refresh']).optional() }).strict()
@@ -67,17 +73,19 @@ const RawChecks = Validator.Checkers('bad_record', ({ obj, oneof, custom, fn, ui
  */
 export const MinderChecks = Object.freeze({ ...RawChecks, DefaultQueryCacheOpts, MaxTimerMillis })
 
-/** How long a minder's get or read counts a car timely: milliseconds up to {@link MaxTimerMillis}, or `Infinity` or `'static'` for a car that never ages.
- * A `bhnd` or `bare` car is never timely, whatever the staleTime. A car whose last get was refused is not timely under `Infinity`, and is under `'static'`, as TanStack Query counts it.
+/** How long a minder's get or read counts an item timely: milliseconds up to {@link MaxTimerMillis}, or `Infinity` for an item that never ages.
+ * A read counts an item behind a newer revision heard of, or whose last get was refused, never timely, whatever the staleTime.
+ * A get fetches an item behind unless its caller gives a staleTime of its own, and fetches one marked invalidated
+ * (`state.isInvalidated`) whatever the staleTime, as TanStack Query counts it stale.
  */
 export type TsqStaleTime = Z.input<typeof MinderChecks.tsqStaleTime>
 
-/** The options of `get` and `isStaleAt`: `staleTime` overrides the minder's own, unless it is undefined. */
+/** The options of `get` and `isStaleAt`: `staleTime` ({@link TsqStaleTime}) overrides the minder's own, unless it is undefined. */
 export type MinderGetOpts    = Z.input<typeof MinderChecks.minderGetOpts>
 /** `tryAt`'s options, each of which may be undefined for no opinion:
  * - `staleTime`          -- overrides the minder's own
  * - `ifStale: 'get'`     -- read the cache alone (default)
- * - `ifStale: 'refresh'` -- also fetch a stale or missing car in the background
+ * - `ifStale: 'refresh'` -- also fetch a stale or missing item in the background
  */
 export type MinderTryAtOpts  = Z.input<typeof MinderChecks.minderTryAtOpts>
 /** `invalidate`'s options, which it requires: `list: 'all'` marks every listing under the labelpath stale. */
@@ -86,35 +94,7 @@ export type MinderInvalidateOpts = Z.input<typeof MinderChecks.minderInvalidateO
 export type MinderFriend     = Pick<Bank, 'scope' | 'rootBox' | 'makeGetAsk' | 'makeListAsk' | 'tellBadNews'>
 // --
 
-// == [The car]: ThingCar, BankCar, BoxCar, GateCar, ThingAt, CarAt, DeliverableThing, carLivenessVals
-
-// The vaultDB has a newer whole record when liveness is 'bhnd' or 'bare' (dbHasNewer).
-/** A ThingMinder's cache value for a Thing, deeply frozen: of the records the minder has received, it carries the newest (perhaps sparse), and the fullest (perhaps null, or undefined for "exists, but nothing useful cached").
- * - `newest` is always a record: full, sparse, the void sentinel when void, or a deleted Thing's tombstone when gone.
- * - `fullest` is null when gone or void, and undefined when bare. It stands for the *record* `fullest ?? newest`.
- * - Both records have identical scope and lifepath. (This implies a car with a newer lifepath should always replace the other.)
- * - On `full`, the two are *identical* (`newest === fullest`): the same object, not just the same content.
- * - When `bhnd`, `fullest` is of a strictly earlier revision: `newest.revseq > fullest.revseq`.
- */
-export type ThingCar<RecordT extends Sparse<ThingRecord>> = Readonly<(
-  | { liveness: 'full', newest: RecordT,            fullest: RecordT   } // the same record in both. dbHasNewer: false
-  | { liveness: 'bhnd', newest: Sparse<RecordT>,    fullest: RecordT   } // fullest is strictly older. Newest is strictly Sparse (not full, not gone, not void). dbHasNewer: true
-  | { liveness: 'bare', newest: Sparse<RecordT>,    fullest: undefined } // never fetched a whole record; newest is strictly sparse. dbHasNewer: true
-  | { liveness: 'gone', newest: Tombstone<RecordT>, fullest: null      } // a deleted Thing's tombstone: known to be gone. dbHasNewer: false
-  | { liveness: 'void', newest: VoidSentinel,       fullest: null      } // a shell:     known to be void. dbHasNewer: false
-) & {
-  /** A string that compares as the car's age: of two cars of one Thing, the newer has the greater agerank.
-   * Two cars with the same revisions and liveness have equal ageranks.
-   */
-  agerank: string
-}>
-
-/** The car of the bank's Thing. */
-export type BankCar = ThingCar<BankRecord>
-/** The car of a box. */
-export type BoxCar  = ThingCar<BoxRecord>
-/** The car of a gate. */
-export type GateCar = ThingCar<GateRecord>
+// == [Records]: ThingAt, DeliverableThing
 
 /** The kind of Thing stored at `LabelpathT`, read from its modelkind, or any Thing for a labelpath not known when compiled. */
 export type ThingAt<LabelpathT extends Labelpath> =
@@ -123,23 +103,16 @@ export type ThingAt<LabelpathT extends Labelpath> =
       : LabelpathT extends 'bank' ? BankRecord
         : ThingRecord
 
-/** The car of the Thing stored at `LabelpathT` ({@link ThingAt}). */
-export type CarAt<LabelpathT extends Labelpath> = ThingCar<ThingAt<LabelpathT>>
-
-/** A record a car is made from: a Thing, whole or sparse, or the void sentinel. */
+/** A record the vaultDB tells a minder of: a Thing, whole or sparse, or the void sentinel. */
 export type DeliverableThing = ThingRecord | Sparse<ThingRecord> | VoidSentinel
-
-/** Each `liveness` a car may have. */
-export const carLivenessVals = ['full', 'bhnd', 'bare', 'gone', 'void'] as const
 // --
 
-// == [A minder's answers]: GotAnswer, CarFreshness, TSQGotAnswer, TSQAnswer, ScopeAt
+// == [A minder's answers]: GotAnswer, TSQGotAnswer, TSQAnswer, ScopeAt
 
 // `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage has nothing.
-// A timely car is full, gone or void: a bhnd or bare car is never timely.
 /** A get's answer, read from the cache. Beside a get's own acts:
  * - `vacant`   -- nothing is cached
- * - `untimely` -- the car is `bhnd` or `bare`, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
+ * - `untimely` -- the item is behind a newer revision heard of, or missing beside one, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
  */
 export type GotAnswer<RecordT extends ThingRecord = ThingRecord> = (
   | GoodAnswer<RecordT, 'gotlive'>
@@ -148,85 +121,127 @@ export type GotAnswer<RecordT extends ThingRecord = ThingRecord> = (
   | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
 ) & { ask: GetAsk }
 
-/** The car cached for a scope, however old, and the state of its gets. */
-export interface CarFreshness<RecordT extends ThingRecord = ThingRecord> {
-  /** The cached car, or undefined for none. */
-  car:         ThingCar<RecordT> | undefined
+/** A get's answer read from the cache, with the record the item has, however old, and the state of its gets. */
+export type TSQGotAnswer<RecordT extends ThingRecord = ThingRecord> = GotAnswer<RecordT> & Readonly<{
+  /** The whole record, tombstone or shell the item has, or undefined for no item. */
+  record:      RecordT | Tombstone<RecordT> | undefined
   /** False where the act is `vacant` or `untimely`. */
   isTimely:    boolean
-  /** When a record last arrived in the car, or 0 for none. */
+  /** When a record last arrived in the item, or 0 for none. */
   refreshedAt: EpochMillis
-  /** True while a get of the car is under way. */
+  /** True while a get of the Thing is under way. */
   isFetching:  boolean
-  /** The refusal of the car's last get, or null. */
+  /** The refusal of the Thing's last get, or null. */
   lastErr:     Errors.VaultError | null
-}
-
-/** A get's answer read from the cache, with the car and its {@link CarFreshness}. */
-export type TSQGotAnswer<RecordT extends ThingRecord = ThingRecord> = GotAnswer<RecordT> & CarFreshness<RecordT>
+}>
 
 /** `tryAt`'s answer: a {@link TSQGotAnswer}, or a refusal. */
 export type TSQAnswer<RecordT extends ThingRecord = ThingRecord> = TSQGotAnswer<RecordT> | BadAnswer
 
-/** A scope whose labelpath is `LabelpathT`, which types the car a minder answers for it ({@link ThingAt}). */
+/** A scope whose labelpath is `LabelpathT`, which types the record a minder answers for it ({@link ThingAt}). */
 export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labelpath: LabelpathT }>
 // --
 
-// == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, MinderEventOf
+// == [What a listener is told]: MinderEvent, MinderEventkind, TSQQueryAction, MinderActionTyped, MinderActionOf, MinderEventOf, RecordEventFields, ThingEvent, SoonEvent, ListingEvent
 
-// Each event spreads TanStack Query's cache event into our own, under TanStack's field names (`type`, `action.type`,
-// `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` is given.
-/** An event a minder's `listen` tells: a car's query changed, or a listing's. {@link ThingMinder.isThingEvent} tells them apart. */
-export type MinderEvent = ThingEvent | ListingEvent
+// The emitted event pragmatically mimics the incoming TSQ event: it spreads TanStack Query's cache event into our own,
+// under TanStack's field names (`type`, `action`, `queryKey`, `queryHash`, `state`), so that a reader who knows its events
+// reads ours. Its version is MinderEventFormat, which `listen` is given.
+/** An event a minder's `listen` tells: an item's query changed, a soon's or a listing's, as its `eventkind` says. */
+export type MinderEvent = ThingEvent | SoonEvent | ListingEvent
+
+/** The kind of entry a minder's event is about, as its query key names it: `'item'`, `'soon'` or `'list'`. */
+export type MinderEventkind = 'item' | 'soon' | 'list'
+
+/** TanStack Query's action that changed a query's state, as its cache tells it. */
+export type TSQQueryAction = Extract<TSQ.QueryCacheNotifyEvent, { type: 'updated' }>['action']
+
+/** `ActionT`, one of TanStack Query's actions, with the data it carries typed `DataT` and its error an `Error`. */
+export type MinderActionTyped<ActionT, DataT> =
+  ActionT extends { type: 'success' } ? Readonly<Omit<ActionT, 'data'> & { data: DataT | undefined }>
+    : ActionT extends { type: 'setState' } ? Readonly<Omit<ActionT, 'state'> & { state: Partial<TSQ.QueryState<DataT>> }>
+      : ActionT extends { error: unknown } ? Readonly<Omit<ActionT, 'error'> & { error: TSQ.DefaultError }>
+        : Readonly<ActionT>
+
+/** TanStack Query's action that changed a query's state, under TanStack's names, with the data it carries typed `DataT`. */
+export type MinderActionOf<DataT> = MinderActionTyped<TSQQueryAction, DataT>
 
 /** The fields every minder event carries: TanStack Query's cache event, less its live query, and the scope of the Thing it is about. */
-export type MinderEventOf<DataT> = Readonly<{
-  /** `'updated'` when the query's state changed, `'removed'` when the cache dropped the query. */
-  type:      'updated' | 'removed'
-  /** The action that changed the state, by TanStack's name for it, or undefined for a removal:
-   * - `'success'`    -- a record arrived
+export type MinderEventOf<DataT, EventkindT extends MinderEventkind = MinderEventkind> = Readonly<{
+  /** The kind of entry the event is about, read from its query key: narrow a {@link MinderEvent} on it. */
+  eventkind: EventkindT
+  /** `'added'` when the cache made the query, `'updated'` when its state changed, `'removed'` when the cache dropped it. */
+  type:      'added' | 'updated' | 'removed'
+  /** A frozen copy of TanStack's action that changed the state, or undefined where the query was added or removed. Its `type`:
+   * - `'success'`    -- a record arrived in the item or the soon, or a list set the listing
    * - `'error'`      -- a get was refused
-   * - `'invalidate'` -- a listing was marked stale
+   * - `'invalidate'` -- the item fell behind a newer revision heard of, or the listing was marked stale
+   * - `'fetch'`, `'pause'`, `'continue'`, `'failed'`, `'setState'` -- as TanStack dispatches them
    */
-  action:    Readonly<{ type: 'success' | 'error' | 'invalidate' }> | undefined
+  action:    MinderActionOf<DataT> | undefined
   /** The key the query is cached under, frozen. A host caching the same value may use the same key. */
   queryKey:  TSQ.QueryKey
+  /** TanStack's hash of `queryKey`. */
+  queryHash: string
   /** A frozen shallow copy of the query's state: `data`, `dataUpdatedAt`, `error`, `isInvalidated`, `status` and the rest.
-   * `data` is the same object until it changes, and undefined after a removal.
+   * `data` is the same object until it changes. A removed query tells its last state, `data` included, though the cache no longer has it.
    */
   state:     Readonly<TSQ.QueryState<DataT>>
   /** The user of the bank. */
   userid:    Userid
   /** The bank. */
   banklabel: Banklabel
-  /** Where the Thing is stored in its bank: the Thing a car is of, or whose children a listing lists. */
+  /** Where the Thing is stored in its bank: the Thing an item or a soon is of, or whose children a listing lists. */
   labelpath: Labelpath
 }>
 
-/** A car's query changed. `state.data` is the car as now cached, or undefined where none is (it is removed, or its first get was refused). Its `modelkind` types its car.
- * It also carries the car's `agerank` and its newest record's revision and life, each undefined where no car is cached.
- */
-export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind ? MinderEventOf<ThingCar<RecordOfKind<KindT>>> & Readonly<{
+/** The fields an item's event and a soon's add: the Thing's modelkind, and the revision and life of the record cached, each undefined where none is. */
+export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
   /** The modelkind of the Thing, which its labelpath starts with. */
   modelkind: KindT
-  /** The car's agerank: of two events of one Thing, the greater agerank tells the newer car. */
-  agerank:   string | undefined
-  /** The revtok of the car's newest record. */
+  /** The revtok of the record. */
   revtok:    Revtok | undefined
-  /** The revseq of the car's newest record. */
+  /** The revseq of the record. */
   revseq:    number | undefined
-  /** The am of the car's newest record: `'x'` where the Thing is deleted or void. */
+  /** The am of the record. Tell a live record from a tombstone or the shell by `Thing.isLive`, `Thing.isGone` and `Thing.isVoidSentinel` on `state.data`. */
   am:        DeliverableThing['am'] | undefined
-  /** The lifeseq of the car's newest record. */
+  /** The lifeseq of the record. */
   lifeseq:   Lifeseq | undefined
-  /** The lifepath of the car's newest record. */
+  /** The lifepath of the record. */
   lifepath:  Lifepath | undefined
-}> : never
+}>
 
-/** A listing's query changed. `state.data` is the labelpaths it now lists, in labelpath order, or undefined once removed.
- * The array stays the same object until a labelpath joins. A listing marked stale has `state.isInvalidated` true, and still lists what it did.
+/** An item's query changed, its `eventkind` `'item'`. `state.data` is the item's record: live, a tombstone (a del answers one) or the shell, or undefined before any record.
+ * Its `modelkind` types the record, and its {@link RecordEventFields} are the record's.
+ * `state.isInvalidated` is true while the item is behind a newer revision heard of, or since its last get was refused.
+ * Its `action.type`:
+ * - `'success'`    -- a whole record, tombstone or shell landed, even one that changes only the item's time
+ * - `'error'`      -- a get was refused, and the item is unchanged
+ * - `'invalidate'` -- the item fell behind, just after the soon's `success`. It is told once, and not at all where a
+ *   refused get already left the item invalidated.
+ * A record that lands while the item stays behind tells `success`, its `state.isInvalidated` false, and then `invalidate`
+ * again. A listener on that `success` already finds the item behind, by `isBehindAt`.
  */
-export type ListingEvent = MinderEventOf<readonly Labelpath[]> & Readonly<{
+export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind
+  ? MinderEventOf<RecordOfKind<KindT> | Tombstone<RecordOfKind<KindT>>, 'item'> & RecordEventFields<KindT>
+  : never
+
+/** A soon's query changed, its `eventkind` `'soon'`: a sparse record newer than the item arrived in it (`success`), or it was removed: once the item caught up, or at `goodbye`.
+ * `state.data` is the sparse record, and its {@link RecordEventFields} are that record's.
+ * A listener on a `success` finds the item behind: `soonAt` answers the soon, `isBehindAt` true, `tryAt` untimely, and a
+ * get fetches unless given a staleTime of its own. The item's `invalidate` follows at once, so its own
+ * `state.isInvalidated` may still read false.
+ */
+export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind
+  ? MinderEventOf<Sparse<RecordOfKind<KindT>>, 'soon'> & RecordEventFields<KindT>
+  : never
+
+/** A listing's query changed, its `eventkind` `'list'`. `state.data` is the labelpaths it lists, in labelpath order.
+ * The array stays the same object until a labelpath joins. A listing marked stale has `state.isInvalidated` true, and still lists what it did.
+ * It tells `success` each time a list sets it (even to the labelpaths it had), a labelpath joins it, or `hello` caches the
+ * root box's, and `invalidate` when `invalidate` marks it stale.
+ */
+export type ListingEvent = MinderEventOf<readonly Labelpath[], 'list'> & Readonly<{
   /** The modelkind of the Thing at `labelpath` and of every Thing listed, which is the same: a labelpath starts with its parent's. */
   modelkind: Thingkind
 }>

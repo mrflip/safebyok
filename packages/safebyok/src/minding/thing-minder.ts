@@ -1,5 +1,5 @@
 // The ThingMinder is an exemplar at both of its ends. Its interface is the minder as we would design it for the layer in
-// front of it: scopes, records, cars, acts and refusals, in our vocabulary. Its implementation shows TanStack Query used as
+// front of it: scopes, records, acts and refusals, in our vocabulary. Its implementation shows TanStack Query used as
 // its authors intend: each need is met by the feature TanStack built for that job (query defaults, structural sharing,
 // the error state, the cache's events), chosen because it fits, not because it was nearest to hand.
 // Where a ruling, a design note or this code seems to serve one end at the other's expense, report it rather than split
@@ -8,50 +8,56 @@
 /** `ThingMinder`, which minds every Thing in one bank in a TanStack Query cache of its own. */
 
 import * as TSQ from '@tanstack/query-core'
-import { union } from 'es-toolkit'
+import { deepFreeze, union } from 'es-toolkit'
 import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
-import { type ThingFormat, type ThingRecord, type ThingScope, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
 import type { ListThingsAnswer, ThingNotice, VaultDB, WriteThingAnswer } from '../storage/vault-db'
 import { refusedAnswerOf } from '../storage/refused-answer'
 import {
-  type CarAt, type CarFreshness, type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
-  type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingCar, type ThingEvent, type TsqStaleTime, type ListingEvent,
+  type DeliverableThing, type GotAnswer, type MinderEvent, type MinderFriend, type MinderGetOpts, type MinderOpts, type MinderTryAtOpts,
+  type MinderInvalidateOpts, type QueryCacheOpts, type ScopeAt, type TSQAnswer, type TSQGotAnswer, type ThingAt, type ThingEvent, type SoonEvent, type TsqStaleTime, type ListingEvent, type MinderEventkind, type MinderEventFormat, type TSQQueryAction,
   FixedQueryCacheOpts, MinderChecks,
 } from '../shapes/shapes-minder'
-import { bestCarOf, carOf, dbHasNewer } from './thing-car'
+import { newerThingOf } from './newer-thing'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 
 /** Anything naming a labelpath: a scope, an ask or a record. */
 export type Labelpathed = { labelpath: Labelpath }
 
-/** One bank's Things as best known on this device, a car for each, from all the vaultDB has said of them, and a listing of
- * the children of the root box and of each Thing listed.
- * Four sources tell it of a Thing, in any order, late or more than once: a get's answer (the whole record, or the
- * Thing's shell where nothing is stored), the watch's notice (of each write, each changed tracked Thing and each
- * refusal's `dbhas`), a list's sparse record, and the record a good write's answer carries. Each lands in the Thing's
- * car through one merge, and adds the Thing to its parent's listing, where one is cached. A list sets the parent's
- * listing. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache. `hello` caches the root box's
- * listing, empty and bare: bare until a list sets it.
+/** This device's cache of one bank's Things, kept from everything the vaultDB tells of them.
+ * Each Thing has an item, with the whole record a host shows: live, its tombstone, or its shell where nothing is stored.
+ * A Thing may also have a soon: a sparse record newer than the item, removed once the item catches up. The root box and
+ * each Thing listed have a listing of their children.
+ * Records arrive from gets, lists, good writes and the watch, in any order, late or more than once. A whole record,
+ * tombstone or shell lands in the item and a sparse record in the soon, and each adds the Thing to its parent's listing,
+ * where one is cached. A list sets the parent's listing. It caches only from `hello` until `goodbye`, and
+ * `goodbye` empties its cache. `hello` caches the root box's listing, empty and bare: bare until a list sets it.
  *
  * ## Invariants
- * - For a caller or listener using the library as documented, what it shows depends only on which records the minder
- *   has heard of, never on the order they arrived in.
- * - The order records arrive in never changes a car's liveness, or the revisions it carries.
- * - A car never goes back: it carries the newest revision any source has told of, and a newer life replaces an older one whole.
- * - A listener is told of each car and listing in the order the cache changes, so what it is told never goes back either.
- *   Each car told of a Thing has a newest no older than the last, and within one life it never loses its fullest record or
- *   takes an older one. A refused get tells the car unchanged. Each listing told lists every labelpath the last one did.
- *   Only a removal breaks the run: its event carries no car or listing, and what is told after it starts over. The cache
- *   removes a query only at `goodbye`.
- * - A sparse live record never displaces a whole live record of the same life: it leaves the car `bhnd`, its fullest
- *   still a record. A sparse record of a newer life makes the car `bare`, its fullest undefined. Either way, the next
- *   get fetches the newest whole.
- * - A get answered with a revision older than the car it began with changes nothing in the cache, and refuses `stale_read`.
+ * - For a caller or listener using it as documented, what it shows depends only on which records the minder has heard
+ *   of, never on the order they arrived in.
+ * - An item and a soon never go back. The item has the newest whole record, tombstone or shell heard of, and the soon
+ *   the newest sparse record while that is newer than the item. A newer life replaces an older one whole.
+ * - A record that would take the item or soon back is dropped, nothing is told, and the item keeps its time: a sparse
+ *   record no newer than the item or the soon, or a whole record older than the item from any source but a get. A whole record at the item's
+ *   revision lands, and makes the item fresh as of then. The soon is removed once the item is no older than it.
+ * - An item is behind while a soon newer than it is cached, or a soon with no item. Behind is that comparison, not
+ *   whether a soon is cached: a `tryAt` or `isBehindAt` made while a record lands, once it has caught the item up but
+ *   before the soon is removed, already finds the item not behind. An item behind is never timely, and the next get
+ *   fetches the newest whole record.
+ * - A sparse record lands in the soon before its item is invalidated, so from the soon's `success` on, every read and
+ *   get finds the item behind ({@link SoonEvent}). A refused get leaves the item invalidated too, until a record lands in it.
+ * - A listener is told of each item, soon and listing in the order the cache changes, and what it is told never goes
+ *   back either: each record told of an item, or of a soon, is no older than the last, and each listing lists every
+ *   labelpath the last one did. Only a removal breaks the run, and what is told after it starts over. A soon is removed
+ *   whenever the item catches up with it; the cache removes an item or a listing only at `goodbye`.
+ *   {@link ThingEvent}, {@link SoonEvent} and {@link ListingEvent} give the order of the events.
+ * - A get answered with a revision older than the newest cached when it began refuses `stale_read`, and changes nothing.
  * - A listing never drops a labelpath: a list adds what it answers, and each record that lands adds its own. So once a
  *   listing is cached, what it lists depends only on which records arrived, never on their order.
  * - The root box's listing is cached from `hello` until `goodbye`. So each box that lands
@@ -60,19 +66,17 @@ export type Labelpathed = { labelpath: Labelpath }
  * - A listing is bare from `hello` until a list sets it, even a list that answers nothing. A record joining it, or an
  *   `invalidate`, leaves it bare. Only the root box's listing is ever bare.
  * - A listing is the same array until a labelpath joins it.
- * - A listing lists only Things the vaultDB has stored, tombstones included, never a shell. It lists by labelpath alone:
- *   when the parent's life changes, it keeps the earlier life's children beside the new life's.
+ * - A listing lists only Things the vaultDB has stored, tombstones included, never a shell. It lists by labelpath alone,
+ *   so when the parent's life changes it keeps the earlier life's children beside the new life's.
  * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it. The root
  *   box always has one cached.
- * - An operation caches only its own good answer: the record got, written or listed. Nothing of a write's ask is cached.
- * - Every other record an answer carries (a refusal's `dbhas`, the bank, the main gate, the root box) is cached only as
- *   the watch notifies it.
- * - Records accompanying an operation (updates in `tracked`, or a record in `dbhas`) will be delivered to the Minder -- and
- *   therefore cached -- before returning to the operation.
- * - A refused write itself changes no car and marks nothing stale. (Its `dbhas`, delivered via notify, may update its car.)
- * - A write's answer and the watch's notice of the same write leave the same car and listing, in either order: the
+ * - An operation caches only its own good answer: the record got, written or listed, never a write's ask. Any other
+ *   record an answer carries (a refusal's `dbhas`, or a tracked bank, main gate or root box) is cached only as the watch
+ *   tells of it, and the watch tells of it before the operation returns.
+ * - A refused write changes no item and marks nothing stale. Its `dbhas`, through the watch, may still change an item.
+ * - A write's answer and the watch's notice of the same write leave the same item and listing, in either order: the
  *   later changes nothing.
- * - `invalidate` asks the vaultDB nothing, and changes no car and no listing's labelpaths: it marks listings, never cars.
+ * - `invalidate` asks the vaultDB nothing, and marks listings stale, never items: it changes no item, and no listing's labelpaths.
  */
 export class ThingMinder {
   // == [Props]: userid, banklabel, #bank, #vaultDB, #tsq, #queryCacheOpts, #unwatch, #isReady
@@ -106,15 +110,26 @@ export class ThingMinder {
     Object.freeze(this)
   }
 
-  /** The QueryClient whose cache has this minder's cars, its query defaults set. */
+  // The client's defaults are the item's. TanStack matches query defaults by key prefix, and the kind of entry follows the
+  // bank's segments in every key, so one prefix each gives the listings and the soons their own. Under skipToken, TanStack
+  // never fetches a listing or a soon, and invalidating one only marks it stale.
+  // TanStack calls the cache's onSuccess right after a fetch's record lands, and never for setQueryData: #sendToTSQ does
+  // the same for every other record.
+  /** The QueryClient whose cache has this minder's items, soons and listings, its query defaults set. */
   #makeTSQ(): TSQ.QueryClient {
-    const tsq = new TSQ.QueryClient({ defaultOptions: { queries: {
-      ...this.#queryCacheOpts,
-      ...FixedQueryCacheOpts,
-      staleTime:         staleTimeFnOf(this.#queryCacheOpts.staleTime),
-      queryFn:           ({ queryKey }) => this.#fetchCar(this.#askAt(this.#scopeOfQueryKey(queryKey))),
-      structuralSharing: bestCarOf,
-    } } })
+    const { staleTime } = this.#queryCacheOpts
+    const tsq = new TSQ.QueryClient({
+      queryCache:     new TSQ.QueryCache({ onSuccess: (record, tsqQuery) => { this.#landedByGet(record as DeliverableThing, tsqQuery.queryKey) } }),
+      defaultOptions: { queries: {
+        ...FixedQueryCacheOpts,
+        staleTime,
+        queryFn:           ({ queryKey }) => this.#fetchRecord(this.#askAt(this.#scopeOfQueryKey(queryKey))),
+        structuralSharing: newerThingOf,
+      } },
+    })
+    const bankHead = bankKeyHeadOf(this.scope)
+    tsq.setQueryDefaults([...bankHead, Listkind], { queryFn: TSQ.skipToken, structuralSharing: stableListingOf, staleTime })
+    tsq.setQueryDefaults([...bankHead, Soonkind], { queryFn: TSQ.skipToken, structuralSharing: newerThingOf })
     return tsq
   }
   // --
@@ -145,28 +160,38 @@ export class ThingMinder {
   }
   // --
 
-  // == [Reading]: at, listingAt, isListingBareAt, tryAt, get, tryGet, backgroundRefresh, tryList, list, isStaleAt, listen
+  // == [Reading]: at, soonAt, isBehindAt, listingAt, isListingBareAt, tryAt, get, tryGet, backgroundRefresh, tryList, list, isStaleAt, listen
 
-  /** The cached car for `scoped`, however old, or undefined for none. Never asks the vaultDB. */
-  at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): CarAt<LabelpathT> | undefined {
-    return this.#cachedAt(this.#demandOwnScope(scoped)) as CarAt<LabelpathT> | undefined
+  /** The record `scoped`'s item has, however old, or undefined for no item. Never asks the vaultDB. */
+  at<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>> | undefined {
+    return this.#itemAt(this.#demandOwnScope(scoped)) as ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>> | undefined
+  }
+
+  /** The sparse record `scoped`'s soon has, newer than its item, or undefined for no soon. Never asks the vaultDB. */
+  soonAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>): Sparse<ThingAt<LabelpathT>> | undefined {
+    return this.#soonAt(this.#demandOwnScope(scoped)) as Sparse<ThingAt<LabelpathT>> | undefined
+  }
+
+  /** True when `scoped`'s item is behind: a soon newer than the item is cached, or a soon with no item. Never asks the vaultDB. */
+  isBehindAt(scoped: ThingScope): boolean {
+    return this.#isBehindAt(this.#demandOwnScope(scoped))
   }
 
   /** The cached listing of `scoped`'s children, however old, or undefined for none. Never asks the vaultDB.
    * A bare listing lists only the children received since `hello` ({@link isListingBareAt}).
    */
   listingAt(scoped: ThingScope): readonly Labelpath[] | undefined {
-    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listingQueryKey(this.#demandOwnScope(scoped)))
+    return this.#tsq.getQueryData<readonly Labelpath[]>(this.listQueryKey(this.#demandOwnScope(scoped)))
   }
 
   /** True when `scoped`'s listing is cached but bare: no list has set it since `hello`, so the vaultDB may have more. */
   isListingBareAt(scoped: ThingScope): boolean {
-    return this.#tsq.getQueryState(this.listingQueryKey(this.#demandOwnScope(scoped)))?.dataUpdatedAt === BareListedAt
+    return this.#tsq.getQueryState(this.listQueryKey(this.#demandOwnScope(scoped)))?.dataUpdatedAt === BareListedAt
   }
 
   /** The cache's answer for `scoped`, without waiting on the vaultDB.
-   * A car that is not timely answers `untimely`, with no `val`.
-   * Under `ifStale: 'refresh'`, it also fetches a stale or missing car in the background ({@link MinderTryAtOpts}).
+   * An item that is not timely answers `untimely`, with no `val`, and so does a newer revision heard of with no item.
+   * Under `ifStale: 'refresh'`, it also fetches a stale or missing item in the background ({@link MinderTryAtOpts}).
    */
   tryAt<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderTryAtOpts = {}): TSQAnswer<ThingAt<LabelpathT>> {
     try {
@@ -181,34 +206,33 @@ export class ThingMinder {
     }
   }
 
-  /** Get `scoped`'s car: the cached one if timely, else from the vaultDB. A get already under way is shared.
+  /** Get `scoped`'s whole record, its tombstone or its shell: the cached one if timely, else from the vaultDB. A get already under way is shared.
    * Refuses `stale_read` when the vaultDB answers with a revision older than one cached when the get began. A later get asks again.
-   * With no root car cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
+   * With no root box cached, a get of a box the vaultDB has nothing for refuses: get the root box first.
    */
-  async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<CarAt<LabelpathT>> {
+  async get<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>>> {
     MinderChecks.minderGetOpts.parse(opts)
     this.#demandReady()
-    return await this.#doGet(this.#demandOwnScope(scoped), opts) as CarAt<LabelpathT>
+    return await this.#doGet(this.#demandOwnScope(scoped), opts) as ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>>
   }
 
   /** {@link get}, resolving an `Outcome` instead of throwing: a refusal, misuse included, is its bad outcome. */
-  async tryGet<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<Outcome.Outcome<CarAt<LabelpathT>>> {
+  async tryGet<LabelpathT extends Labelpath>(scoped: ScopeAt<LabelpathT>, opts: MinderGetOpts = {}): Promise<Outcome.Outcome<ThingAt<LabelpathT> | Tombstone<ThingAt<LabelpathT>>>> {
     return await Outcome.outcomeOf(() => this.get(scoped, opts))
   }
 
-  /** Get `scoped`'s car in the background, unless it is timely, and return at once.
+  /** Get `scoped`'s whole record in the background, unless its item is timely, and return at once.
    * It throws nothing and tells no one of a refusal, misuse included. A refusal from the vaultDB shows as `lastErr` in the next {@link tryAt}.
    */
   backgroundRefresh(scoped: ThingScope, opts: MinderGetOpts = {}): void {
     void this.tryGet(scoped, opts)
   }
 
-  /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included, and return the vaultDB's answer, a refusal included.
-   * Each Thing it answers joins the listing of the Thing at `labelpath` ({@link listingAt}). A list never drops a labelpath
-   * from that listing. Each record is cached sparse.
-   * Where that leaves a car `bhnd` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
-   * answers from the cache.
-   * A Thing stored damaged is left out of `val`, reported in `damaged_rows`, and told to the bank's `tellBadNews` by its labelpath.
+  /** List the Things directly under `labelpath`, tombstones included, in labelpath order, and return the vaultDB's answer.
+   * The answer is added to the listing at `labelpath` ({@link listingAt}). A live record is cached as the Thing's soon
+   * where it is newer than the item, so the next get fetches the item whole. A tombstone lands in the item, so a get of
+   * it answers from the cache. A Thing stored damaged is left out of `val`, and reported in `damaged_rows` and to the
+   * bank's `tellBadNews`.
    * Before `hello`, after `goodbye`, or for a labelpath that is no Thing's, it answers the refusal without asking the vaultDB.
    */
   async tryList(labelpath: Labelpath): Promise<ListThingsAnswer> {
@@ -234,25 +258,26 @@ export class ThingMinder {
     return Outcome.valOf(await this.tryList(labelpath)).map((record) => record.labelpath)
   }
 
-  /** True when `scoped`'s car is missing or not timely. */
+  /** True when the item is not timely for a {@link get} with these `opts`.
+   * A `staleTime` given wins over the item's being behind, as for a get, and an item invalidated is stale whatever the staleTime.
+   */
   isStaleAt(scoped: ThingScope, opts: MinderGetOpts = {}): boolean {
     MinderChecks.minderGetOpts.parse(opts)
-    const carQuery = this.#tsqFind(this.#demandOwnScope(scoped))
-    return (! isTimelyQuery(carQuery, opts.staleTime ?? this.#queryCacheOpts.staleTime))
+    const scope = this.#demandOwnScope(scoped)
+    return this.#tsqFind(scope)?.isStaleByTime(this.#staleTimeOf(scope, opts)) ?? true
   }
 
-  /** Call `listener` with each change of the cache, as a {@link MinderEvent}. Returns the function that stops it.
-   * Pass `ThingFormat` as `version`, the version of the event shape `listener` was written for; any other refuses.
-   * It tells a {@link ThingEvent} each time a record arrives in a car (even one that changes nothing), a get of it is refused,
-   * or it is removed. It tells a {@link ListingEvent} each time a list sets a listing (even to the labelpaths it had), a labelpath
-   * joins it, `hello` caches the root box's, `invalidate` marks it stale, or it is removed.
-   * Nothing is called when a car ages past `staleTime`, and listening caches no car.
+  /** Call `listener` with each change to the cache, and return the function that stops it.
+   * Pass `MinderEventFormat` as `version`: the event shape `listener` was written for. Any other refuses.
+   * It tells of each query added, changed or removed, and of nothing an observer does. Narrow each event on its
+   * `eventkind`: {@link ThingEvent}, {@link SoonEvent} and {@link ListingEvent} say what each tells, and when.
+   * Nothing is told when an item ages past `staleTime`, and listening caches nothing.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
    */
-  listen(listener: (event: MinderEvent) => void, version: typeof ThingFormat): () => void {
+  listen(listener: (event: MinderEvent) => void, version: typeof MinderEventFormat): () => void {
     MinderChecks.minderListener.parse(listener)
     MinderChecks.feedVersion.parse(version)
-    return this.#tsq.getQueryCache().subscribe((tsqEvent: unknown) => {
+    return this.#tsq.getQueryCache().subscribe((tsqEvent) => {
       const event = this.#minderEventOf(tsqEvent)
       if (event === undefined) { return }
       try {
@@ -272,13 +297,9 @@ export class ThingMinder {
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
-    const keyHead = (labelpath === undefined) ? bankKeyHeadOf(this.scope) : this.#keyHeadOf({ ...this.scope, labelpath: MinderChecks.minderLabelpath.parse(labelpath) })
+    const labels = (labelpath === undefined) ? [] : labelsOf(MinderChecks.minderLabelpath.parse(labelpath))
     // refetchType 'none': TanStack would otherwise refetch each active match. A listing has no queryFn to run, and the minder fetches nothing here.
-    void this.#tsq.invalidateQueries({
-      queryKey:    keyHead,
-      predicate:   (tsqQuery) => tsqQuery.queryKey.at(-1) === 'kids',
-      refetchType: 'none',
-    })
+    void this.#tsq.invalidateQueries({ queryKey: [...bankKeyHeadOf(this.scope), Listkind, ...labels], refetchType: 'none' })
   }
   // --
 
@@ -308,105 +329,140 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Direct Cache Calls]: #doGet, #fetchCar, #cachedAt, #tsqFind, #sendToTSQ, #seedListing, #sendListingToTSQ, #setListingDefaults, #joinParentListing
+  // == [TSQ Direct Cache Calls]: #doGet, #fetchRecord, #itemAt, #soonAt, #soonestAt, #isBehindAt, #tsqFind, #sendToTSQ, #landedByGet, #markBehinds, #seedListing, #sendListingToTSQ, #addToParentListing
 
-  // The car's Thing joins its parent's listing here: TanStack lands a get's record through the queryFn, never through #sendToTSQ.
-  /** `scoped`'s car: the cached one if timely within `opts.staleTime`, else from the vaultDB. */
-  async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingCar<ThingRecord>> {
+  // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: a notice that landed during the
+  // get may have left the item a later record.
+  /** `scoped`'s record: the item's if timely within `opts.staleTime`, else from the vaultDB. */
+  async #doGet(scoped: ThingScope, opts: MinderGetOpts): Promise<ThingRecord | Tombstone<ThingRecord>> {
     const fetched = await this.#tsq.query(this.#tsqQueryOptions(scoped, opts))
-    // TanStack resolves with what the queryFn returned, not what structural sharing left in the cache: a notice that landed during the
-    // get may have left the cache a later record.
-    const car = this.#cachedAt(scoped) ?? fetched
-    this.#joinParentListing(car.newest)
-    return car
+    return this.#itemAt(scoped) ?? fetched
   }
 
-  /** Fetch `ask`'s car from the vaultDB, made of its shell where storage has nothing.
-   * Refuses an answer older than the revision cached when it began.
-   * Refuses a record of another Thing than `ask`'s.
+  /** Fetch `ask`'s record, deeply frozen, or its shell where the vaultDB has nothing.
+   * Refuses `stale_read` for an answer older than the soonest record cached when the fetch began.
    */
-  async #fetchCar(ask: GetAsk): Promise<ThingCar<ThingRecord>> {
+  async #fetchRecord(ask: GetAsk): Promise<ThingRecord | Tombstone<ThingRecord>> {
     // Read before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
-    const prior  = this.#cachedAt(ask)
+    const prior  = this.#soonestAt(ask)
     const answer = await this.#vaultDB.tryGetThing(ask)
     // Thrown unchanged. The `dbhas` is delivered through the watch, never from here.
     if (! answer.ok) { throw answer.err }
     const record = (answer.act === 'gotvoid') ? this.#shellAt(ask) : this.#checkedDelivered(answer.val, ask)
-    // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
-    if ((prior !== undefined) && (Thing.cmp(prior.newest, record) < 0)) { throw Throwers.staleRead(ask) }
-    return carOf(record)
+    // TanStack leaves the item and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
+    if ((prior !== undefined) && (Thing.cmp(prior, record) < 0)) { throw Throwers.staleRead(ask) }
+    return deepFreeze(record)
   }
 
-  /** The cached car for `scoped`, a scope in this minder's bank, or undefined for none. */
-  #cachedAt(scoped: ThingScope): ThingCar<ThingRecord> | undefined {
-    return this.#tsq.getQueryData<ThingCar<ThingRecord>>(this.queryKey(scoped))
+  /** The record `scoped`'s item has, or undefined for no item. */
+  #itemAt(scoped: Labelpathed): ThingRecord | Tombstone<ThingRecord> | undefined {
+    return this.#tsq.getQueryData<ThingRecord | Tombstone<ThingRecord>>(this.itemQueryKey(scoped))
   }
 
-  /** The cache's query of `scoped`'s car, or undefined for none. */
-  #tsqFind(scoped: ThingScope): TSQ.Query<ThingCar<ThingRecord>> | undefined {
-    return this.#tsq.getQueryCache().find<ThingCar<ThingRecord>>({ queryKey: this.queryKey(scoped), exact: true })
+  /** The sparse record `scoped`'s soon has, or undefined for no soon. */
+  #soonAt(scoped: Labelpathed): Sparse<ThingRecord> | undefined {
+    return this.#tsq.getQueryData<Sparse<ThingRecord>>(this.soonQueryKey(scoped))
   }
 
-  // Every record that lands but a get's comes through here: TanStack lands a get's in the car itself.
-  /** Land `record` in its car and its parent's listing, while minding. A record of another bank refuses. */
+  /** The soonest record cached for `scoped`: its soon where the item is behind it, else its item, or undefined for neither. */
+  #soonestAt(scoped: Labelpathed): DeliverableThing | undefined {
+    return this.#isBehindAt(scoped) ? this.#soonAt(scoped) : this.#itemAt(scoped)
+  }
+
+  // A soon the item has caught up with stays cached while the record that caught it up lands: listeners hear the landing first.
+  /** True when `scoped`'s soon is newer than its item, or there is a soon and no item. */
+  #isBehindAt(scoped: Labelpathed): boolean {
+    const soon = this.#soonAt(scoped)
+    return (soon !== undefined) && isNewer(this.#itemAt(scoped), soon)
+  }
+
+  /** The cache's query of `scoped`'s item, or undefined for none. */
+  #tsqFind(scoped: Labelpathed): TSQ.Query<ThingRecord | Tombstone<ThingRecord>> | undefined {
+    return this.#tsq.getQueryCache().find<ThingRecord | Tombstone<ThingRecord>>({ queryKey: this.itemQueryKey(scoped), exact: true })
+  }
+
+  // Every record but a get's lands here: TanStack lands a get's record in the item itself, then calls #landedByGet.
+  // A whole record at the item's revision lands, and makes the item fresh as of now, as TanStack counts a confirmation from
+  // the server. An older one lands nowhere: it would make the newer record read fresh as of its arrival.
+  // The record lands before #markBehinds invalidates the item or removes the soon, so a listener told of a soon's success
+  // already finds the item behind, and a get there fetches it.
+  /** Cache `record` in its item or soon, and in its parent's listing, while minding.
+   * A whole record older than the item, or a sparse one no newer than the soonest cached, joins only the listing.
+   */
   #sendToTSQ(record: DeliverableThing): void {
     if (! this.#isReady) { return }
-    this.#checkedDelivered(record, this.scope)
-    this.#tsq.setQueryData(this.queryKey(record), carOf(record))
-    this.#joinParentListing(record)
+    deepFreeze(this.#checkedDelivered(record, this.scope))
+    if (! Thing.isSparse(record)) {
+      if (! isOlder(this.#itemAt(record), record)) { this.#tsq.setQueryData(this.itemQueryKey(record), record) }
+      this.#addToParentListing(record)
+      this.#markBehinds(record)
+      return
+    }
+    if (isNewer(this.#soonestAt(record), record)) {
+      this.#tsq.setQueryData(this.soonQueryKey(record), record)
+      this.#markBehinds(record)
+    }
+    this.#addToParentListing(record)
+  }
+
+  /** Bring the parent's listing and the soon up to date with `record`, which a get just landed under `itemQueryKey`. */
+  #landedByGet(record: DeliverableThing, itemQueryKey: TSQ.QueryKey): void {
+    this.#addToParentListing(record)
+    this.#markBehinds(this.#scopeOfQueryKey(itemQueryKey))
+  }
+
+  // TanStack tells nothing when it invalidates a query already invalidated, so an item tells its falling behind once until
+  // a record lands in it, and not at all after a refused get. refetchType 'none': the next get of the item fetches it.
+  /** Remove `scoped`'s soon if its item has caught up with it, else invalidate the item.
+   * Does nothing unless both are cached.
+   */
+  #markBehinds(scoped: Labelpathed): void {
+    const item = this.#itemAt(scoped)
+    const soon = this.#soonAt(scoped)
+    if ((item === undefined) || (soon === undefined)) { return }
+    if (! isNewer(item, soon)) {
+      this.#tsq.removeQueries({ queryKey: this.soonQueryKey(scoped), exact: true })
+      return
+    }
+    void this.#tsq.invalidateQueries({ queryKey: this.itemQueryKey(scoped), exact: true, refetchType: 'none' })
   }
 
   // Its time is TanStack's for a query never fetched, so the listing reads as bare until a list sets it.
   /** Cache `scoped`'s listing empty and bare. */
   #seedListing(scoped: ThingScope): void {
-    this.#tsq.setQueryData<readonly Labelpath[]>(this.#setListingDefaults(scoped), [], { updatedAt: BareListedAt })
+    this.#tsq.setQueryData<readonly Labelpath[]>(this.listQueryKey(scoped), [], { updatedAt: BareListedAt })
   }
 
   /** Set `scoped`'s listing to the labelpaths it had and `labelpaths`, while minding. */
   #sendListingToTSQ(scoped: ThingScope, labelpaths: readonly Labelpath[]): void {
     if (! this.#isReady) { return }
-    this.#tsq.setQueryData<readonly Labelpath[]>(this.#setListingDefaults(scoped), (prior) => listingOf(prior ?? [], labelpaths))
-  }
-
-  // TanStack matches query defaults by key prefix, and no prefix starts every listing's key and no car's, so each listing's
-  // key gets defaults of its own: without them a listing would get the cars', and be fetched and merged as a car.
-  // Under skipToken, TanStack never fetches the listing, and invalidating it only marks it stale.
-  /** Set the query defaults of `scoped`'s listing, and answer its query key. */
-  #setListingDefaults(scoped: ThingScope): TSQ.QueryKey {
-    const listingKey = this.listingQueryKey(scoped)
-    this.#tsq.setQueryDefaults(listingKey, { queryFn: TSQ.skipToken, structuralSharing: stableListingOf, staleTime: this.#queryCacheOpts.staleTime })
-    return listingKey
+    this.#tsq.setQueryData<readonly Labelpath[]>(this.listQueryKey(scoped), (prior) => listingOf(prior ?? [], labelpaths))
   }
 
   // Each record that lands joins its parent's listing here, whatever its source. A shell is stored nowhere, so it is no
   // one's child; and a root's parent, '', is never listed. A join is not a list, so the listing's time stays the time a list
   // last set it, as TanStack dates data derived from another query at that query's time: a bare listing stays bare.
   /** Add `record`'s labelpath to its parent's listing, where one is cached that lacks it. */
-  #joinParentListing(record: DeliverableThing): void {
+  #addToParentListing(record: DeliverableThing): void {
     if (Thing.isVoidSentinel(record)) { return }
-    const parentKey = this.listingQueryKey({ ...record, labelpath: Labelpath.parentOf(record.labelpath) })
+    const parentKey = this.listQueryKey({ labelpath: Labelpath.parentOf(record.labelpath) })
     const listing   = this.#tsq.getQueryState<readonly Labelpath[]>(parentKey)
     if ((listing?.data === undefined) || listing.data.includes(record.labelpath)) { return }
     this.#tsq.setQueryData<readonly Labelpath[]>(parentKey, listingOf(listing.data, [record.labelpath]), { updatedAt: listing.dataUpdatedAt })
   }
   // --
 
-  // == [TSQ Asks]: queryKeyOf, isThingEvent, bankQueryKeyOf, queryKey, listingQueryKey, descendantsQueryKey, #keyHeadOf, #tsqQueryOptions, #askAt, #shellAt
+  // == [TSQ Asks]: itemQueryKeyOf, bankQueryKeyOf, itemQueryKey, soonQueryKey, listQueryKey, #tsqQueryOptions, #staleTimeOf, #askAt, #shellAt
 
-  // A key is the bank's three segments, the labelpath's labels with '/' between them, then a mark: '!' for the Thing's car,
-  // '#' and 'kids' for its listing. Dropping the mark and putting '/' in its place makes a prefix that selects everything
-  // under the Thing and neither of its own keys. No label is '!', '/' or '#', so no mark is mistaken for one. TanStack matches
-  // query defaults by key prefix too, so without a mark the root box's key would start every box's key, and no defaults
-  // could single out the root box. A labelpath starts with its modelkind, so the key does too.
-  /** The query key a minder caches `scope`'s car under. A host caching the same car may use the same key. */
-  static queryKeyOf(scope: ThingScope): TSQ.QueryKey {
+  // A key is the bank's three segments, the kind of entry ('item', 'soon' or 'list'), the labelpath's labels with '/'
+  // between them, then a mark: '!' for the item, '~' for the soon, '#' and 'kids' for the listing. TanStack matches query
+  // defaults and invalidation by key prefix, so the kind's prefix singles out every entry of that kind, and a Thing's
+  // listing key without its mark covers every listing under it too. Without a mark the root box's item key would start
+  // every box's. No label is '!', '~', '/' or '#', so no mark is mistaken for one. A labelpath starts with its modelkind.
+  /** The query key a minder caches `scope`'s item under. A host caching the same record may use the same key. */
+  static itemQueryKeyOf(scope: ThingScope): TSQ.QueryKey {
     const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
-    return [...keyHeadOf({ userid, banklabel }, labelpath), '!']
-  }
-
-  /** True when `event` is about a car's query, not a listing's. */
-  static isThingEvent(event: MinderEvent): event is ThingEvent {
-    return event.queryKey.at(-1) === '!'
+    return [...bankKeyHeadOf({ userid, banklabel }), Itemkind, ...labelsOf(labelpath), '!']
   }
 
   /** The key prefix of everything a minder of `scope`'s bank caches. */
@@ -414,24 +470,25 @@ export class ThingMinder {
     return bankKeyHeadOf(ThingChecks.bankScope.parse(scope))
   }
 
-  /** The query key `labelpathed`'s car is cached under. */
-  queryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '!'] }
+  /** The query key `labelpathed`'s item is cached under. */
+  itemQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...bankKeyHeadOf(this.scope), Itemkind, ...labelsOf(labelpathed.labelpath), '!'] }
 
-  /** The query key the list of `labelpathed`'s children is cached under. */
-  listingQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '#', 'kids'] }
+  /** The query key `labelpathed`'s soon is cached under. */
+  soonQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...bankKeyHeadOf(this.scope), Soonkind, ...labelsOf(labelpathed.labelpath), '~'] }
 
-  /** The key prefix of every car and listing cached under `labelpathed` at any depth, but not of its own. */
-  descendantsQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...this.#keyHeadOf(labelpathed), '/'] }
+  /** The query key the listing of `labelpathed`'s children is cached under. */
+  listQueryKey(labelpathed: Labelpathed): TSQ.QueryKey { return [...bankKeyHeadOf(this.scope), Listkind, ...labelsOf(labelpathed.labelpath), '#', 'kids'] }
 
-  /** The part of a query key that `labelpathed` has in common with each of its keys. */
-  #keyHeadOf(labelpathed: Labelpathed): string[] { return keyHeadOf(this.scope, labelpathed.labelpath) }
+  /** TanStack's query options for a get of `labelpathed`'s item, under {@link #staleTimeOf}'s staleTime. */
+  #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingRecord | Tombstone<ThingRecord>> {
+    return { queryKey: this.itemQueryKey(labelpathed), staleTime: this.#staleTimeOf(labelpathed, opts) }
+  }
 
-  // TanStack spreads these over the query defaults: a staleTime key given as undefined would put TanStack's 0 in place of the minder's own.
-  /** TanStack's query options for a get of `labelpathed`'s car, with `opts.staleTime` where given, else the minder's query defaults' own. */
-  #tsqQueryOptions(labelpathed: Labelpathed, opts: MinderGetOpts): TSQ.QueryExecuteOptions<ThingCar<ThingRecord>> {
-    const queryOpts = { queryKey: this.queryKey(labelpathed) }
-    if (opts.staleTime === undefined) { return queryOpts }
-    return { ...queryOpts, staleTime: staleTimeFnOf(opts.staleTime) }
+  // A listener on a soon's success runs before the item is invalidated, so a get there needs the 0.
+  /** The staleTime a get of `labelpathed`'s item runs under: `opts.staleTime` where given, else 0 for an item behind, else the minder's own. */
+  #staleTimeOf(labelpathed: Labelpathed, opts: MinderGetOpts): TsqStaleTime {
+    if (opts.staleTime !== undefined) { return opts.staleTime }
+    return this.#isBehindAt(labelpathed) ? 0 : this.#queryCacheOpts.staleTime
   }
 
   /** The get ask the minder sends the vaultDB for `labelpathed`, in this minder's bank. */
@@ -474,68 +531,76 @@ export class ThingMinder {
     if (! this.#isReady) { throw Throwers.minderNotStarted() }
   }
 
-  /** The scope whose car, or whose list of children, is cached under `queryKey`, one of this minder's query keys. */
+  /** The scope whose item, soon or listing is cached under `queryKey`, one of this minder's query keys. */
   #scopeOfQueryKey(queryKey: TSQ.QueryKey): ThingScope {
-    const afterBank = queryKey.slice(3)
-    const labels    = afterBank.slice(0, afterBank.findIndex((segment) => (segment === '!') || (segment === '#')))
+    const afterEntrykind = queryKey.slice(EntrykindIdx + 1)
+    const labels         = afterEntrykind.slice(0, afterEntrykind.findIndex((segment) => Marks.has(segment)))
     return { ...this.scope, labelpath: labels.filter((segment) => segment !== '/').join('/') }
   }
   // --
 
   // == [TSQ Helpers]: #answerOfTSQ, #minderEventOf
 
-  // Its caller starts any refresh first, so that a vacant answer is isFetching. A removed car is vacant.
+  // Its caller starts any refresh first, so that a vacant answer is isFetching. A removed item is vacant.
   /** The {@link TSQGotAnswer} the cache gives for `ask`'s scope, timely within `opts.staleTime`, or the minder's own. */
   #answerOfTSQ(ask: GetAsk, opts: MinderGetOpts): TSQGotAnswer {
-    const carQuery = this.#tsqFind(ask)
-    const lastErr  = carQuery?.state.error ?? null
+    const itemQuery = this.#tsqFind(ask)
+    const lastErr   = itemQuery?.state.error ? Outcome.storageRefusalOf(itemQuery.state.error) : null
     return {
-      ...gotAnswerOf(ask, carQuery, opts.staleTime ?? this.#queryCacheOpts.staleTime),
-      refreshedAt: carQuery?.state.dataUpdatedAt ?? 0,
-      isFetching:  (carQuery?.state.fetchStatus === 'fetching'),
-      lastErr:     (lastErr === null) ? null : Outcome.storageRefusalOf(lastErr),
+      ...gotAnswerOf(ask, itemQuery, this.#isBehindAt(ask), opts.staleTime ?? this.#queryCacheOpts.staleTime),
+      refreshedAt: itemQuery?.state.dataUpdatedAt ?? 0,
+      isFetching:  (itemQuery?.state.fetchStatus === 'fetching'),
+      lastErr,
     }
   }
 
-  // A key's mark says what its query caches: '!' a car, '#' and 'kids' a listing. A removed query still has its last state, but
-  // no longer caches it, so its event carries no car or listing. A car's invalidation can't arise, as the minder invalidates none.
-  /** The event a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for one it is not told of. */
-  #minderEventOf(tsqEvent: unknown): MinderEvent | undefined {
-    if (! isUsefulTSQEvent(tsqEvent)) { return undefined }
-    const { queryKey }  = tsqEvent.query
+  // The emitted event pragmatically mimics the incoming TSQ event.
+  // A key's kind says what its query caches: an item, a soon or a listing. A removed query still has its last state, which its
+  // event tells, though the cache no longer has it. An item is invalidated when it falls behind its soon, or its get is
+  // refused; a listing, by `invalidate`. A soon is never invalidated or fetched.
+  /** The event a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for an observer's. */
+  #minderEventOf(tsqEvent: TSQ.QueryCacheNotifyEvent): MinderEvent | undefined {
+    if (! isTellableTSQEvent(tsqEvent)) { return undefined }
+    const { queryKey, queryHash, state } = tsqEvent.query
     const { labelpath } = this.#scopeOfQueryKey(queryKey)
-    const isRemoved     = (tsqEvent.type === 'removed')
     const told = {
+      eventkind: queryKey[EntrykindIdx] as MinderEventkind,
       type:      tsqEvent.type,
-      action:    isRemoved ? undefined : Object.freeze({ type: tsqEvent.action.type }),
+      action:    (tsqEvent.type === 'updated') ? Object.freeze({ ...tsqEvent.action }) : undefined,
       queryKey:  Object.freeze([...queryKey]),
-      state:     Object.freeze(isRemoved ? { ...tsqEvent.query.state, data: undefined } : { ...tsqEvent.query.state }),
+      queryHash,
+      state:     Object.freeze({ ...state }),
       ...this.scope,
       labelpath,
       modelkind: Labelpath.modelkindOf(labelpath),
     }
-    if (queryKey.at(-1) === '!') {
-      const car    = told.state.data as ThingCar<ThingRecord> | undefined
-      const newest = car?.newest
-      // The car at a labelpath is of the kind its labelpath starts with.
-      return Object.freeze({
-        ...told, agerank: car?.agerank,
-        revtok: newest?.revtok, revseq: newest?.revseq, am: newest?.am, lifeseq: newest?.lifeseq, lifepath: newest?.lifepath,
-      }) as ThingEvent
-    }
     // A listing lists Things of its parent's kind, as a labelpath starts with its parent's.
-    if (queryKey.at(-1) === 'kids') { return Object.freeze(told) as ListingEvent }
-    return undefined
+    if (told.eventkind === Listkind) { return Object.freeze(told) as ListingEvent }
+    const record = told.state.data as DeliverableThing | undefined
+    // The record at a labelpath is of the kind its labelpath starts with.
+    return Object.freeze({
+      ...told, revtok: record?.revtok, revseq: record?.revseq, am: record?.am, lifeseq: record?.lifeseq, lifepath: record?.lifepath,
+    }) as ThingEvent | SoonEvent
   }
   // --
 }
 
-// == [Helpers]: keyHeadOf, bankKeyHeadOf, BareListedAt, UsefulTSQEvent, isUsefulTSQEvent, gotAnswerOf, isTimelyQuery, staleTimeFnOf, listingOf, stableListingOf
+// == [Helpers]: Itemkind, Soonkind, Listkind, EntrykindIdx, Marks, labelsOf, bankKeyHeadOf, BareListedAt, TellableTSQEvent, isTellableTSQEvent, isNewer, isOlder, gotAnswerOf, isTimelyQuery, listingOf, stableListingOf
 
-/** The part of a query key that the Thing at `labelpath` in `scope`'s bank has in common with each of its keys. */
-function keyHeadOf(scope: BankScope, labelpath: Labelpath): string[] {
-  const labels = labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
-  return [...bankKeyHeadOf(scope), ...labels]
+/** The entrykind segment of an item's query key. */
+const Itemkind = 'item'
+/** The entrykind segment of a soon's query key. */
+const Soonkind = 'soon'
+/** The entrykind segment of a listing's query key. */
+const Listkind = 'list'
+/** Where a query key's entrykind segment is: after the bank's three. */
+const EntrykindIdx = 3
+/** The marks a query key's labels end at. */
+const Marks: ReadonlySet<unknown> = new Set(['!', '~', '#'])
+
+/** The labels of `labelpath`, with '/' between them, as a query key spells them. */
+function labelsOf(labelpath: Labelpath): string[] {
+  return labelpath.split('/').flatMap((label) => ['/', label]).slice(1)
 }
 
 /** The part of a query key that every key of `scope`'s bank has in common. */
@@ -544,52 +609,45 @@ function bankKeyHeadOf({ userid, banklabel }: BankScope): string[] { return ['so
 /** The time a bare listing was last listed: TanStack's `dataUpdatedAt` for a query no fetch has set. */
 const BareListedAt = 0
 
-/** A cache event a listener may hear of, narrowed by {@link isUsefulTSQEvent}. */
-type UsefulTSQEvent = Readonly<
-  | { type: 'removed', query: TSQ.Query }
-  | { type: 'updated', query: TSQ.Query, action: Readonly<{ type: 'success' | 'error' | 'invalidate' }> }
+/** A cache event a listener hears of, as {@link isTellableTSQEvent} narrows it: a query added, updated or removed. */
+type TellableTSQEvent = Readonly<
+  | { type: 'added' | 'removed', query: TSQ.Query }
+  | { type: 'updated', query: TSQ.Query, action: TSQQueryAction }
 >
 
-// A record arrives (success), a get is refused (which leaves the car untimely), the car is removed, or a listing is
-// invalidated. A fetch starting, pausing or failing once, and the observers' bookkeeping change none.
-/** True for a cache event a listener may hear of: a query removed, or a query's success, error or invalidation. */
-function isUsefulTSQEvent(event: unknown): event is UsefulTSQEvent {
-  if (! (event instanceof Object)) { return false }
-  const qcne = event as TSQ.QueryCacheNotifyEvent
-  if (qcne.type === 'removed') { return true }
-  return (qcne.type === 'updated') && ['success', 'error', 'invalidate'].includes(qcne.action.type)
+// The observers' events are of another flavour: their bookkeeping changes no query's state, and the minder has none.
+/** True for a cache event a listener hears of: any but an observer's. */
+function isTellableTSQEvent(event: TSQ.QueryCacheNotifyEvent): event is TellableTSQEvent {
+  return (event.type === 'added') || (event.type === 'updated') || (event.type === 'removed')
 }
 
-/** The {@link GotAnswer} for `carQuery`, the query of `ask`'s car, with the car and whether it is timely within `staleTime`. */
-function gotAnswerOf(ask: GetAsk, carQuery: TSQ.Query<ThingCar<ThingRecord>> | undefined, staleTime: TsqStaleTime): GotAnswer & Pick<CarFreshness, 'car' | 'isTimely'> {
-  const car      = carQuery?.state.data
-  const isTimely = isTimelyQuery(carQuery, staleTime)
-  const base     = { ok: true, car, ask, world: null, isTimely } as const
-  if (car === undefined)          { return { ...base, act: 'vacant',   val: undefined } }
-  if (isTimely) {
-    if (car.liveness === 'full')  { return { ...base, act: 'gotlive',  val: car.newest } }
-    if (car.liveness === 'gone')  { return { ...base, act: 'gotgone',  val: car.newest } }
-    if (car.liveness === 'void')  { return { ...base, act: 'gotvoid',  val: null } }
-  }
-  // A bhnd or bare car has no whole record of its newest revision.
-  return                                   { ...base, act: 'untimely', val: undefined }
+/** True when `record` is newer than `prior`, or `prior` is undefined. */
+function isNewer(prior: DeliverableThing | undefined, record: DeliverableThing): boolean {
+  return (prior === undefined) || (Thing.cmp(prior, record) > 0)
 }
 
-/** True when `carQuery` has a car the vaultDB has nothing newer for, and which TanStack Query counts fresh under `staleTime`. */
-function isTimelyQuery(carQuery: TSQ.Query<ThingCar<ThingRecord>> | undefined, staleTime: TsqStaleTime): boolean {
-  const car = carQuery?.state.data
-  if ((carQuery === undefined) || (car === undefined)) { return false }
-  if (dbHasNewer(car))                                 { return false }
-  return (! carQuery.isStaleByTime(staleTime))
+/** True when `record` is older than `prior`; false where `prior` is undefined. */
+function isOlder(prior: DeliverableThing | undefined, record: DeliverableThing): boolean {
+  return (prior !== undefined) && (Thing.cmp(prior, record) < 0)
 }
 
-// Every query in the minder's cache has a car the minder cached.
-/** TanStack's staleTime for a car's query: `staleTime`, or 0 where {@link dbHasNewer}. */
-function staleTimeFnOf(staleTime: TsqStaleTime): (carQuery: Readonly<{ state: Readonly<{ data: unknown }> }>) => TSQ.StaleTime {
-  return (carQuery) => {
-    const car = carQuery.state.data as ThingCar<ThingRecord> | undefined
-    return ((car !== undefined) && dbHasNewer(car)) ? 0 : staleTime
-  }
+/** The {@link GotAnswer} for `itemQuery`, the query of `ask`'s item, with its record and whether it is timely within `staleTime`. */
+function gotAnswerOf(ask: GetAsk, itemQuery: TSQ.Query<ThingRecord | Tombstone<ThingRecord>> | undefined, isBehind: boolean, staleTime: TsqStaleTime): GotAnswer & Pick<TSQGotAnswer, 'record' | 'isTimely'> {
+  const record   = itemQuery?.state.data
+  const isTimely = isTimelyQuery(itemQuery, isBehind, staleTime)
+  const base     = { ok: true, record, ask, world: null, isTimely } as const
+  // A newer revision heard of, with no item, is something cached all the same.
+  if ((record === undefined) && (! isBehind))  { return { ...base, act: 'vacant',   val: undefined } }
+  if ((record === undefined) || (! isTimely))  { return { ...base, act: 'untimely', val: undefined } }
+  if (Thing.isVoidSentinel(record))            { return { ...base, act: 'gotvoid',  val: null } }
+  if (Thing.isGone(record))                    { return { ...base, act: 'gotgone',  val: record } }
+  return                                                { ...base, act: 'gotlive',  val: record }
+}
+
+/** True when `itemQuery` has a record, is not behind, and is fresh under `staleTime` as TanStack Query counts it. */
+function isTimelyQuery(itemQuery: TSQ.Query<ThingRecord | Tombstone<ThingRecord>> | undefined, isBehind: boolean, staleTime: TsqStaleTime): boolean {
+  if ((itemQuery === undefined) || isBehind) { return false }
+  return (! itemQuery.isStaleByTime(staleTime))
 }
 
 /** A listing of every labelpath in `prior` and in `labelpaths`, once each, in labelpath order. */

@@ -1,11 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { ThingCar } from '../../../src/shapes/shapes-minder'
 import type { Labelpath } from '../../../src/shapes/primitives'
-import { type ThingRecord, ThingFormat } from '../../../src/shapes/shapes-thing'
+import type { ThingRecord, Tombstone } from '../../../src/shapes/shapes-thing'
+import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { Thing } from '../../../src/models/thing'
-import { ThingMinder } from '../../../src/minding/thing-minder'
 import * as TH from '../../test-helpers'
-import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf } from './world'
+import { QuietVaultDB, minderWorldOf, storedBoxOf, noticeOf, boxScopeOf, cheatBox, boxBirthAskOf, listenerOf, isListingEvent } from './world'
 
 // == [Listings in any order]: ListingStep, OrdersWithoutWrite, ListingOrders, listingAfter
 
@@ -80,7 +79,7 @@ describe("a ThingMinder's listing is the same, in any order", () => {
 })
 // --
 
-// == [Events in any order]: Openai, Reborn, eventsAfter, backwardCars, isForwardCar, fullestRecordOf, shrunkListings
+// == [Events in any order]: Openai, Reborn, eventsAfter, backwardRecords, shrunkListings
 
 /** The box openai, as the store has it at the start. */
 const Openai = TH.boxThingOf()
@@ -97,7 +96,7 @@ async function eventsAfter(steps: readonly ListingStep[]) {
   await storedBoxOf(vaultDB)
   const { minder, receive } = minderWorldOf(vaultDB)
   const heard      = listenerOf()
-  minder.listen(heard, ThingFormat)
+  minder.listen(heard, MinderEventFormat)
   const replaceAsk = TH.replaceAskOf(Openai, TH.nextOf(Openai))
   const refusalkinds: unknown[] = []
   const stepRunners: Readonly<Record<ListingStep, () => Promise<void> | void>> = {
@@ -112,38 +111,30 @@ async function eventsAfter(steps: readonly ListingStep[]) {
   return { events: heard.mock.calls.map(([event]) => event), refusalkinds }
 }
 
-/** Each car in `cars`, told in that order, that went back from the one told before it. */
-function backwardCars(cars: readonly (ThingCar<ThingRecord> | undefined)[]) {
-  return cars.filter((car, ii) => (ii > 0) && (! isForwardCar(cars[ii - 1], car)))
+/** Each record in `records`, told in that order, that is missing or older than the one told before it. */
+function backwardRecords(records: readonly (ThingRecord | Tombstone<ThingRecord> | undefined)[]) {
+  return records.filter((record, ii) => {
+    const prior = records[ii - 1]
+    return (ii > 0) && ((prior === undefined) || (record === undefined) || (Thing.cmp(prior, record) < 0))
+  })
 }
-
-/** True when `next`, told after `prior`, has a newest no older, and within one life a fullest record no older. */
-function isForwardCar(prior: ThingCar<ThingRecord> | undefined, next: ThingCar<ThingRecord> | undefined): boolean {
-  if ((prior === undefined) || (next === undefined) || (Thing.cmp(prior.newest, next.newest) < 0)) { return false }
-  if (prior.newest.lifepath !== next.newest.lifepath) { return true }
-  const [priorFullest, nextFullest] = [fullestRecordOf(prior), fullestRecordOf(next)]
-  return (priorFullest === undefined) || ((nextFullest !== undefined) && (Thing.cmp(priorFullest, nextFullest) >= 0))
-}
-
-/** The fullest record `car` stands for, its tombstone or shell included, or undefined for a bare car. */
-function fullestRecordOf(car: ThingCar<ThingRecord>) { return (car.liveness === 'bare') ? undefined : (car.fullest ?? car.newest) }
 
 /** Each listing in `listings`, told in that order, that lacks a labelpath of the one told before it. */
 function shrunkListings(listings: readonly (readonly Labelpath[] | undefined)[]) {
   return listings.filter((labelpaths, ii) => (ii > 0) && (listings[ii - 1] ?? []).some((labelpath) => (! labelpaths?.includes(labelpath))))
 }
 
-describe("a ThingMinder tells each car and listing going forward, in any order", () => {
+describe("a ThingMinder tells each item and listing going forward, in any order", () => {
   describe("of a list, a get, a write and a notice of a later life", () => {
     for (const steps of ListingOrders) {
       const blurb = steps.join(', ')
       it(blurb, async () => {
         const { events, refusalkinds } = await eventsAfter(steps)
-        const cars     = events.flatMap((event) => (ThingMinder.isThingEvent(event) && (event.labelpath === TH.BoxScope.labelpath)) ? [event.state.data] : [])
-        const listings = events.flatMap((event) => ((! ThingMinder.isThingEvent(event)) && (event.labelpath === 'box')) ? [event.state.data] : [])
-        expect(backwardCars(cars)).to.deep.equal([])
+        const records  = events.flatMap((event) => ((event.eventkind === 'item') && (event.labelpath === TH.BoxScope.labelpath)) ? [event.state.data] : [])
+        const listings = events.flatMap((event) => (isListingEvent(event) && (event.labelpath === 'box')) ? [event.state.data] : [])
+        expect(backwardRecords(records)).to.deep.equal([])
         expect(shrunkListings(listings)).to.deep.equal([])
-        expect(cars.at(-1)?.newest).to.deep.equal(Reborn)
+        expect(records.at(-1)).to.deep.equal(Reborn)
         expect(refusalkinds.filter((kind) => kind !== 'stale_read')).to.deep.equal([])
       })
     }

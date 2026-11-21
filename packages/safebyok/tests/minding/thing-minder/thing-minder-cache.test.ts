@@ -1,10 +1,10 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { type BankCar, type BoxCar, type GateCar, type ThingCar, MaxTimerMillis } from '../../../src/shapes/shapes-minder'
-import { carOf } from '../../../src/minding/thing-car'
+import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { type ThingRecord, Shell } from '../../../src/shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type Tombstone, Shell } from '../../../src/shapes/shapes-thing'
+import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
-import { Hours24, GateGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
+import { Hours24, GateGetAsk, DownVaultDB, QuietVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedGateOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf } from './world'
 
 describe("ThingMinder.at", () => {
   it("has nothing before any get", () => {
@@ -12,16 +12,27 @@ describe("ThingMinder.at", () => {
     expect(minder.at(TH.GateScope)).to.be.undefined
   })
 
-  it("has the car however old it is, its record in both newest and fullest", async () => {
+  it("has the whole record however old it is, deeply frozen", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(TH.GateScope)
     expect(minder.isStaleAt(TH.GateScope, { staleTime: 0 })).to.be.true
-    const car = minder.at(TH.GateScope)
-    expect(car).to.deep.include({ liveness: 'full', newest: gate, fullest: gate })
-    expect(car?.newest).to.eq(car?.fullest)
-    expect([Object.isFrozen(car), Object.isFrozen(car?.newest)]).to.deep.equal([true, true])
+    const record = minder.at(TH.GateScope)
+    expect(record).to.deep.equal(gate)
+    expect([Object.isFrozen(record), Object.isFrozen((record as typeof gate).wayins)]).to.deep.equal([true, true])
+  })
+
+  it("has nothing of a list's sparse record, and keeps the item it had", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box0    = await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.list('box')
+    expect(minder.at(TH.BoxScope)).to.be.undefined
+    await minder.get(TH.BoxScope)
+    cheatBox(vaultDB, TH.nextOf(box0))
+    await minder.list('box')
+    expect(minder.at(TH.BoxScope)).to.deep.equal(box0)
   })
 
   const ForeignScopes = [
@@ -36,26 +47,111 @@ describe("ThingMinder.at", () => {
     })
   }
 
-  it("has the car of every kind of Thing in the bank", async () => {
+  it("has the item of every kind of Thing in the bank", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
     await Promise.all([minder.get(TH.BankScope), minder.get(TH.GateScope), minder.get(TH.BoxScope)])
-    expect(minder.at(TH.BankScope)?.newest).to.deep.equal(TH.bankThingOf())
-    expect(minder.at(TH.GateScope)?.newest).to.deep.equal(TH.gateThingOf())
-    expect(minder.at(TH.RootScope)?.newest).to.deep.equal(TH.rootBoxOf())
-    expect(minder.at(TH.BoxScope)?.newest).to.deep.equal(box)
+    expect(minder.at(TH.BankScope)).to.deep.equal(TH.bankThingOf())
+    expect(minder.at(TH.GateScope)).to.deep.equal(TH.gateThingOf())
+    expect(minder.at(TH.RootScope)).to.deep.equal(TH.rootBoxOf())
+    expect(minder.at(TH.BoxScope)).to.deep.equal(box)
   })
 
-  it("types the car by the labelpath's kind, where it is known when compiled", () => {
+  it("types the record by the labelpath's kind, where it is known when compiled", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
     // Known only when run, as a host's labels are.
     const [label, labelpath] = ['openai' as string, 'box/openai' as string]
-    expectTypeOf(minder.at(TH.GateScope)).toEqualTypeOf<GateCar | undefined>()
-    expectTypeOf(minder.at(TH.RootScope)).toEqualTypeOf<BoxCar | undefined>()
-    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath: `box/${label}` as const })).toEqualTypeOf<BoxCar | undefined>()
-    expectTypeOf(minder.at(TH.BankScope)).toEqualTypeOf<BankCar | undefined>()
-    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingCar<ThingRecord> | undefined>()
+    expectTypeOf(minder.at(TH.GateScope)).toEqualTypeOf<GateRecord | Tombstone<GateRecord> | undefined>()
+    expectTypeOf(minder.at(TH.RootScope)).toEqualTypeOf<BoxRecord | Tombstone<BoxRecord> | undefined>()
+    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath: `box/${label}` as const })).toEqualTypeOf<BoxRecord | Tombstone<BoxRecord> | undefined>()
+    expectTypeOf(minder.at(TH.BankScope)).toEqualTypeOf<BankRecord | Tombstone<BankRecord> | undefined>()
+    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingRecord | Tombstone<ThingRecord> | undefined>()
+  })
+})
+
+describe("ThingMinder.soonAt", () => {
+  it("has a list's sparse record where no item is cached", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box0    = await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.list('box')
+    const soon = minder.soonAt(TH.BoxScope)
+    expect(soon).to.deep.equal(Thing.sparseOf(box0))
+    expect(Object.isFrozen(soon)).to.be.true
+  })
+
+  it("has a sparse record newer than the item, until a get catches the item up", async () => {
+    const vaultDB = new MemoryVaultDB()
+    const box0    = await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(TH.BoxScope)
+    const box1    = TH.nextOf(box0)
+    cheatBox(vaultDB, box1)
+    await minder.list('box')
+    expect(minder.soonAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(box1))
+    await minder.get(TH.BoxScope)
+    expect(minder.soonAt(TH.BoxScope)).to.be.undefined
+    expect(minder.at(TH.BoxScope)).to.deep.equal(box1)
+  })
+
+  it("has nothing of a sparse record no newer than the item", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { minder } = minderWorldOf(vaultDB)
+    await minder.get(TH.BoxScope)
+    await minder.list('box')
+    expect(minder.soonAt(TH.BoxScope)).to.be.undefined
+  })
+
+  it("keeps the newer of two sparse records, in either order", () => {
+    const box0 = TH.boxThingOf()
+    const box1 = TH.nextOf(box0)
+    for (const order of [[box0, box1], [box1, box0]]) {
+      const { minder, receive } = minderWorldOf(new MemoryVaultDB())
+      for (const box of order) { receive(sparseNoticeOf(box)) }
+      expect(minder.soonAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(box1))
+    }
+  })
+
+  it("has nothing once a whole record no older arrives", () => {
+    const { minder, receive } = minderWorldOf(new MemoryVaultDB())
+    const box0 = TH.boxThingOf()
+    receive(sparseNoticeOf(box0))
+    receive(noticeOf(box0))
+    expect([minder.soonAt(TH.BoxScope), minder.at(TH.BoxScope)]).to.deep.equal([undefined, box0])
+  })
+
+  it("types the sparse record by the labelpath's kind", () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    expectTypeOf(minder.soonAt(TH.GateScope)).toEqualTypeOf<Sparse<GateRecord> | undefined>()
+  })
+
+  it("refuses bad_record for another bank's scope", () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    TH.expectSyncRefusal(() => minder.soonAt({ ...TH.GateScope, banklabel: 'zz' }), 'bad_record')
+  })
+})
+
+describe("ThingMinder.isBehindAt", () => {
+  it("is true while a newer sparse record is cached, with no item or a whole older one, and false once a record no older lands", () => {
+    const { minder, receive } = minderWorldOf(new MemoryVaultDB())
+    const box0 = TH.boxThingOf()
+    const box1 = TH.nextOf(box0)
+    expect(minder.isBehindAt(TH.BoxScope)).to.be.false
+    receive(sparseNoticeOf(box0))
+    expect(minder.isBehindAt(TH.BoxScope)).to.be.true
+    receive(noticeOf(box0))
+    expect(minder.isBehindAt(TH.BoxScope)).to.be.false
+    receive(sparseNoticeOf(box1))
+    expect(minder.isBehindAt(TH.BoxScope)).to.be.true
+    receive(noticeOf(box1))
+    expect(minder.isBehindAt(TH.BoxScope)).to.be.false
+  })
+
+  it("refuses bad_record for another bank's scope", () => {
+    const { minder } = minderWorldOf(new MemoryVaultDB())
+    TH.expectSyncRefusal(() => minder.isBehindAt({ ...TH.BoxScope, banklabel: 'zz' }), 'bad_record')
   })
 })
 
@@ -91,8 +187,8 @@ describe("ThingMinder.listingAt", () => {
     await minder.get(boxScopeOf('anthropic'))
     const mistralTomb = TH.boxTombOf(TH.boxThingOf('mistral'))
     receive(noticeOf(mistralTomb))
-    const { liveness } = await minder.get(boxScopeOf('cohere'))
-    expect(liveness).to.eq('void')
+    const cohere = await minder.get(boxScopeOf('cohere'))
+    expect(Thing.isVoidSentinel(cohere)).to.be.true
     expect(minder.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/mistral', 'box/openai'])
   })
 
@@ -259,7 +355,7 @@ describe("ThingMinder.isListingBareAt", () => {
 describe("ThingMinder.tryAt", () => {
   it("answers vacant where the cache has nothing", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB())
-    expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'vacant', val: undefined, car: undefined, isTimely: false, refreshedAt: 0, isFetching: false, lastErr: null })
+    expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'vacant', val: undefined, record: undefined, isTimely: false, refreshedAt: 0, isFetching: false, lastErr: null })
   })
 
   it("answers gotlive with the record where it is timely", async () => {
@@ -267,7 +363,7 @@ describe("ThingMinder.tryAt", () => {
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(TH.GateScope)
-    expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'gotlive', val: gate, car: carOf(gate), isTimely: true, isFetching: false, lastErr: null })
+    expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'gotlive', val: gate, record: gate, isTimely: true, isFetching: false, lastErr: null })
   })
 
   it("treats options given as undefined as left out", async () => {
@@ -278,35 +374,33 @@ describe("ThingMinder.tryAt", () => {
     expect(minder.tryAt(TH.GateScope, { staleTime: undefined, ifStale: undefined })).to.deep.include({ ok: true, act: 'gotlive', val: gate, isTimely: true })
   })
 
-  it("answers gotlive for a full car under a staleTime of Infinity or 'static'", async () => {
+  it("answers gotlive for a whole record under a staleTime of Infinity", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(TH.GateScope)
-    for (const staleTime of [Infinity, 'static'] as const) {
-      expect(minder.tryAt(TH.GateScope, { staleTime })).to.deep.include({ ok: true, act: 'gotlive', val: gate, isTimely: true })
-    }
+    expect(minder.tryAt(TH.GateScope, { staleTime: Infinity })).to.deep.include({ ok: true, act: 'gotlive', val: gate, isTimely: true })
   })
 
-  it("answers untimely for a bare or bhnd car, even under a staleTime of Infinity", async () => {
+  it("answers untimely beside a newer sparse record, with no item or behind one, even under a staleTime of Infinity", async () => {
     const vaultDB = new MemoryVaultDB()
     const box0    = await storedBoxOf(vaultDB)
     const { minder } = minderWorldOf(vaultDB)
     await minder.list('box')
-    expect(minder.tryAt(TH.BoxScope, { staleTime: Infinity })).to.deep.include({ ok: true, act: 'untimely', isTimely: false })
+    expect(minder.tryAt(TH.BoxScope, { staleTime: Infinity })).to.deep.include({ ok: true, act: 'untimely', record: undefined, isTimely: false })
     await minder.get(TH.BoxScope)
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, TH.nextOf(box0))
     await minder.list('box')
-    expect(minder.tryAt(TH.BoxScope, { staleTime: Infinity })).to.deep.include({ ok: true, act: 'untimely', isTimely: false })
+    expect(minder.tryAt(TH.BoxScope, { staleTime: Infinity })).to.deep.include({ ok: true, act: 'untimely', record: box0, isTimely: false })
   })
 
-  it("answers untimely, without the record but with its car, where it is older than staleTime", async () => {
+  it("answers untimely, without val but with the item's record, where it is older than staleTime", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
     await minder.get(TH.GateScope)
     const answer = minder.tryAt(TH.GateScope, { staleTime: 0 })
-    expect(answer).to.deep.include({ ok: true, act: 'untimely', val: undefined, car: carOf(gate), isTimely: false })
+    expect(answer).to.deep.include({ ok: true, act: 'untimely', val: undefined, record: gate, isTimely: false })
     expect(answer).to.have.property('refreshedAt').above(0)
   })
 
@@ -339,7 +433,7 @@ describe("ThingMinder.tryAt", () => {
     const { minder } = minderWorldOf(vaultDB)
     expect(minder.tryAt(TH.GateScope, { ifStale: 'refresh' })).to.deep.include({ act: 'vacant', isFetching: true })
     await TH.eventually(() => actOf(minder.tryAt(TH.GateScope)) === 'gotlive')
-    expect(minder.at(TH.GateScope)).to.deep.equal(carOf(gate))
+    expect(minder.at(TH.GateScope)).to.deep.equal(gate)
   })
 
   it("fetches nothing under ifStale: 'refresh' while the record is timely", async () => {

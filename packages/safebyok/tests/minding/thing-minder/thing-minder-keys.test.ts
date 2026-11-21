@@ -8,52 +8,50 @@ import { minderWithoutStart } from './world'
 describe("ThingMinder keys", () => {
   const DeepScope = { ...TH.BoxScope, labelpath: 'box/openai/deep' }
 
-  it("interleave '/' between the labels, then end with '!' for the Thing's car", () => {
+  it("name the item after the bank, interleave '/' between the labels, then end with '!'", () => {
     const minder = minderWithoutStart()
-    expect(minder.queryKey(TH.GateScope)).to.deep.equal(['sok', 'u1', 'acme', 'gate', '!'])
-    expect(minder.queryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '!'])
-    expect(minder.queryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '!'])
-    expect(minder.queryKey(TH.BankScope)).to.deep.equal(['sok', 'u1', 'acme', 'bank', '!'])
+    expect(minder.itemQueryKey(TH.GateScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'gate', '!'])
+    expect(minder.itemQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '!'])
+    expect(minder.itemQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
+    expect(minder.itemQueryKey(TH.BankScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'bank', '!'])
   })
 
-  it("put the list of a Thing's children under '#' and 'kids'", () => {
+  it("name the soon after the bank, and end it with '~'", () => {
     const minder = minderWithoutStart()
-    expect(minder.listingQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '#', 'kids'])
-    expect(minder.listingQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '#', 'kids'])
+    expect(minder.soonQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'soon', 'box', '~'])
+    expect(minder.soonQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'soon', 'box', '/', 'openai', '~'])
   })
 
-  it("make a descendants prefix of the labels and '/', which no key of the Thing's own starts", () => {
+  it("name the list of a Thing's children after the bank, and end it with '#' and 'kids'", () => {
     const minder = minderWithoutStart()
-    expect(minder.descendantsQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/'])
-    expect(minder.descendantsQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'box', '/', 'openai', '/'])
+    expect(minder.listQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
+    expect(minder.listQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '/', 'openai', '#', 'kids'])
   })
 
-  it("match, for a descendants prefix, every key under the Thing and neither of the Thing's own", () => {
+  it("match, for a Thing's listing key without its mark, its own listing and every listing under it, and no item or soon", () => {
     const minder = minderWithoutStart()
     const matches = (prefixScope: ThingScope, keyScope: ThingScope) => {
-      const prefix = minder.descendantsQueryKey(prefixScope)
-      return [minder.queryKey(keyScope), minder.listingQueryKey(keyScope)].map((queryKey) => TSQ.partialMatchKey(queryKey, prefix))
+      const prefix = minder.listQueryKey(prefixScope).slice(0, -2)
+      return [minder.listQueryKey(keyScope), minder.itemQueryKey(keyScope), minder.soonQueryKey(keyScope)].map((queryKey) => TSQ.partialMatchKey(queryKey, prefix))
     }
-    expect(matches(TH.RootScope, TH.RootScope)).to.deep.equal([false, false])
-    expect(matches(TH.RootScope, TH.BoxScope)).to.deep.equal([true, true])
-    expect(matches(TH.RootScope, DeepScope)).to.deep.equal([true, true])
-    expect(matches(TH.BoxScope, TH.BoxScope)).to.deep.equal([false, false])
-    expect(matches(TH.BoxScope, DeepScope)).to.deep.equal([true, true])
-    expect(matches(TH.BoxScope, TH.RootScope)).to.deep.equal([false, false])
-    expect(matches(TH.BoxScope, { ...TH.BoxScope, labelpath: 'box/openai2' })).to.deep.equal([false, false])
-    expect(matches(TH.RootScope, TH.GateScope)).to.deep.equal([false, false])
+    expect(matches(TH.RootScope, TH.RootScope)).to.deep.equal([true, false, false])
+    expect(matches(TH.RootScope, TH.BoxScope)).to.deep.equal([true, false, false])
+    expect(matches(TH.BoxScope, DeepScope)).to.deep.equal([true, false, false])
+    expect(matches(TH.BoxScope, TH.RootScope)).to.deep.equal([false, false, false])
+    expect(matches(TH.BoxScope, { ...TH.BoxScope, labelpath: 'box/openai2' })).to.deep.equal([false, false, false])
+    expect(matches(TH.RootScope, TH.GateScope)).to.deep.equal([false, false, false])
   })
 
-  it("are the same, made without a minder, for anyone caching the same car", () => {
+  it("are the same, made without a minder, for anyone caching the same record", () => {
     const minder = minderWithoutStart()
     for (const scope of [TH.GateScope, TH.RootScope, TH.BoxScope, TH.BankScope]) {
-      expect(ThingMinder.queryKeyOf(scope)).to.deep.equal(minder.queryKey(scope))
+      expect(ThingMinder.itemQueryKeyOf(scope)).to.deep.equal(minder.itemQueryKey(scope))
     }
     expect(ThingMinder.bankQueryKeyOf(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme'])
   })
 
   it("made without a minder, refuse a scope that is not one", () => {
-    TH.expectSyncRefusal(() => ThingMinder.queryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
+    TH.expectSyncRefusal(() => ThingMinder.itemQueryKeyOf({ ...TH.BoxScope, labelpath: '' }), 'bad_record')
     TH.expectSyncRefusal(() => ThingMinder.bankQueryKeyOf({ userid: 'u1' } as never), 'bad_record')
   })
 })
