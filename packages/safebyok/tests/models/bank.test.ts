@@ -708,6 +708,48 @@ function nextBankThingOf(bank: Bank) {
   return { ...bank.pickle(), revtok: Crypto.randomId(), revseq: bank.revseq + 1, written_at: bank.written_at + 1 }
 }
 
+describe("bank.trySealBox, bank.tryUnsealBox, bank.sealBoxEnsuringUnlock and bank.unsealBoxEnsuringUnlock", () => {
+  it("try forms resolve a good outcome of what the throwing forms resolve, and the refusal they throw", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { record: box } = await TH.expectGood(bank.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }))
+    expect(await TH.expectGood(bank.tryUnsealBox(box))).to.deep.include({ whisper: TH.Whisper })
+    bank.lock()
+    await TH.expectBad(bank.trySealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
+    await TH.expectBad(bank.tryUnsealBox(box), 'bank_locked')
+  })
+
+  it("ensuring forms wait on a locked bank for the unlock, showing it wanted, then seal and unseal", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const sealing   = bank.sealBoxEnsuringUnlock(TH.boxShellOf({ labelpath: 'box/openai', label: 'openai' }), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const unsealing = bank.unsealBoxEnsuringUnlock(box)
+    expect(bank.getSnapshot()).to.include({ isLocked: true, isUnlockWanted: true })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    const { record } = await sealing
+    expect(record).to.include({ labelpath: 'box/openai', am: 'a' })
+    expect(await unsealing).to.deep.include({ whisper: TH.Whisper })
+  })
+
+  it("ensuring forms refuse a box of another bank before the wait, never asking for the unlock", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    await TH.expectRefusal(bank.sealBoxEnsuringUnlock(TH.boxShellOf({ banklabel: 'work' }), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'record_conflict')
+    await TH.expectRefusal(bank.unsealBoxEnsuringUnlock({ ...box, banklabel: 'work' }), 'record_conflict')
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+  })
+
+  it("ensuring forms reject 'dismissed' when the unlock is dismissed", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.lock()
+    const unsealing = TH.expectRefusal(bank.unsealBoxEnsuringUnlock(box), 'dismissed')
+    bank.dismissUnlock()
+    await unsealing
+  })
+})
+
 describe("bank.track, and the asks the bank builds", () => {
   it("track the revseq and lifepath this object has of the bank, its main gate and its root box", async () => {
     const { bank } = await TH.buildBornBank()

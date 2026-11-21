@@ -262,7 +262,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Boxes]: sealBox, tombstoneBox, unsealBox
+  // == [Boxes]: sealBox, trySealBox, sealBoxEnsuringUnlock, tombstoneBox, unsealBox, tryUnsealBox, unsealBoxEnsuringUnlock
 
   /** Seal the next revision of the box `donorProps`, and return the ask that writes it over `donorProps`. Needs the bank unlocked.
    * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
@@ -286,6 +286,27 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     return BaseBox.isTombstone(record) ? this.makeDelAsk<BoxRecord>({ cited, record }) : this.makePutAsk<BoxRecord>({ cited, record })
   }
 
+  /** {@link sealBox}, resolving an `Outcome` instead of throwing. */
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<Outcome.Outcome<SealedBoxAsk<TombstoneOf<BoxRecord>>>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<Outcome.Outcome<SealedBoxAsk<LiveOf<BoxRecord>>>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<SealedBoxAsk>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<SealedBoxAsk>> {
+    return Outcome.outcomeOf(() => this.sealBox(donorProps, publicProps, secretProps))
+  }
+
+  /** {@link sealBox}, first waiting for the bank to be unlocked ({@link ensureUnlocked}) on a locked bank.
+   * A box of another bank refuses before the wait, so it never asks the user to unlock.
+   */
+  sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<SealedBoxAsk<TombstoneOf<BoxRecord>>>
+  sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<SealedBoxAsk<LiveOf<BoxRecord>>>
+  sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<SealedBoxAsk>
+  async sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<SealedBoxAsk> {
+    this.demandEnabled()
+    this.#demandOwnBox(donorProps)
+    await this.ensureUnlocked()
+    return await this.sealBox(donorProps, publicProps, secretProps)
+  }
+
   /** Seal the tombstone of the live box `donorProps`, and return the del ask that writes it over `donorProps`. Needs the bank unlocked.
    * Its sealed empty whisper authenticates it. Its `written_at` is `publicProps.written_at`, or now.
    */
@@ -300,6 +321,19 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     this.demandEnabled()
     this.#demandOwnBox(box)
     return await this.#gate.unseal(BaseBox, box)
+  }
+
+  /** {@link unsealBox}, resolving an `Outcome` instead of throwing. */
+  tryUnsealBox(box: BoxRecord): Promise<Outcome.Outcome<BoxUnsealed>> { return Outcome.outcomeOf(() => this.unsealBox(box)) }
+
+  /** {@link unsealBox}, first waiting for the bank to be unlocked ({@link ensureUnlocked}) on a locked bank.
+   * A box of another bank refuses before the wait, so it never asks the user to unlock.
+   */
+  async unsealBoxEnsuringUnlock(box: BoxRecord): Promise<BoxUnsealed> {
+    this.demandEnabled()
+    this.#demandOwnBox(box)
+    await this.ensureUnlocked()
+    return await this.unsealBox(box)
   }
   // --
 
