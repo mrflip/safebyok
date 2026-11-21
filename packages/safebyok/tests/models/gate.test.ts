@@ -161,7 +161,7 @@ describe("what a gate shows", () => {
 
   it("fixes the fields of its life for good, and only its revision fields may be set again", async () => {
     const gate = Gate.make(await gateRecordOf(), worldOpts())
-    const configurableOf = (fieldname: string) => Object.getOwnPropertyDescriptor(gate, fieldname)!.configurable
+    function configurableOf(fieldname: string): boolean | undefined { return Object.getOwnPropertyDescriptor(gate, fieldname)!.configurable }
     expect(['userid', 'banklabel', 'labelpath', 'label', 'lifepath', 'lifeseq', 'born_at'].map((fieldname) => configurableOf(fieldname))).to.not.include(true)
     expect(['fmt', 'revtok', 'revseq', 'written_at', 'am'].map((fieldname) => configurableOf(fieldname))).to.not.include(false)
   })
