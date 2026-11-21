@@ -224,6 +224,109 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.1.0)(jsdom@30.1.3(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1))
 
+  demos/safebyok-demo-knockknock:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^1.4.0
+        version: 1.4.0(zod@4.6.7)
+      '@tanstack/react-query':
+        specifier: ^5.107.1
+        version: 5.107.1(@types/react@19.3.0)(react@19.3.1)
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
+      safebyok:
+        specifier: workspace:*
+        version: link:../../packages/safebyok
+      safebyok-react-lean:
+        specifier: workspace:*
+        version: link:../../packages/safebyok-react-lean
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.14.0)
+      '@stylistic/eslint-plugin':
+        specifier: ^5.10.0
+        version: 5.10.0(eslint@10.14.0)
+      '@testing-library/dom':
+        specifier: ^10.4.2
+        version: 10.4.2
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@types/node':
+        specifier: ^24.19.2
+        version: 24.19.2
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitejs/plugin-react':
+        specifier: ^6.3.0
+        version: 6.3.0(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1))
+      '@vitest/coverage-v8':
+        specifier: ^5.1.0
+        version: 5.1.0(vitest@5.1.0)
+      '@vitest/eslint-plugin':
+        specifier: ^1.6.28
+        version: 1.6.28(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.72.2(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)(typescript@6.0.3)(vitest@5.1.0)
+      eslint:
+        specifier: ^10.14.0
+        version: 10.14.0
+      eslint-import-resolver-typescript:
+        specifier: ^4.4.5
+        version: 4.4.5(eslint-plugin-import-x@4.18.1(@typescript-eslint/utils@8.71.1(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0))(eslint@10.14.0)
+      eslint-plugin-chai-expect:
+        specifier: ^4.1.1
+        version: 4.1.1(eslint@10.14.0)
+      eslint-plugin-chai-friendly:
+        specifier: ^1.2.1
+        version: 1.2.1(eslint@10.14.0)
+      eslint-plugin-import-x:
+        specifier: ^4.18.1
+        version: 4.18.1(@typescript-eslint/utils@8.71.1(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.5
+        version: 65.4.5(eslint@10.14.0)(typescript@6.0.3)
+      eslint-plugin-jsx-a11y:
+        specifier: ^6.10.2
+        version: 6.10.2(eslint@10.14.0)
+      eslint-plugin-react:
+        specifier: ^7.37.5
+        version: 7.37.5(eslint@10.14.0)
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.14.0)
+      eslint-plugin-react-refresh:
+        specifier: ^0.5.7
+        version: 0.5.7(eslint@10.14.0)
+      eslint-plugin-sonarjs:
+        specifier: ^4.2.2
+        version: 4.2.2(eslint@10.14.0)
+      eslint-plugin-unicorn:
+        specifier: ^79.0.0
+        version: 79.0.0(eslint@10.14.0)(typescript@6.0.3)
+      jsdom:
+        specifier: ^31.0.0
+        version: 31.0.0(@noble/hashes@2.4.0)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8.72.2
+        version: 8.72.2(eslint@10.14.0)(typescript@6.0.3)
+      vite:
+        specifier: ^8.3.8
+        version: 8.3.8(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1)
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.1.0)(jsdom@31.0.0(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1))
+
   demos/safebyok-demo-react:
     dependencies:
       '@anthropic-ai/sdk':
@@ -419,9 +522,6 @@ importers:
 
   packages/safebyok:
     dependencies:
-      '@tanstack/query-core':
-        specifier: ^5.107.1
-        version: 5.107.1
       es-toolkit:
         specifier: ^1.53.2
         version: 1.53.2
@@ -441,6 +541,9 @@ importers:
       '@stylistic/eslint-plugin':
         specifier: ^5.10.0
         version: 5.10.0(eslint@10.14.0)
+      '@tanstack/query-core':
+        specifier: ^5.107.1
+        version: 5.107.1
       '@types/node':
         specifier: ^24.19.2
         version: 24.19.2
@@ -1044,12 +1147,103 @@ importers:
       react-dom:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
-      safebyok:
-        specifier: workspace:*
-        version: link:../safebyok
       safebyok-big:
         specifier: workspace:*
         version: link:../safebyok-big
+      tsdown:
+        specifier: ^0.23.7
+        version: 0.23.7(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
+      typescript:
+        specifier: 6.0.3
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8.72.2
+        version: 8.72.2(eslint@10.14.0)(typescript@6.0.3)
+      vitest:
+        specifier: ^5.1.0
+        version: 5.1.0(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.1.0)(jsdom@31.0.0(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1))
+
+  packages/safebyok-react-lean:
+    dependencies:
+      safebyok:
+        specifier: workspace:*
+        version: link:../safebyok
+    devDependencies:
+      '@arethetypeswrong/core':
+        specifier: ^0.18.5
+        version: 0.18.5
+      '@eslint/js':
+        specifier: ^10.0.1
+        version: 10.0.1(eslint@10.14.0)
+      '@stylistic/eslint-plugin':
+        specifier: ^5.10.0
+        version: 5.10.0(eslint@10.14.0)
+      '@tanstack/react-query':
+        specifier: ^5.107.1
+        version: 5.107.1(@types/react@19.3.0)(react@19.3.1)
+      '@testing-library/dom':
+        specifier: ^10.4.2
+        version: 10.4.2
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      '@vitest/coverage-v8':
+        specifier: ^5.1.0
+        version: 5.1.0(vitest@5.1.0)
+      '@vitest/eslint-plugin':
+        specifier: ^1.6.28
+        version: 1.6.28(@typescript-eslint/eslint-plugin@8.71.1(@typescript-eslint/parser@8.72.2(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)(typescript@6.0.3)(vitest@5.1.0)
+      eslint:
+        specifier: ^10.14.0
+        version: 10.14.0
+      eslint-import-resolver-typescript:
+        specifier: ^4.4.5
+        version: 4.4.5(eslint-plugin-import-x@4.18.1(@typescript-eslint/utils@8.71.1(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0))(eslint@10.14.0)
+      eslint-plugin-chai-expect:
+        specifier: ^4.1.1
+        version: 4.1.1(eslint@10.14.0)
+      eslint-plugin-chai-friendly:
+        specifier: ^1.2.1
+        version: 1.2.1(eslint@10.14.0)
+      eslint-plugin-import-x:
+        specifier: ^4.18.1
+        version: 4.18.1(@typescript-eslint/utils@8.71.1(eslint@10.14.0)(typescript@6.0.3))(eslint@10.14.0)
+      eslint-plugin-jsdoc:
+        specifier: ^65.4.5
+        version: 65.4.5(eslint@10.14.0)(typescript@6.0.3)
+      eslint-plugin-jsx-a11y:
+        specifier: ^6.10.2
+        version: 6.10.2(eslint@10.14.0)
+      eslint-plugin-react:
+        specifier: ^7.37.5
+        version: 7.37.5(eslint@10.14.0)
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.14.0)
+      eslint-plugin-sonarjs:
+        specifier: ^4.2.2
+        version: 4.2.2(eslint@10.14.0)
+      eslint-plugin-unicorn:
+        specifier: ^79.0.0
+        version: 79.0.0(eslint@10.14.0)(typescript@6.0.3)
+      jsdom:
+        specifier: ^31.0.0
+        version: 31.0.0(@noble/hashes@2.4.0)
+      publint:
+        specifier: ^0.3.25
+        version: 0.3.25
+      react:
+        specifier: ^19.3.1
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.1
+        version: 19.3.1(react@19.3.1)
       tsdown:
         specifier: ^0.23.7
         version: 0.23.7(@arethetypeswrong/core@0.18.5)(publint@0.3.25)(typescript@6.0.3)
@@ -4346,10 +4540,6 @@ packages:
     resolution: {integrity: sha512-sXcNcHOC51uPGF0P/D4NVtrkjSU2fNsm9iog4ZvZJsL3rjoDAzXZhkm2MWt1y+PUdggKAYVoMAIYcs78wJ51Cw==}
     engines: {node: '>=20'}
 
-  whatwg-url@17.2.0:
-    resolution: {integrity: sha512-IhLIHNcBrzIixC5XXsbr4DxdjajyA5vQ5RwGZMtrUp+GbtE5Nrsge9QKau7jXrC0aTXLYGV0xiW7Tb4YS2aomw==}
-    engines: {node: ^22.14.0 || >=24.0.0}
-
   whatwg-url@17.3.0:
     resolution: {integrity: sha512-KwOAJrpf+GTgBvcBQJcP38sMF0DsQKdwtG+TxM2pW44P6E5k0hDbWrDmyuJDIF0Uef0aQq0ZoJs+5oI+k8ddhg==}
     engines: {node: ^22.14.0 || >=24.0.0}
@@ -4458,6 +4648,14 @@ snapshots:
       standardwebhooks: 1.1.1
     optionalDependencies:
       zod: 4.6.5
+
+  '@anthropic-ai/sdk@1.4.0(zod@4.6.7)':
+    dependencies:
+      '@opentelemetry/api': 1.9.1
+      json-schema-to-ts: 3.1.1
+      standardwebhooks: 1.1.1
+    optionalDependencies:
+      zod: 4.6.7
 
   '@arethetypeswrong/core@0.18.5':
     dependencies:
@@ -4837,7 +5035,7 @@ snapshots:
 
   '@es-joy/esutils@3.0.0':
     dependencies:
-      '@types/estree': 1.0.9
+      '@types/estree': 1.0.10
 
   '@es-joy/jsdoccomment@1.1.0':
     dependencies:
@@ -5992,7 +6190,7 @@ snapshots:
   data-urls@8.0.0(@noble/hashes@2.4.0):
     dependencies:
       whatwg-mimetype: 5.0.0
-      whatwg-url: 17.2.0(@noble/hashes@2.4.0)
+      whatwg-url: 17.3.0(@noble/hashes@2.4.0)
     transitivePeerDependencies:
       - '@noble/hashes'
 
@@ -6326,8 +6524,8 @@ snapshots:
       '@babel/parser': 7.29.9
       eslint: 10.14.0
       hermes-parser: 0.25.1
-      zod: 4.6.5
-      zod-validation-error: 4.0.2(zod@4.6.5)
+      zod: 4.6.7
+      zod-validation-error: 4.0.2(zod@4.6.7)
     transitivePeerDependencies:
       - supports-color
 
@@ -6850,7 +7048,7 @@ snapshots:
 
   jsdoc-type-pratt-parser@9.5.0:
     dependencies:
-      '@types/estree': 1.0.9
+      '@types/estree': 1.0.10
 
   jsdom@30.1.3(@noble/hashes@2.4.0):
     dependencies:
@@ -6865,14 +7063,14 @@ snapshots:
       html-encoding-sniffer: 7.0.0(@noble/hashes@2.4.0)
       is-potential-custom-element-name: 1.0.1
       lru-cache: 11.5.3
-      parse5: 8.0.1
+      parse5: 8.1.1
       saxes: 6.0.0
       tough-cookie: 6.0.2
       undici: 8.12.3
       w3c-xmlserializer: 6.0.0
       webidl-conversions: 8.0.1
       whatwg-mimetype: 5.0.0
-      whatwg-url: 17.2.0(@noble/hashes@2.4.0)
+      whatwg-url: 17.3.0(@noble/hashes@2.4.0)
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - '@noble/hashes'
@@ -7932,14 +8130,6 @@ snapshots:
 
   whatwg-mimetype@5.0.0: {}
 
-  whatwg-url@17.2.0(@noble/hashes@2.4.0):
-    dependencies:
-      '@exodus/bytes': 1.16.0(@noble/hashes@2.4.0)
-      tr46: 7.0.0
-      webidl-conversions: 8.0.1
-    transitivePeerDependencies:
-      - '@noble/hashes'
-
   whatwg-url@17.3.0(@noble/hashes@2.4.0):
     dependencies:
       '@exodus/bytes': 1.16.0(@noble/hashes@2.4.0)
@@ -8022,10 +8212,11 @@ snapshots:
       '@yuku-toolchain/win32-arm64': 0.27.0
       '@yuku-toolchain/win32-x64': 0.27.0
 
-  zod-validation-error@4.0.2(zod@4.6.5):
+  zod-validation-error@4.0.2(zod@4.6.7):
     dependencies:
-      zod: 4.6.5
+      zod: 4.6.7
 
-  zod@4.6.5: {}
+  zod@4.6.5:
+    optional: true
 
   zod@4.6.7: {}

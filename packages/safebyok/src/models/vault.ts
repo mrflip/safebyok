@@ -27,24 +27,26 @@ export class Vault {
   /** The bank whose boxes this vault carries. */
   get bank(): Bank { return this.#bank }
 
-  /** The minder caching this bank's Things, made with this vault. */
+  /** The minder caching this bank's Things, which the vault reads and writes through. */
   get minder(): ThingMinder { return this.#minder }
   // --
 
   // == [Construction]: make, constructor
 
-  /** Make the vault of `bank`'s boxes, with a minder of its own that does nothing until its `hello`.
-   * The bank's sweep sweeps the vault too. Refuses a swept bank.
+  /** Make the vault of `bank`'s boxes, reading and writing them through `minder`, a minder of the same bank.
+   * Its gets refuse until the minder's `hello`. The bank's sweep sweeps the vault too, and so the minder. Refuses a swept bank.
    */
-  static make(bank: Bank): Vault {
-    const vault = new Vault(Checks.bank.parse(bank))
+  static make(bank: Bank, minder: ThingMinder): Vault {
+    const checked = Checks.vaultMakeArgs.parse({ bank, minder })
+    Validator.checkedConsistent(checked.minder.scope, checked.bank.scope, { kind: 'record_conflict' })
+    const vault = new Vault(checked.bank, checked.minder)
     bank.hostVault(vault)
     return vault
   }
 
-  private constructor(bank: Bank) {
+  private constructor(bank: Bank, minder: ThingMinder) {
     this.#bank   = bank
-    this.#minder = ThingMinder.make({ vaultDB: bank.vaultDB, queryCacheOpts: bank.queryCacheOpts }, bank)
+    this.#minder = minder
     Object.freeze(this)
   }
   // --
@@ -183,9 +185,12 @@ function isOfNewerLife(item: Pick<BoxRecord, 'lifepath' | 'revseq'>, soon: Pick<
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Vault.make}'s argument, and of {@link Vault.withWhisper}'s `fn`. */
-const Checks = Validator.Checkers('bad_record', ({ custom, fn }) => ({
-  bank: custom<Bank>((val) => val instanceof Bank, Phrases.VaultBankExpected),
-  fn:   fn<(box: BoxUnsealed) => unknown>(),
+/** The checks of {@link Vault.make}'s arguments, and of {@link Vault.withWhisper}'s `fn`. */
+const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
+  vaultMakeArgs: obj({
+    bank:   custom<Bank>((val) => val instanceof Bank, Phrases.VaultBankExpected),
+    minder: custom<ThingMinder>((val) => val instanceof ThingMinder, Phrases.VaultMinderExpected),
+  }),
+  fn: fn<(box: BoxUnsealed) => unknown>(),
 }))
 // --

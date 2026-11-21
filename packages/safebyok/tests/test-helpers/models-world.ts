@@ -15,7 +15,7 @@ import { Bank } from '../../src/models/bank'
 import { Device } from '../../src/models/device'
 import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
-import { Vault } from '../../src/models/vault'
+import type { Vault } from '../../src/models/vault'
 import type { ThingMinder } from '../../src/minding/thing-minder'
 import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/models/proving'
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
@@ -146,12 +146,11 @@ export interface BornVault extends BornBank {
   minder: ThingMinder
 }
 
-/** A {@link buildBornBank} bank, unlocked, and the vault of its boxes, whose minder has said `hello`. */
+/** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth, the device having said `hello` since. */
 export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
-  const born  = await buildBornBank(given)
-  const vault = Vault.make(born.bank)
-  vault.minder.hello()
-  return { ...born, vault, minder: vault.minder }
+  const born = await buildBornBank(given)
+  await born.device.hello()
+  return { ...born, vault: born.device.vault!, minder: born.device.minder }
 }
 // --
 
