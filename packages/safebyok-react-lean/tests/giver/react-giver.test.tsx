@@ -1,26 +1,34 @@
-import { QueryClient, QueryClientProvider, type UseMutationOptions, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
-import { type Gating, PendingBank, VaultError } from 'safebyok'
+import { type BankSnapshot, type Gating, MemoryVaultDB, isVaultError } from 'safebyok'
+import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { makeReactGiver } from '../../src/giver/react-giver'
+import { reactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
-const OpenaiPath = 'box/openai'
+const Passphrase = LeanTH.TestPassphrase
 
-type AcmeGiver = ReturnType<typeof setup>['Acme']
+/** A passphrase the held checker finds strong, an obvious fake. */
+const NewPassphrase = 'a fake new passphrase'
 
-/** A passkey answer, an obvious fake: what a WebAuthn ceremony with the PRF extension hands the host. A new one each call, as a gating zeroes the bytes it adopts. */
-function fakePasskeyAnswer() { return { credential_id: 'fake-credential', prf_salt_b64: 'ZmFrZSBzYWx0', prfBytes: new Uint8Array(32).fill(7) } }
+/** `hook` over a fresh world built from `given`, rendered under its provider with `opts` (signed in as the world's user unless they say otherwise).
+ * Change `treeOpts` and call `rerender` to render the provider again with them.
+ */
+async function renderUnder<ResultT>(hook: (world: TH.ProviderWorld) => ResultT, given: TH.ProviderWorldGiven = {}, opts: Partial<TH.ProviderTreeOpts> = {}) {
+  const world = await TH.buildProviderWorld(given)
+  const treeOpts: TH.ProviderTreeOpts = { userid: TH.ProviderUser, ...opts }
+  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, treeOpts) }
+  const rendered = renderHook(() => hook(world), { wrapper: Wrapper })
+  return { world, treeOpts, ...rendered }
+}
 
-/** Each form verb, its gating maker, its mutationOptions and its hook, and the cleartexts a form hands it, obvious fakes, new at each call. */
-const FormCases = [
-  ["birth",             (acme: AcmeGiver) => acme.birthGating,             (acme: AcmeGiver) => acme.birthMutationOptions(),             (acme: AcmeGiver) => acme.useBirth(),             () => ({ passphraseCleartext: "fake new passphrase" })],
-  ["unlock",            (acme: AcmeGiver) => acme.unlockGating,            (acme: AcmeGiver) => acme.unlockMutationOptions(),            (acme: AcmeGiver) => acme.useUnlock(),            () => ({ passphraseCleartext: "fake passphrase" })],
-  ["replacePassphrase", (acme: AcmeGiver) => acme.replacePassphraseGating, (acme: AcmeGiver) => acme.replacePassphraseMutationOptions(), (acme: AcmeGiver) => acme.useReplacePassphrase(), () => ({ passkeyCleartext: fakePasskeyAnswer(), nextPassphraseCleartext: "fake new passphrase" })],
-  ["addPasskey",        (acme: AcmeGiver) => acme.addPasskeyGating,        (acme: AcmeGiver) => acme.addPasskeyMutationOptions(),        (acme: AcmeGiver) => acme.useAddPasskey(),        () => ({ passphraseCleartext: "fake passphrase", nextPasskeyCleartext: fakePasskeyAnswer() })],
-  ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyGating,     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     () => ({ passkeyCleartext: fakePasskeyAnswer() })],
-] as const
+/** The bank's stage, read by `useBank`, and every stage it rendered with, the first among them. */
+function useStageSeen(world: TH.ProviderWorld, seen: BankSnapshot['stage'][]) {
+  const stage = world.Bank.useBank((bank) => bank.stage)
+  seen.push(stage)
+  return stage
+}
 
 /** Count the calls to `vacate` on `gating`, from here on: a gating freezes, so the spy goes on the class that defines `vacate`. */
 function watchVacates(gating: Gating) {
@@ -31,359 +39,346 @@ function watchVacates(gating: Gating) {
   return { countOf: () => spy.mock.contexts.filter((context) => context === gating).length }
 }
 
-/** A fake world, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
-function setup() {
-  const world  = TH.makeFakeGiverWorld()
-  const Giver  = makeReactGiver(world.device)
-  const Acme   = Giver.forBank('acme')
-  const client = new QueryClient()
-  onTestFinished(() => { client.clear() })
-  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
-  return { world, Giver, Acme, client, wrapper: Wrapper }
-}
+describe("reactGiver", () => {
+  const ConfigCases = [
+    [undefined,                                                                               'refuses a config left out'],
+    [{ keyDeriver: LeanTH.testDeriver },                                                      'refuses a config with no banks'],
+    [{ banks: {}, keyDeriver: LeanTH.testDeriver },                                           'refuses a config naming no bank'],
+    [{ banks: { acme: { vaultDB: new MemoryVaultDB() }, beta: { vaultDB: new MemoryVaultDB() } }, keyDeriver: LeanTH.testDeriver }, 'refuses a config naming two banks'],
+    [{ banks: { 'not a label': { vaultDB: new MemoryVaultDB() } }, keyDeriver: LeanTH.testDeriver }, 'refuses a bank whose banklabel is not a label'],
+    [{ banks: { acme: {} }, keyDeriver: LeanTH.testDeriver },                                 'refuses a bank with no vaultDB'],
+    [{ banks: { acme: { vaultDB: {} } }, keyDeriver: LeanTH.testDeriver },                    'refuses a bank whose vaultDB lacks its verbs'],
+  ] as const
+  for (const [config, blurb] of ConfigCases) {
+    it(blurb, () => { TH.expectSyncRefusal(() => reactGiver(config as never), 'bad_record') })
+  }
 
-describe("makeReactGiver", () => {
-  it("refuses something that is not a Device", () => {
-    for (const notDevice of [null, {}, { subscribe: () => null }, 'device']) {
-      TH.expectSyncRefusal(() => makeReactGiver(notDevice as never), 'bad_record')
-    }
-  })
-
-  // makeReactGiver @example
-  it("gives the hooks of the Device's bank", () => {
-    const { Giver } = setup()
-    expect(Object.keys(Giver.forBank('acme'))).to.deep.equal([
-      'useBankSnapshot', 'useBoxRecord', 'boxRecordQueryOptions',
-      'birthGating', 'birthMutationOptions', 'useBirth', 'unlockGating', 'unlockMutationOptions', 'useUnlock',
-      'replacePassphraseGating', 'replacePassphraseMutationOptions', 'useReplacePassphrase', 'addPasskeyGating', 'addPasskeyMutationOptions', 'useAddPasskey',
-      'revokePasskeyGating', 'revokePasskeyMutationOptions', 'useRevokePasskey', 'dismissUnlock',
+  // reactGiver @example
+  it("gives the provider, the strength hook, and the bank's hooks and calls", async () => {
+    const { SOK } = await TH.buildProviderWorld()
+    expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'bank'])
+    expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
+      'useBank', 'useBoxRecord', 'withWhisper', 'lock', 'dismissUnlock',
+      'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
     ])
   })
 
-  it("refuses any other banklabel", () => {
-    const { Giver } = setup()
+  it("refuses any other banklabel", async () => {
+    const { SOK } = await TH.buildProviderWorld()
     for (const banklabel of ['other', '']) {
-      TH.expectSyncRefusal(() => Giver.forBank(banklabel), 'bad_scope')
+      TH.expectSyncRefusal(() => SOK.bank(banklabel), 'bad_scope')
     }
   })
 })
 
-describe("useBankSnapshot", () => {
-  it("reads as starting and locked before the Device has a bank object", () => {
-    const { Acme, wrapper } = setup()
-    const { result } = renderHook(() => Acme.useBankSnapshot(), { wrapper })
-    expect(result.current).to.eq(PendingBank)
-    expect([result.current.stage, result.current.isLocked]).to.deep.equal(['starting', true])
+describe("the provider", () => {
+  it("shows signed_out, and starts nothing, while it has no userid", async () => {
+    const seen: BankSnapshot['stage'][] = []
+    const { world, result } = await renderUnder((world) => useStageSeen(world, seen), { stored: 'jokes' }, { userid: undefined })
+    expect(result.current).to.eq('signed_out')
+    expect(world.counts.watches).to.eq(0)
   })
 
-  it("re-renders with the bank's snapshot when it changes", () => {
-    const { world, Acme, wrapper } = setup()
-    const { result } = renderHook(() => Acme.useBankSnapshot(), { wrapper })
-    act(() => { world._cheat_setBank(TH.UnlockedBank) })
-    expect(result.current).to.eq(TH.UnlockedBank)
+  it("starts the user's device when a userid arrives, showing starting until its bank is found locked", async () => {
+    const seen: BankSnapshot['stage'][] = []
+    const { world, result } = await renderUnder((world) => useStageSeen(world, seen), { stored: 'jokes' })
+    expect(seen[0]).to.eq('starting')
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(seen).to.not.include('signed_out')
+    expect(world.counts.watches).to.eq(1)
   })
 
-  it("given a selector, re-renders only when what it selects changes", () => {
-    const { world, Acme, wrapper } = setup()
-    let renders = 0
-    const { result } = renderHook(() => {
-      renders += 1
-      return Acme.useBankSnapshot((snap) => snap.isLocked)
-    }, { wrapper })
-    act(() => { world._cheat_setBank(TH.UnlockedBank) })
-    expect([result.current, renders]).to.deep.equal([false, 2])
-    act(() => { world._cheat_setBank({ ...TH.UnlockedBank, leaseEndsAt: 1_900_000_000_000 }) })
-    expect(renders).to.eq(2)
+  it("shows unborn for a user with no bank stored", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage))
+    await waitFor(() => { expect(result.current).to.eq('unborn') })
+  })
+
+  it("changes nothing when the userid goes null", async () => {
+    const { world, result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    treeOpts.userid = null
+    rerender()
+    expect(result.current).to.eq('locked')
+    treeOpts.userid = TH.ProviderUser
+    rerender()
+    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 1])
+  })
+
+  it("starts the device once under StrictMode, which runs its effect twice", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' }, { isStrict: true })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(world.counts.watches).to.eq(1)
+  })
+
+  it("shows starting, in the same render, under a userid other than its device's", async () => {
+    const seen: BankSnapshot['stage'][] = []
+    const { result, treeOpts, rerender } = await renderUnder((world) => useStageSeen(world, seen), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    treeOpts.userid = 'someone_else'
+    seen.length = 0
+    rerender()
+    expect(seen).to.deep.equal(['starting'])
+  })
+
+  it("uses the config's vaultDB and key deriver where it is handed none", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes', isInConfig: true }, { isBare: true })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(world.counts.watches).to.eq(1)
+  })
+
+  it("refuses to render outside a QueryClientProvider", async () => {
+    const { SOK } = await TH.buildProviderWorld()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    onTestFinished(() => { vi.restoreAllMocks() })
+    expect(() => render(<SOK.Provider userid={TH.ProviderUser} />)).to.throw('No QueryClient set')
   })
 })
 
-/** Attempt the bank's verb through its mutationOptions, with a gating its maker makes of `cleartexts`; the fake world and the gating after it settles. */
-async function runThroughOptions(makerOf: (acme: AcmeGiver) => (cleartexts: never) => Promise<Gating>, optionsOf: (acme: AcmeGiver) => unknown, cleartexts: unknown) {
-  const { world, Acme, wrapper } = setup()
-  const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, Gating>), { wrapper })
-  const gating  = await makerOf(Acme)(cleartexts as never)
-  const vacates = watchVacates(gating)
-  await act(() => result.current.mutateAsync(gating))
-  return { world, vacates }
-}
+describe("useBank", () => {
+  it("given a selector, re-renders only when what it selects changes", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const onRender = vi.fn()
+    function LockedProbe() {
+      onRender()
+      return <p>{world.Bank.useBank((bank) => bank.isLocked) ? 'is locked' : 'is unlocked'}</p>
+    }
+    function StageProbe() { return <p>{world.Bank.useBank((bank) => bank.stage)}</p> }
+    render(TH.providerTreeOf(world, <><LockedProbe /><StageProbe /></>, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    // `starting` and `locked` are both locked.
+    expect(screen.getByText('is locked')).to.exist
+    expect(onRender).toHaveBeenCalledOnce()
+  })
+})
 
-/** Attempt the bank's verb through its hook, with a gating the hook's `gating` makes of `cleartexts`; the fake world and the gating after it settles. */
-async function runThroughHook(useForm: (acme: AcmeGiver) => { mutate: (gating: Gating) => void, gating: (cleartexts: never) => Promise<Gating>, isSuccess: boolean }, cleartexts: unknown) {
-  const { world, Acme, wrapper } = setup()
-  const { result } = renderHook(() => useForm(Acme), { wrapper })
-  const gating  = await result.current.gating(cleartexts as never)
-  const vacates = watchVacates(gating)
-  act(() => { result.current.mutate(gating) })
-  await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-  return { world, vacates }
-}
+/** What a test calls of any form verb's hook. */
+type AnyForm = Readonly<{ mutate: (gating: Gating) => void, gating: (cleartexts: never) => Gating }>
 
-/** Attempt `useUnlock`'s gating against a world whose form verbs refuse with `refusal`; the gating and the mutation's error once it shows. */
-async function runRefusedUnlock(refusal: VaultError) {
-  const { world, Acme, wrapper } = setup()
-  world.refuseFormVerbs(refusal)
-  const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
-  const gating  = await result.current.gating({ passphraseCleartext: 'fake wrong passphrase' })
-  const vacates = watchVacates(gating)
-  act(() => { result.current.mutate(gating) })
-  await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-  return { vacates, err: result.current.error }
-}
+/** Each form verb, the stage it runs at, its hook, and the cleartexts a form hands it, obvious fakes, new at each call. */
+const FormCases = [
+  ["birth",             'unborn', (world: TH.ProviderWorld): AnyForm => world.Bank.useBirth(),             () => ({ passphraseCleartext: NewPassphrase })],
+  ["unlock",            'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useUnlock(),            () => ({ passphraseCleartext: Passphrase })],
+  ["replacePassphrase", 'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useReplacePassphrase(), () => ({ passphraseCleartext: Passphrase, nextPassphraseCleartext: NewPassphrase })],
+  ["addPasskey",        'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useAddPasskey(),        () => ({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })],
+  ["revokePasskey",     'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useRevokePasskey(),     () => ({ passphraseCleartext: Passphrase })],
+] as const
 
-/** Attempt `useRevokePasskey`'s gating against a refusing world under a host's default of retrying mutations once; the fake world and the gating once the error shows. */
-async function runRefusedUnderRetries(refusal: VaultError) {
-  const { world, Acme } = setup()
-  const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
-  onTestFinished(() => { client.clear() })
-  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
-  world.refuseFormVerbs(refusal)
-  const { result } = renderHook(() => Acme.useRevokePasskey(), { wrapper: Wrapper })
-  const gating  = await result.current.gating({ passkeyCleartext: fakePasskeyAnswer() })
-  const vacates = watchVacates(gating)
-  act(() => { result.current.mutate(gating) })
-  await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-  return { world, vacates }
+/** A form verb's hook, beside the bank's stage, rendered over a world at `stage`, once the bank shows it. */
+async function renderForm<FormT extends AnyForm>(useForm: (world: TH.ProviderWorld) => FormT, stage: 'unborn' | 'locked') {
+  const rendered = await renderUnder((world) => ({ form: useForm(world), bank: world.Bank.useBank() }), { stored: (stage === 'unborn') ? 'none' : 'jokes' })
+  await waitFor(() => { expect(rendered.result.current.bank.stage).to.eq(stage) })
+  return rendered
 }
 
 describe("the form mutations", () => {
-  for (const [verb, makerOf, optionsOf, useForm, cleartextsOf] of FormCases) {
-    it(`attempts the bank's ${verb} gating, with the cleartexts it has, through its mutationOptions`, async () => {
-      const { world } = await runThroughOptions(makerOf, optionsOf, cleartextsOf())
-      expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
+  for (const [verb, stage, useForm, cleartextsOf] of FormCases) {
+    it(`runs the bank's ${verb}, leaving it unlocked`, async () => {
+      const { result } = await renderForm(useForm, stage)
+      act(() => { result.current.form.mutate(result.current.form.gating(cleartextsOf() as never)) })
+      await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
     })
 
-    it(`vacates the gating once the bank's ${verb} runs through its mutationOptions`, async () => {
-      const { vacates } = await runThroughOptions(makerOf, optionsOf, cleartextsOf())
-      expect(vacates.countOf()).to.equal(2)
-    })
-
-    it(`attempts the bank's ${verb} gating, made by the hook's gating, through its hook`, async () => {
-      const { world } = await runThroughHook(useForm, cleartextsOf())
-      expect(world.formCalls).to.deep.equal([{ verb, cleartexts: cleartextsOf() }])
-    })
-
-    it(`vacates the gating once the bank's ${verb} runs through its hook`, async () => {
-      const { vacates } = await runThroughHook(useForm, cleartextsOf())
-      expect(vacates.countOf()).to.equal(2)
+    it(`vacates the gating once the bank's ${verb} runs`, async () => {
+      const { result } = await renderForm(useForm, stage)
+      const gating  = result.current.form.gating(cleartextsOf() as never)
+      const vacates = watchVacates(gating)
+      act(() => { result.current.form.mutate(gating) })
+      await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+      await waitFor(() => { expect(vacates.countOf()).to.equal(2) })
     })
   }
 
-  it("reports the verb's refusal as the mutation's error", async () => {
-    const refusal = new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.')
-    const { err } = await runRefusedUnlock(refusal)
-    expect(err).to.eq(refusal)
-    expect(refusal.family).to.eq('condition')
+  it("reports a wrong passphrase as the mutation's error, and leaves the bank locked", async () => {
+    const { result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: 'correct horse battery stable' })) })
+    await waitFor(() => { expect(result.current.form.error).to.not.be.null })
+    const err = result.current.form.error
+    expect([isVaultError(err) && err.refusalkind, isVaultError(err) && err.family]).to.deep.equal(['wrong_passphrase', 'condition'])
+    expect(result.current.bank.stage).to.eq('locked')
   })
 
   it("vacates the gating when the verb refuses", async () => {
-    const { vacates } = await runRefusedUnlock(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
+    const { result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const gating  = result.current.form.gating({ passphraseCleartext: 'correct horse battery stable' })
+    const vacates = watchVacates(gating)
+    act(() => { result.current.form.mutate(gating) })
+    await waitFor(() => { expect(result.current.form.error).to.not.be.null })
     expect(vacates.countOf()).to.equal(2)
   })
 
   it("runs the verb once under a host's default of retrying mutations", async () => {
-    const { world } = await runRefusedUnderRetries(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    const handed = { verb: 'revokePasskey', cleartexts: { passkeyCleartext: fakePasskeyAnswer() } }
-    expect(world.formCalls).to.deep.equal([handed])
+    const world  = await TH.buildProviderWorld({ stored: 'jokes' })
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
+    onTestFinished(() => { client.clear() })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) {
+      return <QueryClientProvider client={client}><world.SOK.Provider userid={TH.ProviderUser} vaultDB={world.vaultDB} keyDeriver={world.deriver}>{children}</world.SOK.Provider></QueryClientProvider>
+    }
+    const { result } = renderHook(() => ({ form: world.Bank.useUnlock(), stage: world.Bank.useBank((bank) => bank.stage) }), { wrapper: Wrapper })
+    await waitFor(() => { expect(result.current.stage).to.eq('locked') })
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: 'correct horse battery stable' })) })
+    await waitFor(() => { expect(result.current.form.error).to.not.be.null })
+    expect(world.deriver.heard).to.eq(1)
   })
 
-  it("vacates the gating once the verb settles under a host's default of retrying mutations", async () => {
-    const { vacates } = await runRefusedUnderRetries(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    expect(vacates.countOf()).to.equal(2)
+  it("keys each form mutation under the bank", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    expect(world.client.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey)).to.deep.equal([['sok', 'acme', 'unlock']])
   })
 
-  it("keys each form mutation under the bank", () => {
-    const { Acme } = setup()
-    expect(Acme.unlockMutationOptions().mutationKey).to.deep.equal(['sok', 'u1', 'acme', 'unlock'])
-    expect(Acme.addPasskeyMutationOptions().mutationKey).to.deep.equal(['sok', 'u1', 'acme', 'addPasskey'])
+  it("refuses an unlock gating while the bank is unborn", async () => {
+    const { result } = await renderForm((world) => world.Bank.useUnlock(), 'unborn')
+    TH.expectSyncRefusal(() => result.current.form.gating({ passphraseCleartext: Passphrase }), 'absent_vault')
+  })
+
+  it("refuses a birth gating while nobody is signed in", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBirth(), {}, { userid: null })
+    TH.expectSyncRefusal(() => result.current.gating({ passphraseCleartext: NewPassphrase }), 'absent_vault')
   })
 })
 
-describe("dismissUnlock", () => {
-  it("dismisses the bank's wait for an `unlock` gating", async () => {
-    const { world, Acme } = setup()
-    await Acme.dismissUnlock()
-    expect(world.formCalls).to.deep.equal([{ verb: 'dismissUnlock', cleartexts: undefined }])
+describe("withWhisper", () => {
+  it("calls back with the box's whisper and the whole box, once the bank is unlocked", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    const answer = await world.Bank.withWhisper(TH.JokesPath, (whisper, box) => [String(whisper['apiKey']), box.sidecar])
+    expect(answer).to.deep.equal([TH.JokesKey, { service: 'jokes' }])
+  })
+
+  it("waits on a locked bank, wanting an unlock, and resumes once unlocked", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const answering = world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))
+    await waitFor(() => { expect(result.current.bank.isUnlockWanted).to.eq(true) })
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    expect(await answering).to.eq(TH.JokesKey)
+    expect(result.current.bank.isUnlockWanted).to.eq(false)
+  })
+
+  it("rejects dismissed when the wait for an unlock is dismissed", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const answering = world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))
+    await waitFor(() => { expect(result.current.bank.isUnlockWanted).to.eq(true) })
+    act(() => { world.Bank.dismissUnlock() })
+    await TH.expectRefusal(answering, 'dismissed')
+    expect(result.current.bank.stage).to.eq('locked')
+  })
+
+  it("rethrows what its callback throws, as thrown", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    const thrown = new TypeError('The joke service is down')
+    await expect(world.Bank.withWhisper(TH.JokesPath, () => { throw thrown })).rejects.toBe(thrown)
+  })
+
+  it("refuses while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_vault')
+  })
+
+  it("refuses for a user with no bank stored", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage))
+    await waitFor(() => { expect(result.current).to.eq('unborn') })
+    await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_vault')
+  })
+
+  it("refuses a labelpath that is not a string, and a callback that is not a function", async () => {
+    const world = await TH.buildProviderWorld()
+    for (const labelpath of [undefined, 42, '']) {
+      await TH.expectRefusal(world.Bank.withWhisper(labelpath as never, (whisper) => whisper), 'bad_record')
+    }
+    await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, 'not a function' as never), 'bad_record')
+  })
+})
+
+describe("lock", () => {
+  it("locks an unlocked bank", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    act(() => { world.Bank.lock() })
+    expect(result.current.bank.stage).to.eq('locked')
+  })
+
+  it("does nothing while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld()
+    expect(() => { world.Bank.lock(); world.Bank.dismissUnlock() }).to.not.throw()
+  })
+})
+
+describe("useBoxRecord", () => {
+  it("shows the stored record once the device starts, and fetches nothing while nobody is signed in", async () => {
+    const { result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBoxRecord(TH.JokesPath), { stored: 'jokes' }, { userid: null })
+    expect([result.current.data, result.current.fetchStatus]).to.deep.equal([undefined, 'idle'])
+    treeOpts.userid = TH.ProviderUser
+    rerender()
+    await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+  })
+
+  it("shows a newer revision another device writes, without fetching again", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBoxRecord(TH.JokesPath), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    const gets = vi.spyOn(world.vaultDB, 'tryGetThing')
+    await act(() => world._cheat_otherVault!.putBoxOnce(`box/${TH.JokesPath}`, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
+    await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' }) })
+    expect(gets).not.toHaveBeenCalled()
+  })
+
+  it("answers null for a box none is stored at", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBoxRecord('nothing_here'), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(result.current.data).to.be.null
   })
 })
 
 describe("useStrengthVerdict", () => {
   it("judges a new passphrase, pending until the verdict lands", async () => {
-    const { world, Giver, wrapper } = setup()
-    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    const { world, result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
     expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, false])
-    const release = world.pauseVerdicts()
+    const release = world.checker.hold()
     let judging: Promise<void> = Promise.resolve()
     act(() => { judging = result.current.judge('short') })
     expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, true])
     release()
     await act(() => judging)
-    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.fakeVerdictOf('short'), false])
-    await act(() => result.current.judge('a fake passphrase long enough'))
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.heldVerdictOf('short'), false])
+    await act(() => result.current.judge(NewPassphrase))
     expect(result.current.verdict).to.deep.equal({ strong: true })
   })
 
   it("still shows the last verdict while the next is judged", async () => {
-    const { world, Giver, wrapper } = setup()
-    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    const { world, result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
     await act(() => result.current.judge('short'))
-    const release = world.pauseVerdicts()
+    const release = world.checker.hold()
     let judging: Promise<void> = Promise.resolve()
-    act(() => { judging = result.current.judge('a fake passphrase long enough') })
-    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.fakeVerdictOf('short'), true])
+    act(() => { judging = result.current.judge(NewPassphrase) })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.heldVerdictOf('short'), true])
     release()
     await act(() => judging)
     expect(result.current.verdict).to.deep.equal({ strong: true })
   })
 
   it("returns the same judge across renders", async () => {
-    const { Giver, wrapper } = setup()
-    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    const { result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
     const { judge } = result.current
     await act(() => result.current.judge('short'))
     expect(result.current.judge).to.eq(judge)
   })
 
   it("reports the checker's refusal as lastErr, with no verdict", async () => {
-    const { world, Giver, wrapper } = setup()
-    const { result } = renderHook(() => Giver.useStrengthVerdict(), { wrapper })
+    const { world, result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
     await act(() => result.current.judge('short'))
-    const refusal = new VaultError('unexpected_error', 'The strength checker failed.')
-    world.refuseVerdicts(refusal)
-    await act(() => result.current.judge('a fake passphrase long enough'))
-    expect([result.current.verdict, result.current.isJudging, result.current.lastErr]).to.deep.equal([null, false, refusal])
-  })
-})
-
-describe("useBoxRecord", () => {
-  it("shows the whole record once fetched", async () => {
-    const { world, Acme, wrapper } = setup()
-    const record = TH.fakeBoxRecordOf(OpenaiPath, 1)
-    world.stored.set(OpenaiPath, record)
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    expect(result.current.isPending).to.eq(true)
-    await waitFor(() => { expect(result.current.data).to.eq(record) })
+    world.checker.throwing(new Error('The strength checker failed.'))
+    await act(() => result.current.judge(NewPassphrase))
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, false])
+    expect(isVaultError(result.current.lastErr) && result.current.lastErr.refusalkind).to.eq('unexpected_error')
   })
 
-  it("answers null for a box none is stored at", async () => {
-    const { Acme, wrapper } = setup()
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-    expect(result.current.data).to.be.null
-  })
-
-  it("answers null for a deleted box, and hands a select of its own the tombstone", async () => {
-    const { world, Acme, wrapper } = setup()
-    const tombstone = Object.freeze({ ...TH.fakeBoxRecordOf(OpenaiPath, 2), am: 'x' as const })
-    world.stored.set(OpenaiPath, tombstone)
-    const shown    = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    const selected = renderHook(() => Acme.useBoxRecord(OpenaiPath, { select: (record) => record }), { wrapper })
-    await waitFor(() => { expect(shown.result.current.isSuccess).to.eq(true) })
-    await waitFor(() => { expect(selected.result.current.isSuccess).to.eq(true) })
-    expect([shown.result.current.data, selected.result.current.data]).to.deep.equal([null, tombstone])
-  })
-
-  it("stays fresh until the host's item is invalidated, and then fetches again", async () => {
-    const { world, Acme, client, wrapper } = setup()
-    const first = TH.fakeBoxRecordOf(OpenaiPath, 1)
-    world.stored.set(OpenaiPath, first)
-    await client.query(Acme.boxRecordQueryOptions(OpenaiPath))
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    expect([result.current.data, result.current.isStale]).to.deep.equal([first, false])
-    const { queryKey } = Acme.boxRecordQueryOptions(OpenaiPath)
-    expect(client.getQueryState(queryKey)?.dataUpdateCount).to.eq(1)
-    await act(() => client.invalidateQueries({ queryKey }))
-    await waitFor(() => { expect(client.getQueryState(queryKey)?.dataUpdateCount).to.eq(2) })
-    expect([result.current.data, result.current.isStale]).to.deep.equal([first, false])
-  })
-
-  it("fetches while the browser is offline", async () => {
-    const { world, Acme, wrapper } = setup()
-    onlineManager.setOnline(false)
-    onTestFinished(() => { onlineManager.setOnline(true) })
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-    expect(world.counts.gets).to.eq(1)
-  })
-
-  it("prefers React Query's own options to the giver's defaults", async () => {
-    const { world, Acme, wrapper } = setup()
-    world.stored.set(OpenaiPath, TH.fakeBoxRecordOf(OpenaiPath, 1))
-    const idle = renderHook(() => Acme.useBoxRecord(OpenaiPath, { enabled: false }), { wrapper })
-    expect([idle.result.current.fetchStatus, world.counts.gets]).to.deep.equal(['idle', 0])
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath, { staleTime: 0 }), { wrapper })
-    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-    expect(result.current.isStale).to.eq(true)
-  })
-
-  it("hands a host's select the whole record", async () => {
-    const { world, Acme, wrapper } = setup()
-    world.stored.set(OpenaiPath, TH.fakeBoxRecordOf(OpenaiPath, 2))
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath, { select: (record) => record.revseq }), { wrapper })
-    await waitFor(() => { expect(result.current.data).to.eq(2) })
-  })
-
-  it("shows the new box's record when the labelpath changes under a select that returns records", async () => {
-    const { world, Acme, client, wrapper } = setup()
-    const AnthropicPath = 'box/anthropic'
-    world.stored.set(OpenaiPath, TH.fakeBoxRecordOf(OpenaiPath, 5))
-    world.stored.set(AnthropicPath, TH.fakeBoxRecordOf(AnthropicPath, 1))
-    await client.query(Acme.boxRecordQueryOptions(AnthropicPath))
-    const { result, rerender } = renderHook(({ labelpath }) => Acme.useBoxRecord(labelpath, { select: (record) => ({ ...record }) }), { wrapper, initialProps: { labelpath: OpenaiPath } })
-    await waitFor(() => { expect(result.current.data?.labelpath).to.eq(OpenaiPath) })
-    rerender({ labelpath: AnthropicPath })
-    await waitFor(() => { expect(result.current.isFetching).to.eq(false) })
-    expect(result.current.data?.labelpath).to.eq(AnthropicPath)
-  })
-
-  it("shows what a new select returns from the same record, when it returns records", async () => {
-    const { world, Acme, wrapper } = setup()
-    world.stored.set(OpenaiPath, TH.fakeBoxRecordOf(OpenaiPath, 1))
-    const { result, rerender } = renderHook(({ title }) => Acme.useBoxRecord(OpenaiPath, { select: (record) => ({ ...record, title }) }), { wrapper, initialProps: { title: 'OpenAI' } })
-    await waitFor(() => { expect(result.current.data?.title).to.eq('OpenAI') })
-    rerender({ title: 'Open AI' })
-    expect(result.current.data?.title).to.eq('Open AI')
-  })
-
-  it("refuses a labelpath that is not a string", () => {
-    const { Acme, wrapper } = setup()
-    for (const labelpath of [42, null, '']) {
-      TH.expectSyncRefusal(() => renderHook(() => Acme.useBoxRecord(labelpath as never), { wrapper }), 'bad_record')
-    }
-  })
-})
-
-describe("boxRecordQueryOptions", () => {
-  it("gives a host's useQuery the whole record", async () => {
-    const { world, Acme, wrapper } = setup()
-    const record = TH.fakeBoxRecordOf(OpenaiPath, 1)
-    world.stored.set(OpenaiPath, record)
-    const { result } = renderHook(() => useQuery(Acme.boxRecordQueryOptions(OpenaiPath)), { wrapper })
-    await waitFor(() => { expect(result.current.data).to.eq(record) })
-  })
-
-  it("keys the record as the bank's minder keys its item", () => {
-    const { Acme } = setup()
-    expect(Acme.boxRecordQueryOptions(OpenaiPath).queryKey).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
-  })
-
-  it("lets a fetch ahead of render fill the item that useBoxRecord then shows at once", async () => {
-    const { world, Acme, client, wrapper } = setup()
-    const record = TH.fakeBoxRecordOf(OpenaiPath, 1)
-    world.stored.set(OpenaiPath, record)
-    await client.query(Acme.boxRecordQueryOptions(OpenaiPath))
-    const { result } = renderHook(() => Acme.useBoxRecord(OpenaiPath), { wrapper })
-    expect([result.current.data, world.counts.gets]).to.deep.equal([record, 1])
-  })
-
-  it("never replaces a record with an older one", async () => {
-    const { world, Acme, client } = setup()
-    const first = TH.fakeBoxRecordOf(OpenaiPath, 1)
-    world.stored.set(OpenaiPath, first)
-    const { queryKey } = Acme.boxRecordQueryOptions(OpenaiPath)
-    await client.query(Acme.boxRecordQueryOptions(OpenaiPath))
-    const second = TH.fakeBoxRecordOf(OpenaiPath, 2)
-    client.setQueryData(queryKey, second)
-    client.setQueryData(queryKey, structuredClone(first))
-    expect(client.getQueryData(queryKey)).to.eq(second)
+  it("reports a refusal while nobody is signed in", async () => {
+    const { result } = await renderUnder((world) => world.SOK.useStrengthVerdict(), {}, { userid: null })
+    await act(() => result.current.judge(NewPassphrase))
+    expect(isVaultError(result.current.lastErr) && result.current.lastErr.refusalkind).to.eq('absent_vault')
   })
 })

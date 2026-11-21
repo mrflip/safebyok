@@ -1,0 +1,148 @@
+/** The provider's world: the real giver over a memory vaultDB, a key deriver and a strength checker a test can hold, and a QueryClient of the test's own. */
+
+import { QueryClient } from '@tanstack/react-query'
+import { onTestFinished } from 'vitest'
+import { type KeyDeriver, type PassphraseVerdict, type StrengthChecker, type Vault, MemoryVaultDB } from 'safebyok'
+import * as LeanTH from 'safebyok/testing'
+import { type BankGiver, type ReactGiver, reactGiver } from '../../src/giver/react-giver'
+
+// == [The key deriver]: HeldDeriver, makeHeldDeriver
+
+/** A key deriver over the core's one-SHA-256 test deriver that counts the passphrases it is given, and that a test can hold mid-derivation. */
+export interface HeldDeriver extends KeyDeriver {
+  /** How many passphrases it has derived from. */
+  readonly heard: number
+  /** Hold every derivation from now on until the function returned is called. */
+  hold(): () => void
+}
+
+/** A {@link HeldDeriver}, holding nothing. */
+export function makeHeldDeriver(): HeldDeriver {
+  let heard = 0
+  let held: Promise<void> | null = null
+  return {
+    key_deriver_label: LeanTH.testDeriver.key_deriver_label,
+    salt_size:         LeanTH.testDeriver.salt_size,
+    get heard() { return heard },
+    deriveKeyBytes: async (passphrase, saltBytes) => {
+      heard += 1
+      if (held !== null) { await held }
+      return LeanTH.testDeriver.deriveKeyBytes(passphrase, saltBytes)
+    },
+    hold: () => {
+      let release!: () => void
+      held = new Promise<void>((resolve) => { release = resolve })
+      return () => { held = null; release() }
+    },
+  }
+}
+// --
+
+// == [The strength checker]: HeldChecker, makeHeldChecker, heldVerdictOf
+
+/** A strength checker that finds twelve characters or more strong, and that a test can hold or make throw. */
+export interface HeldChecker extends StrengthChecker {
+  /** Hold every verdict from now on until the function returned is called. */
+  hold(): () => void
+  /** Throw `err` from every call from now on, or judge again for null. */
+  throwing(err: Error | null): void
+}
+
+/** A {@link HeldChecker}, holding nothing. */
+export function makeHeldChecker(): HeldChecker {
+  let held: Promise<void> | null = null
+  let thrown: Error | null = null
+  const check = async (passphrase: string): Promise<PassphraseVerdict> => {
+    if (held !== null) { await held }
+    if (thrown !== null) { throw thrown }
+    return heldVerdictOf(passphrase)
+  }
+  return Object.assign(check, {
+    hold: () => {
+      let release!: () => void
+      held = new Promise<void>((resolve) => { release = resolve })
+      return () => { held = null; release() }
+    },
+    throwing: (err: Error | null) => { thrown = err },
+  })
+}
+
+/** The held checker's verdict: strong at twelve characters or more. */
+export function heldVerdictOf(passphrase: string): PassphraseVerdict {
+  return (passphrase.length >= 12) ? { strong: true } : { strong: false, reason: 'Twelve characters or more, please.' }
+}
+// --
+
+// == [The world]: ProviderUser, JokesPath, JokesKey, ProviderWorld, ProviderWorldGiven, buildProviderWorld
+
+/** The userid the world's bank is stored for. */
+export const ProviderUser = LeanTH.WorldScope.userid
+
+/** The host's labelpath of the box with the joke service's key. */
+export const JokesPath = 'jokes'
+
+/** The joke service's key, an obvious fake: the whisper of the box at {@link JokesPath}. */
+export const JokesKey = LeanTH.Whisper.apiKey
+
+/** The real giver of the world's bank, the vaultDB its provider is handed, and what a test watches and holds. */
+export interface ProviderWorld {
+  SOK:     ReactGiver
+  /** The giver's bank, `SOK.bank(...)`. */
+  Bank:    BankGiver
+  /** The vaultDB to hand the provider, unless the world was built `isInConfig`. */
+  vaultDB: MemoryVaultDB
+  deriver: HeldDeriver
+  checker: HeldChecker
+  client:  QueryClient
+  /** How many watches have been opened on {@link vaultDB} since the world was built: one for each device started over it. */
+  counts:  { watches: number }
+  /** The vault of another device over {@link vaultDB}, unlocked, for a test to write a box as another tab would; null for a world with no bank stored. */
+  _cheat_otherVault: Vault | null
+  /** Put the joke service's key at {@link JokesPath} from another device over {@link vaultDB}, unlocked with `passphraseCleartext`, as another tab would: for a bank born since the world was built. */
+  _cheat_putJokesKey(passphraseCleartext: string): Promise<void>
+}
+
+/** What a {@link buildProviderWorld} stores before the giver starts. */
+export interface ProviderWorldGiven {
+  /** `'jokes'` stores a bank for {@link ProviderUser}, under {@link LeanTH.TestPassphrase}, with the joke service's key at {@link JokesPath}. `'none'` stores nothing. */
+  stored?:         'none' | 'jokes'
+  /** Hand the config the world's vaultDB and key deriver, for a provider handed neither. Otherwise the config's are others, never used. */
+  isInConfig?:     boolean
+}
+
+/** A giver over nothing yet started, and a vaultDB with what `given` stores. */
+export async function buildProviderWorld({ stored = 'none', isInConfig = false }: ProviderWorldGiven = {}): Promise<ProviderWorld> {
+  const vaultDB = new MemoryVaultDB()
+  let otherVault: Vault | null = null
+  if (stored === 'jokes') {
+    const { vault } = await LeanTH.buildBornVault({ device: LeanTH.makeDevice({}, { vaultDB }) })
+    await vault.putBoxOnce(`box/${JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper })
+    otherVault = vault
+  }
+  const counts = { watches: 0 }
+  const watch = vaultDB.watch.bind(vaultDB)
+  vaultDB.watch = (...args) => {
+    counts.watches += 1
+    return watch(...args)
+  }
+  const deriver = makeHeldDeriver()
+  const checker = makeHeldChecker()
+  const SOK = reactGiver({
+    banks:           { [LeanTH.WorldScope.banklabel]: { vaultDB: isInConfig ? vaultDB : new MemoryVaultDB() } },
+    keyDeriver:      isInConfig ? deriver : LeanTH.testDeriver,
+    strengthChecker: checker,
+    logger:          LeanTH.quietLogger,
+  })
+  const client = new QueryClient()
+  onTestFinished(() => { client.clear() })
+  return {
+    SOK, Bank: SOK.bank(LeanTH.WorldScope.banklabel), vaultDB, deriver, checker, client, counts, _cheat_otherVault: otherVault,
+    _cheat_putJokesKey: async (passphraseCleartext) => {
+      const device = LeanTH.makeDevice({}, { vaultDB })
+      await device.hello()
+      await device.bank!.unlock({ passphraseCleartext })
+      await device.vault!.putBoxOnce(`box/${JokesPath}`, { sidecar: { service: 'jokes' } }, { whisper: LeanTH.Whisper })
+    },
+  }
+}
+// --

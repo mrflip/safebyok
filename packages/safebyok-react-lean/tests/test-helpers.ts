@@ -2,5 +2,6 @@
 export * from 'safebyok/testing'
 export * from './test-helpers/fake-giver-world'
 export * from './test-helpers/minder-giver-world'
-export * from './test-helpers/knock-knock-world'
+export * from './test-helpers/provider-world'
 export * from './test-helpers/secret-search'
+export * from './test-helpers-react'
