@@ -98,16 +98,11 @@ function makeKnockKnockApp(world: TH.ProviderWorld) {
     const bank = Knock.useBank()
     shown.push(bank)
     switch (bank.stage) {
-    case 'signed_out': { return <p>Signed out</p>
-    }
-    case 'starting': {   return <p>Starting</p>
-    }
-    case 'unborn': {     return <CreateVaultForm />
-    }
-    case 'failed': {     return <p role="alert">{bank.lastErr?.message}</p>
-    }
-    default: {           return <Vault isLocked={bank.isLocked} />
-    }
+    case 'signed_out': { return <p>Signed out</p> }
+    case 'starting':   { return <p>Starting</p> }
+    case 'unborn':     { return <CreateVaultForm /> }
+    case 'failed':     { return <p role="alert">{bank.lastErr?.message}</p> }
+    default:           { return <Vault isLocked={bank.isLocked} /> }
     }
   }
 

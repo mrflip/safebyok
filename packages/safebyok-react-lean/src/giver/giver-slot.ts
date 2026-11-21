@@ -130,7 +130,7 @@ export class GiverSlot {
   readonly #align = (): void => {
     const device = this.#device
     if (device === null) { return }
-    const {bank} = device.getSnapshot()
+    const { bank } = device.getSnapshot()
     if ((this.#snapshot.userid === device.userid) && (this.#snapshot.bank === bank)) { return }
     this.#snapshot = Object.freeze({ userid: device.userid, bank })
     for (const listener of this.#subscribers) { listener() }
