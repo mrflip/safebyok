@@ -12,7 +12,6 @@ import type { BankProviderProps, PassphraseGating } from '../src/shapes'
 
 export * from 'safebyok-big/testing'
 export * from './test-helpers-react'
-export * from './test-helpers/fake-giver-world'
 
 /** Sweep every bank a test made, once the test ends. This is `useBankWorlds`, under a name that React's hook lint does not mistake for a hook. */
 export const sweepBankWorlds = useBankWorlds
@@ -318,6 +317,4 @@ const b64Of = (source: BufferSource): string => (
   toB64(ArrayBuffer.isView(source) ? new Uint8Array(source.buffer, source.byteOffset, source.byteLength) : new Uint8Array(source))
 )
 // --
-export * from './test-helpers/minder-giver-world'
-export * from './test-helpers/knock-knock-world'
 export * from './test-helpers/secret-search'

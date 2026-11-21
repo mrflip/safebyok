@@ -47,8 +47,6 @@ export interface BankOpts {
   device:  Device
   /** Where the bank's boxes are stored. */
   vaultDB: VaultDB
-  /** The defaults this bank's minders set on their items and lists in TanStack Query's cache. A missing field defaults from {@link DefaultQueryCacheOpts}. */
-  queryCacheOpts?: Partial<QueryCacheOpts>
 }
 
 /** The options of a bank's birth, beside its record: {@link BankOpts}, plus the `proving` of the main gate that the birth's gating built. */
@@ -97,6 +95,8 @@ export interface DeviceOpts {
   autolockMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:       BadNewsHandler | undefined
+  /** The defaults the device's minder sets on its items and lists in TanStack Query's cache. A missing field defaults from {@link DefaultQueryCacheOpts}. */
+  queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
 }
@@ -144,14 +144,14 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device shows before it has a bank object. */
+/** The bank snapshot a device shows until its `hello` finds its bank stored or not. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
 /** A device's state, for a host to render. */
 export interface DeviceSnapshot {
-  /** The snapshot of this device's bank, or {@link PendingBank} while it has none. */
+  /** The snapshot of this device's bank. With none yet, a stand-in at stage `'starting'` ({@link PendingBank}), `'unborn'` or `'failed'`. */
   readonly bank: BankSnapshot
 }
 // --

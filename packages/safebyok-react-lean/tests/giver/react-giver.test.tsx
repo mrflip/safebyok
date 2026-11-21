@@ -1,0 +1,743 @@
+import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query'
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
+import { type ReactNode, useActionState, useEffect } from 'react'
+import { type BankSnapshot, type BoxRecord, type Gating, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
+import * as LeanTH from 'safebyok/testing'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { nullifyThing } from '../../src/giver/giver-defaults'
+import { type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
+import * as TH from '../test-helpers'
+
+const Passphrase = LeanTH.TestPassphrase
+
+/** A passphrase the held checker finds strong, an obvious fake. */
+const NewPassphrase = 'a fake new passphrase'
+
+/** `hook` over a fresh world built from `given`, rendered under its provider with `opts` (signed in as the world's user unless they say otherwise).
+ * Change `treeOpts` and call `rerender` to render the provider again with them.
+ */
+async function renderUnder<ResultT>(hook: (world: TH.ProviderWorld) => ResultT, given: TH.ProviderWorldGiven = {}, opts: Partial<TH.ProviderTreeOpts> = {}) {
+  const world = await TH.buildProviderWorld(given)
+  const treeOpts: TH.ProviderTreeOpts = { userid: TH.ProviderUser, ...opts }
+  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, treeOpts) }
+  const rendered = renderHook(() => hook(world), { wrapper: Wrapper })
+  return { world, treeOpts, ...rendered }
+}
+
+/** The bank's stage, read by `useBank`, and every stage it rendered with, the first among them. */
+function useStageSeen(world: TH.ProviderWorld, seen: BankSnapshot['stage'][]) {
+  const stage = world.Bank.useBank((bank) => bank.stage)
+  seen.push(stage)
+  return stage
+}
+
+/** Count the calls to `vacate` on `gating`, from here on: a gating freezes, so the spy goes on the class that defines `vacate`. */
+function watchVacates(gating: Gating) {
+  let proto = Object.getPrototypeOf(gating) as object
+  while (! Object.hasOwn(proto, 'vacate')) { proto = Object.getPrototypeOf(proto) as object }
+  const spy = vi.spyOn(proto as Gating, 'vacate')
+  onTestFinished(() => { spy.mockRestore() })
+  return { countOf: () => spy.mock.contexts.filter((context) => context === gating).length }
+}
+
+describe("reactGiver", () => {
+  const ConfigCases = [
+    [undefined,                                                                               'refuses a config left out'],
+    [{ keyDeriver: LeanTH.testDeriver },                                                      'refuses a config with no banks'],
+    [{ banks: {}, keyDeriver: LeanTH.testDeriver },                                           'refuses a config naming no bank'],
+    [{ banks: { acme: { vaultDB: new MemoryVaultDB() }, beta: { vaultDB: new MemoryVaultDB() } }, keyDeriver: LeanTH.testDeriver }, 'refuses a config naming two banks'],
+    [{ banks: { 'not a label': { vaultDB: new MemoryVaultDB() } }, keyDeriver: LeanTH.testDeriver }, 'refuses a bank whose banklabel is not a label'],
+    [{ banks: { acme: {} }, keyDeriver: LeanTH.testDeriver },                                 'refuses a bank with no vaultDB'],
+    [{ banks: { acme: { vaultDB: {} } }, keyDeriver: LeanTH.testDeriver },                    'refuses a bank whose vaultDB lacks its verbs'],
+  ] as const
+  for (const [config, blurb] of ConfigCases) {
+    it(blurb, () => { TH.expectSyncRefusal(() => reactGiver(config as never), 'bad_record') })
+  }
+
+  // reactGiver @example
+  it("gives the provider, the strength hook, and the bank's hooks and calls", async () => {
+    const { SOK } = await TH.buildProviderWorld()
+    expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
+    expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
+      'useBank', 'useBox', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'lock', 'dismissUnlock',
+      'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
+    ])
+  })
+
+  it("refuses any other banklabel", async () => {
+    const { SOK } = await TH.buildProviderWorld()
+    for (const banklabel of ['other', '']) {
+      TH.expectSyncRefusal(() => SOK.bank(banklabel as never), 'bad_scope')
+    }
+  })
+})
+
+describe("the provider", () => {
+  it("shows signed_out, and starts nothing, while it has no userid", async () => {
+    const seen: BankSnapshot['stage'][] = []
+    const { world, result } = await renderUnder((world) => useStageSeen(world, seen), { stored: 'jokes' }, { userid: undefined })
+    expect(result.current).to.eq('signed_out')
+    expect(world.counts.watches).to.eq(0)
+  })
+
+  it("starts the user's device when a userid arrives, showing starting until its bank is found locked", async () => {
+    const seen: BankSnapshot['stage'][] = []
+    const { world, result } = await renderUnder((world) => useStageSeen(world, seen), { stored: 'jokes' })
+    expect(seen[0]).to.eq('starting')
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(seen).to.not.include('signed_out')
+    expect(world.counts.watches).to.eq(1)
+  })
+
+  it("shows unborn for a user with no bank stored", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage))
+    await waitFor(() => { expect(result.current).to.eq('unborn') })
+  })
+
+  it("changes nothing when the userid goes null", async () => {
+    const { world, result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    treeOpts.userid = null
+    rerender()
+    expect(result.current).to.eq('locked')
+    treeOpts.userid = TH.ProviderUser
+    rerender()
+    expect([result.current, world.counts.watches]).to.deep.equal(['locked', 1])
+  })
+
+  it("starts the device once under StrictMode, which runs its effect twice", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' }, { isStrict: true })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(world.counts.watches).to.eq(1)
+  })
+
+  it("shows starting, in the same render, under a userid other than its device's", async () => {
+    const seen: BankSnapshot['stage'][] = []
+    const { result, treeOpts, rerender } = await renderUnder((world) => useStageSeen(world, seen), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    treeOpts.userid = 'someone_else'
+    seen.length = 0
+    rerender()
+    expect(seen).to.deep.equal(['starting'])
+  })
+
+  it("uses the config's vaultDB and key deriver where it is handed none", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes', isInConfig: true }, { isBare: true })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(world.counts.watches).to.eq(1)
+  })
+
+  it("refuses to render outside a QueryClientProvider", async () => {
+    const { SOK } = await TH.buildProviderWorld()
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    onTestFinished(() => { vi.restoreAllMocks() })
+    expect(() => render(<SOK.Provider userid={TH.ProviderUser} />)).to.throw('No QueryClient set')
+  })
+})
+
+describe("useBank", () => {
+  it("given a selector, re-renders only when what it selects changes", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const onRender = vi.fn()
+    function LockedProbe() {
+      onRender()
+      return <p>{world.Bank.useBank((bank) => bank.isLocked) ? 'is locked' : 'is unlocked'}</p>
+    }
+    function StageProbe() { return <p>{world.Bank.useBank((bank) => bank.stage)}</p> }
+    render(TH.providerTreeOf(world, <><LockedProbe /><StageProbe /></>, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    // `starting` and `locked` are both locked.
+    expect(screen.getByText('is locked')).to.exist
+    expect(onRender).toHaveBeenCalledOnce()
+  })
+})
+
+/** What a test calls of any form verb's hook. */
+type AnyForm = Readonly<{ mutate: (gating: Gating) => void, gating: (cleartexts: never) => Gating }>
+
+/** Each form verb, the stage it runs at, its hook, and the cleartexts a form hands it, obvious fakes, new at each call. */
+const FormCases = [
+  ["birth",             'unborn', (world: TH.ProviderWorld): AnyForm => world.Bank.useBirth(),             () => ({ passphraseCleartext: NewPassphrase })],
+  ["unlock",            'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useUnlock(),            () => ({ passphraseCleartext: Passphrase })],
+  ["replacePassphrase", 'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useReplacePassphrase(), () => ({ passphraseCleartext: Passphrase, nextPassphraseCleartext: NewPassphrase })],
+  ["addPasskey",        'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useAddPasskey(),        () => ({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })],
+  ["revokePasskey",     'locked', (world: TH.ProviderWorld): AnyForm => world.Bank.useRevokePasskey(),     () => ({ passphraseCleartext: Passphrase })],
+] as const
+
+/** A form verb's hook, beside the bank's stage, rendered over a world at `stage`, once the bank shows it. */
+async function renderForm<FormT extends AnyForm>(useForm: (world: TH.ProviderWorld) => FormT, stage: 'unborn' | 'locked') {
+  const rendered = await renderUnder((world) => ({ form: useForm(world), bank: world.Bank.useBank() }), { stored: (stage === 'unborn') ? 'none' : 'jokes' })
+  await waitFor(() => { expect(rendered.result.current.bank.stage).to.eq(stage) })
+  return rendered
+}
+
+describe("the form mutations", () => {
+  for (const [verb, stage, useForm, cleartextsOf] of FormCases) {
+    it(`runs the bank's ${verb}, leaving it unlocked`, async () => {
+      const { result } = await renderForm(useForm, stage)
+      act(() => { result.current.form.mutate(result.current.form.gating(cleartextsOf() as never)) })
+      await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    })
+
+    it(`vacates the gating once the bank's ${verb} runs`, async () => {
+      const { result } = await renderForm(useForm, stage)
+      const gating  = result.current.form.gating(cleartextsOf() as never)
+      const vacates = watchVacates(gating)
+      act(() => { result.current.form.mutate(gating) })
+      await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+      await waitFor(() => { expect(vacates.countOf()).to.equal(2) })
+    })
+  }
+
+  it("reports a wrong passphrase as the mutation's error, and leaves the bank locked", async () => {
+    const { result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: 'correct horse battery stable' })) })
+    await waitFor(() => { expect(result.current.form.error).to.not.be.null })
+    const err = result.current.form.error
+    expect([isVaultError(err) && err.refusalkind, isVaultError(err) && err.family]).to.deep.equal(['wrong_passphrase', 'condition'])
+    expect(result.current.bank.stage).to.eq('locked')
+  })
+
+  it("vacates the gating when the verb refuses", async () => {
+    const { result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const gating  = result.current.form.gating({ passphraseCleartext: 'correct horse battery stable' })
+    const vacates = watchVacates(gating)
+    act(() => { result.current.form.mutate(gating) })
+    await waitFor(() => { expect(result.current.form.error).to.not.be.null })
+    expect(vacates.countOf()).to.equal(2)
+  })
+
+  it("runs the verb once under a host's default of retrying mutations", async () => {
+    const world  = await TH.buildProviderWorld({ stored: 'jokes' })
+    const client = new QueryClient({ defaultOptions: { mutations: { retry: 1, retryDelay: 0 } } })
+    onTestFinished(() => { client.clear() })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) {
+      return <QueryClientProvider client={client}><world.SOK.Provider userid={TH.ProviderUser} vaultDB={world.vaultDB} keyDeriver={world.deriver}>{children}</world.SOK.Provider></QueryClientProvider>
+    }
+    const { result } = renderHook(() => ({ form: world.Bank.useUnlock(), stage: world.Bank.useBank((bank) => bank.stage) }), { wrapper: Wrapper })
+    await waitFor(() => { expect(result.current.stage).to.eq('locked') })
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: 'correct horse battery stable' })) })
+    await waitFor(() => { expect(result.current.form.error).to.not.be.null })
+    expect(world.deriver.heard).to.eq(1)
+  })
+
+  it("keys each form mutation under the bank", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    expect(world.client.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey)).to.deep.equal([['sok', 'acme', 'unlock']])
+  })
+
+  it("refuses an unlock gating while the bank is unborn", async () => {
+    const { result } = await renderForm((world) => world.Bank.useUnlock(), 'unborn')
+    TH.expectSyncRefusal(() => result.current.form.gating({ passphraseCleartext: Passphrase }), 'absent_vault')
+  })
+
+  it("refuses a birth gating while nobody is signed in", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBirth(), {}, { userid: null })
+    TH.expectSyncRefusal(() => result.current.gating({ passphraseCleartext: NewPassphrase }), 'absent_vault')
+  })
+})
+
+describe("withWhisper", () => {
+  it("calls back with the box's whisper and the whole box, once the bank is unlocked", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    const answer = await world.Bank.withWhisper(TH.JokesPath, (whisper, box) => [String(whisper['apiKey']), box.sidecar])
+    expect(answer).to.deep.equal([TH.JokesKey, { service: 'jokes' }])
+  })
+
+  it("waits on a locked bank, wanting an unlock, and resumes once unlocked", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const answering = world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))
+    await waitFor(() => { expect(result.current.bank.isUnlockWanted).to.eq(true) })
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    expect(await answering).to.eq(TH.JokesKey)
+    expect(result.current.bank.isUnlockWanted).to.eq(false)
+  })
+
+  it("rejects dismissed when the wait for an unlock is dismissed", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    const answering = world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))
+    await waitFor(() => { expect(result.current.bank.isUnlockWanted).to.eq(true) })
+    act(() => { world.Bank.dismissUnlock() })
+    await TH.expectRefusal(answering, 'dismissed')
+    expect(result.current.bank.stage).to.eq('locked')
+  })
+
+  it("rethrows what its callback throws, as thrown", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    const thrown = new TypeError('The joke service is down')
+    await expect(world.Bank.withWhisper(TH.JokesPath, () => { throw thrown })).rejects.to.eq(thrown)
+  })
+
+  it("refuses while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_vault')
+  })
+
+  it("refuses for a user with no bank stored", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage))
+    await waitFor(() => { expect(result.current).to.eq('unborn') })
+    await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_vault')
+  })
+
+  it("refuses a labelpath that is not a string, and a callback that is not a function", async () => {
+    const world = await TH.buildProviderWorld()
+    for (const labelpath of [undefined, 42, '']) {
+      await TH.expectRefusal(world.Bank.withWhisper(labelpath as never, (whisper) => whisper), 'bad_record')
+    }
+    await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, 'not a function' as never), 'bad_record')
+  })
+})
+
+describe("lock", () => {
+  it("locks an unlocked bank", async () => {
+    const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
+    act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
+    act(() => { world.Bank.lock() })
+    expect(result.current.bank.stage).to.eq('locked')
+  })
+
+  it("does nothing while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld()
+    expect(() => { world.Bank.lock(); world.Bank.dismissUnlock() }).to.not.throw()
+  })
+})
+
+/** {@link renderUnder} over a world with the joke service's key stored, its bank unlocked once the device starts. */
+async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => ResultT) {
+  const rendered = await renderUnder(hook, { stored: 'jokes' })
+  const device = await waitFor(() => rendered.world._cheat_device())
+  await act(async () => {
+    await device.hello()
+    await device.bank!.unlock({ passphraseCleartext: Passphrase })
+  })
+  return rendered
+}
+
+/** The key the minder caches the jokes box under, for the world's user. */
+const JokesKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
+
+describe("useBox", () => {
+  it("shows the stored record once the device starts, and fetches nothing while nobody is signed in", async () => {
+    const { result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath), { stored: 'jokes' }, { userid: null })
+    expect([result.current.data, result.current.fetchStatus]).to.deep.equal([undefined, 'idle'])
+    treeOpts.userid = TH.ProviderUser
+    rerender()
+    await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+  })
+
+  it("answers null for a box none is stored at", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBox('nothing_here'), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(result.current.data).to.be.null
+  })
+
+  it("answers null for a deleted box, and hands a select of its own the tombstone", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const tombstone = await world._cheat_otherVault!.delBoxOnce(`box/${TH.JokesPath}`)
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+    const { result } = renderHook(() => ({ shown: world.Bank.useBox(TH.JokesPath), whole: world.Bank.useBox(TH.JokesPath, { select: (thing) => thing }) }), { wrapper: Wrapper })
+    await waitFor(() => { expect(result.current.whole.isSuccess).to.eq(true) })
+    expect([result.current.shown.data, result.current.whole.data]).to.deep.equal([null, tombstone])
+    expect(tombstone.sidecar).to.deep.equal({})
+  })
+
+  it("hands a select of its own the whole record", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath, { select: (thing) => thing.revseq }), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.data).to.eq(0) })
+  })
+
+  it("stays fresh until the host's item is invalidated, and then fetches again", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(result.current.isStale).to.eq(false)
+    const queryKey = JokesKey
+    const updates = world.client.getQueryState(queryKey)!.dataUpdateCount
+    await act(() => world.client.invalidateQueries({ queryKey }))
+    await waitFor(() => { expect(world.client.getQueryState(queryKey)?.dataUpdateCount).to.eq(updates + 1) })
+    expect(result.current.isStale).to.eq(false)
+  })
+
+  it("fetches while the browser is offline", async () => {
+    onlineManager.setOnline(false)
+    onTestFinished(() => { onlineManager.setOnline(true) })
+    const { result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+  })
+
+  it("prefers React Query's own options to the giver's defaults", async () => {
+    const idle = await renderUnder((world) => ({ box: world.Bank.useBox(TH.JokesPath, { enabled: false }), stage: world.Bank.useBank((bank) => bank.stage) }), { stored: 'jokes' })
+    await waitFor(() => { expect(idle.result.current.stage).to.eq('locked') })
+    expect([idle.result.current.box.fetchStatus, idle.result.current.box.data]).to.deep.equal(['idle', undefined])
+    const { result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath, { staleTime: 0 }), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(result.current.isStale).to.eq(true)
+  })
+
+  it("shows the new box's record when the labelpath changes under a select that returns records", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    await world._cheat_otherVault!.putBoxOnce('box/puns', { sidecar: { service: 'puns' } }, { whisper: LeanTH.Whisper })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+    const { result, rerender } = renderHook(({ labelpath }) => world.Bank.useBox(labelpath, { select: (thing) => ({ ...thing }) }), { wrapper: Wrapper, initialProps: { labelpath: TH.JokesPath } })
+    await waitFor(() => { expect(result.current.data?.labelpath).to.eq(`box/${TH.JokesPath}`) })
+    rerender({ labelpath: 'puns' })
+    await waitFor(() => { expect(result.current.isFetching).to.eq(false) })
+    expect(result.current.data?.labelpath).to.eq('box/puns')
+  })
+
+  it("shows what a new select returns from the same record, when it returns records", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+    const { result, rerender } = renderHook(({ title }) => world.Bank.useBox(TH.JokesPath, { select: (thing) => ({ ...thing, title }) }), { wrapper: Wrapper, initialProps: { title: 'Jokes' } })
+    await waitFor(() => { expect(result.current.data?.title).to.eq('Jokes') })
+    rerender({ title: 'Puns' })
+    expect(result.current.data?.title).to.eq('Puns')
+  })
+
+  it("refuses a labelpath that is not a string", async () => {
+    const world = await TH.buildProviderWorld()
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: null }) }
+    for (const labelpath of [42, null, '']) {
+      TH.expectSyncRefusal(() => renderHook(() => world.Bank.useBox(labelpath as never), { wrapper: Wrapper }), 'bad_record')
+    }
+  })
+})
+
+describe("boxQuery", () => {
+  it("gives a host's useQuery what useBox answers", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+    const queried = renderHook(() => useQuery(world.Bank.boxQuery(TH.JokesPath)), { wrapper: Wrapper })
+    await waitFor(() => { expect(queried.result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+  })
+
+  it("keys the record as the bank's minder keys its item", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(world.Bank.boxQuery(TH.JokesPath).queryKey).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'jokes', '!'])
+  })
+
+  // boxQuery @example
+  it("lets a fetch ahead of render fill the item that useBox then shows at once", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const probe = renderHook(() => world.Bank.useBank((bank) => bank.stage), { wrapper: ({ children }: Readonly<{ children: ReactNode }>) => TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) })
+    await waitFor(() => { expect(probe.result.current).to.eq('locked') })
+    const record = await world.client.query(world.Bank.boxQuery(TH.JokesPath))
+    const { gets } = world.counts
+    const { result } = renderHook(() => world.Bank.useBox(TH.JokesPath), { wrapper: ({ children }: Readonly<{ children: ReactNode }>) => TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) })
+    expect([result.current.data, world.counts.gets]).to.deep.equal([record, gets])
+  })
+
+  it("never replaces a record with an older one", async () => {
+    const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    const first = world.client.getQueryData(JokesKey)
+    const second = await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
+    world.client.setQueryData(JokesKey, structuredClone(first))
+    expect(world.client.getQueryData(JokesKey)).to.deep.equal(second)
+  })
+
+  it("fetches nothing while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const options = world.Bank.boxQuery(TH.JokesPath)
+    expect(options.queryKey).to.deep.equal(['sok', null, 'acme', 'box/jokes'])
+    await expect(world.client.query(options)).rejects.toThrow('Missing queryFn')
+    expect(world.counts.gets).to.eq(0)
+  })
+})
+
+describe("keys", () => {
+  const UnderCases = [
+    ["jokes",     true,   'the box itself'],
+    ["jokes_v2",  false,  'a box beside it, whose label starts the same'],
+    ["puns",      false,  'another box'],
+  ] as const
+  for (const [labelpath, expected, blurb] of UnderCases) {
+    it(`starts the key of ${blurb}: ${expected ? 'under' : 'not under'}`, async () => {
+      const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
+      await waitFor(() => { expect(result.current).to.eq('locked') })
+      world.client.setQueryData(world.Bank.keys.box(labelpath), LeanTH.boxShellOf())
+      await world.client.invalidateQueries({ queryKey: world.Bank.keys.under(TH.JokesPath) })
+      expect(world.client.getQueryState(world.Bank.keys.box(labelpath))?.isInvalidated).to.eq(expected)
+    })
+  }
+
+  it("starts every box's key when given no labelpath", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current).to.eq('locked') })
+    expect(world.Bank.keys.under()).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box'])
+    expect(world.Bank.keys.box('puns')).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'puns', '!'])
+  })
+})
+
+describe("useQueryOptions", () => {
+  it("gives the bank's query factories, keyed for the user shown, the same across renders", async () => {
+    const { result, rerender } = await renderUnder((world) => ({ sok: world.SOK.useQueryOptions(), box: useQuery(world.SOK.useQueryOptions().acme.box(TH.JokesPath)) }), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.box.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    const { sok } = result.current
+    rerender()
+    expect(result.current.sok).to.eq(sok)
+    expect(sok.acme.box(TH.JokesPath).queryKey).to.deep.equal(JokesKey)
+  })
+
+  it("changes key with the user, and fetches nothing while nobody is signed in", async () => {
+    const { world, result, treeOpts, rerender } = await renderUnder((world) => useQuery(world.SOK.useQueryOptions().acme.box(TH.JokesPath)), { stored: 'jokes' }, { userid: null })
+    expect(result.current.fetchStatus).to.eq('idle')
+    treeOpts.userid = TH.ProviderUser
+    rerender()
+    await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    expect(world.client.getQueryCache().getAll().map((entry) => entry.queryKey)).to.deep.include.members([['sok', null, 'acme', 'box/jokes'], JokesKey])
+  })
+})
+
+describe("nullifyThing", () => {
+  const box = LeanTH.boxThingOf('jokes')
+  const ThingCases = [
+    [box,                         box,       'answers a live record itself'],
+    [LeanTH.boxTombOf(box),       null,      'answers null for a tombstone'],
+    [LeanTH.boxShellOf(),         null,      'answers null for the shell, where nothing is stored'],
+    [Thing.sparseOf(box),         undefined, 'answers undefined for a sparse record, whose body is not yet known'],
+  ] as const
+  for (const [thing, expected, blurb] of ThingCases) {
+    it(blurb, () => { expect(nullifyThing(thing as never)).to.eq(expected) })
+  }
+})
+
+describe("putBoxOnce", () => {
+  it("writes the box, in the host's query of it by the time it resolves, and useBox shows it", async () => {
+    const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
+    // React Query re-renders a hook only for the fields it has read.
+    await waitFor(() => { expect(result.current.data).to.not.be.undefined })
+    const box = await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: { apiKey: 'sk-test-1111' } }))
+    expect(world.client.getQueryData(JokesKey)).to.deep.equal(box)
+    await waitFor(() => { expect(result.current.data).to.deep.equal(box) })
+    expect(box.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' })
+    expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq('sk-test-1111')
+  })
+
+  it("writes over the newest revision the minder has heard of, whatever the record that names the box", async () => {
+    const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    const first = result.current.data!
+    await act(() => world.Bank.putBoxOnce(first, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
+    const third = await act(() => world.Bank.putBoxOnce(first, { sidecar: { service: 'jokes', tier: 'max' } }, { whisper: LeanTH.Whisper }))
+    expect(third.revseq).to.eq(2)
+  })
+
+  it("writes a new box, given its sidecar", async () => {
+    const { world, result } = await renderUnlocked((world) => world.Bank.useBox('puns'))
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(result.current.data).to.be.null
+    await act(() => world.Bank.putBoxOnce('puns', { sidecar: { service: 'puns' } }, { whisper: LeanTH.Whisper }))
+    await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'puns' }) })
+  })
+
+  it("refuses on a locked bank, without waiting for the unlock form", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBank(), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.stage).to.eq('locked') })
+    await TH.expectRefusal(world.Bank.putBoxOnce(TH.JokesPath, { sidecar: {} }, { whisper: LeanTH.Whisper }), 'bank_locked')
+    expect(result.current.isUnlockWanted).to.eq(false)
+  })
+
+  it("refuses while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    await TH.expectRefusal(world.Bank.putBoxOnce(TH.JokesPath, { sidecar: {} }, { whisper: LeanTH.Whisper }), 'absent_vault')
+  })
+
+  it("refuses what names no box", async () => {
+    const world = await TH.buildProviderWorld()
+    for (const boxNamed of [42, null, '', {}, { labelpath: 'gate' }, { labelpath: 'jokes' }]) {
+      await TH.expectRefusal(world.Bank.putBoxOnce(boxNamed as never, { sidecar: {} }, { whisper: LeanTH.Whisper }), 'bad_record')
+    }
+  })
+})
+
+describe("delBox", () => {
+  it("deletes the box, its tombstone in the host's query by the time it resolves, and useBox shows null", async () => {
+    const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    const tombstone = await act(() => world.Bank.delBox(result.current.data!))
+    expect(world.client.getQueryData(JokesKey)).to.deep.equal(tombstone)
+    await waitFor(() => { expect(result.current.data).to.be.null })
+    expect(tombstone.am).to.eq('x')
+    await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_box')
+  })
+})
+
+/** The core's test whisper, whatever the form. */
+function whisperOfAnyForm(): Whisper { return LeanTH.Whisper }
+
+/** A key for the joke service a user types, an obvious fake. */
+const TypedKey = 'sk-test-typed-4242'
+
+/** The key editor a host would write: the stored key's mask, a form whose action is `putBoxAction`, and what the action last resolved. */
+function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> = {}) {
+  const putJokesKey = world.Bank.putBoxAction(TH.JokesPath, {
+    whisperOf: (form) => ({ apiKey: form.get('apiKey') as string }),
+    sidecarOf: (whisper) => ({ service: 'jokes', mask: `…${String(whisper['apiKey']).slice(-4)}` }),
+    ...opts,
+  })
+  const seen: { result: PutBoxActionResult | null } = { result: null }
+  function KeyEditor() {
+    const mask = world.Bank.useBox(TH.JokesPath, { select: (thing) => nullifyThing(thing)?.sidecar['mask'] }).data
+    const [result, putAction, isPutting] = useActionState(putJokesKey, null)
+    useEffect(() => { seen.result = result }, [result])
+    return (
+      <form action={putAction}>
+        <p>{(typeof mask === 'string') ? `Key ${mask}` : 'No mask'}</p>
+        <input name="apiKey" type="password" aria-label="Key" />
+        <button disabled={isPutting}>Save</button>
+        {(result !== null) && <output>{(result.error === null) ? 'Saved' : 'Refused'}</output>}
+      </form>
+    )
+  }
+  return { KeyEditor, seen }
+}
+
+/** Render the key editor over a world with the joke service's key stored, its bank unlocked. */
+async function renderKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  const editor = makeKeyEditor(world, opts)
+  const rendered = render(TH.providerTreeOf(world, <editor.KeyEditor />, { userid: TH.ProviderUser }))
+  const device = await waitFor(() => world._cheat_device())
+  await act(async () => {
+    await device.hello()
+    await device.bank!.unlock({ passphraseCleartext: Passphrase })
+  })
+  return { world, ...editor, ...rendered }
+}
+
+/** Type {@link TypedKey} into the key editor and save it. */
+function submitKey(): void {
+  fireEvent.change(screen.getByLabelText('Key'), { target: { value: TypedKey } })
+  fireEvent.click(screen.getByText('Save'))
+}
+
+describe("putBoxAction", () => {
+  // putBoxAction @example
+  it("writes the box from the form, and useBox shows its new sidecar, with the whisper in no action result and neither cache", async () => {
+    const { world, seen, container } = await renderKeyEditor()
+    submitKey()
+    await screen.findByText('Saved')
+    await screen.findByText('Key …4242')
+    expect(seen.result?.box?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
+    expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq(TypedKey)
+    const kept = [seen.result, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
+    expect(kept.map((each) => TH.holdsText(each, TypedKey))).to.deep.equal([false, false, false, false])
+  })
+
+  it("empties the form before it writes, so no render sees the whisper in its FormData", async () => {
+    const forms: FormData[] = []
+    const { world } = await renderKeyEditor({ whisperOf: (form) => {
+      forms.push(form)
+      return { apiKey: form.get('apiKey') as string }
+    } })
+    const release = world.pauseGets()
+    submitKey()
+    await waitFor(() => { expect(forms).to.have.lengthOf(1) })
+    expect([...forms[0]!.keys()]).to.deep.equal([])
+    release()
+    await screen.findByText('Saved')
+  })
+
+  it("resolves a refusal as its error, and never rejects", async () => {
+    const { world, seen } = await renderKeyEditor()
+    act(() => { world.Bank.lock() })
+    submitKey()
+    await screen.findByText('Refused')
+    const err = seen.result!.error
+    expect(isVaultError(err) && err.refusalkind).to.eq('bank_locked')
+    expect(TH.holdsText(seen.result, TypedKey)).to.eq(false)
+  })
+
+  it("resolves what whisperOf throws, as thrown, and empties the form all the same", async () => {
+    const thrown = new TypeError('The key field is missing')
+    const forms: FormData[] = []
+    const { seen } = await renderKeyEditor({ whisperOf: (form) => {
+      forms.push(form)
+      throw thrown
+    } })
+    submitKey()
+    await screen.findByText('Refused')
+    expect(seen.result?.error).to.eq(thrown)
+    expect([...forms[0]!.keys()]).to.deep.equal([])
+  })
+
+  it("keeps the box's sidecar when it has no sidecarOf", async () => {
+    const { world } = await renderKeyEditor({ sidecarOf: undefined })
+    submitKey()
+    await screen.findByText('Saved')
+    expect(world.client.getQueryData<BoxRecord>(JokesKey)?.sidecar).to.deep.equal({ service: 'jokes' })
+  })
+
+  it("refuses what names no box, and a whisperOf or sidecarOf that is not a function", async () => {
+    const world = await TH.buildProviderWorld()
+    const whisperOf = whisperOfAnyForm
+    TH.expectSyncRefusal(() => world.Bank.putBoxAction('', { whisperOf }), 'bad_record')
+    TH.expectSyncRefusal(() => world.Bank.putBoxAction(TH.JokesPath, {} as never), 'bad_record')
+    TH.expectSyncRefusal(() => world.Bank.putBoxAction(TH.JokesPath, { whisperOf, sidecarOf: 'mask' as never }), 'bad_record')
+  })
+
+  it("resolves a refusal when handed something other than a FormData", async () => {
+    const world = await TH.buildProviderWorld()
+    const { error: err } = await world.Bank.putBoxAction(TH.JokesPath, { whisperOf: whisperOfAnyForm })(null, { apiKey: TypedKey } as never)
+    expect(isVaultError(err) && err.refusalkind).to.eq('bad_record')
+  })
+})
+
+describe("useStrengthVerdict", () => {
+  it("judges a new passphrase, pending until the verdict lands", async () => {
+    const { world, result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, false])
+    const release = world.checker.hold()
+    let judging: Promise<void> = Promise.resolve()
+    act(() => { judging = result.current.judge('short') })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, true])
+    release()
+    await act(() => judging)
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.heldVerdictOf('short'), false])
+    await act(() => result.current.judge(NewPassphrase))
+    expect(result.current.verdict).to.deep.equal({ strong: true })
+  })
+
+  it("still shows the last verdict while the next is judged", async () => {
+    const { world, result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
+    await act(() => result.current.judge('short'))
+    const release = world.checker.hold()
+    let judging: Promise<void> = Promise.resolve()
+    act(() => { judging = result.current.judge(NewPassphrase) })
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([TH.heldVerdictOf('short'), true])
+    release()
+    await act(() => judging)
+    expect(result.current.verdict).to.deep.equal({ strong: true })
+  })
+
+  it("returns the same judge across renders", async () => {
+    const { result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
+    const { judge } = result.current
+    await act(() => result.current.judge('short'))
+    expect(result.current.judge).to.eq(judge)
+  })
+
+  it("reports the checker's refusal as lastErr, with no verdict", async () => {
+    const { world, result } = await renderUnder((world) => world.SOK.useStrengthVerdict())
+    await act(() => result.current.judge('short'))
+    world.checker.throwing(new Error('The strength checker failed.'))
+    await act(() => result.current.judge(NewPassphrase))
+    expect([result.current.verdict, result.current.isJudging]).to.deep.equal([null, false])
+    expect(isVaultError(result.current.lastErr) && result.current.lastErr.refusalkind).to.eq('unexpected_error')
+  })
+
+  it("reports a refusal while nobody is signed in", async () => {
+    const { result } = await renderUnder((world) => world.SOK.useStrengthVerdict(), {}, { userid: null })
+    await act(() => result.current.judge(NewPassphrase))
+    expect(isVaultError(result.current.lastErr) && result.current.lastErr.refusalkind).to.eq('absent_vault')
+  })
+})
