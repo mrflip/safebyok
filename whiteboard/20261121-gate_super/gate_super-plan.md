@@ -6,7 +6,7 @@
 * **At once**: 3 (the line is two threads, stacked, so one runs at a time).
 * **Design**: `gate_super-design.md`, beside this file. It wins over this plan on the shape of the code.
 * **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 647; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
-* **Status**: thread 1 filed and ready for merge (#815 at 65027522f, stacked on #814); thread 2 building in /workspace/byok-bank_whole.
+* **Status**: done. Line main → #813 → #814 → #815 → #816 → #812, every PR filed and ready; six matters still open in the doc (human/20261121-sprint_gate_super_done.md).
 
 ## Read first
 
@@ -99,6 +99,11 @@ second unlock of the bank's gate, `rootBox` readonly, `BirthOpts` gone); thread 
 `Bank.make` and has `#bringUp` make the gate, deleting the double unlock. Cut it after #813 merges, on
 `device.birthGating`. *Levels*: defaults. *Depends on*: thread 1, stacked on its branch once it is ready.
 *Size*: medium.
+
+*Review:* fixed (medium, opus): `makeStoredGate` renamed to match `TH.makeStoredBank`, whose doc says what the bank
+is; the changeset names what the birth checks of the answer (orchestrator). Left, minor: a throw from `attachBank`
+leaves the device a bank whose gate is swept (a broken state, reported by the throw); `Bank.make` checks only the
+gate's stamp (my call, on *Cleanup*). Filed as #816 at aa01109f6.
 
 ## For the Coach
 
