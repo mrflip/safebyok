@@ -21,7 +21,7 @@ const GatingMarker = '[gating]'
 
 // A form mutation's variables stay in React Query's mutation cache, its devtools and the `useMutation` hook's state; a
 // gating there shows none of its cleartexts, and is vacated once attempted. A cleartext goes from the gating only to its
-// verb's body, and to a getter's caller as a copy.
+// verb's body.
 /** A form verb's cleartexts and the change they prove, to attempt once: make one with a {@link Bank} maker, such as {@link Bank.unlockGating}.
  * A spread copies none of its cleartexts, and JSON, `String()` and Node's inspect show only `'[gating]'`.
  */
@@ -40,18 +40,6 @@ export class Gating {
     Object.freeze(this)
   }
 
-  /** The passphrase: a new bank's, or the proof of an `unlock` gating or a gate change. */
-  get passphraseCleartext(): string | undefined { return this.#cleartexts.passphraseCleartext }
-
-  /** A fresh copy of the passkey answer: a new bank's, or the proof of an `unlock` gating or a gate change. */
-  get passkeyCleartext(): GX.PasskeyAnswer | null | undefined { return copiedAnswerOf(this.#cleartexts.passkeyCleartext) }
-
-  /** The new passphrase. */
-  get nextPassphraseCleartext(): string | undefined { return this.#cleartexts.nextPassphraseCleartext }
-
-  /** A fresh copy of the new passkey's answer. */
-  get nextPasskeyCleartext(): GX.PasskeyAnswer | undefined { return copiedAnswerOf(this.#cleartexts.nextPasskeyCleartext) }
-
   /** Prove the cleartexts and make the verb's change, resolving the bank.
    * A gating is attempted once, and vacated whatever the outcome: make another for the next try.
    */
@@ -68,7 +56,7 @@ export class Gating {
   /** {@link attempt}, resolving an `Outcome` instead of throwing. */
   tryAttempt(): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.attempt()) }
 
-  /** Zero the gating's passkey answers and drop its passphrases: every getter returns undefined after, and an attempt refuses. */
+  /** Zero the gating's passkey answers and drop its passphrases: an attempt refuses after. */
   vacate(): void {
     zeroAnswer(this.#cleartexts.passkeyCleartext)
     zeroAnswer(this.#cleartexts.nextPasskeyCleartext)
@@ -225,7 +213,7 @@ function nextGateAsk(ante: Gate, wayins: GateDna['wayins'], policy: EX.StoragePo
 }
 // --
 
-// == [Adopting and vacating]: adoptedCleartextsOf, adoptedAnswerOf, isAnswerish, copiedAnswerOf, zeroAnswer, zeroBytes
+// == [Adopting and vacating]: adoptedCleartextsOf, adoptedAnswerOf, isAnswerish, zeroAnswer, zeroBytes
 
 /** A copy of `cleartexts` the gating owns, each passkey answer adopted, checked only for its fields.
  * A throw that is not a VaultError, such as a host's getter throwing, is replaced by one that carries nothing of it.
@@ -257,12 +245,6 @@ function adoptedAnswerOf(answer: unknown): unknown {
 /** True of an object whose PRF bytes are bytes the gating can copy and zero. */
 function isAnswerish(answer: unknown): answer is GX.PasskeyAnswer {
   return (typeof answer === 'object') && (answer !== null) && Validator.isBytes((answer as { prfBytes?: unknown }).prfBytes)
-}
-
-/** A copy of `answer` with PRF bytes of its own, or anything else as given, for the body to refuse. */
-function copiedAnswerOf<AnswerT extends GX.PasskeyAnswer | null | undefined>(answer: AnswerT): AnswerT {
-  if (! isAnswerish(answer)) { return answer }
-  return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) }
 }
 
 /** Zero the PRF bytes of `answer`, the gating's own, if it has any. */

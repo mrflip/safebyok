@@ -31,7 +31,7 @@ what differs from big, in a sentence or two.
   vacates it. A passphrase is still held in a private field until the gating is attempted or vacated (G1), and the copy
   of a passkey answer's PRF bytes is the gating's, which G9's "only `Gating`, `Proving` and `Lease`" covers again. The
   host's PRF bytes are zeroed at adoption, before the cleartexts' fields are checked, and the gating's copy in its
-  attempt's `finally`. The gating's getters still hand out a copy of a passkey answer, which nothing zeroes.
+  attempt's `finally`. The gating has no getter: its cleartexts leave it only to its verb's body.
 
 * 2026-11-20 (form_verbs), G2: **A passkey answer is vacated after every attempt.** In big an attempt refused with a
   correctable refusal, short of its gating's last, left the answer's PRF bytes un-zeroed for the host to hand in again.

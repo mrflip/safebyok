@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider, type UseMutationOptions, onlineManage
 import { act, renderHook, waitFor } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { type Gating, PendingBank, VaultError } from 'safebyok'
-import { describe, expect, it, onTestFinished } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
@@ -22,9 +22,13 @@ const FormCases = [
   ["revokePasskey",     (acme: AcmeGiver) => acme.revokePasskeyGating,     (acme: AcmeGiver) => acme.revokePasskeyMutationOptions(),     (acme: AcmeGiver) => acme.useRevokePasskey(),     () => ({ passkeyCleartext: fakePasskeyAnswer() })],
 ] as const
 
-/** True of a gating that contains nothing. */
-function isVacated(gating: Gating): boolean {
-  return [gating.passphraseCleartext, gating.passkeyCleartext, gating.nextPassphraseCleartext, gating.nextPasskeyCleartext].every((val) => val === undefined)
+/** Count the calls to `vacate` on `gating`, from here on: a gating freezes, so the spy goes on the class that defines `vacate`. */
+function watchVacates(gating: Gating) {
+  let proto = Object.getPrototypeOf(gating) as object
+  while (! Object.hasOwn(proto, 'vacate')) { proto = Object.getPrototypeOf(proto) as object }
+  const spy = vi.spyOn(proto as Gating, 'vacate')
+  onTestFinished(() => { spy.mockRestore() })
+  return { countOf: () => spy.mock.contexts.filter((context) => context === gating).length }
 }
 
 /** A fake world, its giver for the bank `acme`, and a wrapper providing a fresh QueryClient. */
@@ -97,19 +101,21 @@ describe("useBankSnapshot", () => {
 async function runThroughOptions(makerOf: (acme: AcmeGiver) => (cleartexts: never) => Promise<Gating>, optionsOf: (acme: AcmeGiver) => unknown, cleartexts: unknown) {
   const { world, Acme, wrapper } = setup()
   const { result } = renderHook(() => useMutation(optionsOf(Acme) as UseMutationOptions<void, Error, Gating>), { wrapper })
-  const gating = await makerOf(Acme)(cleartexts as never)
+  const gating  = await makerOf(Acme)(cleartexts as never)
+  const vacates = watchVacates(gating)
   await act(() => result.current.mutateAsync(gating))
-  return { world, gating }
+  return { world, vacates }
 }
 
 /** Attempt the bank's verb through its hook, with a gating the hook's `gating` makes of `cleartexts`; the fake world and the gating after it settles. */
 async function runThroughHook(useForm: (acme: AcmeGiver) => { mutate: (gating: Gating) => void, gating: (cleartexts: never) => Promise<Gating>, isSuccess: boolean }, cleartexts: unknown) {
   const { world, Acme, wrapper } = setup()
   const { result } = renderHook(() => useForm(Acme), { wrapper })
-  const gating = await result.current.gating(cleartexts as never)
+  const gating  = await result.current.gating(cleartexts as never)
+  const vacates = watchVacates(gating)
   act(() => { result.current.mutate(gating) })
   await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-  return { world, gating }
+  return { world, vacates }
 }
 
 /** Attempt `useUnlock`'s gating against a world whose form verbs refuse with `refusal`; the gating and the mutation's error once it shows. */
@@ -117,10 +123,11 @@ async function runRefusedUnlock(refusal: VaultError) {
   const { world, Acme, wrapper } = setup()
   world.refuseFormVerbs(refusal)
   const { result } = renderHook(() => Acme.useUnlock(), { wrapper })
-  const gating = await result.current.gating({ passphraseCleartext: 'fake wrong passphrase' })
+  const gating  = await result.current.gating({ passphraseCleartext: 'fake wrong passphrase' })
+  const vacates = watchVacates(gating)
   act(() => { result.current.mutate(gating) })
   await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-  return { gating, err: result.current.error }
+  return { vacates, err: result.current.error }
 }
 
 /** Attempt `useRevokePasskey`'s gating against a refusing world under a host's default of retrying mutations once; the fake world and the gating once the error shows. */
@@ -131,10 +138,11 @@ async function runRefusedUnderRetries(refusal: VaultError) {
   function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return <QueryClientProvider client={client}>{children}</QueryClientProvider> }
   world.refuseFormVerbs(refusal)
   const { result } = renderHook(() => Acme.useRevokePasskey(), { wrapper: Wrapper })
-  const gating = await result.current.gating({ passkeyCleartext: fakePasskeyAnswer() })
+  const gating  = await result.current.gating({ passkeyCleartext: fakePasskeyAnswer() })
+  const vacates = watchVacates(gating)
   act(() => { result.current.mutate(gating) })
   await waitFor(() => { expect(result.current.error).to.eq(refusal) })
-  return { world, gating }
+  return { world, vacates }
 }
 
 describe("the form mutations", () => {
@@ -145,8 +153,8 @@ describe("the form mutations", () => {
     })
 
     it(`vacates the gating once the bank's ${verb} runs through its mutationOptions`, async () => {
-      const { gating } = await runThroughOptions(makerOf, optionsOf, cleartextsOf())
-      expect(isVacated(gating)).to.eq(true)
+      const { vacates } = await runThroughOptions(makerOf, optionsOf, cleartextsOf())
+      expect(vacates.countOf()).to.be.greaterThan(0)
     })
 
     it(`attempts the bank's ${verb} gating, made by the hook's gating, through its hook`, async () => {
@@ -155,8 +163,8 @@ describe("the form mutations", () => {
     })
 
     it(`vacates the gating once the bank's ${verb} runs through its hook`, async () => {
-      const { gating } = await runThroughHook(useForm, cleartextsOf())
-      expect(isVacated(gating)).to.eq(true)
+      const { vacates } = await runThroughHook(useForm, cleartextsOf())
+      expect(vacates.countOf()).to.be.greaterThan(0)
     })
   }
 
@@ -168,8 +176,8 @@ describe("the form mutations", () => {
   })
 
   it("vacates the gating when the verb refuses", async () => {
-    const { gating } = await runRefusedUnlock(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    expect(isVacated(gating)).to.eq(true)
+    const { vacates } = await runRefusedUnlock(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
+    expect(vacates.countOf()).to.be.greaterThan(0)
   })
 
   it("runs the verb once under a host's default of retrying mutations", async () => {
@@ -179,8 +187,8 @@ describe("the form mutations", () => {
   })
 
   it("vacates the gating once the verb settles under a host's default of retrying mutations", async () => {
-    const { gating } = await runRefusedUnderRetries(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    expect(isVacated(gating)).to.eq(true)
+    const { vacates } = await runRefusedUnderRetries(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
+    expect(vacates.countOf()).to.be.greaterThan(0)
   })
 
   it("keys each form mutation under the bank", () => {
