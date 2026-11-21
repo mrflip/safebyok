@@ -22,9 +22,29 @@ export const KitPhrases = Object.freeze({
   createButton:       'Create vault',
   creatingButton:     'Creating…',
 
+  replaceBlurb:          'Enter your current passphrase, then choose a new one. Your passkey, if you have one, keeps working.',
+  currentField:          'Current passphrase',
+  replaceButton:         'Replace passphrase',
+  replacingButton:       'Replacing…',
+
+  addPasskeyBlurb:       'Enter your vault passphrase. Your browser will then offer a passkey, to unlock with your fingerprint, face or security key alone.',
+  addPasskeyButton:      'Add passkey',
+  addingPasskeyButton:   'Adding…',
+  revokePasskeyBlurb:    'Enter your vault passphrase to remove the passkey here and on every other device.',
+  revokePasskeyButton:   'Remove passkey',
+  revokingPasskeyButton: 'Removing…',
+  passkeyUnlockButton:   'Unlock with a passkey',
+  askingPasskeyButton:   'Asking your passkey…',
+
   wrongPassphrase:    'That is not the passphrase.',
   weakPassphrase:     'That passphrase is too easy to guess.',
+  wrongPasskey:       'That passkey does not unlock this vault.',
   troubled:           'Something went wrong. Please try again later.',
+
+  noPasskeyToAsk:     'This vault has no passkey to ask: unlock it with your passphrase, then add one.',
+  noWebAuthn:         "This browser can't use passkeys. Your passphrase still works.",
+  noPrf:              'That device or security key is not compatible with this vault. Try another, or use your passphrase.',
+  passkeyAskFailed:   "Your browser couldn't ask for a passkey just now: try again, or use your passphrase.",
 })
 
 /** The alert a form shows for `err`, its form verb's refusal: a condition the user can mend in their own words, anything else as trouble. */
@@ -33,6 +53,7 @@ export function refusalTextOf(err: unknown): string {
   switch (err.refusalkind) {
   case 'wrong_passphrase': { return KitPhrases.wrongPassphrase }
   case 'weak_passphrase': {  return KitPhrases.weakPassphrase }
+  case 'wrong_passkey': {    return KitPhrases.wrongPasskey }
   default: {                 return err.message }
   }
 }
