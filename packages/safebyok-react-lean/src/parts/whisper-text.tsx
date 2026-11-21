@@ -27,7 +27,13 @@ export interface WhisperTextProps {
  * @example
  *   <WhisperText labelpath="openai" field="apiKey" />
  */
-export function WhisperText({ bank: bankProp, labelpath, field, masked = PartsPhrases.masked, onError }: Readonly<WhisperTextProps>) {
+export function WhisperText(props: Readonly<WhisperTextProps>) {
+  // Keyed by what it shows, so another box or field starts masked, with its own Show button.
+  return <WhisperTextOf key={JSON.stringify([props.labelpath, props.field])} {...props} />
+}
+
+/** The stateful part of {@link WhisperText}, for one box and field. */
+function WhisperTextOf({ bank: bankProp, labelpath, field, masked = PartsPhrases.masked, onError }: Readonly<WhisperTextProps>) {
   const bank = useGivenBank(bankProp)
   const reveal = useReveal(bank, labelpath)
   const textRef = useRef<HTMLSpanElement>(null)

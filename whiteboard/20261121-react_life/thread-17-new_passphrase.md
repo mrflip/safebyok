@@ -36,6 +36,10 @@ changed.
   * `useDraft` now marks a field revealed inside `withWhisper`'s callback (under `flushSync`, just before writing the
     input's value) rather than after `withWhisper` resolves, since `WhisperText` needs its element mounted before the
     write. Nothing a test asserts moved; the input turns `type="text"` in the same task its value is written.
+  * Rework after review: `WhisperText` is now a thin shell over an inner `WhisperTextOf` keyed by
+    `JSON.stringify([labelpath, field])`, React's idiom for resetting state when a prop changes, so a revealed
+    WhisperText given another box or field starts masked (it kept the old text before). No effect, counter or new
+    state; one test, which fails without the key.
   * The ride-along comment on useDraft's focus branch was already there ("The unlock form takes the focus while the
     bank is locked: the field shown is given it back."), so nothing was added.
 * **Discoveries**: no demo keeps a meter or a reveal of its own: both use the kit forms, `WhisperText` and `useDraft`.
