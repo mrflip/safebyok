@@ -446,9 +446,10 @@ Earlier, on the shape: "it should call an unseal method that refuses: there shou
     `withWhisper`: locked or unlocked, `vault.withWhisper` (the unlock form is the user's, not a crossing); else a
     refusal. The two writes refuse through `demandVault()` as they already do at locked.
   * **Queries** (`useBox`, `useGate`, `useBoxList`, `boxQuery`): `skipToken` but at locked or unlocked, as they already do with no device. A loader calling `queryClient.query(boxQuery(...))` before then
-    rejects as it does signed out; its doc says to wait on the stage. Their queryFns keep the one `await` that
-    keeps a fetch from starting inside the minder's own notification (Closer Look E3), with E3's comment
-    (`#not-a-crossing`), until the Coach rules on the Open Matters row about it.
+    rejects as it does signed out; its doc says to wait on the stage. Their queryFns lose their `await`; the bridge defers its writes into the host's
+    QueryClient out of the minder's own notification, one line flagged as a pragmatic fix (the Coach, on the
+    ordering-await row: "Move to the bridge and flag as a pragmatic fix. If it causes other problems it will have to
+    go.").
   * **A failed bring-up** gets a refusal phrase of its own in place of `BankNotStarted`'s advice (Closer Look E8).
   * **WhisperMask's effect** gets React's stale-result flag in its cleanup, and its wontfix row goes. Where React's
     docs teach an idiom that closes a race in a line or two in the files this thread touches, use it.
@@ -459,8 +460,7 @@ Earlier, on the shape: "it should call an unseal method that refuses: there shou
   a method that unlocks then unseals); `Vault.forceTimelyUnlocked`, which nothing calls (Cleanup); E2's device verb;
   E10.
 * **Levels:** `opus` worker, medium effort; review `medium`. **Depends on:** 14.
-* **Ready when:** `rg 'hello\(\)' packages/safebyok-react-lean/src demos` finds only the provider's effect and the
-  queryFns' E3 hop; a test shows `withLockableWhisper` refusing at starting and answering through `ifLocked` at
+* **Ready when:** `rg 'hello\(\)' packages/safebyok-react-lean/src demos` finds only the provider's effect; a test shows `withLockableWhisper` refusing at starting and answering through `ifLocked` at
   locked; no test's subject is a crossing.
 
 ## What no thread builds
