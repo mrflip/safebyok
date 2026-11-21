@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { UnlockDialog, UnlockForm } from '../../src/kit'
 import * as TH from '../test-helpers'
 
@@ -11,13 +11,13 @@ const WrongPassphrase = 'correct horse battery stable'
 /** The bank's stage as a line of text, with the unlock form while it is locked. */
 function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
-  return (stage === 'locked') ? <UnlockForm bank={world.Bank} username="hue@example.com" /> : <p>{stage}</p>
+  return (stage === 'locked') ? <UnlockForm username="hue@example.com" /> : <p>{stage}</p>
 }
 
 /** The bank's stage as a line of text, beside the unlock dialog. */
 function DialogScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
-  return <><p>{stage}</p><UnlockDialog bank={world.Bank} /></>
+  return <><p>{stage}</p><UnlockDialog /></>
 }
 
 /** A world with a bank stored, rendered with `children` under its provider, once it shows `shown`. */
@@ -75,6 +75,23 @@ describe("UnlockForm", () => {
     expect(username?.value).to.eq('hue@example.com')
     expect(username?.autocomplete).to.eq('username')
     expect(screen.queryByRole('button', { name: 'Cancel' })).to.be.null
+  })
+
+  it("uses the bank handed to it over the provider's", async () => {
+    const heard: string[] = []
+    const { world } = await renderWorld((world) => {
+      const bank = { useUnlock: () => { heard.push('useUnlock'); return world.Bank.useUnlock() } }
+      return <UnlockForm bank={bank} />
+    }, 'Unlock')
+    expect(heard).to.not.be.empty
+    typePassphrase(Passphrase)
+    await waitFor(() => { expect(world._cheat_device().bank?.isUnlocked).to.eq(true) })
+  })
+
+  it("refuses to render outside every provider with no bank handed to it", () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    onTestFinished(() => { vi.restoreAllMocks() })
+    TH.expectSyncRefusal(() => render(<UnlockForm />), 'bad_record')
   })
 })
 

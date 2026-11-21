@@ -15,7 +15,7 @@ beforeEach(() => { localStorage.clear() })
 describe("LocalStorageVaultDB", () => {
   it("finds a bank born before the page reloaded, and its boxes", async () => {
     const { vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB: new LocalStorageVaultDB() }) })
-    await vault.putBoxOnce('box/anthropic', { sidecar: { mask: 'sk-ant-…cdef' } }, { whisper: TH.Whisper })
+    await vault.putBoxOnce('box/anthropic', { sidecar: { mask: 'sk-ant-…' } }, { whisper: TH.Whisper })
     const device = TH.makeDevice({}, { vaultDB: new LocalStorageVaultDB() })
     await device.hello()
     await device.bank!.unlock({ passphraseCleartext: TH.TestPassphrase })

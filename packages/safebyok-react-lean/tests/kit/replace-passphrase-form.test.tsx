@@ -17,8 +17,8 @@ function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
   return (
     <>
       <p>{stage}</p>
-      <ReplacePassphraseForm giver={world.SOK} bank={world.Bank} username="hue@example.com" />
-      {(stage === 'locked') && <UnlockForm bank={world.Bank} />}
+      <ReplacePassphraseForm username="hue@example.com" />
+      {(stage === 'locked') && <UnlockForm />}
     </>
   )
 }

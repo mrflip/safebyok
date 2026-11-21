@@ -1,5 +1,6 @@
 export * from './giver/react-giver'
 export { type GiverBanks, type GiverConfig, type GiverSlotSnapshot, SignedOutBank } from './giver/giver-slot'
-export { nullifyThing } from './giver/giver-defaults'
+export { liveOf } from './giver/giver-defaults'
 export type { BoxQueryOpts } from './giver/shapes-giver'
 export type { Draft, DraftPutOpts, WhisperFieldProps } from './giver/use-draft'
+export * from './mask'

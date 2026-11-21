@@ -2,19 +2,20 @@
  * Its provider says who is signed in. Its hooks read the slot the provider fills, and records come through the host's React Query.
  */
 
-import { type DataTag, type QueryKey, type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, skipToken, useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, mutationOptions, queryOptions, skipToken, useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   Bank, type BankSnapshot, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, type Gating, type KeyDeriver, Labelpath, type LiveOf,
   type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
   type TombstoneOf, type UnlockCleartexts, type Userid, type VaultDB, type Whisper,
 } from 'safebyok'
-import { FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, nullifyThing, recordQueryDefaults } from './giver-defaults'
+import { FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, formMutationsKeyUnder, liveOf, recordQueryDefaults } from './giver-defaults'
+import { type Given, GiverContext } from './giver-context'
 import { type GiverConfig, type GiverSlotSnapshot, GiverSlot } from './giver-slot'
 import { type BoxQueryOpts, ScopeChecks } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
-// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, BoxQueryOptions, BoxQueries, PutBoxActionOpts, PutBoxActionResult, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, BoxQueryOptions, BoxQueries, PutBoxActionOpts, PutBoxActionResult, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
@@ -54,7 +55,10 @@ export type PutBoxActionOpts = Readonly<{
 }>
 
 /** What a {@link BankGiver.putBoxAction} resolves, for `useActionState` to keep: the box stored, or why it was not. */
-export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, error: null }> | Readonly<{ box: null, error: unknown }>
+export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, err: null }> | Readonly<{ box: null, err: unknown }>
+
+/** React Query's options for a form verb's mutation, for the host's own `useMutation`: its `mutate` is handed the verb's gating. */
+export type FormMutationOptions = UseMutationOptions<void, Error, Gating>
 
 /** A form verb's mutation, through `useMutation`, with `gating` to make what its `mutate` is handed. */
 export type FormMutationResult<CleartextsT> = UseMutationResult<void, Error, Gating> & Readonly<{
@@ -102,6 +106,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
   /** Says who is signed in: mount it once, at the root, inside the host's `QueryClientProvider`.
    * The first userid starts that user's device. A null or undefined userid changes nothing, and neither does unmounting.
    * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead.
+   * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
    */
   function Provider({ userid, vaultDB, keyDeriver, children }: ProviderProps) {
     const client = useQueryClient()
@@ -110,7 +115,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     useEffect(() => {
       if (typeof userid === 'string') { slot.start(userid, { client, vaultDB, keyDeriver }) }
     }, [userid, client, vaultDB, keyDeriver])
-    return <UseridContext value={userid}>{children}</UseridContext>
+    return <UseridContext value={userid}><GiverContext value={given}>{children}</GiverContext></UseridContext>
   }
 
   /** What `pick` reads of the slot's snapshot, as the provider's children see it: `starting`, with no userid, while the device is not the prop's user's. */
@@ -167,7 +172,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     }, [userid])
   }
 
-  return Object.freeze({
+  const giver = Object.freeze({
     Provider,
     useStrengthVerdict,
     useQueryOptions,
@@ -177,6 +182,9 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
       return bankGiver
     },
   })
+  /** What the provider hands the parts and the kit beneath it. */
+  const given: Given = Object.freeze({ giver, bank: bankGiver })
+  return giver
 }
 
 /** The fields of a {@link StrengthVerdictResult} before anything is judged. */
@@ -208,11 +216,12 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
    * Show `AddPasskeyForm` while it is null and `RevokePasskeyForm` while it is not, and hand it to `PasskeyUnlockButton`.
    * @example
    *   const passkeyHeader = Knock.usePasskeyHeader()
-   *   <PasskeyUnlockButton bank={Knock} passkeyHeader={passkeyHeader} />
+   *   <PasskeyUnlockButton passkeyHeader={passkeyHeader} />
    */
   function usePasskeyHeader(): PasskeyWayinHeader | null {
     useBank((snap) => snap.stage)
-    useMutationState({ filters: { mutationKey: ['sok', banklabel], status: 'success' }, select: (mutation) => mutation.state.submittedAt })
+    const userid = useShownSnapshot((snap) => snap.userid)
+    useMutationState({ filters: { mutationKey: formMutationsKeyUnder({ userid, banklabel }), status: 'success' }, select: (mutation) => mutation.state.submittedAt })
     const passkey0 = slot.device?.bank?.maingate.passkey0 ?? null
     return useMemo(() => (passkey0?.toJSON() as PasskeyWayinHeader | undefined) ?? null, [passkey0])
   }
@@ -233,7 +242,7 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
   // One factory serves render and the calls outside it: a hook hands it the userid it shows, `boxQuery` the slot's.
   /** The `queryOptions` of the box at `labelpath` in `userid`'s bank, skipping the fetch while `userid` is null. */
   function boxQueryOf(userid: Userid | null, labelpath: string): BoxQueryOptions {
-    return queryOptions({ ...boxQueryBaseOf(userid, labelpath), select: nullifyThing<BoxRecord> })
+    return queryOptions({ ...boxQueryBaseOf(userid, labelpath), select: liveOf<BoxRecord> })
   }
 
   /** {@link boxQueryOf}, less its `select`. */
@@ -259,14 +268,14 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or while nobody is signed in.
    * A record overtaken by a newer revision shows until the newer one arrives.
    * `opts` are React Query's own, and override the giver's. A `select` given there is handed the whole record, the box's
-   * tombstone, or its shell where none is stored: {@link nullifyThing} is the default.
+   * tombstone, or its shell where none is stored: {@link liveOf} is the default.
    * @example
    *   const { data: box } = Knock.useBox('jokes')
-   *   const mask = Knock.useBox('jokes', { select: (thing) => nullifyThing(thing)?.sidecar['mask'] }).data
+   *   const mask = Knock.useBox('jokes', { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data
    */
   function useBox<SelT = BoxSelected>(labelpath: string, opts: BoxQueryOpts<BoxShown, SelT> = {}): UseQueryResult<SelT> {
     const userid = useShownSnapshot((snap) => snap.userid)
-    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(userid, labelpath), select: nullifyThing as (thing: BoxShown) => SelT, ...opts })
+    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(userid, labelpath), select: liveOf as (thing: BoxShown) => SelT, ...opts })
   }
 
   /** The signed-in user's listing of the root box's children. */
@@ -346,7 +355,7 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
   /** Delete the box `boxNamed` names, resolving its stored tombstone. It tries once, over the newest revision the minder has heard of.
    * A {@link useBox} showing the box then answers null.
    */
-  async function delBox(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
+  async function delBoxOnce(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
     const boxLabelpath = boxLabelpathOfNamed(boxNamed)
     await slot.demandDevice().hello()
     return await slot.demandVault().delBoxOnce(boxLabelpath)
@@ -380,9 +389,9 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     return async (_prior, form) => {
       try {
         const [patch, secrets] = takeForm(Checks.form.parse(form))
-        return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), error: null }
+        return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), err: null }
       } catch (err) {
-        return { box: null, error: err }
+        return { box: null, err }
       }
     }
   }
@@ -397,19 +406,44 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
 
   // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
-  // Its `gating` refuses `absent_vault` at a stage the verb has no bank for: show each form only at its own stage.
+  // Each gating refuses `absent_vault` at a stage the verb has no bank for: show each form only at its own stage.
+  // A verb comes three ways: its gating, its mutation options for the host's own `useMutation`, and its hook, which is
+  // the two together. The hook keys its mutation by the user the provider shows; the options, by whoever is signed in.
 
-  /** A form verb's mutation, keyed `verb` under the bank, with `gatingOf` as its `gating`. */
-  function useFormMutation<CleartextsT>(verb: string, gatingOf: (cleartexts: CleartextsT) => Gating): FormMutationResult<CleartextsT> {
-    return { ...useMutation({ ...FormMutationDefaults, mutationKey: ['sok', banklabel, verb] }), gating: gatingOf }
+  /** React Query's options for the form mutation keyed `verb` under `userid`'s bank. */
+  function formMutationOptionsOf(userid: Userid | null, verb: string): FormMutationOptions {
+    return mutationOptions({ ...FormMutationDefaults, mutationKey: formMutationKeyOf({ userid, banklabel, verb }) })
   }
+
+  /** The form mutation keyed `verb` under the bank of the user the provider shows, with `gatingOf` as its `gating`. */
+  function useFormMutation<CleartextsT>(verb: string, gatingOf: (cleartexts: CleartextsT) => Gating): FormMutationResult<CleartextsT> {
+    const userid = useShownSnapshot((snap) => snap.userid)
+    return { ...useMutation(formMutationOptionsOf(userid, verb)), gating: gatingOf }
+  }
+
+  /** The gating that births the bank under a new passphrase, for {@link birthMutationOptions}' mutation. */
+  function birthGating(cleartexts: BirthCleartexts): Gating { return Bank.birthGating(slot.demandDevice(), cleartexts) }
+
+  /** React Query's options for the mutation that births the bank, for the host's own `useMutation`: hand its `mutate` a {@link birthGating}.
+   * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
+   */
+  function birthMutationOptions(): FormMutationOptions { return formMutationOptionsOf(slot.device?.userid ?? null, 'birth') }
 
   /** The mutation that births the bank, at stage `unborn`, leaving it unlocked: hand it `birth.gating({ passphraseCleartext })`.
    * Disable the submit until the giver's `useStrengthVerdict` judges the passphrase strong.
    */
-  function useBirth(): FormMutationResult<BirthCleartexts> {
-    return useFormMutation('birth', (cleartexts: BirthCleartexts) => Bank.birthGating(slot.demandDevice(), cleartexts))
-  }
+  function useBirth(): FormMutationResult<BirthCleartexts> { return useFormMutation('birth', birthGating) }
+
+  /** The gating that unlocks the bank by its passphrase or its passkey, for {@link unlockMutationOptions}' mutation. */
+  function unlockGating(cleartexts: UnlockCleartexts): Gating { return slot.demandBank().unlockGating(cleartexts) }
+
+  /** React Query's options for the mutation that unlocks the bank, for the host's own `useMutation`: hand its `mutate` an {@link unlockGating}.
+   * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
+   * @example
+   *   const unlock = useMutation(Knock.unlockMutationOptions())
+   *   unlock.mutate(Knock.unlockGating({ passphraseCleartext }))
+   */
+  function unlockMutationOptions(): FormMutationOptions { return formMutationOptionsOf(slot.device?.userid ?? null, 'unlock') }
 
   /** The mutation that unlocks the bank by its passphrase or its passkey: hand it `unlock.gating({ passphraseCleartext })`.
    * Every {@link withWhisper} waiting resumes. A wrong passphrase or passkey refuses, and the bank stays locked.
@@ -422,34 +456,52 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
    *     unlock.mutate(unlock.gating({ passphraseCleartext }))
    *   }}>
    */
-  function useUnlock(): FormMutationResult<UnlockCleartexts> {
-    return useFormMutation('unlock', (cleartexts: UnlockCleartexts) => slot.demandBank().unlockGating(cleartexts))
-  }
+  function useUnlock(): FormMutationResult<UnlockCleartexts> { return useFormMutation('unlock', unlockGating) }
+
+  /** The gating that replaces the passphrase, proved by the current passphrase or the passkey, for {@link replacePassphraseMutationOptions}' mutation. */
+  function replacePassphraseGating(cleartexts: PassphraseReplaceCleartexts): Gating { return slot.demandBank().replacePassphraseGating(cleartexts) }
+
+  /** React Query's options for the mutation that replaces the passphrase, for the host's own `useMutation`: hand its `mutate` a {@link replacePassphraseGating}.
+   * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
+   */
+  function replacePassphraseMutationOptions(): FormMutationOptions { return formMutationOptionsOf(slot.device?.userid ?? null, 'replacePassphrase') }
 
   /** The mutation that replaces the passphrase, proved by the current passphrase or the passkey, leaving the bank unlocked.
    * Disable the submit until the giver's `useStrengthVerdict` judges the new passphrase strong.
    */
-  function useReplacePassphrase(): FormMutationResult<PassphraseReplaceCleartexts> {
-    return useFormMutation('replacePassphrase', (cleartexts: PassphraseReplaceCleartexts) => slot.demandBank().replacePassphraseGating(cleartexts))
-  }
+  function useReplacePassphrase(): FormMutationResult<PassphraseReplaceCleartexts> { return useFormMutation('replacePassphrase', replacePassphraseGating) }
+
+  /** The gating that adds a passkey, proved by the passphrase, for {@link addPasskeyMutationOptions}' mutation. */
+  function addPasskeyGating(cleartexts: PasskeyAddCleartexts): Gating { return slot.demandBank().addPasskeyGating(cleartexts) }
+
+  /** React Query's options for the mutation that adds a passkey, for the host's own `useMutation`: hand its `mutate` an {@link addPasskeyGating}.
+   * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
+   */
+  function addPasskeyMutationOptions(): FormMutationOptions { return formMutationOptionsOf(slot.device?.userid ?? null, 'addPasskey') }
 
   /** The mutation that adds a passkey, proved by the passphrase, leaving the bank unlocked.
    * Run the WebAuthn ceremony in the click handler, before anything slow (the browser requires it).
    */
-  function useAddPasskey(): FormMutationResult<PasskeyAddCleartexts> {
-    return useFormMutation('addPasskey', (cleartexts: PasskeyAddCleartexts) => slot.demandBank().addPasskeyGating(cleartexts))
-  }
+  function useAddPasskey(): FormMutationResult<PasskeyAddCleartexts> { return useFormMutation('addPasskey', addPasskeyGating) }
+
+  /** The gating that revokes the passkey, proved by the passphrase or the passkey, for {@link revokePasskeyMutationOptions}' mutation. */
+  function revokePasskeyGating(cleartexts: PasskeyRevokeCleartexts): Gating { return slot.demandBank().revokePasskeyGating(cleartexts) }
+
+  /** React Query's options for the mutation that revokes the passkey, for the host's own `useMutation`: hand its `mutate` a {@link revokePasskeyGating}.
+   * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
+   */
+  function revokePasskeyMutationOptions(): FormMutationOptions { return formMutationOptionsOf(slot.device?.userid ?? null, 'revokePasskey') }
 
   /** The mutation that revokes the passkey, proved by the passphrase or the passkey, leaving the bank unlocked. */
-  function useRevokePasskey(): FormMutationResult<PasskeyRevokeCleartexts> {
-    return useFormMutation('revokePasskey', (cleartexts: PasskeyRevokeCleartexts) => slot.demandBank().revokePasskeyGating(cleartexts))
-  }
+  function useRevokePasskey(): FormMutationResult<PasskeyRevokeCleartexts> { return useFormMutation('revokePasskey', revokePasskeyGating) }
 
   const useDraft = makeUseDraft(slot, { useBank, useBox, withWhisper })
 
   const bankGiver = Object.freeze({
-    useBank, usePasskeyHeader, useBox, useBoxList, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, useDraft, lock, dismissUnlock,
+    useBank, usePasskeyHeader, useBox, useBoxList, boxQuery, keys, withWhisper, putBoxOnce, delBoxOnce, putBoxAction, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
+    birthGating, unlockGating, replacePassphraseGating, addPasskeyGating, revokePasskeyGating,
+    birthMutationOptions, unlockMutationOptions, replacePassphraseMutationOptions, addPasskeyMutationOptions, revokePasskeyMutationOptions,
   })
   return { bankGiver, boxQueryOf }
 }

@@ -2,6 +2,7 @@
 
 import { type ReactNode, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
+import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { whisperTextOf } from '../giver/use-draft'
 import { PartsPhrases } from './phrases-parts'
@@ -10,8 +11,8 @@ import { PartsPhrases } from './phrases-parts'
 
 /** The props of a {@link WhisperText}. */
 export interface WhisperTextProps {
-  /** The giver's bank, `SOK.bank(banklabel)`. */
-  bank:      Pick<BankGiver, 'useBank' | 'withWhisper'>
+  /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
+  bank?:     Pick<BankGiver, 'useBank' | 'withWhisper'> | undefined
   /** The box's labelpath, as the bank's other hooks take it. */
   labelpath: string
   /** The field of the box's whisper to show. */
@@ -25,9 +26,10 @@ export interface WhisperTextProps {
 /** One field of a box's whisper, masked, with a Show / Hide button. Show writes the text into the page, never into React's state, and asks for the unlock form first on a locked bank.
  * Locking the bank hides it again.
  * @example
- *   <WhisperText bank={Knock} labelpath="openai" field="apiKey" />
+ *   <WhisperText labelpath="openai" field="apiKey" />
  */
-export function WhisperText({ bank, labelpath, field, masked = PartsPhrases.masked, onError }: Readonly<WhisperTextProps>) {
+export function WhisperText({ bank: bankProp, labelpath, field, masked = PartsPhrases.masked, onError }: Readonly<WhisperTextProps>) {
+  const bank = useGivenBank(bankProp)
   const isLocked = bank.useBank((snap) => snap.isLocked)
   const [reveal, setReveal] = useState<'hidden' | 'revealing' | 'shown'>('hidden')
   const textRef = useRef<HTMLSpanElement>(null)

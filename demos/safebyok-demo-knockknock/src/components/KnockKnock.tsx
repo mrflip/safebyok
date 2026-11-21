@@ -1,6 +1,6 @@
 import type { BankStage } from 'safebyok'
 import { CreateVaultForm, PasskeyUnlockButton, UnlockDialog, UnlockForm } from 'safebyok-react-lean/kit'
-import { Knock, SOK } from '../lib/sok'
+import { Knock } from '../lib/sok'
 import { KeyPanel } from './KeyPanel'
 import { KnockForm } from './KnockForm'
 import { WaysIn } from './WaysIn'
@@ -11,7 +11,7 @@ export function KnockKnock({ username }: Readonly<{ username: string | undefined
   return (
     <>
       {screenOf(bank.stage, username, bank.lastErr?.message)}
-      <UnlockDialog bank={Knock} username={username} />
+      <UnlockDialog username={username} />
     </>
   )
 }
@@ -34,7 +34,7 @@ function CreateVault({ username }: Readonly<{ username: string | undefined }>) {
   return (
     <section aria-labelledby="create-title">
       <h2 id="create-title">Create your vault</h2>
-      <CreateVaultForm giver={SOK} bank={Knock} username={username} />
+      <CreateVaultForm username={username} />
     </section>
   )
 }
@@ -58,8 +58,8 @@ function LockedPanel({ username }: Readonly<{ username: string | undefined }>) {
   return (
     <section aria-labelledby="locked-title" className="card">
       <h2 id="locked-title">Your vault is locked</h2>
-      <UnlockForm bank={Knock} username={username} />
-      <PasskeyUnlockButton bank={Knock} passkeyHeader={passkeyHeader} />
+      <UnlockForm username={username} />
+      <PasskeyUnlockButton passkeyHeader={passkeyHeader} />
     </section>
   )
 }

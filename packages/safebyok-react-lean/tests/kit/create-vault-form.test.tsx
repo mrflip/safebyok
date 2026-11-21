@@ -9,7 +9,7 @@ const NewPassphrase = 'a fake new passphrase'
 /** The bank's stage as a line of text, with the create-vault form while it is unborn. */
 function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
-  return (stage === 'unborn') ? <CreateVaultForm giver={world.SOK} bank={world.Bank} username="hue@example.com" /> : <p>{stage}</p>
+  return (stage === 'unborn') ? <CreateVaultForm username="hue@example.com" /> : <p>{stage}</p>
 }
 
 /** A world with nothing stored, rendered under its provider, once it shows the create-vault form. */

@@ -1,6 +1,7 @@
 /** `CreateVaultForm`, the form that births a bank under a new passphrase, with a strength meter and a confirmation field. */
 
 import { useId, useRef, useState } from 'react'
+import { useGivenBank, useGivenGiver } from '../giver/giver-context'
 import type { BankGiver, ReactGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
@@ -12,10 +13,10 @@ import { UsernameField } from './unlock-form'
 
 /** The props of a {@link CreateVaultForm}. */
 export interface CreateVaultFormProps {
-  /** The giver, for its strength checker. */
-  giver:     Pick<ReactGiver, 'useStrengthVerdict'>
-  /** The giver's bank, `SOK.bank(banklabel)`. */
-  bank:      Pick<BankGiver, 'useBirth'>
+  /** The giver, for its strength checker: the provider's, when left out. */
+  giver?:    Pick<ReactGiver, 'useStrengthVerdict'> | undefined
+  /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
+  bank?:     Pick<BankGiver, 'useBirth'> | undefined
   /** The account the passphrase is saved under in a password manager: the user's email, say. */
   username?: string | undefined
 }
@@ -24,9 +25,11 @@ export interface CreateVaultFormProps {
  * Its submit stays disabled until the passphrase is strong and the two match. The bank is left unlocked.
  * The passphrase never reaches React's state or the mutation's variables.
  * @example
- *   case 'unborn': return <CreateVaultForm giver={SOK} bank={Knock} username={user.email} />
+ *   case 'unborn': return <CreateVaultForm username={user.email} />
  */
-export function CreateVaultForm({ giver, bank, username }: Readonly<CreateVaultFormProps>) {
+export function CreateVaultForm({ giver: giverProp, bank: bankProp, username }: Readonly<CreateVaultFormProps>) {
+  const bank = useGivenBank(bankProp)
+  const giver = useGivenGiver(giverProp)
   const birth = bank.useBirth()
   const strength = giver.useStrengthVerdict()
   const chosenRef = useRef<HTMLInputElement>(null)

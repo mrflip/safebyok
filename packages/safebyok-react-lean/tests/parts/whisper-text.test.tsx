@@ -11,8 +11,8 @@ function KeyScreen({ world, onError }: Readonly<{ world: TH.ProviderWorld, onErr
   return (
     <>
       <p>{stage}</p>
-      <WhisperText bank={world.Bank} labelpath={TH.JokesPath} field="apiKey" onError={onError} />
-      <UnlockDialog bank={world.Bank} />
+      <WhisperText labelpath={TH.JokesPath} field="apiKey" onError={onError} />
+      <UnlockDialog />
     </>
   )
 }
