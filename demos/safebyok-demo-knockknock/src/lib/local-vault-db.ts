@@ -45,8 +45,8 @@ export class LocalStorageVaultDB extends MemoryVaultDB {
 /** Every bank saved in `storage`, skipping an entry that does not parse: a vault saved by an older demo reads as absent. */
 function savedBanksIn(storage: Storage): SavedBank[] {
   const saved: SavedBank[] = []
-  for (let at = 0; at < storage.length; at += 1) {
-    const ckey = storage.key(at)
+  for (let ii = 0; ii < storage.length; ii += 1) {
+    const ckey = storage.key(ii)
     if (ckey?.startsWith(SavedPrefix) !== true) { continue }
     try {
       const bank = JSON.parse(storage.getItem(ckey) ?? 'null') as Partial<SavedBank> | null

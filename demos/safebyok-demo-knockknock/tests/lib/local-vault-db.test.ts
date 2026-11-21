@@ -36,7 +36,7 @@ describe("LocalStorageVaultDB", () => {
     const storage = new Map<string, string>()
     const handed = {
       get length() { return storage.size },
-      key:        (at: number) => [...storage.keys()][at] ?? null,
+      key:        (idx: number) => [...storage.keys()][idx] ?? null,
       getItem:    (ckey: string) => storage.get(ckey) ?? null,
       setItem:    (ckey: string, text: string) => { storage.set(ckey, text) },
     } as unknown as Storage
