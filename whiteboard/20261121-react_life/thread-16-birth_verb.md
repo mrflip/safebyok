@@ -1,7 +1,7 @@
 # Thread 16: birth_verb (2026-11-21)
 
-Branch `20261121-birth_verb`, PR #813, cut from #811 (since merged; the PR's base is main). Proved: before the catch-up,
-safebyok 1346, safebyok-react-lean 251, knockknock 26, envman 24, each with lint and typecheck; `pnpm justify` pending.
+Branch `20261121-birth_verb`, PR #813, cut from #811 (since merged; the PR's base is main). Proved: `pnpm justify` green after
+the catch-up onto main (safebyok 1346, safebyok-react-lean 251, knockknock 26, envman 24, e2e 576, the rest as before).
 
 * **Built**:
   * **`device.birthGating(cleartexts)`** (`packages/safebyok/src/models/device.ts`, section *Starting*): the gating of
@@ -39,7 +39,7 @@ safebyok 1346, safebyok-react-lean 251, knockknock 26, envman 24, each with lint
   * **A sweep test changed**: device.test.ts's "does nothing on a device with no bank, which births one after it" now
     says `hello` before the sweep and births through `device.birthGating`. Its subject is unchanged.
 * **Discoveries**:
-  * #809, #810 and #811 merged while this thread was built, so the catch-up rebases onto main.
+  * #809, #810 and #811 merged while this thread was built, so the catch-up rebased onto main, cleanly.
 * **For the Coach**:
   * **The internal `keep` argument** on `Bank.birthGating`: is a third argument on a public static acceptable, or should
     `Bank.birthGating` leave the entry points?
