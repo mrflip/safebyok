@@ -54,12 +54,11 @@ function Opened({ isLocked, username }: Readonly<{ isLocked: boolean, username: 
 
 /** The unlock form, and the passkey's button where the vault has one. */
 function LockedPanel({ username }: Readonly<{ username: string | undefined }>) {
-  const passkeyHeader = Knock.usePasskeyHeader()
   return (
     <section aria-labelledby="locked-title" className="card">
       <h2 id="locked-title">Your vault is locked</h2>
       <UnlockForm username={username} />
-      <PasskeyUnlockButton passkeyHeader={passkeyHeader} />
+      <PasskeyUnlockButton />
     </section>
   )
 }

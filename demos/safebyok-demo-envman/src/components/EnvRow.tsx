@@ -1,8 +1,8 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { isVaultError } from 'safebyok'
 import type { EnvFields } from '../lib/env-form'
-import { DayMs, dayValueOf, envSidecarOf, isOverdueAt, valMaskOf } from '../lib/env-sidecar'
+import { DayMs, dayValueOf, envSidecarOf, isOverdueAt, valMaskOf, valRevealOf } from '../lib/env-sidecar'
 import { Envman } from '../lib/sok'
 import { EnvSettingsDialog } from './EnvSettingsDialog'
 import { ValInput } from './ValInput'
@@ -12,12 +12,29 @@ export function EnvRow({ labelpath }: Readonly<{ labelpath: string }>) {
   const { data: box } = Envman.useBox(labelpath)
   if (box === null) { return null }
   if (box === undefined) { return <li className="quiet">Loading…</li> }
-  return <EnvEditor labelpath={labelpath} />
+  return <EnvEditor labelpath={labelpath} revtok={box.revtok} />
+}
+
+/** The mask of the env's value to show: its last four characters while unlocked, the stored mask from its sidecar while locked.
+ * Keyed on the stage and the box's `revtok`, it answers again on a lock, an unlock or a save.
+ */
+function useValMask(labelpath: string, revtok: string): string | undefined {
+  const isLocked = Envman.useBank((bank) => bank.isLocked)
+  const { data: shown } = useQuery({
+    queryKey: ['valMask', labelpath, isLocked, revtok],
+    // The unlocked answer shows the value's last four characters: gcTime 0 drops it from the cache as the page locks, rather than keeping it five minutes.
+    gcTime:   0,
+    queryFn:  () => Envman.withLockableWhisper(labelpath, (whisper) => valRevealOf(String(whisper['val'])), {
+      ifLocked: (stored) => envSidecarOf(stored.sidecar).mask,
+    }),
+  })
+  return shown
 }
 
 /** An env's editor: its title and details, red when overdue for rotation, its value with Save and Undo, and the gear that opens its settings. */
-function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
+function EnvEditor({ labelpath, revtok }: Readonly<{ labelpath: string, revtok: string }>) {
   const draft = Envman.useDraft(labelpath)
+  const valMask = useValMask(labelpath, revtok)
   const [isSetting, setIsSetting] = useState(false)
   // When the row was first shown: a row left open for days does not turn red until the page is reloaded.
   const [shownAt] = useState(Date.now)
@@ -26,6 +43,12 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
     mutationFn: () => draft.put({
       sidecarOf: (whisper, sidecar) => (draft.isWhisperDirty ? { ...sidecar, last_rotated_at: Date.now(), mask: valMaskOf(String(whisper['val'])) } : sidecar),
     }),
+  })
+  // The library leaves an open draft alone on a lock: this demo empties it, so a value typed in stays nowhere once locked.
+  Envman.useStageChange((stage) => {
+    if (stage !== 'locked') { return }
+    save.reset()
+    draft.discard()
   })
   const env = envSidecarOf(draft.sidecar)
   const isOverdue = isOverdueAt(env, shownAt)
@@ -46,7 +69,7 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
       {(env.description !== '') && <p className="quiet">{env.description}</p>}
       <p className="quiet">Rotate every {Math.round(env.rotation_period_ms / DayMs)} days. Last rotated {dayValueOf(env.last_rotated_at)}.</p>
       <p className="row">
-        <ValInput draft={draft} mask={env.mask} label={`Value of ${title}`} />
+        <ValInput draft={draft} mask={valMask ?? env.mask} label={`Value of ${title}`} />
         <button type="button" disabled={(! draft.isDirty) || save.isPending} onClick={() => { save.mutate() }}>Save</button>
         <button type="button" disabled={! draft.isDirty} onClick={() => { save.reset(); draft.discard() }}>Undo</button>
       </p>

@@ -3,19 +3,20 @@
  */
 
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, mutationOptions, queryOptions, skipToken, useMutation, useMutationState, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  Bank, type BankSnapshot, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, type Gating, type KeyDeriver, Labelpath, type LiveOf,
+  Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, type Gating, type KeyDeriver, Labelpath, type LiveOf,
   type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
-  type TombstoneOf, type UnlockCleartexts, type Userid, type VaultDB, type Whisper,
+  type TombstoneOf, type UnlockCleartexts, type Userid, VaultError, type VaultDB, type Whisper,
 } from 'safebyok'
 import { FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, formMutationsKeyUnder, liveOf, recordQueryDefaults } from './giver-defaults'
 import { type Given, GiverContext } from './giver-context'
 import { type GiverConfig, type GiverSlotSnapshot, GiverSlot } from './giver-slot'
+import * as Phrases from './phrases-giver'
 import { type BoxQueryOpts, ScopeChecks } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
-// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, BoxQueryOptions, BoxQueries, PutBoxActionOpts, PutBoxActionResult, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
@@ -44,6 +45,12 @@ export type BoxQueryOptions = UseQueryOptions<BoxShown, Error, BoxSelected> & Re
 export type BoxQueries = Readonly<{
   /** The `queryOptions` of the box at `labelpath`. */
   box: (labelpath: string) => BoxQueryOptions
+}>
+
+/** What a {@link BankGiver.withLockableWhisper} calls in place of its callback on a locked bank. */
+export type WithLockableWhisperOpts<ResultT> = Readonly<{
+  /** Called with the box's stored record, its whisper sealed, while the bank is locked: answer from its sidecar. */
+  ifLocked: (box: LiveOf<BoxRecord>) => ResultT | Promise<ResultT>
 }>
 
 /** How a {@link BankGiver.putBoxAction} reads the form it is handed. */
@@ -210,6 +217,24 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     return useShownSnapshot((snap) => (select ? select(snap.bank) : snap.bank))
   }
 
+  /** Call `onChange` after each render that shows the bank at a new stage, with the stage before it: never on the first render.
+   * Use it to act on a lock, as to empty a form the user was typing a secret into.
+   * @example
+   *   Knock.useStageChange((stage) => { if (stage === 'locked') { draft.discard() } })
+   */
+  function useStageChange(onChange: (stage: BankStage, prevStage: BankStage) => void): void {
+    Checks.fn.parse(onChange)
+    const stage = useBank((snap) => snap.stage)
+    const prevStageRef = useRef(stage)
+    const changed = useEffectEvent((prevStage: BankStage) => { onChange(stage, prevStage) })
+    useEffect(() => {
+      const prevStage = prevStageRef.current
+      if (prevStage === stage) { return }
+      prevStageRef.current = stage
+      changed(prevStage)
+    }, [stage])
+  }
+
   // Cheat (react_life): the bank's snapshot does not carry its gate, so this reads the gate during render, and re-renders
   // on each change of stage and on each form mutation of the bank that succeeds, the ways a passkey comes and goes.
   /** The header of the bank's passkey, or null while it has none or there is no bank.
@@ -328,8 +353,34 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     const boxLabelpath = boxLabelpathOf(labelpath)
     Checks.fn.parse(fn)
     const device = slot.demandDevice()
+    // Awaited even once said: the hop keeps the bridge's synchronous invalidateQueries from re-entering the minder.
     await device.hello()
     return await slot.demandVault().withWhisper(boxLabelpath, (box) => fn(box.whisper, box))
+  }
+
+  /** Call `fn` with the box's whisper on an unlocked bank, and `opts.ifLocked` with its sealed record on a locked one, resolving what either resolves.
+   * Unlike {@link withWhisper}, it never waits for the unlock form. Key a query of it on `isLocked` and the box's `revtok`, so it answers again on a lock, an unlock or a write.
+   * Use the whisper only inside `fn`, and return only what is safe to retain.
+   * @example
+   *   const { data: shown } = useQuery({
+   *     queryKey: ['apiKeyMask', isLocked, box?.revtok],
+   *     enabled:  Boolean(box),
+   *     queryFn:  () => Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) }),
+   *   })
+   */
+  async function withLockableWhisper<ResultT>(
+    labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>, opts: WithLockableWhisperOpts<ResultT>,
+  ): Promise<ResultT> {
+    const boxLabelpath = boxLabelpathOf(labelpath)
+    Checks.fn.parse(fn)
+    const { ifLocked } = Checks.withLockableWhisperOpts.parse(opts) as WithLockableWhisperOpts<ResultT>
+    const device = slot.demandDevice()
+    await device.hello()
+    if (slot.demandBank().isUnlocked) { return await slot.demandVault().withWhisper(boxLabelpath, (box) => fn(box.whisper, box)) }
+    const box = liveOf(await getBoxShown(boxLabelpath))
+    // A sparse record has no sidecar to read, so it refuses as a deleted box does.
+    if ((box === null) || (box === undefined)) { throw new VaultError('absent_box', Phrases.BoxAbsent) }
+    return await ifLocked(box)
   }
 
   // Each write tries once. By the time it resolves, the minder has cached what was written, and the bridge has copied it
@@ -370,7 +421,7 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
    * @example
    *   const [put, putAction, isPutting] = useActionState(useMemo(() => Knock.putBoxAction('jokes', {
    *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
-   *     sidecarOf: (whisper) => ({ mask: maskOf(String(whisper['apiKey'])) }),
+   *     sidecarOf: (whisper) => ({ mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
    *   }), []), null)
    *   <form action={putAction}><input name="apiKey" type="password" /><button disabled={isPutting}>Save</button></form>
    */
@@ -498,7 +549,7 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
   const useDraft = makeUseDraft(slot, { useBank, useBox, withWhisper })
 
   const bankGiver = Object.freeze({
-    useBank, usePasskeyHeader, useBox, useBoxList, boxQuery, keys, withWhisper, putBoxOnce, delBoxOnce, putBoxAction, useDraft, lock, dismissUnlock,
+    useBank, useStageChange, usePasskeyHeader, useBox, useBoxList, boxQuery, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
     birthGating, unlockGating, replacePassphraseGating, addPasskeyGating, revokePasskeyGating,
     birthMutationOptions, unlockMutationOptions, replacePassphraseMutationOptions, addPasskeyMutationOptions, revokePasskeyMutationOptions,
@@ -538,12 +589,13 @@ function emptyForm(form: FormData): void {
 const Checks = Checkers('bad_record', ({ obj, str, fn, custom }) => {
   const boxLabelpath = custom<BoxLabelpath>((val) => (typeof val === 'string') && Labelpath.isBox(val), 'Expected the labelpath of a box, such as `openai`')
   return {
-    labelpath:        str.min(1),
+    labelpath:               str.min(1),
     boxLabelpath,
-    boxScoped:        obj({ labelpath: boxLabelpath }).loose(),
-    fn:               fn(),
-    putBoxActionOpts: obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional() }),
-    form:             custom<FormData>((val) => val instanceof FormData, 'Expected the FormData a form action is handed'),
+    boxScoped:               obj({ labelpath: boxLabelpath }).loose(),
+    fn:                      fn(),
+    withLockableWhisperOpts: obj({ ifLocked: fn<WithLockableWhisperOpts<unknown>['ifLocked']>() }),
+    putBoxActionOpts:        obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional() }),
+    form:                    custom<FormData>((val) => val instanceof FormData, 'Expected the FormData a form action is handed'),
   }
 })
 // --

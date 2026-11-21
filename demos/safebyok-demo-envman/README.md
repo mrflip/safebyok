@@ -19,11 +19,13 @@ pnpm demo:envman          # from the repo root: builds what the demo needs, then
   `UnlockDialog`, each finding its bank through the provider.
 * `src/components/EnvList.tsx`: `Envman.useBoxList()`, a row each.
 * `src/components/EnvRow.tsx`: each row's `Envman.useBox`, nothing for a deleted box, and `Envman.useDraft` for the
-  value's Save and Undo; Save stamps `last_rotated_at` when the value changed.
-* `src/components/ValInput.tsx`: the draft's `whisperField('val')` on a plain input, showing the stored mask until focused.
+  value's Save and Undo; Save stamps `last_rotated_at` when the value changed. The mask shown comes from
+  `Envman.withLockableWhisper`: the value's last four characters while unlocked, the stored mask while locked. On a
+  lock, `Envman.useStageChange` discards the row's open draft: the library leaves it alone, and this demo chooses to.
+* `src/components/ValInput.tsx`: the draft's `whisperField('val')` on a plain input, showing the mask until focused.
 * `src/components/EnvSettingsDialog.tsx`: the gear's dialog, the kit's `ModalDialog`, setting the draft's sidecar.
 * `src/components/AddEnvForm.tsx`: `Envman.putBoxAction` under `useActionState`, a new box under a minted label per
-  submit, its sidecar mask from `maskOf` (`tail: 0`).
+  submit, its sidecar mask from `mask` (`tail: 0`).
 * `src/lib/env-sidecar.ts`: the stored sidecar, `title`, `description`, `rotation_period_ms`, `last_rotated_at` and `mask`.
 
 ## Demo scaffolding

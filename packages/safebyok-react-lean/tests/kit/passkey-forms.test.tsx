@@ -10,8 +10,8 @@ const Passphrase = TH.TestPassphrase
 /** A passphrase one letter off the stored one. */
 const WrongPassphrase = 'correct horse battery stable'
 
-/** The bank's stage as a line of text, beside the form `kind` names. */
-function StageScreen({ world, kind, passkeyHeader = null }: Readonly<{ world: TH.ProviderWorld, kind: 'add' | 'revoke' | 'unlock', passkeyHeader?: WayinHeader | null }>) {
+/** The bank's stage as a line of text, beside the form `kind` names: an unlock button handed `passkeyHeader`, or none when it is undefined. */
+function StageScreen({ world, kind, passkeyHeader }: Readonly<{ world: TH.ProviderWorld, kind: 'add' | 'revoke' | 'unlock', passkeyHeader?: WayinHeader | null | undefined }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
@@ -24,7 +24,7 @@ function StageScreen({ world, kind, passkeyHeader = null }: Readonly<{ world: TH
 }
 
 /** A world with a bank stored, rendered with the form `kind` names under its provider, once it shows the bank locked. */
-async function renderWorld(kind: 'add' | 'revoke' | 'unlock', world?: TH.ProviderWorld, passkeyHeader: WayinHeader | null = null) {
+async function renderWorld(kind: 'add' | 'revoke' | 'unlock', world?: TH.ProviderWorld, passkeyHeader?: WayinHeader | null) {
   world ??= await TH.buildProviderWorld({ stored: 'jokes' })
   const rendered = render(TH.providerTreeOf(world, <StageScreen world={world} kind={kind} passkeyHeader={passkeyHeader} />, { userid: TH.ProviderUser }))
   await screen.findByText('locked')
@@ -151,6 +151,23 @@ describe("PasskeyUnlockButton", () => {
     await screen.findByText('unlocked')
     expect(authenticator.calls.get).to.have.lengthOf(1)
     expect(authenticator.answersHanded().every((answer) => answer.every((byte) => byte === 0))).to.be.true
+  })
+
+  // PasskeyUnlockButton @example
+  it("unlocks by the bank's own passkey when handed no header", async () => {
+    const authenticator = TH.installFakeAuthenticator()
+    const { world } = await buildPasskeyWorld()
+    await renderWorld('unlock', world)
+    fireEvent.click(await screen.findByRole('button', { name: 'Unlock with a passkey' }))
+    await screen.findByText('unlocked')
+    expect(authenticator.calls.get).to.have.lengthOf(1)
+  })
+
+  it("renders nothing for a header of null, even for a bank with a passkey", async () => {
+    TH.installFakeAuthenticator()
+    const { world } = await buildPasskeyWorld()
+    await renderWorld('unlock', world, null)
+    expect(screen.queryByRole('button')).to.be.null
   })
 
   it("renders nothing while the bank has no passkey", async () => {

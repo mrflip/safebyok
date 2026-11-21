@@ -26,6 +26,15 @@ const DatabaseUrl = 'postgres://hue:fake-password-42@db.example.test/envman'
 /** The OpenAI key Hue rotates to, an obvious fake. */
 const NextOpenaiKey = 'sk-proj-fake-fedcba9876543210'
 
+/** {@link OpenaiKey}'s mask as its sidecar stores it, no character of its tail shown: what a locked page shows. */
+const StoredMask = 'sk**********************'
+
+/** {@link OpenaiKey}'s mask with its last four characters: what an unlocked page shows. */
+const LiveMask = 'sk******************cdef'
+
+/** {@link NextOpenaiKey}'s mask with its last four characters. */
+const NextLiveMask = 'sk******************3210'
+
 /** The page as a fresh load finds it: the app's modules imported anew over what localStorage kept, and rendered. */
 async function loadPage() {
   cleanup()
@@ -121,7 +130,7 @@ describe("Envman", () => {
     expect(within(database).getByText('Last rotated 2020-01-01.', { exact: false })).to.exist
     expect(database.className).to.contain('overdue')
     expect(openai.className).not.to.contain('overdue')
-    expect(valInputOf(openai, 'OPENAI_API_KEY')).to.include({ type: 'password', value: '', placeholder: 'sk-proj…' })
+    expect(valInputOf(openai, 'OPENAI_API_KEY')).to.include({ type: 'password', value: '', placeholder: StoredMask })
     expectUnheld(reloaded)
   })
 
@@ -156,9 +165,43 @@ describe("Envman", () => {
     await screen.findByText('Your vault is unlocked.')
     const reloadedRow = await rowOf('DATABASE_URL')
     expect(reloadedRow.className).not.to.contain('overdue')
-    expect(valInputOf(reloadedRow, 'DATABASE_URL').placeholder).to.eq('sk-proj…')
+    await waitFor(() => { expect(valInputOf(reloadedRow, 'DATABASE_URL').placeholder).to.eq(NextLiveMask) })
     await revealIn(valInputOf(reloadedRow, 'DATABASE_URL'), NextOpenaiKey)
     expectUnheld(reloaded)
+  })
+
+  it("shows a value's last four characters while unlocked, and the stored mask while locked", async () => {
+    const page = await loadWithEnvs()
+    const input = valInputOf(await rowOf('OPENAI_API_KEY'), 'OPENAI_API_KEY')
+    await waitFor(() => { expect(input.placeholder).to.eq(LiveMask) })
+    fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
+    const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
+    await waitFor(() => { expect(input.placeholder).to.eq(StoredMask) })
+    TH.expectTextUnheld(OpenaiKey.slice(-4), page.container, page.client)
+    unlockIn(locked)
+    await screen.findByText('Your vault is unlocked.')
+    await waitFor(() => { expect(input.placeholder).to.eq(LiveMask) })
+    expectUnheld(page)
+  })
+
+  it("empties an open draft on Lock", async () => {
+    const page = await loadWithEnvs()
+    const row = await rowOf('OPENAI_API_KEY')
+    const input = valInputOf(row, 'OPENAI_API_KEY')
+    const undo = within(row).getByRole<HTMLButtonElement>('button', { name: 'Undo' })
+    await revealIn(input, OpenaiKey)
+    fireEvent.change(input, { target: { value: NextOpenaiKey } })
+    act(() => { input.blur() })
+    await waitFor(() => { expect(undo.disabled).to.eq(false) })
+    fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
+    const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
+    await waitFor(() => { expect(undo.disabled).to.eq(true) })
+    expect(input).to.include({ type: 'password', value: '' })
+    expectUnheld(page)
+    unlockIn(locked)
+    await screen.findByText('Your vault is unlocked.')
+    await revealIn(input, OpenaiKey)
+    expectUnheld(page)
   })
 
   it("back-dates and renames a secret through its settings, written on Save", async () => {

@@ -265,3 +265,25 @@ Steps to reproduce: focus a draft's field, write the box from another device, th
 Reasoning for wontfix: it needs a write from another device inside the moment between a focus and a keystroke, and what
 is written is what the user typed, over the newest revision. Catching it would mean a base pinned on every focus, or the
 whisper held outside its callback. Written by the react_life thread 9 worker, 2026-11-21, awaiting a ruling.
+
+### A lock that lands while `withLockableWhisper` takes its unlocked branch waits for the unlock form
+
+* current outcome: in `safebyok-react-lean`, `Knock.withLockableWhisper` reads whether the bank is unlocked once, then
+  either unseals the box through `withWhisper` or hands its stored record to `ifLocked`. A `lock()` that lands after
+  that read, but before `withWhisper` finds the bank unlocked, makes the call wait for the unlock form, as `withWhisper`
+  does, rather than answer through `ifLocked`. An unlock that lands after a locked read answers through `ifLocked` on an
+  unlocked bank.
+* alternatives:
+  - read the stage again inside `withWhisper`'s wait and fall back to `ifLocked`: a check for a crossing in the
+    unseal's path, and a way out of `ensureUnlocked` that no other caller has.
+  - hold a lock across the read and the unseal: a lock where none was needed.
+* workaround: none needed: a query keyed on `isLocked`, as the doc block's example is, asks again under the new stage,
+  and the answer from the old stage is filed under the old key. A user who meets the unlock form can cancel it.
+
+Steps to reproduce: call `withLockableWhisper` on an unlocked bank, with the vault's `withWhisper` stubbed to call
+`lock()` before it calls through.
+
+Reasoning for wontfix: a lock comes a few times a day, and the gap between the read and the unseal is a microtask or
+two (CLAUDE.md, *Hours separate updates*). Nothing is written, and no whisper is shown that the user did not ask for.
+A guard would sit in the unseal's path for a crossing. Written by the react_life thread 12 worker, 2026-11-21, awaiting
+a ruling.
