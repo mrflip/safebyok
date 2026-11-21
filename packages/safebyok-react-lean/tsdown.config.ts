@@ -19,7 +19,7 @@ export default defineConfig({
   clean:      true,
   // A checker's declared type refers to zod's types, through safebyok's validators. zod is a peer dependency
   // of safebyok, so any host that has the core already has it. Keep it external, like safebyok.
-  deps:       { neverBundle: [/^zod(\/|$)/] },
+  deps:       { neverBundle: [/^zod(\/|$)/, /^@tanstack\//] },
   exports:    { devExports: '@safebyok/source' },
   publint:    { level: 'warning' },
   attw:       { profile: 'strict', level: 'error' },

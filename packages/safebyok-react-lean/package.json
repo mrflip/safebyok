@@ -71,19 +71,46 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./parts": {
-      "@safebyok/source": "./src/parts/index.ts",
-      "import": "./dist/parts/index.js",
-      "require": "./dist/parts/index.cjs"
-    },
     "./kit": {
       "@safebyok/source": "./src/kit/index.ts",
       "import": "./dist/kit/index.js",
       "require": "./dist/kit/index.cjs"
     },
+    "./parts": {
+      "@safebyok/source": "./src/parts/index.ts",
+      "import": "./dist/parts/index.js",
+      "require": "./dist/parts/index.cjs"
+    },
     "./package.json": "./package.json"
   },
   "dependencies": {
     "safebyok": "workspace:*"
+  },
+  "publishConfig": {
+    "exports": {
+      ".": {
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./kit": {
+        "import": "./dist/kit/index.js",
+        "require": "./dist/kit/index.cjs"
+      },
+      "./parts": {
+        "import": "./dist/parts/index.js",
+        "require": "./dist/parts/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "parts": [
+        "./dist/parts/index.d.cts"
+      ],
+      "kit": [
+        "./dist/kit/index.d.cts"
+      ]
+    }
   }
 }
