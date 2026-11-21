@@ -125,7 +125,7 @@ Goal: everything a host calls on a bank's boxes.
 
 * `Vault` stands for one bank's boxes in this tab: it is born with its minder (and the Bank as the minder's friend), and
   carries the host-facing verbs below. Who makes it, and when, is startup work.
-* The minder keeps its own vaultDB (`MinderOpts.vaultDB`, as today) and asks the Bank only to make asks. Its calls to
+* The minder keeps its own vaultDB (`MinderOpts.vaultDB`, as today) and accepts only pre-formed asks. Its calls to
   the vaultDB are thin, doing no favors: the minder does only what TanStack needs of it.
 * The Bank's `tryGetBox`, `tryListBoxes`, `tryPutBox` and `tryDelBox` leave: they are a second, uncached path to the
   same rows, and a write through them leaves the minded car behind until the watch notice. Say so in the changeset.
