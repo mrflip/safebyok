@@ -1,4 +1,4 @@
-/** The bank's form verbs, each over real provings and its device's MemoryVaultDB, and the awaited `unlock` gating every verb resolves. */
+/** The gate's form verbs, each over real provings and its device's MemoryVaultDB, and the awaited `unlock` gating every verb resolves, through the bank's pass-throughs. */
 
 import { describe, expect, it, vi } from 'vitest'
 import { Errors } from 'safebyok-big/internals'
@@ -137,17 +137,19 @@ describe("bank.gate.unlock(cleartexts)", () => {
 })
 
 describe("bank.gate.replacePassphrase(cleartexts)", () => {
-  it("writes the main gate's next revision with the new passphrase's wayin, makes it the main gate, and unlocks under a lease citing it", async () => {
+  it("writes the main gate's next revision with the new passphrase's wayin, models it in the same Gate, and unlocks under a lease citing it", async () => {
     const passkeyCleartext = TH.passkeyAnswerOf()
     const { bank } = await TH.buildBornBank({ passkeyCleartext })
     bank.lock()
-    const ante = bank.gate.pickle()
+    const { gate } = bank
+    const ante = gate.pickle()
     const make = vi.spyOn(Lease, 'make')
     expect(await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })).to.equal(bank.gate)
     expect(bank.gate).to.include({ revseq: ante.revseq + 1, lifeseq: ante.lifeseq })
     expect(bank.gate.main.pickle()).to.not.deep.equal(ante.wayins.main)
     expect(bank.gate.passkey0!.pickle()).to.deep.equal(ante.wayins.passkey0)
     expect(await storedGateOf(bank)).to.deep.equal(bank.gate.pickle())
+    expect(bank.gate).to.equal(gate)
     expect(bank.isUnlocked).to.be.true
     expect(make.mock.calls[0]![0]).to.include({ gate_revtok: bank.gate.revtok, wayinkind: 'passphrase' })
   })

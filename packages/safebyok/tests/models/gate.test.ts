@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { Errors } from 'safebyok-big/internals'
+import { BaseBox } from '../../src/models/base-box'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
@@ -157,6 +159,13 @@ describe("what a gate shows", () => {
     expect(JSON.stringify(gate)).to.not.include('ciphertext_b64')
   })
 
+  it("fixes the fields of its life for good, and only its revision fields may be set again", async () => {
+    const gate = Gate.make(await gateRecordOf(), worldOpts())
+    const configurableOf = (fieldname: string) => Object.getOwnPropertyDescriptor(gate, fieldname)!.configurable
+    expect(['userid', 'banklabel', 'labelpath', 'label', 'lifepath', 'lifeseq', 'born_at'].map((fieldname) => configurableOf(fieldname))).to.not.include(true)
+    expect(['fmt', 'revtok', 'revseq', 'written_at', 'am'].map((fieldname) => configurableOf(fieldname))).to.not.include(false)
+  })
+
   it("keeps its Thing fields read-only", async () => {
     const gate = Gate.make(await gateRecordOf(), worldOpts())
     expect(() => { (gate as { revtok: unknown }).revtok = 'gate-revision-tok-other' }).to.throw(TypeError)
@@ -186,5 +195,106 @@ describe("gate.demandPasskeyAddable()", () => {
     expect(() => { gate.demandPasskeyAddable() }).to.not.throw()
     const both = Gate.make(await gateRecordOf(true), worldOpts())
     TH.expectSyncRefusal(() => { both.demandPasskeyAddable() })
+  })
+})
+
+/** A counter of the calls `subscribe` makes to a listener it is handed. */
+function countCalls(subscribe: (listener: () => void) => unknown): { readonly calls: number } {
+  const counter = { calls: 0 }
+  subscribe(() => { counter.calls += 1 })
+  return counter
+}
+
+describe("gate.subscribe(listener)", () => {
+  it("tells its subscribers of a lock, an unlock, a wait opened and dismissed, a gate change and its end, and of nothing after", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { gate } = bank
+    const counter = countCalls(gate.subscribe)
+    gate.lock()
+    expect([counter.calls, gate.isLocked]).to.deep.equal([1, true])
+    const ensuring = TH.expectRefusal(gate.ensureUnlocked(), 'dismissed')
+    expect([counter.calls, gate.isUnlockWanted]).to.deep.equal([2, true])
+    gate.dismissUnlock()
+    await ensuring
+    expect([counter.calls, gate.isUnlockWanted]).to.deep.equal([3, false])
+    await gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    expect([counter.calls, gate.isUnlocked]).to.deep.equal([4, true])
+    await gate.addPasskey({ passphraseCleartext: TH.TestPassphrase, nextPasskeyCleartext: TH.passkeyAnswerOf() })
+    expect(counter.calls).to.be.greaterThan(4)
+    const beforeSweep = counter.calls
+    gate.sweep()
+    expect(counter.calls).to.eq(beforeSweep + 1)
+    gate.lock()
+    expect(counter.calls).to.eq(beforeSweep + 1)
+  })
+
+  it("tells every subscriber when one throws, and passes the throw to the device's onBadNews", async () => {
+    const onBadNews = vi.fn()
+    const { bank } = await TH.buildBornBank({ device: TH.makeDevice({}, { onBadNews }) })
+    bank.gate.subscribe(() => { throw new Error('a bug in the host') })
+    const listener = vi.fn()
+    bank.gate.subscribe(listener)
+    bank.gate.lock()
+    expect(listener).toHaveBeenCalledOnce()
+    await TH.eventually(() => onBadNews.mock.calls.length === 1)
+  })
+
+  it("refuses a listener that is not a function", async () => {
+    const gate = Gate.make(await gateRecordOf(), worldOpts())
+    TH.expectSyncRefusal(() => gate.subscribe('call me' as never), 'bad_record')
+  })
+})
+
+describe("gate.seal(sealer, donor, publicProps, secretProps) and gate.unseal(sealer, record)", () => {
+  it("seal and unseal under the gate's lease while it is unlocked", async () => {
+    const { bank } = await TH.buildBornBank()
+    const box = await bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    expect(await bank.gate.unseal(BaseBox, box)).to.deep.include({ whisper: TH.Whisper })
+    expect(await bank.unsealBox(box)).to.deep.include({ whisper: TH.Whisper })
+  })
+
+  it("refuse 'bank_locked' while the gate is locked, and its end cause once it is swept", async () => {
+    const { bank } = await TH.buildBornBank()
+    const box = await bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    bank.gate.lock()
+    await TH.expectRefusal(bank.gate.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bank_locked')
+    await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'bank_locked')
+    bank.gate.sweep()
+    expect(await TH.expectRefusal(bank.gate.unseal(BaseBox, box), 'disabled')).to.equal(bank.gate.endCause)
+  })
+})
+
+describe("gate.sweep(endCause)", () => {
+  it("drops its lease, disables the gate for good, and rejects a waiter with the end cause given", async () => {
+    const { bank } = await TH.buildBornBank()
+    const { gate } = bank
+    gate.lock()
+    const endCause = new Errors.VaultError('disabled', 'the bank was swept')
+    const ensuring = TH.expectRefusal(gate.ensureUnlocked(), 'disabled')
+    gate.sweep(endCause)
+    expect(await ensuring).to.equal(endCause)
+    expect([gate.isEnabled, gate.isLocked, gate.endCause]).to.deep.equal([false, true, endCause])
+    gate.sweep(new Errors.VaultError('disabled', 'a second sweep'))
+    expect(gate.endCause).to.equal(endCause)
+    expect(bank.isEnabled).to.be.true
+  })
+
+  it("takes its device's end cause, or a 'disabled' refusal of its own, where none is given", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.gate.sweep()
+    expect(bank.gate.endCause).to.include({ refusalkind: 'disabled' })
+    expect(TH.expectSyncRefusal(() => bank.gate.demandEnabled(), 'disabled')).to.equal(bank.gate.endCause)
+  })
+
+  it("is swept with its bank's end cause as its bank is swept", async () => {
+    const { bank } = await TH.buildBornBank()
+    bank.sweep()
+    expect(bank.gate.endCause).to.equal(bank.endCause)
+  })
+
+  it("refuses an end cause that is not a VaultError, leaving the gate enabled", async () => {
+    const gate = Gate.make(await gateRecordOf(), worldOpts())
+    TH.expectSyncRefusal(() => gate.sweep(new Error('not a refusal') as never), 'bad_record')
+    expect(gate.isEnabled).to.be.true
   })
 })
