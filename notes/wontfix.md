@@ -256,7 +256,7 @@ the react_life thread 9 worker, 2026-11-21, awaiting a ruling.
   older field.
 * alternatives:
   - base the draft at the reveal: every focus would pin a base, and a draft merely looked at would go behind.
-  - compare the revealed field with the newer revision's: holds the whisper outside the callback, against rule 2.
+  - compare the revealed field with the newer revision's: holds the whisper outside its callback, where React, a cache and a FormData must never have it.
 * workaround: none needed: the field the user typed is theirs to write, and the newer revision's other fields and
   sidecar are what the draft starts from.
 
