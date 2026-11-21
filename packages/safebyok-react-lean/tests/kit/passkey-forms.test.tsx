@@ -153,6 +153,7 @@ describe("PasskeyUnlockButton", () => {
     expect(authenticator.answersHanded().every((answer) => answer.every((byte) => byte === 0))).to.be.true
   })
 
+  // PasskeyUnlockButton @example
   it("unlocks by the bank's own passkey when handed no header", async () => {
     const authenticator = TH.installFakeAuthenticator()
     const { world } = await buildPasskeyWorld()
