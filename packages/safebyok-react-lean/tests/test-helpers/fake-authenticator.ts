@@ -30,7 +30,7 @@ export function installFakeAuthenticator(opts: FakeAuthenticatorOpts = {}) {
   let refusal: string | null = null
 
   // Before it responds, each call throws, if the test asked it to.
-  const asTold = () => {
+  function asTold(): void {
     const errname = refusal
     refusal = null
     if (errname !== null) { throw new DOMException('The fake authenticator refused, as told.', errname) }
@@ -38,7 +38,7 @@ export function installFakeAuthenticator(opts: FakeAuthenticatorOpts = {}) {
   /** A credential as the fake returns it: only the parts of a PublicKeyCredential that the helpers read. */
   type FakeCredential = { type: 'public-key', id: string, rawId: ArrayBuffer, getClientExtensionResults: () => AuthenticationExtensionsClientOutputs }
   // `prf` describes the PRF extension's result: null for no result at all, otherwise an output computed over `salt` when one is given.
-  const credentialOf = async (credential_id: string, prf: { enabled?: true, salt: BufferSource | undefined } | null): Promise<FakeCredential> => {
+  async function credentialOf(credential_id: string, prf: { enabled?: true, salt: BufferSource | undefined } | null): Promise<FakeCredential> {
     const answered: AuthenticationExtensionsPRFOutputs = { ...(prf?.enabled && { enabled: true }) }
     if (prf?.salt !== undefined) {
       const first = new Uint8Array(await prfOf(secrets.get(credential_id)!, prf.salt))
