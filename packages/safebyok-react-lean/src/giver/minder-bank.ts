@@ -1,6 +1,5 @@
 /** A giver's bank over a vault in the new core, or over a bank's minder alone, for a Device to hand the giver. */
 
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import { type BoxLabelpath, type BoxRecord, type Tombstone, Bank, Checkers, Labelpath, MinderEventFormat, ThingMinder, Vault } from 'safebyok'
 import type { GiverBank, GiverEvent } from './shapes-giver'
 
