@@ -62,7 +62,7 @@ describe("Bank.makeRecord(dna)", () => {
     const { record, bank } = await TH.buildBornBank()
     expect(record).to.include({ ...TH.WorldBankStamp, labelpath: 'bank', label: 'bank', fmt: ThingFormat, revseq: 0, am: 'a', lifepath: Life0, written_at: TH.T0 })
     expect(record.maingate).to.include({ ...TH.WorldGateStamp, label: 'gate', fmt: ThingFormat, revseq: 0, am: 'a', lifepath: Life0, written_at: TH.T0 })
-    expect(record.maingate.wayins).to.deep.equal({ main: bank.maingate.main.pickle(), passkey0: null })
+    expect(record.maingate.wayins).to.deep.equal({ main: bank.gate.main.pickle(), passkey0: null })
     expect(Object.keys(record)).to.have.members([...BankFields, 'maingate', 'rootBox'])
   })
 
@@ -83,7 +83,7 @@ describe("Bank.makeRecord(dna)", () => {
   it("refuses a dna with no lifeseq", async () => {
     const { record, device } = await TH.buildBornBank()
     const bank = Bank.make(record, { device, vaultDB: device.vaultDB })
-    const dna = { ...TH.omitting(TH.WorldBankStamp, 'lifeseq'), maingate: { ...TH.WorldGateStamp, wayins: { main: bank.maingate.main, passkey0: null } } }
+    const dna = { ...TH.omitting(TH.WorldBankStamp, 'lifeseq'), maingate: { ...TH.WorldGateStamp, wayins: { main: bank.gate.main, passkey0: null } } }
     TH.expectSyncRefusal(() => Bank.makeRecord(dna), 'bad_record')
   })
 })
@@ -98,9 +98,9 @@ describe("Bank.make(record, { device, vaultDB })", () => {
     expect(bank.scope).to.deep.equal(TH.ThingBank)
     expect(bank.device).to.equal(device)
     expect(bank.device_tok).to.eq(TH.DeviceTok)
-    expect(bank.maingate).to.be.instanceOf(Gate)
-    expect(bank.maingate.pickle()).to.deep.equal(record.maingate)
-    expect(bank.maingate.bankStamp).to.deep.equal(TH.WorldBankStamp)
+    expect(bank.gate).to.be.instanceOf(Gate)
+    expect(bank.gate.pickle()).to.deep.equal(record.maingate)
+    expect(bank.gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
     expect(bank.rootBox).to.deep.equal(record.rootBox)
     expect([bank.revtok, bank.revseq, bank.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
   })
@@ -170,7 +170,7 @@ describe("Bank.make(record, { device, vaultDB })", () => {
   it("accepts a main gate of a later life of its own", async () => {
     const { record, device } = await TH.buildBornBank()
     const bank = Bank.make({ ...record, maingate: { ...record.maingate, lifeseq: Life2, lifepath: Life2 } }, { device, vaultDB: device.vaultDB })
-    expect(bank.maingate.lifeseq).to.eq(Life2)
+    expect(bank.gate.lifeseq).to.eq(Life2)
   })
 
   const OtherRootCases = [
@@ -283,7 +283,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(locked).to.deep.equal({ stage: 'locked', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false })
     expect(bank.getSnapshot()).to.equal(locked)
 
-    await TH.expectGood(bank.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
+    await TH.expectGood(bank.gate.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
     expect(counter.calls).to.eq(2)
     expect(bank.getSnapshot()).to.deep.equal(unlocked)
 
@@ -301,7 +301,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     expect(bank.getSnapshot()).to.equal(unlocked)
     bank.lock()
     bank.lock()
-    await TH.expectBad(bank.tryUnlock({ passphraseCleartext: 'not the passphrase' }), 'wrong_passphrase')
+    await TH.expectBad(bank.gate.tryUnlock({ passphraseCleartext: 'not the passphrase' }), 'wrong_passphrase')
     expect(counter.calls).to.eq(1)
     bank.sweep()
     bank.sweep()
@@ -429,7 +429,7 @@ describe("bank.sealBox(donor, publicProps, secretProps) and bank.unsealBox(box)"
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
-    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     const { whisper } = await bank.unsealBox(box)
     expect(whisper).to.deep.equal(TH.Whisper)
   })
@@ -711,7 +711,7 @@ function nextBankThingOf(bank: Bank) {
 describe("bank.track, and the asks the bank builds", () => {
   it("track the revseq and lifepath this object has of the bank, its main gate and its root box", async () => {
     const { bank } = await TH.buildBornBank()
-    expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.maingate.pickle(), bank.rootBox as never))
+    expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox as never))
   })
 
   it("fill in the bank's scope, the modelkind, the default flags and the track", async () => {

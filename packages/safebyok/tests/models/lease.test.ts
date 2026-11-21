@@ -48,18 +48,18 @@ async function provingWithWayin(): Promise<PassphraseProving> {
   return proving
 }
 
-/** A lease on a fake bank, beside that bank, the record it was made of, and the proving that built it. */
+/** A lease granted to a fake gate, beside that gate, the record it was made of, and the proving that built it. */
 async function leaseWorld() {
   const proving = await provingWithWayin()
-  const bank = TH.fakeLeaseBankOf()
-  const { lease, record } = await TH._cheat_grantedLease(proving, bank)
-  return { proving, bank, lease, record }
+  const gate = TH.fakeLeaseGateOf()
+  const { lease, record } = await TH._cheat_grantedLease(proving, gate)
+  return { proving, gate, lease, record }
 }
 
-describe("Lease.make(record, { bank })", () => {
+describe("Lease.make(record, { gate })", () => {
   it("makes a lease of the record, showing its stamp, in force", async () => {
-    const { bank, record } = await leaseWorld()
-    const lease = Lease.make(record, { bank })
+    const { gate, record } = await leaseWorld()
+    const lease = Lease.make(record, { gate })
     expect(lease).to.deep.include(Stamped)
     expect(lease.isEvicted).to.be.false
     expect(lease.modelkind).to.eq('lease')
@@ -74,9 +74,9 @@ describe("Lease.make(record, { bank })", () => {
   })
 
   it("opens what another lease of the same record sealed", async () => {
-    const { bank, lease, record } = await leaseWorld()
+    const { gate, lease, record } = await leaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
-    expect(await Lease.make(record, { bank }).unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
+    expect(await Lease.make(record, { gate }).unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
   })
 
   const MalformedCases = [
@@ -92,16 +92,16 @@ describe("Lease.make(record, { bank })", () => {
 
   for (const [tamper, blurb] of MalformedCases) {
     it(`refuses a record ${blurb}, quoting none of it`, async () => {
-      const { bank, record } = await leaseWorld()
-      const err = TH.expectSyncRefusal(() => Lease.make(tamper(record) as never, { bank }), 'bad_record')
+      const { gate, record } = await leaseWorld()
+      const err = TH.expectSyncRefusal(() => Lease.make(tamper(record) as never, { gate }), 'bad_record')
       expect(TH.thrownText(err)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
     })
   }
 
   it("refuses a record whose leaseKey is an extractable key", async () => {
-    const { bank, record } = await leaseWorld()
+    const { gate, record } = await leaseWorld()
     const bankKey = await Crypto.makeBankKey()
-    TH.expectSyncRefusal(() => Lease.make({ ...record, lease_key: bankKey }, { bank }), 'bad_record')
+    TH.expectSyncRefusal(() => Lease.make({ ...record, lease_key: bankKey }, { gate }), 'bad_record')
   })
 
   const OtherBankCases = [
@@ -112,18 +112,18 @@ describe("Lease.make(record, { bank })", () => {
   ] as const
 
   for (const [stamp, blurb] of OtherBankCases) {
-    it(`refuses a bank of ${blurb}`, async () => {
+    it(`refuses a gate of ${blurb}`, async () => {
       const { record } = await leaseWorld()
-      TH.expectSyncRefusal(() => Lease.make(record, { bank: TH.fakeLeaseBankOf(stamp) }), 'damaged_lease')
+      TH.expectSyncRefusal(() => Lease.make(record, { gate: TH.fakeLeaseGateOf(stamp) }), 'damaged_lease')
     })
   }
 
-  it("refuses a bank with no lock, one with no stamp, one with no enabled check, and no opts at all", async () => {
+  it("refuses a gate with no lock, one with no bank stamp, one with no enabled check, and no opts at all", async () => {
     const { record } = await leaseWorld()
-    const { isEnabled: _isEnabled, demandEnabled: _demandEnabled, ...unchecked } = TH.fakeLeaseBankOf()
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), lock: undefined } } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: { ...TH.fakeLeaseBankOf(), stamp: undefined } } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Lease.make(record, { bank: unchecked } as never), 'bad_record')
+    const { isEnabled: _isEnabled, demandEnabled: _demandEnabled, ...unchecked } = TH.fakeLeaseGateOf()
+    TH.expectSyncRefusal(() => Lease.make(record, { gate: { ...TH.fakeLeaseGateOf(), lock: undefined } } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Lease.make(record, { gate: { ...TH.fakeLeaseGateOf(), bankStamp: undefined } } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Lease.make(record, { gate: unchecked } as never), 'bad_record')
     TH.expectSyncRefusal(() => Lease.make(record, undefined as never), 'bad_record')
   })
 })
@@ -248,11 +248,11 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(nextRevisionOf.mock.calls[0]?.[0]).to.not.have.any.keys('whisper', 'notes_sealed')
   })
 
-  it("binds the bank's stamp first, its fields alone: a field beside them on the bank binds nothing", async () => {
+  it("binds the bank's stamp first, its fields alone: a field beside them on the gate's bankStamp binds nothing", async () => {
     const proving = await provingWithWayin()
-    const { lease: plain } = await TH._cheat_grantedLease(proving, TH.fakeLeaseBankOf())
-    const padded = TH.fakeLeaseBankOf()
-    const { lease } = await TH._cheat_grantedLease(proving, { ...padded, stamp: { ...padded.stamp, lifepath: 'not-a-stamp-field' } } as never)
+    const { lease: plain } = await TH._cheat_grantedLease(proving, TH.fakeLeaseGateOf())
+    const padded = TH.fakeLeaseGateOf()
+    const { lease } = await TH._cheat_grantedLease(proving, { ...padded, bankStamp: { ...padded.bankStamp, lifepath: 'not-a-stamp-field' } } as never)
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     expect(await plain.unseal(BaseBox, sealed)).to.deep.include(Cleartexts)
   })
@@ -310,11 +310,11 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
   }
 
   it("refuses 'damaged_whisper' for what another bankKey sealed, and locks nothing", async () => {
-    const { bank, lease } = await leaseWorld()
-    const { lease: other } = await TH._cheat_grantedLease(await provingWithWayin(), TH.fakeLeaseBankOf())
+    const { gate, lease } = await leaseWorld()
+    const { lease: other } = await TH._cheat_grantedLease(await provingWithWayin(), TH.fakeLeaseGateOf())
     const sealed = await other.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'damaged_whisper')
-    expect(bank.lock).not.toHaveBeenCalled()
+    expect(gate.lock).not.toHaveBeenCalled()
     expect(lease.isEvicted).to.be.false
   })
 })
@@ -328,13 +328,13 @@ describe("withoutSecrets(bag)", () => {
 
 describe("lease.evict() and isEvicted", () => {
   it("drops the keys, so that a seal or an unseal refuses 'bank_locked', and locks nothing", async () => {
-    const { bank, lease } = await leaseWorld()
+    const { gate, lease } = await leaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     lease.evict()
     expect(lease.isEvicted).to.be.true
     await TH.expectRefusal(lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'bank_locked')
     await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'bank_locked')
-    expect(bank.lock).not.toHaveBeenCalled()
+    expect(gate.lock).not.toHaveBeenCalled()
   })
 
   it("is idempotent", async () => {
@@ -352,15 +352,15 @@ describe("lease.evict() and isEvicted", () => {
   })
 })
 
-/** A lease on a bank born on a device of its own, beside the bank and device. */
+/** A lease granted to the gate of a bank born on a device of its own, beside the bank and device. */
 async function bornLeaseWorld() {
   const { bank, device, proving } = await TH.buildBornBank()
-  const { lease } = await TH._cheat_grantedLease(proving, bank)
+  const { lease } = await TH._cheat_grantedLease(proving, bank.gate)
   return { bank, device, lease }
 }
 
-describe("lease.isEnabled and lease.demandEnabled(), over its bank", () => {
-  it("is enabled while in force on an enabled bank, and not once evicted", async () => {
+describe("lease.isEnabled and lease.demandEnabled(), over its gate", () => {
+  it("is enabled while in force on an enabled gate, and not once evicted", async () => {
     const { lease } = await bornLeaseWorld()
     expect(lease.isEnabled).to.be.true
     expect(lease.demandEnabled()).to.equal(lease)
@@ -369,23 +369,23 @@ describe("lease.isEnabled and lease.demandEnabled(), over its bank", () => {
     TH.expectSyncRefusal(() => lease.demandEnabled(), 'bank_locked')
   })
 
-  it("is not enabled once its bank is swept, though not evicted, and throws the bank's refusal before 'bank_locked'", async () => {
+  it("is not enabled once its bank is swept, though not evicted, and throws the gate's refusal before 'bank_locked'", async () => {
     const { bank, lease } = await bornLeaseWorld()
     bank.sweep()
     expect([lease.isEnabled, lease.isEvicted]).to.deep.equal([false, false])
     const swept = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
     lease.evict()
     const sweptAndEvicted = TH.expectSyncRefusal(() => lease.demandEnabled(), 'disabled')
-    expect([swept, sweptAndEvicted]).to.deep.equal([bank.endCause, bank.endCause])
+    expect([swept, sweptAndEvicted]).to.deep.equal([bank.gate.endCause, bank.gate.endCause])
   })
 
-  it("refuses a seal and an unseal with the bank's refusal once the device is swept", async () => {
+  it("refuses a seal and an unseal with the gate's refusal once the device is swept", async () => {
     const { bank, device, lease } = await bornLeaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const shell = TH.boxShellOf()
     device.sweep()
-    expect(await TH.expectRefusal(lease.seal(BaseBox, shell, PublicProps, Cleartexts), 'disabled')).to.equal(bank.endCause)
-    expect(await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')).to.equal(bank.endCause)
+    expect(await TH.expectRefusal(lease.seal(BaseBox, shell, PublicProps, Cleartexts), 'disabled')).to.equal(bank.gate.endCause)
+    expect(await TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')).to.equal(bank.gate.endCause)
   })
 
   // As a lock refuses a seal or an unseal under way, so does a sweep.
@@ -395,8 +395,8 @@ describe("lease.isEnabled and lease.demandEnabled(), over its bank", () => {
     const sealing = TH.expectRefusal(lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'disabled')
     const unsealing = TH.expectRefusal(lease.unseal(BaseBox, sealed), 'disabled')
     device.sweep()
-    expect(await sealing).to.equal(bank.endCause)
-    expect(await unsealing).to.equal(bank.endCause)
+    expect(await sealing).to.equal(bank.gate.endCause)
+    expect(await unsealing).to.equal(bank.gate.endCause)
   })
 })
 
@@ -412,30 +412,30 @@ describe("a tampered lease record", () => {
   ] as const
 
   for (const [tamper, blurb] of TamperCases) {
-    it(`with ${blurb} locks its bank at its first unseal, and is evicted`, async () => {
-      const { proving, bank, lease, record } = await leaseWorld()
+    it(`with ${blurb} locks its gate at its first unseal, and is evicted`, async () => {
+      const { proving, gate, lease, record } = await leaseWorld()
       const sealed = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
-      const { record: other } = await TH._cheat_grantedLease(proving, bank)
-      const tampered = Lease.make(tamper(record, other) as LeaseRecord, { bank })
+      const { record: other } = await TH._cheat_grantedLease(proving, gate)
+      const tampered = Lease.make(tamper(record, other) as LeaseRecord, { gate })
       const err = await TH.expectRefusal(tampered.unseal(BaseBox, sealed), 'damaged_lease')
       expect(TH.thrownText(err)).to.not.include(record.bank_key_lease_wrapped.ciphertext_b64)
-      expect(bank.lock).toHaveBeenCalledTimes(1)
+      expect(gate.lock).toHaveBeenCalledTimes(1)
       expect(tampered.isEvicted).to.be.true
       await TH.expectRefusal(tampered.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'bank_locked')
-      expect(bank.lock).toHaveBeenCalledTimes(1)
+      expect(gate.lock).toHaveBeenCalledTimes(1)
     })
   }
 
   it("refuses at its first seal too, sealing nothing", async () => {
-    const { bank, record } = await leaseWorld()
-    const tampered = Lease.make({ ...record, proved_at: TH.T0 + 1 }, { bank })
+    const { gate, record } = await leaseWorld()
+    const tampered = Lease.make({ ...record, proved_at: TH.T0 + 1 }, { gate })
     await TH.expectRefusal(tampered.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'damaged_lease')
-    expect(bank.lock).toHaveBeenCalledTimes(1)
+    expect(gate.lock).toHaveBeenCalledTimes(1)
   })
 })
 
 describe("what a lease shows", () => {
-  it("Object.keys shows its stamp alone: no leaseKey, no wrapped bankKey, no bank", async () => {
+  it("Object.keys shows its stamp alone: no leaseKey, no wrapped bankKey, no gate", async () => {
     const { lease } = await leaseWorld()
     expect(Object.keys(lease)).to.have.members(StampFieldnames)
   })

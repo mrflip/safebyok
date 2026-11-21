@@ -162,7 +162,7 @@ describe("device.hello()", () => {
     expect(device.bank!.scope).to.deep.equal(born.bank.scope)
     expect(device.vault!.bank).to.equal(device.bank)
     expect(device.vault!.minder).to.equal(device.minder)
-    await TH.expectGood(device.bank!.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
+    await TH.expectGood(device.bank!.gate.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))
     expect(device.getSnapshot().bank).to.include({ stage: 'unlocked' })
   })
 
@@ -346,8 +346,8 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     const snapshots = snapshotsOf(device)
     const ensuring = bank.ensureUnlocked()
     const passphraseCleartext = 'not the passphrase, though long enough'
-    await TH.expectRefusal(bank.unlock({ passphraseCleartext }), 'wrong_passphrase')
-    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext }), 'wrong_passphrase')
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     await ensuring
     expect(snapshots.map(({ bank: { stage, isUnlockWanted } }) => ({ stage, isUnlockWanted }))).to.deep.equal([
       { stage: 'locked', isUnlockWanted: true },

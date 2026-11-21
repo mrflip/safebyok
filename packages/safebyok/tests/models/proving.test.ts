@@ -42,17 +42,20 @@ function novelPasskey(answer = TH.passkeyAnswerOf(), device: ProvingDevice = TH.
 async function gateWithBoth(): Promise<{ gate: Gate, answerOf: () => GX.PasskeyAnswer }> {
   const answer = TH.passkeyAnswerOf()
   const { bank } = await TH.buildBornBank({ passkeyCleartext: TH.copyOfAnswer(answer) })
-  return { gate: bank.maingate, answerOf: () => TH.copyOfAnswer(answer) }
+  return { gate: bank.gate, answerOf: () => TH.copyOfAnswer(answer) }
 }
 
 /** The main gate of a bank born with its passphrase's wayin alone. */
 async function gateWithPassphrase(): Promise<Gate> {
   const { bank } = await TH.buildBornBank()
-  return bank.maingate
+  return bank.gate
 }
 
 /** The gate of `record`, of {@link TH.WorldBankStamp}'s bank. */
-function gateOf(record: unknown): Gate { return Gate.make(record as never, { bank: { stamp: TH.WorldBankStamp } }) }
+function gateOf(record: unknown): Gate {
+  const device = TH.makeDevice()
+  return Gate.make(record as never, { device, vaultDB: device.vaultDB, bankStamp: TH.WorldBankStamp })
+}
 
 /** The arguments of a proving of `gate`, under a bank's stamp and a gate's stamp each moved by `moves`: the stamps a Gate would refuse to be made under. */
 function movedGate(gate: Gate, moves: { bank?: object, gate?: object }): StampedGate {
@@ -68,7 +71,7 @@ function findsStrongAsync() { return Promise.resolve({ strong: true as const }) 
 
 /** Checks that `one`'s lease unseals what `other`'s seals: that both have one bankKey. */
 async function expectOneBankKey(one: Proving, other: Proving): Promise<void> {
-  const bank = TH.fakeLeaseBankOf()
+  const bank = TH.fakeLeaseGateOf()
   const sealer = await one.buildLease(bank, TH.WorldGate)
   const opener = await other.buildLease(bank, TH.WorldGate)
   const sealed = await sealer.seal(BaseBox, TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: { apiKey: 'sk-test-5678' } })
@@ -609,12 +612,12 @@ describe("a passkey proving's passkeyKey", () => {
 describe("proving.buildLease(bank, gate)", () => {
   it("refuses before the proving has made a wayin", async () => {
     const proving = await novelPassphrase()
-    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), TH.WorldGate))
+    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseGateOf(), TH.WorldGate))
   })
 
   it("builds a lease on the bank that cites the gate, and records its proved_at and the wayinkind", async () => {
     const { gate, answerOf } = await gateWithBoth()
-    const bank = TH.fakeLeaseBankOf()
+    const bank = TH.fakeLeaseGateOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(bank, gate)
     expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gate_labelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
@@ -625,7 +628,7 @@ describe("proving.buildLease(bank, gate)", () => {
   it("records the revision of the gate cited", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    const lease = await proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, revtok: TH.revtokOf('gate5') })
+    const lease = await proving.buildLease(TH.fakeLeaseGateOf(), { ...TH.WorldGate, revtok: TH.revtokOf('gate5') })
     expect(lease.gate_revtok).to.eq(TH.revtokOf('gate5'))
   })
 
@@ -647,7 +650,7 @@ describe("proving.buildLease(bank, gate)", () => {
     it(`refuses a bank of ${blurb}`, async () => {
       const proving = await novelPassphrase()
       await proving.buildWayin(NOVEL)
-      const err = await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(stamp), TH.WorldGate))
+      const err = await TH.expectRefusal(proving.buildLease(TH.fakeLeaseGateOf(stamp), TH.WorldGate))
       expect(err.message).to.eq(Phrases.LeaseOfOtherGate)
     })
   }
@@ -655,15 +658,15 @@ describe("proving.buildLease(bank, gate)", () => {
   it("refuses to cite another life of the gate proved", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    const err = await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), { ...TH.WorldGate, lifeseq: Lifeseq.ofLifenum(2) }))
+    const err = await TH.expectRefusal(proving.buildLease(TH.fakeLeaseGateOf(), { ...TH.WorldGate, lifeseq: Lifeseq.ofLifenum(2) }))
     expect(err.message).to.eq(Phrases.LeaseOfOtherGate)
   })
 
   it("refuses a gate cited with no revtok, or none at all, and a bank with no lock", async () => {
     const proving = await novelPassphrase()
     await proving.buildWayin(NOVEL)
-    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), TH.omitting(TH.WorldGate, 'revtok')))
-    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseBankOf(), undefined as never))
+    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseGateOf(), TH.omitting(TH.WorldGate, 'revtok')))
+    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseGateOf(), undefined as never))
     await TH.expectRefusal(proving.buildLease({ stamp: TH.WorldBankStamp } as never, TH.WorldGate))
   })
 })

@@ -447,7 +447,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const using = vault.withWhisper(Openai, fn)
     expect(bank.getSnapshot().isUnlockWanted).to.be.true
     expect(fn).not.toHaveBeenCalled()
-    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('sk-test-0000')
     expect(bank.isUnlocked).to.be.true
   })
@@ -464,7 +464,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await vi.advanceTimersByTimeAsync(0)
     expect(boxGetsOf(asked)).to.equal(0)
     expect(bank.getSnapshot().isUnlockWanted).to.be.true
-    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal(0)
     expect(boxGetsOf(asked)).to.equal(1)
     expect(onBadNews).not.toHaveBeenCalled()
@@ -476,7 +476,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const fn = vi.fn()
     const refused = TH.expectRefusal(vault.withWhisper(Openai, fn), 'absent_box')
     expect(bank.getSnapshot().isUnlockWanted).to.be.true
-    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     await refused
     expect(fn).not.toHaveBeenCalled()
   })
@@ -487,7 +487,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     bank.lock()
     const firstUsing  = vault.withWhisper(Openai, ({ revseq }) => revseq)
     const secondUsing = vault.withWhisper(Openai, ({ revseq }) => revseq + 1)
-    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await Promise.all([firstUsing, secondUsing])).to.deep.equal([0, 1])
   })
 
@@ -534,7 +534,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
     const using = vault.withWhisper(Openai, () => 'done')
-    await bank.unlock({ passphraseCleartext: TH.TestPassphrase })
+    await bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase })
     expect(await using).to.equal('done')
     const traces = JSON.stringify([minder.at(scopeAt(bank, Openai)), minder.listingAt(scopeAt(bank, 'box')), bank.getSnapshot(), device.getSnapshot()])
     expect(traces).to.include(Openai).and.not.include('sk-test-0000')
@@ -685,8 +685,8 @@ describe("a vault's minder, beside the bank's own writes", () => {
   it("has cached the main gate a gate verb wrote before the verb resolves", async () => {
     const { bank, minder } = await TH.buildBornVault()
     const seen = itemsOnAnswer(bank, minder, 'gate')
-    const after = await bank.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
-    expect(seen).to.deep.equal([after.maingate.revtok])
-    expect(minder.at(scopeAt(bank, 'gate'))!).to.include({ revtok: after.maingate.revtok })
+    const after = await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: 'another horse battery staple' })
+    expect(seen).to.deep.equal([after.revtok])
+    expect(minder.at(scopeAt(bank, 'gate'))!).to.include({ revtok: after.revtok })
   })
 })

@@ -5,6 +5,7 @@ import { NEVER } from 'zod'
 import { Consts, GX, Phrases as BigPhrases, Validator } from 'safebyok-big/internals'
 import type { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
 import type { Bank } from '../models/bank'
+import type { Device } from '../models/device'
 import type { Gate } from '../models/gate'
 import type { Gating } from '../models/gating'
 import type { Lease } from '../models/lease'
@@ -14,12 +15,12 @@ import type { BankScope, BankStamp, GateStamp } from './shapes-stamps'
 import { BankChecks, GateChecks } from './shapes-thingkinds'
 import { type GateRecord, ThingChecks } from './shapes-thing'
 import type { PutAskDraft } from './shapes-asks'
-import type { BankMakeRecord } from './shapes-bankish'
+import type { VaultDB } from '../storage/vault-db'
 
 // == [The form verbs' cleartexts]: CleartextChecks, BirthCleartexts, UnlockCleartexts, PassphraseReplaceCleartexts, PasskeyAddCleartexts, PasskeyRevokeCleartexts, ProvedCleartexts, GatingCleartexts
 
 // A gate change's proof is named as an `unlock` gating's, `passphraseCleartext` or `passkeyCleartext`, and what it puts in place is named `next…`.
-/** The checks of what {@link Bank.birth}, {@link Bank.unlock}, {@link Bank.replacePassphrase}, {@link Bank.addPasskey}, {@link Bank.revokePasskey} and a {@link Gating} are handed.
+/** The checks of what {@link Bank.birth}, {@link Gate.unlock}, {@link Gate.replacePassphrase}, {@link Gate.addPasskey}, {@link Gate.revokePasskey} and a {@link Gating} are handed.
  * A cleartext is only ever checked by its gating's body (models/gating.ts): a gating's own check at construction judges none.
  */
 export const CleartextChecks = Validator.Checkers('bad_record', ({ obj, unk }) => {
@@ -46,16 +47,16 @@ function oneProofOf({ passphraseCleartext, passkeyCleartext }: { passphraseClear
 /** The cleartexts {@link Bank.birth} is handed: the new passphrase, and a new passkey's answer or none. */
 export type BirthCleartexts = Z.input<typeof CleartextChecks.birth>
 
-/** The cleartexts {@link Bank.unlock} is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
+/** The cleartexts {@link Gate.unlock} is handed: the passphrase, or the passkey's answer. Given both, the passphrase is tried. */
 export type UnlockCleartexts = Z.input<typeof CleartextChecks.unlock>
 
-/** The cleartexts {@link Bank.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
+/** The cleartexts {@link Gate.replacePassphrase} is handed: the proof, by the passphrase or the passkey's answer, and the new passphrase. */
 export type PassphraseReplaceCleartexts = Z.input<typeof CleartextChecks.passphraseReplace>
 
-/** The cleartexts {@link Bank.addPasskey} is handed: the passphrase, and the new passkey's answer. */
+/** The cleartexts {@link Gate.addPasskey} is handed: the passphrase, and the new passkey's answer. */
 export type PasskeyAddCleartexts = Z.input<typeof CleartextChecks.passkeyAdd>
 
-/** The cleartexts {@link Bank.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
+/** The cleartexts {@link Gate.revokePasskey} is handed: the proof, by the passphrase or the passkey's answer. */
 export type PasskeyRevokeCleartexts = Z.input<typeof CleartextChecks.passkeyRevoke>
 
 /** The cleartexts a {@link Gating} adopts: any of the form verbs' fields. */
@@ -65,43 +66,46 @@ export type GatingCleartexts = Partial<BirthCleartexts & UnlockCleartexts & Pass
 export type ProvedCleartexts = { passphraseCleartext: GX.PassphraseCleartext, passkeyCleartext?: never } | { passkeyCleartext: GX.PasskeyAnswer, passphraseCleartext?: never }
 // --
 
-// == [Given to a gating]: BirthGatingFriend, BankGatingFriend
+// == [Given to a gating]: BirthGatingFriend, GateGatingFriend
 
-/** The bank's private birth, for {@link Bank.birth}'s gating to call. Internal. */
+/** The gate's private unlock, for {@link Bank.birth}'s gating to call on the gates it makes, and the attaching of the bank it births to whoever made the gating. Internal. */
 export interface BirthGatingFriend {
-  /** Write the bank of `record`, and resolve it unlocked under a lease `proving` builds. */
-  birth: (record: BankMakeRecord, proving: Proving) => Promise<Bank>
+  /** Unlock `gate` under a lease `proving` builds, citing the revision `gate` models. */
+  unlockByProving: (gate: Gate, proving: Proving) => Promise<Gate>
+  /** Hand `bank`, just born, to whoever made the gating, to attach. */
+  attachBank:      (bank: Bank) => void
 }
 
-/** A bank's private verbs, for its form verbs' gatings to call. Internal. */
-export interface BankGatingFriend {
-  /** Unlock the bank under a lease `proved` builds, citing its main gate. */
-  unlockByProving: (proved: Proving) => Promise<Bank>
-  /** Write the main gate's next revision, and make the gate written the bank's main gate. */
+/** A gate's private verbs, for its form verbs' gatings to call. Internal. */
+export interface GateGatingFriend {
+  /** Unlock the gate under a lease `proved` builds, citing the revision it models. */
+  unlockByProving: (proved: Proving) => Promise<Gate>
+  /** Write the gate's next revision, and model the revision written. */
   putGate:         (ask: PutAskDraft<GateRecord>) => Promise<Gate>
 }
 // --
 
-// == [The gate's forms]: GateDna, GateBank, GateOpts
+// == [The gate's forms]: GateDna, GateOpts
 
 /** The dna of a new main gate: its stamp, and its wayins. */
 export type GateDna = GateStamp & { wayins: { main: Wayin, passkey0: Wayin | null } }
 
-/** The part of its bank a gate uses: its stamp. */
-export type GateBank = Pick<Bank, 'stamp'>
-
 /** The options of {@link Gate.make}, beside its record. */
 export interface GateOpts {
-  /** The bank the gate belongs to. */
-  bank: GateBank
+  /** The device the gate's bank is on. */
+  device:    Device
+  /** Where the gate is stored. */
+  vaultDB:   VaultDB
+  /** The stamp of the gate's bank, which its scope must match. */
+  bankStamp: BankStamp
 }
 // --
 
-// == [What a proving is handed]: RawChecks, leaseBank, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
+// == [What a proving is handed]: RawChecks, leaseGate, GateRevisionedStamp, ProvingDevice, GuardedKeyDeriver, ProvingParts, ProvingOpts
 
 /** The checks of what a lease and a proving are handed. */
 const RawChecks = Validator.Checkers('bad_record', ({ obj, fn, bool, custom }) => ({
-  leaseBank:           obj({ stamp: BankChecks.stamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
+  leaseGate:           obj({ bankStamp: BankChecks.stamp, lock: fn<() => unknown>(), isEnabled: bool, demandEnabled: fn<() => unknown>() }),
   // A gate's stamp is fixed for its life; the lease pins one revision of the gate too.
   gateRevisionedStamp: GateChecks.stamp.extend(ThingChecks.sparse.pick({ revtok: true }).shape),
   provingDevice:       GX.provingDevice.extend({ strengthChecker: custom<GuardedStrengthChecker>(Consts.isGuarded, BigPhrases.GuardedExpected) }),
@@ -132,18 +136,18 @@ export interface ProvingOpts {
 }
 // --
 
-// == [What a lease is handed]: LeaseBank, SecretFieldname, LeaseOpts
+// == [What a lease is handed]: LeaseGate, SecretFieldname, LeaseOpts
 
-/** The part of its bank a lease uses: its stamp, its `lock` (called when the bankKey will not unwrap), and whether its device is enabled. */
-export type LeaseBank = Pick<Bank, 'stamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
+/** The part of its gate a lease uses: its bank's stamp, its `lock` (called when the bankKey will not unwrap), and whether it is enabled. */
+export type LeaseGate = Pick<Gate, 'bankStamp' | 'lock' | 'isEnabled' | 'demandEnabled'>
 
 /** A field that contains a cleartext or a sealed part: `whisper`, or any name ending `_sealed`. */
 export type SecretFieldname = 'whisper' | `${string}_sealed`
 
 /** The options of {@link Lease.make}, beside its record. */
 export interface LeaseOpts {
-  /** The bank the lease is granted to. */
-  bank: LeaseBank
+  /** The gate the lease is granted to. */
+  gate: LeaseGate
 }
 // --
 
@@ -152,7 +156,7 @@ export interface LeaseOpts {
 /** `Device.make`'s `strengthChecker`: judges whether a new passphrase is strong enough, returning a {@link GX.PassphraseVerdict}.
  * It is given the passphrase as typed, and the bank's scope, `{ userid, banklabel }`: words a guesser who knows the user tries first.
  * It runs on each new passphrase before any key is derived: the one `Bank.birth` births the bank with, and the one
- * `bank.replacePassphrase` puts in place. It is never asked to judge a blank passphrase, which is weak without it. It should not throw: one that
+ * `gate.replacePassphrase` puts in place. It is never asked to judge a blank passphrase, which is weak without it. It should not throw: one that
  * throws, or returns no verdict, refuses its call.
  *
  * It is given the passphrase in cleartext: it should retain nothing, send nothing anywhere, and never quote
@@ -188,6 +192,6 @@ const StrengthChecks = Validator.Checkers('bad_record', ({ custom }) => ({
   strengthChecker: custom<StrengthChecker>(GX.isStrengthChecker, BigPhrases.StrengthCheckerShape),
 }))
 
-/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, a {@link LeaseBank} and a host's {@link StrengthChecker}. */
+/** The checks of a {@link GateRevisionedStamp}, a {@link ProvingDevice}, a {@link LeaseGate} and a host's {@link StrengthChecker}. */
 export const GateishChecks = Object.freeze({ ...RawChecks, ...StrengthChecks })
 // --

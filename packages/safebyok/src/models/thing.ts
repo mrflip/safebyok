@@ -1,5 +1,5 @@
 import { omit, pick } from 'es-toolkit'
-import { Helpers } from 'safebyok-big/internals'
+import { Helpers, VX } from 'safebyok-big/internals'
 import { BaseThing } from './base-thing'
 import type { ThingRecord } from '../shapes/shapes-thing'
 
@@ -10,11 +10,18 @@ const RevisionFieldnames = ['fmt', 'revtok', 'revseq', 'written_at', 'am'] as co
 // subclass declares its own: `make(record, opts[, friend])`, which parses what it is given.
 /** A model of one life of a stored Thing: its Thing fields are read-only props, and its record is private.
  * A subclass parses its record before calling `super`. One that never adopts a newer record freezes itself last.
+ * A listener can {@link subscribe} to the changes a subclass tells of.
  */
 export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT> extends BaseThing {
-  // == [Props]: #record
+  // == [Props]: #record, #subscribers, #subscribe
 
   #record: RecordT
+
+  readonly #subscribers = new Set<() => void>()
+  readonly #subscribe = (listener: () => void): (() => void) => {
+    this.#subscribers.add(VX.listener.parse(listener))
+    return () => { this.#subscribers.delete(listener) }
+  }
   // --
 
   // == [Construction]: constructor, adoptRecord
@@ -45,5 +52,27 @@ export abstract class Thing<RecordT extends ThingRecord, ScopeT, StampT> extends
 
   /** This Thing's record, frozen. */
   pickle(): RecordT { return this.#record }
+  // --
+
+  // == [Subscribers]: subscribe, tellSubscribers, dropSubscribers
+
+  /** Subscribe a listener to this Thing's changes, returning its unsubscribe. Already bound, as `useSyncExternalStore` wants it.
+   * The listener is called with no argument after each change the subclass tells of: read the Thing again.
+   */
+  get subscribe(): (listener: () => void) => (() => void) { return this.#subscribe }
+
+  /** Call each subscriber, handing what one throws to `onThrow`. */
+  protected tellSubscribers(onThrow: (err: unknown) => void): void {
+    for (const listener of this.#subscribers) {
+      try {
+        listener()
+      } catch (err) {
+        onThrow(err)
+      }
+    }
+  }
+
+  /** Let go of every subscriber: none is told of anything after. */
+  protected dropSubscribers(): void { this.#subscribers.clear() }
   // --
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Gate } from '../../src/models/gate'
 import { NOVEL, PasskeyProving, PassphraseProving } from '../../src/models/proving'
 import { Wayin } from '../../src/models/wayin'
+import type { GateOpts } from '../../src/shapes/shapes-gateish'
 import { type GateRecord, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Lifeseq } from '../../src/shapes/primitives'
 import * as TH from '../test-helpers'
@@ -11,8 +12,11 @@ TH.useFakeClock()
 const ThingFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', 'am']
 const GateFields = [...ThingFields, 'wayins', 'auth', 'sigs', 'meta']
 
-/** The part of its bank a gate is given: {@link TH.WorldBankStamp}'s stamp. */
-const WorldBank = Object.freeze({ stamp: TH.WorldBankStamp })
+/** What a gate of {@link TH.WorldBankStamp}'s bank is made with: a new device of its scope, that device's vaultDB, and the bank's stamp. */
+function worldOpts(): GateOpts {
+  const device = TH.makeDevice()
+  return { device, vaultDB: device.vaultDB, bankStamp: TH.WorldBankStamp }
+}
 
 interface DnaWayins { main: Wayin, passkey0: Wayin | null }
 
@@ -37,7 +41,7 @@ describe("Gate.makeRecord(dna)", () => {
     expect(record).to.include({ ...TH.WorldGateStamp, label: 'gate', fmt: ThingFormat, revseq: 0, lifepath: TH.WorldGateStamp.lifeseq, written_at: TH.T0, am: 'a' })
     expect(record.wayins).to.deep.equal({ main: wayins.main.pickle(), passkey0: null })
     expect(record).to.deep.include({ auth: {}, sigs: {}, meta: {} })
-    const gate = Gate.make(record, { bank: WorldBank })
+    const gate = Gate.make(record, worldOpts())
     expect(gate.main.pickle()).to.deep.equal(wayins.main.pickle())
     expect(gate.passkey0).to.be.null
   })
@@ -72,10 +76,10 @@ describe("Gate.makeRecord(dna)", () => {
   }
 })
 
-describe("Gate.make(record, { bank })", () => {
+describe("Gate.make(record, { device, vaultDB, bankStamp })", () => {
   it("makes the same gate again from a gate's pickle", async () => {
-    const gate = Gate.make(await gateRecordOf(true), { bank: WorldBank })
-    const again = Gate.make(gate.pickle(), { bank: WorldBank })
+    const gate = Gate.make(await gateRecordOf(true), worldOpts())
+    const again = Gate.make(gate.pickle(), worldOpts())
     expect(again.pickle()).to.deep.equal(gate.pickle())
     expect(again.stamp).to.deep.equal(gate.stamp)
   })
@@ -95,7 +99,7 @@ describe("Gate.make(record, { bank })", () => {
   for (const [recordOf, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, async () => {
       const record = recordOf(await gateRecordOf(true))
-      TH.expectSyncRefusal(() => Gate.make(record as never, { bank: WorldBank }), 'bad_record')
+      TH.expectSyncRefusal(() => Gate.make(record as never, worldOpts()), 'bad_record')
     })
   }
 
@@ -107,33 +111,36 @@ describe("Gate.make(record, { bank })", () => {
   for (const [moved, blurb] of OtherBankCases) {
     it(`refuses a record with ${blurb} than its bank's`, async () => {
       const record = { ...await gateRecordOf(), ...moved }
-      TH.expectSyncRefusal(() => Gate.make(record, { bank: WorldBank }), 'record_conflict')
+      TH.expectSyncRefusal(() => Gate.make(record, worldOpts()), 'record_conflict')
     })
   }
 
   it("accepts a record of another life than its bank's: only the bank's scope is checked", async () => {
     const later = Lifeseq.ofLifenum(2)
     const record = { ...await gateRecordOf(), lifeseq: later, lifepath: later }
-    expect(Gate.make(record, { bank: WorldBank }).lifeseq).to.eq(later)
+    expect(Gate.make(record, worldOpts()).lifeseq).to.eq(later)
   })
 
-  it("refuses a bank with no stamp, and no opts at all", async () => {
+  it("refuses opts with no bankStamp, no device, a device that is not a Device, or no opts at all", async () => {
     const record = await gateRecordOf()
-    TH.expectSyncRefusal(() => Gate.make(record, { bank: {} } as never), 'bad_record')
+    const opts = worldOpts()
+    TH.expectSyncRefusal(() => Gate.make(record, { ...opts, bankStamp: undefined } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(record, { ...opts, device: undefined } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Gate.make(record, { ...opts, device: TH.provingDeviceOf() } as never), 'bad_record')
     TH.expectSyncRefusal(() => Gate.make(record, undefined as never))
   })
 
   it("quotes none of a refused record in its refusal: no ciphertext", async () => {
     const record = await gateRecordOf(true)
     const { main, passkey0 } = record.wayins
-    const err = TH.expectSyncRefusal(() => Gate.make({ ...record, wayins: { main: passkey0, passkey0: main } } as never, { bank: WorldBank }))
+    const err = TH.expectSyncRefusal(() => Gate.make({ ...record, wayins: { main: passkey0, passkey0: main } } as never, worldOpts()))
     expect(TH.thrownText(err)).to.not.include(main.bank_key_wayin_wrapped.ciphertext_b64)
   })
 })
 
 describe("what a gate shows", () => {
   it("pickle() is the gate Thing, its wayin records frozen", async () => {
-    const gate = Gate.make(await gateRecordOf(true), { bank: WorldBank })
+    const gate = Gate.make(await gateRecordOf(true), worldOpts())
     const pickle = gate.pickle()
     expect(Object.keys(pickle)).to.have.members(GateFields)
     expect(pickle.wayins.main).to.deep.equal(gate.main.pickle())
@@ -145,21 +152,23 @@ describe("what a gate shows", () => {
   })
 
   it("Object.keys shows its Thing fields alone: no Wayin, no wayin record", async () => {
-    const gate = Gate.make(await gateRecordOf(true), { bank: WorldBank })
+    const gate = Gate.make(await gateRecordOf(true), worldOpts())
     expect(Object.keys(gate)).to.have.members(ThingFields)
     expect(JSON.stringify(gate)).to.not.include('ciphertext_b64')
   })
 
-  it("is frozen, its Thing fields read-only", async () => {
-    const gate = Gate.make(await gateRecordOf(), { bank: WorldBank })
-    expect(Object.isFrozen(gate)).to.be.true
+  it("keeps its Thing fields read-only", async () => {
+    const gate = Gate.make(await gateRecordOf(), worldOpts())
     expect(() => { (gate as { revtok: unknown }).revtok = 'gate-revision-tok-other' }).to.throw(TypeError)
     expect(() => { (gate as { banklabel: unknown }).banklabel = 'other' }).to.throw(TypeError)
   })
 
-  it("has the bank's stamp it was given, and its own", async () => {
+  it("has the bank's stamp, the device and the vaultDB it was given, and its own stamp", async () => {
     const record = await gateRecordOf()
-    const gate = Gate.make(record, { bank: WorldBank })
+    const opts = worldOpts()
+    const gate = Gate.make(record, opts)
+    expect(gate.device).to.eq(opts.device)
+    expect(gate.vaultDB).to.eq(opts.vaultDB)
     expect(gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
     expect(gate.stamp).to.deep.equal(TH.WorldGateStamp)
     expect(gate.scope).to.deep.equal({ userid: TH.WorldScope.userid, banklabel: TH.WorldScope.banklabel, labelpath: 'gate' })
@@ -167,15 +176,15 @@ describe("what a gate shows", () => {
   })
 
   it("is a gate by its modelkind", async () => {
-    expect(Gate.make(await gateRecordOf(), { bank: WorldBank }).modelkind).to.eq('gate')
+    expect(Gate.make(await gateRecordOf(), worldOpts()).modelkind).to.eq('gate')
   })
 })
 
 describe("gate.demandPasskeyAddable()", () => {
   it("passes a gate with no passkey and refuses one that has one", async () => {
-    const gate = Gate.make(await gateRecordOf(), { bank: WorldBank })
+    const gate = Gate.make(await gateRecordOf(), worldOpts())
     expect(() => { gate.demandPasskeyAddable() }).to.not.throw()
-    const both = Gate.make(await gateRecordOf(true), { bank: WorldBank })
+    const both = Gate.make(await gateRecordOf(true), worldOpts())
     TH.expectSyncRefusal(() => { both.demandPasskeyAddable() })
   })
 })

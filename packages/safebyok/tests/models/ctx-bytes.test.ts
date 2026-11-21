@@ -58,14 +58,14 @@ async function unsealByHand(bankKey: CryptoKey, box: LiveOf<BoxRecord>, bankStam
 /** A lease's record, built by a born bank's passphrase proving on a fake bank of {@link TH.WorldBankStamp}. */
 async function leaseRecordOf(): Promise<LeaseRecord> {
   const { proving } = await TH.buildBornBank()
-  const { record } = await TH._cheat_grantedLease(proving, TH.fakeLeaseBankOf())
+  const { record } = await TH._cheat_grantedLease(proving, TH.fakeLeaseGateOf())
   return record
 }
 
 /** Whether a born bank's passphrase wayin unwraps under the ctx of the stamps `bankStamp` and `gateStamp`, built field for field without a check. */
 async function passphraseWayinUnwraps(bankStamp: Crypto.CipherCtxRecord, gateStamp: Crypto.CipherCtxRecord): Promise<boolean> {
   const { bank } = await TH.buildBornBank()
-  const { bank_key_wayin_wrapped: wrapped, ...header } = bank.maingate.wayins.main
+  const { bank_key_wayin_wrapped: wrapped, ...header } = bank.gate.wayins.main
   const wayinKey = await Crypto.importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(TH.TestPassphrase, Crypto.fromB64(header.salt_b64)))
   const ctx = Crypto.cipherCtx([bankStamp, gateStamp], 'bank_key_passphrase_wrapped', header)
   try {
@@ -82,7 +82,7 @@ describe("each ctx, byte for byte", () => {
 
   it("binds a passphrase wayin's wrap to the bank's stamp, the gate's, the purpose and its whole header", async () => {
     const { bank } = await TH.buildBornBank()
-    const wayin = bank.maingate.wayins.main
+    const wayin = bank.gate.wayins.main
     const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passphrase_wrapped",{"device_tok":"${wayin.device_tok}","key_deriver_label":"${wayin.key_deriver_label}","registered_at":${String(wayin.registered_at)},"salt_b64":"${wayin.salt_b64}","wayinkind":"passphrase","wayinlabel":"main"}]`)
     const wayinKey = await Crypto.importWrappingKeyBytes(await TH.testDeriver.deriveKeyBytes(TH.TestPassphrase, Crypto.fromB64(wayin.salt_b64)))
     expect(await Crypto.unwrapKeyUnder(wayinKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
@@ -92,7 +92,7 @@ describe("each ctx, byte for byte", () => {
     const answer = TH.passkeyAnswerOf()
     const prfBytes = new Uint8Array(answer.prfBytes)
     const { bank } = await TH.buildBornBank({ passkeyCleartext: answer })
-    const wayin = bank.maingate.wayins.passkey0!
+    const wayin = bank.gate.wayins.passkey0!
     const ctx = textBytes(`[${BankStampText},${GateStampText},"bank_key_passkey_wrapped",{"credential_id":"${wayin.credential_id}","device_tok":"${wayin.device_tok}","prf_salt_b64":"${wayin.prf_salt_b64}","registered_at":${String(wayin.registered_at)},"wayinkind":"passkey","wayinlabel":"passkey0"}]`)
     const passkeyKey = await Crypto.deriveWrappingKey(prfBytes, ctx)
     expect(await Crypto.unwrapKeyUnder(passkeyKey, wayin.bank_key_wayin_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
@@ -132,7 +132,7 @@ describe("each ctx binds every field of its stamps", () => {
   it("names every field of a bank's and a gate's stamps below", async () => {
     const { bank } = await TH.buildBornBank()
     expect(Object.keys(bank.stamp)).to.have.members([...BankStampFields])
-    expect(Object.keys(bank.maingate.stamp)).to.have.members([...GateStampFields])
+    expect(Object.keys(bank.gate.stamp)).to.have.members([...GateStampFields])
   })
 
   it("unseals a box by hand under the stamps it was sealed under", async () => {

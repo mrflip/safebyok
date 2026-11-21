@@ -1,5 +1,5 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
- * a bank born unlocked, a spy on births, a gating with no bank behind it, a box's shell, a fake of the bank a lease is given, and the loudly named
+ * a bank born unlocked, a spy on births, a gating with no gate behind it, a box's shell, a fake of the gate a lease is granted to, and the loudly named
  * cheats that unwrap a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
@@ -22,7 +22,7 @@ import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankMakeRecord, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
 import type { BoxRecord } from '../../src/shapes/shapes-thing'
-import type { GateRevisionedStamp, GatingCleartexts, LeaseBank, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
+import type { GateRevisionedStamp, GatingCleartexts, LeaseGate, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
@@ -133,7 +133,7 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   try {
     const bank = await Bank.birth(device, { passphraseCleartext: TestPassphrase, passkeyCleartext: passkeyCleartext && copyOfAnswer(passkeyCleartext) })
     const record = makeRecord.mock.results.at(-1)!.value as BankMakeRecord
-    const proving = await PassphraseProving.buildStored(device, bank.maingate, TestPassphrase)
+    const proving = await PassphraseProving.buildStored(device, bank.gate, TestPassphrase)
     return { device, bank, record, proving }
   } finally {
     mintStamps.mockRestore()
@@ -156,17 +156,15 @@ export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVau
 
 // == [Births]: BirthSpy, spyBirths
 
-/** The births {@link spyBirths} saw, in call order: each bank `Bank.make` made, and whether the bank was locked as its birth reached the vaultDB. */
+/** The births {@link spyBirths} saw, in call order: each bank `Bank.make` made, and each call to the vaultDB's `tryBirthBank`. */
 export interface BirthSpy {
-  banks:          Bank[]
-  tryBirthBank:   MockInstance<VaultDB['tryBirthBank']>
-  lockedAtBirths: boolean[]
+  banks:        Bank[]
+  tryBirthBank: MockInstance<VaultDB['tryBirthBank']>
 }
 
 /** Spy on each birth on `device`: the banks made, and the device's vaultDB's `tryBirthBank`, which `answer` answers in its place where given. Vitest restores both before the next test. */
 export function spyBirths(device: Device, answer?: (ask: BirthBankAsk) => Promise<BirthBankAnswer>): BirthSpy {
   const banks: Bank[] = []
-  const lockedAtBirths: boolean[] = []
   const make = Bank.make.bind(Bank)
   vi.spyOn(Bank, 'make').mockImplementation((record, opts) => {
     const made = make(record, opts)
@@ -175,22 +173,19 @@ export function spyBirths(device: Device, answer?: (ask: BirthBankAsk) => Promis
   })
   const { vaultDB } = device
   const tryBirthBank = vaultDB.tryBirthBank.bind(vaultDB)
-  const spy = vi.spyOn(vaultDB, 'tryBirthBank').mockImplementation((ask) => {
-    lockedAtBirths.push(banks.at(-1)!.isLocked)
-    return answer ? answer(ask) : tryBirthBank(ask)
-  })
-  return { banks, tryBirthBank: spy, lockedAtBirths }
+  const spy = vi.spyOn(vaultDB, 'tryBirthBank').mockImplementation((ask) => (answer ? answer(ask) : tryBirthBank(ask)))
+  return { banks, tryBirthBank: spy }
 }
 // --
 
 // == [Gatings]: _cheat_gatingOf, CheatGating
 
-/** A gating over `cleartexts` whose attempt calls `body` with the cleartexts it adopted, in place of a verb's: a form mutation's test with no bank behind it. */
+/** A gating over `cleartexts` whose attempt calls `body` with the cleartexts it adopted, in place of a verb's: a form mutation's test with no gate behind it. */
 export function _cheat_gatingOf(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<unknown>): Gating { return new CheatGating(cleartexts, body) }
 
 /** A gating whose body is any function, made by {@link _cheat_gatingOf}. */
 class CheatGating extends Gating {
-  constructor(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<unknown>) { super(cleartexts, body as (cleartexts: GatingCleartexts) => Promise<Bank>) }
+  constructor(cleartexts: unknown, body: (cleartexts: GatingCleartexts) => Promise<unknown>) { super(cleartexts, body) }
 }
 // --
 
@@ -214,21 +209,21 @@ export function boxShellOf(overrides: Partial<ShellOf<BoxRecord>> = {}): ShellOf
 }
 // --
 
-// == [Leases]: FakeLeaseBank, fakeLeaseBankOf, _cheat_grantedLease
+// == [Leases]: FakeLeaseGate, fakeLeaseGateOf, _cheat_grantedLease
 
-/** A fake of the bank a lease is given: its stamp, a spy for `lock`, and an enabled check that always passes. */
-export type FakeLeaseBank = LeaseBank & { lock: Mock<() => void> }
+/** A fake of the gate a lease is granted to: its bank's stamp, a spy for `lock`, and an enabled check that always passes. */
+export type FakeLeaseGate = LeaseGate & { lock: Mock<() => void> }
 
-/** A {@link FakeLeaseBank} of {@link WorldBankStamp}, as `overrides` moves it. */
-export function fakeLeaseBankOf(overrides: Partial<BankStamp> = {}): FakeLeaseBank {
-  const bank = { stamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => bank }
-  return bank as unknown as FakeLeaseBank
+/** A {@link FakeLeaseGate} whose bank's stamp is {@link WorldBankStamp}, as `overrides` moves it. */
+export function fakeLeaseGateOf(overrides: Partial<BankStamp> = {}): FakeLeaseGate {
+  const gate = { bankStamp: { ...WorldBankStamp, ...overrides }, lock: vi.fn<() => void>(), isEnabled: true, demandEnabled: () => gate }
+  return gate as unknown as FakeLeaseGate
 }
 
-/** A test cheat: a lease `proving` builds on `bank` citing `gate`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
-export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
+/** A test cheat: a lease `proving` builds, granted to `gate` and citing `cited`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
+export async function _cheat_grantedLease(proving: Proving, gate: LeaseGate, cited: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
-  const lease = await proving.buildLease(bank, gate)
+  const lease = await proving.buildLease(gate, cited)
   const [record] = make.mock.calls.at(-1)!
   make.mockRestore()
   return { lease, record: record as LeaseRecord }
@@ -264,7 +259,7 @@ export async function _cheat_bankKeyBytesOf(bankStamp: BankStamp, gateStamp: Gat
 
 /** A test cheat: the bankKey of `bank`'s main gate, unwrapped by {@link TestPassphrase}, able to unwrap what a lease sealed. */
 export async function _cheat_bankKeyOf(bank: Bank): Promise<CryptoKey> {
-  const bankKeyBytes = await _cheat_bankKeyBytesOf(bank.stamp, bank.maingate.stamp, bank.maingate.main, { passphrase: TestPassphrase })
+  const bankKeyBytes = await _cheat_bankKeyBytesOf(bank.stamp, bank.gate.stamp, bank.gate.main, { passphrase: TestPassphrase })
   return crypto.subtle.importKey('raw', bankKeyBytes as BufferSource, 'AES-GCM', false, ['unwrapKey'])
 }
 // --

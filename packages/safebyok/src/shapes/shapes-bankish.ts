@@ -4,7 +4,6 @@ import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
 import type { DefaultOnBadNews, Device } from '../models/device'
-import type { Proving } from '../models/proving'
 import type { VaultDB } from '../storage/vault-db'
 import type { GateDna, StrengthChecker } from './shapes-gateish'
 import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
@@ -39,7 +38,7 @@ export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbse
 export type SealedBoxAsk<RecordT extends BoxRecord = BoxRecord> = BoxWriteAsk & Readonly<{ record: RecordT }>
 // --
 
-// == [The bank's making]: BankOpts, BirthOpts, HostedVault
+// == [The bank's making]: BankOpts, HostedVault
 
 /** The options of {@link Bank.make}, beside its record. */
 export interface BankOpts {
@@ -47,11 +46,6 @@ export interface BankOpts {
   device:  Device
   /** Where the bank's boxes are stored. */
   vaultDB: VaultDB
-}
-
-/** The options of a bank's birth, beside its record: {@link BankOpts}, plus the `proving` of the main gate that the birth's gating built. */
-export interface BirthOpts extends BankOpts {
-  proving: Proving
 }
 
 // `safebyok/core` carries no caching, so the bank knows its vaults by this method alone, not by the Vault class.
