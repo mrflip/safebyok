@@ -59,7 +59,7 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'usePasskeyHeader', 'useBox', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'lock', 'dismissUnlock',
+      'useBank', 'usePasskeyHeader', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
     ])
   })
@@ -446,6 +446,52 @@ describe("useBox", () => {
     for (const labelpath of [42, null, '']) {
       TH.expectSyncRefusal(() => renderHook(() => world.Bank.useBox(labelpath as never), { wrapper: Wrapper }), 'bad_record')
     }
+  })
+})
+
+/** The world's user's key for the listing of the root box's children, as the minder caches it. */
+const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+
+describe("useBoxList", () => {
+  it("lists the stored boxes once the device starts, and fetches nothing while nobody is signed in", async () => {
+    const { result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'jokes' }, { userid: null })
+    expect([result.current.data, result.current.fetchStatus]).to.deep.equal([undefined, 'idle'])
+    treeOpts.userid = TH.ProviderUser
+    rerender()
+    await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
+  })
+
+  it("answers an empty listing for a user with no bank stored", async () => {
+    const { result } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'none' })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(result.current.data).to.deep.equal([])
+  })
+
+  it("grows when a box is written, the same array until then", async () => {
+    const { world, result } = await renderUnlocked((world) => world.Bank.useBoxList().data)
+    await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath]) })
+    const first = result.current
+    await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
+    expect(result.current).to.eq(first)
+    await act(() => world.Bank.putBoxOnce('puns', { sidecar: { service: 'puns' } }, { whisper: LeanTH.Whisper }))
+    await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath, 'puns']) })
+  })
+
+  it("keeps a deleted box listed", async () => {
+    const { world, result } = await renderUnlocked((world) => world.Bank.useBoxList().data)
+    await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath]) })
+    const first = result.current
+    await act(() => world.Bank.delBox(TH.JokesPath))
+    expect(result.current).to.eq(first)
+  })
+
+  it("keys the listing as the bank's minder keys it, under no key from keys.under", async () => {
+    const { world, result } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
+    expect(world.Bank.keys.boxList()).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
+    expect(world.client.getQueryData(BoxListKey)).to.deep.equal([`box/${TH.JokesPath}`])
+    await world.client.invalidateQueries({ queryKey: world.Bank.keys.under() })
+    expect(world.client.getQueryState(BoxListKey)?.isInvalidated).to.eq(false)
   })
 })
 

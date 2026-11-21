@@ -1,16 +1,17 @@
-/** The bridge: keeps the host's React Query items of a Device's boxes current with its bank's minder. */
+/** The bridge: keeps the host's React Query items of a Device's boxes, and its listing of them, current with its bank's minder. */
 
 import type { QueryClient } from '@tanstack/react-query'
-import { MinderEventFormat, type ThingMinder } from 'safebyok'
+import { type ListingEvent, MinderEventFormat, type ThingMinder } from 'safebyok'
 import { boxQueryKeyOf } from './giver-defaults'
 import type { GiverEvent } from './shapes-giver'
 
-/** Keep the host's React Query items of the boxes `minder` minds in step with it. Returns the function that stops it.
+/** Keep the host's React Query items of the boxes `minder` minds, and its listing of them, in step with it. Returns the function that stops it.
  * Start it before the minder's first get: a record cached before is copied only when it next changes.
  */
 export function bridgeMinder(client: QueryClient, minder: ThingMinder): () => void {
   return minder.listen((event) => {
-    if ((event.eventkind !== 'list') && (event.modelkind === 'box')) { deliverEvent(client, event) }
+    if (event.modelkind !== 'box') { return }
+    if (event.eventkind === 'list') { deliverListing(client, event) } else { deliverEvent(client, event) }
   }, MinderEventFormat)
 }
 
@@ -35,4 +36,14 @@ function deliverEvent(client: QueryClient, event: GiverEvent): void {
   if (action?.type === 'error')      { void client.invalidateQueries({ queryKey, exact: true, refetchType: 'none' }, { cancelRefetch: false }) }
   // When the minder heard of the record, not when it reached the host.
   if ((record !== undefined) && (action?.type === 'success')) { client.setQueryData(queryKey, record, { updatedAt: dataUpdatedAt }) }
+}
+
+// A listing's key is the host's key for it too, and its listed time is when a list last set it, which a box joining
+// leaves as it was.
+/** Put the listing in the host's item of it, if a hook made one, or invalidate that item where the minder marked the listing stale. */
+function deliverListing(client: QueryClient, event: ListingEvent): void {
+  const { type, action, queryKey, state: { data: labelpaths, dataUpdatedAt } } = event
+  if ((type !== 'updated') || (client.getQueryCache().find({ queryKey, exact: true }) === undefined)) { return }
+  if (action?.type === 'invalidate') { void client.invalidateQueries({ queryKey, exact: true }) }
+  if ((labelpaths !== undefined) && (action?.type === 'success')) { client.setQueryData(queryKey, labelpaths, { updatedAt: dataUpdatedAt }) }
 }

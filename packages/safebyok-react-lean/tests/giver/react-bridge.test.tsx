@@ -98,6 +98,39 @@ describe("the bridge", () => {
   })
 })
 
+/** The key the minder and the host both cache the listing of the root box's children under. */
+const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
+
+/** A world with the jokes box stored, its provider signed in, and `useBoxList` rendered under it, once it lists the jokes box; and how many lists the vaultDB has been asked. */
+async function setupListed() {
+  const world = await TH.buildProviderWorld({ stored: 'jokes' })
+  const lists = { count: 0 }
+  const tryListThings = world.vaultDB.tryListThings.bind(world.vaultDB)
+  world.vaultDB.tryListThings = async (ask) => { lists.count += 1; return await tryListThings(ask) }
+  function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+  const { result } = renderHook(() => world.Bank.useBoxList().data, { wrapper: Wrapper })
+  await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath]) })
+  return { world, result, lists, minder: world._cheat_device().minder }
+}
+
+describe("the bridge's listing", () => {
+  it("shows a box another device writes, without listing again", async () => {
+    const { world, result, lists } = await setupListed()
+    const { count } = lists
+    await act(() => world._cheat_otherVault!.putBoxOnce('box/puns', { sidecar: { service: 'puns' } }, { whisper: LeanTH.Whisper }))
+    await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath, 'puns']) })
+    expect(lists.count).to.eq(count)
+  })
+
+  it("lists again when the minder marks its listing stale", async () => {
+    const { world, result, lists, minder } = await setupListed()
+    const { count } = lists
+    act(() => { minder.invalidate('box', { list: 'all' }) })
+    await waitFor(() => { expect(world.client.getQueryState(BoxListKey)?.isInvalidated).to.eq(false) })
+    expect([lists.count, result.current]).to.deep.equal([count + 1, [TH.JokesPath]])
+  })
+})
+
 // The host's fetch reads the first revision and waits; meanwhile the minder hears of the second, from the watch or from a
 // list. Whichever lands first, the host ends showing the second.
 const OrderCases = [

@@ -452,7 +452,7 @@ export class ThingMinder {
   }
   // --
 
-  // == [TSQ Asks]: itemQueryKeyOf, bankQueryKeyOf, itemQueryKey, soonQueryKey, listQueryKey, #tsqQueryOptions, #staleTimeOf, #askAt, #shellAt
+  // == [TSQ Asks]: itemQueryKeyOf, listQueryKeyOf, bankQueryKeyOf, itemQueryKey, soonQueryKey, listQueryKey, #tsqQueryOptions, #staleTimeOf, #askAt, #shellAt
 
   // A key is the bank's three segments, the kind of entry ('item', 'soon' or 'list'), the labelpath's labels with '/'
   // between them, then a mark: '!' for the item, '~' for the soon, '#' and 'kids' for the listing. TanStack matches query
@@ -463,6 +463,12 @@ export class ThingMinder {
   static itemQueryKeyOf(scope: ThingScope): TSQ.QueryKey {
     const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
     return [...bankKeyHeadOf({ userid, banklabel }), Itemkind, ...labelsOf(labelpath), '!']
+  }
+
+  /** The query key a minder caches the listing of `scope`'s children under. A host caching the same labelpaths may use the same key. */
+  static listQueryKeyOf(scope: ThingScope): TSQ.QueryKey {
+    const { userid, banklabel, labelpath } = ThingChecks.thingScope.parse(scope)
+    return [...bankKeyHeadOf({ userid, banklabel }), Listkind, ...labelsOf(labelpath), '#', 'kids']
   }
 
   /** The key prefix of everything a minder of `scope`'s bank caches. */
