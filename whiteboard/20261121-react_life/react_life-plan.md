@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** threads 16 (`birth_verb`) and 17 (`new_passphrase`) added from the Closer Look triage; 16 building on #811, 17 cut from 16 once ready. Threads 1 to 15 filed and out of draft, in one line ending at #811. Then: the sprint PR rebased on top with notes/security.md reconciled, and wrap-up.
+* **Status:** threads 1 to 15 merged (the Coach, 2026-11-21). Thread 16 (`birth_verb`, #813, on main) ready, in a high review; one compaction before its readiness check. Thread 17 (`new_passphrase`) building, stacked on #813. Then: the sprint PR rebased on top with notes/security.md reconciled, and wrap-up.
 
 ## The goal
 
