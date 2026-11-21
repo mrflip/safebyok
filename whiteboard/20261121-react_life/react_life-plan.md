@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Thread 1 filed, out of draft (#797). Thread 2 building, stacked on #797.
+* **Status:** running. Thread 1 filed, out of draft (#797). Thread 2 ready, in review (#798; one compaction, before its readiness check). Thread 3 building, stacked on #798.
 
 ## The goal
 
@@ -192,6 +192,7 @@ Serves threads 2 to 10, which all write in it.
 * **Size:** one feature in four files and their tests, at the limit. Its cheats are its overflow.
 * **Ready when:** a test starts a device over a `MemoryVaultDB` that has a born bank and sees `starting` then
   `locked`, and over an empty one sees `unborn`, then birth, then `unlocked`.
+* *Orchestrator:* ready, #798. One compaction, six minutes in, before its readiness check. Cheats: birth hands the bank to the device from inside `Bank.birthGating` (`device.adoptBornBank`); `hello` skips its fetch when the device already has a bank. Deviation: five sweep and lock tests dropped and one rewritten, because a swept device now shows the swept bank. Two Open Matters rows.
 
 ### 3. `giver_slot`: the provider and the slot
 
@@ -207,6 +208,7 @@ Serves threads 2 to 10, which all write in it.
 * **Levels:** `opus`, high effort; review `medium`. **Depends on:** 2.
 * **Look-ahead:** threads 4 to 6 read the slot's vault.
 * **Size:** the sprint's largest. If it runs long, `withWhisper`, `lock` and the knock-knock port move to thread 4.
+* *Orchestrator:* run on `thread-worker-400k` (opus, high), since thread 2 compacted after six minutes and this thread is larger.
 * **Ready when:** the ported test passes: unborn, birth, lock, `withWhisper` waits, unlock, it resumes, with no
   secret found in the tree or either cache.
 

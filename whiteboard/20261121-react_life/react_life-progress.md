@@ -21,3 +21,21 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   ignores the deviceDB. The Coach has ruled that neither is touched or raised in this sprint.
 * **Uncommitted in the base checkout when the sprint was planned:** the Coach's own edits to
   `whiteboard/20261116-react_backwards/app-side.md` and `human/PROMPTS.md`. They are not the sprint's.
+
+## Thread 1, react_lean_pkg (#797, filed)
+
+* `packages/safebyok-react-lean` holds the giver, its four test files (88 cases, not the plan's 62) and three test
+  worlds; `tests/test-helpers.ts` re-exports `safebyok/testing`, the worlds and secret-search. `./parts` and `./kit`
+  are `export {}` with `typesVersions` entries (attw needs them). `safebyok` takes query-core as a peer and a
+  devDependency.
+
+## Thread 2, device_bring_up (#798, ready)
+
+* **The device's surface:** `Device.make(record, opts)` (`opts.queryCacheOpts`); `await device.hello()`, memoised,
+  never rejects; stage via `device.getSnapshot().bank.stage`: `starting` → `locked` | `unborn` | `failed`
+  (`lastErr`); `Bank.birth(device, …)` hands the born bank to the device, which makes and owns the vault
+  (`device.vault`, null until a bank); `device.minder`, `device.bank`; `Vault.make(bank, minder)` public.
+* **Cheats:** birth calls `device.adoptBornBank` from inside the bank; `hello` skips its fetch when a bank is already
+  held (test helpers birth before hello).
+* **Planning lesson:** the opus worker compacted six minutes in, on handoff plus reading. Larger threads go to
+  `thread-worker-400k`.
