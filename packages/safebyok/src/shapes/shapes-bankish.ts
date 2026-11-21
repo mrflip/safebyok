@@ -10,7 +10,7 @@ import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, LiveOf, ShellOf, UnsealedOf } from './shapes-sealers'
 import type { BankStamp } from './shapes-stamps'
 import type { BoxRecord } from './shapes-thing'
-import type { BoxWriteAsk, GetAsk, ListAsk, WorldRecord } from './shapes-asks'
+import type { GetAsk, ListAsk, WorldRecord } from './shapes-asks'
 import type { EpochMillis, Labelpath } from './primitives'
 
 // == [The bank's forms]: BankMakeRecord, BankDna, BoxUnsealed
@@ -27,15 +27,12 @@ export type BankDna = BankStamp & { maingate: GateDna }
 export type BoxUnsealed = UnsealedOf<BoxRecord, BoxCleartexts>
 // --
 
-// == [The bank's drafts and asks]: BankAskDraft, SealedBoxAsk
+// == [The bank's drafts and asks]: BankAskDraft
 
 /** The draft of a get or list ask, for {@link Bank.makeGetAsk} or {@link Bank.makeListAsk}: a labelpath in the bank, and `ifAbsent`, the answer when nothing is stored there.
  * The bank fills in the rest of the {@link GetAsk} or {@link ListAsk}.
  */
 export type BankAskDraft = Readonly<{ labelpath: Labelpath, ifAbsent?: EX.IfAbsent }>
-
-/** The write ask {@link Bank.sealBox} returns, carrying the sealed `record`: a put for a live box, or a del for a tombstone. */
-export type SealedBoxAsk<RecordT extends BoxRecord = BoxRecord> = BoxWriteAsk & Readonly<{ record: RecordT }>
 // --
 
 // == [The bank's making]: BankOpts, HostedVault

@@ -6,7 +6,8 @@ import { ThingMinder } from '../minding/thing-minder'
 import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
-import type { BoxCleartexts, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
+import type { BoxWriteAsk } from '../shapes/shapes-asks'
+import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import type { BoxLabelpath } from '../shapes/primitives'
 import { type MinderGetOpts, type ScopeAt, MinderChecks } from '../shapes/shapes-minder'
 import type { BoxRecord } from '../shapes/shapes-thing'
@@ -74,7 +75,7 @@ export class Vault {
   async tryPutBoxOnce(cited: Sealable<LiveOf<BoxRecord>> | BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>> {
     const sealed = await Outcome.outcomeOf(async () => {
       const donorProps = (typeof cited === 'string') ? await this.#soonestAt(cited) : cited
-      return await this.#bank.sealBox(donorProps, patch, secrets)
+      return await this.#sealedAsk(donorProps, patch, secrets)
     })
     if (! sealed.ok) { return sealed }
     // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
@@ -95,7 +96,7 @@ export class Vault {
    * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
-    const sealed = await Outcome.outcomeOf(async () => await this.#bank.tombstoneBox(await this.#soonestAt(labelpath)))
+    const sealed = await Outcome.outcomeOf(async () => await this.#sealedAsk(await this.#soonestAt(labelpath), { am: 'x' }))
     if (! sealed.ok) { return sealed }
     // The ask's modelkind is a box's, which the vaultDB checks what it answers against.
     return await this.#minder.tryWrite(sealed.val) as Outcome.Outcome<TombstoneOf<BoxRecord>>
@@ -174,7 +175,14 @@ export class Vault {
   }
   // --
 
-  // == [Helpers]: #scopeAt, #soonestAt
+  // == [Helpers]: #sealedAsk, #scopeAt, #soonestAt
+
+  /** The ask writing the box `donorProps`'s next revision over it, sealed by the bank ({@link Bank.sealBox}): a put, or a del for a tombstone. */
+  async #sealedAsk(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxWriteAsk> {
+    const record = await this.#bank.sealBox(donorProps, publicProps, secretProps)
+    const cited  = Thing.sparseOf(donorProps)
+    return BaseBox.isTombstone(record) ? this.#bank.makeDelAsk<BoxRecord>({ cited, record }) : this.#bank.makePutAsk<BoxRecord>({ cited, record })
+  }
 
   /** The scope of the box at `labelpath`, in this vault's bank. */
   #scopeAt(labelpath: BoxLabelpath): ScopeAt<BoxLabelpath> {

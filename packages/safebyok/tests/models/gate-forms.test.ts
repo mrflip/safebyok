@@ -170,7 +170,7 @@ describe("bank.gate.replacePassphrase(cleartexts)", () => {
 
   it("unlocks by the new passphrase afterwards, and refuses the old one, under the same bankKey", async () => {
     const { bank } = await TH.buildBornBank()
-    const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    const box = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await bank.gate.replacePassphrase({ passphraseCleartext: TH.TestPassphrase, nextPassphraseCleartext: NextPassphrase })
     bank.lock()
     await TH.expectRefusal(bank.gate.unlock({ passphraseCleartext: TH.TestPassphrase }), 'wrong_passphrase')

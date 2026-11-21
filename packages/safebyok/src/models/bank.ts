@@ -6,7 +6,7 @@ import { Device } from './device'
 import { Gate } from './gate'
 import type { BirthGating } from './gating'
 import type { BirthCleartexts } from '../shapes/shapes-gateish'
-import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BoxUnsealed, HostedVault, SealedBoxAsk } from '../shapes/shapes-bankish'
+import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
@@ -262,56 +262,36 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
   // --
 
-  // == [Boxes]: sealBox, trySealBox, sealBoxEnsuringUnlock, tombstoneBox, unsealBox, tryUnsealBox, unsealBoxEnsuringUnlock
+  // == [Boxes]: sealBox, trySealBox, unsealBox, tryUnsealBox
+  // The gate's seal and unseal, for this bank's own boxes: only the bank knows its root box, whose lifeseq begins each box's
+  // lifepath. A vault writes what they seal, and waits for the unlock where its verb does.
 
-  /** Seal the next revision of the box `donorProps`, and return the ask that writes it over `donorProps`. Needs the bank unlocked.
+  /** Seal and return the next revision of the box `donorProps`. Needs the bank unlocked.
    * The revision applies `publicProps`, and encrypts the whisper of `secretProps`. An unknown key in either refuses.
    * Pass `donorProps` as you have it: whole or sparse, sealed or unsealed, a tombstone or the shell. It must be a box of this bank.
    * A whole live box's revision keeps its sidecar unless `publicProps` gives one. Over a sparse box, a tombstone or the shell,
    * `publicProps` must give the sidecar. After a tombstone or the shell, the revision begins the box's next life.
-   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead ({@link tombstoneBox}), returns a del
-   * ask, and refuses `secretProps` or any sidecar but `{}`.
-   * Its `written_at` is `publicProps.written_at`, or now. The ask cites `donorProps` sparse, and carries nothing of its whisper.
+   * Given `am: 'x'` in `publicProps`, it seals the tombstone of the live box instead, whose sealed empty whisper authenticates
+   * it, and refuses `secretProps` or any sidecar but `{}`.
+   * Its `written_at` is `publicProps.written_at`, or now.
    * @example
-   *   const { record } = await bank.sealBox(box, { sidecar: { account: 'work' } }, { whisper })
+   *   const box = await bank.sealBox(donor, { sidecar: { account: 'work' } }, { whisper })
    */
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<SealedBoxAsk<TombstoneOf<BoxRecord>>>
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<SealedBoxAsk<LiveOf<BoxRecord>>>
-  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<SealedBoxAsk>
-  async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<SealedBoxAsk> {
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<TombstoneOf<BoxRecord>>
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<LiveOf<BoxRecord>>
+  sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord>
+  async sealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<BoxRecord> {
     this.demandEnabled()
     this.#demandOwnBox(donorProps)
-    const record = await this.#gate.seal(BaseBox, donorProps, publicProps, secretProps)
-    const cited  = Thing.sparseOf(donorProps)
-    return BaseBox.isTombstone(record) ? this.makeDelAsk<BoxRecord>({ cited, record }) : this.makePutAsk<BoxRecord>({ cited, record })
+    return await this.#gate.seal(BaseBox, donorProps, publicProps, secretProps)
   }
 
   /** {@link sealBox}, resolving an `Outcome` instead of throwing. */
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<Outcome.Outcome<SealedBoxAsk<TombstoneOf<BoxRecord>>>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<Outcome.Outcome<SealedBoxAsk<LiveOf<BoxRecord>>>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<SealedBoxAsk>>
-  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<SealedBoxAsk>> {
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<Outcome.Outcome<LiveOf<BoxRecord>>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>>
+  trySealBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<Outcome.Outcome<BoxRecord>> {
     return Outcome.outcomeOf(() => this.sealBox(donorProps, publicProps, secretProps))
-  }
-
-  /** {@link sealBox}, first waiting for the bank to be unlocked ({@link ensureUnlocked}) on a locked bank.
-   * A box of another bank refuses before the wait, so it never asks the user to unlock.
-   */
-  sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxTombstonePublicProps): Promise<SealedBoxAsk<TombstoneOf<BoxRecord>>>
-  sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secretProps: BoxCleartexts): Promise<SealedBoxAsk<LiveOf<BoxRecord>>>
-  sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<SealedBoxAsk>
-  async sealBoxEnsuringUnlock(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: BoxPublicProps, secretProps?: BoxCleartexts): Promise<SealedBoxAsk> {
-    this.demandEnabled()
-    this.#demandOwnBox(donorProps)
-    await this.ensureUnlocked()
-    return await this.sealBox(donorProps, publicProps, secretProps)
-  }
-
-  /** Seal the tombstone of the live box `donorProps`, and return the del ask that writes it over `donorProps`. Needs the bank unlocked.
-   * Its sealed empty whisper authenticates it. Its `written_at` is `publicProps.written_at`, or now.
-   */
-  tombstoneBox(donorProps: Sealable<LiveOf<BoxRecord>>, publicProps: Partial<BoxTombstonePublicProps> = {}): Promise<SealedBoxAsk<TombstoneOf<BoxRecord>>> {
-    return this.sealBox(donorProps, { ...publicProps, am: 'x' })
   }
 
   /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
@@ -325,16 +305,6 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   /** {@link unsealBox}, resolving an `Outcome` instead of throwing. */
   tryUnsealBox(box: BoxRecord): Promise<Outcome.Outcome<BoxUnsealed>> { return Outcome.outcomeOf(() => this.unsealBox(box)) }
-
-  /** {@link unsealBox}, first waiting for the bank to be unlocked ({@link ensureUnlocked}) on a locked bank.
-   * A box of another bank refuses before the wait, so it never asks the user to unlock.
-   */
-  async unsealBoxEnsuringUnlock(box: BoxRecord): Promise<BoxUnsealed> {
-    this.demandEnabled()
-    this.#demandOwnBox(box)
-    await this.ensureUnlocked()
-    return await this.unsealBox(box)
-  }
   // --
 
   // == [Guards]: isEnabled, endCause, isLocked, isUnlocked, demandEnabled, demandOwnBox
