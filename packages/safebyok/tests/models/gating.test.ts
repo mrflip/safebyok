@@ -133,7 +133,7 @@ describe("Bank.birth(device, cleartexts)", () => {
   })
 
   // The vaultDB answers retcon, not passed, to a birth it stored already; passed on this bank is a vaultDB's answer alone.
-  it("unlocks where the vaultDB passes on this same bank, taking the root box it answers", async () => {
+  it("unlocks where the vaultDB passes on this same bank, adopting the root box it answers", async () => {
     const device = TH.makeDevice()
     const tryBirthBank = device.vaultDB.tryBirthBank.bind(device.vaultDB)
     const births = TH.spyBirths(device, async (ask) => {

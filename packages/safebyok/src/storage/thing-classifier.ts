@@ -233,8 +233,8 @@ function trackedEntryOf<RecordT extends ThingRecord>(check: StoredCheck<RecordT>
 // --
 
 // == [Classifying]: classifyGetThing, classifyWriteThing, ThingsFetched, classifyListThings, isChildLabelpath, classifyBirthBank
-// Each takes the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
-// a birth takes the bank's three roots, and where it is born, reports the world its puts wrote.
+// Each is given the raw bank and main gate of the ask's bank, fetched in the same step, and reports them as its `world`;
+// a birth is given the bank's three roots, and where it is born, reports the world its puts wrote.
 
 /** Classify a get against the raw Thing a store fetched at its scope, null for none. */
 export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.GotAct> {

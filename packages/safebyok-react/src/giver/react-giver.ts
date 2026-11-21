@@ -34,8 +34,8 @@ function carStaleTimeOf<CarT extends CarFields>(entry: Query<CarT, Error, CarT>)
 }
 
 // TanStack shares structure through this both between a query's cars and between what `select` returns from them, so a
-// value that is not a car takes TanStack's own default. When a hook's key changes, it shares the last key's selected value
-// with the new key's, so cars of two boxes take the default too: their agerank says nothing of which to show. A box's cars
+// value that is not a car gets TanStack's own default. When a hook's key changes, it shares the last key's selected value
+// with the new key's, so cars of two boxes get the default too: their agerank says nothing of which to show. A box's cars
 // never go back, so the newer car has everything the older one has, and nothing needs merging. Without this, a fetch
 // that read an older car and resolved after the bridge copied a newer one would put the older car back.
 /** Structural sharing for the host's item of a box: of two cars of one box, the one with the greater agerank, `prior` on a tie.

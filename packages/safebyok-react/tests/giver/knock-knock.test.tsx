@@ -88,7 +88,7 @@ function unlockAlertOf(err: unknown): string {
 }
 
 // React retains the FormData a form action is handed after the action ends: as the form's pending status, and in the
-// action's queued update. A field taken out before the first await is never in either.
+// action's queued update. A field removed before the first await is never in either.
 /** Take the text of `form`'s field `fieldname` out of it, or '' for none. */
 function takeText(form: FormData, fieldname: string): string {
   const val = form.get(fieldname)

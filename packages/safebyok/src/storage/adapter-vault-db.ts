@@ -58,7 +58,7 @@ export abstract class AdapterVaultDB implements VaultDB {
 
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
   // A subclass's `do*` calls these. A store that reaches some of the verdict itself overrides them to read it. Each
-  // takes the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
+  // is given the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
   protected classifyGetThing(ask: GetAsk, raw: unknown, world: WorldFetched): Actual<EX.GotAct> { return Classifier.classifyGetThing(ask, raw, world) }

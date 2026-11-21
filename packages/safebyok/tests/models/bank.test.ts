@@ -38,7 +38,7 @@ describe("Bank.mintStamps(scope)", () => {
     expect([two.bankStamp.born_at, two.gateStamp.born_at]).to.deep.equal([TH.T0 + 5, TH.T0 + 5])
   })
 
-  it("takes the scope of anything that has one, such as a device", () => {
+  it("accepts the scope of anything that has one, such as a device", () => {
     const { bankStamp } = Bank.mintStamps(TH.makeDevice())
     expect(bankStamp).to.include(TH.ThingBank)
     expect(bankStamp).to.not.have.property('device_tok')

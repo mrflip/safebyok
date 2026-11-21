@@ -31,7 +31,7 @@ describe("ThingMinder.make", () => {
     })
   }
 
-  it("takes its scope from the bank", () => {
+  it("has the bank's scope", () => {
     const { minder } = minderWorldOf(new MemoryVaultDB(), { isStarted: false })
     expect(minder.scope).to.deep.equal(TH.ThingBank)
   })
@@ -58,7 +58,7 @@ describe("ThingMinder.hello", () => {
     }
   })
 
-  it("takes a staleTime of Infinity for the minder's own, under which a full car never ages and a bare one is stale", async () => {
+  it("accepts a staleTime of Infinity as the minder's own, under which a full car never ages and a bare one is stale", async () => {
     vi.useFakeTimers()
     try {
       const vaultDB = new MemoryVaultDB()

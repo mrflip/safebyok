@@ -175,7 +175,7 @@ export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labe
 // == [What a listener is told]: MinderEvent, ThingEvent, ListingEvent, MinderEventOf
 
 // Each event spreads TanStack Query's cache event into our own, under TanStack's field names (`type`, `action.type`,
-// `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` takes.
+// `state`) so that a reader who knows its events reads ours. A change to this shape bumps ThingFormat, which `listen` is given.
 /** An event a minder's `listen` tells: a car's query changed, or a listing's. {@link ThingMinder.isThingEvent} tells them apart. */
 export type MinderEvent = ThingEvent | ListingEvent
 

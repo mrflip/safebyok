@@ -369,7 +369,7 @@ export class ThingMinder {
   }
 
   // TanStack matches query defaults by key prefix, and no prefix starts every listing's key and no car's, so each listing's
-  // key gets defaults of its own: without them a listing would take the cars', and be fetched and merged as a car.
+  // key gets defaults of its own: without them a listing would get the cars', and be fetched and merged as a car.
   // Under skipToken, TanStack never fetches the listing, and invalidating it only marks it stale.
   /** Set the query defaults of `scoped`'s listing, and answer its query key. */
   #setListingDefaults(scoped: ThingScope): TSQ.QueryKey {

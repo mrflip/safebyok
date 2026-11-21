@@ -39,7 +39,7 @@ describe("Device.make(record, opts)", () => {
     expect(device.modelkind).to.eq('device')
   })
 
-  it("takes the bag of browserOpts() spread in, ignoring its device database", () => {
+  it("accepts the bag of browserOpts() spread in, ignoring its device database", () => {
     const vaultDB = new MemoryVaultDB()
     const device = Device.make({ ...TH.WorldScope, device_tok: TH.DeviceTok }, { ...browserOpts({ dbName: 'device-test' }), vaultDB, logger: TH.quietLogger })
     expect(device.isEnabled).to.be.true

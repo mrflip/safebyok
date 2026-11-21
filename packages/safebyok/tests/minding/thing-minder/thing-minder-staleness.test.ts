@@ -16,13 +16,13 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(TH.GateScope, { staleTime: 0 })).to.be.true
   })
 
-  it("takes a staleTime given as undefined as the minder's own", async () => {
+  it("treats a staleTime given as undefined as the minder's own", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.GateScope)
     expect(minder.isStaleAt(TH.GateScope, { staleTime: undefined })).to.be.false
   })
 
-  it("takes an ask or a record as its scope", async () => {
+  it("accepts an ask or a record as its scope", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)
@@ -68,7 +68,7 @@ describe("ThingMinder.isStaleAt", () => {
     expect(minder.isStaleAt(TH.GateScope, { staleTime: Infinity })).to.be.false
   })
 
-  it("takes a staleTime up to MaxTimerMillis", async () => {
+  it("accepts a staleTime up to MaxTimerMillis", async () => {
     const { minder } = minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.GateScope)
     expect(minder.isStaleAt(TH.GateScope, { staleTime: MaxTimerMillis })).to.be.false

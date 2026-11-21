@@ -167,7 +167,7 @@ describe("BaseBox.tombstoneOf(donor)", () => {
     expect(next).to.include({ am: 'x', written_at: TH.T0 - 3 })
   })
 
-  it("takes the sidecar `{}` given, a tombstone's own", () => {
+  it("accepts the sidecar `{}` given, a tombstone's own", () => {
     const next = BaseBox.tombstoneOf(liveRevisionOf(), { sidecar: {}, written_at: TH.T0 - 3 })
     expect(next).to.deep.include({ am: 'x', written_at: TH.T0 - 3, sidecar: {} })
   })
@@ -177,7 +177,7 @@ describe("BaseBox.tombstoneOf(donor)", () => {
     expect(TH.thrownText(err)).to.include(Phrases.TombstoneSidecarNotEmpty)
   })
 
-  it("takes the am `'x'` given, a tombstone's own", () => {
+  it("accepts the am `'x'` given, a tombstone's own", () => {
     expect(BaseBox.tombstoneOf(liveRevisionOf(), { am: 'x' })).to.include({ am: 'x' })
   })
 

@@ -283,7 +283,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(TH.isZeroed(openedBytes)).to.be.true
   })
 
-  it("takes any value with a sealer's members, as it takes the class", async () => {
+  it("accepts any value with a sealer's members, as well as the class", async () => {
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(BoxSealerBag, TH.boxShellOf(), PublicProps, Cleartexts)
     expect(await lease.unseal(BoxSealerBag, sealed)).to.deep.include(Cleartexts)

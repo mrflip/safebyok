@@ -270,7 +270,7 @@ describe("ThingMinder.tryAt", () => {
     expect(minder.tryAt(TH.GateScope)).to.deep.include({ ok: true, act: 'gotlive', val: gate, car: carOf(gate), isTimely: true, isFetching: false, lastErr: null })
   })
 
-  it("takes options given as undefined as no opinion", async () => {
+  it("treats options given as undefined as left out", async () => {
     const vaultDB = new MemoryVaultDB()
     const gate    = await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)

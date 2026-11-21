@@ -15,7 +15,7 @@ describe("ThingMinder.get", () => {
     await TH.expectRefusal(minder.get({ ...TH.GateScope, banklabel: 'zz' }), 'bad_record')
   })
 
-  it("takes a staleTime given as undefined as the minder's own", async () => {
+  it("treats a staleTime given as undefined as the minder's own", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedGateOf(vaultDB, 0)
     const { minder } = minderWorldOf(vaultDB)

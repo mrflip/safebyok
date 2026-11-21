@@ -17,7 +17,7 @@ export type RecordOfKind<KindT extends Thingkind | null> = KindT extends Thingki
 export type Kinded<KindT extends Thingkind | null> = { readonly modelkind: KindT }
 
 // A member of ValT that is neither wider nor narrower than RecordT, nor wide enough for its shell, is another kind's
-// record: a BoxRecord, asked about as a gate. Each branch is ValT or never, so TypeScript takes the result as a ValT, as a
+// record: a BoxRecord, asked about as a gate. Each branch is ValT or never, so TypeScript reads the result as a ValT, as a
 // type predicate requires.
 /** The members of `ValT` that a record of `RecordT`'s kind, or its shell, may be. */
 export type MembersOfKind<ValT, RecordT extends Sparse<ThingRecord>> = ValT extends unknown
@@ -99,13 +99,13 @@ export abstract class BaseThing implements Sparse<ThingRecord> {
     return isVoidSentinelOfKind(this.modelkind, val)
   }
 
-  // The void sentinel is a whole tombstone, though no record check accepts it: a store must never take a shell as a record.
+  // The void sentinel is a whole tombstone, though no record check accepts it: a store must never treat a shell as a record.
   /** True when `record` is whole, with its body, and of this class's kind. The void sentinel is whole. */
   static isWhole<KindT extends Thingkind | null, ValT extends Sparse<ThingRecord>>(this: Kinded<KindT>, record: ValT): record is WholeOfKind<KindT, ValT> {
     return isWholeOfKind(this.modelkind, record)
   }
 
-  // Not a type predicate: TypeScript would take a false answer about a whole live record to mean it is no record at all.
+  // Not a type predicate: TypeScript would read a false answer about a whole live record to mean it is no record at all.
   /** True when `record` is live, of this class's kind, and not whole. */
   static isSparse<KindT extends Thingkind | null>(this: Kinded<KindT>, record: Sparse<ThingRecord>): boolean {
     return (record.am === 'a') && isOfKind(this.modelkind, record.labelpath) && (! isWholeOfKind(this.modelkind, record))

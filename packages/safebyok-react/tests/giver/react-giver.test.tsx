@@ -237,7 +237,7 @@ describe("useBoxRecord", () => {
     expect(world.counts.gets).to.eq(1)
   })
 
-  it("takes React Query's own options over the giver's defaults", async () => {
+  it("prefers React Query's own options to the giver's defaults", async () => {
     const { world, Acme, wrapper } = setup()
     world.stored.set(OpenaiPath, TH.fullCarOf(TH.fakeBoxRecordOf(OpenaiPath, 1)))
     const idle = renderHook(() => Acme.useBoxRecord(OpenaiPath, { enabled: false }), { wrapper })
