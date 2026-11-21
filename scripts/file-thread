@@ -58,7 +58,8 @@ fail() { echo "file-thread: $*" >&2; exit 1; }
 
 main="$(git -C "$root" worktree list --porcelain | sed -n '1s/^worktree //p')"
 [[ "$root" != "$main" ]] || fail "$root is the main checkout, not a thread's worktree"
-branch="$(git -C "$root" symbolic-ref -q --short HEAD)" || fail "$root has no branch checked out"
+branch="$(git -C "$root" branch --show-current)"
+[[ -n "$branch" ]] || fail "$root has no branch checked out"
 [[ -z "$(git -C "$root" status --porcelain)" ]] || fail "$root has uncommitted changes: commit them, or hand the thread to a worker"
 base="$(git -C "$root" config "branch.${branch}.sprintbase")" || fail "$branch records no base; set it with git config branch.${branch}.sprintbase <the SHA it was cut from>"
 
@@ -94,9 +95,9 @@ fi
 push_branch() {
   local pushed lease=()
   pushed="$(git -C "$root" rev-parse --verify --quiet "refs/remotes/origin/${branch}" || true)"
-  if [[ -n "$pushed" ]]; then lease=("--force-with-lease=${branch}:${pushed}"); fi
+  if [[ -n "$pushed" ]]; then lease=("--force-with-lease=refs/heads/${branch}:${pushed}"); fi
   git -C "$root" -c credential.helper= -c credential.helper='!gh auth git-credential' \
-    push --quiet ${lease[@]+"${lease[@]}"} origin "${branch}:${branch}"
+    push --quiet ${lease[@]+"${lease[@]}"} origin "refs/heads/${branch}:refs/heads/${branch}"
 }
 
 if [[ -n "$catch_up" ]]; then
@@ -172,4 +173,4 @@ if ! removal="$(git -C "$main" worktree remove "$root" 2>&1)"; then
   finish_removal "$removal" "$tip" "$dirty"
   tidied=", after its removal needed finishing by hand"
 fi
-echo "file-thread: $branch filed: $caught, proved, pushed at $(git -C "$main" rev-parse --short "$branch"), its worktree removed${tidied}."
+echo "file-thread: $branch filed: $caught, proved, pushed at $(git -C "$main" rev-parse --short "$tip"), its worktree removed${tidied}."
