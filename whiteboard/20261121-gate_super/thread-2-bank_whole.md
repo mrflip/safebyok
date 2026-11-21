@@ -1,6 +1,6 @@
 # Thread 2: bank_whole (2026-11-21)
 
-Branch `20261121-bank_whole`, PR #TBD, stacked on [#815](https://github.com/mrflip/safebyok/pull/815)
+Branch `20261121-bank_whole`, PR [#816](https://github.com/mrflip/safebyok/pull/816), stacked on [#815](https://github.com/mrflip/safebyok/pull/815)
 (`20261121-gate_holds`); the PR's base stays `main`. Proved: see the PR's **Tests:** line.
 
 The Coach: "The weird liminal gate-then-bank creation goes: a Bank fully constructs." A Bank is now made
