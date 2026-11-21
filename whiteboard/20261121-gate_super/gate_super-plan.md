@@ -5,7 +5,7 @@
   `thread-reviewer` on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **At once**: 3 (the line is two threads, stacked, so one runs at a time).
 * **Design**: `gate_super-design.md`, beside this file. It wins over this plan on the shape of the code.
-* **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 643; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
+* **Sprint doc**: https://claude.ai/artifact/QXN2XWNRYQG1e3WjwCijS5 (doc be7f75cf-e738-4c41-a935-e38fb389206e; Open Matters tab c8cbcdee-b8dd, body 2b3e8042-eb8b, State enum 746f6e46-9377, bookmark rev 644; Cleanup body 066fec2e-3b24; Progress body f5db6e4e-26ef; Resolved body 8456c1e0-084a).
 * **Status**: thread 1 ready (PR #815, no compactions), in a `high` review on opus; thread 2 waits on #815's review and on #813 (react_life's birth_verb, ready), which rewrites the same birth code.
 
 ## Read first
@@ -31,7 +31,10 @@
      friend: `#gateFriend() { return { m: () => this.#m() } }`, `#m() { return this.bankFriend.m() }`.
   3. `gate.seal` / `gate.unseal` underneath; `Bank` serves `sealBox` / `unsealBox` with `trySealBox` /
      `tryUnsealBox`, and `sealBoxEnsuringUnlock` / `unsealBoxEnsuringUnlock`, which await `ensureUnlocked()` first.
-     The names are back with the Coach (the answer was cut off).
+     Superseded in chat (the Coach, 2026-11-21): "any sugar or orchestration around unsealing: put that on bank for
+     the moment; leave gate to hold primitives (seal / unseal), bank has passthrough seal/unseal/trySeal/tryUnseal".
+     So `Bank` passes `seal` / `unseal` / `trySeal` / `tryUnseal` through to the gate, and keeps its sugar
+     (`sealBox`, `tombstoneBox`, `unsealBox`, the `…EnsuringUnlock` pair).
   4. The change signal is built into `Thing`: `subscribe`, bound, and a protected way to tell subscribers; `Gate` and
      `Bank` both use it.
 * **No crossing guards** (`#no-slop-crossings`). A gating reads what it needs of the gate before its first await, as
@@ -45,6 +48,9 @@
   redesign; if it looks wrong it probably is, propose a fix rather than heroics." Where `Device.hello` / `#bringUp`,
   `Bank.make`'s order or `device.adoptBornBank` fights the work, change it as little as gets the thread green, and
   write the proposed fix as an open matter.
+* **The line sits on react_life's** (the Coach, 2026-11-21): "would you mind rebasing on top of 814 and starting".
+  #815 rebases onto #814 (`20261121-new_passphrase`, which carries #813's `device.birthGating`); its PR says
+  "Stacked on #814", its base stays `main`.
 * **Check with your orchestrating agent before fanning out** to subagents beyond the ones your agent file names.
 
 ## Threads
