@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 6 filed, out of draft, in one line: #797 → #798 → #799 → #800 → #802 → #801. Thread 7 ready, in review (#803). Threads 8 and 9 building side by side, stacked on #803.
+* **Status:** running. Threads 1 to 7 filed, out of draft, in one line: #797 → #798 → #799 → #800 → #802 → #801 → #803. Threads 8 and 9 building side by side, stacked on #803. Thread 11 (giver_surface) waits on 8 and 9; thread 10 on 11.
 
 ## The goal
 
@@ -273,6 +273,7 @@ Serves thread 7: the parts and kit Knock-Knock needs. The Coach's text is quoted
 
 *Orchestrator:* cut from #801, the top of the line, on `thread-worker-400k`. Also adds `Knock.usePasskeyHeader()` to the giver (thread 6's gap).
 * *Orchestrator:* ready, #803. The worker stalled for hours mid-proof (a hung `pnpm justify` typecheck) and was resumed by message. Built the demo, `usePasskeyHeader` (a cheat over `useMutationState`), a new `safebyok-react-lean/testing` entry, `LocalStorageVaultDB` (a cheat over `_cheat_things`), and an integration test of every flow under jsdom; fixed a flaky #802 test as a ride-along. Locked and unlocked share one component so a knock waiting on the dialog keeps its result. Not yet clicked through in a browser.
+* *Review:* fixed (low). The cancel and wrong-passphrase cases now run the rule-2 search, and a new case shows the passkey button after a reload; four style fixes. Judged against the dream: it holds. Left: the key's mask keeps its last four secret characters in the plaintext sidecar (a TOP Open Matters row); doc blocks and names in `src/lib/anthropic.ts` (Cleanup). Out of bounds, noted: `LocalStorageVaultDB.#save` throwing after the memory write; `signIn` not guarding blocked storage.
 
 **"Once that's reached" is reached here.**
 
