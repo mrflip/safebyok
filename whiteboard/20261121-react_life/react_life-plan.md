@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 7 filed, out of draft, in one line ending at #803. Thread 8 ready, in review (#804). Thread 9 building. Thread 11 (giver_surface) waits on 8 and 9; thread 10 on 11.
+* **Status:** running. Threads 1 to 8 filed, out of draft: the line ends at #803, with #804 on it. Thread 9 building, on #803. Thread 11 (giver_surface) waits on 9; thread 10 on 11.
 
 ## The goal
 
@@ -287,6 +287,7 @@ Serves thread 10: envman lists its records. The Coach's text is quoted there.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 7. **Beside:** 9.
 * **Ready when:** a test adds a box and sees the listing grow, the same array until then.
 * *Orchestrator:* ready, #804, no compaction. `Knock.useBoxList()` (no args) answers host labelpaths in order, the same array until a box joins; deleted boxes stay listed (their `useBox` answers null). `Knock.keys.boxList()`; a new core static `ThingMinder.listQueryKeyOf(scope)`. The bridge copies listing successes into the host's item.
+* *Review:* fixed (medium). A doc block and an `@example` marker; the listing-fetch crossing got its `notes/wontfix.md` row. Rule 7 holds. Out of bounds, noted: a lock between `minder.list` and `listingAt`.
 
 ### 9. `use_draft`: drafts
 
