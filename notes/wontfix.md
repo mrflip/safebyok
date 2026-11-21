@@ -227,3 +227,41 @@ separate updates*). Written by the react_life thread 2 worker, 2026-11-21, await
 Steps to reproduce: sign in with the listing fetch pending; write a box through the device in the microtask between the fetch's `listingAt` and TanStack storing its answer.
 
 Reasoning for wontfix: it is a crossing of a write and a fetch of milliseconds (CLAUDE.md, *Hours separate updates*); the listing holds only labelpaths the vaultDB did store, and the fix puts a guard on a common path. Written by the react_life thread 8 reviewer, 2026-11-21, awaiting a ruling.
+
+### A lock that lands while a draft's field is on its way shows the field on a locked bank
+
+* current outcome: in `safebyok-react-lean`, focusing a draft's field (`useDraft(...).whisperField(fieldname)`) asks
+  `withWhisper` for the box. A `lock()` that lands after the bank is found unlocked, but before the callback writes the
+  field into the input, leaves the field shown, as text, on a locked bank, until the user leaves it. `WhisperText`
+  reveals the same way.
+* alternatives:
+  - have the callback ask whether the bank is still unlocked before it writes: a check for a crossing in the reveal's
+    path, and the lock may still land between that check and the write.
+  - have the lock reach into a reveal in flight: a lifecycle call reaching across a callback.
+* workaround: none needed: leaving the field masks and empties it, and the next focus asks for the unlock form.
+
+Steps to reproduce: focus a draft's field on an unlocked bank, and call `lock()` while the box is being unsealed, with
+the key deriver or the vaultDB's get held.
+
+Reasoning for wontfix: a lock comes a few times a day, and a reveal is in flight for milliseconds (CLAUDE.md, *Hours
+separate updates*). The whisper shown is the one the user asked for a moment before, it stays in the input's DOM value
+where it was going anyway, and nothing is written. A guard would sit in the reveal's path for a crossing. Written by
+the react_life thread 9 worker, 2026-11-21, awaiting a ruling.
+
+### A draft's field shown unedited while another device writes the box bases the draft on the newer revision
+
+* current outcome: a draft is based on the box stored when it is first edited. A field revealed shows the whisper of the
+  revision stored at the focus. When another device writes the box between that focus and the user's first keystroke,
+  the draft is based on the newer revision, so `isBehind` stays false and `put` writes over it, though the user saw the
+  older field.
+* alternatives:
+  - base the draft at the reveal: every focus would pin a base, and a draft merely looked at would go behind.
+  - compare the revealed field with the newer revision's: holds the whisper outside the callback, against rule 2.
+* workaround: none needed: the field the user typed is theirs to write, and the newer revision's other fields and
+  sidecar are what the draft starts from.
+
+Steps to reproduce: focus a draft's field, write the box from another device, then type into the field and put.
+
+Reasoning for wontfix: it needs a write from another device inside the moment between a focus and a keystroke, and what
+is written is what the user typed, over the newest revision. Catching it would mean a base pinned on every focus, or the
+whisper held outside its callback. Written by the react_life thread 9 worker, 2026-11-21, awaiting a ruling.

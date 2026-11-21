@@ -12,6 +12,7 @@ import {
 import { FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, nullifyThing, recordQueryDefaults } from './giver-defaults'
 import { type GiverConfig, type GiverSlotSnapshot, GiverSlot } from './giver-slot'
 import { type BoxQueryOpts, ScopeChecks } from './shapes-giver'
+import { makeUseDraft } from './use-draft'
 
 // == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, BoxQueryOptions, BoxQueries, PutBoxActionOpts, PutBoxActionResult, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
@@ -444,8 +445,10 @@ function makeBankGiver(slot: GiverSlot, useShownSnapshot: <SelT>(pick: (snap: Gi
     return useFormMutation('revokePasskey', (cleartexts: PasskeyRevokeCleartexts) => slot.demandBank().revokePasskeyGating(cleartexts))
   }
 
+  const useDraft = makeUseDraft(slot, { useBank, useBox, withWhisper })
+
   const bankGiver = Object.freeze({
-    useBank, usePasskeyHeader, useBox, useBoxList, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, lock, dismissUnlock,
+    useBank, usePasskeyHeader, useBox, useBoxList, boxQuery, keys, withWhisper, putBoxOnce, delBox, putBoxAction, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
   })
   return { bankGiver, boxQueryOf }

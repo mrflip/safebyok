@@ -59,7 +59,7 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'usePasskeyHeader', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'lock', 'dismissUnlock',
+      'useBank', 'usePasskeyHeader', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
     ])
   })
