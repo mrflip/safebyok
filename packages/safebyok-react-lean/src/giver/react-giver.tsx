@@ -6,7 +6,7 @@ import { type DataTag, type QueryKey, type UseMutationResult, type UseQueryOptio
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   Bank, type BankSnapshot, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, type Gating, type KeyDeriver, Labelpath, type LiveOf,
-  type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyWayinHeader, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
+  type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, PendingBank, type Sidecar, type Tombstone,
   type TombstoneOf, type UnlockCleartexts, type Userid, type VaultDB, type Whisper,
 } from 'safebyok'
 import { FormMutationDefaults, boxQueryKeyOf, boxesQueryKeyUnder, nullifyThing, recordQueryDefaults } from './giver-defaults'
