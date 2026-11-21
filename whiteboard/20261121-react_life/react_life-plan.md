@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** threads 1 to 15 merged (the Coach, 2026-11-21). Thread 16 (`birth_verb`, #813, on main) ready, in a high review; one compaction before its readiness check. Thread 17 (`new_passphrase`) building, stacked on #813. Then: the sprint PR rebased on top with notes/security.md reconciled, and wrap-up.
+* **Status:** threads 1 to 15 merged. Thread 16 (`birth_verb`, #813) filed and out of draft; thread 17 (`new_passphrase`, #814, stacked on #813) filing. Then: the sprint PR squashed and rebased on top with notes/security.md reconciled, and wrap-up.
 
 ## The goal
 
@@ -490,6 +490,8 @@ Earlier, on the shape: "it should call an unseal method that refuses: there shou
 * **Ready when:** nothing calls `adoptBornBank` and it is gone; `#bringUp` has no fixture-only branch; the giver's
   create-vault flow and both demos still birth a bank; the E5 row is in.
 
+* *Review:* flagged (high), then fixed on a second review (high). The first found the 'starting' refusal threw before the gating existed, leaving the host's passkey answer unzeroed (G2); a rework makes the gating, vacates it and throws, makes `keep` optional and checked, and fixes two doc blocks. Left: whether `Bank.birthGating` stays on the surface; `keep` vs `adopt` (VOCABULARY's vague verbs); a test asserting an answer stays live on an entry-point refusal (the declared deviation, in the drift entry); `keepNothing` unneeded; out of range, `gating.ts` drops its own copies unzeroed when the cleartext check refuses. One compaction before the readiness check.
+
 ### 17. `new_passphrase`: one new-passphrase hook, one reveal helper
 
 *Orchestrator:* added 2026-11-21 from the Closer Look triage (E10).
@@ -507,6 +509,8 @@ Earlier, on the shape: "it should call an unseal method that refuses: there shou
 * **Leaves out:** new behaviour; a passphrase never enters React state beyond what it does now.
 * **Levels:** `opus` worker, medium effort; review `medium`. **Depends on:** 16 (cut from its tip once ready).
 * **Ready when:** each concern is written once; both demos' tests pass unchanged in what they assert.
+
+* *Review:* fixed (medium). A lost doc block and quoted keys. Left: two draft fields waiting on one unlock both reveal (pre-existing, a guard would be new state); doc blocks of `useReveal`, `showWhisper`, `useNewPassphrase` (documentarian); STYLE.md's `"` for quoted keys vs big's `'`. `WhisperText` showing the old field after a prop change was closed by a keyed inner part (React's reset idiom), with a test, under the Coach's best-practices ruling.
 
 ## What no thread builds
 
