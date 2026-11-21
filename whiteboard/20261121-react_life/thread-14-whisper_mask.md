@@ -35,3 +35,9 @@ clean; knockknock 26, envman 24; `pnpm justify` green after the catch-up onto #8
   the live tail in the page), and the thread 12 row's workaround no longer cites the query example.
 * **Discoveries**: `notes/security.md`'s thread 12 entry saying the live reveal sits in the host's React Query cache is
   now wrong: neither demo holds it in any cache; it lives in the page alone. The orchestrator has it amended.
+* **Filing**: the Knock-Knock App test "adds a passkey, unlocks with it, and revokes it" flaked red under `pnpm justify`
+  (unlocked with no passkey ask). Cause: `addPasskey` writes the gate, then unlocks; the Remove passkey button shows on
+  the gate write, so the test's Lock could land before the add's unlock, which then unlocked the bank again (already a
+  `notes/wontfix.md` row: "A lock, a sweep or a second form verb while a form verb runs"). Reproduced by delaying
+  `#unlockByProving` 35-40 ms; the test now waits for the add's mutation to settle (`isMutating() === 0`) before Lock.
+  No code changed: nothing a user sees marks the add's end, and a guard would be a crossing fix.
