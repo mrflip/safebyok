@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 12 filed and out of draft, in one line ending at #808. Thread 13 (giver_device) ready as #809, stacked on #808, in review (medium, opus). Closer Look triage and answers are in the tab, awaiting the Coach.
+* **Status:** running. Threads 1 to 12 filed and out of draft, in one line ending at #808. Thread 13 (giver_device) ready as #809, in review. Thread 14 (whisper_mask) building, stacked on #809. Closer Look triage and answers are in the tab, awaiting the Coach.
 
 ## The goal
 
@@ -401,6 +401,25 @@ choice ("they go lower in the list at a priority you choose").
 * **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 12.
 * **Ready when:** no `slot` left in the package; a hook under the provider reads a non-null device; `useGate` shows a
   passkey added and revoked without a reload; the host's cache holds no wrapped bankKey and no secret (rule 2).
+
+### 14. `whisper_mask`: a part that shows a whisper's live mask, written into the page
+
+*Orchestrator:* added 2026-11-21 from the Coach's ruling on an Open Matters row (survey after thread 12).
+
+> The demos' tail-4 mask sits in the host's query cache → "can "the way whisper text does it" be made simple? I don't want a big deal, but it sounds like a dream interface would provide that"
+
+* **Builds:** a part beside `WhisperText`, which writes a whisper field's live mask into the page rather than into
+  React state or the host's query cache: unlocked, `mask(field, { tail })` of the unsealed whisper through
+  `withLockableWhisper`; locked, the stored mask from the sidecar through `ifLocked`; rewritten when the stage or the
+  box's revision changes. Small and plain; it should read as the simple form of what `WhisperText` does. Both demos
+  use it in place of their mask queries (`KeyMask`, `useValMask`), and `withLockableWhisper`'s doc example stops
+  teaching a query.
+* **Leaves out:** folding `WhisperText` and `useDraft`'s reveal into one helper (Closer Look E10, not yet ruled);
+  changing `mask`'s policy (a TODO entry, the Coach on #808).
+* **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 13.
+* **Ready when:** neither demo holds a mask in React Query; the part's test shows the stored mask locked, the live
+  tail unlocked, and the stored mask again on lock; rule 2 finds no secret, and the last four are in neither the page
+  nor any cache once locked.
 
 ## What no thread builds
 
