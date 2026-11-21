@@ -59,7 +59,7 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'useBox', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'lock', 'dismissUnlock',
+      'useBank', 'usePasskeyHeader', 'useBox', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
     ])
   })
@@ -236,6 +236,46 @@ describe("the form mutations", () => {
   it("refuses a birth gating while nobody is signed in", async () => {
     const { result } = await renderUnder((world) => world.Bank.useBirth(), {}, { userid: null })
     TH.expectSyncRefusal(() => result.current.gating({ passphraseCleartext: NewPassphrase }), 'absent_vault')
+  })
+})
+
+/** The passkey header beside the add and revoke mutations, over a world with the jokes bank stored, once it shows `locked`. */
+async function renderPasskeyHeader() {
+  const rendered = await renderUnder((world) => ({
+    header: world.Bank.usePasskeyHeader(), add: world.Bank.useAddPasskey(), revoke: world.Bank.useRevokePasskey(), stage: world.Bank.useBank((bank) => bank.stage),
+  }), { stored: 'jokes' })
+  await waitFor(() => { expect(rendered.result.current.stage).to.eq('locked') })
+  return rendered
+}
+
+describe("usePasskeyHeader", () => {
+  it("answers null while nobody is signed in", async () => {
+    const { result } = await renderUnder((world) => world.Bank.usePasskeyHeader(), {}, { userid: null })
+    expect(result.current).to.be.null
+  })
+
+  it("answers null for a bank with no passkey", async () => {
+    const { result } = await renderPasskeyHeader()
+    expect(result.current.header).to.be.null
+  })
+
+  // usePasskeyHeader @example
+  it("answers the passkey's header once one is added, and null again once it is revoked", async () => {
+    const { result, world } = await renderPasskeyHeader()
+    act(() => { result.current.add.mutate(result.current.add.gating({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })) })
+    await waitFor(() => { expect(result.current.header?.wayinkind).to.eq('passkey') })
+    expect(result.current.header).to.deep.equal(await TH._cheat_passkeyHeaderOf(world))
+    act(() => { result.current.revoke.mutate(result.current.revoke.gating({ passphraseCleartext: Passphrase })) })
+    await waitFor(() => { expect(result.current.header).to.be.null })
+  })
+
+  it("answers the same header at each render until the passkey changes", async () => {
+    const { result, rerender } = await renderPasskeyHeader()
+    act(() => { result.current.add.mutate(result.current.add.gating({ passphraseCleartext: Passphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })) })
+    await waitFor(() => { expect(result.current.header).to.not.be.null })
+    const { header } = result.current
+    rerender()
+    expect(result.current.header).to.eq(header)
   })
 })
 

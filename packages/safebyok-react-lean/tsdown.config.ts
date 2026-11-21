@@ -4,10 +4,10 @@ import { defineConfig } from 'tsdown'
 // writes package.json's entry points from what was built. publint and attw check the package the way a
 // consumer would, and fail the build on anything they find. `react` and react-query are peer dependencies,
 // so they stay external and this package uses the host's single copy of each. The entry also gets the
-// core's `@safebyok/source` condition, for the workspace's tsconfigs.
-//
+// core's `@safebyok/source` condition, for the workspace's tsconfigs. `testing`, for a host's own tests, is built from
+// tests/ and so named in an object beside the list; vitest is its optional peer, as it is the core's.
 export default defineConfig({
-  entry:      ['src/index.ts', 'src/parts/index.ts', 'src/kit/index.ts'],
+  entry:      ['src/index.ts', 'src/parts/index.ts', 'src/kit/index.ts', { testing: 'tests/testing.ts' }],
   root:       'src',
   format:     ['esm', 'cjs'],
   // 'browser' would be ignored for the CommonJS build, which tsdown 0.23.5 reports as an error. Nothing
