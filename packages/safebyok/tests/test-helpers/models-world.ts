@@ -1,6 +1,6 @@
 /** The test world of the lean core's models: fixed stamps, a fake clock, a device over a fast key deriver, passkey answers,
  * a bank born unlocked, a spy on births, a box's shell, a fake of the bank a lease is given, and the loudly named
- * backdoors that unwrap a wayin or read a lease's record from outside.
+ * cheats that unwrap a wayin or read a lease's record from outside.
  *
  * Time. Call {@link useFakeClock} at the top of a test file that reads a time a proving, a lease or a record carries: it
  * installs vitest's fake timers at {@link T0} before each test and puts real ones back after, so the package's clock
@@ -214,7 +214,7 @@ export function fakeLeaseBankOf(overrides: Partial<BankStamp> = {}): FakeLeaseBa
   return bank as unknown as FakeLeaseBank
 }
 
-/** A test backdoor: a lease `proving` builds on `bank` citing `gate`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
+/** A test cheat: a lease `proving` builds on `bank` citing `gate`, beside the record it was made of, read as `Lease.make` is handed it. No model hands out a lease's record. */
 export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gate: GateRevisionedStamp = WorldGate): Promise<{ lease: Lease, record: LeaseRecord }> {
   const make = vi.spyOn(Lease, 'make')
   const lease = await proving.buildLease(bank, gate)
@@ -230,12 +230,12 @@ export async function _cheat_grantedLease(proving: Proving, bank: LeaseBank, gat
 export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte) => byte === 0) }
 // --
 
-// == [Backdoor]: WayinSecret, _cheat_bankKeyBytesOf, _cheat_bankKeyOf
+// == [Cheats]: WayinSecret, _cheat_bankKeyBytesOf, _cheat_bankKeyOf
 
 /** The secret that unwraps a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes, for a passkey wayin. */
 export type WayinSecret = { passphrase: string } | { prfBytes: Uint8Array }
 
-/** A test backdoor: the raw bytes of the bankKey `wayin` wraps, unwrapped from outside the models from the secret, the wayin's header and the bank's and gate's stamps.
+/** A test cheat: the raw bytes of the bankKey `wayin` wraps, unwrapped from outside the models from the secret, the wayin's header and the bank's and gate's stamps.
  * It exists only so a test can show two wayins have one bankKey, or read what a seal is bound to; no model hands out a bankKey.
  * Rejects with WebCrypto's error when the wayin will not unwrap.
  */
@@ -251,7 +251,7 @@ export async function _cheat_bankKeyBytesOf(bankStamp: BankStamp, gateStamp: Gat
   return new Uint8Array(await crypto.subtle.exportKey('raw', bankKey))
 }
 
-/** A test backdoor: the bankKey of `bank`'s main gate, unwrapped by {@link TestPassphrase}, able to unwrap what a lease sealed. */
+/** A test cheat: the bankKey of `bank`'s main gate, unwrapped by {@link TestPassphrase}, able to unwrap what a lease sealed. */
 export async function _cheat_bankKeyOf(bank: Bank): Promise<CryptoKey> {
   const bankKeyBytes = await _cheat_bankKeyBytesOf(bank.stamp, bank.maingate.stamp, bank.maingate.main, { passphrase: TestPassphrase })
   return crypto.subtle.importKey('raw', bankKeyBytes as BufferSource, 'AES-GCM', false, ['unwrapKey'])

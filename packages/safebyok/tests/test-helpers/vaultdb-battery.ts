@@ -16,7 +16,7 @@ import { describeVaultDBTracked } from './vaultdb-battery-tracked'
 
 // == [The hooks a vaultDB hands the battery]: VaultDBRowCheats, VaultDBBatteryOpts
 
-/** A vaultDB's stored Things, past its verbs: the backdoor the battery plants a damaged Thing by, or takes one away. */
+/** A vaultDB's stored Things, past its verbs: the cheat the battery plants a damaged Thing with, or removes one with. */
 export type VaultDBRowCheats = {
   /** Stores `raw` as the Thing at `scope`, unchecked. A store that cannot write `raw` throws. */
   plant:  (scope: ThingScope, raw: unknown) => Helpers.Awaitable<void>
@@ -24,11 +24,11 @@ export type VaultDBRowCheats = {
   remove: (scope: ThingScope) => Helpers.Awaitable<void>
 }
 
-/** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the backdoor to what it stores. */
+/** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the cheat into what it stores. */
 export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
   /** A fresh, empty vaultDB. A store may empty one database for each it makes: a case uses only the vaultDB it made last. */
   makeVaultDB:   () => Helpers.Awaitable<DBT>
-  /** The backdoor to a vaultDB's stored Things. */
+  /** The cheat into a vaultDB's stored Things. */
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
   /** False for a vaultDB whose watch hears nothing; the battery then has no cases of a watch. */
   watches?:      boolean
@@ -44,7 +44,7 @@ const batteryOpts = Validator.objCheck(({ fn, bool }) => ({
 
 // == [The world the cases share]: VaultDBBatteryWorld, worldOf
 
-/** The world each part of the battery is handed: vaultDBs made fresh or with Things in them, and the backdoor to any of them. */
+/** The world each part of the battery is handed: vaultDBs made fresh or with Things in them, and the cheat into any of them. */
 export type VaultDBBatteryWorld = {
   /** A fresh, empty vaultDB. */
   fresh:     () => Promise<VaultDB>
@@ -58,7 +58,7 @@ export type VaultDBBatteryWorld = {
   boxesBorn: (vaultDB: VaultDB, ...boxes: BoxRecord[]) => Promise<BoxRecord[]>
   /** The Thing `vaultDB` stores at `labelpath`, or null for none; throws on a refusal. */
   gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<ThingRecord | null>
-  /** The backdoor to what `vaultDB` stores. */
+  /** The cheat into what `vaultDB` stores. */
   rowsOf:    (vaultDB: VaultDB) => VaultDBRowCheats
   watches:   boolean
 }

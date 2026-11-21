@@ -448,7 +448,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Unseal `box`, returning it with its whisper in place of the sealed one. Needs the bank unlocked.
-   * It authenticates the box, all but its sidecar. For a tombstone, that checks its signature.
+   * It authenticates the box, all but its sidecar. For a tombstone, that checks its seal.
    */
   async unsealBox(box: BoxRecord): Promise<BoxUnsealed> {
     const lease = this.#demandLease()

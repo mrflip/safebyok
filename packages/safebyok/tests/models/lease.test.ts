@@ -192,7 +192,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     expect(encode).not.toHaveBeenCalled()
   })
 
-  it("writes the box at the written_at given, and signs it: a box whose written_at moved will not unseal", async () => {
+  it("writes the box at the written_at given, and seals it: a box whose written_at moved will not unseal", async () => {
     const { lease } = await leaseWorld()
     const sealed = await lease.seal(BaseBox, TH.boxShellOf(), { ...PublicProps, written_at: TH.T0 - 5 }, Cleartexts)
     expect(sealed).to.include({ written_at: TH.T0 - 5, born_at: TH.T0 - 5 })
@@ -207,7 +207,7 @@ describe("lease.seal(sealer, donor, publicProps, secretProps) and lease.unseal(s
     await TH.expectRefusal(lease.seal(BaseBox, TH.boxShellOf(), { am: 'x' }), 'bad_record')
   })
 
-  it("writes a tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {
+  it("writes a tombstone at the written_at given, and seals it: a tombstone whose written_at moved will not unseal", async () => {
     const { lease } = await leaseWorld()
     const live = await lease.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts)
     const tombstone = await lease.seal(BaseBox, live, { am: 'x', written_at: TH.T0 + 7 })

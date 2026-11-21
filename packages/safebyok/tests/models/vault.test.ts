@@ -158,7 +158,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
     expect(await minder.list('box')).to.deep.equal([Openai])
   })
 
-  it("deletes a box by its signed tombstone, which unseals, lists, and a put brings back to life", async () => {
+  it("deletes a box by its sealed tombstone, which unseals, is listed, and which a put brings back to life", async () => {
     const { vault, minder } = await TH.buildBornVault()
     await bumpApicalls(vault)
     await vault.delBoxOnce(Openai)

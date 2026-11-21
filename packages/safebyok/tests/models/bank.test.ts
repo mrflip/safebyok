@@ -614,7 +614,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     expect(BoxChecks.record.parse(tombstone)).to.deep.equal(tombstone)
   })
 
-  it("writes the tombstone at the written_at given, and signs it: a tombstone whose written_at moved will not unseal", async () => {
+  it("writes the tombstone at the written_at given, and seals it: a tombstone whose written_at moved will not unseal", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: tombstone } = await bank.tombstoneBox(box, { written_at: TH.T0 + 21 })
@@ -669,8 +669,8 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     await TH.expectRefusal(bank.tombstoneBox(TH.boxShellOf()), 'bad_record')
   })
 
-  // A tombstone's signature is its sealed empty whisper, and the unseal is its check.
-  it("refuses 'damaged_whisper' for a tombstone made up without the bankKey, or signed by its live box's seal", async () => {
+  // A tombstone's seal is its sealed empty whisper, and the unseal is its check.
+  it("refuses 'damaged_whisper' for a tombstone made up without the bankKey, or sealed with its live box's seal", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const madeUp = { ...box, sidecar: {}, revtok: TH.revtokOf('madeup'), revseq: box.revseq + 1, am: 'x', lifeseq: Life1, lifepath: `${Life0}/${Life1}`, whisper_sealed: TH.FakeSealed } as const
@@ -678,7 +678,7 @@ describe("bank.tombstoneBox(donor), and the unseal of a tombstone", () => {
     await TH.expectRefusal(bank.unsealBox({ ...madeUp, whisper_sealed: box.whisper_sealed }), 'damaged_whisper')
   })
 
-  it("refuses 'damaged_whisper' for a tombstone carrying another tombstone's signature", async () => {
+  it("refuses 'damaged_whisper' for a tombstone carrying another tombstone's seal", async () => {
     const { bank } = await TH.buildBornBank()
     const { record: box } = await bank.sealBox(TH.boxShellOf(), { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const { record: one } = await bank.tombstoneBox(box)
