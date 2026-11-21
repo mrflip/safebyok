@@ -1,4 +1,4 @@
-/** `useNewPassphrase`, what a kit form keeps for a new passphrase and its confirmation: the strength meter and whether the two fields match. */
+/** `useNewPassphrase`, the state of a new passphrase and its confirmation, for a kit form or a host's own: the strength meter and whether the two fields match. */
 
 import { type ChangeEvent, type RefObject, useId, useRef, useState } from 'react'
 import type { ReactGiver } from '../giver/react-giver'
@@ -40,8 +40,9 @@ export type NewPassphraseFieldProps = Readonly<{
 
 // == [The hook]: useNewPassphrase
 
-/** The state of a form's new passphrase and its confirmation, judged by `giver`'s strength checker and compared in the page.
- * React keeps the verdicts, never the text.
+/** The verdicts on a new passphrase and its confirmation as the user types them, for a form of your own: how strong it is, and whether the two match.
+ * Spread `field` and `confirmField` onto two `PassphraseInput`s, show `verdictText` and `matchText` under them, enable the submit on `isReady`, and call `forget` from the form's `onReset`.
+ * `giver`'s strength checker judges the passphrase. React keeps the verdicts, never the text.
  */
 export function useNewPassphrase(giver: Pick<ReactGiver, 'useStrengthVerdict'>): NewPassphrase {
   const strength = giver.useStrengthVerdict()
