@@ -325,13 +325,17 @@ describe("device.getSnapshot() and device.subscribe(listener)", () => {
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
   })
 
-  it("stops telling a listener once it unsubscribes, and refuses one that is not a function", async () => {
+  it("stops telling a listener once it unsubscribes", async () => {
     const { bank, device } = await TH.buildBornBank()
     const listener = vi.fn()
     const unsubscribe = device.subscribe(listener)
     unsubscribe()
     bank.lock()
     expect(listener).not.toHaveBeenCalled()
+  })
+
+  it("refuses a listener that is not a function", async () => {
+    const { device } = await TH.buildBornBank()
     TH.expectSyncRefusal(() => device.subscribe(null as never), 'bad_record')
   })
 })
