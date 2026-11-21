@@ -236,6 +236,16 @@ export async function _cheat_grantedLease(proving: Proving, gate: LeaseGate, cit
 export function isZeroed(bytes: Uint8Array): boolean { return bytes.every((byte) => byte === 0) }
 // --
 
+// == [Subscribers]: countCalls
+
+/** A counter, read as `calls`, of the times a listener handed to `subscribe` is called. */
+export function countCalls(subscribe: (listener: () => void) => unknown): { readonly calls: number } {
+  const counter = { calls: 0 }
+  subscribe(() => { counter.calls += 1 })
+  return counter
+}
+// --
+
 // == [Cheats]: WayinSecret, _cheat_bankKeyBytesOf, _cheat_bankKeyOf
 
 /** The secret that unwraps a wayin: the passphrase, for a passphrase wayin, or a copy of the PRF bytes, for a passkey wayin. */

@@ -206,18 +206,11 @@ describe("gate.demandPasskeyAddable()", () => {
   })
 })
 
-/** A counter of the calls `subscribe` makes to a listener it is handed. */
-function countCalls(subscribe: (listener: () => void) => unknown): { readonly calls: number } {
-  const counter = { calls: 0 }
-  subscribe(() => { counter.calls += 1 })
-  return counter
-}
-
 describe("gate.subscribe(listener)", () => {
   it("tells its subscribers of a lock, an unlock, a wait opened and dismissed, a gate change and its end, and of nothing after", async () => {
     const { bank } = await TH.buildBornBank()
     const { gate } = bank
-    const counter = countCalls(gate.subscribe)
+    const counter = TH.countCalls(gate.subscribe)
     gate.lock()
     expect([counter.calls, gate.isLocked]).to.deep.equal([1, true])
     const ensuring = TH.expectRefusal(gate.ensureUnlocked(), 'dismissed')

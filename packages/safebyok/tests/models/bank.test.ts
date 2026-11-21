@@ -257,13 +257,6 @@ describe("bank.lock() and bank.sweep()", () => {
   })
 })
 
-/** A counter, read as `calls`, of the times a listener handed to `subscribe` is called. */
-function countCalls(subscribe: (listener: () => void) => unknown): { readonly calls: number } {
-  const counter = { calls: 0 }
-  subscribe(() => { counter.calls += 1 })
-  return counter
-}
-
 describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
   it("shows a born bank unlocked, its lease ending the device's lease length after it was proved", async () => {
     const { bank, device } = await TH.buildBornBank()
@@ -273,7 +266,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
 
   it("tells its subscribers once each for a lock, an `unlock` gating and a sweep, the snapshot the same object between them", async () => {
     const { bank } = await TH.buildBornBank()
-    const counter = countCalls(bank.subscribe)
+    const counter = TH.countCalls(bank.subscribe)
     const unlocked = bank.getSnapshot()
     expect(bank.getSnapshot()).to.equal(unlocked)
 
@@ -295,7 +288,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
 
   it("tells no subscriber of a call that changes nothing in the snapshot: a second lock or sweep, a wrong passphrase, or a box landing", async () => {
     const { bank, vault } = await TH.buildBornVault()
-    const counter = countCalls(bank.subscribe)
+    const counter = TH.countCalls(bank.subscribe)
     const unlocked = bank.getSnapshot()
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(bank.getSnapshot()).to.equal(unlocked)
@@ -310,7 +303,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
 
   it("shows the bank swept once its device is swept", async () => {
     const { bank, device } = await TH.buildBornBank()
-    const counter = countCalls(bank.subscribe)
+    const counter = TH.countCalls(bank.subscribe)
     device.sweep()
     expect(counter.calls).to.eq(1)
     expect(bank.getSnapshot()).to.include({ stage: 'swept', isEnded: true, endCause: bank.endCause })
@@ -320,7 +313,7 @@ describe("bank.getSnapshot() and bank.subscribe(listener)", () => {
     const { bank, device } = await TH.buildBornBank()
     bank.sweep()
     const swept = bank.getSnapshot()
-    const counter = countCalls(bank.subscribe)
+    const counter = TH.countCalls(bank.subscribe)
     bank.lock()
     device.sweep()
     expect(counter.calls).to.eq(0)
