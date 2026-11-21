@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 3 filed, out of draft (#797, #798, #799). Threads 4 and 5 building side by side, stacked on #799.
+* **Status:** running. Threads 1 to 3 filed, out of draft (#797, #798, #799). Thread 5 ready, in review (#800). Threads 4 and 6 building, 4 stacked on #799 and 6 on #800.
 
 ## The goal
 
@@ -237,6 +237,7 @@ Serves thread 7: the parts and kit Knock-Knock needs. The Coach's text is quoted
   `FormData` before its first await.
 * **Levels:** `opus`, high effort; review `medium`. **Depends on:** 3. **Beside:** 4.
 * **Ready when:** tests drive each kit form, and no passphrase or whisper is found after a submit.
+* *Orchestrator:* ready, #800, no compaction. Parts and kit take the bank as a prop (`bank={Knock}`, `giver={SOK}`), against the dream's bare `<UnlockForm />`: an Open Matters row. `CreateVaultForm` gained a confirmation field and a hidden `username` field, ported from the old kit. Kit words are English constants (my call: leave until a host asks).
 
 ### 6. `kit_ways_in`: the other gating verbs
 

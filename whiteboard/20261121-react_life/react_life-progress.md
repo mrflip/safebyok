@@ -62,3 +62,14 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
 * Form mutation keys `['sok', banklabel, verb]`; box keys carry the userid. Labelpaths flat.
 * Cheat: a fresh `device_tok` per device (`crypto.randomUUID()`) in `slot.start`.
 * The 400k worker built the whole thread in one context (about 290k tokens).
+
+## Thread 5, parts_kit (#800, ready)
+
+* Parts: `WhisperInput`, `PassphraseInput` (masked, uncontrolled, Show/Hide), `SubmitButton` (`useFormStatus`,
+  `whilePending`), `WhisperText` (Show calls `withWhisper`, `flushSync` mounts an element, `textContent` through a
+  ref). Kit: `UnlockForm`, `UnlockDialog` (modal while `isUnlockWanted`; Cancel or Escape calls `dismissUnlock`),
+  `CreateVaultForm` (meter plus confirmation).
+* Parts and kit take `bank={Knock}` (and `giver={SOK}`). `formActionOf(mutation, fieldnames, cleartextsOf)`,
+  private in `src/kit/form-action.ts`, deletes every listed field before any await and resolves true or false.
+* Thread 5's file, *How a kit form is assembled from parts*, is the recipe for any later kit form.
+* Test helper `TH.expectTextUnheld` searches the tree and both caches.
