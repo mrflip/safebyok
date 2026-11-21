@@ -16,9 +16,9 @@ function StageScreen({ world, kind, passkeyHeader = null }: Readonly<{ world: TH
   return (
     <>
       <p>{stage}</p>
-      {(kind === 'add') && <AddPasskeyForm bank={world.Bank} passkeyOpts={TH.PasskeyMaking} username="hue@example.com" />}
-      {(kind === 'revoke') && <RevokePasskeyForm bank={world.Bank} username="hue@example.com" />}
-      {(kind === 'unlock') && <PasskeyUnlockButton bank={world.Bank} passkeyHeader={passkeyHeader} />}
+      {(kind === 'add') && <AddPasskeyForm passkeyOpts={TH.PasskeyMaking} username="hue@example.com" />}
+      {(kind === 'revoke') && <RevokePasskeyForm username="hue@example.com" />}
+      {(kind === 'unlock') && <PasskeyUnlockButton passkeyHeader={passkeyHeader} />}
     </>
   )
 }

@@ -1,6 +1,7 @@
 /** `UnlockForm`, the passphrase form that unlocks a bank, and `UnlockDialog`, the same form as the dialog shown while a call waits on it. */
 
 import { useId, useRef } from 'react'
+import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
@@ -12,8 +13,8 @@ import { KitPhrases, refusalTextOf } from './phrases-kit'
 
 /** The props of an {@link UnlockForm}. */
 export interface UnlockFormProps {
-  /** The giver's bank, `SOK.bank(banklabel)`. */
-  bank:      Pick<BankGiver, 'useUnlock'>
+  /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
+  bank?:     Pick<BankGiver, 'useUnlock'> | undefined
   /** The account the passphrase is saved under in a password manager: the user's email, say. */
   username?: string | undefined
   /** Shows a Cancel button that calls it. */
@@ -23,9 +24,10 @@ export interface UnlockFormProps {
 /** The form that unlocks the bank by its passphrase, for stage `locked`. A wrong passphrase shows an alert and leaves the form open for another try.
  * The passphrase never reaches React's state or the mutation's variables. Every `withWhisper` waiting on the unlock resumes.
  * @example
- *   case 'locked': return <UnlockForm bank={Knock} username={user.email} />
+ *   case 'locked': return <UnlockForm username={user.email} />
  */
-export function UnlockForm({ bank, username, onCancel }: Readonly<UnlockFormProps>) {
+export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<UnlockFormProps>) {
+  const bank = useGivenBank(bankProp)
   const unlock = bank.useUnlock()
   const fieldRef = useRef<HTMLInputElement>(null)
   const alertId = useId()
@@ -67,8 +69,8 @@ export function UsernameField({ username }: Readonly<{ username: string }>) {
 
 /** The props of an {@link UnlockDialog}. */
 export interface UnlockDialogProps {
-  /** The giver's bank, `SOK.bank(banklabel)`. */
-  bank:      Pick<BankGiver, 'useBank' | 'useUnlock' | 'dismissUnlock'>
+  /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
+  bank?:     Pick<BankGiver, 'useBank' | 'useUnlock' | 'dismissUnlock'> | undefined
   /** The account the passphrase is saved under in a password manager: the user's email, say. */
   username?: string | undefined
 }
@@ -76,9 +78,10 @@ export interface UnlockDialogProps {
 /** The unlock form as a modal dialog, open while a call such as `withWhisper` waits for the bank to be unlocked. Mount it once, anywhere under the provider.
  * Cancel or Escape dismisses the wait: each waiting call rejects `dismissed`, and the bank stays locked.
  * @example
- *   <main><KeyEditor /><UnlockDialog bank={Knock} /></main>
+ *   <main><KeyEditor /><UnlockDialog /></main>
  */
-export function UnlockDialog({ bank, username }: Readonly<UnlockDialogProps>) {
+export function UnlockDialog({ bank: bankProp, username }: Readonly<UnlockDialogProps>) {
+  const bank = useGivenBank(bankProp)
   const isUnlockWanted = bank.useBank((snap) => snap.isUnlockWanted)
   const titleId = useId()
   if (! isUnlockWanted) { return null }

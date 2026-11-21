@@ -1,10 +1,10 @@
-import { QueryClient, QueryClientProvider, onlineManager, useQuery } from '@tanstack/react-query'
+import { QueryClient, QueryClientProvider, onlineManager, useMutation, useQuery } from '@tanstack/react-query'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { type ReactNode, useActionState, useEffect } from 'react'
 import { type BankSnapshot, type BoxRecord, type Gating, type Whisper, MemoryVaultDB, Thing, ThingMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { nullifyThing } from '../../src/giver/giver-defaults'
+import { liveOf } from '../../src/giver/giver-defaults'
 import { type PutBoxActionOpts, type PutBoxActionResult, reactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
@@ -59,8 +59,10 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'usePasskeyHeader', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBox', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
+      'useBank', 'usePasskeyHeader', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
+      'birthGating', 'unlockGating', 'replacePassphraseGating', 'addPasskeyGating', 'revokePasskeyGating',
+      'birthMutationOptions', 'unlockMutationOptions', 'replacePassphraseMutationOptions', 'addPasskeyMutationOptions', 'revokePasskeyMutationOptions',
     ])
   })
 
@@ -221,11 +223,29 @@ describe("the form mutations", () => {
     expect(world.deriver.heard).to.eq(1)
   })
 
-  it("keys each form mutation under the bank", async () => {
+  it("keys each form mutation under the user's bank", async () => {
     const { world, result } = await renderForm((world) => world.Bank.useUnlock(), 'locked')
     act(() => { result.current.form.mutate(result.current.form.gating({ passphraseCleartext: Passphrase })) })
     await waitFor(() => { expect(result.current.bank.stage).to.eq('unlocked') })
-    expect(world.client.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey)).to.deep.equal([['sok', 'acme', 'unlock']])
+    expect(world.client.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey)).to.deep.equal([['sok', TH.ProviderUser, 'acme', 'unlock']])
+  })
+
+  // unlockMutationOptions @example
+  it("unlocks through the host's own useMutation, handed a gating made outside any hook", async () => {
+    const { world, result } = await renderUnder((world) => ({ form: useMutation(world.Bank.unlockMutationOptions()), bank: world.Bank.useBank() }), { stored: 'jokes' })
+    await waitFor(() => { expect(result.current.bank.stage).to.eq('locked') })
+    const gating = world.Bank.unlockGating({ passphraseCleartext: Passphrase })
+    const vacates = watchVacates(gating)
+    await act(() => result.current.form.mutateAsync(gating))
+    expect(result.current.bank.stage).to.eq('unlocked')
+    expect(vacates.countOf()).to.equal(2)
+    expect(world.client.getMutationCache().getAll().map((mutation) => mutation.options.mutationKey)).to.deep.equal([['sok', TH.ProviderUser, 'acme', 'unlock']])
+  })
+
+  it("keys the standalone options under no user while nobody is signed in", async () => {
+    const world = await TH.buildProviderWorld()
+    expect([world.Bank.birthMutationOptions().mutationKey, world.Bank.revokePasskeyMutationOptions().mutationKey]).to.deep.equal([['sok', null, 'acme', 'birth'], ['sok', null, 'acme', 'revokePasskey']])
+    TH.expectSyncRefusal(() => world.Bank.unlockGating({ passphraseCleartext: Passphrase }), 'absent_vault')
   })
 
   it("refuses an unlock gating while the bank is unborn", async () => {
@@ -482,7 +502,7 @@ describe("useBoxList", () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBoxList().data)
     await waitFor(() => { expect(result.current).to.deep.equal([TH.JokesPath]) })
     const first = result.current
-    await act(() => world.Bank.delBox(TH.JokesPath))
+    await act(() => world.Bank.delBoxOnce(TH.JokesPath))
     expect(result.current).to.eq(first)
   })
 
@@ -584,7 +604,7 @@ describe("useQueryOptions", () => {
   })
 })
 
-describe("nullifyThing", () => {
+describe("liveOf", () => {
   const box = LeanTH.boxThingOf('jokes')
   const ThingCases = [
     [box,                         box,       'answers a live record itself'],
@@ -593,7 +613,7 @@ describe("nullifyThing", () => {
     [Thing.sparseOf(box),         undefined, 'answers undefined for a sparse record, whose body is not yet known'],
   ] as const
   for (const [thing, expected, blurb] of ThingCases) {
-    it(blurb, () => { expect(nullifyThing(thing as never)).to.eq(expected) })
+    it(blurb, () => { expect(liveOf(thing as never)).to.eq(expected) })
   }
 })
 
@@ -646,11 +666,11 @@ describe("putBoxOnce", () => {
   })
 })
 
-describe("delBox", () => {
+describe("delBoxOnce", () => {
   it("deletes the box, its tombstone in the host's query by the time it resolves, and useBox shows null", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-    const tombstone = await act(() => world.Bank.delBox(result.current.data!))
+    const tombstone = await act(() => world.Bank.delBoxOnce(result.current.data!))
     expect(world.client.getQueryData(JokesKey)).to.deep.equal(tombstone)
     await waitFor(() => { expect(result.current.data).to.be.null })
     expect(tombstone.am).to.eq('x')
@@ -673,7 +693,7 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
   })
   const seen: { result: PutBoxActionResult | null } = { result: null }
   function KeyEditor() {
-    const mask = world.Bank.useBox(TH.JokesPath, { select: (thing) => nullifyThing(thing)?.sidecar['mask'] }).data
+    const mask = world.Bank.useBox(TH.JokesPath, { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data
     const [result, putAction, isPutting] = useActionState(putJokesKey, null)
     useEffect(() => { seen.result = result }, [result])
     return (
@@ -681,7 +701,7 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
         <p>{(typeof mask === 'string') ? `Key ${mask}` : 'No mask'}</p>
         <input name="apiKey" type="password" aria-label="Key" />
         <button disabled={isPutting}>Save</button>
-        {(result !== null) && <output>{(result.error === null) ? 'Saved' : 'Refused'}</output>}
+        {(result !== null) && <output>{(result.err === null) ? 'Saved' : 'Refused'}</output>}
       </form>
     )
   }
@@ -739,7 +759,7 @@ describe("putBoxAction", () => {
     act(() => { world.Bank.lock() })
     submitKey()
     await screen.findByText('Refused')
-    const err = seen.result!.error
+    const { err } = seen.result!
     expect(isVaultError(err) && err.refusalkind).to.eq('bank_locked')
     expect(TH.holdsText(seen.result, TypedKey)).to.eq(false)
   })
@@ -753,7 +773,7 @@ describe("putBoxAction", () => {
     } })
     submitKey()
     await screen.findByText('Refused')
-    expect(seen.result?.error).to.eq(thrown)
+    expect(seen.result?.err).to.eq(thrown)
     expect([...forms[0]!.keys()]).to.deep.equal([])
   })
 
@@ -774,7 +794,7 @@ describe("putBoxAction", () => {
 
   it("resolves a refusal when handed something other than a FormData", async () => {
     const world = await TH.buildProviderWorld()
-    const { error: err } = await world.Bank.putBoxAction(TH.JokesPath, { whisperOf: whisperOfAnyForm })(null, { apiKey: TypedKey } as never)
+    const { err } = await world.Bank.putBoxAction(TH.JokesPath, { whisperOf: whisperOfAnyForm })(null, { apiKey: TypedKey } as never)
     expect(isVaultError(err) && err.refusalkind).to.eq('bad_record')
   })
 })

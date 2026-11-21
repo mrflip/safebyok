@@ -4,7 +4,7 @@ import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
 import { type BankSnapshot, type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sidecar, Thing, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
 import { PartsPhrases } from '../parts/phrases-parts'
-import { nullifyThing } from './giver-defaults'
+import { liveOf } from './giver-defaults'
 import type { GiverSlot } from './giver-slot'
 import * as Phrases from './phrases-giver'
 import type { BoxSelected, BoxShown } from './react-giver'
@@ -99,7 +99,7 @@ export function makeUseDraft(slot: GiverSlot, bank: DraftFriend) {
     const inputs = useRef(new Map<string, HTMLInputElement>())
 
     const baseThing = pinned ?? stored
-    const base = (baseThing === undefined) ? undefined : nullifyThing<BoxRecord>(baseThing)
+    const base = (baseThing === undefined) ? undefined : liveOf<BoxRecord>(baseThing)
     const baseSidecar = base?.sidecar ?? EmptySidecar
     const sidecar = sidecarSet ?? baseSidecar
     const isWhisperDirty = dirtyFieldnames.size > 0

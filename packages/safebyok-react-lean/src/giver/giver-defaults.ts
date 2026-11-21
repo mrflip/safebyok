@@ -3,7 +3,7 @@
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
 import { type Gating, type LiveOf, type Sparse, Thing, type ThingCited, ThingChecks, ThingMinder, type ThingRecord, type Tombstone, type Userid, newerThingOf } from 'safebyok'
 
-// == [Query defaults]: recordQueryDefaults, ListingQueryDefaults, newerOrSharedOf, isRecord, nullifyThing
+// == [Query defaults]: recordQueryDefaults, ListingQueryDefaults, newerOrSharedOf, isRecord, liveOf
 
 // A host may override anything the giver supplies here (the keys and each of these defaults), so nothing in the giver may
 // depend on one staying in place. The bridge copies each record into the host's item whatever that item's options say.
@@ -49,9 +49,9 @@ function isRecord(val: unknown): val is ThingCited & Readonly<{ labelpath: strin
 /** The record a host shows of `thing`: itself while live, null for a tombstone or the shell, undefined for a sparse record.
  * The shell is nothing stored, or deleted; a sparse record's body is not yet known. It is the default `select` of a box's query. Call it from a `select` of your own to start from what the default shows.
  * @example
- *   const title = useQuery({ ...sok.acme.box('openai'), select: (thing) => nullifyThing(thing)?.sidecar['title'] }).data
+ *   const title = useQuery({ ...sok.acme.box('openai'), select: (thing) => liveOf(thing)?.sidecar['title'] }).data
  */
-export function nullifyThing<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tombstone<RecordT>): LiveOf<RecordT> | null | undefined {
+export function liveOf<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tombstone<RecordT>): LiveOf<RecordT> | null | undefined {
   if (Thing.isTombstone(thing)) { return null }
   if (Thing.isSparse(thing))    { return undefined }
   return thing as LiveOf<RecordT>
@@ -79,7 +79,17 @@ async function attemptGating(gating: Gating): Promise<void> { await gating.attem
 function vacateGating(_data: unknown, _err: Error | null, gating: Gating): void { gating.vacate() }
 // --
 
-// == [Keys]: boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf
+// == [Keys]: formMutationKeyOf, formMutationsKeyUnder, boxQueryKeyOf, boxesQueryKeyUnder, boxListQueryKeyOf
+
+/** The host's React Query key for the mutation of the form verb `verb` in `userid`'s bank, `userid` null while nobody is signed in. */
+export function formMutationKeyOf({ userid, banklabel, verb }: Readonly<{ userid: Userid | null, banklabel: string, verb: string }>): QueryKey {
+  return ['sok', userid, banklabel, verb]
+}
+
+/** The key that starts the key of every form verb's mutation in `userid`'s bank: for `useMutationState`'s filters. */
+export function formMutationsKeyUnder({ userid, banklabel }: Readonly<{ userid: Userid | null, banklabel: string }>): QueryKey {
+  return ['sok', userid, banklabel]
+}
 
 // While nobody is signed in, a hook still needs a key: one of no user's, `null` where the userid goes, whose fetch is
 // skipped. It never matches a key the minder caches under.

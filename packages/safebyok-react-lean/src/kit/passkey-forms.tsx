@@ -2,6 +2,7 @@
 
 import { useId, useRef, useState } from 'react'
 import { type PasskeyAnswer, type VaultError, type WayinHeader, isVaultError } from 'safebyok'
+import { useGivenBank } from '../giver/giver-context'
 import type { BankGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
@@ -14,8 +15,8 @@ import { UsernameField } from './unlock-form'
 
 /** The props of an {@link AddPasskeyForm}. */
 export interface AddPasskeyFormProps {
-  /** The giver's bank, `SOK.bank(banklabel)`. */
-  bank:        Pick<BankGiver, 'useAddPasskey'>
+  /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
+  bank?:       Pick<BankGiver, 'useAddPasskey'> | undefined
   /** How the authenticator labels the new passkey: the relying party, and the account it lists the passkey under. */
   passkeyOpts: CreatePasskeyOpts
   /** The account the passphrase is saved under in a password manager: the user's email, say. */
@@ -26,9 +27,10 @@ export interface AddPasskeyFormProps {
  * Show it while the bank has no passkey, `Knock.usePasskeyHeader()` null. The bank is left unlocked.
  * A dismissed prompt adds nothing and says nothing; the passphrase field empties as after any submit. A browser or authenticator that cannot make a passkey shows why in the form.
  * @example
- *   <AddPasskeyForm bank={Knock} passkeyOpts={{ rp: { name: 'Knock-Knock' }, user: { name: user.email, displayName: user.name } }} />
+ *   <AddPasskeyForm passkeyOpts={{ rp: { name: 'Knock-Knock' }, user: { name: user.email, displayName: user.name } }} />
  */
-export function AddPasskeyForm({ bank, passkeyOpts, username }: Readonly<AddPasskeyFormProps>) {
+export function AddPasskeyForm({ bank: bankProp, passkeyOpts, username }: Readonly<AddPasskeyFormProps>) {
+  const bank = useGivenBank(bankProp)
   const add = bank.useAddPasskey()
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
@@ -68,8 +70,8 @@ export function AddPasskeyForm({ bank, passkeyOpts, username }: Readonly<AddPass
 
 /** The props of a {@link RevokePasskeyForm}. */
 export interface RevokePasskeyFormProps {
-  /** The giver's bank, `SOK.bank(banklabel)`. */
-  bank:      Pick<BankGiver, 'useRevokePasskey'>
+  /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
+  bank?:     Pick<BankGiver, 'useRevokePasskey'> | undefined
   /** The account the passphrase is saved under in a password manager: the user's email, say. */
   username?: string | undefined
 }
@@ -78,9 +80,10 @@ export interface RevokePasskeyFormProps {
 /** The form that removes the bank's passkey, here and on every other device, proved by the passphrase. The bank is left unlocked.
  * Show it while the bank has a passkey, `Knock.usePasskeyHeader()` not null.
  * @example
- *   {(passkeyHeader !== null) && <RevokePasskeyForm bank={Knock} username={user.email} />}
+ *   {(passkeyHeader !== null) && <RevokePasskeyForm username={user.email} />}
  */
-export function RevokePasskeyForm({ bank, username }: Readonly<RevokePasskeyFormProps>) {
+export function RevokePasskeyForm({ bank: bankProp, username }: Readonly<RevokePasskeyFormProps>) {
+  const bank = useGivenBank(bankProp)
   const revoke = bank.useRevokePasskey()
   const fieldRef = useRef<HTMLInputElement>(null)
   const alertId = useId()
@@ -114,8 +117,8 @@ export function RevokePasskeyForm({ bank, username }: Readonly<RevokePasskeyForm
 
 /** The props of a {@link PasskeyUnlockButton}. */
 export interface PasskeyUnlockButtonProps {
-  /** The giver's bank, `SOK.bank(banklabel)`. */
-  bank:          Pick<BankGiver, 'useUnlock'>
+  /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
+  bank?:         Pick<BankGiver, 'useUnlock'> | undefined
   /** The header of the bank's passkey, or null while it has none. */
   passkeyHeader: WayinHeader | null
   /** The relying-party id the passkey was made under, and how long the browser waits. */
@@ -125,9 +128,10 @@ export interface PasskeyUnlockButtonProps {
 /** A button that unlocks the bank by its passkey, for stage `locked`. It renders nothing while the bank has no passkey, or the browser cannot use one.
  * A dismissed prompt changes nothing; a wrong passkey, or a browser that cannot ask, shows why beside the button.
  * @example
- *   case 'locked': return <><UnlockForm bank={Knock} /><PasskeyUnlockButton bank={Knock} passkeyHeader={passkeyHeader} /></>
+ *   case 'locked': return <><UnlockForm /><PasskeyUnlockButton passkeyHeader={passkeyHeader} /></>
  */
-export function PasskeyUnlockButton({ bank, passkeyHeader, askOpts }: Readonly<PasskeyUnlockButtonProps>) {
+export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader, askOpts }: Readonly<PasskeyUnlockButtonProps>) {
+  const bank = useGivenBank(bankProp)
   const unlock = bank.useUnlock()
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const alertId = useId()
