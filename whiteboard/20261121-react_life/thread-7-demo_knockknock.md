@@ -1,6 +1,6 @@
 # Thread 7: demo_knockknock (2026-11-21)
 
-Branch `20261121-demo_knockknock`, PR #PRNUM, stacked on #801. Proved: `safebyok-demo-knockknock` lint, typecheck, test (4 files, 25: the app's integration test 8, `local-vault-db` 4, `session` 9, `anthropic` 4), `vite build`; `safebyok-react-lean` lint, typecheck, test (12 files, 189) and build (attw, publint). `pnpm demo:knockknock` serves the page; nobody has clicked through it in a real browser yet.
+Branch `20261121-demo_knockknock`, PR #803, stacked on #801. Proved: `safebyok-demo-knockknock` lint, typecheck, test (4 files, 25: the app's integration test 8, `local-vault-db` 4, `session` 9, `anthropic` 4), `vite build`; `safebyok-react-lean` lint, typecheck, test (12 files, 189) and build (attw, publint). `pnpm demo:knockknock` serves the page; nobody has clicked through it in a real browser yet.
 
 * **Built**
   * **`Knock.usePasskeyHeader()`** (`packages/safebyok-react-lean/src/giver/react-giver.tsx`): the bank's passkey header, or null. A marked cheat: the bank's snapshot carries no gate, so it reads `slot.device?.bank?.maingate.passkey0` during render, and re-renders on each change of stage (`useBank`) and each successful form mutation under `['sok', banklabel]` (`useMutationState`); the header is memoized on the `Wayin`, so it is the same object until the passkey changes. Tests: `describe("usePasskeyHeader")` in `react-giver.test.tsx` (4).
