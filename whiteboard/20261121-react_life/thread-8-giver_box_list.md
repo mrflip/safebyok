@@ -1,6 +1,6 @@
 # Thread 8: giver_box_list (2026-11-21)
 
-Branch `20261121-giver_box_list`, PR #804, stacked on #803. Proved: `safebyok-react-lean` lint, typecheck, test (giver: 3 files, 113); `safebyok` `thing-minder-keys.test` (6).
+Branch `20261121-giver_box_list`, PR #804, stacked on #803. Proved: `pnpm justify` green after catch-up onto #803 at ef1cc6873 (safebyok 1338, safebyok-react-lean 196, demo-knockknock 26, e2e 576, and the rest).
 
 * **Built**
   - **`Knock.useBoxList()`** (`react-giver.tsx`, in `makeBankGiver`): `useQuery` over the root box's listing, with the userid `useShownSnapshot` shows. No arguments: labelpaths are flat, so the root is the only listing.
