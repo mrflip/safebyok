@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 8 filed, out of draft: the line ends at #803, with #804 on it. Thread 9 building, on #803. Thread 11 (giver_surface) waits on 9; thread 10 on 11.
+* **Status:** running. Threads 1 to 8 filed, out of draft (line ends #803, #804 on it). Thread 9 ready, in review (#805, on #803). Then #805 restacks onto #804, thread 11 is cut from the top, and thread 10 after it.
 
 ## The goal
 
@@ -298,6 +298,7 @@ Serves thread 10: envman's masked editor with save and undo. The Coach's text is
 * **Leaves out:** `rebase`.
 * **Levels:** `opus`, high effort; review `medium`. **Depends on:** 7. **Beside:** 8.
 * **Ready when:** a test does focus, reveal, edit, put, and focus, edit, discard, with no secret found.
+* *Orchestrator:* ready, #805, no compaction. `Knock.useDraft` in `src/giver/use-draft.ts`; answers `isDirty`, `isWhisperDirty`, `isBehind`, `base`, `sidecar`, `setSidecar`, `whisperField(fieldname)` (props for a plain `<input>`), `put(opts?)` with `sidecarOf`, `discard`, `lastErr`. `put` cites the base (`stale_write` when behind) and waits for unlock. `es-toolkit` added as a runtime dependency. Two wontfix rows. My calls on Cleanup; the dream's comment amended.
 
 ### 10. `demo_envman`: the envman app
 

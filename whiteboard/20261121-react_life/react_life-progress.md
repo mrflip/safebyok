@@ -138,3 +138,16 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
 * **Form mutation keys carry the userid** (`['sok', userid, banklabel, verb]`): thread 11.
 * **The sidecar mask is tuneable, one schedule for everyone**, default first 7 and last 4 characters; revealing a few
   is by design (which key, was it rotated). Thread 11 adds the helper; `notes/security.md` records it.
+
+## Thread 9, use_draft (#805, ready)
+
+* `Knock.useDraft(labelpath)` (`src/giver/use-draft.ts`): `isDirty`, `isWhisperDirty`, `isBehind`, `base`,
+  `sidecar`, `setSidecar`, `whisperField(fieldname)`, `put(opts?)`, `discard`, `lastErr`. Types `Draft`,
+  `DraftPutOpts`, `WhisperFieldProps` exported.
+* **For envman:** spread `draft.whisperField('val')` onto a plain `<input>`. Stamp on Save:
+  `draft.put({ sidecarOf: (_whisper, sidecar) => draft.isWhisperDirty ? { ...sidecar, last_rotated_at: Date.now() } : sidecar })`.
+  The gear modal can `setSidecar` and leave Save to write it, or put through its own `sidecarOf`; `setSidecar` then
+  `put` in one handler writes the old sidecar. A draft edits stored boxes only (`absent_box` otherwise): the add form
+  uses `putBoxOnce` or `putBoxAction`.
+* `put` cites the base (refuses `stale_write` when behind) and goes through `withWhisper` (waits for unlock).
+* Expect a one-line conflict with #804 in `react-giver.test.tsx`'s list of bank-giver keys.
