@@ -22,7 +22,7 @@ export function bankSwept(): Errors.VaultError { return new Errors.VaultError('d
 /** A `disabled` refusal: the device's `hello` has not answered. */
 export function bankNotBroughtUp(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankNotBroughtUp) }
 
-/** A `disabled` refusal: the gate was swept, as its bank's sweep sweeps it. */
+/** A `disabled` refusal: the gate was swept. */
 export function gateSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.GateSwept) }
 
 /** A `dismissed` refusal: the wait for an `unlock` gating was dismissed. */

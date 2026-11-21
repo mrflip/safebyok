@@ -283,8 +283,8 @@ export class Gate extends Thing<GateRecord, ThingScope, GateStamp> implements Ga
   }
 
   // It shuts first, so that a subscriber told of the end finds every call refusing.
-  /** End this gate for good: drop its lease, and reject every call waiting for an `unlock` gating. Never throws.
-   * Every call after meets `endCause`: its bank's sweep passes the bank's own. Left out, it is the device's, or a `disabled` refusal.
+  /** End this gate for good: drop its lease, and reject every call waiting for an `unlock` gating.
+   * Every call after meets `endCause`, or, left out, the device's end cause or a `disabled` refusal. An `endCause` that is not a refusal refuses `bad_record`; nothing else throws.
    * Its subscribers hear of the end, and of nothing after.
    */
   sweep(endCause: Errors.VaultError | null = null): this {
