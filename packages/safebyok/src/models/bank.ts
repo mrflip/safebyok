@@ -6,11 +6,11 @@ import { Device } from './device'
 import { Gate } from './gate'
 import type { BirthGating } from './gating'
 import type { BirthCleartexts } from '../shapes/shapes-gateish'
-import type { BankAskDraft, BankDna, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
-import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, ShellOf, TombstoneOf } from '../shapes/shapes-sealers'
+import type { BankAskDraft, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
+import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
 import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, Shell, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../shapes/shapes-asks'
 import type { VaultDB } from '../storage/vault-db'
@@ -30,7 +30,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   readonly #gate: Gate
 
   /** The root box, as the bank was made with it. */
-  readonly #rootBox: LiveOf<BoxRecord> | ShellOf<BoxRecord>
+  readonly #rootBox: LiveOf<BoxRecord>
 
   /** The vaults made on this bank, which its sweep sweeps. */
   readonly #vaults = new Set<HostedVault>()
@@ -64,7 +64,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   get gate(): Gate { return this.#gate }
 
   /** The root box, as the bank was made with it. Every box of this bank is under it. */
-  get rootBox(): LiveOf<BoxRecord> | ShellOf<BoxRecord> { return this.#rootBox }
+  get rootBox(): LiveOf<BoxRecord> { return this.#rootBox }
 
   /** The revseq and lifepath this object has of the bank, its main gate and its root box, which every ask it makes tracks. */
   get track(): Track {
@@ -82,21 +82,22 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
   // == [Construction]: make, constructor, mintStamps, makeRecord
 
-  /** Make the bank of `record`, with its main gate and root box, on `opts.device`, with its boxes in `opts.vaultDB`. Locked, and nothing is fetched or stored.
-   * The device is not told of it: a device makes its own bank in its `hello`, and is handed the bank its birth makes.
+  /** Make the bank of `record`, with `opts.gate` as its main gate, on `opts.device`, with its boxes in `opts.vaultDB`. Nothing is fetched or stored.
+   * It is locked or unlocked as its gate is. The device is not told of it: a device makes its own bank in its `hello`, and is handed the bank its birth makes.
    */
   static make(record: BankMakeRecord, opts: BankOpts): Bank { return new Bank(record, opts) }
 
   private constructor(record: BankMakeRecord, opts: BankOpts) {
-    const { record: { maingate, rootBox, ...rest }, opts: { device, vaultDB } } = Checks.bankMakeArgs.parse({ record, opts })
+    const { record: { rootBox, ...rest }, opts: { device, vaultDB, gate } } = Checks.bankMakeArgs.parse({ record, opts })
     const bankRecord = BankChecks.record.parse(rest)
     Validator.checkedConsistent(StampChecks.bankScope.parse(bankRecord), device.scope, { kind: 'record_conflict' })
+    Validator.checkedConsistent(gate.bankStamp, BankChecks.stamp.parse(bankRecord), { kind: 'record_conflict' })
     Validator.checkedConsistent(rootBox, { ...StampChecks.bankScope.parse(bankRecord), labelpath: 'box' }, { kind: 'record_conflict' })
     super(bankRecord)
     this.#device = device
     this.#vaultDB = vaultDB
     this.#rootBox = Object.freeze(rootBox)
-    this.#gate = Gate.make(maingate, { device, vaultDB, bankStamp: this.stamp })
+    this.#gate = gate
     this.#snapshot = this.#makeSnapshot()
     // The bank's sweep sweeps its gate, which then lets go of this listener.
     this.#gate.subscribe(() => { this.#align() })
@@ -115,14 +116,12 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
     }
   }
 
-  /** The first record of a new bank, made from `dna`, with its main gate and its root box's shell. The birth seals the root box over the shell. */
-  static makeRecord(dna: BankDna): BankMakeRecord {
-    const { userid, banklabel, lifeseq, born_at } = BankChecks.stamp.parse(dna)
-    const bank = BankChecks.record.parse({
+  /** The first record of a new bank's Thing, of `stamp`, born at its `born_at`. */
+  static makeRecord(stamp: BankStamp): BankRecord {
+    const { userid, banklabel, lifeseq, born_at } = BankChecks.stamp.parse(stamp)
+    return BankChecks.record.parse({
       userid, banklabel, labelpath: 'bank', label: 'bank', fmt: ThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
     })
-    const rootBox = BoxChecks.liveOrShell.parse(Shell.of({ userid, banklabel, labelpath: Labelpath.RootBox }))
-    return { ...bank, maingate: Gate.makeRecord(dna.maingate), rootBox }
   }
   // --
 
@@ -355,12 +354,13 @@ function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepat
 const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
   device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
   hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
-  // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
+  // The bank's Thing is strict and refined, so it is checked apart, once the root box is removed.
   bankMakeArgs: obj({
-    record: obj({ maingate: GateChecks.record, rootBox: BoxChecks.liveOrShell }).loose(),
+    record: obj({ rootBox: BoxChecks.live }).loose(),
     opts:   obj({
-      device:         custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
-      vaultDB:        ThingChecks.vaultDBShape,
+      device:  custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
+      vaultDB: ThingChecks.vaultDBShape,
+      gate:    custom<Gate>((val) => val instanceof Gate, Phrases.GateExpected),
     }),
   }),
 }))

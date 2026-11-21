@@ -68,7 +68,7 @@ export type ProvedCleartexts = { passphraseCleartext: GX.PassphraseCleartext, pa
 
 // == [Given to a gating]: BirthGatingFriend, GateGatingFriend
 
-/** The gate's private unlock, for {@link Bank.birth}'s gating to call on the gates it makes, and the attaching of the bank it births to whoever made the gating. Internal. */
+/** The gate's private unlock, for {@link Bank.birth}'s gating to call on the gate it makes, and the attaching of the bank it births to whoever made the gating. Internal. */
 export interface BirthGatingFriend {
   /** Unlock `gate` under a lease `proving` builds, citing the revision `gate` models. */
   unlockByProving: (gate: Gate, proving: Proving) => Promise<Gate>

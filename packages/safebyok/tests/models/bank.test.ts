@@ -1,11 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Crypto, Errors, SX } from 'safebyok-big/internals'
+import { Crypto, Errors } from 'safebyok-big/internals'
 import { Bank } from '../../src/models/bank'
 import { type BadNews, type BankMakeRecord, bankStageVals } from '../../src/shapes/shapes-bankish'
 import { Gate } from '../../src/models/gate'
 import { Lease } from '../../src/models/lease'
 import type { LiveOf, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { Lifeseq } from '../../src/shapes/primitives'
+import type { BankStamp } from '../../src/shapes/shapes-stamps'
 import { type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { BoxChecks } from '../../src/shapes/shapes-thingkinds'
 import { Thing } from '../../src/models/thing'
@@ -57,59 +58,61 @@ describe("Bank.mintStamps(scope)", () => {
   }
 })
 
-describe("Bank.makeRecord(dna)", () => {
-  it("is the bank's Thing at its first revision, of its stamp, with its main gate's first record and its root box's", async () => {
-    const { record, bank } = await TH.buildBornBank()
+describe("Bank.makeRecord(stamp)", () => {
+  it("is the bank's Thing at its first revision, of its stamp", () => {
+    const record = Bank.makeRecord(TH.WorldBankStamp)
     expect(record).to.include({ ...TH.WorldBankStamp, labelpath: 'bank', label: 'bank', fmt: ThingFormat, revseq: 0, am: 'a', lifepath: Life0, written_at: TH.T0 })
-    expect(record.maingate).to.include({ ...TH.WorldGateStamp, label: 'gate', fmt: ThingFormat, revseq: 0, am: 'a', lifepath: Life0, written_at: TH.T0 })
-    expect(record.maingate.wayins).to.deep.equal({ main: bank.gate.main.pickle(), passkey0: null })
-    expect(Object.keys(record)).to.have.members([...BankFields, 'maingate', 'rootBox'])
+    expect(Object.keys(record)).to.have.members(BankFields)
   })
 
-  it("makes the root box its shell, which the birth seals as the first revision of its first life", async () => {
-    const { record, bank } = await TH.buildBornBank()
-    expect(record.rootBox).to.deep.equal({ ...TH.RootScope, label: 'box', fmt: ThingFormat, ...Shell.Cited, lifeseq: Shell.VoidLifeseq, born_at: SX.VoidTime, written_at: SX.VoidTime })
-    expect(bank.rootBox).to.include({ ...TH.RootScope, revseq: 0, am: 'a', lifeseq: Life0, lifepath: Life0, born_at: TH.T0, written_at: TH.T0 })
-    expect(bank.rootBox).to.include.keys('sidecar', 'whisper_sealed')
+  it("mints a new revtok on each call", () => {
+    expect(Bank.makeRecord(TH.WorldBankStamp).revtok).to.not.eq(Bank.makeRecord(TH.WorldBankStamp).revtok)
   })
 
-  it("refuses a dna with no main gate, a malformed one, or none at all", async () => {
-    const { record } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Bank.makeRecord({ ...TH.WorldBankStamp } as never))
-    TH.expectSyncRefusal(() => Bank.makeRecord({ ...TH.WorldBankStamp, maingate: { ...TH.WorldGateStamp, wayins: record.maingate.wayins } } as never))
-    TH.expectSyncRefusal(() => Bank.makeRecord(null as never))
-  })
-
-  it("refuses a dna with no lifeseq", async () => {
-    const { record, device } = await TH.buildBornBank()
-    const bank = Bank.make(record, { device, vaultDB: device.vaultDB })
-    const dna = { ...TH.omitting(TH.WorldBankStamp, 'lifeseq'), maingate: { ...TH.WorldGateStamp, wayins: { main: bank.gate.main, passkey0: null } } }
-    TH.expectSyncRefusal(() => Bank.makeRecord(dna), 'bad_record')
+  it("refuses a stamp with no lifeseq, or none at all", () => {
+    TH.expectSyncRefusal(() => Bank.makeRecord(TH.omitting(TH.WorldBankStamp, 'lifeseq')), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.makeRecord(null as never), 'bad_record')
   })
 })
 
-describe("Bank.make(record, { device, vaultDB })", () => {
-  it("makes a locked bank of the record, its main gate a Gate of the same life, on the device", async () => {
-    const { record, device } = await TH.buildBornBank()
-    const bank = Bank.make(record, { device, vaultDB: device.vaultDB })
+/** A locked gate made from the main gate `born` stored, for the bank stamped `bankStamp`, or `born`'s own bank by default. */
+function storedGateOf(born: TH.BornBank, bankStamp: BankStamp = born.record): Gate {
+  return Gate.make(born.gateRecord, { device: born.device, vaultDB: born.device.vaultDB, bankStamp })
+}
+
+describe("Bank.make(record, { device, vaultDB, gate })", () => {
+  it("makes a bank of the record with the gate given as its main gate, on the device, locked as its gate is", async () => {
+    const born = await TH.buildBornBank()
+    const { record, device } = born
+    const gate = storedGateOf(born)
+    const bank = Bank.make(record, { device, vaultDB: device.vaultDB, gate })
     expect(bank.isLocked).to.be.true
     expect(bank.isUnlocked).to.be.false
     expect(bank.stamp).to.deep.equal(TH.WorldBankStamp)
     expect(bank.scope).to.deep.equal(TH.ThingBank)
     expect(bank.device).to.equal(device)
     expect(bank.device_tok).to.eq(TH.DeviceTok)
-    expect(bank.gate).to.be.instanceOf(Gate)
-    expect(bank.gate.pickle()).to.deep.equal(record.maingate)
-    expect(bank.gate.bankStamp).to.deep.equal(TH.WorldBankStamp)
+    expect(bank.gate).to.equal(gate)
     expect(bank.rootBox).to.deep.equal(record.rootBox)
     expect([bank.revtok, bank.revseq, bank.written_at]).to.deep.equal([record.revtok, 0, TH.T0])
   })
 
-  it("pickles to its Thing alone, frozen, without its main gate or root box", async () => {
+  it("is unlocked where its gate is, and locks as its gate does", async () => {
+    const born = await TH.buildBornBank()
+    const gate = storedGateOf(born)
+    await gate.unlock({ passphraseCleartext: TH.TestPassphrase })
+    const bank = Bank.make(born.record, { device: born.device, vaultDB: born.device.vaultDB, gate })
+    expect(bank.isUnlocked).to.be.true
+    expect(bank.getSnapshot()).to.include({ stage: 'unlocked' })
+    gate.lock()
+    expect(bank.getSnapshot()).to.include({ stage: 'locked' })
+  })
+
+  it("pickles to its Thing alone, frozen, without its root box", async () => {
     const { record, bank } = await TH.buildBornBank()
     const pickle = bank.pickle()
     expect(Object.keys(pickle)).to.have.members(BankFields)
-    const { maingate: _maingate, rootBox: _rootBox, ...thing } = record
+    const { rootBox: _rootBox, ...thing } = record
     expect(pickle).to.deep.equal(thing)
     expect(Object.isFrozen(pickle)).to.be.true
   })
@@ -130,20 +133,20 @@ describe("Bank.make(record, { device, vaultDB })", () => {
     [(record: BankMakeRecord) => ({ ...record, lifepath: Life2 }),            'a lifepath not its lifeseq'],
     [(record: BankMakeRecord) => ({ ...record, labelpath: 'gate' }),          'the labelpath of another kind'],
     [(record: BankMakeRecord) => ({ ...record, vaultlabel: 'main' }),         'a field no bank Thing has'],
-    [(record: BankMakeRecord) => TH.omitting(record, 'maingate'),             'no main gate'],
-    [(record: BankMakeRecord) => ({ ...record, maingate: null }),             'a null main gate'],
     [(record: BankMakeRecord) => TH.omitting(record, 'rootBox'),              'no root box'],
+    [(record: BankMakeRecord) => ({ ...record, rootBox: Shell.of(TH.RootScope) }), "the root box's shell"],
+    [(record: BankMakeRecord) => ({ ...record, rootBox: TH.boxTombOf(record.rootBox) }), "the root box's tombstone"],
     [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, am: 'd' } }), 'a root box of a damaged row'],
     [(record: BankMakeRecord) => ({ ...record, rootBox: Thing.sparseOf(TH.rootBoxOf()) }), "a live root box's Thing fields alone"],
-    [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, revseq: 0 } }), 'a root box half the shell'],
+    [(record: BankMakeRecord) => ({ ...record, rootBox: { ...record.rootBox, ...Shell.Cited } }), "a root box with the shell's revision"],
     [(record: BankMakeRecord) => ({ ...record, born_at: 'yesterday' }),       'a born_at that is not epoch millis'],
     [() => null,                                                          'null'],
   ] as const
 
   for (const [recordOf, blurb] of RecordCases) {
     it(`refuses a record with ${blurb}`, async () => {
-      const { record, device } = await TH.buildBornBank()
-      TH.expectSyncRefusal(() => Bank.make(recordOf(record) as never, { device, vaultDB: device.vaultDB }), 'bad_record')
+      const born = await TH.buildBornBank()
+      TH.expectSyncRefusal(() => Bank.make(recordOf(born.record) as never, { device: born.device, vaultDB: born.device.vaultDB, gate: storedGateOf(born) }), 'bad_record')
     })
   }
 
@@ -154,22 +157,32 @@ describe("Bank.make(record, { device, vaultDB })", () => {
 
   for (const [moved, fieldname, blurb] of OtherDeviceCases) {
     it(`refuses ${blurb}`, async () => {
-      const { record } = await TH.buildBornBank()
+      const born = await TH.buildBornBank()
       const device = TH.makeDevice(moved)
-      const err = TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: device.vaultDB }), 'record_conflict')
+      const err = TH.expectSyncRefusal(() => Bank.make(born.record, { device, vaultDB: device.vaultDB, gate: storedGateOf(born) }), 'record_conflict')
       expect(err.meta).to.deep.equal({ fieldnames: [fieldname] })
     })
   }
 
-  it("refuses a main gate of another bank", async () => {
-    const { record, device } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Bank.make({ ...record, maingate: { ...record.maingate, banklabel: 'work' } }, { device, vaultDB: device.vaultDB }), 'record_conflict')
-  })
+  const OtherStampCases = [
+    [{ lifeseq: Life2 },     "lifeseq", "another life of the bank"],
+    [{ born_at: TH.T0 + 5 }, "born_at", "a bank of its scope born at another time"],
+  ] as const
+
+  for (const [moved, fieldname, blurb] of OtherStampCases) {
+    it(`refuses a gate made for ${blurb}`, async () => {
+      const born = await TH.buildBornBank()
+      const gate = storedGateOf(born, { ...TH.WorldBankStamp, ...moved })
+      const err = TH.expectSyncRefusal(() => Bank.make(born.record, { device: born.device, vaultDB: born.device.vaultDB, gate }), 'record_conflict')
+      expect(err.meta).to.deep.equal({ fieldnames: [fieldname] })
+    })
+  }
 
   // A gate's life is its own: a main gate born again stands in the bank's life it was born in.
   it("accepts a main gate of a later life of its own", async () => {
-    const { record, device } = await TH.buildBornBank()
-    const bank = Bank.make({ ...record, maingate: { ...record.maingate, lifeseq: Life2, lifepath: Life2 } }, { device, vaultDB: device.vaultDB })
+    const born = await TH.buildBornBank()
+    const gate = storedGateOf({ ...born, gateRecord: { ...born.gateRecord, lifeseq: Life2, lifepath: Life2 } })
+    const bank = Bank.make(born.record, { device: born.device, vaultDB: born.device.vaultDB, gate })
     expect(bank.gate.lifeseq).to.eq(Life2)
   })
 
@@ -180,22 +193,28 @@ describe("Bank.make(record, { device, vaultDB })", () => {
 
   for (const [moved, blurb] of OtherRootCases) {
     it(`refuses ${blurb} root box`, async () => {
-      const { record, device } = await TH.buildBornBank()
-      TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: { ...record.rootBox, ...moved } }, { device, vaultDB: device.vaultDB }), 'record_conflict')
+      const born = await TH.buildBornBank()
+      const { record, device } = born
+      TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: { ...record.rootBox, ...moved } }, { device, vaultDB: device.vaultDB, gate: storedGateOf(born) }), 'record_conflict')
     })
   }
 
   it("refuses a box other than the root box as its root box", async () => {
-    const { record, device } = await TH.buildBornBank()
+    const born = await TH.buildBornBank()
+    const { record, device } = born
     const box: LiveOf<BoxRecord> = { ...TH.boxThingOf('openai'), am: 'a' }
-    TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: box }, { device, vaultDB: device.vaultDB }), 'record_conflict')
+    TH.expectSyncRefusal(() => Bank.make({ ...record, rootBox: box }, { device, vaultDB: device.vaultDB, gate: storedGateOf(born) }), 'record_conflict')
   })
 
-  it("refuses a device that is not a Device, a vaultDB that is not a VaultDB, and no opts at all", async () => {
-    const { record, device } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Bank.make(record, { device: { ...device.toJSON(), scope: device.scope, isEnabled: true }, vaultDB: device.vaultDB } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: { ...device.vaultDB, tryGetThing: null } } as never), 'bad_record')
-    TH.expectSyncRefusal(() => Bank.make(record, { device } as never), 'bad_record')
+  it("refuses a device that is not a Device, a vaultDB that is not a VaultDB, a gate that is not a Gate, and no opts at all", async () => {
+    const born = await TH.buildBornBank()
+    const { record, device, gateRecord } = born
+    const { vaultDB } = device
+    const gate = storedGateOf(born)
+    TH.expectSyncRefusal(() => Bank.make(record, { device: { ...device.toJSON(), scope: device.scope, isEnabled: true }, vaultDB, gate } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB: { ...vaultDB, tryGetThing: null }, gate } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB, gate: { ...gateRecord, bankStamp: TH.WorldBankStamp } } as never), 'bad_record')
+    TH.expectSyncRefusal(() => Bank.make(record, { device, vaultDB } as never), 'bad_record')
     TH.expectSyncRefusal(() => Bank.make(record, undefined as never), 'bad_record')
   })
 })
@@ -691,7 +710,7 @@ describe("bank.trySealBox(donor, publicProps, secretProps) and bank.tryUnsealBox
 describe("bank.track, and the asks the bank builds", () => {
   it("track the revseq and lifepath this object has of the bank, its main gate and its root box", async () => {
     const { bank } = await TH.buildBornBank()
-    expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox as never))
+    expect(bank.track).to.deep.equal(TH.trackOf(bank.pickle(), bank.gate.pickle(), bank.rootBox))
   })
 
   it("fill in the bank's scope, the modelkind, the default flags and the track", async () => {

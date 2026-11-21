@@ -13,6 +13,7 @@ import { Consts, Crypto, GX, SX } from 'safebyok-big/internals'
 import { anyStrengthChecker, quietLogger, testDeriver } from 'safebyok-big/testing'
 import { Bank } from '../../src/models/bank'
 import { Device } from '../../src/models/device'
+import { Gate } from '../../src/models/gate'
 import { Gating } from '../../src/models/gating'
 import { Lease } from '../../src/models/lease'
 import type { Vault } from '../../src/models/vault'
@@ -21,7 +22,7 @@ import { PassphraseProving, type Proving, guardKeyDeriver } from '../../src/mode
 import { guardStrengthChecker } from '../../src/helpers/passphrase-strength'
 import type { BankMakeRecord, DeviceOpts, DeviceRecord } from '../../src/shapes/shapes-bankish'
 import type { ShellOf } from '../../src/shapes/shapes-sealers'
-import type { BoxRecord } from '../../src/shapes/shapes-thing'
+import type { BoxRecord, GateRecord } from '../../src/shapes/shapes-thing'
 import type { GateRevisionedStamp, GatingCleartexts, LeaseGate, ProvingDevice, StrengthChecker } from '../../src/shapes/shapes-gateish'
 import type { BankScope, BankStamp, GateStamp, LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { Shell, ThingFormat } from '../../src/shapes/shapes-thing'
@@ -105,7 +106,7 @@ export function passkeyAnswerOf(overrides: Partial<GX.PasskeyAnswer> = {}): GX.P
 export function copyOfAnswer(answer: GX.PasskeyAnswer): GX.PasskeyAnswer { return { ...answer, prfBytes: new Uint8Array(answer.prfBytes) } }
 // --
 
-// == [A born bank]: BornBankGiven, BornBank, buildBornBank, BornVault, buildBornVault
+// == [A born bank]: BornBankGiven, BornBank, buildBornBank, makeStoredBank, BornVault, buildBornVault
 
 /** The options of a {@link buildBornBank} bank. */
 export interface BornBankGiven {
@@ -115,12 +116,15 @@ export interface BornBankGiven {
   device?:       Device | undefined
 }
 
-/** A bank born under {@link TestPassphrase}, unlocked, beside its device, its record and the passphrase's proving. */
+/** A bank born under {@link TestPassphrase}, unlocked, beside its device, the records its birth stored, and the passphrase's proving. */
 export interface BornBank {
-  device:  Device
-  bank:    Bank
-  record:  ReturnType<typeof Bank.makeRecord>
-  proving: PassphraseProving
+  device:     Device
+  bank:       Bank
+  /** The bank's Thing with its root box, as the birth stored them: what `Bank.make` takes. */
+  record:     BankMakeRecord
+  /** The main gate's Thing, as the birth stored it. */
+  gateRecord: GateRecord
+  proving:    PassphraseProving
 }
 
 /** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB by `Bank.birth` once the device has said `hello`, and so unlocked.
@@ -129,16 +133,20 @@ export interface BornBank {
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
   await device.hello()
   const mintStamps = vi.spyOn(Bank, 'mintStamps').mockReturnValue({ bankStamp: WorldBankStamp, gateStamp: WorldGateStamp })
-  const makeRecord = vi.spyOn(Bank, 'makeRecord')
   try {
     const bank = await Bank.birth(device, { passphraseCleartext: TestPassphrase, passkeyCleartext: passkeyCleartext && copyOfAnswer(passkeyCleartext) })
-    const record = makeRecord.mock.results.at(-1)!.value as BankMakeRecord
     const proving = await PassphraseProving.buildStored(device, bank.gate, TestPassphrase)
-    return { device, bank, record, proving }
+    return { device, bank, record: { ...bank.pickle(), rootBox: bank.rootBox }, gateRecord: bank.gate.pickle(), proving }
   } finally {
     mintStamps.mockRestore()
-    makeRecord.mockRestore()
   }
+}
+
+/** Another Bank over the records a {@link buildBornBank} birth stored, locked, made as a device's `hello` makes one: its gate first, from the gate's record. Its device is not told of it. */
+export function makeStoredBank({ device, record, gateRecord }: Pick<BornBank, 'device' | 'record' | 'gateRecord'>): Bank {
+  const { vaultDB } = device
+  const gate = Gate.make(gateRecord, { device, vaultDB, bankStamp: record })
+  return Bank.make(record, { device, vaultDB, gate })
 }
 
 /** A {@link buildBornBank} bank, beside the vault of its boxes and that vault's minder. */
