@@ -1,8 +1,8 @@
 # Thread gating_instance: a gating is an instance (2026-11-21)
 
 Branch `20261121-gating_instance`, PR [#794](https://github.com/mrflip/safebyok/pull/794), stacked on #793 (plain_words). Design: `gating_instance-design.md` beside
-this file, agreed with the Coach 2026-11-21. Proved: safebyok 1348 tests, safebyok-react 347, lint and typecheck of both
-clean; `pnpm justify` green (safebyok-big 2946, safebyok 1348, safebyok-react 347, e2e 576, every other package green).
+this file, agreed with the Coach 2026-11-21. Proved: safebyok 1357 tests, safebyok-react 360, lint and typecheck of both
+clean; `pnpm justify` green (safebyok-big 2946, safebyok 1357, safebyok-react 360, e2e 576, every other package green), after the catch-up onto #793's rework 1.
 
 * **Built**:
   * `packages/safebyok/src/models/gating.ts` (288 lines): the base `Gating` and one subclass per form verb
@@ -66,3 +66,5 @@ clean; `pnpm justify` green (safebyok-big 2946, safebyok 1348, safebyok-react 34
   as history.
 * **For the Coach**: the async maker (above), and whether the gating's getters should go. Nothing in the core or the
   giver calls them, and each read of a passkey answer mints a copy that nothing zeroes.
+* **Rebase**: the catch-up met #793's rework 1, which split `react-giver.test.tsx`'s two-behaviour tests into one per
+  outcome, with `runThrough…` helpers. The resolution keeps that split and turns each helper from a cloak to a gating.
