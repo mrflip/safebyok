@@ -115,3 +115,10 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   the server process, bridged to that request's QueryClient, and `keys.*`, `boxQuery` and the `fooMutationOptions`
   in later requests' server code would answer that first user's keys. It never says hello, so it fetches nothing and
   holds no secret. When server-rendering hosts are in scope, make the device only on the client (a hydration flag, say).
+* **Read the bank's gate and root box from the minder rather than keep copies.** The lean core's `Bank` keeps its own
+  main gate and root box (`#maingate`, `#rootBox`, replaced by each gating) beside the minder's cached records of the
+  same things. With the device keeping only the lease and reading those records from the minder, only locked and
+  unlocked would live in a store, and starting, unborn and failed could come from the bank record's fetch instead of
+  stand-in snapshots. "this fits with upcoming changes, but it needs more design before anything should be
+  rewritten, so leave the shim"; and "the lease shouldn't go to the device so it needs more design" (the Coach,
+  2026-11-21, react_life, survey after thread 12). Part of the ownership work, with Closer Look E11.
