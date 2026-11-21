@@ -103,3 +103,18 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   (`slot.device?.bank?.maingate.passkey0?.toJSON()` is the worker's sketch, in its thread file).
 * `formActionOf`'s `cleartextsOf` may resolve null: nothing runs, the action resolves true (a dismissed prompt).
 * Tests: `tests/test-helpers/fake-authenticator.ts` stubs `navigator.credentials`; `_cheat_passkeyHeaderOf(world)`.
+
+## Thread 7, demo_knockknock (#803, ready): "once that's reached"
+
+* The Knock-Knock app runs on the new core: `demos/safebyok-demo-knockknock`, `pnpm demo:knockknock`. An integration
+  test (SDK stubbed by a fake `fetch`, the core's test deriver, a reload as `vi.resetModules()` and a fresh import)
+  runs every flow of the plan, plus cancel, wrong passphrase, Show then Delete.
+* **For envman:** thread 7's file, *For envman (thread 10): what to copy*, lists every file to `cp` and the
+  `knockknock:` localStorage prefixes to change.
+* **Lesson:** a stage switch with one component per stage unmounts work waiting on the unlock dialog; locked and
+  unlocked render one component (`Opened`).
+* `Knock.usePasskeyHeader()` (cheat: reads `slot.device?.bank?.maingate.passkey0` in render, re-renders on stage
+  changes and successful form mutations via `useMutationState`). `safebyok-react-lean/testing` exports
+  `expectTextUnheld`, `holdsText`, `reactTreeOf`, `installFakeAuthenticator`. `LocalStorageVaultDB` in the demo's
+  `src/lib/` (cheat: `_cheat_things`).
+* **Planning lesson:** a stalled worker shows as a stale ohai heartbeat; resume it by message, never relaunch.
