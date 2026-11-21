@@ -55,6 +55,26 @@ describe("WhisperInput", () => {
     expect(field.type).to.eq('password')
   })
 
+  it("hides the whisper again when the form is submitted", async () => {
+    let settle!: () => void
+    const settled = new Promise<void>((resolve) => { settle = resolve })
+    render(
+      <form action={async (form) => { form.delete('apiKey'); await settled }}>
+        <WhisperInput name="apiKey" aria-label="API key" />
+        <SubmitButton whilePending="Saving…">Save</SubmitButton>
+      </form>,
+    )
+    const field = screen.getByLabelText<HTMLInputElement>('API key')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field.type).to.eq('text')
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await screen.findByRole('button', { name: 'Saving…' })
+    expect(field.type).to.eq('password')
+    settle()
+    await screen.findByRole('button', { name: 'Save' })
+    expect(field.type).to.eq('password')
+  })
+
   it("carries the attributes that keep password managers away", () => {
     render(<WhisperInput name="apiKey" aria-label="API key" />)
     const field = screen.getByLabelText('API key')
