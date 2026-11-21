@@ -557,25 +557,25 @@ const HeaderCases = [
 
 describe("the ctx a wayin is wrapped under", () => {
   for (const [altered, blurb] of StampCases) {
-    it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
+    it(`a passphrase wayin will not unwrap under ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
       await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf(), movedGate(gate, altered), TH.TestPassphrase), 'wrong_passphrase')
     })
 
-    it(`keeps a passkey wayin shut under ${blurb}`, async () => {
+    it(`a passkey wayin will not unwrap under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
       await TH.expectRefusal(PasskeyProving.buildStored(movedGate(gate, altered), answerOf()), 'wrong_passkey')
     })
   }
 
   for (const [altered, blurb] of HeaderCases) {
-    it(`keeps a passphrase wayin shut under ${blurb}`, async () => {
+    it(`a passphrase wayin will not unwrap under ${blurb}`, async () => {
       const gate = await gateWithPassphrase()
       const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, main: { ...gate.wayins.main, ...altered } } })
       await TH.expectRefusal(PassphraseProving.buildStored(TH.provingDeviceOf(), moved, TH.TestPassphrase), 'wrong_passphrase')
     })
 
-    it(`keeps a passkey wayin shut under ${blurb}`, async () => {
+    it(`a passkey wayin will not unwrap under ${blurb}`, async () => {
       const { gate, answerOf } = await gateWithBoth()
       const moved = gateOf({ ...gate.pickle(), wayins: { ...gate.wayins, passkey0: { ...gate.wayins.passkey0!, ...altered } } })
       await TH.expectRefusal(PasskeyProving.buildStored(moved, answerOf()), 'wrong_passkey')

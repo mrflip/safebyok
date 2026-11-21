@@ -1,4 +1,4 @@
-/** The ctx each wrap and cipher is bound to, byte for byte, and that a change to any field of a stamp keeps it shut. */
+/** The ctx each wrap and cipher is bound to, byte for byte, and that a stamp with any one field changed will not unseal or unwrap what was bound to it. */
 
 import { describe, expect, it } from 'vitest'
 import { Crypto } from 'safebyok-big/internals'
@@ -141,26 +141,26 @@ describe("each ctx binds every field of its stamps", () => {
   })
 
   for (const fieldname of BoxStampFields) {
-    it(`keeps a box shut under a box stamp with another ${fieldname}`, async () => {
+    it(`a box will not unseal under a box stamp with another ${fieldname}`, async () => {
       const { box, boxStamp, bankKey } = await sealedWorld()
       await expect(unsealByHand(bankKey, box, TH.WorldBankStamp, { ...boxStamp, [fieldname]: changed(boxStamp[fieldname]) as string })).rejects.toThrow()
     })
   }
 
   for (const fieldname of SealTagFields) {
-    it(`keeps a box shut under tags with another ${fieldname}`, async () => {
+    it(`a box will not unseal under tags with another ${fieldname}`, async () => {
       const { box, boxStamp, bankKey } = await sealedWorld()
       await expect(unsealByHand(bankKey, box, TH.WorldBankStamp, boxStamp, { ...BaseBox.tags, [fieldname]: changed(BaseBox.tags[fieldname]) as string })).rejects.toThrow()
     })
   }
 
-  it("keeps a box shut under its two stamps in the other order: the bank's stamp is the ctx's first part", async () => {
+  it("a box will not unseal under its two stamps in the other order: the bank's stamp is the ctx's first part", async () => {
     const { box, boxStamp, bankKey } = await sealedWorld()
     expect(await unsealByHand(bankKey, box, TH.WorldBankStamp, boxStamp)).to.eq(WhisperText)
     await expect(unsealByHand(bankKey, box, boxStamp, TH.WorldBankStamp)).rejects.toThrow()
   })
 
-  it("keeps a box shut under no tags", async () => {
+  it("a box will not unseal under no tags", async () => {
     const { box, boxStamp, bankKey } = await sealedWorld()
     const { key_wrapped } = box.whisper_sealed
     await expect(Crypto.unwrapKeyUnder(bankKey, key_wrapped, Crypto.cipherCtx([TH.WorldBankStamp, boxStamp], 'whisper_sealed.key_wrapped'), DecipherUsage)).rejects.toThrow()
@@ -168,17 +168,17 @@ describe("each ctx binds every field of its stamps", () => {
   })
 
   for (const fieldname of BankStampFields) {
-    it(`keeps a box shut under a bank stamp with another ${fieldname}`, async () => {
+    it(`a box will not unseal under a bank stamp with another ${fieldname}`, async () => {
       const { box, boxStamp, bankKey } = await sealedWorld()
       await expect(unsealByHand(bankKey, box, { ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, boxStamp)).rejects.toThrow()
     })
 
-    it(`keeps a wayin shut under a bank stamp with another ${fieldname}`, async () => {
+    it(`a wayin will not unwrap under a bank stamp with another ${fieldname}`, async () => {
       expect(await passphraseWayinUnwraps(TH.WorldBankStamp, TH.WorldGateStamp)).to.be.true
       expect(await passphraseWayinUnwraps({ ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, TH.WorldGateStamp)).to.be.false
     })
 
-    it(`keeps a lease shut under a bank stamp with another ${fieldname}`, async () => {
+    it(`a lease will not unwrap under a bank stamp with another ${fieldname}`, async () => {
       const { lease_key, bank_key_lease_wrapped, ...stamp } = await leaseRecordOf()
       const ctx = Crypto.cipherCtx([{ ...TH.WorldBankStamp, [fieldname]: changed(TH.WorldBankStamp[fieldname]) as string }, stamp], 'bank_key_lease_wrapped')
       await expect(Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, CheckUsage)).rejects.toThrow()
@@ -186,13 +186,13 @@ describe("each ctx binds every field of its stamps", () => {
   }
 
   for (const fieldname of GateStampFields) {
-    it(`keeps a wayin shut under a gate stamp with another ${fieldname}`, async () => {
+    it(`a wayin will not unwrap under a gate stamp with another ${fieldname}`, async () => {
       expect(await passphraseWayinUnwraps(TH.WorldBankStamp, { ...TH.WorldGateStamp, [fieldname]: changed(TH.WorldGateStamp[fieldname]) as string })).to.be.false
     })
   }
 
   for (const fieldname of LeaseStampFields) {
-    it(`keeps a lease shut under a lease stamp with another ${fieldname}`, async () => {
+    it(`a lease will not unwrap under a lease stamp with another ${fieldname}`, async () => {
       const { lease_key, bank_key_lease_wrapped, ...stamp } = await leaseRecordOf()
       const ctx = Crypto.cipherCtx([TH.WorldBankStamp, { ...stamp, [fieldname]: changed(stamp[fieldname]) as string }], 'bank_key_lease_wrapped')
       await expect(Crypto.unwrapKeyUnder(lease_key, bank_key_lease_wrapped, ctx, CheckUsage)).rejects.toThrow()
