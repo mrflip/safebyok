@@ -1,6 +1,6 @@
 # Thread 5: parts_kit (2026-11-21)
 
-Branch `20261121-parts_kit`, PR #800, stacked on #799. Proved: `safebyok-react-lean` lint, typecheck, build, and tests (11 files, 134: 27 new, in `tests/parts/` and `tests/kit/`).
+Branch `20261121-parts_kit`, PR #800, stacked on #799. Proved: `pnpm justify` green after the catch-up onto #799 at f6260ec89 (`safebyok-react-lean` 134 tests in 11 files, 27 new in `tests/parts/` and `tests/kit/`; `safebyok` 1338; e2e 576).
 
 * **Built** (all in `packages/safebyok-react-lean/src/`)
   - **Parts** (`./parts`): `WhisperInput` (masked, uncontrolled, password-manager attributes, Show / Hide), `PassphraseInput` (masked, uncontrolled, Show / Hide, Caps Lock warning, hides again at each submit, `autoComplete` `current-password` or `new-password`), `SubmitButton` (`useFormStatus`: disabled while the form's action runs, `whilePending` text), `WhisperText` (one field of a box's whisper, masked; Show calls `withWhisper`, and inside its callback `flushSync`s the text's element into the page and writes `textContent` through a ref; Hide unmounts that element; a lock hides it). Private: `reveal-toggle.tsx` (`useRevealToggle`), `phrases-parts.ts`.
