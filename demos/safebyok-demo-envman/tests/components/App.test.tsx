@@ -173,7 +173,8 @@ describe("Envman", () => {
     const renamed = await rowOf('OPENAI_KEY_PROD')
     expect(within(renamed).getByText('Overdue for rotation')).to.exist
     fireEvent.click(within(renamed).getByRole('button', { name: 'Save' }))
-    await waitFor(() => { expect(within(renamed).getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled).to.eq(true) })
+    // Undo, not Save: Save is disabled while the write is pending too, and Undo only once the draft is clean.
+    await waitFor(() => { expect(within(renamed).getByRole<HTMLButtonElement>('button', { name: 'Undo' }).disabled).to.eq(true) })
     expectUnheld(page)
 
     await loadPage()
