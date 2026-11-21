@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 9 filed, out of draft, in one line ending at #805. Thread 11 ready, in review (#806). Thread 10 (envman) building, stacked on #806. Thread 12 waits on 10. A Closer Look runs at #805's tip.
+* **Status:** running. Threads 1 to 9 and 11 filed, out of draft, in one line ending at #806. Thread 10 (envman) building, stacked on #806. Thread 12 waits on 10. A Closer Look runs at #805's tip.
 
 ## The goal
 
@@ -341,6 +341,7 @@ written against the final names.
 * **Ready when:** a kit form renders bare under the provider and its tests pass; the old names are gone; a test makes
   a gating outside a hook and mutates through the standalone options.
 * *Orchestrator:* ready, #806, no compaction. `liveOf`, `err`, `delBoxOnce`; `fooGating` and `fooMutationOptions()` beside the hooks; the provider's `{ giver, bank }` context (`src/giver/giver-context.ts`, unexported), props as overrides, `bad_record` outside a provider; form keys carry the userid; `maskOf(text, { head, tail }?)`, default 7 and 4, the demo storing `tail: 0`. The dream's names updated on the sprint branch.
+* *Review:* fixed (low). One style fix. Standalone gatings vacate as the hooks do; the demo's stored mask has no secret characters; rule 2 holds. Left: `maskOf` reimplements `safebyok-big`'s `mask` (thread 12 replaces it); doc blocks; a test file for the context (thread 12); the name "given".
 
 ### 12. `lockable_whisper`: a locked view, and a callback on a stage change
 
