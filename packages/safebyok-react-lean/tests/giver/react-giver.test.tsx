@@ -530,7 +530,7 @@ async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => Result
   const device = await waitFor(() => rendered.world._cheat_device())
   await act(async () => {
     await device.hello()
-    await device.bank!.unlock({ passphraseCleartext: Passphrase })
+    await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return rendered
 }
@@ -878,7 +878,7 @@ async function renderKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
     await device.hello()
-    await device.bank!.unlock({ passphraseCleartext: Passphrase })
+    await device.bank!.gate.unlock({ passphraseCleartext: Passphrase })
   })
   return { world, ...editor, ...rendered }
 }

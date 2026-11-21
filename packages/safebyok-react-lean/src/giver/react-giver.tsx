@@ -552,7 +552,7 @@ function makeBankGiver(friend: BankFriend) {
   function useBirth(): FormMutationResult<BirthCleartexts> { return useFormMutation('birth', birthGating) }
 
   /** The gating that unlocks the bank by its passphrase or its passkey, for {@link unlockMutationOptions}' mutation. */
-  function unlockGating(cleartexts: UnlockCleartexts): Gating { return demandBank().unlockGating(cleartexts) }
+  function unlockGating(cleartexts: UnlockCleartexts): Gating { return demandBank().gate.unlockGating(cleartexts) }
 
   /** React Query's options for the mutation that unlocks the bank, for the host's own `useMutation`: hand its `mutate` an {@link unlockGating}.
    * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
@@ -576,7 +576,7 @@ function makeBankGiver(friend: BankFriend) {
   function useUnlock(): FormMutationResult<UnlockCleartexts> { return useFormMutation('unlock', unlockGating) }
 
   /** The gating that replaces the passphrase, proved by the current passphrase or the passkey, for {@link replacePassphraseMutationOptions}' mutation. */
-  function replacePassphraseGating(cleartexts: PassphraseReplaceCleartexts): Gating { return demandBank().replacePassphraseGating(cleartexts) }
+  function replacePassphraseGating(cleartexts: PassphraseReplaceCleartexts): Gating { return demandBank().gate.replacePassphraseGating(cleartexts) }
 
   /** React Query's options for the mutation that replaces the passphrase, for the host's own `useMutation`: hand its `mutate` a {@link replacePassphraseGating}.
    * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
@@ -589,7 +589,7 @@ function makeBankGiver(friend: BankFriend) {
   function useReplacePassphrase(): FormMutationResult<PassphraseReplaceCleartexts> { return useFormMutation('replacePassphrase', replacePassphraseGating) }
 
   /** The gating that adds a passkey, proved by the passphrase, for {@link addPasskeyMutationOptions}' mutation. */
-  function addPasskeyGating(cleartexts: PasskeyAddCleartexts): Gating { return demandBank().addPasskeyGating(cleartexts) }
+  function addPasskeyGating(cleartexts: PasskeyAddCleartexts): Gating { return demandBank().gate.addPasskeyGating(cleartexts) }
 
   /** React Query's options for the mutation that adds a passkey, for the host's own `useMutation`: hand its `mutate` an {@link addPasskeyGating}.
    * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.
@@ -602,7 +602,7 @@ function makeBankGiver(friend: BankFriend) {
   function useAddPasskey(): FormMutationResult<PasskeyAddCleartexts> { return useFormMutation('addPasskey', addPasskeyGating) }
 
   /** The gating that revokes the passkey, proved by the passphrase or the passkey, for {@link revokePasskeyMutationOptions}' mutation. */
-  function revokePasskeyGating(cleartexts: PasskeyRevokeCleartexts): Gating { return demandBank().revokePasskeyGating(cleartexts) }
+  function revokePasskeyGating(cleartexts: PasskeyRevokeCleartexts): Gating { return demandBank().gate.revokePasskeyGating(cleartexts) }
 
   /** React Query's options for the mutation that revokes the passkey, for the host's own `useMutation`: hand its `mutate` a {@link revokePasskeyGating}.
    * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.

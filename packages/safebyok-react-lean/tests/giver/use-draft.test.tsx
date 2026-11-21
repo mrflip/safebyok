@@ -56,7 +56,7 @@ async function renderDraftEditor({ putOpts, isLocked = false }: Readonly<{ putOp
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
     await device.hello()
-    if (! isLocked) { await device.bank!.unlock({ passphraseCleartext: LeanTH.TestPassphrase }) }
+    if (! isLocked) { await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }) }
   })
   await screen.findByText('Tier none')
   const input = screen.getByLabelText<HTMLInputElement>('Key')
@@ -142,7 +142,7 @@ describe("useDraft", () => {
     act(() => { input.focus() })
     await waitFor(() => { expect(device.bank!.getSnapshot().isUnlockWanted).to.eq(true) })
     expect(input.readOnly).to.eq(true)
-    await act(() => device.bank!.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     await waitFor(() => { expect([input.type, input.value, input.readOnly]).to.deep.equal(['text', TH.JokesKey, false]) })
     expect(seen.draft?.lastErr).to.be.null
   })
