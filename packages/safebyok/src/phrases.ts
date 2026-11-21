@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, UnlockDismissed, VaultBankExpected, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, SealerExpected, NovelOrProvingExpected, WayinExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, UnlockDismissed, VaultBankExpected, VaultMinderExpected, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -31,6 +31,9 @@ export const GatingSpent = 'This gating was attempted already, and a gating is a
 
 /** A vault made without a bank. */
 export const VaultBankExpected = 'A Vault is made with the Bank whose boxes it carries.'
+
+/** A vault made without a minder. */
+export const VaultMinderExpected = "A Vault is made with the ThingMinder of its bank's Things."
 
 /** Something a bank is asked to host that has no sweep. */
 export const HostedVaultExpected = 'Expected a vault: an object with a sweep function.'
@@ -132,10 +135,10 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: BankExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
-/** A minder made without a bank. */
-export const BankExpected = 'A ThingMinder is made with the Bank it minds Things of.'
+/** A minder made without a friend: a device or a bank. */
+export const MinderFriendExpected = 'A ThingMinder is made with its friend: the device or bank whose Things it minds.'
 
 
 /** A minder read or written through before `hello`, or after `goodbye`. */

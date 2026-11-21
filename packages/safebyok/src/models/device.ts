@@ -1,14 +1,20 @@
 import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
-import type { Bank } from './bank'
+import { Bank } from './bank'
 import { Proving, guardKeyDeriver } from './proving'
+import { Vault } from './vault'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
-import { type BadNewsHandler, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
+import { ThingMinder } from '../minding/thing-minder'
+import { type BadNewsHandler, type BankAskDraft, type BankSnapshot, type DeviceOpts, type DeviceRecord, type DeviceSnapshot, type RefusalSnapshot, BankishChecks, PendingBank } from '../shapes/shapes-bankish'
+import { type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
+import { type MinderFriend, MinderChecks } from '../shapes/shapes-minder'
+import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
 import type { GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
-import type { Banklabel, DeviceTok, Userid } from '../shapes/primitives'
+import { type Banklabel, type DeviceTok, Labelpath, type Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
-import { type Modelkind, ThingChecks } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type Modelkind, Shell, ThingChecks } from '../shapes/shapes-thing'
+import { BoxChecks } from '../shapes/shapes-thingkinds'
 import * as Throwers from '../refusals/throwers'
 
 // == [Defaults]: DefaultLeaseMillis
@@ -16,11 +22,12 @@ import * as Throwers from '../refusals/throwers'
 /** How long a lease lasts when the host gives no `autolockMinutes`: fourteen days. */
 export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
-/** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, and its bank.
- * Make it with `Device.make(record, opts)`. A `sweep()` ends every bank made on it, and the device stays usable for the next.
+/** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, its minder, and its bank and vault.
+ * Make it with `Device.make(record, opts)`, then call `hello()` to bring its bank up. Its snapshot's stage goes from
+ * `'starting'` to `'locked'` for a bank stored, or to `'unborn'` for none, which `Bank.birth` on this device fills.
  */
-export class Device {
-  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #thisIsTemporaryBank, #madeBanks, #unsubscribeBank, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
+export class Device implements MinderFriend {
+  // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #minder, #rootShell, #bank, #vault, #broughtUp, #banklessSnapshot, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
 
   declare readonly userid:     Userid
   declare readonly banklabel:  Banklabel
@@ -36,14 +43,18 @@ export class Device {
 
   /** The host's `onBadNews`, or the default. */
   readonly #onBadNews: BadNewsHandler
-  /** The last bank made on this device, or null for none or once it is swept.
-   * The device's snapshot carries its snapshot, or {@link PendingBank} while there is none.
-   */
-  #thisIsTemporaryBank: Bank | null = null
-  /** Every bank made on this device and not yet swept. */
-  readonly #madeBanks = new Set<Bank>()
-  /** Ends this device's subscription to its bank. */
-  #unsubscribeBank: () => void = () => undefined
+  /** The minder of this device's bank's Things, which this device is the friend of. */
+  readonly #minder: ThingMinder
+  /** The shell of the root box, which the minder is given while the device has no bank. */
+  readonly #rootShell: ShellOf<BoxRecord>
+  /** This device's bank, from when `hello` finds it stored or a birth on this device makes it. Null until then. */
+  #bank:  Bank | null = null
+  /** The vault of this device's bank's boxes, made with the bank. */
+  #vault: Vault | null = null
+  /** What `hello` resolves, once it has been called. */
+  #broughtUp: Promise<void> | null = null
+  /** The bank snapshot shown while the device has no bank: {@link PendingBank}, then `'unborn'` or `'failed'` as `hello` finds. */
+  #banklessSnapshot: BankSnapshot = PendingBank
   // Nothing ends a device yet: its sweep ends only its banks.
   /** Why the device ended, or null while it is enabled. */
   #endCause:   Errors.VaultError | null = null
@@ -64,13 +75,25 @@ export class Device {
   }
   // --
 
-  // == [Getters]: scope, autolockMinutes, getSnapshot, subscribe
+  // == [Getters]: scope, autolockMinutes, minder, bank, vault, rootBox, getSnapshot, subscribe
 
   /** The bank scope this device serves. */
   get scope(): BankScope { return StampChecks.bankScope.parse(this) }
 
   /** The autolock duration in minutes, past which a lease no longer unlocks the bank. */
   get autolockMinutes(): number { return this.leaseMillis / Consts.MinuteMillis }
+
+  /** The minder of this device's bank's Things: it says `hello` with the device. */
+  get minder(): ThingMinder { return this.#minder }
+
+  /** This device's bank, or null until `hello` finds it stored or a birth on this device makes it. */
+  get bank(): Bank | null { return this.#bank }
+
+  /** The vault of this device's bank's boxes, or null while the device has no bank. */
+  get vault(): Vault | null { return this.#vault }
+
+  /** The bank's root box, or its shell while the device has no bank. The minder reads it. */
+  get rootBox(): LiveOf<BoxRecord> | ShellOf<BoxRecord> { return this.#bank?.rootBox ?? this.#rootShell }
 
   /** This device's snapshot getter, already bound, as `useSyncExternalStore` wants it.
    * It returns the same frozen object until something in the snapshot changes. The snapshot includes the bank's, so one
@@ -86,19 +109,21 @@ export class Device {
 
   // == [Construction]: make, constructor
 
-  /** Make a device for the bank scope and token in `record`, guarding the host's functions in `opts`. Nothing is fetched or stored. */
+  /** Make a device for the bank scope and token in `record`, guarding the host's functions in `opts`, with its minder. Nothing is fetched or stored until {@link hello}. */
   static make(record: DeviceRecord, opts: DeviceOpts): Device { return new Device(record, opts) }
 
   private constructor(record: DeviceRecord, opts: DeviceOpts) {
     checkSecureContext()
-    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, onBadNews = DefaultOnBadNews } } = Checks.deviceMakeArgs.parse({ record, opts })
+    const { record: { userid, banklabel, device_tok }, opts: { vaultDB, keyDeriver, strengthChecker = DefaultStrengthChecker, logger, autolockMinutes, onBadNews = DefaultOnBadNews, queryCacheOpts } } = Checks.deviceMakeArgs.parse({ record, opts })
     Object.assign(this, { userid, banklabel, device_tok })
+    this.#rootShell = Object.freeze(BoxChecks.liveOrShell.parse(Shell.of({ userid, banklabel, labelpath: Labelpath.RootBox })) as ShellOf<BoxRecord>)
     this.vaultDB = vaultDB
     this.keyDeriver = guardKeyDeriver(keyDeriver)
     this.strengthChecker = guardStrengthChecker(strengthChecker)
     this.logger = Logger.parseLogger(logger)
     this.leaseMillis = millisOf(autolockMinutes, DefaultLeaseMillis)
     this.#onBadNews = onBadNews
+    this.#minder = ThingMinder.make({ vaultDB, queryCacheOpts }, this)
     this.#snapshot = this.#makeSnapshot()
     if (Deriver.isTestDeriver(keyDeriver)) { this.logger.warn(PhrasesX.TestDeriverNotice, { oplabel: 'Device.make' }) }
     Object.freeze(this)
@@ -113,46 +138,87 @@ export class Device {
   judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Locking]: lock, cheatHoldBank, cheatDropBank
+  // == [Starting]: hello, adoptBornBank, #bringUp, #hold
 
-  /** Lock every bank made on this device. Never throws. */
-  lock(): this {
-    for (const bank of this.#madeBanks) { bank.lock() }
-    return this
-  }
-
-  // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one its snapshot shows.
-  /** Make `bank` the bank this device's snapshot shows, and one its lock and sweep reach. Internal.
-   * The bank shown before is unchanged.
+  /** Start the minder and bring up the bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
+   * Each later call resolves as the first. A device that already has a bank, born on it before `hello`, keeps it.
    */
-  cheatHoldBank(bank: Bank): void {
-    this.#madeBanks.add(bank)
-    this.#unsubscribeBank()
-    this.#thisIsTemporaryBank = bank
-    this.#unsubscribeBank = bank.subscribe(this.#align)
-    this.#align()
+  hello(): Promise<void> {
+    this.#broughtUp ??= this.#bringUp()
+    return this.#broughtUp
   }
 
-  /** Let go of `bank`, and show {@link PendingBank} if it is the bank this device's snapshot shows. Internal. */
-  cheatDropBank(bank: Bank): void {
-    this.#madeBanks.delete(bank)
-    if (bank !== this.#thisIsTemporaryBank) { return }
-    this.#unsubscribeBank()
-    this.#unsubscribeBank = () => undefined
-    this.#thisIsTemporaryBank = null
+  // Cheat (react_life): the bank's birth hands the born bank over by calling this, a bank-to-device call, until birth's caller owns the handover.
+  /** Make `bank`, just born on this device, the device's bank, and make its vault. Internal. Returns `bank`. */
+  adoptBornBank(bank: Bank): Bank {
+    Checks.bank.parse(bank)
+    Validator.checkedConsistent(bank.scope, this.scope, { kind: 'record_conflict' })
+    this.#hold(bank)
+    return bank
+  }
+
+  /** Bring up this device's bank, if it has none. */
+  async #bringUp(): Promise<void> {
+    // Cheat (react_life): tests birth a bank before they say hello, which a device's startup never does.
+    try {
+      this.#minder.hello()
+      if (this.#bank !== null) { return }
+      const [bankRecord, maingate, rootBox] = await Promise.all([
+        this.#minder.get({ ...this.scope, labelpath: 'bank' }),
+        this.#minder.get({ ...this.scope, labelpath: Labelpath.MainGate }),
+        this.#minder.get({ ...this.scope, labelpath: Labelpath.RootBox }),
+      ])
+      if (! Bank.isLive(bankRecord)) {
+        this.#banklessSnapshot = Object.freeze({ ...PendingBank, stage: 'unborn' })
+        this.#align()
+        return
+      }
+      // Bank.make checks the gate and the root box: a tombstone or a shell of either refuses.
+      this.#hold(Bank.make({ ...(bankRecord as BankRecord), maingate: maingate as GateRecord, rootBox: rootBox as LiveOf<BoxRecord> }, { device: this, vaultDB: this.vaultDB }))
+    } catch (err) {
+      this.#banklessSnapshot = Object.freeze({ ...PendingBank, stage: 'failed', lastErr: refusalSnapshotOf(err) })
+      this.#align()
+    }
+  }
+
+  // The bank's own sweep clears its subscribers, so nothing here unsubscribes.
+  /** Make `bank` this device's bank. */
+  #hold(bank: Bank): void {
+    this.#bank  = bank
+    this.#vault = Vault.make(bank, this.#minder)
+    bank.subscribe(this.#align)
     this.#align()
+  }
+  // --
+
+  // == [Locking]: lock
+
+  /** Lock this device's bank, if it has one. Never throws. */
+  lock(): this {
+    this.#bank?.lock()
+    return this
   }
   // --
 
   // == [Ending]: sweep
 
-  /** Sweep every bank made on this device. Never throws.
-   * The device stays usable: it judges passphrases, and a bank may be made on it again.
+  /** Sweep this device's bank, if it has one. Never throws.
+   * The device stays usable: it judges passphrases. Its snapshot shows the swept bank.
    */
   sweep(): this {
-    for (const bank of this.#madeBanks) { bank.sweep() }
+    this.#bank?.sweep()
     return this
   }
+  // --
+
+  // == [The minder's friend]: makeGetAsk, makeListAsk
+  // The bank's builders where the device has one, so that each ask tracks the bank, its main gate and its root box; until then, asks that track nothing.
+
+  /** The get ask for the Thing at `ask.labelpath` in this device's bank scope. */
+  makeGetAsk(ask: BankAskDraft): GetAsk { return this.#bank?.makeGetAsk(ask) ?? getAskOf({ ...ask, ...this.scope }) }
+
+  /** The list ask for the children of the Thing at `ask.labelpath` in this device's bank scope. */
+  makeListAsk(ask: BankAskDraft): ListAsk { return this.#bank?.makeListAsk(ask) ?? listAskOf({ ...ask, ...this.scope }) }
   // --
 
   // == [Snapshot]: align, makeSnapshot
@@ -172,9 +238,9 @@ export class Device {
     }
   }
 
-  /** A new snapshot of this device: its bank's snapshot. */
+  /** A new snapshot of this device: its bank's snapshot, or the stand-in while it has none. */
   #makeSnapshot(): DeviceSnapshot {
-    return Object.freeze({ bank: this.#thisIsTemporaryBank?.getSnapshot() ?? PendingBank })
+    return Object.freeze({ bank: this.#bank?.getSnapshot() ?? this.#banklessSnapshot })
   }
   // --
 
@@ -235,7 +301,7 @@ export function tellBadNewsTo(onBadNews: BadNewsHandler, device: Device, badnews
 }
 // --
 
-// == [Helpers]: millisOf, checkSecureContext
+// == [Helpers]: millisOf, checkSecureContext, refusalSnapshotOf
 
 // A host's Infinity minutes, for never, becomes ForeverMillis: past the entrypoint, nothing is infinite.
 /** `minutes` in milliseconds, capped at `ForeverMillis`, or `fallback` for none. */
@@ -245,12 +311,19 @@ function millisOf(minutes: number | undefined, fallback: number): number { retur
 function checkSecureContext(): void {
   if ((globalThis as { isSecureContext?: unknown }).isSecureContext === false) { throw Throwers.insecureContext() }
 }
+
+/** What a snapshot shows of `err`: its refusal's kind, family and message, anything but a refusal as an unexpected error. */
+function refusalSnapshotOf(err: unknown): RefusalSnapshot {
+  const { refusalkind, family, message } = Errors.isVaultError(err) ? err : Throwers.unexpectedError(err)
+  return Object.freeze({ refusalkind, family, message })
+}
 // --
 
 // == [Checks]: Checks
 
-/** The checks of {@link Device.make}'s arguments. */
+/** The checks of {@link Device.make}'s arguments, {@link tellBadNewsTo}'s and {@link Device.adoptBornBank}'s. */
 const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
+  bank: custom<Bank>((val) => val instanceof Bank, PhrasesX.BankExpected),
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
     opts:   Validator.objCheck(() => ({
@@ -260,6 +333,7 @@ const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
       logger:          custom<Logger.VaultLogger>().optional(),
       autolockMinutes: VX.positiveMinutes.optional(),
       onBadNews:       fn<BadNewsHandler>().optional(),
+      queryCacheOpts:  MinderChecks.queryCacheOptsOrDefault,
       // Ignored: the new core has no device database. Accepted so that `...browserOpts()` from safebyok/browser, which carries one, spreads in.
       deviceDB:        custom<unknown>().optional(),
     }), { refusalkind: 'bad_record' }),
