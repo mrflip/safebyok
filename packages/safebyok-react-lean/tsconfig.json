@@ -1,0 +1,22 @@
+{
+  // The React binding: components and hooks for the browser, tested under jsdom.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src",
+    "tests",
+    "*.config.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage"
+  ]
+}
