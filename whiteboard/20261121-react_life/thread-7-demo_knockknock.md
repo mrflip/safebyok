@@ -1,6 +1,6 @@
 # Thread 7: demo_knockknock (2026-11-21)
 
-Branch `20261121-demo_knockknock`, PR #803, stacked on #801. Proved: `safebyok-demo-knockknock` lint, typecheck, test (4 files, 25: the app's integration test 8, `local-vault-db` 4, `session` 9, `anthropic` 4), `vite build`; `safebyok-react-lean` lint, typecheck, test (12 files, 189) and build (attw, publint). `pnpm demo:knockknock` serves the page; nobody has clicked through it in a real browser yet.
+Branch `20261121-demo_knockknock`, PR #803, stacked on #801. Proved: `safebyok-demo-knockknock` lint, typecheck, test (4 files, 25: the app's integration test 8, `local-vault-db` 4, `session` 9, `anthropic` 4), `vite build`; `safebyok-react-lean` lint, typecheck, test (12 files, 189) and build (attw, publint); `pnpm justify` green after the catch-up. `pnpm demo:knockknock` serves the page; nobody has clicked through it in a real browser yet.
 
 * **Built**
   * **`Knock.usePasskeyHeader()`** (`packages/safebyok-react-lean/src/giver/react-giver.tsx`): the bank's passkey header, or null. A marked cheat: the bank's snapshot carries no gate, so it reads `slot.device?.bank?.maingate.passkey0` during render, and re-renders on each change of stage (`useBank`) and each successful form mutation under `['sok', banklabel]` (`useMutationState`); the header is memoized on the `Wayin`, so it is the same object until the passkey changes. Tests: `describe("usePasskeyHeader")` in `react-giver.test.tsx` (4).
@@ -12,6 +12,9 @@ Branch `20261121-demo_knockknock`, PR #803, stacked on #801. Proved: `safebyok-d
     * `src/components/`: `App` (QueryClientProvider, `SOK.Provider userid`), `SessionBar`, `KnockKnock` (the stage switch; `UnlockDialog` at every stage), `KnockForm` (`useMutation` over `withWhisper`; a `dismissed` refusal is quiet), `KeyPanel` (the mask from the sidecar, `WhisperText` Show, `putBoxAction` under `useActionState` with `WhisperInput`, Delete via `useMutation` over `delBox`), `WaysIn` (`ReplacePassphraseForm`, then `AddPasskeyForm` or `RevokePasskeyForm` by `usePasskeyHeader`).
     * `src/lib/anthropic.ts` and its test, ported from the old demo (arrow consts made function declarations).
   * **The integration test** (`tests/components/App.test.tsx`) drives the real app, giver and core over the app's own localStorage vaultDB, with `safebyok/browser` mocked so `argon2idWebV1Deriver` is the core's test deriver, the real zxcvbn, and the old demo's `fakeAnthropic` as the global `fetch`. A reload is `vi.resetModules()` and a fresh import of the app (a fresh giver over what localStorage kept). Cases: new user → vault → key → knock → joke; reload lands locked → knock → dialog → unlock → joke; cancel the dialog; lock and unlock; wrong passphrase; Show and Delete; replace the passphrase and unlock with the new one after a reload; add a passkey, unlock with it, revoke it. Each searches the rendered tree and both QueryClient caches (action state is in the tree) for both passphrases and the key.
+
+* **Deviations**
+  * **A ride-along fix to thread 6's test**: `ReplacePassphraseForm`'s first test read the emptied field once the stage showed `unlocked`, but React resets the form only when the action settles, which can come later. It failed on this PR's first CI run (node 22 and coverage) and passed on #801's. It now waits for the field to empty. The test only; the form is unchanged.
 
 * **Cheats** (`// Cheat (react_life): …`)
   * `usePasskeyHeader` reads the gate during render (above).
