@@ -1,6 +1,6 @@
 # Thread 2: device_bring_up (2026-11-21)
 
-Branch `20261121-device_bring_up`, PR pending, stacked on #797. Proved: `pnpm --filter safebyok` test (29 files, 1336 tests), lint, typecheck; `safebyok-react-lean` test (4 files, 88), lint, typecheck.
+Branch `20261121-device_bring_up`, PR #798, stacked on #797. Proved: `pnpm --filter safebyok` test (29 files, 1336 tests), lint, typecheck; `safebyok-react-lean` test (4 files, 88), lint, typecheck.
 
 * **Built**
   - `Device` makes and owns its `ThingMinder`, and is its friend: `MinderFriend` is now a structural interface (`shapes-minder.ts`) that both `Device` and `Bank` satisfy. The device's `rootBox` is its bank's, or a shell of the root box until it has one; its `makeGetAsk`/`makeListAsk` delegate to its bank when it has one (so asks track the bank as before), and otherwise build untracked asks.
