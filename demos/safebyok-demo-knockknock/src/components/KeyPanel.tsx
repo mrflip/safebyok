@@ -1,14 +1,10 @@
 import { useMutation } from '@tanstack/react-query'
 import { useActionState } from 'react'
 import type { Whisper } from 'safebyok'
+import { maskOf } from 'safebyok-react-lean'
 import { SubmitButton, WhisperInput, WhisperText } from 'safebyok-react-lean/parts'
 import { formTextOf } from '../lib/form-text'
 import { KeyLabelpath, Knock } from '../lib/sok'
-
-/** The key's mask for the sidecar: its first seven characters and its last four, so the user can tell keys apart without unlocking. */
-function maskOf(apiKey: string): string {
-  return (apiKey.length > 16) ? `${apiKey.slice(0, 7)}…${apiKey.slice(-4)}` : '…'
-}
 
 // Made once, at module scope, as useActionState wants: it empties the form before it writes.
 const saveKeyAction = Knock.putBoxAction(KeyLabelpath, {
@@ -32,7 +28,7 @@ export function KeyPanel() {
       {(box === null) && <p className="quiet">No key saved yet.</p>}
       {(box !== null) && (box !== undefined) && (
         <p className="row">
-          Saved key: <WhisperText bank={Knock} labelpath={KeyLabelpath} field="apiKey" masked={<code>{mask}</code>} />
+          Saved key: <WhisperText labelpath={KeyLabelpath} field="apiKey" masked={<code>{mask}</code>} />
           {! isLocked && <DeleteKeyButton />}
         </p>
       )}
@@ -48,14 +44,14 @@ function KeyEditor({ isReplacing }: Readonly<{ isReplacing: boolean }>) {
     <form className="row" action={saveAction}>
       <WhisperInput name="apiKey" aria-label="Anthropic API key" placeholder="sk-ant-…" required />
       <SubmitButton whilePending="Saving…">{isReplacing ? 'Replace key' : 'Save key'}</SubmitButton>
-      {(saved?.error !== undefined) && (saved.error !== null) && <span role="alert" className="gripe">{(saved.error as Error).message}</span>}
+      {(saved?.err !== undefined) && (saved.err !== null) && <span role="alert" className="gripe">{(saved.err as Error).message}</span>}
     </form>
   )
 }
 
 /** Delete the saved key. */
 function DeleteKeyButton() {
-  const del = useMutation({ mutationFn: () => Knock.delBox(KeyLabelpath) })
+  const del = useMutation({ mutationFn: () => Knock.delBoxOnce(KeyLabelpath) })
   return (
     <>
       <button type="button" disabled={del.isPending} onClick={() => { del.mutate() }}>Delete</button>
