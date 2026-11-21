@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** all threads filed. Threads 1 to 14 filed and out of draft, in one line ending at #810. Waiting on the Coach: Open Matters rows, the Closer Look triage and answers, browser click-throughs of both demos; then base-sync and wrap-up.
+* **Status:** thread 15 (`stage_not_wait`) building, stacked on #810. Threads 1 to 14 filed and out of draft, in one line ending at #810. Waiting on the Coach: Open Matters rows, the Closer Look triage, browser click-throughs of both demos; then base-sync and wrap-up.
 
 ## The goal
 
@@ -422,6 +422,46 @@ choice ("they go lower in the list at a priority you choose").
   tail unlocked, and the stored mask again on lock; rule 2 finds no secret, and the last four are in neither the page
   nor any cache once locked.
 * *Review:* fixed (medium). Doc blocks of `WhisperMask`, `withLockableWhisper` and the Provider; a three-behaviour test split. Envman's mask beside the input judged sound. Left: the effect has no cleanup, so a late answer can write the tail after a lock, or overwrite a newer mask (a wontfix row; a two-line stale-result flag awaits the Coach, Open Matters); a ms passive-effect gap after a lock; empty while loading. Filing went red once (Knock-Knock's passkey test, `authenticator.calls.get` empty); a fresh worker is repairing it.
+
+### 15. `stage_not_wait`: verbs read the stage and act or refuse; nothing but startup awaits hello
+
+*Orchestrator:* added 2026-11-21 from two Open Matters rows and the Coach in chat.
+
+> withLockableWhisper, a lock landing mid-call (#808) → "remove the wait on hello there and everywhere but the startup sequence. Assume that things are disabled and locked (and in general will not be called) if state is not correct. Remember that hello takes a fraction of a second. Would you find other examples of this?" / "WithUnlockedWhisper is not supposed to call ensureUnlocked"
+
+> WhisperMask, a late answer after a lock (#810) → "Demonstrate react best practices everywhere especially if it trivially resolves a race or edge case; you may add that as a standing memory"
+
+> In chat: "look for things awaiting unreasonable startup or state crossings those count as concurrency machinery (waiting on hello() )"
+
+Earlier, on the shape: "it should call an unseal method that refuses: there should be a method that unlocks then unseals (by calling the one this will: it demands unlocked and unseals). But withLockable will have just sync checked that the vault is unlocked".
+
+* **Builds:**
+  * **Core,** `Vault.withUnlockedWhisper(labelpath, fn)`: demands the lease (refusing `bank_locked`), gets the box
+    by today's rule (a refused get throws only when nothing is cached), unseals it through `bank.unsealBox`, calls
+    `fn`. It never waits and never unlocks. `Vault.withWhisper` becomes `await bank.ensureUnlocked()` then
+    `withUnlockedWhisper`, dropping the `Promise.allSettled` pairing.
+  * **React, no `await device.hello()` but the provider's effect:** `withWhisper`, `withLockableWhisper`,
+    `putBoxOnceAt` and `delBoxOnce` read the stage synchronously and act or refuse. `withLockableWhisper`:
+    unlocked, `vault.withUnlockedWhisper`; locked, `ifLocked` with the box; any other stage, a refusal.
+    `withWhisper`: locked or unlocked, `vault.withWhisper` (the unlock form is the user's, not a crossing); else a
+    refusal. The two writes refuse through `demandVault()` as they already do at locked.
+  * **Queries** (`useBox`, `useGate`, `useBoxList`, `boxQuery`): `skipToken` but at locked or unlocked, as they already do with no device. A loader calling `queryClient.query(boxQuery(...))` before then
+    rejects as it does signed out; its doc says to wait on the stage. Their queryFns keep the one `await` that
+    keeps a fetch from starting inside the minder's own notification (Closer Look E3), with E3's comment
+    (`#not-a-crossing`), until the Coach rules on the Open Matters row about it.
+  * **A failed bring-up** gets a refusal phrase of its own in place of `BankNotStarted`'s advice (Closer Look E8).
+  * **WhisperMask's effect** gets React's stale-result flag in its cleanup, and its wontfix row goes. Where React's
+    docs teach an idiom that closes a race in a line or two in the files this thread touches, use it.
+  * **notes/wontfix.md:** thread 12's row on a lock landing mid-`withLockableWhisper` is rewritten: such a lock is a
+    `bank_locked` refusal (a `#no-slop-crossings` row at most). Thread 12's misplaced comment on `withWhisper`
+    ("Awaited even once said") goes with the await.
+* **Leaves out:** removing `#unlockWait`, `isUnlockWanted` and the unlock dialog's trigger (the Coach's shape keeps
+  a method that unlocks then unseals); `Vault.forceTimelyUnlocked`, which nothing calls (Cleanup); E2's device verb;
+  E10.
+* **Levels:** `opus` worker, medium effort; review `medium`. **Depends on:** 14.
+* **Ready when:** `rg 'hello\(\)' packages/safebyok-react-lean/src demos` finds only the provider's effect and the
+  queryFns' E3 hop; a test shows `withLockableWhisper` refusing at starting and answering through `ifLocked` at
+  locked; no test's subject is a crossing.
 
 ## What no thread builds
 
