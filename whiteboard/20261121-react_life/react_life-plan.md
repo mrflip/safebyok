@@ -421,6 +421,7 @@ choice ("they go lower in the list at a priority you choose").
 * **Ready when:** neither demo holds a mask in React Query; the part's test shows the stored mask locked, the live
   tail unlocked, and the stored mask again on lock; rule 2 finds no secret, and the last four are in neither the page
   nor any cache once locked.
+* *Review:* fixed (medium). Doc blocks of `WhisperMask`, `withLockableWhisper` and the Provider; a three-behaviour test split. Envman's mask beside the input judged sound. Left: the effect has no cleanup, so a late answer can write the tail after a lock, or overwrite a newer mask (a wontfix row; a two-line stale-result flag awaits the Coach, Open Matters); a ms passive-effect gap after a lock; empty while loading. Filing went red once (Knock-Knock's passkey test, `authenticator.calls.get` empty); a fresh worker is repairing it.
 
 ## What no thread builds
 
