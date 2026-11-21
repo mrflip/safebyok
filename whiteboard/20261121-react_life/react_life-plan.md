@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** all threads filed. Threads 1 to 15 filed and out of draft, in one line ending at #811. Waiting on the Coach: Open Matters rows, the Closer Look triage, browser click-throughs of both demos; then base-sync and wrap-up.
+* **Status:** threads 16 (`birth_verb`) and 17 (`new_passphrase`) added from the Closer Look triage; 16 building on #811, 17 cut from 16 once ready. Threads 1 to 15 filed and out of draft, in one line ending at #811. Then: the sprint PR rebased on top with notes/security.md reconciled, and wrap-up.
 
 ## The goal
 
@@ -464,6 +464,49 @@ Earlier, on the shape: "it should call an unseal method that refuses: there shou
   locked; no test's subject is a crossing.
 
 * *Review:* fixed (medium). A test title. Left: the bridge's microtask takes deliveries outside `ThingMinder.listen`'s try/catch, so a throw from `setQueryData` (a broken host `structuralSharing`) escapes uncaught instead of reaching `tellBadNews` (the Coach: "Bad news handler to the bridge and try catch on all deliveries sound perfect"; done in ceb458102, with a test); `withLockableWhisper`'s doc states a crossing's outcome as contract, and `vault.ts`'s two whisper doc blocks narrate (documentarian, Cleanup); demos' adapter tests still call `device.hello()` (outside the rule). Filing went red once on e2e's "stops the server's watch once the browser stops watching" (Postgres, safebyok-big; a timeout) and green on the re-run: a flake. The worker compacted once, before its readiness check.
+
+### 16. `birth_verb`: birth is a device verb
+
+*Orchestrator:* added 2026-11-21 from the Closer Look triage (E2, E5).
+
+> E2, on the cheat by which a born bank is handed to its device (`adoptBornBank`) → "having a device verb sounds good". On whether `buildBornBank` may say hello before it births → "yes, it will likely have to. Paper over what you must, my next session will build on it"
+
+> E5, on `Vault.sweep` stopping the device's minder, which it no longer owns → "a note, no code, thanks"; then "lgtm"
+
+* **Builds:**
+  * `device.birthGating(cleartexts)`, wrapping `Bank.birthGating` and keeping the bank it resolves, in place of the
+    bank-to-device call `adoptBornBank`. The giver's create-vault path calls it.
+  * `buildBornBank` (the test fixture) says hello before it births, so `#bringUp`'s fixture-only early return
+    (`if (this.#bank !== null) { return }`, the "Cheat (react_life)") goes, and with it the wontfix row "A bank
+    born on a device while its hello still fetches".
+  * E5: a row in `notes/wontfix.md` that `Vault.sweep` stops the device's minder, which it no longer owns, to be
+    settled when ends are built. No code.
+* **Paper over what you must** (the Coach): where the device verb meets a startup knot, a cheat marked
+  "Cheat (react_life)" and a line in the thread file beats a redesign; the Coach's next session builds on it.
+* **Leaves out:** retiring the stand-in root shell (`#rootShell`) and E1's refusal kind (`bad_record` for a box read
+  before birth; Rec was `absent_vault`), unless the verb cannot stand without them; the bank's copies of minder
+  records (TODO); E11's ownership work.
+* **Levels:** `opus` worker, medium effort; review `medium`. **Depends on:** 15.
+* **Ready when:** nothing calls `adoptBornBank` and it is gone; `#bringUp` has no fixture-only branch; the giver's
+  create-vault flow and both demos still birth a bank; the E5 row is in.
+
+### 17. `new_passphrase`: one new-passphrase hook, one reveal helper
+
+*Orchestrator:* added 2026-11-21 from the Closer Look triage (E10).
+
+> E10, on the new-passphrase meter and the reveal machine each existing twice → "lgtm, build "Rec: one useNewPassphrase hook and one reveal helper, a small thread after 13. Say if you want it.""
+
+* **Builds:**
+  * `useNewPassphrase`: the one hook behind every form that takes a new passphrase (its strength verdict, the
+    latest-wins `judgeseq` ref in `react-giver.tsx`, and whatever else the create-vault and change-passphrase forms
+    each keep), used by each of them.
+  * One reveal helper for what `use-draft.ts` and `parts/whisper-text.tsx` each do: pending state, `withWhisper`,
+    write into the DOM inside the callback, mask on lock. Both use it.
+  * Ride-along: a one-line comment on useDraft's focus branch (`if (input.ownerDocument.activeElement !== input)`):
+    the unlock dialog takes the focus.
+* **Leaves out:** new behaviour; a passphrase never enters React state beyond what it does now.
+* **Levels:** `opus` worker, medium effort; review `medium`. **Depends on:** 16 (cut from its tip once ready).
+* **Ready when:** each concern is written once; both demos' tests pass unchanged in what they assert.
 
 ## What no thread builds
 
