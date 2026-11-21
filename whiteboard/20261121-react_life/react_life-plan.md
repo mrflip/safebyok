@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** thread 15 (`stage_not_wait`, #811, stacked on #810) ready, in review; one compaction before its readiness check. Threads 1 to 14 filed and out of draft, in one line ending at #810. Waiting on the Coach: Open Matters rows, the Closer Look triage, browser click-throughs of both demos; then base-sync and wrap-up.
+* **Status:** all threads filed. Threads 1 to 15 filed and out of draft, in one line ending at #811. Waiting on the Coach: Open Matters rows, the Closer Look triage, browser click-throughs of both demos; then base-sync and wrap-up.
 
 ## The goal
 
@@ -462,6 +462,8 @@ Earlier, on the shape: "it should call an unseal method that refuses: there shou
 * **Levels:** `opus` worker, medium effort; review `medium`. **Depends on:** 14.
 * **Ready when:** `rg 'hello\(\)' packages/safebyok-react-lean/src demos` finds only the provider's effect; a test shows `withLockableWhisper` refusing at starting and answering through `ifLocked` at
   locked; no test's subject is a crossing.
+
+* *Review:* fixed (medium). A test title. Left: the bridge's microtask takes deliveries outside `ThingMinder.listen`'s try/catch, so a throw from `setQueryData` (a broken host `structuralSharing`) escapes uncaught instead of reaching `tellBadNews` (Open Matters: keep with a three-line catch, or drop the microtask); `withLockableWhisper`'s doc states a crossing's outcome as contract, and `vault.ts`'s two whisper doc blocks narrate (documentarian, Cleanup); demos' adapter tests still call `device.hello()` (outside the rule). Filing went red once on e2e's "stops the server's watch once the browser stops watching" (Postgres, safebyok-big; a timeout) and green on the re-run: a flake. The worker compacted once, before its readiness check.
 
 ## What no thread builds
 
