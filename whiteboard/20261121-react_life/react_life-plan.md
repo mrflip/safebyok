@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 to 9 and 11 filed, out of draft, in one line ending at #806. Thread 10 (envman) filed as #807, out of draft, stacked on #806. Thread 12 (lockable_whisper) building, stacked on #807. The Closer Look tab is up, awaiting the Coach's replies.
+* **Status:** running. Threads 1 to 9 and 11 filed, out of draft, in one line ending at #806. Thread 10 (envman) filed as #807, out of draft, stacked on #806. Thread 12 (lockable_whisper) ready as #808, stacked on #807, in review (medium). The Closer Look tab is up, awaiting the Coach's replies.
 
 ## The goal
 
@@ -372,6 +372,7 @@ choice ("they go lower in the list at a priority you choose").
 * **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 10.
 * **Ready when:** tests show `withLockableWhisper` taking each branch without waiting; the stage-change callback
   fires once per change; envman's draft clears on lock in its own test; no secret found.
+* *Review:* fixed (medium). The demos' live tail-4 mask queries set `gcTime: 0`, so the last four characters leave the host QueryClient and DOM on lock (both App tests check it); a `typeof` check replaces an `as string` cast in `KeyMask`; one test's first line and one doc block. Left: `mask(x, { tail: 4 })` reveals four characters of a short value while unlocked (Open Matters); `valRevealOf` → `valLiveMaskOf` and five doc blocks to the documentarian pass; `useStageChange` runs after commit, so one locked render may show the draft before it is discarded (my call: leave); `withLockableWhisper` on an unstarted bank throws `demandBank`'s refusal (my call: leave, with Closer Look E8); the lock-crossing wontfix row awaits the Coach.
 
 ## What no thread builds
 
