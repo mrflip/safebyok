@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** all threads filed. Threads 1 to 12 filed and out of draft, in one line ending at #808 (10 as #807, 12 as #808). Waiting on the Coach: Closer Look replies, browser click-throughs of both demos, and Open Matters rows; then base-sync and wrap-up.
+* **Status:** running. Threads 1 to 12 filed and out of draft, in one line ending at #808. Thread 13 (giver_device) building, stacked on #808. A survey of where the hooks underuse React Query runs beside it. Waiting on the Coach: Closer Look replies, browser click-throughs, Open Matters rows.
 
 ## The goal
 
@@ -373,6 +373,34 @@ choice ("they go lower in the list at a priority you choose").
 * **Ready when:** tests show `withLockableWhisper` taking each branch without waiting; the stage-change callback
   fires once per change; envman's draft clears on lock in its own test; no secret found.
 * *Review:* fixed (medium). The demos' live tail-4 mask queries set `gcTime: 0`, so the last four characters leave the host QueryClient and DOM on lock (both App tests check it); a `typeof` check replaces an `as string` cast in `KeyMask`; one test's first line and one doc block. Left: `mask(x, { tail: 4 })` reveals four characters of a short value while unlocked (Open Matters); `valRevealOf` → `valLiveMaskOf` and five doc blocks to the documentarian pass; `useStageChange` runs after commit, so one locked render may show the draft before it is discarded (my call: leave); `withLockableWhisper` on an unstarted bank throws `demandBank`'s refusal (my call: leave, with Closer Look E8); the lock-crossing wontfix row awaits the Coach.
+
+### 13. `giver_device`: the giver keeps its device; useGate reads the gate through React Query
+
+*Orchestrator:* added 2026-11-21 from a chat with the Coach after the line filed.
+
+> "what is "slot"? That word isn't in VOCABULARY, `slot.device?.bank?.maingate.passkey0` this doesn't look like anything anyone wants. What are all the question marks for? who is uncertain that a device exists?"
+>
+> "I would instead have a useGate that serves the bank's maingate. An upcoming change will make that less weird than it sounds. [...] Why does a giver instance need a slot to hold a single variable, why doesn't it just store the device directly?"
+>
+> "is that better than watching the React Query, which will see every update immediately? Shouldn't the snapshots be coming from TSQ or RQ?"
+>
+> "Do you want thread 13 built as itemized? yes, with the RQ version. [...] proceed on 13, I endorse your proposals and decisions on the above points"
+
+* **Builds:** (a) `GiverSlot` dissolves (VOCABULARY lists *slot* as a vague word). The giver's closure holds
+  `let device: Device | null` and plain `start`/`demandDevice`/`demandBank`/`demandVault`; the provider starts the
+  device and passes it to its children through context, so a hook under the provider always has one. Only the calls a
+  host may make outside the provider (`lock`, `keys.*`, `fooMutationOptions`) keep a nobody-signed-in branch. The
+  second store (`GiverSlotSnapshot`, `#align`, `SignedOutSlot`, `StartingSlot`) goes; `SignedOutBank` stays as the
+  constant `useBank` answers with no userid. (b) `Knock.useGate()`: a `useQuery` over `minder.get(MainGate)`, as
+  `useBox` is (keeping the `await device.hello()` hop), with a gate key beside `keys.box`; the bridge forwards gate
+  events as it does box events. The host's cache holds the gate without each wayin's wrapped bankKey: one function
+  makes that shown form, for the query function and the bridge alike. (c) `usePasskeyHeader` goes; the kit's
+  `PasskeyUnlockButton` and the demos read `useGate()`'s `passkey0`.
+* **Leaves out:** a notify in `Bank.#putGate` (the minder's watch already carries every gate write); moving stage
+  into the cache (locked and unlocked rest on a lease, which is never stored).
+* **Levels:** `opus`, medium effort; review `medium`. **Depends on:** 12.
+* **Ready when:** no `slot` left in the package; a hook under the provider reads a non-null device; `useGate` shows a
+  passkey added and revoked without a reload; the host's cache holds no wrapped bankKey and no secret (rule 2).
 
 ## What no thread builds
 
