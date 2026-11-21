@@ -154,7 +154,7 @@ describe("the form mutations", () => {
 
     it(`vacates the gating once the bank's ${verb} runs through its mutationOptions`, async () => {
       const { vacates } = await runThroughOptions(makerOf, optionsOf, cleartextsOf())
-      expect(vacates.countOf()).to.be.greaterThan(0)
+      expect(vacates.countOf()).to.equal(2)
     })
 
     it(`attempts the bank's ${verb} gating, made by the hook's gating, through its hook`, async () => {
@@ -164,7 +164,7 @@ describe("the form mutations", () => {
 
     it(`vacates the gating once the bank's ${verb} runs through its hook`, async () => {
       const { vacates } = await runThroughHook(useForm, cleartextsOf())
-      expect(vacates.countOf()).to.be.greaterThan(0)
+      expect(vacates.countOf()).to.equal(2)
     })
   }
 
@@ -177,7 +177,7 @@ describe("the form mutations", () => {
 
   it("vacates the gating when the verb refuses", async () => {
     const { vacates } = await runRefusedUnlock(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    expect(vacates.countOf()).to.be.greaterThan(0)
+    expect(vacates.countOf()).to.equal(2)
   })
 
   it("runs the verb once under a host's default of retrying mutations", async () => {
@@ -188,7 +188,7 @@ describe("the form mutations", () => {
 
   it("vacates the gating once the verb settles under a host's default of retrying mutations", async () => {
     const { vacates } = await runRefusedUnderRetries(new VaultError('wrong_passphrase', 'That passphrase does not unlock the bank.'))
-    expect(vacates.countOf()).to.be.greaterThan(0)
+    expect(vacates.countOf()).to.equal(2)
   })
 
   it("keys each form mutation under the bank", () => {
