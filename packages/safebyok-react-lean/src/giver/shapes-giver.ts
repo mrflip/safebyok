@@ -1,7 +1,6 @@
 /** The giver's types and checks: what it asks of a Device and of a started bank object, and the events it reads. */
 
 import type { QueryKey, UseQueryOptions } from '@tanstack/react-query'
-// eslint-disable-next-line import-x/no-extraneous-dependencies -- the giver is not yet exported, so nothing built reaches safebyok, which stays private until it is published
 import {
   type Banklabel, type BirthCleartexts, type DeviceSnapshot, type Gating, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PassphraseReplaceCleartexts, type PassphraseVerdict,
   type UnlockCleartexts, type Userid, Checkers,

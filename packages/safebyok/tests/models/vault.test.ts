@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Bank } from '../../src/models/bank'
 import { Vault } from '../../src/models/vault'
-import { type BadNews, type BoxUnsealed, PendingBank } from '../../src/shapes/shapes-bankish'
+import { type BadNews, type BoxUnsealed } from '../../src/shapes/shapes-bankish'
 import { type BoxLabelpath, Lifeseq } from '../../src/shapes/primitives'
 import { type BoxRecord, Shell, ThingFormat } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
-import type { ThingMinder } from '../../src/minding/thing-minder'
+import { ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { GetAsk } from '../../src/shapes/shapes-asks'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
@@ -40,25 +40,38 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
   return vault.putBoxOnce(newest, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
 }
 
-describe("Vault.make(bank)", () => {
-  it("makes the vault of the bank's boxes, with a minder of that bank that waits for its hello", async () => {
+/** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
+function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, ThingMinder.make({ vaultDB: bank.vaultDB }, bank)) }
+
+describe("Vault.make(bank, minder)", () => {
+  it("makes the vault of the bank's boxes, over the minder given, which waits for its hello", async () => {
     const { bank } = await TH.buildBornBank()
-    const vault = Vault.make(bank)
+    const minder = ThingMinder.make({ vaultDB: bank.vaultDB }, bank)
+    const vault = Vault.make(bank, minder)
     expect(vault.bank).to.equal(bank)
-    expect(vault.minder.scope).to.deep.equal({ userid: bank.userid, banklabel: bank.banklabel })
+    expect(vault.minder).to.equal(minder)
     expect(vault.minder.tryAt(scopeAt(bank, Openai))).to.include({ ok: false })
     expect(Object.isFrozen(vault)).to.be.true
   })
 
-  it("refuses anything but a bank", () => {
-    TH.expectSyncRefusal(() => Vault.make({} as never), 'bad_record')
-    TH.expectSyncRefusal(() => Vault.make(null as never), 'bad_record')
+  it("refuses anything but a bank and a minder", async () => {
+    const { bank, device } = await TH.buildBornBank()
+    TH.expectSyncRefusal(() => Vault.make({} as never, device.minder), 'bad_record')
+    TH.expectSyncRefusal(() => Vault.make(null as never, device.minder), 'bad_record')
+    TH.expectSyncRefusal(() => Vault.make(bank, {} as never), 'bad_record')
+    TH.expectSyncRefusal(() => Vault.make(bank, bank as never), 'bad_record')
+  })
+
+  it("refuses a minder of another bank", async () => {
+    const { bank } = await TH.buildBornBank()
+    const other = TH.makeDevice({ banklabel: 'other' })
+    TH.expectSyncRefusal(() => Vault.make(bank, other.minder), 'record_conflict')
   })
 
   it("refuses a swept bank", async () => {
-    const { bank } = await TH.buildBornBank()
+    const { bank, device } = await TH.buildBornBank()
     bank.sweep()
-    TH.expectSyncRefusal(() => Vault.make(bank), 'disabled')
+    TH.expectSyncRefusal(() => Vault.make(bank, device.minder), 'disabled')
   })
 })
 
@@ -86,7 +99,7 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     it(`sweep each vault when ${blurb} is swept: its cache emptied, telling each listener of the removal, and its watch stopped`, async () => {
       const born = await buildWatchedVault()
       const { bank, minder, vault, unwatched } = born
-      Vault.make(bank).minder.hello()
+      vaultBesideOf(bank).minder.hello()
       await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
       const events: MinderEvent[] = []
       minder.listen((event) => { events.push(event) }, ThingFormat)
@@ -115,9 +128,9 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     })
     const onBadNews = vi.fn()
     const { bank, device } = await TH.buildBornVault({ device: TH.makeDevice({}, { vaultDB, onBadNews }) })
-    Vault.make(bank).minder.hello()
+    vaultBesideOf(bank).minder.hello()
     expect(() => device.sweep()).not.to.throw()
-    expect(device.getSnapshot().bank).to.equal(PendingBank)
+    expect(device.getSnapshot().bank).to.include({ stage: 'swept' })
     await TH.eventually(() => onBadNews.mock.calls.length === 2)
     expect((onBadNews.mock.calls[0]![0] as BadNews).news).to.include({ refusalkind: 'unexpected_error' })
   })
@@ -229,7 +242,7 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
   it("given a labelpath with nothing cached, gets the newest revision to write over", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const other = Vault.make(bank)
+    const other = vaultBesideOf(bank)
     other.minder.hello()
     const next = await other.putBoxOnce(Openai, {}, { whisper: TH.Whisper })
     expect(next).to.include({ revseq: 1 })
@@ -363,7 +376,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
   it("unseals a box its vault has only listed, on an unlocked bank", async () => {
     const { bank, vault } = await TH.buildBornVault()
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
-    const other = Vault.make(bank)
+    const other = vaultBesideOf(bank)
     other.minder.hello()
     await other.minder.list('box')
     expect(await other.withWhisper(Openai, ({ whisper }) => whisper)).to.deep.equal(TH.Whisper)
@@ -444,7 +457,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     const { bank, vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { onBadNews }) })
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     bank.lock()
-    const other = Vault.make(bank)
+    const other = vaultBesideOf(bank)
     other.minder.hello()
     const asked = vi.spyOn(bank.vaultDB, 'tryGetThing')
     const using = other.withWhisper(Openai, ({ revseq }) => revseq)

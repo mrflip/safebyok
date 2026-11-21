@@ -1,25 +1,29 @@
-import { QueryClient, QueryClientProvider, useMutation } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { describe, expect, it, onTestFinished } from 'vitest'
-import { isVaultError } from 'safebyok'
+import { describe, expect, it } from 'vitest'
+import { type BankSnapshot, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
-import { makeReactGiver } from '../../src/giver/react-giver'
 import * as TH from '../test-helpers'
 
-// Hue sits down at the knock-knock app, and the vault is locked. Hue types a line and hits enter; the app asks the joke
-// service with the key in the vault, which first needs Hue's passphrase. These tests drive that path against the real core.
+// Hue sits down at the knock-knock app. The first time, there is no vault yet: Hue creates one with a new passphrase, and
+// locks it. Later the vault is locked, with the joke service's key in it. Hue types a line and hits enter; the app asks the
+// joke service with the key, which first needs Hue's passphrase. These tests drive that path against the real core,
+// through the real giver and its provider.
 
 const Passphrase = LeanTH.TestPassphrase
 
 /** A passphrase one letter off Hue's. */
 const WrongPassphrase = 'correct horse battery stable'
 
-/** Hue's app over `world`, as a host would write it beside its Device: the joke form, the unlock dialog, and every line sent to the joke service with its key. */
-function makeKnockKnockApp(world: TH.KnockKnockWorld) {
-  const { vault } = world
-  const Giver = makeReactGiver(world.giverDevice)
-  const Acme  = Giver.forBank(world.device.banklabel)
+/** A new passphrase, an obvious fake, that the world's strength checker finds strong. */
+const NewPassphrase = 'a fake new passphrase'
+
+/** Hue's app over `world`'s giver, as a host would write it at module scope: the stage switch, the create-vault form, the joke form, the unlock dialog, and every line sent to the joke service with its key. */
+function makeKnockKnockApp(world: TH.ProviderWorld) {
+  const { SOK, Bank: Knock } = world
   const heard: string[] = []
+  /** Every bank snapshot the app rendered with. */
+  const shown: BankSnapshot[] = []
 
   /** The joke service: it answers a line sent with its key. */
   function tellJoke(apiKey: unknown, line: string): string {
@@ -28,10 +32,22 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
     return `${line}? Who's there?`
   }
 
+  /** The form that creates the vault with a new passphrase, its submit disabled until the passphrase is strong. */
+  function CreateVaultForm() {
+    const birth = Knock.useBirth()
+    const strength = SOK.useStrengthVerdict()
+    return (
+      <form action={(form) => { birth.mutate(birth.gating({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
+        <input name="passphrase" type="password" autoComplete="new-password" aria-label="New passphrase" onChange={(event) => { void strength.judge(event.target.value) }} />
+        <button disabled={birth.isPending || ! strength.verdict?.strong}>Create</button>
+      </form>
+    )
+  }
+
   /** A form that sends a line to the joke service, and shows the reply, or the refusal kind of a call that failed. */
   function JokeForm() {
     const ask = useMutation({
-      mutationFn: (line: string) => vault.withWhisper(TH.JokesPath, ({ whisper }) => tellJoke(whisper['apiKey'], line)),
+      mutationFn: (line: string) => Knock.withWhisper(TH.JokesPath, ({ apiKey }) => tellJoke(apiKey, line)),
     })
     return (
       <form action={(form) => { ask.mutate(takeText(form, 'line')) }}>
@@ -45,12 +61,12 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
 
   /** The passphrase form: it submits through the unlock mutation, says why the last try failed, and cancels the wait. */
   function UnlockForm() {
-    const unlock = Acme.useUnlock()
+    const unlock = Knock.useUnlock()
     return (
-      <form action={async (form) => { unlock.mutate(await unlock.gating({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
+      <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: takeText(form, 'passphrase') })) }}>
         <input name="passphrase" type="password" autoComplete="current-password" aria-label="Passphrase" />
         <button disabled={unlock.isPending}>Unlock</button>
-        <button type="button" onClick={() => { void Acme.dismissUnlock() }}>Cancel</button>
+        <button type="button" onClick={() => { Knock.dismissUnlock() }}>Cancel</button>
         {(unlock.error !== null) && <p role="alert">{unlockAlertOf(unlock.error)}</p>}
       </form>
     )
@@ -58,27 +74,39 @@ function makeKnockKnockApp(world: TH.KnockKnockWorld) {
 
   /** The unlock dialog, open while a call waits for the bank to be unlocked. */
   function UnlockDialog() {
-    const isUnlockWanted = Acme.useBankSnapshot((snap) => snap.isUnlockWanted)
+    const isUnlockWanted = Knock.useBank((bank) => bank.isUnlockWanted)
     if (! isUnlockWanted) { return null }
     return <dialog open aria-label="Unlock"><UnlockForm /></dialog>
   }
 
-  /** The app: whether the vault is locked, whether its key is stored, the joke form and the unlock dialog. */
-  function App() {
-    Giver.useBridge()
-    const isLocked = Acme.useBankSnapshot((snap) => snap.isLocked)
-    const { data: record } = Acme.useBoxRecord(TH.JokesPath)
+  /** The app once the vault exists: whether it is locked, whether its key is stored, the joke form, Lock, and the unlock dialog. */
+  function Vault({ isLocked }: Readonly<{ isLocked: boolean }>) {
+    const { data: record } = Knock.useBoxRecord(TH.JokesPath)
     return (
       <main>
         <p>{isLocked ? 'Locked' : 'Unlocked'}</p>
         <p>{record ? 'Key stored' : 'No key yet'}</p>
+        <button type="button" onClick={() => { Knock.lock() }}>Lock</button>
         <JokeForm />
         <UnlockDialog />
       </main>
     )
   }
 
-  return { App, heard }
+  /** The app: one screen for each stage of the bank. */
+  function App() {
+    const bank = Knock.useBank()
+    shown.push(bank)
+    switch (bank.stage) {
+    case 'signed_out': { return <p>Signed out</p> }
+    case 'starting':   { return <p>Starting</p> }
+    case 'unborn':     { return <CreateVaultForm /> }
+    case 'failed':     { return <p role="alert">{bank.lastErr?.message}</p> }
+    default:           { return <Vault isLocked={bank.isLocked} /> }
+    }
+  }
+
+  return { App, heard, shown }
 }
 
 /** The unlock form's alert for `err`, its last refusal: a condition the user can mend at the field, anything else as a banner. */
@@ -96,24 +124,33 @@ function takeText(form: FormData, fieldname: string): string {
   return (typeof val === 'string') ? val : ''
 }
 
-/** Hue's app over a fresh world, rendered under the test's own QueryClient. */
-async function renderKnockKnock() {
-  const world  = await TH.buildKnockKnockWorld()
-  const app    = makeKnockKnockApp(world)
-  const client = new QueryClient()
-  onTestFinished(() => { client.clear() })
-  const { container } = render(<QueryClientProvider client={client}><app.App /></QueryClientProvider>)
+/** Hue's app over a fresh world storing `stored`, rendered under the giver's provider, signed in as Hue: with the jokes stored, once it shows the vault locked. */
+async function renderKnockKnock(stored: 'none' | 'jokes' = 'jokes') {
+  const world = await TH.buildProviderWorld({ stored })
+  const app   = makeKnockKnockApp(world)
+  const { container } = render(TH.providerTreeOf(world, <app.App />, { userid: TH.ProviderUser }))
+  if (stored === 'jokes') { await screen.findByText('Locked') }
   const derivedBefore = world.deriver.heard
-  /** Assert `passphrase` is in no snapshot the Device has published, in nothing React has of the tree, and in no item or mutation of the host's React Query. */
+  /** Assert `passphrase` is in no bank snapshot the app rendered with, in nothing React has of the tree, and in no item or mutation of the host's React Query. */
   function expectUnheld(passphrase: string): void {
-    expect(world.snapshots.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
+    expect(app.shown.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
     expect(TH.holdsText(TH.reactTreeOf(container), passphrase)).to.eq(false)
-    const entries = [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()]
+    const entries = [...world.client.getQueryCache().getAll(), ...world.client.getMutationCache().getAll()]
     expect(TH.holdsText(entries.map((entry) => entry.state), passphrase)).to.eq(false)
   }
   /** How many passphrases the key deriver has been given since the app was rendered. */
   function derivations(): number { return world.deriver.heard - derivedBefore }
-  return { world, heard: app.heard, derivations, expectUnheld }
+  /** How many times the app has shown a call waiting for an `unlock` gating: each rise of `isUnlockWanted`. */
+  function unlockAsks(): number {
+    let asks = 0
+    let wasWanted = false
+    for (const snap of app.shown) {
+      if (! wasWanted && snap.isUnlockWanted) { asks += 1 }
+      wasWanted = snap.isUnlockWanted
+    }
+    return asks
+  }
+  return { world, heard: app.heard, derivations, unlockAsks, expectUnheld }
 }
 
 /** Send `line` from the joke form, as Hue typing it and pressing Tell. */
@@ -128,21 +165,36 @@ function typePassphrase(passphrase: string): void {
   fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
 }
 
-/** How many times the Device's snapshots have shown a call waiting for an `unlock` gating: each rise of `isUnlockWanted`. */
-function unlockAsksOf(world: TH.KnockKnockWorld): number {
-  let asks = 0
-  let wasWanted = false
-  for (const snap of world.snapshots) {
-    if (! wasWanted && snap.bank.isUnlockWanted) { asks += 1 }
-    wasWanted = snap.bank.isUnlockWanted
-  }
-  return asks
-}
-
 describe("the knock-knock app", () => {
+  it("creates a vault, locks it, and asks for the passphrase before a joke once its key is stored", async () => {
+    const { world, heard, expectUnheld } = await renderKnockKnock('none')
+    expect(screen.getByText('Starting')).to.exist
+    const field = await screen.findByLabelText('New passphrase')
+    fireEvent.change(field, { target: { value: 'short' } })
+    await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Create' }).disabled).to.eq(true) })
+    fireEvent.change(field, { target: { value: NewPassphrase } })
+    await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Create' }).disabled).to.eq(false) })
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }))
+    await screen.findByText('Unlocked')
+    expect(screen.getByText('No key yet')).to.exist
+    expectUnheld(NewPassphrase)
+
+    await world._cheat_putJokesKey(NewPassphrase)
+    await screen.findByText('Key stored')
+    fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
+    await screen.findByText('Locked')
+    tell('Knock knock')
+    await screen.findByRole('dialog', { name: 'Unlock' })
+    expect(heard).to.deep.equal([])
+
+    typePassphrase(NewPassphrase)
+    await waitFor(() => { expect(screen.getByLabelText('Reply').textContent).to.eq("Knock knock? Who's there?") })
+    expect(screen.getByText('Unlocked')).to.exist
+    expectUnheld(NewPassphrase)
+  })
+
   it("asks for the passphrase before telling a joke that needs the locked vault's key", async () => {
     const { world, heard, derivations, expectUnheld } = await renderKnockKnock()
-    expect(screen.getByText('Locked')).to.exist
     await screen.findByText('Key stored')
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })
@@ -163,19 +215,19 @@ describe("the knock-knock app", () => {
   })
 
   it("tells the next line without asking again while the vault stays unlocked", async () => {
-    const { world, heard, derivations } = await renderKnockKnock()
+    const { heard, derivations, unlockAsks } = await renderKnockKnock()
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })
     typePassphrase(Passphrase)
     await waitFor(() => { expect(heard).to.deep.equal(['Knock knock']) })
     tell('Lettuce')
     await waitFor(() => { expect(screen.getByLabelText('Reply').textContent).to.eq("Lettuce? Who's there?") })
-    expect(unlockAsksOf(world)).to.eq(1)
+    expect(unlockAsks()).to.eq(1)
     expect(derivations()).to.eq(1)
   })
 
   it("keeps the dialog open for another try after a wrong passphrase", async () => {
-    const { world, heard, expectUnheld } = await renderKnockKnock()
+    const { heard, unlockAsks, expectUnheld } = await renderKnockKnock()
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })
     typePassphrase(WrongPassphrase)
@@ -188,19 +240,19 @@ describe("the knock-knock app", () => {
 
     typePassphrase(Passphrase)
     await waitFor(() => { expect(heard).to.deep.equal(['Knock knock']) })
-    expect(unlockAsksOf(world)).to.eq(1)
+    expect(unlockAsks()).to.eq(1)
     expectUnheld(Passphrase)
   })
 
   it("answers a second line sent while the dialog is open with the same unlock", async () => {
-    const { world, heard, derivations, expectUnheld } = await renderKnockKnock()
+    const { heard, derivations, unlockAsks, expectUnheld } = await renderKnockKnock()
     tell('Knock knock')
     await screen.findByRole('dialog', { name: 'Unlock' })
     tell('Boo')
     await waitFor(() => { expect(screen.getAllByRole('dialog')).to.have.lengthOf(1) })
     typePassphrase(Passphrase)
     await waitFor(() => { expect(heard).to.have.members(['Knock knock', 'Boo']) })
-    expect(unlockAsksOf(world)).to.eq(1)
+    expect(unlockAsks()).to.eq(1)
     expect(derivations()).to.eq(1)
     expectUnheld(Passphrase)
   })
