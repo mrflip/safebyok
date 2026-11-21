@@ -31,10 +31,11 @@
      friend: `#gateFriend() { return { m: () => this.#m() } }`, `#m() { return this.bankFriend.m() }`.
   3. `gate.seal` / `gate.unseal` underneath; `Bank` serves `sealBox` / `unsealBox` with `trySealBox` /
      `tryUnsealBox`, and `sealBoxEnsuringUnlock` / `unsealBoxEnsuringUnlock`, which await `ensureUnlocked()` first.
-     Superseded in chat (the Coach, 2026-11-21): "any sugar or orchestration around unsealing: put that on bank for
-     the moment; leave gate to hold primitives (seal / unseal), bank has passthrough seal/unseal/trySeal/tryUnseal".
-     So `Bank` passes `seal` / `unseal` / `trySeal` / `tryUnseal` through to the gate, and keeps its sugar
-     (`sealBox`, `tombstoneBox`, `unsealBox`, the `…EnsuringUnlock` pair).
+     Superseded in chat (the Coach, 2026-11-21, correcting a first wording): "any sugar or orchestration around
+     unsealing: put that on vault where it already is/was/will be; Use gate to offer primitives (seal / unseal), bank
+     has passthrough seal/unseal and wrapped trySeal/tryUnseal, vault has withWhisper and anything fancier than the
+     four bank methods". So `Bank` has exactly `seal`, `unseal`, `trySeal`, `tryUnseal`; `sealBox`, `tombstoneBox`,
+     `unsealBox` and the `…EnsuringUnlock` pair go to `Vault` or go.
   4. The change signal is built into `Thing`: `subscribe`, bound, and a protected way to tell subscribers; `Gate` and
      `Bank` both use it.
 * **No crossing guards** (`#no-slop-crossings`). A gating reads what it needs of the gate before its first await, as
