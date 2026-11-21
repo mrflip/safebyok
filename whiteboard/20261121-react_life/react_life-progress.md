@@ -49,3 +49,16 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   stays.
 * **Birth's handover cheat stays** (`Bank.birthGating` calls `device.adoptBornBank`): the first place to look when
   ownership is re-apportioned.
+
+## Thread 3, giver_slot (#799, ready)
+
+* **How a hook reaches things:** every hook closes over the giver's `slot` and reads it when called
+  (`slot.device`, `slot.demandVault()`, `slot.demandBank()`, `slot.device.minder`); in render through
+  `useShownSnapshot(pick)`, which composes the provider's userid with the slot. New bank hooks go in `makeBankGiver`.
+* **The bridge** is made in `slot.start` before `hello`, with the provider's QueryClient, never stopped. It
+  invalidates the host's query from the minder's cache subscriber; the refetch's `minder.get` waits on
+  `await device.hello()`. Under review against rule 7.
+* **"An unlock is wanted"** is `Knock.useBank((bank) => bank.isUnlockWanted)`; `dismissUnlock()` rejects the waits.
+* Form mutation keys `['sok', banklabel, verb]`; box keys carry the userid. Labelpaths flat.
+* Cheat: a fresh `device_tok` per device (`crypto.randomUUID()`) in `slot.start`.
+* The 400k worker built the whole thread in one context (about 290k tokens).

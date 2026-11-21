@@ -5,7 +5,7 @@
 * **Default levels:** review `low`; worker and reviewer on their agents' own model and effort; the style pass on
   `style-reviewer`'s pin. Each thread names its own where they differ. **At once:** 3 threads.
 * **Sprint doc:** https://claude.ai/artifact/KbesoYhFF84nnLQorPYQ2K (Open Matters, Cleanup, Progress, Resolved).
-* **Status:** running. Threads 1 and 2 filed, out of draft (#797, #798). Thread 3 building, stacked on #798.
+* **Status:** running. Threads 1 and 2 filed, out of draft (#797, #798). Thread 3 ready, in review (#799). Threads 4 and 5 building side by side, stacked on #799.
 
 ## The goal
 
@@ -210,6 +210,7 @@ Serves threads 2 to 10, which all write in it.
 * **Look-ahead:** threads 4 to 6 read the slot's vault.
 * **Size:** the sprint's largest. If it runs long, `withWhisper`, `lock` and the knock-knock port move to thread 4.
 * *Orchestrator:* run on `thread-worker-400k` (opus, high), since thread 2 compacted after six minutes and this thread is larger.
+* *Orchestrator:* ready, #799, no compaction, nothing moved to thread 4. The old giver (`old-giver.ts`, `minder-bank.ts`, the fake and minder-giver worlds) stays unexported for thread 4 to port and delete. Two Open Matters rows (form mutation keys without the userid; standalone gating makers dropped); the provider effect's wider deps are my call.
 * **Ready when:** the ported test passes: unborn, birth, lock, `withWhisper` waits, unlock, it resumes, with no
   secret found in the tree or either cache.
 
@@ -220,6 +221,7 @@ Serves thread 7: the hooks Knock-Knock's key editor needs. The Coach's text is q
 * **Builds:** `Knock.boxQuery`, `useBox`, `keys.under`; `SOK.useQueryOptions`; `nullifyThing` as the default
   `select`; `putBoxOnce`, `delBox`, `putBoxAction`. The bridge, minder-giver and react-bridge tests are ported.
 * **Leaves out:** listings, `putBox` with a revisor, suspense.
+* *Orchestrator:* also ports or retires the old giver's three test files (`react-bridge`, `minder-giver`, `old-giver`: 50 cases) and deletes the old giver and its worlds, which thread 3 left. Run on `thread-worker-400k`.
 * **Levels:** `opus`, medium effort; review `low`. **Depends on:** 3. **Beside:** 5 and 6.
 * **Ready when:** a test shows `putBoxAction`, then `useBox` with the new sidecar, and no whisper in the action
   state, the mutation cache or the query cache.
