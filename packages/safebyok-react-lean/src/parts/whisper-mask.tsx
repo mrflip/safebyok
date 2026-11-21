@@ -35,17 +35,26 @@ export function WhisperMask({ bank: bankProp, labelpath, field, tail, ifLocked =
   const revtok = bank.useBox(labelpath).data?.revtok
   const maskRef = useRef<HTMLElement>(null)
 
-  /** Write the mask of the box at its revision into `el`, or leave it empty. */
-  const writeMask = useEffectEvent(async (el: HTMLElement) => {
+  /** Write the mask of the box at its revision into `el`, or leave it empty, unless `isCurrent()` has gone false meanwhile. */
+  const writeMask = useEffectEvent(async (el: HTMLElement, isCurrent: () => boolean) => {
     el.textContent = ''
     if (revtok === undefined) { return }
     try {
-      el.textContent = await bank.withLockableWhisper(labelpath, (whisper) => mask(whisperTextOf(whisper[field]), (tail === undefined) ? {} : { tail }), { ifLocked })
+      const shown = await bank.withLockableWhisper(labelpath, (whisper) => mask(whisperTextOf(whisper[field]), (tail === undefined) ? {} : { tail }), { ifLocked })
+      if (isCurrent()) { el.textContent = shown }
     } catch (err) {
-      onError?.(err)
+      if (isCurrent()) { onError?.(err) }
     }
   })
-  useEffect(() => { if (maskRef.current !== null) { void writeMask(maskRef.current) } }, [stage, revtok, labelpath, field, tail])
+  // React's stale-result flag: an answer that lands after the next stage, revision or prop is dropped, so a live mask
+  // never lands over the stored one written after a lock.
+  useEffect(() => {
+    const el = maskRef.current
+    if (el === null) { return }
+    let isCurrent = true
+    void writeMask(el, () => isCurrent)
+    return () => { isCurrent = false }
+  }, [stage, revtok, labelpath, field, tail])
 
   // React renders the element empty and never touches its text, so the mask lives in the page alone.
   return <code ref={maskRef} className="whisper-mask" />

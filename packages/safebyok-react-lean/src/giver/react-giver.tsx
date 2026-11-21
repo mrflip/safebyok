@@ -158,7 +158,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     return device
   }
 
-  /** The signed-in user's bank. Refuses `absent_vault` while nobody is signed in, while the bank is unborn, or until it is brought up. */
+  /** The signed-in user's bank. Refuses `absent_vault` while nobody is signed in, while the bank is unborn, until it is brought up, or where it failed to come up. */
   function demandBank(): Bank {
     const signedIn = demandDevice()
     if (signedIn.bank === null) { throw bankAbsentOf(signedIn) }
@@ -224,17 +224,18 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
 
   /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin.
    * Every key it makes is the user's: it re-renders when the user changes, so each query made from it changes key with them.
-   * While nobody is signed in, a query from it fetches nothing.
+   * Until the bank is brought up, a query from it fetches nothing.
    * @example
    *   const sok = SOK.useQueryOptions()
    *   const { data: box } = useQuery(sok.knock.box('jokes'))
    */
   function useQueryOptions(): Readonly<Record<BanklabelT, BoxQueries>> {
     const shownDevice = useShown().device
+    const isUp = bankGiver.useBank(isBroughtUp)
     return useMemo(() => {
-      const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(shownDevice, labelpath) })
+      const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(shownDevice, labelpath, isUp) })
       return Object.freeze({ [banklabel]: queries }) as Record<BanklabelT, BoxQueries>
-    }, [shownDevice])
+    }, [shownDevice, isUp])
   }
 
   const giver = Object.freeze({
@@ -308,32 +309,34 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // One factory serves render and the calls outside it: a hook hands it the device it shows, `boxQuery` the one signed in.
-  /** The `queryOptions` of the box at `labelpath` in `device`'s bank, skipping the fetch while `device` is null. */
-  function boxQueryOf(device: Device | null, labelpath: string): BoxQueryOptions {
-    return queryOptions({ ...boxQueryBaseOf(device, labelpath), select: liveOf<BoxRecord> })
+  /** The `queryOptions` of the box at `labelpath` in `device`'s bank, skipping the fetch unless `isUp`, the bank brought up. */
+  function boxQueryOf(device: Device | null, labelpath: string, isUp: boolean): BoxQueryOptions {
+    return queryOptions({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf<BoxRecord> })
   }
 
   /** {@link boxQueryOf}, less its `select`. */
-  function boxQueryBaseOf(device: Device | null, labelpath: string): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
+  function boxQueryBaseOf(device: Device | null, labelpath: string, isUp: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
     return {
       ...recordQueryDefaults(() => isBehindAt(device, boxLabelpath)),
       queryKey: boxQueryKeyOf({ userid: useridOf(device), banklabel, labelpath: boxLabelpath }),
-      queryFn:  (device === null) ? skipToken : () => getBoxShown(device, boxLabelpath),
+      queryFn:  (isUp && (device !== null)) ? () => getBoxShown(device, boxLabelpath) : skipToken,
     }
   }
 
   /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader, a prefetch, or `useQuery` outside the provider's reach.
-   * Its `data` is what {@link useBox} answers. While nobody is signed in, it fetches nothing, and `queryClient.query` rejects.
+   * Its `data` is what {@link useBox} answers. Until the bank is brought up, it fetches nothing, and `queryClient.query` rejects:
+   * a loader waits for the stage to show `locked` or `unlocked` first.
    * @example
    *   loader: () => queryClient.query(Knock.boxQuery('jokes'))
    */
   function boxQuery(labelpath: string): BoxQueryOptions {
-    return boxQueryOf(signedIn(), labelpath)
+    const device = signedIn()
+    return boxQueryOf(device, labelpath, (device !== null) && isBroughtUp(device.getSnapshot().bank))
   }
 
   /** The box's stored record, through React Query, its whisper still sealed.
-   * `data` is the record, null when none is stored or it was deleted, and undefined while pending or while nobody is signed in.
+   * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the bank is brought up.
    * A record overtaken by a newer revision shows until the newer one arrives.
    * `opts` are React Query's own, and override the giver's. A `select` given there is handed the whole record, the box's
    * tombstone, or its shell where none is stored: {@link liveOf} is the default.
@@ -343,11 +346,12 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useBox<SelT = BoxSelected>(labelpath: string, opts: BoxQueryOpts<BoxShown, SelT> = {}): UseQueryResult<SelT> {
     const { device } = useShown()
-    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath), select: liveOf as (thing: BoxShown) => SelT, ...opts })
+    const isUp = useBank(isBroughtUp)
+    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf as (thing: BoxShown) => SelT, ...opts })
   }
 
   /** The bank's main gate, through React Query: its wayins' headers, never the bankKey they wrap.
-   * `data` is the gate, null when no bank is stored, and undefined while pending or while nobody is signed in.
+   * `data` is the gate, null when no bank is stored, and undefined while pending or until the bank is brought up.
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
    * `opts` are React Query's own, as {@link useBox} takes them.
    * @example
@@ -356,29 +360,29 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useGate<SelT = GateSelected>(opts: BoxQueryOpts<GateShown, SelT> = {}): UseQueryResult<SelT> {
     const { device } = useShown()
-    return useQuery<GateShown, Error, SelT>({ ...gateQueryBaseOf(device), select: liveGateOf as (gate: GateShown) => SelT, ...opts })
+    const isUp = useBank(isBroughtUp)
+    return useQuery<GateShown, Error, SelT>({ ...gateQueryBaseOf(device, isUp), select: liveGateOf as (gate: GateShown) => SelT, ...opts })
   }
 
-  /** The key, fetch and defaults of the query of `device`'s main gate, skipping the fetch while `device` is null. */
-  function gateQueryBaseOf(device: Device | null): Pick<UseQueryOptions<GateShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
+  /** The key, fetch and defaults of the query of `device`'s main gate, skipping the fetch unless `isUp`, the bank brought up. */
+  function gateQueryBaseOf(device: Device | null, isUp: boolean): Pick<UseQueryOptions<GateShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     return {
       ...recordQueryDefaults(() => isBehindAt(device, Labelpath.MainGate)),
       queryKey: gateQueryKeyOf({ userid: useridOf(device), banklabel }),
-      queryFn:  (device === null) ? skipToken : () => getGateShown(device),
+      queryFn:  (isUp && (device !== null)) ? () => getGateShown(device) : skipToken,
     }
   }
 
   /** The signed-in user's listing of the root box's children. */
   async function getBoxListing(): Promise<readonly Labelpath[]> {
     const device = demandDevice()
-    await device.hello()
     await device.minder.list(RootBoxLabelpath)
     // The minder caches the root box's listing from `hello`, so there is always one to read.
     return device.minder.listingAt({ ...device.scope, labelpath: RootBoxLabelpath })!
   }
 
   /** The labelpaths of the bank's boxes, through React Query, for a list that renders each one by {@link useBox}.
-   * `data` is the labelpaths in labelpath order, and undefined while pending or while nobody is signed in. It is the same array until a box joins.
+   * `data` is the labelpaths in labelpath order, and undefined while pending or until the bank is brought up. It is the same array until a box joins.
    * A deleted box stays listed, and its `useBox` answers null. A box this device writes or hears of joins at once.
    * @example
    *   const { data: labelpaths } = Knock.useBoxList()
@@ -386,10 +390,11 @@ function makeBankGiver(friend: BankFriend) {
    */
   function useBoxList(): UseQueryResult<readonly string[]> {
     const { device } = useShown()
+    const isUp = useBank(isBroughtUp)
     return useQuery({
       ...ListingQueryDefaults,
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
-      queryFn:  (device === null) ? skipToken : getBoxListing,
+      queryFn:  (isUp && (device !== null)) ? getBoxListing : skipToken,
       select:   hostLabelpathsOf,
     })
   }
@@ -410,7 +415,7 @@ function makeBankGiver(friend: BankFriend) {
   })
 
   /** Call `fn` with the box's whisper, and resolve what `fn` resolves. On a locked bank, it first waits for the unlock form.
-   * While it waits, `useBank((bank) => bank.isUnlockWanted)` is true: show the unlock form, or call {@link dismissUnlock}, which rejects the wait `dismissed`.
+   * Call it once the stage shows `locked` or `unlocked`: before then it refuses. While it waits, `useBank((bank) => bank.isUnlockWanted)` is true: show the unlock form, or call {@link dismissUnlock}, which rejects the wait `dismissed`.
    * `fn` also gets the whole box, unsealed. Use the whisper only inside `fn`, and return only what is safe to retain:
    * what `fn` throws is rethrown as thrown.
    * @example
@@ -419,14 +424,12 @@ function makeBankGiver(friend: BankFriend) {
   async function withWhisper<ResultT>(labelpath: string, fn: (whisper: Whisper, box: BoxUnsealed) => ResultT | Promise<ResultT>): Promise<ResultT> {
     const boxLabelpath = boxLabelpathOf(labelpath)
     Checks.fn.parse(fn)
-    const device = demandDevice()
-    // Awaited even once said: the hop keeps the bridge's synchronous invalidateQueries from re-entering the minder.
-    await device.hello()
     return await demandVault().withWhisper(boxLabelpath, (box) => fn(box.whisper, box))
   }
 
   /** Call `fn` with the box's whisper on an unlocked bank, and `opts.ifLocked` with its sealed record on a locked one, resolving what either resolves.
-   * Unlike {@link withWhisper}, it never waits for the unlock form. Call it again after a lock, an unlock or a `putBox`.
+   * Unlike {@link withWhisper}, it never waits for the unlock form: a lock that lands before the box is unsealed refuses `bank_locked`.
+   * Call it once the stage shows `locked` or `unlocked`, and again after a lock, an unlock or a `putBox`.
    * Use the whisper only inside `fn`. A result that shows any of the whisper belongs in the page, not in React's state or a query.
    * @example
    *   const shown = await Knock.withLockableWhisper('jokes', ({ apiKey }) => mask(String(apiKey), { tail: 4 }), { ifLocked: (box) => String(box.sidecar['mask']) })
@@ -438,10 +441,9 @@ function makeBankGiver(friend: BankFriend) {
     const boxLabelpath = boxLabelpathOf(labelpath)
     Checks.fn.parse(fn)
     const { ifLocked } = Checks.withLockableWhisperOpts.parse(opts) as WithLockableWhisperOpts<ResultT>
-    const device = demandDevice()
-    await device.hello()
-    if (demandBank().isUnlocked) { return await demandVault().withWhisper(boxLabelpath, (box) => fn(box.whisper, box)) }
-    const box = liveOf(await getBoxShown(device, boxLabelpath))
+    const vault = demandVault()
+    if (vault.bank.isUnlocked) { return await vault.withUnlockedWhisper(boxLabelpath, (box) => fn(box.whisper, box)) }
+    const box = liveOf<BoxRecord>(await vault.minder.get({ ...vault.bank.scope, labelpath: boxLabelpath }))
     // A sparse record has no sidecar to read, so it refuses as a deleted box does.
     if ((box === null) || (box === undefined)) { throw new VaultError('absent_box', Phrases.BoxAbsent) }
     return await ifLocked(box)
@@ -463,7 +465,6 @@ function makeBankGiver(friend: BankFriend) {
 
   /** {@link putBoxOnce} of the box at `boxLabelpath`. */
   async function putBoxOnceAt(boxLabelpath: BoxLabelpath, patch: LivePublicPropsOf<BoxRecord, BoxCleartexts>, secrets: BoxCleartexts): Promise<LiveOf<BoxRecord>> {
-    await demandDevice().hello()
     return await demandVault().putBoxOnce(boxLabelpath, patch, secrets)
   }
 
@@ -472,7 +473,6 @@ function makeBankGiver(friend: BankFriend) {
    */
   async function delBoxOnce(boxNamed: BoxNamed): Promise<TombstoneOf<BoxRecord>> {
     const boxLabelpath = boxLabelpathOfNamed(boxNamed)
-    await demandDevice().hello()
     return await demandVault().delBoxOnce(boxLabelpath)
   }
 
@@ -622,11 +622,16 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBehindAt, getBoxShown, getGateShown, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, emptyForm, Checks
+// == [Helpers]: useridOf, isBroughtUp, isBehindAt, getBoxShown, getGateShown, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
   return (device === null) ? null : device.userid
+}
+
+/** True while `bank` is brought up, unborn, locked or unlocked: the stages its boxes and gate are fetched at. */
+function isBroughtUp(bank: BankSnapshot): boolean {
+  return (bank.stage === 'unborn') || (bank.stage === 'locked') || (bank.stage === 'unlocked')
 }
 
 /** True while `device`'s minder has heard of a newer revision of the Thing at `labelpath` than its item. False for no device. */
@@ -634,17 +639,13 @@ function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
   return device?.minder.isBehindAt({ ...device.scope, labelpath }) ?? false
 }
 
-// Each fetch below awaits `hello` even once said: the hop keeps the bridge's synchronous invalidateQueries from
-// re-entering the minder.
 /** `device`'s record of the box at `labelpath`, through its minder. */
 async function getBoxShown(device: Device, labelpath: BoxLabelpath): Promise<BoxShown> {
-  await device.hello()
   return await device.minder.get({ ...device.scope, labelpath })
 }
 
 /** `device`'s main gate, through its minder, as the host's React Query holds it. */
 async function getGateShown(device: Device): Promise<GateShown> {
-  await device.hello()
   return gateShownOf(await device.minder.get({ ...device.scope, labelpath: Labelpath.MainGate }))
 }
 
@@ -656,7 +657,9 @@ function unsubscribeFromNothing(): void { /* Nothing was subscribed. */ }
 
 /** The refusal of a call that needs `device`'s bank, while it has none: unborn, still coming up, or failed. */
 function bankAbsentOf(device: Device): VaultError {
-  return new VaultError('absent_vault', (device.getSnapshot().bank.stage === 'unborn') ? Phrases.BankAbsent : Phrases.BankNotStarted)
+  const { stage } = device.getSnapshot().bank
+  if (stage === 'unborn') { return new VaultError('absent_vault', Phrases.BankAbsent) }
+  return new VaultError('absent_vault', (stage === 'failed') ? Phrases.BankFailed : Phrases.BankNotStarted)
 }
 
 /** The core's labelpath of the root box, which every box is under. */
