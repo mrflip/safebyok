@@ -43,8 +43,10 @@ export function KeyPanel() {
 function KeyMask({ revtok, isLocked }: Readonly<{ revtok: string, isLocked: boolean }>) {
   const { data: shown = '…' } = useQuery({
     queryKey: ['keyMask', isLocked, revtok],
-    queryFn: () => Knock.withLockableWhisper(KeyLabelpath, (whisper) => mask(String(whisper['apiKey']), { tail: 4 }), {
-      ifLocked: (stored) => stored.sidecar['mask'] as string,
+    // The unlocked answer shows the key's last four characters: gcTime 0 drops it from the cache as the page locks, rather than keeping it five minutes.
+    gcTime:   0,
+    queryFn:  () => Knock.withLockableWhisper(KeyLabelpath, (whisper) => mask(String(whisper['apiKey']), { tail: 4 }), {
+      ifLocked: (stored) => (typeof stored.sidecar['mask'] === 'string') ? stored.sidecar['mask'] : '…',
     }),
   })
   return <code>{shown}</code>

@@ -153,6 +153,7 @@ describe("the Knock-Knock Machine", () => {
     const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
     expect(within(region('Your Anthropic API key')).queryByLabelText('Anthropic API key')).to.be.null
     await within(region('Your Anthropic API key')).findByText(StoredMask)
+    TH.expectTextUnheld(ApiKey.slice(-4), page.container, page.client)
     unlockIn(locked)
     await screen.findByText('Your vault is unlocked.')
     await within(region('Your Anthropic API key')).findByText(LiveMask)

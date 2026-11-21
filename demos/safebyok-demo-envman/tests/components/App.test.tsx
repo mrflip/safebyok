@@ -177,6 +177,7 @@ describe("Envman", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
     await waitFor(() => { expect(input.placeholder).to.eq(StoredMask) })
+    TH.expectTextUnheld(OpenaiKey.slice(-4), page.container, page.client)
     unlockIn(locked)
     await screen.findByText('Your vault is unlocked.')
     await waitFor(() => { expect(input.placeholder).to.eq(LiveMask) })

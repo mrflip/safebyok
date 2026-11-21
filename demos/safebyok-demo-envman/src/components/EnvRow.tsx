@@ -22,7 +22,9 @@ function useValMask(labelpath: string, revtok: string): string | undefined {
   const isLocked = Envman.useBank((bank) => bank.isLocked)
   const { data: shown } = useQuery({
     queryKey: ['valMask', labelpath, isLocked, revtok],
-    queryFn: () => Envman.withLockableWhisper(labelpath, (whisper) => valRevealOf(String(whisper['val'])), {
+    // The unlocked answer shows the value's last four characters: gcTime 0 drops it from the cache as the page locks, rather than keeping it five minutes.
+    gcTime:   0,
+    queryFn:  () => Envman.withLockableWhisper(labelpath, (whisper) => valRevealOf(String(whisper['val'])), {
       ifLocked: (stored) => envSidecarOf(stored.sidecar).mask,
     }),
   })
