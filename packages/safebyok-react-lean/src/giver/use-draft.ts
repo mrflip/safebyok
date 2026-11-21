@@ -2,10 +2,11 @@
 
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
-import { type BankSnapshot, type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sidecar, Thing, type Whisper, WhisperFieldAttributes } from 'safebyok'
+import { type BankSnapshot, type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sidecar, Thing, VaultError, type Whisper, WhisperFieldAttributes } from 'safebyok'
 import { PartsPhrases } from '../parts/phrases-parts'
 import { nullifyThing } from './giver-defaults'
 import type { GiverSlot } from './giver-slot'
+import * as Phrases from './phrases-giver'
 import type { BoxSelected, BoxShown } from './react-giver'
 import type { BoxQueryOpts } from './shapes-giver'
 
@@ -177,7 +178,7 @@ export function makeUseDraft(slot: GiverSlot, bank: DraftFriend) {
 
     async function put(opts: DraftPutOpts = {}): Promise<LiveOf<BoxRecord>> {
       const { sidecarOf } = Checks.draftPutOpts.parse(opts)
-      const edits = Object.fromEntries([...dirtyFieldnames].map((fieldname) => [fieldname, inputs.current.get(fieldname)?.value ?? '']))
+      const edits = Object.fromEntries([...dirtyFieldnames].map((fieldname) => [fieldname, inputOf(inputs.current, fieldname).value]))
       const box = await bank.withWhisper(labelpath, async (whisper, read) => {
         const nextWhisper = { ...whisper, ...edits }
         const draftSidecar = sidecarSet ?? ((pinned === null) ? read.sidecar : baseSidecar)
@@ -195,7 +196,7 @@ export function makeUseDraft(slot: GiverSlot, bank: DraftFriend) {
 }
 // --
 
-// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, emptyInputs, whisperTextOf, Checks
+// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, inputOf, emptyInputs, whisperTextOf, Checks
 
 /** No field typed into. */
 const NoFieldnames: ReadonlySet<string> = new Set()
@@ -211,6 +212,13 @@ function wholeThingOf(thing: BoxShown): BoxShown { return thing }
 function holdInput(inputs: Map<string, HTMLInputElement>, fieldname: string, input: HTMLInputElement | null): () => void {
   if (input !== null) { inputs.set(fieldname, input) }
   return () => { inputs.delete(fieldname) }
+}
+
+/** The input holding the field `fieldname`, which has text typed into it. Throws where it has left the page, rather than let the field be written empty. */
+function inputOf(inputs: ReadonlyMap<string, HTMLInputElement>, fieldname: string): HTMLInputElement {
+  const input = inputs.get(fieldname)
+  if (input === undefined) { throw new VaultError('bad_record', Phrases.TypedFieldGone) }
+  return input
 }
 
 /** Empty every input of `inputs` but those of `keptFieldnames`. */

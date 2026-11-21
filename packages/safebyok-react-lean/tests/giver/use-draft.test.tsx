@@ -84,9 +84,13 @@ describe("useDraft", () => {
   it("reveals the stored key on focus, and puts what was typed, with neither key held by React or the QueryClient", async () => {
     const { world, input, seen, container } = await renderDraftEditor()
     expect([input.type, input.value, input.placeholder]).to.deep.equal(['password', '', '••••••••'])
+    expect(input.hasAttribute('name')).to.eq(false)
     await revealIn(input)
+    TH.expectTextUnheld(TH.JokesKey, container, world.client)
     typeKeyInto(input)
     await screen.findByText('Dirty')
+    TH.expectTextUnheld(TH.JokesKey, container, world.client)
+    TH.expectTextUnheld(TypedKey, container, world.client)
     act(() => { input.blur() })
     expect([input.type, input.value]).to.deep.equal(['password', TypedKey])
     act(() => { screen.getByText('Save').click() })
@@ -104,6 +108,7 @@ describe("useDraft", () => {
     await revealIn(input)
     typeKeyInto(input)
     await screen.findByText('Dirty')
+    TH.expectTextUnheld(TypedKey, container, world.client)
     act(() => { screen.getByText('Undo').click() })
     await screen.findByText('Clean')
     expect(input.value).to.eq('')
@@ -203,6 +208,17 @@ describe("useDraft", () => {
     act(() => { screen.getByText('Undo').click() })
     await screen.findByText('Clean')
     expect([seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([2, { service: 'jokes', tier: 'ultra' }])
+  })
+
+  it("refuses to put a field typed into whose input has left the page, rather than write it empty", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
+    const { result } = renderHook(() => world.Bank.useDraft(TH.JokesPath), { wrapper: Wrapper })
+    const leave = result.current.whisperField('apiKey').ref(document.createElement('input')) as () => void
+    act(() => { result.current.whisperField('apiKey').onChange({} as never) })
+    expect(result.current.isWhisperDirty).to.eq(true)
+    leave()
+    await TH.expectRefusal(result.current.put(), 'bad_record')
   })
 
   it("refuses a fieldname that is not a string, and a sidecarOf that is not a function", async () => {
