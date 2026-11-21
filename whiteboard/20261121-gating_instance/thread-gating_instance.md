@@ -9,7 +9,7 @@ clean; `pnpm justify` green (safebyok-big 2946, safebyok 1357, safebyok-react 36
     (`BirthGating`, `UnlockGating`, `ReplacePassphraseGating`, `AddPasskeyGating`, `RevokePasskeyGating`). The base
     has a protected constructor `(cleartexts, body)`. The body is a closure over the bank (or device) and its friend,
     held in a private field. The cleartexts are adopted as the cloak adopted them, it redacts as `'[gating]'`, and its
-    getters hand out copies. `attempt()` runs the body and vacates in a `finally`. `tryAttempt()` is the `outcomeOf`
+    it has no getter for them. `attempt()` runs the body and vacates in a `finally`. `tryAttempt()` is the `outcomeOf`
     wrap. `vacate()` zeroes the gating's own PRF bytes. The five bodies are today's functions, moved and made private.
   * `bank.ts`: makers `Bank.birthGating` (static), `unlockGating`, `replacePassphraseGating`, `addPasskeyGating`,
     `revokePasskeyGating`. Each plain verb is `await maker(c).attempt()`.
@@ -26,10 +26,10 @@ clean; `pnpm justify` green (safebyok-big 2946, safebyok 1357, safebyok-react 36
   * `safebyok/testing` gains `_cheat_gatingOf(cleartexts, body)`, a gating whose body is any function, for the fake
     giver world.
 * **Decisions made**:
-  * **The giver's maker is async**: `unlock.mutate(await unlock.gating({ … }))`. The giver holds no `Bank` until
-    `device.ensureBank()` resolves, so a synchronous maker would need the started bank tracked in React state, with a
-    null (or a throw) before it starts. The async maker calls `ensureBank()` as `mutationFn` did before. This is the
-    PR's open question.
+  * **The giver's maker is async** (provisional): `unlock.mutate(await unlock.gating({ … }))`. The giver holds no `Bank` until
+    `device.ensureBank()` resolves, so a synchronous maker would need the started bank tracked in React state. The async
+    maker calls `ensureBank()` as `mutationFn` did before. It follows from the giver's `GiverDevice.ensureBank()` stand-in;
+    startup is not designed yet, so the Coach holds the question (2026-11-21). Revisit when startup is designed.
   * **Adoption runs before the field check.** The two answer fields are read and adopted first, then the
     "knows each field" check runs, so a refused construction (a stray field) still zeroes the host's PRF bytes. The
     cloak missed this; the old verbs' `finally` covered it, and `gating.test.ts` *zeroes the answer when the cleartexts
@@ -57,14 +57,20 @@ clean; `pnpm justify` green (safebyok-big 2946, safebyok 1357, safebyok-react 36
   * **G1**: the drift continues as the cloak's did. A passphrase stays in a private field until the gating is
     attempted or vacated.
   * **G2**: kept and tightened against the cloak. The host's bytes are zeroed at construction, refused or not, and the
-    gating's copies at the attempt's end or at `vacate()`. An answer's getter mints an unzeroed copy (open matter).
+    gating's copies at the attempt's end or at `vacate()`. There is no getter to mint an unzeroed copy (rework 1 dropped them).
   * **G8**: no refusal carries a cleartext. A throwing getter at adoption becomes `cleartextsThrew`, and
     `gatingSpent`'s phrase is constant.
   * **G9**: "only `Gating`, `Proving` and `Lease`" reads literally again. The friend lives only in a private closure,
     and the classes are type-only exports.
 * **Discoveries**: the security.md subagent amended the cloak entry and left the giver_forms entry's "take a `Cloak`"
   as history.
-* **For the Coach**: the async maker (above), and whether the gating's getters should go. Nothing in the core or the
-  giver calls them, and each read of a passkey answer mints a copy that nothing zeroes.
+* **Rework 1** (the Coach's rulings, 2026-11-21): (1) **the gating's getters are dropped**: the four public getters
+  (`passphraseCleartext`, `passkeyCleartext`, `nextPassphraseCleartext`, `nextPasskeyCleartext`) and `copiedAnswerOf` are
+  gone from `gating.ts`; the bodies read the private fields. Tests that read a getter now read what the body is handed
+  (`adoptedFrom` in `gating.test.ts`, over `_cheat_gatingOf`); the giver tests' `isVacated` became `watchVacates`, a spy
+  on the `vacate` the gating's class defines. Set aside: a test-only reader of the private field, which would be a side
+  door. (2) The try twins as built, and `_cheat_gatingOf`: unchanged. (3) The async maker stays, provisional (above).
+  The notes/guarantees-drift.md and notes/security.md lines that said the getters hand out a copy now say there is none.
+* **For the Coach**: nothing open.
 * **Rebase**: the catch-up met #793's rework 1, which split `react-giver.test.tsx`'s two-behaviour tests into one per
   outcome, with `runThrough…` helpers. The resolution keeps that split and turns each helper from a cloak to a gating.

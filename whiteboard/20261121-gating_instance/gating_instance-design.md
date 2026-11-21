@@ -31,8 +31,8 @@ replacePassphrase.mutate(bank.replacePassphraseGating({ passphraseCleartext, nex
 * **The awaited `unlock` gating** is unchanged: the unlock gating's success settles the shared wait.
 * **What goes**: cloak.ts (`cloak`, `Cloak`, `CloakCleartexts`) and the giver's `cleartextsOf` and `vacateCloak`.
   The giver's mutations take a `Gating`, and each mutation hook hands back the matching maker so a form stays one line.
-* **The cloak's guarantees carry over**: adopting a passkey answer copies its bytes and zeroes the host's (G2), and a
-  passkey answer's getter hands out a copy.
+* **The cloak's guarantees carry over**: adopting a passkey answer copies its bytes and zeroes the host's (G2). The gating has
+  no getter (the Coach, 2026-11-21): its cleartexts leave it only to its verb's body.
 
 ## Settled
 
