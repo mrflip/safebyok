@@ -104,7 +104,7 @@ export interface DeviceOpts {
 
 // == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, DeviceSnapshot
 
-/** The stages of a bank, as {@link BankStage} describes each. */
+/** The stages of a bank, each described at {@link BankStage}. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
 /** Where the user stands with their bank, for a host's screen to switch on:
  * - `'signed_out'` -- nobody is signed in, or the bank was vacated or signed out of

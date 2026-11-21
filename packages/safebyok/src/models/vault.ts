@@ -77,7 +77,7 @@ export class Vault {
     return await this.#minder.tryWrite(sealed.val) as Outcome.Outcome<LiveOf<BoxRecord>>
   }
 
-  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the box as stored, on success.
+  /** {@link tryPutBoxOnce}, throwing its refusal instead of answering it: the stored box, on success.
    * @example
    *   const box = await vault.putBoxOnce('box/openai', { sidecar: { account: 'work' } }, { whisper })
    */
@@ -97,7 +97,7 @@ export class Vault {
     return await this.#minder.tryWrite(sealed.val) as Outcome.Outcome<TombstoneOf<BoxRecord>>
   }
 
-  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the tombstone as stored, on success. */
+  /** {@link tryDelBoxOnce}, throwing its refusal instead of answering it: the stored tombstone, on success. */
   async delBoxOnce(labelpath: BoxLabelpath): Promise<TombstoneOf<BoxRecord>> {
     return Outcome.valOf(await this.tryDelBoxOnce(labelpath))
   }
@@ -107,7 +107,7 @@ export class Vault {
 
   /** Call `fn` with the box at `labelpath` unsealed, and resolve what `fn` resolves.
    * On a locked bank, it first waits for an `unlock` gating ({@link Bank.ensureUnlocked}), and rejects if that wait is dismissed or the bank ends.
-   * `fn` gets the box whole, as {@link ThingMinder.get} answers it: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
+   * `fn` gets the whole box {@link ThingMinder.get} answers: its whisper, its sidecar and its record's fields. A box never stored, or deleted, refuses `absent_box`.
    * Nothing of the unsealed box is retained, and what `fn` throws is rethrown unchanged. Use the whisper only inside `fn`, and return only what is safe to retain.
    * @example
    *   const reply = await vault.withWhisper('box/openai', ({ whisper }) => askModel(whisper['apiKey'], question))

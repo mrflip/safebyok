@@ -203,7 +203,7 @@ export class ThingMinder {
     void this.tryGet(scoped, opts)
   }
 
-  /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included, and answer as the vaultDB did, a refusal included.
+  /** List the Things directly under the Thing at `labelpath`, in labelpath order, tombstones included, and return the vaultDB's answer, a refusal included.
    * Each Thing it answers joins the listing of the Thing at `labelpath` ({@link listingAt}). A list never drops a labelpath
    * from that listing. Each record is cached sparse.
    * Where that leaves a car `bhnd` or `bare`, the next get fetches it whole. A deleted Thing's car is `gone`, and
@@ -268,7 +268,7 @@ export class ThingMinder {
 
   /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
    * Each listing marked tells one {@link ListingEvent} with `state.isInvalidated` true, and no more until a list or a joining record sets it again.
-   * It asks the vaultDB nothing, and leaves what each listing lists as it was.
+   * It asks the vaultDB nothing, and leaves what each listing lists unchanged.
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
@@ -284,7 +284,7 @@ export class ThingMinder {
 
   // == [Writing]: tryWrite, write
 
-  /** Write `ask` through the vaultDB, and answer as it did, a refusal included.
+  /** Write `ask` through the vaultDB, and return its answer, a refusal included.
    * The record written is cached before it answers. A refusal's `dbhas`, and the bank, main gate and root box its answer reports, are cached only as the watch tells of them.
    * Before `hello`, after `goodbye`, or for a scope outside this bank, it answers the refusal without asking the vaultDB.
    * Rejects, whether or not the write was made, when the answer carries a record of another bank.
@@ -329,7 +329,7 @@ export class ThingMinder {
     // Read before asking: a record that lands while the get waits only makes its answer late (notes/wontfix.md).
     const prior  = this.#cachedAt(ask)
     const answer = await this.#vaultDB.tryGetThing(ask)
-    // Thrown as it came. The `dbhas` is delivered through the watch, never from here.
+    // Thrown unchanged. The `dbhas` is delivered through the watch, never from here.
     if (! answer.ok) { throw answer.err }
     const record = (answer.act === 'gotvoid') ? this.#shellAt(ask) : this.#checkedDelivered(answer.val, ask)
     // TanStack leaves the car and its time as they were, marks it invalidated, and caches the refusal beside it as its error.
@@ -544,7 +544,7 @@ function bankKeyHeadOf({ userid, banklabel }: BankScope): string[] { return ['so
 /** The time a bare listing was last listed: TanStack's `dataUpdatedAt` for a query no fetch has set. */
 const BareListedAt = 0
 
-/** A cache event a listener may hear of, as {@link isUsefulTSQEvent} narrows it. */
+/** A cache event a listener may hear of, narrowed by {@link isUsefulTSQEvent}. */
 type UsefulTSQEvent = Readonly<
   | { type: 'removed', query: TSQ.Query }
   | { type: 'updated', query: TSQ.Query, action: Readonly<{ type: 'success' | 'error' | 'invalidate' }> }

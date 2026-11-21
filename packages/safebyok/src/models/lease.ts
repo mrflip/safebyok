@@ -113,7 +113,7 @@ export class Lease implements LeaseStamp {
   }
 
   /** Unseal `record`, returning it with the part `sealer` seals in cleartext, in place of its sealed form.
-   * The answer is a new, frozen record built from `record` as checked, not `record` itself.
+   * The answer is a new, frozen record built from a checked copy of `record`, not `record` itself.
    * Unsealing authenticates the ciphertexts, the stamp and the tags together: a change to any of them refuses as damaged.
    */
   async unseal<RecordT extends Sparse<ThingRecord>, CleartextsT>(sealer: Sealers.Sealer<RecordT, CleartextsT>, record: RecordT): Promise<Sealers.UnsealedOf<RecordT, CleartextsT>> {

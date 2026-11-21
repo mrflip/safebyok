@@ -199,7 +199,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   static tryBirth(device: Device, cleartexts: BirthCleartexts): Promise<Outcome.Outcome<Bank>> { return Outcome.outcomeOf(() => this.birth(device, cleartexts)) }
 
   /** Unlock this bank by its passphrase or its passkey, resuming every call waiting in {@link ensureUnlocked}.
-   * A wrong one refuses `wrong_passphrase` or `wrong_passkey`, and the bank stays as it was.
+   * A wrong one refuses `wrong_passphrase` or `wrong_passkey`, and the bank is unchanged.
    */
   async unlock(cleartexts: UnlockCleartexts): Promise<this> {
     await Gatings.unlockBank(this, cleartexts, this.#gatingFriend())
@@ -501,7 +501,7 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
 
 // == [Helpers]: trackPairOf, Wait, makeWait
 
-/** The revseq and lifepath of a Thing, as a `track` has them. */
+/** The revseq and lifepath of a Thing: the pair a `track` has. */
 function trackPairOf({ revseq, lifepath }: Pick<ThingRecord, 'revseq' | 'lifepath'>): Track['bank'] { return { revseq, lifepath } }
 
 /** A promise, beside the functions that settle it. */

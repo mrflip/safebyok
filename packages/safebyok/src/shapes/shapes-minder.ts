@@ -28,7 +28,7 @@ export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ s
 /** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, is never retried, and its car stays cached until `goodbye`. */
 export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry: false, gcTime: Infinity } as const)
 
-// TanStack Query passes a finite staleTime to a timer as it is, and a timer longer than 2^31 - 1 milliseconds
+// TanStack Query passes a finite staleTime to a timer unchanged, and a timer longer than 2^31 - 1 milliseconds
 // fires at once, in every JavaScript runtime. The bound is a whole number of hours, below that limit.
 /** The longest finite staleTime, in hours: 24.5 days. Give `Infinity` for a longer one. */
 export const MaxTimerHours = 588

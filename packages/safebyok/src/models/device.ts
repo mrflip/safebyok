@@ -123,7 +123,7 @@ export class Device {
 
   // A stand-in, until the device brings up its own bank: each Bank made on this device calls it, and the last is the one its snapshot shows.
   /** Make `bank` the bank this device's snapshot shows, and one its lock and sweep reach. Internal.
-   * The bank shown before stays as it was.
+   * The bank shown before is unchanged.
    */
   cheatHoldBank(bank: Bank): void {
     this.#madeBanks.add(bank)

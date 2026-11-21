@@ -177,7 +177,7 @@ export type StrengthChecker = {
   load?: (() => void | Promise<void>) | undefined
 }
 
-/** The host's strength checker as a device has it, wrapped by {@link guardStrengthChecker}. */
+/** The host's strength checker, wrapped by {@link guardStrengthChecker} for a device. */
 export type GuardedStrengthChecker = {
   (passphrase: string, scope: BankScope): Promise<GX.PassphraseVerdict>
   readonly load: () => Promise<void>

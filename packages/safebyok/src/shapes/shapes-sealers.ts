@@ -71,7 +71,7 @@ export interface SealPurposes {
 }
 
 /** The interface through which a lease seals and unseals one part of a record.
- * `RecordT` is the record as stored, with its part sealed. `CleartextsT` is the part's cleartexts.
+ * `RecordT` is the stored record, with its part sealed. `CleartextsT` is the part's cleartexts.
  * Each member must check what it is given: the lease passes its caller's arguments on unchecked.
  */
 export interface Sealer<RecordT extends Sparse<ThingRecord>, CleartextsT> {

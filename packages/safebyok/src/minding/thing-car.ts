@@ -112,7 +112,7 @@ function demandCar(val: unknown, advice?: string): asserts val is ThingCar<Thing
 
 // == [Checks]: CarChecks, CarOfChecks
 
-/** The checks of a car's invariants, as {@link ThingCar} states them, each liveness by name. A car that fails one is a bug in safebyok. */
+/** The checks of the invariants {@link ThingCar} states, each liveness by name. A car that fails one is a bug in safebyok. */
 const CarChecks = Validator.Checkers('unexpected_error', ({ obj, lit, discrim, custom, str }) => {
   // Its records pass through as they are, so that a refinement can compare them by reference.
   const cited = custom<Sparse<ThingRecord>>((val) => ThingChecks.scopedCited.safeParse(val).success, Phrases.CarRecordShape)
