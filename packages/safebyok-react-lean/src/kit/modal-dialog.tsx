@@ -1,4 +1,4 @@
-/** `ModalDialog`, a dialog shown as a modal for as long as it is mounted. Private to the kit. */
+/** `ModalDialog`, a dialog shown as a modal for as long as it is mounted: the kit's unlock dialog, and a host's own. */
 
 import type { ReactNode } from 'react'
 

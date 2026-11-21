@@ -29,6 +29,7 @@
     "justify": "all() { pnpm install || exit; pnpm lint; lint=$?; pnpm lint:workflows; workflows=$?; pnpm typecheck; typecheck=$?; pnpm test; tested=$?; exit $(( lint || workflows || typecheck || tested )); }; all",
     "demo:react": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-demo-react^...' build && pnpm --filter safebyok-demo-react dev",
     "demo:knockknock": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-demo-knockknock^...' build && pnpm --filter safebyok-demo-knockknock dev",
+    "demo:envman": "SAFEBYOK_SKIP_BUILD_DEPS=1 pnpm --filter 'safebyok-demo-envman^...' build && pnpm --filter safebyok-demo-envman dev",
     "newb": "scripts/newb",
     "changeset": "node scripts/changeset.ts",
     "release:version": "changeset version && pnpm install --lockfile-only",
