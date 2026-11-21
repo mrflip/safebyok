@@ -129,7 +129,7 @@ describe("the Knock-Knock Machine", () => {
     const anthropic = TH.fakeAnthropic(200, Joke)
     vi.stubGlobal('fetch', anthropic.fetchFn)
     await loadWithKey()
-    await loadPage()
+    const page = await loadPage()
     await screen.findByRole('heading', { name: 'Your vault is locked' })
     await within(region('Your Anthropic API key')).findByText('sk-ant-…cdef')
     knock()
@@ -138,6 +138,7 @@ describe("the Knock-Knock Machine", () => {
     expect(screen.queryAllByRole('alert').map((alert) => alert.textContent).join('')).to.eq('')
     expect(screen.getByRole('heading', { name: 'Your vault is locked' })).to.exist
     expect(anthropic.seen).to.have.lengthOf(0)
+    expectUnheld(page)
   })
 
   it("locks and unlocks", async () => {
@@ -151,12 +152,13 @@ describe("the Knock-Knock Machine", () => {
   })
 
   it("refuses a wrong passphrase, and stays locked", async () => {
-    await loadWithKey()
+    const page = await loadWithKey()
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
     unlockIn(locked, NextPassphrase)
     expect(await within(locked).findByText('That is not the passphrase.')).to.exist
     expect(screen.queryByText('Your vault is unlocked.')).to.be.null
+    expectUnheld(page)
   })
 
   it("shows the saved key on Show, and deletes it", async () => {
@@ -214,5 +216,18 @@ describe("the Knock-Knock Machine", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lock' }))
     await screen.findByRole('region', { name: 'Your vault is locked' })
     expect(screen.queryByRole('button', { name: 'Unlock with a passkey' })).to.be.null
+  })
+
+  it("offers the passkey after a reload", async () => {
+    TH.installFakeAuthenticator()
+    await loadWithKey()
+    fireEvent.change(within(region('Ways in')).getByLabelText('Passphrase'), { target: { value: Passphrase } })
+    fireEvent.click(within(region('Ways in')).getByRole('button', { name: 'Add passkey' }))
+    await within(region('Ways in')).findByRole('button', { name: 'Remove passkey' })
+
+    const reloaded = await loadPage()
+    const locked = await screen.findByRole('region', { name: 'Your vault is locked' })
+    expect(await within(locked).findByRole('button', { name: 'Unlock with a passkey' })).to.exist
+    expectUnheld(reloaded)
   })
 })
