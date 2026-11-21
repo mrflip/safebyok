@@ -47,9 +47,18 @@ function maskTextOf(container: Element): string {
 }
 
 describe("WhisperMask", () => {
-  it("shows the stored mask locked, the live tail unlocked, and the stored mask again on lock, holding neither key nor tail", async () => {
+  it("shows the stored mask while locked and the live tail while unlocked", async () => {
     const { world, container } = await renderKey()
     await waitFor(() => { expect(maskTextOf(container)).to.eq('jokes') })
+    await unlock(world)
+    await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes' } }, { whisper: { apiKey: TailedKey } }))
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(mask(TailedKey, { tail: 4 })) })
+    act(() => { world.Bank.lock() })
+    await waitFor(() => { expect(maskTextOf(container)).to.eq('jokes') })
+  })
+
+  it("holds neither the key nor its tail in the page or the host's cache", async () => {
+    const { world, container } = await renderKey()
     await unlock(world)
     await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes' } }, { whisper: { apiKey: TailedKey } }))
     const liveMask = mask(TailedKey, { tail: 4 })
@@ -72,6 +81,7 @@ describe("WhisperMask", () => {
   })
 
   it("shows the sidecar's mask field while locked when no ifLocked is given", async () => {
+    // WhisperMask @example
     const { world, container } = await renderKey({ ifLocked: undefined })
     await unlock(world)
     await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { mask: 'sk-te*******' } }, { whisper: { apiKey: TH.JokesKey } }))
