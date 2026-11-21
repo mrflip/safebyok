@@ -15,27 +15,26 @@
 * `survey-core.md` and `survey-app.md`, by the section a thread's gloss names. One correction: section 6 of
   `survey-core.md` says fetching the bank's records needs a Bank. It does not: an ask's `track` is optional
   (`shapes-asks.ts`, `trackGiven`), and the minder uses `rootBox` only for the shell of a box below the root.
-* STYLE.md *Naming*, once, by any thread that writes code.
 
 ## Ground rules
 
 1. **This is a spike.** "Your goal is not production ready yet, we're proving that the library works end-to-end
    (well, end-to-middle, because no deleting vaults, vacate, etc)" (the Coach). Take the shortest honest path. Mark
    each cheat `// Cheat (react_life): …` and list it in your thread file.
-2. **Build no ending stage or verb:** no `swept`, `vacate`, `delete`, `sweep`, and no `isEnded`. One thing ends a
-   device: a different userid arriving. That teardown is `goodbye()`: it disables the instance, so every later call
-   refuses, locks the bank, and rejects calls waiting on an unlock. No stage records it and nothing restarts it.
-3. **`safebyok/core` stays the disciplined subset:** nothing from `minding/`, `Vault` or TanStack at runtime.
-   `tests/index.test.ts` keeps its assertion.
-4. **Dream rule 2 is tested.** Every test that handles a whisper or a passphrase searches the rendered tree, the
-   QueryClient's query and mutation caches, and any action state for it (`holdsText`, `secret-search.ts`).
+2. **The ending stages are out of scope:** `swept`, `vacate`, `delete`, `sweep`, `isEnded`. One thing ends a
+   device, a different userid arriving, and that teardown is `goodbye()`: it disables the instance, locks the bank,
+   and rejects calls waiting on an unlock. It has no stage, and an instance it ended is not started again.
+3. **`safebyok/core` stays the disciplined subset:** nothing from `minding/`, `Vault` or TanStack at runtime, as
+   `tests/index.test.ts` checks.
+4. **Dream rule 2 gets a test where a thread adds a path for a secret.** One test per new path a whisper or a
+   passphrase travels searches the rendered tree, the QueryClient's query and mutation caches, and any action state
+   for it (`holdsText`, `secret-search.ts`).
 5. **One bank per giver; box labelpaths are flat,** and the giver adds the `box/` prefix.
-6. **The design file wins over the code.** Build this plan's default for each Proposed item, and record a deviation
-   in your thread file.
-7. **A user switch that crosses a fetch or a gating gets a row in `notes/wontfix.md`,** not a guard.
-8. **Leave `safebyok-big`, `safebyok-react` and `demos/safebyok-demo-react` alone,** but for what a thread's gloss
-   names. Every changeset is `--empty`. No new runtime dependency without asking in chat.
-9. **Check with the Coach or your orchestrating agent before fanning out** to subagents.
+6. **Where the design and the code disagree on what your thread builds, follow the design.** For a Proposed item,
+   build this plan's default.
+7. **The old code is not this sprint's:** `safebyok-big`, `demos/safebyok-demo-react`, and `safebyok-react` beyond
+   what thread 2 moves out of it. Nothing published changes, so expect empty changesets.
+8. **Check with the Coach or your orchestrating agent before fanning out** to subagents.
 
 ## The startup order the spike builds
 
@@ -59,8 +58,6 @@
 
 ## Threads
 
-Cut from `origin/main` unless a thread says otherwise. Each lands green.
-
 ### 1. `no_swept`: remove the fake lifecycle
 
 > * remove hallucinatory lifecycle stages: we know what disables the program.
@@ -78,7 +75,7 @@ Cut from `origin/main` unless a thread says otherwise. Each lands green.
   line of `knock-knock-world.ts`.
 * **Levels:** `sonnet`, medium effort; review `low`. **Depends on:** nothing. **Beside:** 2.
 * **Look-ahead:** thread 3 restructures a smaller Device. **Size:** one feature, mechanical.
-* **Ready when:** `rg -n 'swept|sweep\(' packages/safebyok/src` finds nothing, and `pnpm justify` is green.
+* **Ready when:** `rg -n 'swept|sweep\(' packages/safebyok/src` finds no stage, verb or thrower.
 
 ### 2. `react_lean_pkg`: a private package for the new React layer
 
@@ -122,9 +119,9 @@ Cut from `origin/main` unless a thread says otherwise. Each lands green.
   letting go, which evicts our queries and mutations; `Knock.useBank(select?)` with the composed stage; the form
   verbs with a synchronous `.gating`; `SOK.useStrengthVerdict`; `Knock.withWhisper`, `lock`, `dismissUnlock`. The
   bridge is made per device. The provider's unmount does nothing.
-* **Tests:** retire the fake-world cases tied to `onBankStart` and `ensureBank`, rather than port them. Write a
-  provider world (the real giver, `MemoryVaultDB`, the test deriver): a userid starts, null changes nothing, a
-  switch evicts, StrictMode's double effect. Port `knock-knock.test` to it.
+* **Tests:** the fake-world cases that only exercise `onBankStart` and `ensureBank` can be retired; port the ones
+  that test behaviour a host sees. Write a provider world (the real giver, `MemoryVaultDB`, the test deriver): a
+  userid starts, null changes nothing, a switch evicts, StrictMode's double effect. Port `knock-knock.test` to it.
 * **Levels:** `opus`, high effort; review `high`. **Depends on:** 3.
 * **Look-ahead:** threads 5 and 6 read the slot's vault.
 * **Size:** the sprint's largest. If it runs long, `withWhisper`, `lock` and the knock-knock port move to thread 5.
@@ -158,8 +155,8 @@ Cut from `origin/main` unless a thread says otherwise. Each lands green.
 
 > * implement the react Knock-Knock app, with the hooks, parts and kit needed to do that, into safebyok-demo-knockknock. You're inspired by the existing app and its functionality but hew strictly to best-in-class practices recommended by our dream_interface doc
 
-* **Builds:** `demos/safebyok-demo-knockknock`: configs copied with `cp` from the old demo and never read, a `build`
-  script, `pnpm demo:knockknock`. The app (`survey-app.md` section 1): fake sign-in and user switching, the stage
+* **Builds:** `demos/safebyok-demo-knockknock`: configs copied with `cp` from the old demo and edited where they name
+  the package, a `build` script, `pnpm demo:knockknock`. The app (`survey-app.md` section 1): fake sign-in and user switching, the stage
   switch, the kit forms, the key editor (`putBoxAction` and `WhisperInput`, a mask in the sidecar), Show
   (`WhisperText`), Delete (`delBox`), Lock, and the knock form (`useMutation` over `withWhisper`, with the unlock
   dialog on demand). Sign-out calls `Knock.lock()`, since a null userid changes nothing. The localStorage helper
@@ -212,13 +209,14 @@ the giver, nested labelpaths, an IndexedDB vaultDB, leases cached on the device.
 
 ## Risks
 
-* **Thread 4 outgrows one context,** mostly through the 45 fake-world tests. It retires those tied to the removed
-  interface, and has a named overflow into thread 5.
+* **Thread 4 outgrows one context,** mostly through the 45 fake-world tests. It may retire those tied to the
+  removed interface, and has a named overflow into thread 5.
 * **Thread 3's test churn.** `Bank.make` stays a plain constructor, so only tests that read the device's snapshot
   after it change.
 * **Restack conflicts** from thread 2 moving files that threads 1 and 3 edit. Thread 1 touches one line there, and
   the two are restacked before thread 3 is cut.
-* **Demo scaffolding eats context:** a 498-line eslint config, three tsconfigs, vite. Copy them, never read them.
+* **Demo scaffolding eats context:** a 498-line eslint config, three tsconfigs, vite. Copying them with `cp` costs
+  far less than reading them through.
 
 ## For the Coach
 
