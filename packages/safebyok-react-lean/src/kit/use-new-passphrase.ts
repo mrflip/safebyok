@@ -64,6 +64,7 @@ export function useNewPassphrase(giver: Pick<ReactGiver, 'useStrengthVerdict'>):
     void strength.judge(typed)
   }
   // React empties the fields after each submit without an onChange, so the verdicts are reset by hand.
+  /** Forget the verdicts on what the fields held. */
   function forget() {
     setIsChosenTyped(false)
     setConfirmation('untyped')
