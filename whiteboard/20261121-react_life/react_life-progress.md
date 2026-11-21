@@ -39,3 +39,13 @@ The orchestrator's alone. Newer than the plan wherever they disagree. Workers lo
   held (test helpers birth before hello).
 * **Planning lesson:** the opus worker compacted six minutes in, on handoff plus reading. Larger threads go to
   `thread-worker-400k`.
+
+## Rulings, 2026-11-21 (Open Matters and chat)
+
+* **`safebyok/core` sanctity is waived** for now: "don't worry at all about /core sanctity". Core may carry the
+  device's minder and TanStack Query.
+* **Tests may touch ending events:** "it's quite reasonable to expect some tests may touch ending events". A thread
+  that must adjust a sweep or lock test to fit what it builds does so and lists it; the teardown code itself still
+  stays.
+* **Birth's handover cheat stays** (`Bank.birthGating` calls `device.adoptBornBank`): the first place to look when
+  ownership is re-apportioned.
