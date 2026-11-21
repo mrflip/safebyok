@@ -225,6 +225,13 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
     expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
   })
 
+  // Refused at the entry point, before any gating exists, so the answer is the host's to zero.
+  it("leaves the answer live where `Bank.birth` is handed a device that is not a Device", async () => {
+    const passkeyCleartext = TH.passkeyAnswerOf()
+    await TH.expectRefusal(Bank.birth(TH.provingDeviceOf() as never, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext }), 'bad_record')
+    expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.false
+  })
+
   it("zeroes a passkey answer handed as a bare ArrayBuffer", async () => {
     const prfBuffer = new Uint8Array(32).fill(7).buffer
     const device = TH.makeDevice()
@@ -232,6 +239,28 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
     // Whether the check accepts a bare buffer is not this test's subject: the bytes are vacated either way.
     await Bank.tryBirth(device, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } })
     expect(TH.isZeroed(new Uint8Array(prfBuffer))).to.be.true
+  })
+})
+
+describe("Bank.birthGating(device, cleartexts, keep)", () => {
+  it("hands `keep` the bank it births", async () => {
+    const device = TH.makeDevice()
+    await device.hello()
+    const keep = vi.fn()
+    const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }, keep).attempt()
+    expect(keep).toHaveBeenCalledExactlyOnceWith(bank)
+  })
+
+  it("births a bank its device does not show, where no `keep` is given", async () => {
+    const device = TH.makeDevice()
+    await device.hello()
+    const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }).attempt()
+    expect(bank.isUnlocked).to.be.true
+    expect(device.bank).to.be.null
+  })
+
+  it("refuses a `keep` that is not a function", () => {
+    TH.expectSyncRefusal(() => Bank.birthGating(TH.makeDevice(), { passphraseCleartext: TH.TestPassphrase }, 'keep' as never), 'bad_record')
   })
 })
 

@@ -153,8 +153,13 @@ export class Device implements MinderFriend {
    * Call it once `hello` shows the stage `'unborn'`. See {@link Bank.birth} for what the birth refuses.
    */
   birthGating(cleartexts: BirthCleartexts): BirthGating {
-    if (this.#snapshot.bank.stage === 'starting') { throw Throwers.bankNotBroughtUp() }
-    return Bank.birthGating(this, cleartexts, (bank) => { this.#hold(bank) })
+    // Made before the stage is checked, so a refusal here zeroes the host's passkey answer as every gating does (G2).
+    const gating = Bank.birthGating(this, cleartexts, (bank) => { this.#hold(bank) })
+    if (this.#snapshot.bank.stage === 'starting') {
+      gating.vacate()
+      throw Throwers.bankNotBroughtUp()
+    }
+    return gating
   }
 
   /** Bring up this device's bank. */

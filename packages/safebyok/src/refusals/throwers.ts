@@ -19,7 +19,7 @@ export * from 'safebyok-big/refusals/throwers'
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
 
-/** A `disabled` refusal: the device's `hello` has not answered, so whether its bank is stored is not yet known. */
+/** A `disabled` refusal: the device's `hello` has not answered. */
 export function bankNotBroughtUp(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankNotBroughtUp) }
 
 /** A `dismissed` refusal: the wait for an `unlock` gating was dismissed. */

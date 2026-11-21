@@ -220,6 +220,12 @@ describe("device.birthGating(cleartexts)", () => {
     expect(device.birthGating({ passphraseCleartext: TH.TestPassphrase })).to.be.instanceOf(BirthGating)
   })
 
+  it("zeroes the passkey answer when it refuses before `hello` answers", () => {
+    const passkeyCleartext = TH.passkeyAnswerOf()
+    TH.expectSyncRefusal(() => TH.makeDevice().birthGating({ passphraseCleartext: TH.TestPassphrase, passkeyCleartext }), 'disabled')
+    expect(TH.isZeroed(passkeyCleartext.prfBytes)).to.be.true
+  })
+
   it("keeps no bank where the birth is refused", async () => {
     const device = TH.makeDevice({}, { strengthChecker: () => ({ strong: false, reason: 'too short' }) })
     await device.hello()

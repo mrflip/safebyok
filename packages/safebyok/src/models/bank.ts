@@ -180,12 +180,15 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   // verbs: no public method accepts a proving (G9). Each verb attempts the gating its maker makes, which is vacated
   // whatever its outcome, and changes nothing where it refuses.
 
-  /** The gating of {@link birth} over `cleartexts`, handing `keep` the bank it births. Internal: make a birth's gating with {@link Device.birthGating}. */
-  static birthGating(device: Device, cleartexts: BirthCleartexts, keep: (bank: Bank) => void): BirthGating {
+  /** The gating of {@link birth} over `cleartexts`, handing `keep`, where given, the bank it births. Internal: make a birth's gating with {@link Device.birthGating}.
+   * Without `keep`, the bank it births is no device's: `device` does not show it.
+   */
+  static birthGating(device: Device, cleartexts: BirthCleartexts, keep?: (bank: Bank) => void): BirthGating {
+    const keeper = Checks.keep.parse(keep)
     const friend = {
       birth: async (record: BankMakeRecord, proving: Proving) => {
         const bank = await Bank.#birthByProving(record, { device, vaultDB: device.vaultDB, proving })
-        keep(bank)
+        keeper?.(bank)
         return bank
       },
     }
@@ -542,9 +545,10 @@ function makeWait(): Wait {
 // == [Checks]: Checks
 
 // Defined here, not with the shapes: they name a model class.
-/** The checks of {@link Bank.make}'s arguments, {@link Bank.birth}'s device, and {@link Bank.hostVault}'s vault. */
-const Checks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
+/** The checks of {@link Bank.make}'s arguments, {@link Bank.birth}'s device, {@link Bank.birthGating}'s keeper, and {@link Bank.hostVault}'s vault. */
+const Checks = Validator.Checkers('bad_record', ({ obj, custom, fn }) => ({
   device:      custom<Device>((val) => val instanceof Device, BigPhrases.DeviceExpected),
+  keep:        fn<(bank: Bank) => void>().optional(),
   hostedVault: custom<HostedVault>((val) => typeof (val as Partial<HostedVault> | null)?.sweep === 'function', Phrases.HostedVaultExpected),
   // The bank's Thing is strict and refined, so it is checked apart, once the gate and root box are removed.
   bankMakeArgs: obj({

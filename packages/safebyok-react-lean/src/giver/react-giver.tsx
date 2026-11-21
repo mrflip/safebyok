@@ -523,6 +523,7 @@ function makeBankGiver(friend: BankFriend) {
   // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
   // Each gating refuses `absent_vault` at a stage the verb has no bank for: show each form only at its own stage.
+  // The birth's refuses `disabled` at `'starting'`, until the device's `hello` answers.
   // A verb comes three ways: its gating, its mutation options for the host's own `useMutation`, and its hook, which is
   // the two together. The hook keys its mutation by the user the provider shows; the options, by whoever is signed in.
 
