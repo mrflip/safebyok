@@ -179,11 +179,11 @@ export function makeUseDraft(slot: GiverSlot, bank: DraftFriend) {
     async function put(opts: DraftPutOpts = {}): Promise<LiveOf<BoxRecord>> {
       const { sidecarOf } = Checks.draftPutOpts.parse(opts)
       const edits = Object.fromEntries([...dirtyFieldnames].map((fieldname) => [fieldname, inputOf(inputs.current, fieldname).value]))
-      const box = await bank.withWhisper(labelpath, async (whisper, read) => {
+      const box = await bank.withWhisper(labelpath, async (whisper, unsealed) => {
         const nextWhisper = { ...whisper, ...edits }
-        const draftSidecar = sidecarSet ?? ((pinned === null) ? read.sidecar : baseSidecar)
+        const draftSidecar = sidecarSet ?? ((pinned === null) ? unsealed.sidecar : baseSidecar)
         const patch = { sidecar: sidecarOf ? sidecarOf(nextWhisper, draftSidecar) : draftSidecar }
-        return await slot.demandVault().putBoxOnce(pinned ?? Thing.sparseOf(read), patch, { whisper: nextWhisper })
+        return await slot.demandVault().putBoxOnce(pinned ?? Thing.sparseOf(unsealed), patch, { whisper: nextWhisper })
       })
       discard()
       return box
