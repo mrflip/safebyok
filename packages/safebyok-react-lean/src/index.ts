@@ -3,4 +3,5 @@ export { type GiverBanks, type GiverConfig, type GiverSlotSnapshot, SignedOutBan
 export { liveOf } from './giver/giver-defaults'
 export type { BoxQueryOpts } from './giver/shapes-giver'
 export type { Draft, DraftPutOpts, WhisperFieldProps } from './giver/use-draft'
-export * from './mask'
+// A box's sidecar keeps a whisper's mask: the core's, one binding across both packages.
+export { type MaskOpts, mask } from 'safebyok'

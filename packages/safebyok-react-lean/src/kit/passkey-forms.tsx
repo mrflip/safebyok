@@ -118,20 +118,22 @@ export function RevokePasskeyForm({ bank: bankProp, username }: Readonly<RevokeP
 /** The props of a {@link PasskeyUnlockButton}. */
 export interface PasskeyUnlockButtonProps {
   /** The giver's bank, `SOK.bank(banklabel)`: the provider's, when left out. */
-  bank?:         Pick<BankGiver, 'useUnlock'> | undefined
-  /** The header of the bank's passkey, or null while it has none. */
-  passkeyHeader: WayinHeader | null
+  bank?:          Pick<BankGiver, 'useUnlock' | 'usePasskeyHeader'> | undefined
+  /** The header of the bank's passkey, or null while it has none: the bank's `usePasskeyHeader()`, when left out. */
+  passkeyHeader?: WayinHeader | null | undefined
   /** The relying-party id the passkey was made under, and how long the browser waits. */
-  askOpts?:      AskPasskeyOpts | undefined
+  askOpts?:       AskPasskeyOpts | undefined
 }
 
 /** A button that unlocks the bank by its passkey, for stage `locked`. It renders nothing while the bank has no passkey, or the browser cannot use one.
  * A dismissed prompt changes nothing; a wrong passkey, or a browser that cannot ask, shows why beside the button.
  * @example
- *   case 'locked': return <><UnlockForm /><PasskeyUnlockButton passkeyHeader={passkeyHeader} /></>
+ *   case 'locked': return <><UnlockForm /><PasskeyUnlockButton /></>
  */
-export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader, askOpts }: Readonly<PasskeyUnlockButtonProps>) {
+export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHeaderProp, askOpts }: Readonly<PasskeyUnlockButtonProps>) {
   const bank = useGivenBank(bankProp)
+  const bankPasskeyHeader = bank.usePasskeyHeader()
+  const passkeyHeader = (passkeyHeaderProp === undefined) ? bankPasskeyHeader : passkeyHeaderProp
   const unlock = bank.useUnlock()
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const alertId = useId()
