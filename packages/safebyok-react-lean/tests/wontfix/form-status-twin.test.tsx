@@ -1,8 +1,6 @@
-// Demonstrations of rows in notes/wontfix.md, `## React`: behaviour left as it is on purpose. They are not promises.
-// - Each names its row, and asserts what a host observes today. A failure means the behaviour changed: bring the row up to
-//   date, or delete the row and its test.
-// - Each uses only what a host could write: components, events and the package's exports. A case that shows only under
-//   fake timers, a spy or an injected delay has no test here, and its row says so.
+// A demonstration of a row in notes/wontfix.md (STYLE.md, *Tests*): it asserts the behaviour the row leaves as it is.
+// It mocks and injects nothing. To reopen the row, bring something this test does not already show.
+// If it fails, the behaviour has changed: invert it into a promise, move it beside putBoxMutationOptions' tests, and delete the row.
 /** The row "A component inside a form that hands `mutate` its `FormData` can read the secret for one render". */
 import { useMutation } from '@tanstack/react-query'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -15,7 +13,7 @@ import * as TH from '../test-helpers'
 /** A key typed into the form, an obvious fake. */
 const TypedKey = 'sk-test-typed-4242'
 
-const RowOutOfDate = 'notes/wontfix.md, "A component inside a form that hands `mutate` its `FormData` can read the secret for one render", is out of date'
+const RowChanged = 'notes/wontfix.md, "A component inside a form that hands `mutate` its `FormData` can read the secret for one render": the behaviour has changed. Invert this test, move it, and delete the row'
 
 describe("wontfix: the form status of a form that hands mutate its FormData", () => {
   it("shows the typed secret to one render of a component inside the form", async () => {
@@ -50,7 +48,7 @@ describe("wontfix: the form status of a form that hands mutate its FormData", ()
     fireEvent.change(screen.getByLabelText('Key'), { target: { value: TypedKey } })
     fireEvent.click(screen.getByText('Save'))
     await screen.findByText('Saved')
-    expect(keysRead.filter((apiKey) => apiKey === TypedKey), RowOutOfDate).to.have.lengthOf(1)
-    expect(keysRead.at(-1), RowOutOfDate).to.be.null
+    expect(keysRead.filter((apiKey) => apiKey === TypedKey), RowChanged).to.have.lengthOf(1)
+    expect(keysRead.at(-1), RowChanged).to.be.null
   })
 })
