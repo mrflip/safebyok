@@ -51,7 +51,8 @@ export class Wayin {
   /** Always `'a'`: a wayin is never a tombstone. */
   get am(): 'a' { return 'a' }
 
-  /** Its `born_at`: a wayin is replaced, never rewritten. */
+  // A wayin is replaced, never rewritten, so it is written once, when it is born.
+  /** When it was minted: its `born_at`. */
   get written_at(): EpochMillis { return this.born_at }
 
   readonly #pickle: WayinRecord

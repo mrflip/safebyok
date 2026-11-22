@@ -55,13 +55,16 @@ export class Lease implements LeaseStamp {
    */
   get labelpath(): `lease/${string}` { return `lease/${this.label}` }
 
-  /** Its bank's scope, and its {@link labelpath}. */
+  /** Its bank's `userid` and `banklabel`, and its {@link labelpath}.
+   * It is no Thing's scope: a check of a Thing's scope, such as a vaultDB ask's, refuses it.
+   */
   get scope(): ThingScope { return { userid: this.userid, banklabel: this.banklabel, labelpath: this.labelpath } }
 
   /** Always `'a'`: a lease is never a tombstone. */
   get am(): 'a' { return 'a' }
 
-  /** Its {@link proved_at}: each proof grants a lease whole. */
+  // A renewal grants a new lease whole, so a lease is written once, when it is proved.
+  /** When it was granted: its {@link proved_at}. */
   get written_at(): EpochMillis { return this.proved_at }
 
   readonly #gate: LeaseGate
