@@ -308,3 +308,23 @@ while the unlock's lease is being built.
 Reasoning for wontfix: a gate change comes a few times a day, and a lease is built in milliseconds (CLAUDE.md, *Hours
 separate updates*, `#no-slop-crossings`). Nothing stored changes, and no secret moves. Written by the gate_super thread 1
 worker, 2026-11-21, awaiting a ruling.
+
+## A form reset that the host cancels still discards a draft in that form
+
+A `useDraft` whose inputs sit in a form discards when the form is reset (`safebyok-react-lean`, `use-draft.ts`). A host
+whose `onReset` calls `preventDefault()`, to ask "keep your changes?" say, leaves its form as it was, but the draft has
+already emptied the fields typed into and started again from the box stored.
+
+Current outcome: the typed text is lost, and nothing is written. The draft and the page agree.
+
+Alternatives: hearing the reset after React's handlers, to see whether it was cancelled, means a listener on the root
+in place of the form, kept in step with React's own delegation. Putting the typed text back is not possible: it lived
+only in the input.
+
+Workaround: ask before the reset is started, from the button that would start it, not in `onReset`.
+
+To reproduce: a draft's input inside a `<form onReset={(event) => { event.preventDefault() }}>`; type into it; press
+a `<button type="reset">`.
+
+Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
+and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
