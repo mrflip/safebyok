@@ -415,7 +415,7 @@ describe("useGate", () => {
     const { result, world } = await renderGate()
     expect(result.current.header).to.be.null
     expect(result.current.gate.data?.wayins.main.wayinkind).to.eq('passphrase')
-    expect(world.Bank.queryClient().getQueryCache().findAll().map((tsqQuery) => tsqQuery.queryKey)).to.not.deep.include(['sok', 'u1', 'acme', 'gate'])
+    expect(world.Bank.queryClient().getQueryCache().findAll().map((tsqQuery) => tsqQuery.queryKey)).to.not.deep.include(VaultMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'gate' }))
   })
 
   // useGate @example
