@@ -349,8 +349,8 @@ only in the input.
 
 Workaround: ask before the reset is started, from the button that would start it, not in `onReset`.
 
-To reproduce: a draft's input inside a `<form onReset={(event) => { event.preventDefault() }}>`; type into it; press
-a `<button type="reset">`.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/form-reset-cancelled.test.tsx`, a draft's input inside a
+`<form onReset={(event) => { event.preventDefault() }}>`, typed into, then a `<button type="reset">` pressed.
 
 Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
 and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
@@ -368,8 +368,8 @@ forgotten, with a base and an `isDirty` to work out for each part.
 
 Workaround: put all of a draft's inputs in one form, or give each form a draft of its own.
 
-To reproduce: one `useDraft` with `whisperField('a')` inside a `<form>` and `whisperField('b')` outside it; type into
-both; reset the form.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/form-reset-split-draft.test.tsx`, one `useDraft` with a
+`whisperField` inside a `<form>` and another outside it, typed into, then the form reset.
 
 Reasoning for wontfix: one draft split across forms is rare, the outcome loses typed text and corrupts nothing stored,
 and `discard` has always emptied every input of the draft. Ruled by the Coach, 2026-11-22.
@@ -388,9 +388,11 @@ screen that shows `'locked'` after the bank has unlocked. Holding the stage chan
 fetched puts a wait in the path of every lock and unlock.
 
 Workaround: place the `Suspense` boundary low, around the part that reads the record, with a fallback the size of what
-it replaces; or read with `useBox`, which does not suspend.
+it replaces; or read with `useBox`, which does not suspend. The package has no suspending hook yet, and
+`useSuspenseQuery` over one of its query factories needs a cast, since the factory's `queryFn` may be `skipToken`.
 
-To reproduce: under a stage switch, render at `'unlocked'` a component that suspends on a box not yet fetched; unlock.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/stage-change-suspends.test.tsx`, a stage switch that renders at
+`'unlocked'` a `useSuspenseQuery` over a box not yet fetched, then unlock.
 
 Reasoning for wontfix: the stage is synchronous on purpose, so that no screen shows a stage the bank has left, and
 that is worth more than one smoothed fallback. The limit is React's, stated in its manual. Ruled by the Coach,
@@ -399,8 +401,9 @@ that is worth more than one smoothed fallback. The limit is React's, stated in i
 ### A refusal shown from a form Action's result outlives an Undo
 
 A form whose action resolves its refusal as the action's state (`useActionState`) shows that refusal until the action
-next runs. Envman's row shows a refused Save's message under the row; pressing Undo, or the bank locking, discards the
-draft and leaves the message where it is.
+next runs. Where the draft is still dirty after a refused Save, as it is with a sidecar edit pending, Undo discards the
+draft and leaves the message where it is. Envman's row, with its Save as a form Action, shows the message under the row;
+there the bank locking discards the draft too, by the demo's own code.
 
 Current outcome: a stale message under a row whose draft is clean again. The next Save replaces or removes it.
 
@@ -410,8 +413,8 @@ by hand, is two records of one fact.
 
 Workaround: a host that minds remounts the form by a `key` it changes on Undo.
 
-To reproduce: in envman, on a locked vault, type a value in a row, press Save, and enter a passphrase the gate
-refuses for a reason the row shows; then press Undo.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/action-refusal-after-undo.test.tsx`, a draft's form Action
+that resolves a refused put (`stale_write`) as its state, then Undo pressed.
 
 Reasoning for wontfix: the message is true of the last Save and harms nothing, and each way of removing it costs more
 code than it is worth in a demo meant to be read. Ruled by the Coach, 2026-11-22.
