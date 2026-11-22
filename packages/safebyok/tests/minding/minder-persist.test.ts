@@ -57,8 +57,7 @@ describe("Minder.persist(queryClient, persister)", () => {
     const restored = await restoredMinderOf(persister)
     expect(restored.at(TH.BoxScope)).to.deep.equal(box)
     expect(Object.isFrozen(restored.at(TH.BoxScope))).to.be.true
-    expect(restored.listingAt(TH.RootScope)).to.deep.equal(['box/anthropic', 'box/openai'])
-    expect(restored.isListingBareAt(TH.RootScope)).to.be.false
+    expect(Object.keys(restored.listingAt(TH.RootScope)?.items ?? {}).toSorted((left, right) => left.localeCompare(right))).to.deep.equal(['anthropic', 'openai'])
     expect(restored.at(boxScopeOf('anthropic'))).to.be.undefined
   })
 

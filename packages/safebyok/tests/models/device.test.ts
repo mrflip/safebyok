@@ -211,12 +211,14 @@ describe("a device's persisters", () => {
 
   it("restore the boxes and listings its vault cached", async () => {
     const persisters = memoryPersisters()
-    const { vault }  = await TH.buildBornVault({ device: TH.makeDevice({}, { persisters }) })
+    const first      = TH.makeDevice({}, { persisters })
+    const { vault }  = await TH.buildBornVault({ device: first })
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    await first.minder.list('box')
     await nextTick()
     const device = TH.makeDevice({}, { vaultDB: vault.bank.vaultDB, persisters })
     await device.signIn(TH.WorldScope.userid)
-    expect(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })).to.deep.equal(['box/openai'])
+    expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
     expect(device.minder.at({ ...TH.WorldScope, labelpath: 'box/openai' })).to.have.property('labelpath', 'box/openai')
   })
 
