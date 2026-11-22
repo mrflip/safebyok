@@ -46,6 +46,17 @@ The design this sprint starts from is in the sprint directory, copied so that a 
   lock is, for this sprint, answered by a page reload. A collision with one earns no guard, test, state or open
   matter: a worker writes one line under *End states, for the final report* in its thread file, a reviewer does the
   same in its report, and the orchestrator gathers them in the progress document for the final report.
+* **Damaged records are out of bounds** (the Coach, 2026-11-22), as end states are: no new check, test or matter for
+  a damaged row.
+* **Instance properties are in sync** (the Coach, 2026-11-22). A later thread keeps them synced by subscription.
+  Assume every instance property is perfectly synchronized and every state change comes through a front door (every
+  lock is a call to `lock()`). A lagging property earns no guard, subscription or test: one line under *For the
+  instance-sync thread* in the thread file.
+* **Base case first; no crossing or gap reports** (the Coach, 2026-11-22): get each mechanism working in the base case
+  and record where it glitches; a review accepts no finding about a gap or a crossing.
+* **Hosts are not the threat model** (the Coach, 2026-11-22): no check that hunts for guessed-at misuse, and no
+  preemptive change to what a host is told in an error. The minder's `select` pin goes (thread 2's review); thread 8
+  culls the rest.
 * **No goodbye without a caller** (the Coach, 2026-11-22): no goodbye method on a bank, a device or anything else
   until it has a caller and a feature need.
 * **Architecture first** (the Coach, 2026-11-22). The sprint puts the design's architecture in place. No machinery
@@ -194,8 +205,9 @@ client persists every user and bank's world, and the userids seen; the vault cli
 and the root listing of each user and bank. The restore lands before the minders say `hello` to the vaultDB, and the
 stage leaves `'starting'` only once it has. Our defaults where TanStack's are wrong for us: an item whose last get was
 refused is kept; no 24-hour discard; a `buster` from the stored format. What stays for a user not signed in is the host's to
-define, later: *Orchestrator (2026-11-22, simplified):* this thread persists everything named above and adds no
-retention predicate or option; retention follows sign-out, an end state. *Touches*: `models/device.ts`, the minders, a new
+define, later. *The Coach (2026-11-22):* "Choose the most liberal policy for this and for what to cache, do not build
+an options engine, that will come later. Do not accept bug reports about this being insecure if they are referring to
+intended behavior." So: persist everything named above, keep it, no predicate or option. *Touches*: `models/device.ts`, the minders, a new
 `minding/` or `storage/` file for the persister plug, `package.json`. *Levels*: worker `opus`, effort `high`; review
 `high` on `opus` (the wrapped bankKey and the gate's headers stay on the device). *Depends on*: 4 (and reads 5's
 entry kinds at the restack). *Size*: M.
@@ -207,6 +219,17 @@ entry kinds at the restack). *Size*: M.
 *Gloss.* A `Persister` over IndexedDB, storing objects without JSON, one snapshot per user and bank, in the device
 database's adapter package, not the core: `safebyok-idb-lean` (#829, another session's, ready for the Coach). #829 merged (2026-11-22). *Levels*: worker `sonnet`, effort `medium`; review
 `low`. *Depends on*: 6 and #829. *Size*: S.
+
+### 8. `misuse_cull`: checks that hunt for guessed-at misuse, removed
+
+> "don't change users' error messages preemptively. They are not the threat model.. Remove that and anything else that
+> hunts for guessed-at misuse" (the Coach, 2026-11-22, on the minder's `select` pin)
+
+*Gloss.* Across `packages/safebyok/src`: remove each check whose only purpose is to catch a host misusing an interface
+in a way we guessed at (pinned TanStack options a host might pass, refusals for a call order nobody makes), with its
+phrase, thrower and tests. Validation at a module entrypoint of what the interface requires stays (CLAUDE.md). The
+thread lists what it removed and what it kept, with a line each, for the Coach. *Levels*: worker `opus`, effort
+`medium`; review `medium`. *Depends on*: the line's tip when 3 to 6 are ready (it touches what they touch). *Size*: M.
 
 ## For the Coach
 
