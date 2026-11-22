@@ -331,45 +331,6 @@ Reasoning for wontfix: the lifetok is under-used and the copy is a cache of what
 truth. A bank ends and is born again a few times at most (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`).
 Nothing in the vaultDB changes, and no secret moves. Unspecified and unguarded, by the Coach's ruling, 2026-11-22.
 
-### A late answer from an earlier life of a bank replaces the world of its newer life
-
-* current outcome: the BankMinder keys a world by the bank's life (`lifeseq`, `lifetok`) and holds one world per bank.
-  A world that lands whole for a life it has no world of (a `fetchWorld` answer, a birth's answer, or a notice of the
-  root box with its bank's world) removes every other world of the bank and takes its place. So a `fetchWorld` sent
-  before a delete and a rebirth elsewhere, and answered after the newer life's world landed, puts the earlier life's
-  world back, until the next whole world of the newer life lands.
-* alternatives:
-  - compare lives, keeping the newer: a `lifetok` is random and orders nothing, so the comparison would rest on
-    `lifeseq` alone, a second rule beside the key that keeps lives apart.
-  - a token per fetch, dropping a stale answer: a token on the common path for a millisecond window.
-* workaround: fetch the world again (`bankMinder.fetchWorld`), as bring-up does.
-
-Steps to reproduce: start `bankMinder.fetchWorld` on a born bank, and before it answers, delete the bank and birth it
-again from another device whose notice lands first.
-
-Reasoning for wontfix: a fetch landing across a delete and a birth (#no-slop-crossings). Nothing stored changes: the
-world is a cache, and a write citing the earlier life's records refuses at the vaultDB. Built so in core_first thread 2
-(bank_minder), 2026-11-22.
-
-### A bank deleted or born again elsewhere leaves the earlier life's world until a whole world of the new life lands
-
-* current outcome: a notice or answer carrying a bank record of a life the BankMinder has no world of lands nowhere: a
-  bank record alone does not make a world whole, without its root box. The world of the earlier life stays found by the
-  bank's scope (`bankMinder.worldAt`), and so do the bank's stage and a Bank made over it, until something fetches the
-  world or a root box notice brings the new life's world (a write's own answer lands only within the life cached).
-* alternatives:
-  - fetch the world when a bank of another life is noticed: a fetch the watch starts on its own, outside the feed, and
-    the ends (delete, vacate) decide what a device does on hearing of another life.
-  - land a world with no root box: every reader of a world would then handle a missing root.
-* workaround: the host fetches the world again (`bankMinder.fetchWorld`), or reloads the page.
-
-Steps to reproduce: bring up a device, then delete and birth the bank from another device; read
-`device.bankMinder.worldAt(scope).bank.lifetok`: it is the earlier life's.
-
-Reasoning for wontfix: what a device does on hearing that its bank's life ended belongs to the ends, not yet built;
-fetching here would build part of them ahead of their design. Nothing stored changes, and the earlier life's records
-are refused at the vaultDB when cited. Not yet ruled: built so in core_first thread 2 (bank_minder), 2026-11-22.
-
 ## React
 
 Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on it.
