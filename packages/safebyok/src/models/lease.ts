@@ -3,7 +3,7 @@ import type * as Z from 'zod'
 import type { EX } from 'safebyok-big/internals'
 import { Crypto, Helpers, Validator } from 'safebyok-big/internals'
 import * as Phrases from '../phrases'
-import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Revtok, Userid } from '../shapes/primitives'
+import type { Banklabel, EpochMillis, Labelpath, Lifeseq, Lifetok, Revtok, Userid } from '../shapes/primitives'
 import type { Modelkind, Sparse, ThingRecord } from '../shapes/shapes-thing'
 import { type LeaseGate, type LeaseOpts, type SecretFieldname, GateishChecks } from '../shapes/shapes-gateish'
 import type * as Sealers from '../shapes/shapes-sealers'
@@ -24,13 +24,14 @@ const CleartextFieldnames: ReadonlySet<string> = new Set(['whisper'])
  * Once evicted, or once its gate is swept or its device ends, it refuses every seal and unseal, even one in flight.
  */
 export class Lease implements LeaseStamp {
-  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, gate_labelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #gate, #record, stamp, toJSON
+  // == [Props]: fmt, userid, banklabel, lifeseq, born_at, lifetok, gate_labelpath, gate_lifeseq, gate_revtok, proved_at, wayinkind, #gate, #record, stamp, toJSON
 
   declare readonly fmt:            LeaseStamp['fmt']
   declare readonly userid:         Userid
   declare readonly banklabel:      Banklabel
   declare readonly lifeseq:        Lifeseq
   declare readonly born_at:        EpochMillis
+  declare readonly lifetok:        Lifetok
   /** The labelpath of the gate the lease was granted under. */
   declare readonly gate_labelpath: Labelpath
   /** The lifeseq of that gate's life. */

@@ -132,6 +132,8 @@ export const PerKindChecks = Object.freeze(Validator.Checkers('bad_record', ({ o
     labelpath:      bankLabelpath,
     label:          lit('bank'),
     fmt:            lit(ThingFormat),
+    /** Minted at the bank's birth (`Lifetok`). */
+    lifetok:        uuid(Phrases.LifetokShape),
   }).strict()
   const gateBase     = obj({
     ...sparse.shape,

@@ -47,6 +47,9 @@ export function revtokOf(word: string): string {
 /** The revtok of a fixture's first revision. */
 export const FirstRevtok = revtokOf('0')
 
+/** The lifetok of a fixture's bank: a UUID, like a revtok, fixed so that tests stay deterministic. */
+export const FirstLifetok = revtokOf('life')
+
 /** A revtok no fixture is born with: another writer's revision. */
 export const OtherRevtok = revtokOf('other')
 
@@ -62,11 +65,11 @@ export function useFakeClock(): void {
 /** The bank scope every builder here works in: `u1`'s bank `acme`. */
 export const WorldScope: BankScope = Object.freeze({ userid: 'u1', banklabel: 'acme' })
 
-/** The stamp of the bank every builder here makes things in: its first life, born at {@link T0}. */
-export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.userid, banklabel: WorldScope.banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at: T0 })
+/** The stamp of the bank every builder here makes things in: its first life, born at {@link T0} with {@link FirstLifetok}. */
+export const WorldBankStamp: BankStamp = Object.freeze({ userid: WorldScope.userid, banklabel: WorldScope.banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at: T0, lifetok: FirstLifetok })
 
 /** The stamp of {@link WorldBankStamp}'s main gate: its first life, born at {@link T0}. */
-export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldBankStamp, labelpath: 'gate' })
+export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldScope, labelpath: 'gate', lifeseq: Lifeseq.ofLifenum(0), born_at: T0 })
 
 /** The gate a lease cites when a test says nothing else: {@link WorldGateStamp}'s gate, at a revision of its own. */
 export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: revtokOf('gate1') })

@@ -9,7 +9,7 @@ import type { BirthCleartexts } from '../shapes/shapes-gateish'
 import type { BankAskDraft, BankMakeRecord, BankOpts, BankSnapshot, BankStage, BoxUnsealed, HostedVault } from '../shapes/shapes-bankish'
 import type { BoxCleartexts, BoxPublicProps, BoxTombstonePublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BankScope, type BankStamp, type GateStamp, StampChecks } from '../shapes/shapes-stamps'
-import { type DeviceTok, Labelpath, Lifeseq } from '../shapes/primitives'
+import { type DeviceTok, type Lifetok, Labelpath, Lifeseq } from '../shapes/primitives'
 import { type BankRecord, type BoxRecord, type Modelkind, type ThingRecord, ThingChecks, ThingFormat } from '../shapes/shapes-thing'
 import { BankChecks, BoxChecks, GateChecks } from '../shapes/shapes-thingkinds'
 import { type DelAskDraft, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../shapes/shapes-asks'
@@ -43,7 +43,11 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   readonly #getSnapshot = (): BankSnapshot => this.#snapshot
   // --
 
-  // == [Getters]: device, device_tok, vaultDB, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
+  // == [Getters]: lifetok, device, device_tok, vaultDB, scope, stamp, gate, rootBox, track, getSnapshot, subscribe
+
+  // we are under-using the lifetok at the moment
+  /** The token minted when this bank was born, which tells this life of the bank from any other under its banklabel. */
+  get lifetok(): Lifetok { return this.pickle().lifetok }
 
   /** The device this bank is on. */
   get device(): Device { return this.#device }
@@ -105,22 +109,22 @@ export class Bank extends Thing<BankRecord, BankScope, BankStamp> implements Ban
   }
 
   /** Fresh stamps for a new bank of `scope` and its main gate, both in their first life.
-   * Mint one pair per gating that births a bank.
+   * The bank's stamp carries a new lifetok. Mint one pair per gating that births a bank.
    */
   static mintStamps(scope: BankScope): { bankStamp: BankStamp, gateStamp: GateStamp } {
     const { userid, banklabel } = StampChecks.bankScope.parse(scope)
     const born_at = Clock.nowMillis()
     return {
-      bankStamp: BankChecks.stamp.parse({ userid, banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at }),
+      bankStamp: BankChecks.stamp.parse({ userid, banklabel, lifeseq: Lifeseq.ofLifenum(0), born_at, lifetok: Crypto.randomId() }),
       gateStamp: GateChecks.stamp.parse({ userid, banklabel, labelpath: 'gate', lifeseq: Lifeseq.ofLifenum(0), born_at }),
     }
   }
 
-  /** The first record of a new bank's Thing, of `stamp`, born at its `born_at`. */
+  /** The first record of a new bank's Thing, of `stamp`, born at its `born_at` with its `lifetok`. */
   static makeRecord(stamp: BankStamp): BankRecord {
-    const { userid, banklabel, lifeseq, born_at } = BankChecks.stamp.parse(stamp)
+    const { userid, banklabel, lifeseq, born_at, lifetok } = BankChecks.stamp.parse(stamp)
     return BankChecks.record.parse({
-      userid, banklabel, labelpath: 'bank', label: 'bank', fmt: ThingFormat, revtok: Crypto.randomId(), revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
+      userid, banklabel, labelpath: 'bank', label: 'bank', fmt: ThingFormat, revtok: Crypto.randomId(), lifetok, revseq: 0, am: 'a', born_at, written_at: born_at, lifeseq, lifepath: lifeseq,
     })
   }
   // --

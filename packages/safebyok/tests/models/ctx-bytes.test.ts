@@ -19,12 +19,12 @@ function textBytes(text: string): Uint8Array { return new TextEncoder().encode(t
 const WhisperText = '{"apiKey":"sk-test-0000"}'
 
 /** The JSON text of {@link TH.WorldBankStamp}, as every ctx under the bank has it first: its keys sorted. */
-const BankStampText = `{"banklabel":"acme","born_at":${String(TH.T0)},"lifeseq":"0000000000","userid":"u1"}`
+const BankStampText = `{"banklabel":"acme","born_at":${String(TH.T0)},"lifeseq":"0000000000","lifetok":"${TH.FirstLifetok}","userid":"u1"}`
 
 /** The JSON text of {@link TH.WorldGateStamp}, as each wayin's ctx has it after the bank's. */
 const GateStampText = `{"banklabel":"acme","born_at":${String(TH.T0)},"labelpath":"gate","lifeseq":"0000000000","userid":"u1"}`
 
-const BankStampFields = ['userid', 'banklabel', 'lifeseq', 'born_at'] as const
+const BankStampFields = ['userid', 'banklabel', 'lifeseq', 'born_at', 'lifetok'] as const
 const GateStampFields = ['userid', 'banklabel', 'labelpath', 'lifeseq', 'born_at'] as const
 const LeaseStampFields = ['fmt', ...BankStampFields, 'gate_labelpath', 'gate_lifeseq', 'gate_revtok', 'proved_at', 'wayinkind'] as const
 const BoxStampFields = ['userid', 'banklabel', 'labelpath', 'label', 'fmt', 'revtok', 'revseq', 'am', 'lifeseq', 'lifepath', 'born_at', 'written_at'] as const
@@ -100,7 +100,7 @@ describe("each ctx, byte for byte", () => {
 
   it("binds a lease's wrap of the bankKey to the bank's stamp and its own", async () => {
     const record = await leaseRecordOf()
-    const leaseText = `{"banklabel":"acme","born_at":${String(TH.T0)},"fmt":"${LeaseFormat}","gate_labelpath":"gate","gate_lifeseq":"0000000000","gate_revtok":"${TH.WorldGate.revtok}","lifeseq":"0000000000","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
+    const leaseText = `{"banklabel":"acme","born_at":${String(TH.T0)},"fmt":"${LeaseFormat}","gate_labelpath":"gate","gate_lifeseq":"0000000000","gate_revtok":"${TH.WorldGate.revtok}","lifeseq":"0000000000","lifetok":"${TH.FirstLifetok}","proved_at":${String(TH.T0)},"userid":"u1","wayinkind":"passphrase"}`
     const ctx = textBytes(`[${BankStampText},${leaseText},"bank_key_lease_wrapped"]`)
     expect(await Crypto.unwrapKeyUnder(record.lease_key, record.bank_key_lease_wrapped, ctx, CheckUsage)).to.be.instanceOf(CryptoKey)
   })

@@ -135,6 +135,7 @@ describe("PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseC
     [() => ({ device: { ...TH.provingDeviceOf(), strengthChecker: TH.anyStrengthChecker } }),   "a device with the host's bare strengthChecker"],
     [() => ({ bankStamp: { ...TH.WorldBankStamp, lifeseq: undefined } }),                       'a bank stamp with no lifeseq'],
     [() => ({ bankStamp: { ...TH.WorldBankStamp, born_at: 'yesterday' } }),                     'a bank stamp whose born_at is not epoch millis'],
+    [() => ({ bankStamp: TH.omitting(TH.WorldBankStamp, 'lifetok') }),                         'a bank stamp with no lifetok'],
     [() => ({ bankStamp: null }),                                                               'no bank stamp at all'],
     [() => ({ gateStamp: { ...TH.WorldGateStamp, lifeseq: undefined } }),                       'a gate stamp with no lifeseq'],
     [() => ({ gateStamp: TH.omitting(TH.WorldGateStamp, 'labelpath') }),                         'a gate stamp with no labelpath'],
@@ -515,6 +516,7 @@ describe("proving.buildWayin(source)", () => {
 
   const OtherSourceCases = [
     [{ bankStamp: { lifeseq: Lifeseq.ofLifenum(2) } },      'another life of the bank'],
+    [{ bankStamp: { lifetok: TH.revtokOf('reborn') } },     'another birth of the bank'],
     [{ gateStamp: { lifeseq: Lifeseq.ofLifenum(2) } },      'another life of the gate'],
   ] as const
 

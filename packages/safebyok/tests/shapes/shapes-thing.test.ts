@@ -337,6 +337,8 @@ describe("checkedWriteAsk(ask), of each kind", () => {
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, schematag: 'Whisper v1' } }, under), 'schematag', 'a box whose schematag is not a label'],
     [TH.birthAskOf({ ...box, whisper_sealed: { ...TH.FakeSealed, nonce: 'n' } } as never, under), Unaccepted, 'a box whose sealed whisper has a field no sealed part has'],
     [TH.birthAskOf({ ...TH.bankThingOf(), note: 'hi' } as never),                    Unaccepted,                 'a bank with a body'],
+    [TH.birthAskOf(TH.omitting(TH.bankThingOf(), 'lifetok')),                        'lifetok',                  'a bank with no lifetok'],
+    [TH.birthAskOf(TH.bankThingOf({ lifetok: 'not-a-uuid' })),                       Phrases.LifetokShape,       'a bank whose lifetok is not a UUID'],
     [TH.birthAskOf(TH.rootBoxOf({ labelpath: 'box/root' })),                         Phrases.LabelNotLast,       'a root box at a child\'s labelpath'],
   ]
 
