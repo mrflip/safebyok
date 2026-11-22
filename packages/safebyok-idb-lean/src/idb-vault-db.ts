@@ -120,7 +120,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
     return await DB.inOneStep(this.#shelf, 'readonly', async (store) => {
       const [parent, children, world] = await Promise.all([DB.rowAt(store, thingScopepathOf(ask)), childrenIn(store, ask), worldFetchedIn(store, ask)])
-      return this.classifyListThings(ask, { parent, children }, world)
+      return this.classifyListThings(ask, { parent, children, read_tc: DB.Classifier.readTcNow() }, world)
     })
   }
 

@@ -49,7 +49,7 @@ function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked
 /** The base class of a vaultDB whose Things are in a datastore. A subclass writes the `do*` calls, each one atomic step.
  * The class checks each ask and classifies what a `do*` call fetches, per the act tables in `notes/answer-contract.md`.
  * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, of a refused answer's `dbhas` where it is a Thing,
- * and of each Thing a good list answers.
+ * and of a list's parentage and deltas.
  */
 export abstract class AdapterVaultDB implements VaultDB {
   // == [Props]: #feeds
@@ -67,7 +67,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   /** Classify a write against the raw Thing fetched at its scope, null for none, checking the born_at and storage policies of a replace, and a bank write's lifetok. */
   protected classifyWriteThing(ask: WriteAsk, raw: unknown, world: WorldFetched): Actual<EX.PutAct | EX.DelAct> { return Classifier.classifyWriteThing(ask, raw, world) }
 
-  /** Classify a listing against the raw parent and the raw Things one label under it. */
+  /** Classify a listing against the raw parent, the raw Things one label under it, and the `read_tc` of the step that read them. */
   protected classifyListThings(ask: ListAsk, fetched: ThingsFetched, world: WorldFetched): ListThingsActual { return Classifier.classifyListThings(ask, fetched, world) }
 
   /** Classify a bank's birth, by its three puts, against its raw bank, main gate and root box, each null for none. */
@@ -119,14 +119,14 @@ export abstract class AdapterVaultDB implements VaultDB {
       const listAsk     = AskChecks.listAsk.parse(ask)
       const loggableAsk = loggableAskOf(listAsk)
       const actual      = await this.doListThings(listAsk)
-      const beside      = { world: actual.world, ...trackedFieldOf(actual), parent: actual.parent, damaged_rows: actual.damaged_rows }
+      const beside      = { world: actual.world, ...trackedFieldOf(actual), parentage: actual.parentage, deltas: actual.deltas, damaged_rows: actual.damaged_rows }
       const answer: ListThingsAnswer = actual.ok
-        ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, val: actual.listed }
-        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: actual.listed, err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
+        ? { ok: true,  ask: loggableAsk, act: actual.act, ...beside, read_tc: actual.kids.read_tc, val: actual.kids }
+        : { ok: false, ask: loggableAsk, act: actual.act, ...beside, dbhas: [], err: Throwers.actRefused('vault', actual.act, { oplabel: 'listThings', ask: loggableAsk }) }
       this.notifyTrackedRecords(listAsk, answer)
       this.notifyListed(answer)
       return answer
-    } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parent: null, damaged_rows: [] } }
+    } catch (err) { return { ...this.answerForThrown(err, 'listThings', ask), dbhas: null, parentage: [], deltas: [], damaged_rows: [] } }
   }
 
   /** Write a new bank's three roots (bank, main gate, root box), or answer the roots already stored ({@link VaultDB.tryBirthBank}). */
@@ -189,11 +189,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     this.#queueNotices(answer.ask, answer.dbhas)
   }
 
-  // A list's caller keeps only what it lists, so the watch notifies each Thing listed, after the tracked roots, as it would a dbhas.
-  /** Notify each watch of the answer's bank of each Thing a good list answers, in labelpath order. */
+  // A list's caller keeps only its `val`, so the watch notifies its parentage and its deltas, after the tracked roots, as it would a dbhas.
+  /** Notify each watch of the answer's bank of its `parentage`, then of its `deltas` in labelpath order. */
   protected notifyListed(answer: ListThingsAnswer): void {
-    if (! answer.ok) { return }
-    for (const record of answer.val) { this.#queueListedNotices(answer.ask, record) }
+    for (const record of [...answer.parentage, ...answer.deltas]) { this.#queueListedNotices(answer.ask, record) }
   }
 
   /** Queue one notice of `record` to each watch of `scoped`'s bank. */
@@ -263,7 +262,9 @@ export abstract class AdapterVaultDB implements VaultDB {
    * with its bank's world after the write.
    */
   protected abstract doWriteThing(ask: WriteAsk): Helpers.Awaitable<Actual<EX.PutAct | EX.DelAct>>
-  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw world, and return `this.classifyListThings(ask, fetched, world)`. */
+  /** In one step: fetch the raw parent at `ask`'s scope, each raw Thing one label under it, and its bank's raw world, and return
+   * `this.classifyListThings(ask, fetched, world)`, the fetched rows' `read_tc` made in that step (`readTcNow`, or the datastore's own UUID version 7).
+   */
   protected abstract doListThings(ask: ListAsk): Helpers.Awaitable<ListThingsActual>
   /** In one step: fetch the raw bank, main gate and root box, return `this.classifyBirthBank(puts, fetched)`, and under `born` first
    * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world the bank and main gate make.

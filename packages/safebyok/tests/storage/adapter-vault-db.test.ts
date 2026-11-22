@@ -72,11 +72,11 @@ describe("AdapterVaultDB, a step that throws", () => {
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })
   })
 
-  it("answers a listing that throws with no children, no parent and no damaged rows", async () => {
+  it("answers a listing that throws with no children, no parentage, no deltas and no damaged rows", async () => {
     const vaultDB = new ScriptedVaultDB(() => { throw new Error('connection reset') })
     const answer = await vaultDB.tryListThings(TH.listAskAt('box'))
     await TH.expectBad(Promise.resolve(answer), 'storage_unavailable')
-    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: null, parent: null, damaged_rows: [] })
+    expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing', dbhas: null, parentage: [], deltas: [], damaged_rows: [] })
   })
 
   it("answers a bank's birth that throws with its verb", async () => {
@@ -181,7 +181,7 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
     expect(heard).to.deep.equal([TH.gateThingOf(), TH.gateThingOf(), TH.gateThingOf()])
   })
 
-  it("tells nothing of a good write's val, a null dbhas, a throw that carries none, or a refused listing", async () => {
+  it("tells nothing of a good write's val, a null dbhas, or a throw that carries none, and only the parentage of a refused listing", async () => {
     const steps: (() => Actual<EX.GoodAct>)[] = [
       () => ({ ok: true, act: 'born', world: null, record: TH.gateThingOf() }),
       () => ({ ok: false, act: 'stale', world: null, record: null }),
@@ -194,18 +194,21 @@ describe("AdapterVaultDB, what a watch hears of a verb's answer", () => {
       await TH.aWhile()
       expect(heard).to.deep.equal([])
     }
-    const listing = new ScriptedVaultDB(() => ({ ok: false, act: 'gone', world: null, listed: [], parent: TH.rootBoxOf(), damaged_rows: [] }) as never)
+    const parentage = [Thing.sparseOf(TH.rootBoxOf())]
+    const listing = new ScriptedVaultDB(() => ({ ok: false, act: 'gone', world: null, parentage, deltas: [], damaged_rows: [] }) as never)
     const heard = heardOver(listing)
     expect(await listing.tryListThings(TH.listAskAt('box'))).to.deep.include({ ok: false, dbhas: [] })
     await TH.aWhile()
-    expect(heard).to.deep.equal([])
+    expect(heard).to.deep.equal(parentage)
   })
 
-  it("tells each Thing a good listing answers, sparse and in labelpath order, before the listing answers", async () => {
-    const listed  = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
-    const vaultDB = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, listed, parent: TH.rootBoxOf(), damaged_rows: [] }) as never)
-    const heard   = heardOver(vaultDB)
+  it("tells a good listing's parentage, then its deltas in labelpath order, before the listing answers", async () => {
+    const parentage = [Thing.sparseOf(TH.rootBoxOf())]
+    const deltas    = [Thing.sparseOf(TH.boxThingOf('anthropic')), Thing.sparseOf(TH.boxThingOf('openai'))]
+    const kids      = { modelkind: 'kids', parentpath: 'box', parentlife: TH.rootBoxOf().lifepath, items: {}, gones: {}, read_tc: '' }
+    const vaultDB   = new ScriptedVaultDB(() => ({ ok: true, act: 'gotlive', world: null, kids, parentage, deltas, damaged_rows: [] }) as never)
+    const heard     = heardOver(vaultDB)
     await vaultDB.tryListThings(TH.listAskAt('box'))
-    expect(heard).to.deep.equal(listed)
+    expect(heard).to.deep.equal([...parentage, ...deltas])
   })
 })

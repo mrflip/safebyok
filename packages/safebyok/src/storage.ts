@@ -21,7 +21,7 @@ export * as Classifier from './storage/thing-classifier'
 export { type BankScope, type BankStamp, type BoxStamp, type GateStamp, StampChecks } from './shapes/shapes-stamps'
 export {
   type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
-  type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
+  type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
 
 // From safebyok-big: what an adapter's `do*` methods answer and are named with, its throwers, and the checkers it checks its

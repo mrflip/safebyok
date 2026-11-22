@@ -54,6 +54,13 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
 describe("Classifier.classifyListThings(ask, fetched, roots)", () => {
   it("refuses, as a broken store, a child a store fetched from outside the parent", () => {
     const child = { labelpath: 'box/aa/deep', raw: TH.boxThingOf('deep') }
-    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [child] }, { bank: null, maingate: null }), 'storage_issue')
+    const fetched = { parent: TH.rootBoxOf(), children: [child], read_tc: Classifier.readTcNow() }
+    TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), fetched, { bank: null, maingate: null }), 'storage_issue')
+  })
+
+  it("refuses, as a broken store, a read_tc that is no UUID version 7", () => {
+    for (const read_tc of [undefined, crypto.randomUUID(), Classifier.readTcNow().toUpperCase()]) {
+      TH.expectSyncRefusal(() => Classifier.classifyListThings(TH.listAskAt('box'), { parent: TH.rootBoxOf(), children: [], read_tc }, { bank: null, maingate: null }), 'storage_issue')
+    }
   })
 })

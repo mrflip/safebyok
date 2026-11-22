@@ -151,8 +151,10 @@ export class PostgresVaultDB extends AdapterVaultDB {
   protected async doListThings(ask: ListAsk): Promise<ListThingsActual> {
     const { userid, banklabel, labelpath, modelkind } = ask
     const params = [userid, banklabel, labelpath, trackParam(ask)]
-    const { parent, children, world, tracked } = await this.#firstRow<Classifier.ThingsFetched & { world: Classifier.WorldFetched, tracked: Classifier.TrackedFetched }>(ListThingsSql[modelkind], params)
-    return this.classifyListThings(ask, { parent, children }, { ...world, tracked })
+    // Made before the statement, whose snapshot is no earlier: Postgres before 18 has no UUID version 7 of its own.
+    const read_tc = Classifier.readTcNow()
+    const { parent, children, world, tracked } = await this.#firstRow<Omit<Classifier.ThingsFetched, 'read_tc'> & { world: Classifier.WorldFetched, tracked: Classifier.TrackedFetched }>(ListThingsSql[modelkind], params)
+    return this.classifyListThings(ask, { parent, children, read_tc }, { ...world, tracked })
   }
 
   protected async doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Promise<BirthBankActual> {

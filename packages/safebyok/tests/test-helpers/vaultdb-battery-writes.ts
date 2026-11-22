@@ -359,7 +359,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       expect(await vaultDB.tryGetThing(getAskOf(box))).to.deep.include({ ok: true, act: 'gotlive', val: box })
       const delAsk = delAskOf({ cited: box, record: boxTombOf(box) })
       expect(await vaultDB.tryWriteThing(delAsk)).to.deep.include({ ok: true, act: 'deleted' })
-      expect(await vaultDB.tryListThings(listAskOf(RootScope))).to.deep.include({ ok: true, val: [Thing.sparseOf(boxTombOf(box))] })
+      expect(await vaultDB.tryListThings(listAskOf(RootScope))).to.deep.include({ ok: true, deltas: [Thing.sparseOf(boxTombOf(box))] })
     })
 
     it("leave every refusal to the verb, which answers it", async () => {

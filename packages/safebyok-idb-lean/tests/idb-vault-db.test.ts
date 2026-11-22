@@ -70,8 +70,9 @@ describe("IdbVaultDB's databases", () => {
     const grandchild = { ...TH.boxThingOf('deep'), labelpath: 'box/openai/deep' }
     await rows.plant(otherBankBox, otherBankBox)
     await rows.plant(grandchild, grandchild)
-    const listed = await TH.expectGood(idbVaultDB.tryListThings(TH.listAskAt('box')))
-    expect(listed.map(({ labelpath }) => labelpath)).to.deep.equal([box.labelpath])
+    const answer = await idbVaultDB.tryListThings(TH.listAskAt('box'))
+    await TH.expectGood(answer)
+    expect(answer.deltas.map(({ labelpath }) => labelpath)).to.deep.equal([box.labelpath])
   })
 })
 

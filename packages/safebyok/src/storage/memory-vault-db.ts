@@ -101,7 +101,8 @@ export class MemoryVaultDB extends AdapterVaultDB {
     const children = [...things]
       .filter(([labelpath]) => labelpath.startsWith(under) && (! labelpath.includes('/', under.length)))
       .map(([labelpath, raw]) => ({ labelpath, raw: structuredClone(raw) }))
-    return this.classifyListThings(ask, { parent: structuredClone(things.get(ask.labelpath) ?? null), children }, this.#worldFetchedOf(ask))
+    const fetched  = { parent: structuredClone(things.get(ask.labelpath) ?? null), children, read_tc: Classifier.readTcNow() }
+    return this.classifyListThings(ask, fetched, this.#worldFetchedOf(ask))
   }
 
   protected doBirthBank(ask: BirthBankAsk, puts: BirthPuts): BirthBankActual {
