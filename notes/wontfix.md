@@ -309,7 +309,11 @@ Reasoning for wontfix: a gate change comes a few times a day, and a lease is bui
 separate updates*, `#no-slop-crossings`). Nothing stored changes, and no secret moves. Written by the gate_super thread 1
 worker, 2026-11-21, awaiting a ruling.
 
-## A form reset that the host cancels still discards a draft in that form
+## React
+
+Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on it.
+
+### A form reset that the host cancels still discards a draft in that form
 
 A `useDraft` whose inputs sit in a form discards when the form is reset (`safebyok-react-lean`, `use-draft.ts`). A host
 whose `onReset` calls `preventDefault()`, to ask "keep your changes?" say, leaves its form as it was, but the draft has
@@ -329,7 +333,7 @@ a `<button type="reset">`.
 Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
 and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
 
-## A stage change that reveals a suspending subtree shows its fallback
+### A stage change that reveals a suspending subtree shows its fallback
 
 The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react-lean`, `useBank`). React's manual: an
 update from an external store is never a transition. So when an unlock, or any other stage change, first renders a
@@ -350,3 +354,23 @@ To reproduce: under a stage switch, render at `'unlocked'` a component that susp
 Reasoning for wontfix: the stage is synchronous on purpose, so that no screen shows a stage the bank has left, and
 that is worth more than one smoothed fallback. The limit is React's, stated in its manual. Ruled by the Coach,
 2026-11-22.
+
+### A refusal shown from a form Action's result outlives an Undo
+
+A form whose action resolves its refusal as the action's state (`useActionState`) shows that refusal until the action
+next runs. Envman's row shows a refused Save's message under the row; pressing Undo, or the bank locking, discards the
+draft and leaves the message where it is.
+
+Current outcome: a stale message under a row whose draft is clean again. The next Save replaces or removes it.
+
+Alternatives: React gives an action's state no reset. Undo as a second submit through the same action makes Undo an
+action that writes nothing, and a reader has to learn why. A copy of the refusal in state beside the action's, cleared
+by hand, is two records of one fact.
+
+Workaround: a host that minds remounts the form by a `key` it changes on Undo.
+
+To reproduce: in envman, on a locked vault, type a value in a row, press Save, and enter a passphrase the gate
+refuses for a reason the row shows; then press Undo.
+
+Reasoning for wontfix: the message is true of the last Save and harms nothing, and each way of removing it costs more
+code than it is worth in a demo meant to be read. Ruled by the Coach, 2026-11-22.
