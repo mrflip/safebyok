@@ -421,3 +421,23 @@ not write.
 Reasoning for wontfix: the only reader is a component the host wrote, inside the form the user typed the secret into,
 where it could read the input itself; nothing retains the secret; and each alternative costs every host more than this
 costs any. Ruled by the Coach, 2026-11-22.
+
+### A Show that lands after `useWhisperText` is handed another box or field leaves its button pressed
+
+* current outcome: in `safebyok-react-lean`, a component that calls `useWhisperText` directly and hands it another
+  labelpath or field while a Show is on its way (the unlock form open, or the box being unsealed) writes nothing into
+  the element, but answers `isRevealed: true` for the new box or field once the old Show lands: its button reads Hide
+  over an empty element until it is pressed. `WhisperText` keys itself by box and field, and shows none of this.
+* alternatives:
+  - have `useReveal` take the labelpath and field a Show was asked for, and drop a landing that no longer matches:
+    a change to the reveal every draft shares, for a crossing.
+  - track in the hook which box and field the reveal was asked for, beside the reveal's own state: a second state
+    for one crossing.
+* workaround: key the component that calls the hook by labelpath and field, as `WhisperText` does.
+
+Steps to reproduce: render a component that calls `useWhisperText` on a locked bank, press Show, and while the unlock
+form is open, rerender it with another field.
+
+Reasoning for wontfix: the text never lands in the wrong place, which React's stale-result flag in the hook sees to;
+what is left is a button that reads Hide one press too long. A guard for it would be a second state in the reveal's
+path. Written by the react_free thread 4 worker, 2026-11-22, awaiting a ruling.

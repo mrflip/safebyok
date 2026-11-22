@@ -1,14 +1,14 @@
 /** `WhisperInput`, the field a user types or pastes a whisper into. */
 
-import { type ComponentPropsWithRef, useId } from 'react'
-import { useFormStatus } from 'react-dom'
-import { WhisperFieldAttributes } from 'safebyok'
-import { useRevealToggle } from './reveal-toggle'
+import type { ComponentPropsWithRef } from 'react'
+import type { WhisperFieldAttributes } from 'safebyok'
+import { PartsPhrases } from './phrases-parts'
+import { type WhisperFieldOpts, useWhisperField } from './use-whisper-field'
 
 // == [The input]: WhisperInputProps, WhisperInput
 
 /** The props of a {@link WhisperInput}: its `name` in the form, and any `<input>` attribute but its value, its type, and the ones that keep password managers away. */
-export type WhisperInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' | 'type' | 'value' | 'defaultValue' | keyof typeof WhisperFieldAttributes> & {
+export type WhisperInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' | 'type' | 'value' | 'defaultValue' | keyof typeof WhisperFieldAttributes> & WhisperFieldOpts & {
   /** The field's name in the form's `FormData`, for the form's action to read. */
   name: string
 }
@@ -19,16 +19,13 @@ export type WhisperInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' | 't
  * @example
  *   <form action={putAction}><WhisperInput name="apiKey" aria-label="Anthropic API key" /><SubmitButton>Save</SubmitButton></form>
  */
-export function WhisperInput({ id, ...passed }: WhisperInputProps) {
-  const { pending } = useFormStatus()
-  const reveal = useRevealToggle(! pending)
-  const ownId = useId()
-  const fieldId = id ?? ownId
-  // `value` and `defaultValue` come last, so a host that gets either past the types still leaves the input uncontrolled, and React never writes the whisper into the page.
+export function WhisperInput({ id, isPending, ...passed }: WhisperInputProps) {
+  const field = useWhisperField({ id, isPending })
+  // The hook's props, `value` and `defaultValue` come last, so a host that gets any past the types still leaves the input uncontrolled, and React never writes the whisper into the page.
   return (
     <span className="whisper-input">
-      <input {...passed} {...WhisperFieldAttributes} id={fieldId} type={reveal.fieldType} value={undefined} defaultValue={undefined} />
-      {reveal.button(fieldId)}
+      <input {...passed} {...field.inputProps} value={undefined} defaultValue={undefined} />
+      <button {...field.toggleProps}>{field.isRevealed ? PartsPhrases.hideButton : PartsPhrases.showButton}</button>
     </span>
   )
 }

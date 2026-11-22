@@ -1,7 +1,7 @@
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { isVaultError, mask } from 'safebyok'
-import { WhisperMask, type WhisperMaskProps } from '../../src/parts'
+import { useWhisperMask, WhisperMask, type WhisperMaskProps } from '../../src/parts'
 import * as TH from '../test-helpers'
 
 /** The joke service's key masked with its last four characters. */
@@ -71,6 +71,22 @@ describe("WhisperMask", () => {
     TH.expectTextUnheld(TailedKey.slice(-4), container, world.client)
   })
 
+  it("shows the stored mask from the moment the bank locks, never blank between", async () => {
+    const { world, container } = await renderKey()
+    await unlock(world)
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
+    act(() => { world.Bank.lock() })
+    expect(maskTextOf(container)).to.eq('jokes')
+  })
+
+  it("keeps the stored mask showing until the live one lands, never blank between", async () => {
+    const { world, container } = await renderKey()
+    await waitFor(() => { expect(maskTextOf(container)).to.eq('jokes') })
+    await unlock(world)
+    expect([ 'jokes', LiveMask ]).to.include(maskTextOf(container))
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
+  })
+
   it("writes the mask again when the box is written", async () => {
     const { world, container } = await renderKey()
     await unlock(world)
@@ -114,5 +130,33 @@ describe("WhisperMask", () => {
     const err = onError.mock.calls[0]?.[0]
     expect(err).to.be.instanceOf(Error)
     expect(err?.cause).to.eq(thrown)
+  })
+})
+
+/** The joke service's key masked into a `<span>` of the host's own. */
+function HostMask({ world }: Readonly<{ world: TH.ProviderWorld }>) {
+  const stage = world.Bank.useBank((snap) => snap.stage)
+  const { maskRef } = useWhisperMask(TH.JokesPath, 'apiKey', { tail: 4, ifLocked: serviceOf })
+  return (
+    <>
+      <p>{stage}</p>
+      <span ref={maskRef} data-testid="host-mask" />
+    </>
+  )
+}
+
+describe("useWhisperMask", () => {
+  it("writes the mask into an element of the host's own, stored while locked and live while unlocked", async () => {
+    // useWhisperMask @example
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    render(TH.providerTreeOf(world, <HostMask world={world} />, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    const el = screen.getByTestId('host-mask')
+    await waitFor(() => { expect(el.textContent).to.eq('jokes') })
+    await unlock(world)
+    await waitFor(() => { expect(el.textContent).to.eq(LiveMask) })
+    TH.expectTextUnheld(LiveMask, el.parentElement!, world.client)
+    act(() => { world.Bank.lock() })
+    expect(el.textContent).to.eq('jokes')
   })
 })
