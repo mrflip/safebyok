@@ -10,6 +10,7 @@ import { Hours24, fakeBankOf, minderOf, minderWorldOf, storedBoxOf, boxScopeOf, 
 
 describe("VaultMinder.make", () => {
   const vaultDB = new MemoryVaultDB()
+  const bankMinder = BankMinder.make({ vaultDB }, fakeBankOf())
   const { makeGetAsk: _makeGetAsk, ...noAsks } = fakeBankOf()
   const { makeListAsk: _makeListAsk, ...noListAsks } = fakeBankOf()
   const MakeCases = [
@@ -23,11 +24,13 @@ describe("VaultMinder.make", () => {
     [{ queryCacheOpts: { staleTime: MaxTimerMillis + 1 } }, null,                'refuses a staleTime past MaxTimerMillis'],
     [{ queryCacheOpts: { gcTime: 10 } },                    null,                'refuses a gcTime, which no host sets'],
     [{ queryCacheOpts: { staleTime: 'static' } },           null,                "refuses a staleTime of 'static' for the minder's own"],
+    [{ bankMinder: undefined },                             null,                'refuses a minder made without its BankMinder'],
+    [{ bankMinder: {} },                                    null,                'refuses a bankMinder that is not a BankMinder'],
   ] as const
   for (const [optsOver, bank, blurb] of MakeCases) {
     it(blurb, () => {
       // @ts-expect-error -- sloppy input is the point
-      TH.expectSyncRefusal(() => VaultMinder.make({ vaultDB, ...optsOver }, bank ?? fakeBankOf()), 'bad_record')
+      TH.expectSyncRefusal(() => VaultMinder.make({ vaultDB, bankMinder, ...optsOver }, bank ?? fakeBankOf()), 'bad_record')
     })
   }
 
