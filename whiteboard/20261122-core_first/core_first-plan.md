@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). The line, filed and out of draft: main ← #844 ← #847 ← #850 ← #846 ← #848 ← #849 (`43c77ec2e`). Thread 8 ready (#851, `42c01ce6a`, on #849), in review (medium, opus). Thread 9 (defaults_at_start) building from #851; it also takes `list`'s per-call `staleTime: 0`. Box-persisting plan on the sprint branch. *Finally*: take over #833 (squash, rebase onto the tip, vocabulary changes as a second commit).
+* **Status**: running (2026-11-22). Every thread filed and out of draft, one line: main ← #844 ← #847 ← #850 ← #846 ← #848 ← #849 ← #851 ← #852 (`952fdca35`, the top). Box-persisting plan on the sprint branch, awaiting the Coach. *Finally*: take over #833 (squash, rebase onto the tip, vocabulary changes as a second commit); wrap-up.
 
 The Coach's request, verbatim:
 
@@ -247,6 +247,8 @@ tombstone that last landed" (thread 5); `list`'s per-call `staleTime: 0` if plai
 end"). *Levels*: worker `opus`, effort
 `medium`; review `medium`. *Depends on*: the line's tip when 3 to 6 are ready (it touches what they touch). *Size*: M.
 
+*Status*: filed, [#851](https://github.com/mrflip/safebyok/pull/851) at `85e72c475` on #849, out of draft. *Review* (medium, opus): flagged; reworked so Vault's `#scopeAt` refuses the root box `'box'` (`Phrases.VaultBoxIsRoot`); second review clean. Also: `eqeqeq` added to the core and react-lean lint configs (the Coach's "how did that pass lint?": no config had it); the minder is the one owner of observed-listing refetch (Closer Look 1.3); `read_tc` on a refused list.
+
 ### 9. `defaults_at_start`: a minder's query defaults set when its client is made
 
 > "If it's supposed to be given at start do that?" (the Coach, 2026-11-22, on the Closer Look's 1.2: `restoredSharingOf`
@@ -258,6 +260,8 @@ TanStack's own pattern for client defaults. Then a restored entry takes the mind
 `restoredSharingOf`, `RestoreOpts`' stand-in options and the "set at hello, not at make" rule go. If it proves to need
 more than that, write down why and stop. *Levels*: worker `opus`, effort `high`; review `medium` on `opus`. *Depends
 on*: 8 (both touch `minder.ts`). *Size*: M.
+
+*Status*: filed, [#852](https://github.com/mrflip/safebyok/pull/852) at `952fdca35` on #851, out of draft; the top of the line. *Review* (medium, opus): flagged; fixes kept (a false sentence in `makeClient`'s comment, locals renamed `fetchAt`/`settleFetch`, two doc blocks plain). Flagged: `useBoxList` inherited a listing staleTime of 0 and re-listed on every mount, focus and reconnect. *Orchestrator:* reworked: `useBoxList` passes `staleTime: Infinity` (stale only on evidence), `list()` keeps 0, with a remount-and-focus test. Second review (low, sonnet): clean. Left: soon and dead entries without `skipToken`; null-user placeholder keys take the defaults; no test for a fetch with no minder.
 
 ## For the Coach
 
