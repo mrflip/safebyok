@@ -75,6 +75,16 @@ describe("WhisperInput", () => {
     expect(field.type).to.eq('password')
   })
 
+  it("hides the whisper again while isPending, for a form that submits from a handler", () => {
+    const { rerender } = render(<WhisperInput name="apiKey" aria-label="API key" />)
+    const field = screen.getByLabelText<HTMLInputElement>('API key')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field.type).to.eq('text')
+    rerender(<WhisperInput name="apiKey" aria-label="API key" isPending />)
+    expect(field.type).to.eq('password')
+    expect(field.hasAttribute('ispending')).to.eq(false)
+  })
+
   it("carries the attributes that keep password managers away", () => {
     render(<WhisperInput name="apiKey" aria-label="API key" />)
     const field = screen.getByLabelText('API key')
