@@ -1,7 +1,8 @@
 # Thread 2: knock_rework (2026-11-22)
 
 Branch `20261122-knock_query`, PR #822, stacked on #823 (`20261122-multiples`, 908751892, on #825, #824, #821).
-Proved: the demo's lint, typecheck and tests (28 in 4 files) at `b2124ecfb`; `pnpm justify` after the catch-up, in the PR's **Tests:** line.
+Proved: `pnpm justify` green at `017b57507`, after the catch-up (knockknock 28 in 4 files, safebyok-react-lean 291,
+safebyok 1399, safebyok-big 2946, safebyok-react 277, e2e 576, demo-react 99, envman 24, scripts 331, the adapters all passing).
 
 The workshop built this PR as its thread 5 (`whiteboard/20261122-react_targets/thread-5-knock_query.md`, left as it was).
 This thread takes up what #823 gives the mutation modality: `putBoxMutationOptions` and `SubmitButton`'s `isPending`.
