@@ -170,7 +170,7 @@ export class Device implements MinderFriend {
   async judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return await Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Starting]: hello, signIn, birthGating, #bringUp, #attachBankOf, #attachBank
+  // == [Starting]: hello, signIn, birthGating, #bringUp, #attachWorld, #attachBank
 
   /** Start the device, resolving once it is started. Never rejects, and each later call resolves as the first.
    * Refuses `insecure_context` outside a secure context, where WebCrypto is missing.
@@ -223,7 +223,7 @@ export class Device implements MinderFriend {
       bankMinder.hello()
       minder.hello()
       const cached = bankMinder.worldAt()
-      if ((cached !== undefined) && Bank.isLive(cached.bank)) { this.#attachBankOf(cached) }
+      if ((cached !== undefined) && Bank.isLive(cached.bank)) { this.#attachWorld(cached) }
       const world = await bankMinder.fetchWorld()
       if (this.#bank !== null) { return }
       if ((world === null) || (! Bank.isLive(world.bank))) {
@@ -231,7 +231,7 @@ export class Device implements MinderFriend {
         this.#align()
         return
       }
-      this.#attachBankOf(world)
+      this.#attachWorld(world)
     } catch (err) {
       if (this.#bank !== null) {
         this.tellBadNews([err])
@@ -244,7 +244,7 @@ export class Device implements MinderFriend {
 
   // Gate.make checks the gate and Bank.make the root box: a tombstone of either refuses.
   /** Make the bank of `world`, and its main gate, this device's bank. */
-  #attachBankOf(world: BankRoots): void {
+  #attachWorld(world: BankRoots): void {
     const { vaultDB } = this
     const gate = Gate.make(world.gate, { device: this, vaultDB, bankStamp: world.bank })
     this.#attachBank(Bank.make(world.bank, { device: this, vaultDB, gate }))
