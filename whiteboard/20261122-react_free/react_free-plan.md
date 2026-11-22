@@ -9,8 +9,9 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: threads 1 to 6 filed and restacked into one line on #823: #822 ← #819 ← #835 ← #834 ← #836 (tip
-  `14cc583e6`, `pnpm justify` green, 7,423 tests); thread 7 (`browser_pass`) running from its tip.
+* **Status**: done, 2026-11-22. Every thread filed, in one line on the workshop's #823: #822 ← #819 ← #835 ← #834 ←
+  #836 ← #838, with this sprint PR (#832) on top. The open matters wait in the sprint doc; the done note is
+  `human/20261122-sprint_react_free_done.md`.
 
 ## Read first
 
@@ -183,7 +184,7 @@ directory only, and reports blocked if Chromium needs system libraries.
 deb.debian.org unpacked into scratch, checked against the Packages SHA256, loaded by `LD_LIBRARY_PATH`. Then walked
 Knock-Knock, envman and the old React demo in headless Chromium 159: no step failed, no demo bug. #838 adds the
 walk-through and the walk scripts. Resumed to fix a react-giver test flake CI met on node 26 (test-only). Three open
-matters and a *For coach* row in the doc; two calls on Cleanup. Review `none` (no product code). *Depends on*: threads 2 to 5, restacked into a line. *Size*: small to medium.
+matters and a *For coach* row in the doc; two calls on Cleanup. Review `none` (no product code). Filed at `15281d58c`. *Depends on*: threads 2 to 5, restacked into a line. *Size*: small to medium.
 
 ### Not taken
 
