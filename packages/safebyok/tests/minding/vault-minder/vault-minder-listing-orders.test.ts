@@ -31,7 +31,7 @@ const ListingOrders = OrdersWithoutWrite.flatMap((steps) => [0, 1, 2, 3].map((ii
 async function listingAfter(steps: readonly ListingStep[], { isListedBefore, isListStale }: Readonly<{ isListedBefore: boolean, isListStale: boolean }>) {
   const vaultDB = new QuietVaultDB()
   await storedBoxOf(vaultDB)
-  const { minder, bank, receive } = minderWorldOf(vaultDB)
+  const { minder, bank, receive } = await minderWorldOf(vaultDB)
   if (isListedBefore) { await minder.list('box') }
   if (isListStale) {
     const answered = await vaultDB.tryListThings(bank.makeListAsk({ labelpath: 'box', ifAbsent: 'nil' }))
@@ -94,7 +94,7 @@ const Reborn = TH.boxRebornOf(TH.boxTombOf(TH.nextOf(Openai)))
 async function eventsAfter(steps: readonly ListingStep[]) {
   const vaultDB = new QuietVaultDB()
   await storedBoxOf(vaultDB)
-  const { minder, receive } = minderWorldOf(vaultDB)
+  const { minder, receive } = await minderWorldOf(vaultDB)
   const heard      = listenerOf()
   minder.listen(heard, MinderEventFormat)
   const replaceAsk = TH.replaceAskOf(Openai, TH.nextOf(Openai))

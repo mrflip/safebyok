@@ -8,28 +8,28 @@ import { minderWithoutStart } from './world'
 describe("VaultMinder keys", () => {
   const DeepScope = { ...TH.BoxScope, labelpath: 'box/openai/deep' }
 
-  it("name the item after the bank, interleave '/' between the labels, then end with '!'", () => {
-    const minder = minderWithoutStart()
+  it("name the item after the bank, interleave '/' between the labels, then end with '!'", async () => {
+    const minder = await minderWithoutStart()
     expect(minder.itemQueryKey(TH.GateScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'gate', '!'])
     expect(minder.itemQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '!'])
     expect(minder.itemQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'box', '/', 'openai', '!'])
     expect(minder.itemQueryKey(TH.BankScope)).to.deep.equal(['sok', 'u1', 'acme', 'item', 'bank', '!'])
   })
 
-  it("name the soon after the bank, and end it with '~'", () => {
-    const minder = minderWithoutStart()
+  it("name the soon after the bank, and end it with '~'", async () => {
+    const minder = await minderWithoutStart()
     expect(minder.soonQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'soon', 'box', '~'])
     expect(minder.soonQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'soon', 'box', '/', 'openai', '~'])
   })
 
-  it("name the list of a Thing's children after the bank, and end it with '#' and 'kids'", () => {
-    const minder = minderWithoutStart()
+  it("name the list of a Thing's children after the bank, and end it with '#' and 'kids'", async () => {
+    const minder = await minderWithoutStart()
     expect(minder.listQueryKey(TH.RootScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
     expect(minder.listQueryKey(TH.BoxScope)).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '/', 'openai', '#', 'kids'])
   })
 
-  it("match, for a Thing's listing key without its mark, its own listing and every listing under it, and no item or soon", () => {
-    const minder = minderWithoutStart()
+  it("match, for a Thing's listing key without its mark, its own listing and every listing under it, and no item or soon", async () => {
+    const minder = await minderWithoutStart()
     const matches = (prefixScope: ThingScope, keyScope: ThingScope) => {
       const prefix = minder.listQueryKey(prefixScope).slice(0, -2)
       return [minder.listQueryKey(keyScope), minder.itemQueryKey(keyScope), minder.soonQueryKey(keyScope)].map((queryKey) => TSQ.partialMatchKey(queryKey, prefix))
@@ -42,8 +42,8 @@ describe("VaultMinder keys", () => {
     expect(matches(TH.RootScope, TH.GateScope)).to.deep.equal([false, false, false])
   })
 
-  it("are the same, made without a minder, for anyone caching the same record", () => {
-    const minder = minderWithoutStart()
+  it("are the same, made without a minder, for anyone caching the same record", async () => {
+    const minder = await minderWithoutStart()
     for (const scope of [TH.GateScope, TH.RootScope, TH.BoxScope, TH.BankScope]) {
       expect(VaultMinder.itemQueryKeyOf(scope)).to.deep.equal(minder.itemQueryKey(scope))
       expect(VaultMinder.listQueryKeyOf(scope)).to.deep.equal(minder.listQueryKey(scope))

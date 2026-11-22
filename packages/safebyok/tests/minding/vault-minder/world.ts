@@ -210,4 +210,7 @@ export function boxBirthAskOf(boxlabel = 'openai'): WriteAsk {
 }
 
 /** A minder that has not started, for a test of its keys. */
-export async function minderWithoutStart(): Promise<VaultMinder> { return (await minderWorldOf(new MemoryVaultDB(), { isStarted: false })).minder }
+export async function minderWithoutStart(): Promise<VaultMinder> {
+  const { minder } = await minderWorldOf(new MemoryVaultDB(), { isStarted: false })
+  return minder
+}

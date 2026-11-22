@@ -12,7 +12,6 @@ import { deepFreeze, union } from 'es-toolkit'
 import { Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
 import { type BoxRecord, type Sparse, type ThingRecord, type ThingScope, type Tombstone, type VoidSentinel, Shell, ThingChecks } from '../shapes/shapes-thing'
-import type { ShellOf } from '../shapes/shapes-sealers'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WriteAsk } from '../shapes/shapes-asks'
@@ -548,8 +547,8 @@ export class VaultMinder {
   get scope(): ThingWatchScope { return { userid: this.userid, banklabel: this.banklabel } }
 
   /** The bank's root box, the parent of every box, from its world in the BankMinder: its shell while none is heard of. */
-  get rootBox(): BoxRecord | ShellOf<BoxRecord> {
-    return this.#bankMinder.worldAt(this.scope)?.root ?? Shell.of(this.#rootBoxScope) as ShellOf<BoxRecord>
+  get rootBox(): BoxRecord | VoidSentinel {
+    return this.#bankMinder.worldAt(this.scope)?.root ?? Shell.of(this.#rootBoxScope)
   }
 
   /** The QueryClient this minder caches in: hand it to TanStack's `QueryClientProvider` to observe what it caches. */

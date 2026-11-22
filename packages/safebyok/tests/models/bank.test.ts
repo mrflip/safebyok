@@ -751,7 +751,8 @@ describe("bank.track, and the asks the bank builds", () => {
   it("track the bank a write elsewhere stored, once the watch has told the bank's world of it", async () => {
     const { bank, device } = await TH.buildBornBank()
     const record = nextBankThingOf(bank)
-    await TH.expectGood(device.vaultDB.tryWriteThing({ ...bank.makePutAsk({ cited: bank.pickle(), record }), labelpath: 'bank', modelkind: 'bank' }))
+    const ask = { ...bank.makePutAsk({ cited: bank.pickle(), record }), labelpath: 'bank', modelkind: 'bank' } as const
+    await TH.expectGood(device.vaultDB.tryWriteThing(ask))
     expect(device.bankMinder.worldAt(bank.scope)?.bank).to.deep.equal(record)
     expect(bank.track.bank).to.deep.equal({ revseq: 1, lifepath: record.lifepath })
   })
