@@ -160,7 +160,7 @@ export const MinderFriendExpected = 'A ThingMinder is made with its friend: the 
 export const MinderClientExpected = 'A ThingMinder caches only in a QueryClient made by ThingMinder.makeClient, whose cache hands each fetched record to its minder.'
 
 /** A minder's hello while another minder of its bank is minding in the same QueryClient. */
-export const BankMindedInClient = 'Another ThingMinder of this bank is minding in this QueryClient: call its goodbye before this one\'s hello.'
+export const BankMindedInClient = "Another ThingMinder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
 
 /** A minder read or written through before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it or writing through it.'
