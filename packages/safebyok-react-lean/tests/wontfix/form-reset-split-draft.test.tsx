@@ -41,7 +41,8 @@ describe("wontfix: a draft with one input in a form and one outside it", () => {
     fireEvent.change(org, { target: { value: TypedOrg } })
     await screen.findByText('Dirty')
     act(() => { screen.getByText('Reset').click() })
-    await screen.findByText('Clean')
+    // The form's own reset empties the key's input; the org's is emptied by the draft alone.
     expect([keyInput.value, org.value], RowChanged).to.deep.equal(['', ''])
+    await screen.findByText('Clean')
   })
 })
