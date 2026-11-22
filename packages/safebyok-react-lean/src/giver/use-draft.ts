@@ -81,6 +81,8 @@ type DraftFriend = RevealFriend & Readonly<{
 export function makeUseDraft(bank: DraftFriend) {
   /** A draft of the box at `labelpath`: an editor's sidecar, its whisper's fields as inputs, and `put` and `discard` for its Save and Undo.
    * The fields' text lives only in the inputs: React never holds it, and `put` reads it from there.
+   * The inputs may sit in a form whose action calls `put`. React empties that form once the action ends, and the draft discards with it,
+   * so a refused put there loses what was typed, and the draft starts again from the box stored.
    * @example
    *   const draft = Knock.useDraft('jokes')
    *   <input aria-label="API key" {...draft.whisperField('apiKey')} />
@@ -109,6 +111,14 @@ export function makeUseDraft(bank: DraftFriend) {
     useEffect(() => {
       if (isLocked) { emptyInputs(inputs.current, dirtyFieldnames) }
     }, [isLocked, dirtyFieldnames])
+
+    // React empties a form's uncontrolled fields once its action ends, firing no change event, so the draft discards with them.
+    // An effect listens, not the inputs' ref callbacks: React detaches a ref callback that changed before it resets the form in the same commit.
+    useEffect(() => {
+      const forms = formsOf(inputs.current)
+      for (const form of forms) { form.addEventListener('reset', discard) }
+      return () => { for (const form of forms) { form.removeEventListener('reset', discard) } }
+    })
 
     /** Base the draft on the box stored now, unless it already has a base. */
     function pin(): void { setPinned((prior) => prior ?? stored ?? null) }
@@ -192,7 +202,7 @@ export function makeUseDraft(bank: DraftFriend) {
 }
 // --
 
-// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, inputOf, emptyInputs, Checks
+// == [Helpers]: NoFieldnames, EmptySidecar, wholeThingOf, holdInput, inputOf, formsOf, emptyInputs, Checks
 
 /** No field typed into. */
 const NoFieldnames: ReadonlySet<string> = new Set()
@@ -215,6 +225,11 @@ function inputOf(inputs: ReadonlyMap<string, HTMLInputElement>, fieldname: strin
   const input = inputs.get(fieldname)
   if (input === undefined) { throw new VaultError('bad_record', Phrases.TypedFieldGone) }
   return input
+}
+
+/** The forms the inputs of `inputs` belong to. */
+function formsOf(inputs: ReadonlyMap<string, HTMLInputElement>): ReadonlySet<HTMLFormElement> {
+  return new Set([...inputs.values()].flatMap((input) => ((input.form === null) ? [] : [input.form])))
 }
 
 /** Empty every input of `inputs` but those of `keptFieldnames`. */
