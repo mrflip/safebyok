@@ -5,10 +5,11 @@ import type { Thingkind } from 'safebyok/storage'
 // TableVersion is safebyok's ThingFormat, spelled out because safebyok is private and a published package never imports
 // it at runtime; a test holds them equal, so TableVersion moves whenever ThingFormat does. Until 1.0.0, no change to
 // the tables or the functions bumps either name: nothing stored binds backward, and a host drops the vault tables,
-// creates them again and runs VaultFunctionsSql again over them. From 1.0.0: bump both when any table's columns, CHECKs
-// or stored record format change, since functions built for other tables will not work. Bump SqlRevision when a
-// function's behaviour or signature changes over the same tables, and reset it to 0 when TableVersion moves. Each pair
-// names a new set of functions; the older sets stay installed beside it.
+// creates them again and runs VaultFunctionsSql again over them, first dropping each function whose arguments or result
+// changed, which Postgres will not replace in place. From 1.0.0: bump both when any table's columns, CHECKs or stored
+// record format change, since functions built for other tables will not work. Bump SqlRevision when a function's
+// behaviour or signature changes over the same tables, and reset it to 0 when TableVersion moves. Each pair names a new
+// set of functions; the older sets stay installed beside it.
 /** The head of every vault function's name: the tables these functions are built for, and the `fmt` of the Things in them. */
 export const TableVersion = 'a010501'
 /** The tail of every vault function's name: the revision of these functions over the same tables. */
@@ -27,25 +28,28 @@ export const VaultFunctionNames = Object.freeze(Object.fromEntries(VaultFunction
 )))) as Readonly<Record<typeof VaultFunctionStems[number], string>>
 // --
 
-// Each kind's write function is the same statement over its own table and body columns; the gate's alone also checks the
-// storage policies its write names. Each is written out from writeFunctionOf, so the three cannot drift apart.
+// Each kind's write function is the same statement over its own table and body columns; the bank's alone also checks that
+// a write over a live bank keeps its lifetok, and the gate's alone the storage policies its write names. Each is written
+// out from writeFunctionOf, so the three cannot drift apart.
 
-/** What sets one kind's write function apart: its table, the columns of its body, and the gate's storage policies. */
-type WriteFunctionSpec = Readonly<{ kind: Thingkind, table: string, body: readonly string[], policied: boolean }>
+/** What sets one kind's write function apart: its table, the columns of its body, the bank's lifetok check, and the gate's storage policies. */
+type WriteFunctionSpec = Readonly<{ kind: Thingkind, table: string, body: readonly string[], lifetoked: boolean, policied: boolean }>
 
 const VoidRevtok = `'00000000-0000-0000-0000-000000000000'`
 
 /** The SQL of one kind's write function, from what sets it apart. */
-function writeFunctionOf({ kind, table, body, policied }: WriteFunctionSpec): string {
+function writeFunctionOf({ kind, table, body, lifetoked, policied }: WriteFunctionSpec): string {
   const columns       = ['fmt', 'am', 'lifepath', 'lifeseq', 'revtok', 'revseq', 'born_at', 'written_at', ...body]
   const policiesArg   = policied ? ', policies text[]' : ''
+  const lifetokOut    = lifetoked ? ', lifetok_ok boolean' : ''
   const policiesOut   = policied ? ', policies_ok boolean' : ''
   // The checks whose verdicts a refusal reports: each is the Thing stored's to fail, where the act tables find a write.
   const bornAtCheck   = '((stored.am <> proposed.am) OR (stored.born_at = proposed.born_at))'
+  const lifetokCheck  = `((stored.am <> 'a') OR (stored.lifetok = proposed.lifetok))`
   const policiesCheck = `((stored.am <> proposed.am) OR ${VaultFunctionNames.gate_policies_ok}(policies, stored.wayins, cited.wayins, proposed.wayins))`
   return `
 CREATE OR REPLACE FUNCTION ${VaultFunctionNames[`write_${kind}`]}(proposed_record jsonb, cited_record jsonb${policiesArg})
-RETURNS TABLE (ok boolean, thing jsonb, world jsonb, root jsonb, born_at_ok boolean${policiesOut})
+RETURNS TABLE (ok boolean, thing jsonb, world jsonb, root jsonb, born_at_ok boolean${lifetokOut}${policiesOut})
 LANGUAGE plpgsql AS $$
 DECLARE
   proposed ${table} := jsonb_populate_record(NULL::${table}, proposed_record);
@@ -78,13 +82,14 @@ BEGIN
       AND  ${bornAtCheck}                                                            -- a live Thing keeps its born_at
       AND  ((stored.am = 'a') OR (proposed.born_at = proposed.written_at))           -- a rebirth is born when written
       AND  ${VaultFunctionNames.lifeseq_ok}(stored.lifeseq, stored.am, proposed.lifeseq, proposed.am)
-      AND  ${VaultFunctionNames.lifepath_kept}(stored.lifepath, proposed.lifepath)${policied ? `
+      AND  ${VaultFunctionNames.lifepath_kept}(stored.lifepath, proposed.lifepath)${lifetoked ? `
+      AND  ${lifetokCheck}                                                           -- a write over a live bank keeps its lifetok` : ''}${policied ? `
       AND  ${policiesCheck}                                                          -- a live gate meets its storage policies` : ''}
     RETURNING ${VaultFunctionNames.thing_record}(to_jsonb(stored)) INTO thing;
   END IF;
 
   IF FOUND THEN
-    ok := true;  born_at_ok := true;${policied ? '  policies_ok := true;' : ''}
+    ok := true;  born_at_ok := true;${lifetoked ? '  lifetok_ok := true;' : ''}${policied ? '  policies_ok := true;' : ''}
     -- The world and root box after the write, in statements of their own: a statement does not see what it writes itself.
     -- Another write may land between, so at worst these read newer rows, which a receiver orders by their revisions.
     world := ${VaultFunctionNames.world}(proposed.userid, proposed.banklabel);
@@ -95,11 +100,12 @@ BEGIN
 
   ok := false;
   SELECT (SELECT ${VaultFunctionNames.thing_record}(to_jsonb(stored))),
-         COALESCE(${bornAtCheck}, true)${policied ? `,
+         COALESCE(${bornAtCheck}, true)${lifetoked ? `,
+         COALESCE(${lifetokCheck}, true)` : ''}${policied ? `,
          COALESCE(${policiesCheck}, true)` : ''},
          ${VaultFunctionNames.world}(proposed.userid, proposed.banklabel),
          ${VaultFunctionNames.root_box}(proposed.userid, proposed.banklabel)
-  INTO   thing, born_at_ok${policied ? ', policies_ok' : ''}, world, root
+  INTO   thing, born_at_ok${lifetoked ? ', lifetok_ok' : ''}${policied ? ', policies_ok' : ''}, world, root
   FROM   (SELECT) AS one
   LEFT JOIN ${table} AS stored
     ON   ((stored.userid, stored.banklabel, stored.labelpath) = (proposed.userid, proposed.banklabel, proposed.labelpath));
@@ -283,9 +289,9 @@ $$;
 
 -- Each kind's write function: store proposed_record over the row cited_record cites, or over the shell where none is
 -- stored, if every check holds of the row it writes over.
-${writeFunctionOf({ kind: 'bank', table: 'safebyok_bank_things', body: ['lifetok'], policied: false })}
-${writeFunctionOf({ kind: 'gate', table: 'safebyok_gate_things', body: ['wayins', 'auth', 'sigs', 'meta'], policied: true })}
-${writeFunctionOf({ kind: 'box', table: 'safebyok_box_things', body: ['sidecar', 'whisper_sealed'], policied: false })}
+${writeFunctionOf({ kind: 'bank', table: 'safebyok_bank_things', body: ['lifetok'], lifetoked: true, policied: false })}
+${writeFunctionOf({ kind: 'gate', table: 'safebyok_gate_things', body: ['wayins', 'auth', 'sigs', 'meta'], lifetoked: false, policied: true })}
+${writeFunctionOf({ kind: 'box', table: 'safebyok_box_things', body: ['sidecar', 'whisper_sealed'], lifetoked: false, policied: false })}
 
 -- Store a bank's three roots, its bank, main gate and root box, where none of the three is stored. One statement writes
 -- all three or none. Two births racing for one bank both pass the check that none is stored; the one that commits second

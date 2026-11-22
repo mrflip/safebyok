@@ -61,7 +61,7 @@ function listThingsSqlOf(table: string): string {
 
 /** Each kind's write function, over the record ($1) and what it cites ($2), and how the world and root box after compare with the track ($3); the gate's also takes the storage policies ($4). */
 export const WriteThingSql: Readonly<Record<Thingkind, string>> = {
-  bank: `SELECT ok, thing, world, born_at_ok, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb)`,
+  bank: `SELECT ok, thing, world, born_at_ok, lifetok_ok, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_bank}($1::text::jsonb, $2::text::jsonb)`,
   gate: `SELECT ok, thing, world, born_at_ok, policies_ok, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_gate}($1::text::jsonb, $2::text::jsonb, $4::text[])`,
   box:  `SELECT ok, thing, world, born_at_ok, ${VaultFunctionNames.tracked}(world, root, $3::text::jsonb) AS tracked FROM ${VaultFunctionNames.write_box}($1::text::jsonb, $2::text::jsonb)`,
 }

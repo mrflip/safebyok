@@ -131,9 +131,9 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const policies = (ask.modelkind === 'gate') ? [ask.options?.policies ?? []] : []
     const params   = [JSON.stringify(ask.record), JSON.stringify(ask.cited), trackParam(ask), ...policies]
     // Whether it stored the record, the Thing as it now stands, the raw world, how it compares with the track, and the verdicts
-    // of the checks the act tables cannot name: the stored born_at kept, and the storage policies met (the gate's alone). Each
-    // verdict is true where its check does not apply.
-    const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, policies_ok?: boolean }>(WriteThingSql[ask.modelkind], params)
+    // of the checks the act tables cannot name: the stored born_at kept, the stored lifetok kept (the bank's alone), and the
+    // storage policies met (the gate's alone). Each verdict is true where its check does not apply.
+    const written  = await this.#firstRow<FetchedThing & { ok: boolean, born_at_ok: boolean, lifetok_ok?: boolean, policies_ok?: boolean }>(WriteThingSql[ask.modelkind], params)
     if (written.ok) {
       return { ok: true, act: writtenActOf(ask), world: Classifier.worldOf(ask, written.world), ...Classifier.trackedFieldOf(ask, written.tracked), record: Classifier.writtenThingOf(ask, written.thing) }
     }
@@ -142,6 +142,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     const act    = Classifier.writeActOf(ask, stored)
     if (! Classifier.isWriteAct(act))  { return Classifier.unwrittenWriteOf(written.thing, { ask, act, world: { ...written.world, tracked: written.tracked } }) }
     if (! written.born_at_ok)          { Classifier.demandBornAtKept(ask, written.thing) }
+    if (written.lifetok_ok === false)  { Classifier.demandLifetokKept(ask, written.thing) }
     if (written.policies_ok === false) { Classifier.demandPolicies(ask, written.thing) }
     // No verdict explains the refusal: a check a validated ask cannot fail, or a verdict the classifier does not share.
     throw storedNothing()

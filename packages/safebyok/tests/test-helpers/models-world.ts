@@ -50,6 +50,9 @@ export const FirstRevtok = revtokOf('0')
 /** The lifetok of a fixture's bank: a UUID, like a revtok, fixed so that tests stay deterministic. */
 export const FirstLifetok = revtokOf('life')
 
+/** A lifetok no fixture's bank is born with: another birth's. */
+export const OtherLifetok = revtokOf('life2')
+
 /** A revtok no fixture is born with: another writer's revision. */
 export const OtherRevtok = revtokOf('other')
 

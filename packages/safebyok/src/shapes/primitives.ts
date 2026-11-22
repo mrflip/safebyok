@@ -49,9 +49,9 @@ export type Lifepath = string
 export type Lifenum = number
 /** A fresh token for each revision of a Thing (`revtok`). */
 export type Revtok = string
-/** A token minted when a bank is born, for each later revision of that life to keep (`lifetok`).
+/** A token minted when a bank is born, for each later revision of that life, and the tombstone that ends it, to keep (`lifetok`).
  * It tells one birth of a bank under its banklabel from another, where storage was emptied and the bank born again at life 0 with the same lifepath.
- * Nothing checks that a later revision keeps it.
+ * A vaultDB refuses a write of the bank over a live bank that changes it.
  */
 export type Lifetok = string
 

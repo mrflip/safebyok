@@ -246,8 +246,9 @@ export function classifyGetThing(ask: GetAsk, raw: unknown, worldFetched: WorldF
 }
 
 /** Classify a write against the raw Thing a store fetched at its scope, null for none.
- * Where the write would replace a live Thing, it also checks the born_at and the storage policies. Under a write act, `record`
- * is `ask.record`: the store writes it, then reports the Thing it wrote and the world after the write.
+ * Where the write would replace a live Thing, it also checks the born_at and the storage policies, and where it puts or deletes
+ * the bank over a live bank, the lifetok. Under a write act, `record` is `ask.record`: the store writes it, then reports the
+ * Thing it wrote and the world after the write.
  */
 export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: WorldFetched): Actual<EX.PutAct | EX.DelAct> {
   const stored = storedCitedOf(ask, raw)
@@ -257,6 +258,7 @@ export function classifyWriteThing(ask: WriteAsk, raw: unknown, worldFetched: Wo
     demandBornAtKept(ask, raw)
     demandPolicies(ask, raw)
   }
+  demandLifetokKept(ask, raw)
   return { ok: true, act, world: worldOf(ask, worldFetched), record: ask.record, ...trackedFieldOf(ask, worldFetched.tracked) }
 }
 
@@ -308,7 +310,7 @@ export function classifyBirthBank(puts: BirthPuts, fetched: BankRootsFetched): B
 }
 // --
 
-// == [Steps]: unwrittenWriteOf, UnwrittenWrite, demandBornAtKept, demandPolicies, unwrittenBirthOf
+// == [Steps]: unwrittenWriteOf, UnwrittenWrite, demandBornAtKept, demandLifetokKept, demandPolicies, unwrittenBirthOf
 // The steps of the classifiers above, for a store that checks some preconditions itself to call in its own order.
 
 /** The answer to a write the act tables leave unwritten, a refusal or `passed`, from the raw Thing a store fetched at its scope.
@@ -329,6 +331,17 @@ export function demandBornAtKept(ask: WriteAsk, raw: unknown): void {
   if (ask.record.born_at === storedCitedOf(ask, raw)?.born_at) { return }
   throw Throwers.bornAtNotStored(storedThingOf(ask, raw))
 }
+
+/** Throw `bad_record` if `ask` writes the bank, a put or a del, over a live bank stored with another lifetok, the raw Thing a store fetched at its scope.
+ * A write over a tombstone or none is a birth, and may carry any lifetok.
+ */
+export function demandLifetokKept(ask: WriteAsk, raw: unknown): void {
+  if ((ask.modelkind !== 'bank') || (storedCitedOf(ask, raw)?.am !== 'a')) { return }
+  const stored = storedLifetokChecker.parse(raw)
+  if (ask.record.lifetok === stored.lifetok) { return }
+  throw Throwers.lifetokNotStored(storedThingOf(ask, raw))
+}
+const storedLifetokChecker = BankChecks.storedLifetok.refusingAs('damaged_row')
 
 /** Throw `gate_issue` if a storage policy `ask` names refuses it over `raw`, the live gate it replaces. Only a gate's writes name storage policies. */
 export function demandPolicies(ask: WriteAsk, raw: unknown): void {

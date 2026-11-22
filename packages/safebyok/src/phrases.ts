@@ -122,6 +122,9 @@ export const BornAtNotNow = "A write over a tombstone or none is a birth: its bo
 /** A write over a live Thing that changes its born_at. */
 export const BornAtNotStored = "A write over a live Thing leaves the stored Thing's born_at unchanged."
 
+/** A write of the bank over a live bank that changes its lifetok. */
+export const LifetokNotStored = "A write of the bank over a live bank keeps the stored bank's lifetok."
+
 /** A deleted main gate. */
 export const MainGateDeleted = "The main gate is never deleted: its record is always live (am: 'a')."
 
