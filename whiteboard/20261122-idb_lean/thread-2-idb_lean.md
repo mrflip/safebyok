@@ -28,6 +28,9 @@ lint, typecheck, test (116 tests: the vaultDB battery's 85-odd cases, 20 IdbVaul
     `tests/idb-minder-bridge.test.ts`; helpers behind `tests/test-helpers.ts` (`idb-world.ts`, `minder-world.ts`).
   - `notes/wontfix.md`: a bank born again under the same scope (lifetok under-used). `notes/security.md`: one entry, by a sonnet subagent.
 * **Decisions made**:
+  - The Coach's ruling (2026-11-22) on the noun "store" in vaultDB comments: swept in this package. Two comments changed
+    (tsconfig.json header, the `overwriteThing` transaction comment); the rest are the verb, the browser's own "object store",
+    or a backticked `store` parameter name, and stay.
   - Re-exported big's IndexedDB helpers from `safebyok/storage`, not `safebyok/browser`: storage.ts already re-exports
     from big's storage barrel, so it adds no new import to the entry, and it is "what a storage adapter is written
     against". `browser` would have kept idb-keyval names off the storage entry's surface; set aside as no real saving.

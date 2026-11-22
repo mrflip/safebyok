@@ -75,7 +75,7 @@ export class IdbVaultDB extends DB.AdapterVaultDB {
 
   // A copy of what another vaultDB holds, which no one watches: it cites nothing, classifies nothing and rings nothing.
   // A stored row that fails its kind's checks is overwritten: the copy is never the ground truth, and the record in hand is sound.
-  // Its read and its put share one readwrite transaction, which IndexedDB runs alone on the store, so overwrites in any order leave the newest record.
+  // Its read and its put share one readwrite transaction, which IndexedDB runs alone on the object store, so overwrites in any order leave the newest record.
   /** Store `record` at its scope, if it is newer than the Thing stored there.
    * Concurrent calls, in any order, leave the newest record stored. It notifies no watch.
    */
