@@ -107,3 +107,21 @@ rework, on the same base (13 vitest runs, 6991 tests; `pnpm --filter safebyok li
 
 * **Moved** (the Coach, 2026-11-22): the "store" comment sweep left this PR for its own, #845, stacked on #842, with
   the shapes/ and minder-test uses swept too. This PR keeps VOCABULARY alone.
+
+## Takeover for core_first (2026-11-22)
+
+The Coach asked core_first's orchestrator to take #833 over: its commits squashed into one, rebased onto the line's
+tip (`20261122-defaults_at_start`, #852), then a second commit for what changed since. Tip before: tag
+`20261122-vocab_adopt-pretakeover`.
+
+* **Rebase conflicts**, all in VOCABULARY.md, both sides kept: **device** (the line's wording) beside #833's new
+  **vaultDB** row; the line's **signIn** row kept after #833's **stage**; #833's **act, dbhas** with the line's
+  "a get's good answer carries it only for a tombstone"; #833's **sparse** with the line's "a listing holds a kids
+  value". The line's **world** row (BankMinder, `worldAt`) and #833's (an answer's `WorldRecord`) merged into the
+  line's row, which keeps its place.
+* **Second commit**: **parent** becomes **parentage, deltas** (`ListedBeside`, as the code now has it); a new
+  **persister** row (`DevicePersisters`, `MemoryPersister`, `IdbPersister`); the **entry** ban's example drops
+  `ThingCar`, which is gone. Minder, BankMinder, VaultMinder, Kids with `read_tc`, Absent, the dead entry and
+  `worldAt` already had rows from the line's threads, which agree with the code.
+* **1b9a2993e** (the idb-lean "store" sweep) already landed on main as 0943e46cd; nothing left to apply.
+* **For the Coach**: the line's **dead entry** row uses "entry", which *Words safebyok does not use* bans.
