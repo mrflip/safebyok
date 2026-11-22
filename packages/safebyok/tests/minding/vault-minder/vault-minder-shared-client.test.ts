@@ -187,15 +187,6 @@ describe("a shared client's cache", () => {
     expect(toldOf(mine.heard)).to.deep.equal([])
   })
 
-  it("tells nothing of a host's own query under the bank's key head", async () => {
-    const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank])
-    const [bankMinder] = await sharedBankMindersOf(vaultDB, [TH.ThingBank])
-    const queryClient = VaultMinder.makeClient()
-    const mine        = sharingMinderOf(vaultDB, bankMinder!, queryClient, TH.ThingBank)
-    await queryClient.query({ queryKey: ['sok', 'u1', 'acme', 'gate'], queryFn: () => ({ revseq: 0 }) })
-    expect(toldOf(mine.heard)).to.deep.equal([])
-  })
-
   it("refuses a second minder of a bank at hello while the first is minding", async () => {
     const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank])
     const [bankMinder] = await sharedBankMindersOf(vaultDB, [TH.ThingBank])

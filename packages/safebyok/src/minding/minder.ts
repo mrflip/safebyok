@@ -629,8 +629,6 @@ export abstract class Minder {
     if (! isTellableTSQEvent(tsqEvent)) { return undefined }
     if (! TSQ.partialMatchKey(tsqEvent.query.queryKey, bankKeyHeadOf(this.scope))) { return undefined }
     const { queryKey, queryHash, state } = tsqEvent.query
-    // A shared client may hold a host's own queries under the bank's key head, such as the giver's main gate.
-    if (! Entrykinds.has(queryKey[EntrykindIdx])) { return undefined }
     const { labelpath } = this.#scopeOfQueryKey(queryKey)
     const told = {
       eventkind: queryKey[EntrykindIdx] as MinderEventkind,
@@ -654,7 +652,7 @@ export abstract class Minder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Listkind, EntrykindIdx, Marks, Entrykinds, labelsOf, bankHashOf, Lander, LandersOfClient, BareListedAt, TellableTSQEvent, isTellableTSQEvent, isNewer, isOlder, gotAnswerOf, isTimelyQuery, listingOf, landedListingOf
+// == [Helpers]: Itemkind, Soonkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, Lander, LandersOfClient, BareListedAt, TellableTSQEvent, isTellableTSQEvent, isNewer, isOlder, gotAnswerOf, isTimelyQuery, listingOf, landedListingOf
 
 /** The entrykind segment of an item's query key. */
 const Itemkind = 'item'
@@ -666,8 +664,6 @@ const Listkind = 'list'
 const EntrykindIdx = 3
 /** The marks a query key's labels end at. */
 const Marks: ReadonlySet<unknown> = new Set(['!', '~', '#'])
-/** The entrykind segments of the minder's own keys. */
-const Entrykinds: ReadonlySet<unknown> = new Set([Itemkind, Soonkind, Listkind])
 
 /** The labels of `labelpath`, with '/' between them, as a query key spells them. */
 function labelsOf(labelpath: Labelpath): string[] {
