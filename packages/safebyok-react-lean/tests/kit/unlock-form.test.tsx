@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { useActionState, useState, useTransition } from 'react'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { UnlockDialog, UnlockForm } from '../../src/kit'
 import * as TH from '../test-helpers'
@@ -18,6 +19,29 @@ function StageScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
 function DialogScreen({ world }: Readonly<{ world: TH.ProviderWorld }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
   return <><p>{stage}</p><UnlockDialog /></>
+}
+
+/** A host whose Action awaits the stored key through `withWhisper`, started by `startTransition` or as a form Action, beside the unlock dialog. */
+function AwaitingHost({ world, kind }: Readonly<{ world: TH.ProviderWorld, kind: 'transition' | 'formAction' }>) {
+  const [isPending, startTransition] = useTransition()
+  const [transitionKey, setTransitionKey] = useState('none')
+  const [formKey, formAction, isFormPending] = useActionState(fetchKey, 'none')
+  async function fetchKey() { return await world.Bank.withWhisper(TH.JokesPath, ({ apiKey }) => apiKey as string) }
+  function startFetch() {
+    startTransition(async () => {
+      const apiKey = await fetchKey()
+      startTransition(() => { setTransitionKey(apiKey) })
+    })
+  }
+  const shown = (kind === 'transition') ? transitionKey : formKey
+  return (
+    <>
+      <p>{(isPending || isFormPending) ? 'Fetching' : `Key ${shown}`}</p>
+      {(kind === 'transition') && <button type="button" onClick={startFetch}>Fetch</button>}
+      {(kind === 'formAction') && <form action={formAction}><button type="submit">Fetch</button></form>}
+      <UnlockDialog />
+    </>
+  )
 }
 
 /** A world with a bank stored, rendered with `children` under its provider, once it shows `shown`. */
@@ -42,12 +66,16 @@ describe("UnlockForm", () => {
     TH.expectTextUnheld(Passphrase, container, world.client)
   })
 
-  it("keeps Unlock disabled while the unlock runs, with the passphrase out of the form's status", async () => {
+  it("keeps Unlock disabled and the passphrase hidden while the unlock runs, unlocking once for a double press", async () => {
     const { world, container } = await renderWorld((world) => <StageScreen world={world} />, 'Unlock')
     const release = world.deriver.hold()
+    const field = screen.getByLabelText<HTMLInputElement>('Passphrase')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field.type).to.eq('text')
     typePassphrase(Passphrase)
     const pending = await screen.findByRole<HTMLButtonElement>('button', { name: 'Unlocking…' })
-    expect(pending.disabled).to.eq(true)
+    expect([pending.disabled, field.type]).to.deep.equal([true, 'password'])
+    fireEvent.click(pending)
     TH.expectTextUnheld(Passphrase, container, world.client)
     release()
     await screen.findByText('unlocked')
@@ -107,6 +135,25 @@ describe("UnlockDialog", () => {
     expect(screen.getByText('unlocked')).to.exist
     TH.expectTextUnheld(Passphrase, container, world.client)
   })
+
+  for (const kind of ['transition', 'formAction'] as const) {
+    it(`takes another try after a wrong passphrase while a host's ${kind} waits on it, and resumes it once unlocked`, async () => {
+      const { world, container } = await renderWorld((world) => <AwaitingHost world={world} kind={kind} />, 'Key none')
+      fireEvent.click(screen.getByRole('button', { name: 'Fetch' }))
+      await screen.findByRole('dialog', { name: 'Unlock your vault' })
+      await screen.findByText('Fetching')
+      typePassphrase(WrongPassphrase)
+      const alert = await screen.findByRole('alert')
+      await waitFor(() => { expect(alert.textContent).to.eq('That is not the passphrase.') })
+      const unlockButton = await screen.findByRole<HTMLButtonElement>('button', { name: 'Unlock' })
+      await waitFor(() => { expect(unlockButton.disabled).to.eq(false) })
+      typePassphrase(Passphrase)
+      await screen.findByText(`Key ${TH.JokesKey}`)
+      expect(screen.queryByRole('dialog')).to.be.null
+      TH.expectTextUnheld(Passphrase, container, world.client)
+      TH.expectTextUnheld(WrongPassphrase, container, world.client)
+    })
+  }
 
   for (const [closer, blurb] of [["Cancel", 'dismisses the wait on Cancel'], ["Escape", 'dismisses the wait on Escape']] as const) {
     it(blurb, async () => {

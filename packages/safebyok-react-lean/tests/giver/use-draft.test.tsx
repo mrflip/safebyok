@@ -1,5 +1,5 @@
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
-import { type ReactNode, useEffect } from 'react'
+import { type ReactNode, useActionState, useEffect } from 'react'
 import { type BoxRecord, ThingMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it } from 'vitest'
@@ -19,8 +19,10 @@ interface DraftSeen {
   putErr:  unknown
 }
 
-/** The editor a host would write over a draft of the jokes box: the key's field, the sidecar's tier, Save and Undo. `putOpts` go to each put. */
-function makeDraftEditor(world: TH.ProviderWorld, putOpts?: DraftPutOpts) {
+/** The editor a host would write over a draft of the jokes box: the key's field, the sidecar's tier, Save and Undo. `putOpts` go to each put.
+ * With `isInForm`, the editor is a form whose action is Save.
+ */
+function makeDraftEditor(world: TH.ProviderWorld, putOpts?: DraftPutOpts, isInForm = false) {
   const seen: DraftSeen = { draft: null, puts: 0, putErr: null }
   function DraftEditor() {
     const draft = world.Bank.useDraft(TH.JokesPath)
@@ -33,25 +35,28 @@ function makeDraftEditor(world: TH.ProviderWorld, putOpts?: DraftPutOpts) {
         seen.putErr = err
       }
     }
+    // An action state, so the editor renders again in the commit where React resets the form, as a host's would.
+    const [, saveAction] = useActionState(async (prior: number) => { await save(); return prior + 1 }, 0)
     const { tier } = draft.sidecar
-    return (
-      <div>
+    const fields = (
+      <>
         <input aria-label="Key" {...draft.whisperField('apiKey')} />
         <p>{draft.isDirty ? 'Dirty' : 'Clean'}{draft.isBehind ? ' and behind' : ''}</p>
         <p>{`Tier ${(typeof tier === 'string') ? tier : 'none'}`}</p>
         <button type="button" onClick={() => { draft.setSidecar({ ...draft.sidecar, tier: 'pro' }) }}>Go pro</button>
-        <button type="button" onClick={() => { void save() }}>Save</button>
+        {isInForm ? <button type="submit">Save</button> : <button type="button" onClick={() => { void save() }}>Save</button>}
         <button type="button" onClick={draft.discard}>Undo</button>
-      </div>
+      </>
     )
+    return isInForm ? <form action={saveAction}>{fields}</form> : <div>{fields}</div>
   }
   return { DraftEditor, seen }
 }
 
-/** Render the draft editor over a world with the joke service's key stored, its bank unlocked unless `isLocked`. */
-async function renderDraftEditor({ putOpts, isLocked = false }: Readonly<{ putOpts?: DraftPutOpts, isLocked?: boolean }> = {}) {
+/** Render the draft editor over a world with the joke service's key stored, its bank unlocked unless `isLocked`, as a form if `isInForm`. */
+async function renderDraftEditor({ putOpts, isLocked = false, isInForm = false }: Readonly<{ putOpts?: DraftPutOpts, isLocked?: boolean, isInForm?: boolean }> = {}) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
-  const editor = makeDraftEditor(world, putOpts)
+  const editor = makeDraftEditor(world, putOpts, isInForm)
   const rendered = render(TH.providerTreeOf(world, <editor.DraftEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
@@ -220,6 +225,32 @@ describe("useDraft", () => {
     act(() => { screen.getByText('Undo').click() })
     await screen.findByText('Clean')
     expect([seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([2, { service: 'jokes', tier: 'ultra' }])
+  })
+
+  it("discards what was typed when its form's action refuses the put, so the next put writes nothing typed", async () => {
+    const { world, device, input, seen } = await renderDraftEditor({ isLocked: true, isInForm: true })
+    typeKeyInto(input)
+    await screen.findByText('Dirty')
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(device.bank!.getSnapshot().isUnlockWanted).to.eq(true) })
+    act(() => { world.Bank.dismissUnlock() })
+    await waitFor(() => { expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('dismissed') })
+    await screen.findByText('Clean')
+    expect([input.value, seen.draft?.isWhisperDirty]).to.deep.equal(['', false])
+    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(seen.puts).to.eq(1) })
+    expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
+  })
+
+  it("keeps what was typed outside any form when a form elsewhere on the page is reset", async () => {
+    const { input } = await renderDraftEditor()
+    render(<form aria-label="Other"><input aria-label="Other field" defaultValue="other" /></form>)
+    typeKeyInto(input)
+    await screen.findByText('Dirty')
+    act(() => { screen.getByRole<HTMLFormElement>('form', { name: 'Other' }).reset() })
+    expect(screen.getByText('Dirty')).to.exist
+    expect(input.value).to.eq(TypedKey)
   })
 
   it("refuses to put a field typed into whose input has left the page, rather than write it empty", async () => {

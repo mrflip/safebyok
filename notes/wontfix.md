@@ -328,3 +328,69 @@ will carry; then land the new life's box through the minder. The stored box stay
 Reasoning for wontfix: the lifetok is under-used and the copy is a cache of what the vaultDB holds, never the ground
 truth. A bank ends and is born again a few times at most (CLAUDE.md, *Hours separate updates*, `#no-slop-crossings`).
 Nothing in the vaultDB changes, and no secret moves. Unspecified and unguarded, by the Coach's ruling, 2026-11-22.
+
+## React
+
+Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on it.
+
+### A form reset that the host cancels still discards a draft in that form
+
+A `useDraft` whose inputs sit in a form discards when the form is reset (`safebyok-react-lean`, `use-draft.ts`). A host
+whose `onReset` calls `preventDefault()`, to ask "keep your changes?" say, leaves its form as it was, but the draft has
+already emptied the fields typed into and started again from the box stored.
+
+Current outcome: the typed text is lost, and nothing is written. The draft and the page agree.
+
+Alternatives: hearing the reset after React's handlers, to see whether it was cancelled, means a listener on the root
+in place of the form, kept in step with React's own delegation. Putting the typed text back is not possible: it lived
+only in the input.
+
+Workaround: ask before the reset is started, from the button that would start it, not in `onReset`.
+
+To reproduce: a draft's input inside a `<form onReset={(event) => { event.preventDefault() }}>`; type into it; press
+a `<button type="reset">`.
+
+Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
+and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
+
+### A stage change that reveals a suspending subtree shows its fallback
+
+The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react-lean`, `useBank`). React's manual: an
+update from an external store is never a transition. So when an unlock, or any other stage change, first renders a
+subtree that suspends on a record, React shows that subtree's `Suspense` fallback, and a host cannot have it wait
+behind the screen before by wrapping the change in `startTransition`.
+
+Current outcome: the fallback shows until the record arrives. Nothing is wrong on the page, and nothing is stored.
+
+Alternatives: a copy of the stage in React state, updated in a transition, gives a stage that lags the bank's, and a
+screen that shows `'locked'` after the bank has unlocked. Holding the stage change back until the subtree's records are
+fetched puts a wait in the path of every lock and unlock.
+
+Workaround: place the `Suspense` boundary low, around the part that reads the record, with a fallback the size of what
+it replaces; or read with `useBox`, which does not suspend.
+
+To reproduce: under a stage switch, render at `'unlocked'` a component that suspends on a box not yet fetched; unlock.
+
+Reasoning for wontfix: the stage is synchronous on purpose, so that no screen shows a stage the bank has left, and
+that is worth more than one smoothed fallback. The limit is React's, stated in its manual. Ruled by the Coach,
+2026-11-22.
+
+### A refusal shown from a form Action's result outlives an Undo
+
+A form whose action resolves its refusal as the action's state (`useActionState`) shows that refusal until the action
+next runs. Envman's row shows a refused Save's message under the row; pressing Undo, or the bank locking, discards the
+draft and leaves the message where it is.
+
+Current outcome: a stale message under a row whose draft is clean again. The next Save replaces or removes it.
+
+Alternatives: React gives an action's state no reset. Undo as a second submit through the same action makes Undo an
+action that writes nothing, and a reader has to learn why. A copy of the refusal in state beside the action's, cleared
+by hand, is two records of one fact.
+
+Workaround: a host that minds remounts the form by a `key` it changes on Undo.
+
+To reproduce: in envman, on a locked vault, type a value in a row, press Save, and enter a passphrase the gate
+refuses for a reason the row shows; then press Undo.
+
+Reasoning for wontfix: the message is true of the last Save and harms nothing, and each way of removing it costs more
+code than it is worth in a demo meant to be read. Ruled by the Coach, 2026-11-22.
