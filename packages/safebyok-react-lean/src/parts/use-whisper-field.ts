@@ -28,7 +28,8 @@ export type WhisperFieldInputProps = typeof WhisperFieldAttributes & Readonly<{
 // == [The hook]: useWhisperField
 
 /** A field for typing or pasting a whisper, as props to spread onto an uncontrolled `<input>` and a `<button>` of your own.
- * Each submit of the form it is in hides it again, so whatever the field holds next starts out masked. Read the whisper in the form's action, from the `FormData`.
+ * Each submit of the form it is in hides it again, so whatever the field holds next starts out masked. Called in the component that renders the form, it cannot see the submit: pass `isPending`.
+ * Read the whisper in the form's action, from the `FormData`.
  * Name the input for what it holds (`apiKey`), never `password` or `token`, which password managers look for.
  * @example
  *   const field = useWhisperField()

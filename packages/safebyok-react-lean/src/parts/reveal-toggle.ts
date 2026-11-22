@@ -17,7 +17,7 @@ export type RevealToggleProps = Readonly<{
 export type RevealToggleOpts = Readonly<{
   /** The input's id: a fresh one, when left out. */
   id?:        string | undefined
-  /** True while a form that submits from an `onSubmit` handler, not a form action, is submitting: it hides the field again, as a form action's submit does. */
+  /** True while the form is submitting, for a form that submits from an `onSubmit` handler or one rendered by the component that calls the hook: it hides the field again, as a form action's submit does. */
   isPending?: boolean | undefined
 }>
 

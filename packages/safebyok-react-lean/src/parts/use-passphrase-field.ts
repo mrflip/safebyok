@@ -43,7 +43,8 @@ export type PassphraseFieldInputProps = Readonly<{
 // == [The hook]: usePassphraseField
 
 /** A passphrase field's behaviour, as props to spread onto an uncontrolled `<input>` and a `<button>` of your own, and whether to warn of Caps Lock.
- * Each submit of the form it is in hides the passphrase again, so a password manager sees a password field. Read the passphrase in the form's action, from the `FormData`.
+ * Each submit of the form it is in hides the passphrase again, so a password manager sees a password field. Called in the component that renders the form, it cannot see the submit: pass `isPending`.
+ * Read the passphrase in the form's action, from the `FormData`.
  * @example
  *   const field = usePassphraseField({ autoComplete: 'current-password' })
  *   <input name="passphrase" {...field.inputProps} />
