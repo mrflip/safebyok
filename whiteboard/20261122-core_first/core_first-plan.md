@@ -247,6 +247,18 @@ tombstone that last landed" (thread 5); `list`'s per-call `staleTime: 0` if plai
 end"). *Levels*: worker `opus`, effort
 `medium`; review `medium`. *Depends on*: the line's tip when 3 to 6 are ready (it touches what they touch). *Size*: M.
 
+### 9. `defaults_at_start`: a minder's query defaults set when its client is made
+
+> "If it's supposed to be given at start do that?" (the Coach, 2026-11-22, on the Closer Look's 1.2: `restoredSharingOf`
+> exists because per-bank query defaults are set at `hello`, after the restore)
+
+*Gloss.* Set every minder query default when the client is made (`makeClient`), before any restore, with a default
+`queryFn` that finds the minder by the key's bank (the landers map already registers minders per client by bank hash),
+TanStack's own pattern for client defaults. Then a restored entry takes the minder's own options from the start, and
+`restoredSharingOf`, `RestoreOpts`' stand-in options and the "set at hello, not at make" rule go. If it proves to need
+more than that, write down why and stop. *Levels*: worker `opus`, effort `high`; review `medium` on `opus`. *Depends
+on*: 8 (both touch `minder.ts`). *Size*: M.
+
 ## For the Coach
 
 * **Merging #828** (`lifetok`) before thread 1 is ready lets thread 2 key the world on `lifetok` from the start; #829
