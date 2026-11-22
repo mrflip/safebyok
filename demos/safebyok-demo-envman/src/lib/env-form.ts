@@ -11,7 +11,7 @@ export type EnvFields = Readonly<{
   last_rotated_at:    number
 }>
 
-/** The text of each of a form's fields but the value, by the field's name: what the form shows when it opens, and again after a refusal. */
+/** The text of each of a form's fields but the value, by the field's name. */
 export type EnvTexts = Readonly<{
   title:            string
   description:      string

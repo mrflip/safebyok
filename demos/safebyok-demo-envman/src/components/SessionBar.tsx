@@ -4,12 +4,12 @@ import { SubmitButton } from 'safebyok-react-lean/parts'
 import { formTextOf } from '../lib/form-text'
 import { type Session, signIn, signOut } from '../lib/session'
 
-/** What the sign-in form's action resolves: why the username will not do, or null, and the username the form shows next. */
+/** The sign-in form's next state: why the username will not do, or null, and the username to show again. */
 type SignInResult = Readonly<{ err: Error | null, username: string }>
 
 // React empties the form after its action: a refused username shows again, for the user to mend.
 /** Sign in as the username typed, or say why it will not do. */
-function signInAction(_prior: SignInResult, form: FormData): SignInResult {
+const signInAction = (_prior: SignInResult, form: FormData): SignInResult => {
   const username = formTextOf(form, 'username')
   try {
     signIn(username)

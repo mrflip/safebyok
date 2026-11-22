@@ -12,7 +12,7 @@ export function EnvSettingsDialog({ title, env, onApply, onCancel }: Readonly<{
   onApply:  (fields: EnvFields) => void
   onCancel: () => void
 }>) {
-  /** What the dialog's action resolves: why the fields will not do, or null, and the fields the form shows next. */
+  /** The settings form's next state: why the fields will not do, or null, and the texts to show again. */
   type ApplyResult = Readonly<{ err: Error | null, texts: EnvTexts }>
   const titleId = useId()
   // React empties the form after its action: a refused form shows again what was typed, for the user to mend.

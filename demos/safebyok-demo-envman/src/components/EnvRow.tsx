@@ -33,7 +33,7 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
   // while settings from the gear's dialog stay for the next Save.
   // A new value is a rotation: Save stamps it, and stores the new value's mask.
   /** Write the draft, resolving why it was refused, or null. */
-  async function putDraftAction(): Promise<Error | null> {
+  const putDraftAction = async (): Promise<Error | null> => {
     try {
       await draft.put({
         sidecarOf: (whisper, sidecar) => (draft.isWhisperDirty ? { ...sidecar, last_rotated_at: Date.now(), mask: valMaskOf(String(whisper['val'])) } : sidecar),

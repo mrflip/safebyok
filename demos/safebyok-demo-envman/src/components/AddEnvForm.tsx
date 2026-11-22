@@ -21,9 +21,9 @@ const AddEnvOpts: PutBoxActionOpts = {
 
 // Each new env is a box of its own, under a label minted at submit, so the put action is made per submit, not once.
 /** Write the add form's fields as a new env, never rejecting. */
-function addEnvAction(prior: PutBoxActionResult | null, form: FormData): Promise<PutBoxActionResult> {
-  return Envman.putBoxAction(newEnvLabel(), AddEnvOpts)(prior, form)
-}
+const addEnvAction = (prior: PutBoxActionResult | null, form: FormData): Promise<PutBoxActionResult> => (
+  Envman.putBoxAction(newEnvLabel(), AddEnvOpts)(prior, form)
+)
 
 /** The form that adds an env: its title, description, rotation period, the day it was last rotated, and its value. */
 export function AddEnvForm() {
