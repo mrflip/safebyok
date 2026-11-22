@@ -22,4 +22,23 @@ describe("SubmitButton", () => {
     render(<form><SubmitButton disabled>Create vault</SubmitButton></form>)
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Create vault' }).disabled).to.eq(true)
   })
+
+  it("is disabled, showing what it says while pending, while the host says the form is pending, in a form that is no action", () => {
+    const { rerender } = render(<form onSubmit={(event) => { event.preventDefault() }}><SubmitButton isPending whilePending="Saving…">Save</SubmitButton></form>)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Saving…' }).disabled).to.eq(true)
+    rerender(<form onSubmit={(event) => { event.preventDefault() }}><SubmitButton isPending={false} whilePending="Saving…">Save</SubmitButton></form>)
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled).to.eq(false)
+  })
+
+  it("still follows the form's action while isPending is false, and passes isPending to no attribute of the button", async () => {
+    let settle!: () => void
+    const settled = new Promise<void>((resolve) => { settle = resolve })
+    render(<form action={async () => { await settled }}><SubmitButton isPending={false} whilePending="Working…">Go</SubmitButton></form>)
+    fireEvent.click(screen.getByRole('button', { name: 'Go' }))
+    const pending = await screen.findByRole<HTMLButtonElement>('button', { name: 'Working…' })
+    expect(pending.disabled).to.eq(true)
+    expect(pending.hasAttribute('ispending')).to.eq(false)
+    settle()
+    await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Go' }).disabled).to.eq(false) })
+  })
 })

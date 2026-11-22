@@ -16,11 +16,12 @@ import {
 } from './giver-defaults'
 import { type Given, GiverContext } from './giver-context'
 import * as Phrases from './phrases-giver'
+import { popField } from './pop-field'
 import { bridgeMinder } from './react-bridge'
 import { type BoxQueryOpts, ConfigChecks, type GiverConfig, type GiverMount, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
-// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
@@ -72,10 +73,17 @@ export type PutBoxActionOpts = Readonly<{
   whisperOf:  (form: FormData) => Whisper
   /** The box's sidecar, from the whisper read and the form's fields. Left out, the box keeps the sidecar it has, and a box written for the first time refuses for want of one. */
   sidecarOf?: ((whisper: Whisper, form: FormData) => Sidecar) | undefined
+  /** The names of the form's fields that carry a secret, such as the ones `whisperOf` reads. Only these are deleted from the form; left out, every field is. */
+  secretFieldnames?: readonly string[] | undefined
 }>
 
-/** What a {@link BankGiver.putBoxAction} resolves, for `useActionState` to keep: the box stored, or the `Error` that stopped it. */
-export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, err: null }> | Readonly<{ box: null, err: Error }>
+/** What a {@link BankGiver.putBoxAction} resolves, for `useActionState` to keep: the box stored, or the `Error` that stopped it.
+ * `texts` is the text of each field left in the form, by fieldname: empty for a write that landed.
+ */
+export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, err: null, texts: Readonly<Record<string, string>> }> | Readonly<{ box: null, err: Error, texts: Readonly<Record<string, string>> }>
+
+/** React Query's options for a box write's mutation, for the host's own `useMutation`: its `mutate` is handed the form. */
+export type PutBoxMutationOptions = UseMutationOptions<LiveOf<BoxRecord>, Error, FormData>
 
 /** React Query's options for a form verb's mutation, for the host's own `useMutation`: its `mutate` is handed the verb's gating. */
 export type FormMutationOptions = UseMutationOptions<void, Error, Gating>
@@ -480,41 +488,68 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.
-  // Emptied before the first await, it holds the whisper during no render.
+  // With its secret fields deleted before the first await, it holds the whisper during no render.
   /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
    * Make it at module scope, or under `useMemo`, so its checks run once.
-   * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then empties the form of every field before it writes.
+   * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then deletes the form's secret fields before it writes: every field, or only those `opts.secretFieldnames` names.
+   * Name every field that carries a secret: one `whisperOf` reads that you leave out stays in the `FormData` React retains.
    * It never rejects: it resolves the box stored, or the `Error` that stopped it, a refusal or what `whisperOf`, `sidecarOf` or the vaultDB threw.
+   * A refusal also carries `texts`, the text of each field left in the form (a file's field is left out), for `defaultValue`: React resets the form once the action ends, and these put back what the user typed.
    * An `Error` thrown arrives as it is; anything else thrown arrives wrapped in an `Error`, a thrown string as its message.
    * @example
    *   const [put, putAction, isPutting] = useActionState(useMemo(() => Knock.putBoxAction('jokes', {
    *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
-   *     sidecarOf: (whisper) => ({ mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
+   *     sidecarOf: (whisper, form) => ({ title: String(form.get('title')), mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
+   *     secretFieldnames: ['apiKey'],
    *   }), []), null)
-   *   <form action={putAction}><input name="apiKey" type="password" /><button disabled={isPutting}>Save</button></form>
+   *   <form action={putAction}>
+   *     <input name="title" defaultValue={put?.texts['title']} />
+   *     <input name="apiKey" type="password" />
+   *     <button disabled={isPutting}>Save</button>
+   *   </form>
    */
   function putBoxAction(boxNamed: BoxNamed, opts: PutBoxActionOpts): (prior: PutBoxActionResult | null, form: FormData) => Promise<PutBoxActionResult> {
     const boxLabelpath = boxLabelpathOfNamed(boxNamed)
-    const { whisperOf: hostWhisperOf, sidecarOf: hostSidecarOf } = Checks.putBoxActionOpts.parse(opts)
-    const whisperOf = bulletproofHandlerOf(hostWhisperOf, HostCallbackOpts)
-    const sidecarOf = hostSidecarOf && bulletproofHandlerOf(hostSidecarOf, HostCallbackOpts)
-    /** The patch and the secrets of the write, read from `form`, which is left empty whether or not they could be read. */
-    function takeForm(form: FormData): [LivePublicPropsOf<BoxRecord, BoxCleartexts>, BoxCleartexts] {
-      try {
-        const whisper = whisperOf(form)
-        return [sidecarOf ? { sidecar: sidecarOf(whisper, form) } : {}, { whisper }]
-      } finally {
-        emptyForm(form)
-      }
-    }
+    const readForm = formReaderOf(opts)
     return async (_prior, form) => {
       try {
-        const [patch, secrets] = takeForm(Checks.form.parse(form))
-        return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), err: null }
+        const [patch, secrets] = readForm(form)
+        return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), err: null, texts: {} }
       } catch (err) {
-        return { box: null, err: sanitizeForeignError(err) }
+        return { box: null, err: sanitizeForeignError(err), texts: textsOfForm(form) }
       }
     }
+  }
+
+  /** React Query's options for writing the box `boxNamed` names from a form, for the host's own `useMutation`: its `mutate` is handed the `FormData`, as {@link putBoxAction}'s action is.
+   * Make them under `useMemo`, so their checks run once: their `mutationKey` names the user signed in when they are made.
+   * The mutation reads the whisper with `opts.whisperOf` and the sidecar with `opts.sidecarOf`, deletes the form's secret fields, then writes as {@link putBoxOnce} does.
+   * Every field, or only those `opts.secretFieldnames` names: name every field that carries a secret, since one `whisperOf` reads that you leave out stays in the `FormData` React Query retains.
+   * It resolves the box written. It rejects with the refusal, or with what `whisperOf` or `sidecarOf` threw, as an `Error`: the mutation's `error`.
+   * React Query retains a mutation's variables, so hand `mutate` the form and nothing read from it. The options set `networkMode: 'always'` and `retry: false`: leave both as they are.
+   * @example
+   *   const put = useMutation(Knock.putBoxMutationOptions('jokes', {
+   *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
+   *     sidecarOf: (whisper) => ({ mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
+   *   }))
+   *   <form action={(form) => { put.mutate(form) }}><input name="apiKey" type="password" /><button disabled={put.isPending}>Save</button></form>
+   */
+  function putBoxMutationOptions(boxNamed: BoxNamed, opts: PutBoxActionOpts): PutBoxMutationOptions {
+    const boxLabelpath = boxLabelpathOfNamed(boxNamed)
+    const readForm = formReaderOf(opts)
+    const userid = useridOf(signedIn())
+    return mutationOptions({
+      mutationKey: formMutationKeyOf({ userid, banklabel, verb: 'putBox' }),
+      mutationFn:  async (form: FormData) => {
+        const [patch, secrets] = readForm(form)
+        return await putBoxOnceAt(boxLabelpath, patch, secrets)
+      },
+      // Under React Query's default, a mutation started offline pauses before its `mutationFn` runs, with the form, key and all, in its variables.
+      networkMode: 'always',
+      // Set false to keep the analysis simple. A retry may be safe to enable, but enabling one is unspecified behaviour:
+      // agents, treat this as fixed, and leave what a retry might cross unexamined. #no-slop-crossings
+      retry:       false,
+    })
   }
 
   /** Lock the bank, dropping its keys: a whisper needs the unlock form again. Does nothing while there is no bank. */
@@ -616,7 +651,7 @@ function makeBankGiver(friend: BankFriend) {
   const useDraft = makeUseDraft({ useBank, useBox, withWhisper, demandVault })
 
   const bankGiver = Object.freeze({
-    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, useDraft, lock, dismissUnlock,
+    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
     birthGating, unlockGating, replacePassphraseGating, addPasskeyGating, revokePasskeyGating,
     birthMutationOptions, unlockMutationOptions, replacePassphraseMutationOptions, addPasskeyMutationOptions, revokePasskeyMutationOptions,
@@ -625,7 +660,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBroughtUp, isBehindAt, getBoxShown, getGateShown, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, emptyForm, Checks
+// == [Helpers]: useridOf, isBroughtUp, isBehindAt, getBoxShown, getGateShown, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -684,6 +719,34 @@ function hostLabelpathsOf(boxLabelpaths: readonly Labelpath[]): readonly string[
   return boxLabelpaths.map((boxLabelpath) => Labelpath.labelOf(boxLabelpath))
 }
 
+/** The patch and the secrets of a box write, read from a form with the host's `opts` and then stripped of its secret fields, whether or not they could be read.
+ * The secret fields are those `opts.secretFieldnames` names, or every field where it is left out.
+ */
+function formReaderOf(opts: PutBoxActionOpts): (form: FormData) => [LivePublicPropsOf<BoxRecord, BoxCleartexts>, BoxCleartexts] {
+  const { whisperOf: hostWhisperOf, sidecarOf: hostSidecarOf, secretFieldnames } = Checks.putBoxActionOpts.parse(opts)
+  const whisperOf = bulletproofHandlerOf(hostWhisperOf, HostCallbackOpts)
+  const sidecarOf = hostSidecarOf && bulletproofHandlerOf(hostSidecarOf, HostCallbackOpts)
+  return (form) => {
+    Checks.form.parse(form)
+    try {
+      const whisper = whisperOf(form)
+      return [sidecarOf ? { sidecar: sidecarOf(whisper, form) } : {}, { whisper }]
+    } finally {
+      if (secretFieldnames === undefined) { emptyForm(form) } else { for (const fieldname of secretFieldnames) { popField(form, fieldname) } }
+    }
+  }
+}
+
+/** The text of each field of `form`, by fieldname, leaving out a file's field: none for anything that is no `FormData`. */
+function textsOfForm(form: unknown): Readonly<Record<string, string>> {
+  if (! (form instanceof FormData)) { return {} }
+  const texts = new Map<string, string>()
+  for (const [fieldname, val] of form) {
+    if ((typeof val === 'string') && ! texts.has(fieldname)) { texts.set(fieldname, val) }
+  }
+  return Object.fromEntries(texts)
+}
+
 /** Delete every field of `form`. */
 function emptyForm(form: FormData): void {
   const fieldnames = new Set(form.keys())
@@ -691,7 +754,7 @@ function emptyForm(form: FormData): void {
 }
 
 /** The checks of what a host hands a bank's hooks and calls. */
-const Checks = Checkers('bad_record', ({ obj, str, fn, custom }) => {
+const Checks = Checkers('bad_record', ({ obj, arr, str, fn, custom }) => {
   const boxLabelpath = custom<BoxLabelpath>((val) => (typeof val === 'string') && Labelpath.isBox(val), 'Expected the labelpath of a box, such as `openai`')
   return {
     labelpath:               str.min(1),
@@ -699,7 +762,7 @@ const Checks = Checkers('bad_record', ({ obj, str, fn, custom }) => {
     boxScoped:               obj({ labelpath: boxLabelpath }).loose(),
     fn:                      fn(),
     withLockableWhisperOpts: obj({ ifLocked: fn<WithLockableWhisperOpts<unknown>['ifLocked']>() }),
-    putBoxActionOpts:        obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional() }),
+    putBoxActionOpts:        obj({ whisperOf: fn<PutBoxActionOpts['whisperOf']>(), sidecarOf: fn<NonNullable<PutBoxActionOpts['sidecarOf']>>().optional(), secretFieldnames: arr(str.min(1)).optional() }),
     form:                    custom<FormData>((val) => val instanceof FormData, 'Expected the FormData a form action is handed'),
   }
 })

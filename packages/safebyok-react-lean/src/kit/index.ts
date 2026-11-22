@@ -3,6 +3,7 @@
 export { type CreateVaultFormProps, CreateVaultForm } from './create-vault-form'
 export { type AskPasskeyOpts, type CreatePasskeyOpts, askPasskey, createPasskey, passkeysAvailable } from './passkey'
 export { type AddPasskeyFormProps, type PasskeyUnlockButtonProps, type RevokePasskeyFormProps, AddPasskeyForm, PasskeyUnlockButton, RevokePasskeyForm } from './passkey-forms'
+export { refusalTextOf } from './phrases-kit'
 export { ModalDialog } from './modal-dialog'
 export { type ReplacePassphraseFormProps, ReplacePassphraseForm } from './replace-passphrase-form'
 export { type NewPassphrase, type NewPassphraseFieldProps, useNewPassphrase } from './use-new-passphrase'

@@ -47,7 +47,11 @@ export const KitPhrases = Object.freeze({
   passkeyAskFailed:   "Your browser couldn't ask for a passkey just now: try again, or use your passphrase.",
 })
 
-/** The alert a form shows for `err`, its form verb's refusal: a condition the user can mend in their own words, anything else as trouble. */
+/** The words to show a user for `err`, a refusal: a condition they can mend in their own terms, anything else as "Something went wrong. Please try again later."
+ * Never throws: any value in, a string out. A condition with no words of its own shows its message.
+ * @example
+ *   {put.isError && <p role="alert">{refusalTextOf(put.error)}</p>}
+ */
 export function refusalTextOf(err: unknown): string {
   if (! isVaultError(err) || (err.family !== 'condition')) { return KitPhrases.troubled }
   switch (err.refusalkind) {
