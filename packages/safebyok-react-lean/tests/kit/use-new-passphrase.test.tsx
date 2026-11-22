@@ -65,4 +65,11 @@ describe("useNewPassphrase", () => {
     typeInto('Again', '')
     expect(screen.getByTestId('match').textContent).to.eq('untyped')
   })
+
+  it("gives each field an id of its own, for a label", async () => {
+    await renderChooser()
+    const ids = [screen.getByLabelText('Pick one').id, screen.getByLabelText('Again').id]
+    expect(ids.every((id) => id !== '')).to.eq(true)
+    expect(ids[0]).to.not.eq(ids[1])
+  })
 })

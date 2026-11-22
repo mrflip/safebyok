@@ -11,7 +11,8 @@ the foot.
    elements. No markup, no class name and no word is ours.
 2. **Parts**: those hooks rendered as plain elements, for a host with no design system. Each takes
    `className`, passes every other attribute through, and marks its state in `data-` attributes
-   (`data-revealed`, `data-pending`, `data-invalid`) for a stylesheet to select.
+   (`data-revealed`, `data-pending`, `data-invalid`) for a stylesheet to select. Their words come
+   from the nearest `PartsPhrasesProvider`, or the kit's `KitPhrasesProvider`, which gives them too.
 3. **Kit, copied in**: each kit form as a file in the host's repo, written over the field hooks and
    the host's own components. `npx shadcn@latest add <registry>/unlock-form` puts
    `components/safebyok/unlock-form.tsx` there, to edit freely. Its words are in that file, so
@@ -115,8 +116,6 @@ const newPassphrase = useNewPassphrase()
 
 ## Not built yet
 
-* `className` and `data-` state attributes on the parts.
 * The kit as copy-in source, and a registry to serve it.
-* `KitPhrasesProvider`: today `KitPhrases` is a frozen object of English.
 * A score for a meter: the strength checker answers strong, or weak with a reason, and no score.
 * `actionOf` and gate verbs that take the form, as the [Suspense guide](guide-suspense.md) lists.

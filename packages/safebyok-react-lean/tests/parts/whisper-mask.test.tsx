@@ -142,6 +142,13 @@ describe("WhisperMask", () => {
     await waitFor(() => { expect(maskTextOf(container)).to.eq(mask(nextKey, { tail: 4 })) })
   })
 
+  it("hands className, in place of its own class, and other attributes to its element", async () => {
+    const { container } = await renderKey({ className: 'tail', title: 'The jokes key' })
+    const el = container.querySelector<HTMLElement>('code')!
+    expect([el.className, el.title]).to.deep.equal(['tail', 'The jokes key'])
+    await waitFor(() => { expect(el.textContent).to.eq('jokes') })
+  })
+
   it("shows the sidecar's mask field while locked when no ifLocked is given", async () => {
     // WhisperMask @example
     const { world, container } = await renderKey({ ifLocked: undefined })

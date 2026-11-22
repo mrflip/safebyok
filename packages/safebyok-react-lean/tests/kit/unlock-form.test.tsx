@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useActionState, useState, useTransition } from 'react'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { UnlockDialog, UnlockForm } from '../../src/kit'
+import { KitPhrasesProvider, UnlockDialog, UnlockForm } from '../../src/kit'
 import * as TH from '../test-helpers'
 
 const Passphrase = TH.TestPassphrase
@@ -120,6 +120,21 @@ describe("UnlockForm", () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     onTestFinished(() => { vi.restoreAllMocks() })
     TH.expectSyncRefusal(() => render(<UnlockForm />), 'bad_record')
+  })
+
+  it("names its passphrase field with a visible label", async () => {
+    await renderWorld((world) => <StageScreen world={world} />, 'Unlock')
+    TH.expectVisiblyLabelled('Passphrase')
+  })
+
+  it("shows the words the nearest KitPhrasesProvider gives, a refusal's among them", async () => {
+    const phrases = { passphraseField: 'Phrase secrète', unlockButton: 'Déverrouiller', wrongPassphrase: "Ce n'est pas la phrase secrète." }
+    await renderWorld((world) => <KitPhrasesProvider phrases={phrases}><StageScreen world={world} /></KitPhrasesProvider>, 'Déverrouiller')
+    TH.expectVisiblyLabelled('Phrase secrète')
+    fireEvent.change(screen.getByLabelText('Phrase secrète'), { target: { value: WrongPassphrase } })
+    fireEvent.click(screen.getByRole('button', { name: 'Déverrouiller' }))
+    const alert = await screen.findByRole('alert')
+    await waitFor(() => { expect(alert.textContent).to.eq("Ce n'est pas la phrase secrète.") })
   })
 })
 

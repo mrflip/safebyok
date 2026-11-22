@@ -59,4 +59,17 @@ describe("PassphraseInput", () => {
     expect(screen.getByRole('status').textContent).to.eq('')
     expect(onBlur).toHaveBeenCalledOnce()
   })
+
+  it("hands className and other attributes to the input, and marks it revealed and invalid in data- attributes", () => {
+    const { rerender } = render(<PassphraseInput name="passphrase" aria-label="Passphrase" className="field" title="Your passphrase" />)
+    const field = screen.getByLabelText<HTMLInputElement>('Passphrase')
+    expect([field.className, field.title]).to.deep.equal(['field', 'Your passphrase'])
+    expect([Object.hasOwn(field.dataset, 'revealed'), Object.hasOwn(field.dataset, 'invalid')]).to.deep.equal([false, false])
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(Object.hasOwn(field.dataset, 'revealed')).to.eq(true)
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" aria-invalid="true" />)
+    expect(Object.hasOwn(field.dataset, 'invalid')).to.eq(true)
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" aria-invalid={false} />)
+    expect([Object.hasOwn(field.dataset, 'invalid'), field.getAttribute('aria-invalid')]).to.deep.equal([false, 'false'])
+  })
 })

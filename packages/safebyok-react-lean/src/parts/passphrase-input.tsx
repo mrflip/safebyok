@@ -1,7 +1,7 @@
 /** `PassphraseInput`, the field a user types a passphrase into. */
 
 import type { ComponentPropsWithRef } from 'react'
-import { PartsPhrases } from './phrases-parts'
+import { usePartsPhrases } from './phrases-parts'
 import { type PassphraseFieldOpts, usePassphraseField } from './use-passphrase-field'
 
 // == [The input]: PassphraseInputProps, PassphraseInput
@@ -14,19 +14,30 @@ export type PassphraseInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' |
 
 /** A masked, uncontrolled input for a passphrase, with a Show / Hide button and a Caps Lock warning. Read it in the form's action, from the `FormData`.
  * Each submit hides it again, so a password manager sees a password field.
+ * `className` and the other attributes go to the `<input>`, which carries `data-revealed` while the passphrase shows and `data-invalid` while `aria-invalid` is true.
  * @example
  *   <form action={unlockAction}><PassphraseInput name="passphrase" aria-label="Passphrase" /><SubmitButton>Unlock</SubmitButton></form>
  */
-export function PassphraseInput({ id, autoComplete, isPending, onKeyDown, onKeyUp, onBlur, ...passed }: PassphraseInputProps) {
+export function PassphraseInput({ id, autoComplete, isPending, onKeyDown, onKeyUp, onBlur, 'aria-invalid': ariaInvalid, ...passed }: PassphraseInputProps) {
   const field = usePassphraseField({ id, autoComplete, isPending, onKeyDown, onKeyUp, onBlur })
+  const phrases = usePartsPhrases()
   // `type`, `value` and `defaultValue` come last, so a host that gets any past the types still leaves the input uncontrolled and masked.
   return (
     <>
       <span className="passphrase-input">
-        <input {...field.inputProps} {...passed} type={field.inputProps.type} value={undefined} defaultValue={undefined} />
-        <button {...field.toggleProps}>{field.isRevealed ? PartsPhrases.hideButton : PartsPhrases.showButton}</button>
+        <input
+          {...field.inputProps}
+          {...passed}
+          aria-invalid={ariaInvalid}
+          data-revealed={field.isRevealed || undefined}
+          data-invalid={((ariaInvalid === true) || (ariaInvalid === 'true')) || undefined}
+          type={field.inputProps.type}
+          value={undefined}
+          defaultValue={undefined}
+        />
+        <button {...field.toggleProps}>{field.isRevealed ? phrases.hideButton : phrases.showButton}</button>
       </span>
-      <span role="status">{field.isCapsLockOn && PartsPhrases.capsLockOn}</span>
+      <span role="status">{field.isCapsLockOn && phrases.capsLockOn}</span>
     </>
   )
 }

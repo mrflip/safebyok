@@ -16,6 +16,7 @@ export type SubmitButtonProps = Omit<ComponentPropsWithRef<'button'>, 'type'> & 
 /** The submit button of the form it is in, disabled while that form's action runs, and while `disabled`.
  * An action that awaits its work keeps the button disabled until the work settles, so a double press submits once.
  * A form that is submitted by a mutation or a handler, not a form action, says when it is pending with `isPending`.
+ * It carries `data-pending` while the form is pending.
  * @example
  *   <SubmitButton whilePending="Unlocking…">Unlock</SubmitButton>
  *   <SubmitButton disabled={! strength.verdict?.strong}>Create vault</SubmitButton>
@@ -24,6 +25,6 @@ export type SubmitButtonProps = Omit<ComponentPropsWithRef<'button'>, 'type'> & 
 export function SubmitButton({ whilePending, isPending = false, disabled = false, children, ...passed }: SubmitButtonProps) {
   const { pending: isFormPending } = useFormStatus()
   const pending = isFormPending || isPending
-  return <button {...passed} type="submit" disabled={pending || disabled}>{(pending && (whilePending !== undefined)) ? whilePending : children}</button>
+  return <button {...passed} type="submit" disabled={pending || disabled} data-pending={pending || undefined}>{(pending && (whilePending !== undefined)) ? whilePending : children}</button>
 }
 // --

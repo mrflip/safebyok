@@ -6,7 +6,7 @@ import type { BankGiver, ReactGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
-import { KitPhrases, refusalTextOf } from './phrases-kit'
+import { refusalTextOf, useKitPhrases } from './phrases-kit'
 import { UsernameField } from './unlock-form'
 import { useNewPassphrase } from './use-new-passphrase'
 
@@ -33,6 +33,7 @@ export function CreateVaultForm({ giver: giverProp, bank: bankProp, username }: 
   const giver = useGivenGiver(giverProp)
   const birth = bank.useBirth()
   const newPassphrase = useNewPassphrase(giver)
+  const phrases = useKitPhrases()
   const alertId = useId()
   const birthAction = formActionOf(birth, ['passphrase', 'confirmation'], ({ passphrase }) => ({ passphraseCleartext: passphrase }))
 
@@ -44,8 +45,9 @@ export function CreateVaultForm({ giver: giverProp, bank: bankProp, username }: 
   const isRefused = (birth.error !== null)
   return (
     <form className="sok-create-vault-form" action={action} onReset={newPassphrase.forget}>
-      <p>{KitPhrases.createBlurb}</p>
+      <p>{phrases.createBlurb}</p>
       {(username !== undefined) && <UsernameField username={username} />}
+      <label htmlFor={newPassphrase.field.id}>{phrases.newPassphraseField}</label>
       <PassphraseInput
         {...newPassphrase.field}
         name="passphrase"
@@ -53,10 +55,11 @@ export function CreateVaultForm({ giver: giverProp, bank: bankProp, username }: 
         aria-describedby={isRefused ? `${newPassphrase.verdictId} ${alertId}` : newPassphrase.verdictId}
       />
       <p role="status" id={newPassphrase.verdictId}>{newPassphrase.verdictText}</p>
+      <label htmlFor={newPassphrase.confirmField.id}>{phrases.confirmField}</label>
       <PassphraseInput {...newPassphrase.confirmField} name="confirmation" />
       <p role="status" id={newPassphrase.matchId}>{newPassphrase.matchText}</p>
-      <div role="alert" id={alertId}>{isRefused && refusalTextOf(birth.error)}</div>
-      <SubmitButton whilePending={KitPhrases.creatingButton} disabled={! newPassphrase.isReady}>{KitPhrases.createButton}</SubmitButton>
+      <div role="alert" id={alertId}>{isRefused && refusalTextOf(birth.error, phrases)}</div>
+      <SubmitButton whilePending={phrases.creatingButton} disabled={! newPassphrase.isReady}>{phrases.createButton}</SubmitButton>
     </form>
   )
 }

@@ -3,16 +3,16 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { isVaultError } from 'safebyok'
 import { UnlockDialog } from '../../src/kit'
-import { WhisperText } from '../../src/parts'
+import { PartsPhrasesProvider, WhisperText, type WhisperTextProps } from '../../src/parts'
 import * as TH from '../test-helpers'
 
 /** The bank's stage as a line of text, the joke service's key as a `WhisperText`, and the unlock dialog. */
-function KeyScreen({ world, field = 'apiKey', masked, onError }: Readonly<{ world: TH.ProviderWorld, field?: string, masked?: ReactNode, onError?: ((err: Error) => void) | undefined }>) {
+function KeyScreen({ world, field = 'apiKey', ...props }: Readonly<{ world: TH.ProviderWorld, field?: string } & Partial<WhisperTextProps>>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>
-      <WhisperText labelpath={TH.JokesPath} field={field} masked={masked} onError={onError} />
+      <WhisperText labelpath={TH.JokesPath} field={field} {...props} />
       <UnlockDialog />
     </>
   )
@@ -109,5 +109,36 @@ describe("WhisperText", () => {
     expect(isVaultError(onError.mock.calls[0]?.[0], 'dismissed')).to.eq(true)
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Show' }).disabled).to.eq(false)
     expect(isKeyShown()).to.eq(false)
+  })
+
+  it("hands className, in place of its own class, and other attributes to its outer span, and marks it pending and revealed in data- attributes", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const { container } = render(TH.providerTreeOf(world, <KeyScreen world={world} className="key" title="The jokes key" />, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    const outer = container.querySelector<HTMLElement>('[title="The jokes key"]')!
+    expect(outer.className).to.eq('key')
+    expect([Object.hasOwn(outer.dataset, 'pending'), Object.hasOwn(outer.dataset, 'revealed')]).to.deep.equal([false, false])
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    await screen.findByRole('dialog')
+    expect([Object.hasOwn(outer.dataset, 'pending'), Object.hasOwn(outer.dataset, 'revealed')]).to.deep.equal([true, false])
+    fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: TH.TestPassphrase } })
+    fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
+    await waitFor(() => { expect(isKeyShown()).to.eq(true) })
+    expect([Object.hasOwn(outer.dataset, 'pending'), Object.hasOwn(outer.dataset, 'revealed')]).to.deep.equal([false, true])
+  })
+
+  it("shows the masked word the nearest PartsPhrasesProvider gives, unless handed its own", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const tree = (
+      <PartsPhrasesProvider phrases={{ masked: 'hidden', showButton: 'Reveal' }}>
+        <KeyScreen world={world} />
+        <WhisperText labelpath={TH.JokesPath} field="apiKey" masked="(secret)" />
+      </PartsPhrasesProvider>
+    )
+    render(TH.providerTreeOf(world, tree, { userid: TH.ProviderUser }))
+    await screen.findByText('locked')
+    expect(screen.getByText('hidden')).to.exist
+    expect(screen.getByText('(secret)')).to.exist
+    expect(screen.getAllByRole('button', { name: 'Reveal' })).to.have.lengthOf(2)
   })
 })

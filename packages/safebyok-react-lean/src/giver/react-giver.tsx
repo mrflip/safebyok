@@ -767,4 +767,5 @@ const Checks = Checkers('bad_record', ({ obj, arr, str, fn, custom }) => {
   }
 })
 true satisfies AssertEqual<PutBoxActionOpts, Readonly<CheckerInput<typeof Checks.putBoxActionOpts>>>
+true satisfies AssertEqual<WithLockableWhisperOpts<unknown>, Readonly<CheckerInput<typeof Checks.withLockableWhisperOpts>>>
 // --

@@ -41,4 +41,12 @@ describe("SubmitButton", () => {
     settle()
     await waitFor(() => { expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Go' }).disabled).to.eq(false) })
   })
+
+  it("marks itself pending in a data- attribute, and hands className to the button", () => {
+    const { rerender } = render(<form><SubmitButton className="go" isPending whilePending="Saving…">Save</SubmitButton></form>)
+    const button = screen.getByRole('button', { name: 'Saving…' })
+    expect([button.className, Object.hasOwn(button.dataset, 'pending')]).to.deep.equal(['go', true])
+    rerender(<form><SubmitButton className="go" isPending={false} whilePending="Saving…">Save</SubmitButton></form>)
+    expect(Object.hasOwn(button.dataset, 'pending')).to.eq(false)
+  })
 })

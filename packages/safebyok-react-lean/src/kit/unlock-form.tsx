@@ -7,7 +7,7 @@ import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
 import { ModalDialog } from './modal-dialog'
-import { KitPhrases, refusalTextOf } from './phrases-kit'
+import { refusalTextOf, useKitPhrases } from './phrases-kit'
 
 // == [The form]: UnlockFormProps, UnlockForm, UsernameField
 
@@ -29,8 +29,10 @@ export interface UnlockFormProps {
 export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<UnlockFormProps>) {
   const bank = useGivenBank(bankProp)
   const unlock = bank.useUnlock()
+  const phrases = useKitPhrases()
   const [isUnlocking, setIsUnlocking] = useState(false)
   const fieldRef = useRef<HTMLInputElement>(null)
+  const fieldId = useId()
   const alertId = useId()
   const unlockAction = formActionOf(unlock, ['passphrase'], ({ passphrase }) => ({ passphraseCleartext: passphrase }))
   // What waits on the unlock may be a host's pending Action, and React commits no transition's update until every
@@ -50,20 +52,21 @@ export function UnlockForm({ bank: bankProp, username, onCancel }: Readonly<Unlo
   return (
     <form className="sok-unlock-form" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
       {(username !== undefined) && <UsernameField username={username} />}
+      <label htmlFor={fieldId}>{phrases.passphraseField}</label>
       <PassphraseInput
         ref={fieldRef}
+        id={fieldId}
         name="passphrase"
         autoComplete="current-password"
-        aria-label={KitPhrases.passphraseField}
-        placeholder={KitPhrases.passphraseField}
+        placeholder={phrases.passphraseField}
         required
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}
         isPending={isUnlocking}
       />
-      <div role="alert" id={alertId}>{isRefused && refusalTextOf(unlock.error)}</div>
-      <SubmitButton isPending={isUnlocking} whilePending={KitPhrases.unlockingButton}>{KitPhrases.unlockButton}</SubmitButton>
-      {(onCancel !== undefined) && <button type="button" onClick={onCancel}>{KitPhrases.cancelButton}</button>}
+      <div role="alert" id={alertId}>{isRefused && refusalTextOf(unlock.error, phrases)}</div>
+      <SubmitButton isPending={isUnlocking} whilePending={phrases.unlockingButton}>{phrases.unlockButton}</SubmitButton>
+      {(onCancel !== undefined) && <button type="button" onClick={onCancel}>{phrases.cancelButton}</button>}
     </form>
   )
 }
@@ -94,12 +97,13 @@ export interface UnlockDialogProps {
 export function UnlockDialog({ bank: bankProp, username }: Readonly<UnlockDialogProps>) {
   const bank = useGivenBank(bankProp)
   const isUnlockWanted = bank.useBank((snap) => snap.isUnlockWanted)
+  const phrases = useKitPhrases()
   const titleId = useId()
   if (! isUnlockWanted) { return null }
   return (
     <ModalDialog labelledBy={titleId} onCancel={bank.dismissUnlock}>
-      <h2 id={titleId}>{KitPhrases.unlockTitle}</h2>
-      <p>{KitPhrases.unlockBlurb}</p>
+      <h2 id={titleId}>{phrases.unlockTitle}</h2>
+      <p>{phrases.unlockBlurb}</p>
       <UnlockForm bank={bank} username={username} onCancel={bank.dismissUnlock} />
     </ModalDialog>
   )

@@ -9,7 +9,7 @@ import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
 import { type AskPasskeyOpts, type CreatePasskeyOpts, askPasskey, createPasskey, passkeysAvailable } from './passkey'
-import { KitPhrases, refusalTextOf } from './phrases-kit'
+import { refusalTextOf, useKitPhrases } from './phrases-kit'
 import { UsernameField } from './unlock-form'
 
 // == [Adding]: AddPasskeyFormProps, AddPasskeyForm
@@ -33,8 +33,10 @@ export interface AddPasskeyFormProps {
 export function AddPasskeyForm({ bank: bankProp, passkeyOpts, username }: Readonly<AddPasskeyFormProps>) {
   const bank = useGivenBank(bankProp)
   const add = bank.useAddPasskey()
+  const phrases = useKitPhrases()
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const fieldRef = useRef<HTMLInputElement>(null)
+  const fieldId = useId()
   const alertId = useId()
   const addAction = formActionOf(add, ['passphrase'], async ({ passphrase }) => {
     const nextPasskeyCleartext = await heardCeremony(() => createPasskey(passkeyOpts), setCeremonyErr)
@@ -49,19 +51,20 @@ export function AddPasskeyForm({ bank: bankProp, passkeyOpts, username }: Readon
   const refusal = ceremonyErr ?? add.error
   return (
     <form className="sok-add-passkey-form" action={action}>
-      <p>{KitPhrases.addPasskeyBlurb}</p>
+      <p>{phrases.addPasskeyBlurb}</p>
       {(username !== undefined) && <UsernameField username={username} />}
+      <label htmlFor={fieldId}>{phrases.passphraseField}</label>
       <PassphraseInput
         ref={fieldRef}
+        id={fieldId}
         name="passphrase"
-        aria-label={KitPhrases.passphraseField}
-        placeholder={KitPhrases.passphraseField}
+        placeholder={phrases.passphraseField}
         required
         aria-invalid={(add.error !== null) || undefined}
         aria-describedby={(refusal === null) ? undefined : alertId}
       />
-      <div role="alert" id={alertId}>{(refusal !== null) && refusalTextOf(refusal)}</div>
-      <SubmitButton whilePending={KitPhrases.addingPasskeyButton}>{KitPhrases.addPasskeyButton}</SubmitButton>
+      <div role="alert" id={alertId}>{(refusal !== null) && refusalTextOf(refusal, phrases)}</div>
+      <SubmitButton whilePending={phrases.addingPasskeyButton}>{phrases.addPasskeyButton}</SubmitButton>
     </form>
   )
 }
@@ -87,7 +90,9 @@ export interface RevokePasskeyFormProps {
 export function RevokePasskeyForm({ bank: bankProp, username }: Readonly<RevokePasskeyFormProps>) {
   const bank = useGivenBank(bankProp)
   const revoke = bank.useRevokePasskey()
+  const phrases = useKitPhrases()
   const fieldRef = useRef<HTMLInputElement>(null)
+  const fieldId = useId()
   const alertId = useId()
   const revokeAction = formActionOf(revoke, ['passphrase'], ({ passphrase }) => ({ passphraseCleartext: passphrase }))
   /** Revoke the passkey, proved by the form's passphrase, handing focus back to its field on a refusal. */
@@ -97,19 +102,20 @@ export function RevokePasskeyForm({ bank: bankProp, username }: Readonly<RevokeP
   const isRefused = (revoke.error !== null)
   return (
     <form className="sok-revoke-passkey-form" action={action}>
-      <p>{KitPhrases.revokePasskeyBlurb}</p>
+      <p>{phrases.revokePasskeyBlurb}</p>
       {(username !== undefined) && <UsernameField username={username} />}
+      <label htmlFor={fieldId}>{phrases.passphraseField}</label>
       <PassphraseInput
         ref={fieldRef}
+        id={fieldId}
         name="passphrase"
-        aria-label={KitPhrases.passphraseField}
-        placeholder={KitPhrases.passphraseField}
+        placeholder={phrases.passphraseField}
         required
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}
       />
-      <div role="alert" id={alertId}>{isRefused && refusalTextOf(revoke.error)}</div>
-      <SubmitButton whilePending={KitPhrases.revokingPasskeyButton}>{KitPhrases.revokePasskeyButton}</SubmitButton>
+      <div role="alert" id={alertId}>{isRefused && refusalTextOf(revoke.error, phrases)}</div>
+      <SubmitButton whilePending={phrases.revokingPasskeyButton}>{phrases.revokePasskeyButton}</SubmitButton>
     </form>
   )
 }
@@ -137,6 +143,7 @@ export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHead
   const bankPasskeyHeader = bank.useGate({ select: passkeyHeaderOf }).data ?? null
   const passkeyHeader = (passkeyHeaderProp === undefined) ? bankPasskeyHeader : passkeyHeaderProp
   const unlock = bank.useUnlock()
+  const phrases = useKitPhrases()
   const [isUnlocking, setIsUnlocking] = useState(false)
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const alertId = useId()
@@ -160,10 +167,10 @@ export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHead
   const refusal = ceremonyErr ?? unlock.error
   return (
     <form className="sok-passkey-unlock" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
-      <SubmitButton isPending={isUnlocking} whilePending={KitPhrases.askingPasskeyButton} aria-describedby={(refusal === null) ? undefined : alertId}>
-        {KitPhrases.passkeyUnlockButton}
+      <SubmitButton isPending={isUnlocking} whilePending={phrases.askingPasskeyButton} aria-describedby={(refusal === null) ? undefined : alertId}>
+        {phrases.passkeyUnlockButton}
       </SubmitButton>
-      <div role="alert" id={alertId}>{(refusal !== null) && refusalTextOf(refusal)}</div>
+      <div role="alert" id={alertId}>{(refusal !== null) && refusalTextOf(refusal, phrases)}</div>
     </form>
   )
 }

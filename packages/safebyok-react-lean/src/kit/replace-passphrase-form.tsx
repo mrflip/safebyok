@@ -6,7 +6,7 @@ import type { BankGiver, ReactGiver } from '../giver/react-giver'
 import { PassphraseInput } from '../parts/passphrase-input'
 import { SubmitButton } from '../parts/submit-button'
 import { formActionOf } from './form-action'
-import { KitPhrases, refusalTextOf } from './phrases-kit'
+import { refusalTextOf, useKitPhrases } from './phrases-kit'
 import { UsernameField } from './unlock-form'
 import { useNewPassphrase } from './use-new-passphrase'
 
@@ -33,7 +33,9 @@ export function ReplacePassphraseForm({ giver: giverProp, bank: bankProp, userna
   const giver = useGivenGiver(giverProp)
   const replace = bank.useReplacePassphrase()
   const newPassphrase = useNewPassphrase(giver)
+  const phrases = useKitPhrases()
   const currentRef = useRef<HTMLInputElement>(null)
+  const currentId = useId()
   const alertId = useId()
   const replaceAction = formActionOf(replace, ['passphrase', 'nextPassphrase', 'confirmation'], ({ passphrase, nextPassphrase }) => (
     { passphraseCleartext: passphrase, nextPassphraseCleartext: nextPassphrase }
@@ -48,24 +50,27 @@ export function ReplacePassphraseForm({ giver: giverProp, bank: bankProp, userna
   const isRefused = (replace.error !== null)
   return (
     <form className="sok-replace-passphrase-form" action={action} onReset={newPassphrase.forget}>
-      <p>{KitPhrases.replaceBlurb}</p>
+      <p>{phrases.replaceBlurb}</p>
       {(username !== undefined) && <UsernameField username={username} />}
+      <label htmlFor={currentId}>{phrases.currentField}</label>
       <PassphraseInput
         ref={currentRef}
+        id={currentId}
         name="passphrase"
         autoComplete="current-password"
-        aria-label={KitPhrases.currentField}
-        placeholder={KitPhrases.currentField}
+        placeholder={phrases.currentField}
         required
         aria-invalid={isRefused || undefined}
         aria-describedby={isRefused ? alertId : undefined}
       />
+      <label htmlFor={newPassphrase.field.id}>{phrases.newPassphraseField}</label>
       <PassphraseInput {...newPassphrase.field} name="nextPassphrase" />
       <p role="status" id={newPassphrase.verdictId}>{newPassphrase.verdictText}</p>
+      <label htmlFor={newPassphrase.confirmField.id}>{phrases.confirmField}</label>
       <PassphraseInput {...newPassphrase.confirmField} name="confirmation" />
       <p role="status" id={newPassphrase.matchId}>{newPassphrase.matchText}</p>
-      <div role="alert" id={alertId}>{isRefused && refusalTextOf(replace.error)}</div>
-      <SubmitButton whilePending={KitPhrases.replacingButton} disabled={! newPassphrase.isReady}>{KitPhrases.replaceButton}</SubmitButton>
+      <div role="alert" id={alertId}>{isRefused && refusalTextOf(replace.error, phrases)}</div>
+      <SubmitButton whilePending={phrases.replacingButton} disabled={! newPassphrase.isReady}>{phrases.replaceButton}</SubmitButton>
     </form>
   )
 }

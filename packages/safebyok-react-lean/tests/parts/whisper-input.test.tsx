@@ -101,4 +101,15 @@ describe("WhisperInput", () => {
     fireEvent.change(field, { target: { value: TH.JokesKey } })
     expect(field.value).to.eq(TH.JokesKey)
   })
+
+  it("hands className and other attributes to the input, and marks it revealed and invalid in data- attributes", () => {
+    const { rerender } = render(<WhisperInput name="apiKey" aria-label="API key" className="field" title="Your key" />)
+    const field = screen.getByLabelText<HTMLInputElement>('API key')
+    expect([field.className, field.title]).to.deep.equal(['field', 'Your key'])
+    expect([Object.hasOwn(field.dataset, 'revealed'), Object.hasOwn(field.dataset, 'invalid')]).to.deep.equal([false, false])
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(Object.hasOwn(field.dataset, 'revealed')).to.eq(true)
+    rerender(<WhisperInput name="apiKey" aria-label="API key" aria-invalid />)
+    expect(Object.hasOwn(field.dataset, 'invalid')).to.eq(true)
+  })
 })
