@@ -5,6 +5,7 @@
 /** The row "A refusal shown from a form Action's result outlives an Undo". */
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { useActionState } from 'react'
+import { isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it } from 'vitest'
 import * as TH from '../test-helpers'
@@ -17,6 +18,7 @@ const RowChanged = 'notes/wontfix.md, "A refusal shown from a form Action\'s res
 describe("wontfix: a draft's form Action that resolves its refusal as the Action's state", () => {
   it("shows the refusal still after Undo makes the draft clean again", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const seen: { putErr: Error | null } = { putErr: null }
     function RefusingEditor() {
       const draft = world.Bank.useDraft(TH.JokesPath)
       async function putDraft(): Promise<Error | null> {
@@ -24,6 +26,7 @@ describe("wontfix: a draft's form Action that resolves its refusal as the Action
           await draft.put()
           return null
         } catch (err) {
+          seen.putErr = err as Error
           return err as Error
         }
       }
@@ -55,9 +58,11 @@ describe("wontfix: a draft's form Action that resolves its refusal as the Action
     act(() => { screen.getByText('Save').click() })
     const refusalNode = await screen.findByRole('alert')
     const refusal = refusalNode.textContent
-    expect(refusal).to.not.eq('')
+    expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('stale_write')
+    expect(refusal).to.eq(seen.putErr?.message)
+    await screen.findByText('Dirty and behind')
     act(() => { screen.getByText('Undo').click() })
     await screen.findByText('Clean')
-    expect(screen.getByRole('alert').textContent, RowChanged).to.eq(refusal)
+    expect(screen.queryByRole('alert')?.textContent, RowChanged).to.eq(refusal)
   })
 })
