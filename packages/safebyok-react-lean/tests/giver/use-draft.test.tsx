@@ -227,7 +227,7 @@ describe("useDraft", () => {
     expect([seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([2, { service: 'jokes', tier: 'ultra' }])
   })
 
-  it("discards what was typed when its form's action refuses the put, so the next put writes nothing typed", async () => {
+  it("forgets what was typed when its form's action refuses the put, clean again, so the next put writes nothing typed", async () => {
     const { world, device, input, seen } = await renderDraftEditor({ isLocked: true, isInForm: true })
     typeKeyInto(input)
     await screen.findByText('Dirty')
@@ -240,6 +240,29 @@ describe("useDraft", () => {
     await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     act(() => { screen.getByText('Save').click() })
     await waitFor(() => { expect(seen.puts).to.eq(1) })
+    expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
+  })
+
+  it("forgets only what was typed when its form's action refuses the put, so the next put writes the sidecar set over the stored key", async () => {
+    const { world, device, input, seen } = await renderDraftEditor({ isLocked: true, isInForm: true })
+    act(() => { screen.getByText('Go pro').click() })
+    await screen.findByText('Tier pro')
+    const baseRevseq = seen.draft?.base?.revseq
+    typeKeyInto(input)
+    await waitFor(() => { expect(seen.draft?.isWhisperDirty).to.eq(true) })
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(device.bank!.getSnapshot().isUnlockWanted).to.eq(true) })
+    act(() => { world.Bank.dismissUnlock() })
+    await waitFor(() => { expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('dismissed') })
+    await waitFor(() => { expect(seen.draft?.isWhisperDirty).to.eq(false) })
+    expect([input.value, input.type]).to.deep.equal(['', 'password'])
+    expect([seen.draft?.isDirty, seen.draft?.isBehind, seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([true, false, baseRevseq, { service: 'jokes', tier: 'pro' }])
+    expect(screen.getByText('Dirty')).to.exist
+    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(seen.puts).to.eq(1) })
+    await screen.findByText('Clean')
+    expect(world.client.getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' })
     expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
   })
 
