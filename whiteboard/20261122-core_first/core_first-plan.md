@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Thread 2 (#844) in rework: the Coach ruled the BankMinder a subclass of one minder class beside VaultMinder, made early and holding all users' rows, with no world entry (`worldAt` reads the three items synchronously); the paused review's `useGate` fix (`3f44feddc`) is on the branch. Thread 4 (#846, draft, base main) paused, blocked on thread 2's rework; it leans only on `make`, `worldAt`, `fetchWorld`. Thread 3 ready (#847, `5c4c2254a`, justify green by its report), its review held until #844's rework lands and #847 is rebased onto it.
+* **Status**: running (2026-11-22). Thread 2 (#844) reworked as `Minder` with `BankMinder` and `VaultMinder` subclasses, one BankMinder per user and bank in a shared bank client, no world entry; `f5d6f9b3d`, justify green by its report; in a fresh high review on opus. Thread 3 (#847) being rebased onto it by a fresh worker (file-thread's catch-up conflicted). Thread 4 (#846) resumed, rebasing onto it and adapting to the new BankMinder signatures.
 
 The Coach's request, verbatim:
 
