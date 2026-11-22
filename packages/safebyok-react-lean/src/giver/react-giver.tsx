@@ -522,7 +522,7 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   /** React Query's options for writing the box `boxNamed` names from a form, for the host's own `useMutation`: its `mutate` is handed the `FormData`, as {@link putBoxAction}'s action is.
-   * Make them at module scope, or under `useMemo`, so their checks run once.
+   * Make them under `useMemo`, so their checks run once: their `mutationKey` names the user signed in when they are made.
    * The mutation reads the whisper with `opts.whisperOf` and the sidecar with `opts.sidecarOf`, deletes the form's secret fields, then writes as {@link putBoxOnce} does.
    * Every field, or only those `opts.secretFieldnames` names: name every field that carries a secret, since one `whisperOf` reads that you leave out stays in the `FormData` React Query retains.
    * It resolves the box written. It rejects with the refusal, or with what `whisperOf` or `sidecarOf` threw, as an `Error`: the mutation's `error`.
