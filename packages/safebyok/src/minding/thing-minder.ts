@@ -71,9 +71,9 @@ export type Labelpathed = { labelpath: Labelpath }
  *   so when the parent's life changes it keeps the earlier life's children beside the new life's.
  * - A record that lands while its parent has no listing cached joins none: the parent's next list lists it. The root
  *   box always has one cached.
- * - An operation caches only its own good answer: the record got, written or listed, never a write's ask. Any other
- *   record an answer carries (a refusal's `dbhas`, or a tracked bank, main gate or root box) is cached only as the watch
- *   tells of it, and the watch tells of it before the operation returns.
+ * - An operation caches only its own good answer: the record got or written, or the labelpaths listed, never a write's
+ *   ask. Any other record an answer carries (a refusal's `dbhas`, each Thing a list answers, or a tracked bank, main gate
+ *   or root box) is cached only as the watch tells of it, and the watch tells of it before the operation returns.
  * - A refused write changes no item and marks nothing stale. Its `dbhas`, through the watch, may still change an item.
  * - A write's answer and the watch's notice of the same write leave the same item and listing, in either order: the
  *   later changes nothing.
