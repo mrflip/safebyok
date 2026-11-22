@@ -11,7 +11,7 @@ import * as Phrases from './phrases-giver'
 export type GiverBanks<BanklabelT extends string = string> = Readonly<Record<BanklabelT, Readonly<{ vaultDB: VaultDB }>>>
 
 /** A giver's config: its one bank and where that is stored, and the options of each device it makes. */
-export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB' | 'queryClient'>>
+export type GiverConfig<BanklabelT extends string = string> = Readonly<{ banks: GiverBanks<BanklabelT> }> & Readonly<Omit<DeviceOpts, 'vaultDB' | 'deviceDB'>>
 
 /** The bank snapshot a giver's hooks show while nobody is signed in. */
 export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })

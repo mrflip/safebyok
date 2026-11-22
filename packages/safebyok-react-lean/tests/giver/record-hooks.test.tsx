@@ -56,7 +56,7 @@ async function setupShowing({ isWatching = true, beforeShowing = () => undefined
   beforeShowing(world)
   const { BoxProbe, seen } = makeBoxProbe(world)
   rerender(treeOf(world, <><StageShown world={world} /><BoxProbe /></>))
-  return { world, seen, minder: world._cheat_device().minder }
+  return { world, seen, minder: world._cheat_device().minder! }
 }
 
 /** {@link setupShowing}, once the hook shows the first revision, which it returns. */
@@ -105,7 +105,7 @@ describe("useBox, mounted before anyone is signed in", () => {
     const { rerender } = render(treeOf(world, <BoxProbe />, null))
     rerender(treeOf(world, <BoxProbe />))
     await waitFor(() => { expect(seen.current?.data).to.not.be.undefined })
-    const client = world._cheat_device().minder.queryClient
+    const client = world._cheat_device().queryClient
     const { options } = client.getQueryCache().find({ queryKey: JokesKey, exact: true })!
     const defaults = client.getQueryDefaults(JokesKey)
     expect(defaults.queryFn).to.be.a('function')
@@ -118,7 +118,7 @@ describe("useBox over the minder's own cache", () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const { rerender } = render(treeOf(world, <StageShown world={world} />))
     await screen.findByText('locked')
-    const { minder } = world._cheat_device()
+    const minder = world._cheat_device().minder!
     const record = await act(() => minder.get({ ...minder.scope, labelpath: JokesBoxPath }))
     const { gets } = world.counts
     const { BoxProbe, seen } = makeBoxProbe(world)
@@ -227,7 +227,7 @@ describe("useBoxList over the minder's own listing", () => {
   it("lists again when the minder marks its listing stale", async () => {
     const { world, result, lists } = await setupListing()
     await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
-    const { minder } = world._cheat_device()
+    const minder = world._cheat_device().minder!
     act(() => { minder.invalidate('box', { list: 'all' }) })
     await waitFor(() => { expect(minder.queryClient.getQueryState(BoxListKey)?.isInvalidated).to.eq(false) })
     expect([lists.count, result.current.data]).to.deep.equal([2, [TH.JokesPath]])
@@ -266,12 +266,12 @@ describe("useGate over the BankMinder's world", () => {
     const { container } = render(TH.providerTreeOf(world, <GateProbe />, { userid: TH.ProviderUser }))
     await waitFor(() => { expect(header).to.be.null })
     // The minder freezes, so the spy goes on its class, counting the giver's device's calls alone.
-    const { minder } = world._cheat_device()
+    const minder = world._cheat_device().minder!
     const get = vi.spyOn(VaultMinder.prototype, 'get')
     onTestFinished(() => { get.mockRestore() })
     const other = LeanTH.makeDevice({}, { vaultDB: world.vaultDB })
     await act(async () => {
-      await other.hello()
+      await other.signIn(TH.ProviderUser)
       await other.bank!.gate.addPasskey({ passphraseCleartext: LeanTH.TestPassphrase, nextPasskeyCleartext: LeanTH.passkeyAnswerOf() })
     })
     await waitFor(() => { expect(header?.wayinkind).to.eq('passkey') })

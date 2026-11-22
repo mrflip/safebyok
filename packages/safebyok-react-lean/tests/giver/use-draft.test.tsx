@@ -60,7 +60,7 @@ async function renderDraftEditor({ putOpts, isLocked = false, isInForm = false }
   const rendered = render(TH.providerTreeOf(world, <editor.DraftEditor />, { userid: TH.ProviderUser }))
   const device = await waitFor(() => world._cheat_device())
   await act(async () => {
-    await device.hello()
+    await device.signIn(TH.ProviderUser)
     if (! isLocked) { await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }) }
   })
   await screen.findByText('Tier none')

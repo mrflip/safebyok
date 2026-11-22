@@ -29,7 +29,7 @@ describe("wontfix: a form whose reset the host cancels, with a draft's input in 
     render(TH.providerTreeOf(world, <ResetEditor />, { userid: TH.ProviderUser }))
     const device = await waitFor(() => world._cheat_device())
     await act(async () => {
-      await device.hello()
+      await device.signIn(TH.ProviderUser)
       await device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase })
     })
     const keyInput = await screen.findByLabelText<HTMLInputElement>('Key')
