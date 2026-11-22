@@ -415,3 +415,29 @@ refuses for a reason the row shows; then press Undo.
 
 Reasoning for wontfix: the message is true of the last Save and harms nothing, and each way of removing it costs more
 code than it is worth in a demo meant to be read. Ruled by the Coach, 2026-11-22.
+
+### A component inside a form that hands `mutate` its `FormData` can read the secret for one render
+
+`putBoxMutationOptions` deletes the form's secret fields in its `mutationFn` (`safebyok-react-lean`, `react-giver.tsx`).
+TanStack Query calls a `mutationFn` one turn of the microtask queue after `mutate`. Where the form is
+`<form action={(form) => { put.mutate(form) }}>`, React renders the form's pending status before that turn, with the
+same `FormData` as `useFormStatus().data`.
+
+Current outcome: a component inside the form that reads the secret's field from `useFormStatus().data` reads the typed
+secret on one render. Nothing retains it: the field is deleted from that `FormData` before the write begins, and the
+mutation's `variables`, its result and the cache never have it. No part and no kit form reads `data`. Under
+`putBoxAction` the fields are deleted before React renders, and no render reads the secret.
+
+Alternatives: a form that submits from `onSubmit` with `preventDefault()` puts no `FormData` in React's form status,
+and then every such form of a host's gives up `useFormStatus`, resets itself, and passes its button its pending state.
+A hook of ours that deleted the fields before it called `mutate` would need the secret in a variable of its own for
+that turn.
+
+Workaround: write the form as an Action, with `putBoxAction`; or read no secret's field from `useFormStatus().data`.
+
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/form-status-twin.test.tsx`, which uses nothing a host could
+not write.
+
+Reasoning for wontfix: the only reader is a component the host wrote, inside the form the user typed the secret into,
+where it could read the input itself; nothing retains the secret; and each alternative costs every host more than this
+costs any. Ruled by the Coach, 2026-11-22.
