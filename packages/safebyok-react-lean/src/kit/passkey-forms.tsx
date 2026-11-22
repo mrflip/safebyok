@@ -137,23 +137,32 @@ export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHead
   const bankPasskeyHeader = bank.useGate({ select: passkeyHeaderOf }).data ?? null
   const passkeyHeader = (passkeyHeaderProp === undefined) ? bankPasskeyHeader : passkeyHeaderProp
   const unlock = bank.useUnlock()
+  const [isUnlocking, setIsUnlocking] = useState(false)
   const [ceremonyErr, setCeremonyErr] = useState<VaultError | null>(null)
   const alertId = useId()
   const unlockAction = formActionOf(unlock, [], async () => {
     const passkeyCleartext = await heardCeremony(() => askPasskey(passkeyHeader, askOpts), setCeremonyErr)
     return (passkeyCleartext === null) ? null : { passkeyCleartext }
   })
+  // Submitted from a handler, never a form action, as the unlock form is: what waits on the unlock may be a host's pending Action.
   /** Ask the passkey, and unlock the bank with its answer. */
-  async function action(form: FormData) {
+  async function submit(formEl: HTMLFormElement) {
     setCeremonyErr(null)
     unlock.reset()
-    await unlockAction(form)
+    setIsUnlocking(true)
+    try {
+      await unlockAction(new FormData(formEl))
+    } finally {
+      setIsUnlocking(false)
+    }
   }
   if (! passkeysAvailable() || (passkeyHeader?.wayinkind !== 'passkey')) { return null }
   const refusal = ceremonyErr ?? unlock.error
   return (
-    <form className="sok-passkey-unlock" action={action}>
-      <SubmitButton whilePending={KitPhrases.askingPasskeyButton} aria-describedby={(refusal === null) ? undefined : alertId}>{KitPhrases.passkeyUnlockButton}</SubmitButton>
+    <form className="sok-passkey-unlock" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
+      <button type="submit" disabled={isUnlocking} aria-describedby={(refusal === null) ? undefined : alertId}>
+        {isUnlocking ? KitPhrases.askingPasskeyButton : KitPhrases.passkeyUnlockButton}
+      </button>
       <div role="alert" id={alertId}>{(refusal !== null) && refusalTextOf(refusal)}</div>
     </form>
   )
