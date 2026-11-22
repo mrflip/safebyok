@@ -115,8 +115,7 @@ export abstract class Minder {
   // the same for every other record. The client's own defaults are left to whoever owns it: TanStack matches query
   // defaults by key prefix, and every minder key starts with MinderKeyRoot, so every entry of every bank takes these from
   // the start, a restored one included. Where an option differs by bank, it asks the minder minding the key's bank; by
-  // kind of entry, it reads the key's kind, or the value's for structural sharing, which TanStack hands no key. A minder
-  // of the same bank made while another minds takes nothing over.
+  // kind of entry, it reads the key's kind, or the value's for structural sharing, which TanStack hands no key.
   /** Make a QueryClient that minders of several banks can share, each minding its own bank's entries.
    * Hand it to `make` as `queryClient`. Its cache fetches, and settles a fetched record, only while a minder of the key's bank is minding.
    */
