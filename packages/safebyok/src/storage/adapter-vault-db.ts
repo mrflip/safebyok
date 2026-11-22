@@ -1,4 +1,4 @@
-/** The `AdapterVaultDB` base class: a store extends it by writing the `do*` calls. */
+/** The `AdapterVaultDB` base class: a concrete adapter extends it by writing the `do*` calls. */
 
 import { noop } from 'es-toolkit'
 import { EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
@@ -17,7 +17,7 @@ import * as Throwers from '../refusals/throwers'
 
 // == [Answers]: Received, answerOf
 
-/** A change a store's watch passes to `receive`: the changed Thing, raw, and its bank's world as the store last read it.
+/** A change a concrete adapter's watch passes to `receive`: the changed Thing, raw, and its bank's world as the datastore last read it.
  * The watch tells of the Thing and ignores the world: a bank or main gate that changed is notified as a Thing of its own.
  */
 export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
@@ -25,7 +25,7 @@ export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 /** One of the adapter's watches: its bank, the function that tells it of one raw Thing, and the one that notifies it of a Thing already checked. */
 type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void, notify: (val: ThingRecord | Sparse<ThingRecord>) => void }
 
-/** The answer a verb gives for its store's report: `record` becomes `val` when good, `dbhas` when refused.
+/** The answer a verb gives for its concrete adapter's report: `record` becomes `val` when good, `dbhas` when refused.
  * Throws `storage_issue` if a good report other than `gotvoid` has no Thing.
  */
 function answerOf(actual: Actual<EX.GotAct>, oplabel: string, loggableAsk: LoggableAsk): GetThingAnswer
@@ -37,12 +37,12 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
     const err = Throwers.actRefused('vault', actual.act, { oplabel, ask: loggableAsk })
     return { ok: false, ask: loggableAsk, act: actual.act, world, ...beside, dbhas: record, err }
   }
-  // Every good act but gotvoid finds or writes a Thing: a store that reports none is broken.
+  // Every good act but gotvoid finds or writes a Thing: a concrete adapter that reports none is broken.
   if ((record === null) && (actual.act !== 'gotvoid')) { throw Throwers.storageIssue() }
   return { ok: true, ask: loggableAsk, act: actual.act, world, ...beside, val: record }
 }
 
-/** The `tracked` a store reports, as a field to spread into an answer: none where it reports none. */
+/** The `tracked` a concrete adapter reports, as a field to spread into an answer: none where it reports none. */
 function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked } { return (tracked === undefined) ? {} : { tracked } }
 // --
 
@@ -58,7 +58,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // --
 
   // == [Classifying]: classifyGetThing, classifyWriteThing, classifyListThings, classifyBirthBank
-  // A subclass's `do*` calls these. A store that reaches some of the verdict itself overrides them to read it. Each
+  // A subclass's `do*` calls these. A concrete adapter that reaches some of the verdict itself overrides them to read it. Each
   // is given the raw bank and main gate of the ask's bank, fetched in the same step, as its world.
 
   /** Classify a get against the raw Thing fetched at its scope, null for none. */
@@ -240,7 +240,7 @@ export abstract class AdapterVaultDB implements VaultDB {
   // == [Protected, for a subclass to write]: doGetThing, doWriteThing, doListThings, doBirthBank, doWatch
   // Each is one atomic step: fetch the Thing at the ask's scope, classify it, and when `isWriteAct(act)` is true, write
   // `ask.record` and report the Thing the datastore reports writing, checked by `writtenThingOf`, in place of the one
-  // fetched. A store that can run code of its own may run the whole step there. For an ask that carries `track`, the step
+  // fetched. A datastore that can run code of its own may run the whole step there. For an ask that carries `track`, the step
   // also compares it with the bank and main gate the world is read from, and with the root box read beside them, and reports
   // that as the answer's `tracked` (`trackedFetchedOf` makes the comparison in TypeScript), read again after a write.
   //
@@ -248,9 +248,9 @@ export abstract class AdapterVaultDB implements VaultDB {
   // the lifetok a write of the bank over a live bank keeps, and the storage policies it names (`classifyWriteThing` reads no
   // more). Where several refusals apply at once, any one of them may be the answer: all else equal the likelier is
   // preferred, and `damaged_row` is the least likely, but no code is written to rank them. The record carries every field,
-  // so a store may write it by replacing the Thing stored whole.
+  // so a concrete adapter may write it by replacing the Thing stored whole.
   //
-  // A store that makes the checks in the statement that writes reports, beside a refusal, the Thing as it now stands and a
+  // A concrete adapter that makes the checks in the statement that writes reports, beside a refusal, the Thing as it now stands and a
   // verdict for each check of the Thing stored that the act tables cannot name. It then answers in this order: the act
   // tables over the Thing read back (`storedCitedOf`, `writeActOf`), answering any act but a write with `unwrittenWriteOf`;
   // under a write act, each failed verdict's own refusal (`demandBornAtKept`, `demandLifetokKept`, `demandPolicies`); and
@@ -269,7 +269,7 @@ export abstract class AdapterVaultDB implements VaultDB {
    * write each put's record and report the three as written, checked by `writtenRootsOf`, and the world the bank and main gate make.
    */
   protected abstract doBirthBank(ask: BirthBankAsk, puts: BirthPuts): Helpers.Awaitable<BirthBankActual>
-  /** Start a watch: call `receive` with each changed Thing, raw, and its bank's world as the store last read it, and `onBadNews` with
+  /** Start a watch: call `receive` with each changed Thing, raw, and its bank's world as the datastore last read it, and `onBadNews` with
    * trouble, whether or not it ends the watch. Returns a function that stops it. Left unwritten, for a datastore with no watch, it calls neither.
    */
   protected doWatch(_scope: ThingWatchScope, _receive: (received: Received) => void, _onBadNews: (news: Errors.VaultError) => void): () => void { return noop }

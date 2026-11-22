@@ -31,11 +31,11 @@ export function badnewsOf(bank: ReturnType<typeof fakeBankOf>): string[] {
   return bank.tellBadNews.mock.calls.flatMap(([told]) => told.map((news) => (news as Errors.VaultError).refusalkind))
 }
 
-/** A vaultDB whose gets read the store at once, and answer only when the test calls `release`. */
+/** A vaultDB whose gets read the datastore at once, and answer only when the test calls `release`. */
 export class LateVaultDB extends MemoryVaultDB {
   readonly #releases: (() => void)[] = []
 
-  /** True while a get has read the store and waits to answer. */
+  /** True while a get has read the datastore and waits to answer. */
   get isHolding(): boolean { return this.#releases.length > 0 }
 
   override async tryGetThing(ask: GetAsk): Promise<GetThingAnswer> {
@@ -157,7 +157,7 @@ export function actOf(answer: TSQAnswer): string { return answer.act }
 /** The scope of the box under the root box labelled `boxlabel`. */
 export function boxScopeOf(boxlabel: string): ThingScope { return { ...TH.ThingBank, labelpath: `box/${boxlabel}` } }
 
-/** Put `box` in `vaultDB`'s store as another device would, telling no watch. */
+/** Put `box` in `vaultDB`'s datastore as another device would, telling no watch. */
 export function cheatBox(vaultDB: MemoryVaultDB, box: DeliverableThing): void { vaultDB._cheat_things(TH.ThingBank).set(box.labelpath, box) }
 
 /** A listener that records each event it is told. */

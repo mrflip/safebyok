@@ -18,7 +18,7 @@ function toldOf(heard: ReturnType<typeof listenerOf>) {
   })
 }
 
-/** A minder that has listed the root box, the box under it, and the main gate, over a store with the box. */
+/** A minder that has listed the root box, the box under it, and the main gate, over a datastore with the box. */
 async function listedWorldOf() {
   const vaultDB = new MemoryVaultDB()
   await storedBoxOf(vaultDB)

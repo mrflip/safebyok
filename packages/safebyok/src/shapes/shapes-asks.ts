@@ -168,7 +168,7 @@ function checkWriteInvariants(ask: WriteAsk): void {
   if (Lifeseq.leadingOf(record.lifepath) !== Lifeseq.leadingOf(cited.lifepath))                     { throw Throwers.lifepathNotKept(ask) }
   const isLifeFlipped = (record.am !== cited.am)
   if (Lifeseq.lifenumOf(record.lifeseq) !== Lifeseq.lifenumOf(Lifeseq.ofLifepath(cited.lifepath)) + (isLifeFlipped ? 1 : 0)) { throw Throwers.lifeseqNotNext(ask) }
-  // A live record over a live one leaves the stored born_at unchanged: the store checks that, against the Thing it has.
+  // A live record over a live one leaves the stored born_at unchanged: AdapterVaultDB checks that, against the Thing it has.
   if (isLifeFlipped && (record.am === 'a') && (record.born_at !== record.written_at))               { throw Throwers.bornAtNotNow(ask) }
   if ((ask.modelkind === 'gate') && ask.options?.policies.includes('replace_passphrase') && (ask.cited.wayins?.main === undefined)) { throw Throwers.testimonyMissing(ask) }
 }

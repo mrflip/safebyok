@@ -8,7 +8,7 @@ import type { Actual, BirthBankActual, ListThingsActual, ThingNotice } from '../
 import * as Throwers from '../../src/refusals/throwers'
 import * as TH from '../test-helpers'
 
-/** A store whose every step does what the test hands it: throws, or reports what it is given. */
+/** A concrete adapter whose every step does what the test hands it: throws, or reports what it is given. */
 class ScriptedVaultDB extends AdapterVaultDB {
   receive: ((received: Received) => void) | null = null
   readonly step: () => Actual<EX.GoodAct>

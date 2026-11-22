@@ -70,7 +70,7 @@ function mayWrite({ op, cited, ifAbsent, ifPresent }: WriteAsk): boolean {
   return (cited.am === 'a') ? (ifPresent === 'repl') : (ifAbsent === 'add')
 }
 
-/** The act of a write the store made, over the Thing the ask cites. */
+/** The act of a write Postgres made, over the Thing the ask cites. */
 function writtenActOf({ op, cited }: WriteAsk): WriteAct {
   if (op === 'del')                        { return 'deleted' }
   if (cited.revseq === Shell.Cited.revseq)  { return 'born' }
@@ -137,7 +137,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
     if (written.ok) {
       return { ok: true, act: writtenActOf(ask), world: Classifier.worldOf(ask, written.world), ...Classifier.trackedFieldOf(ask, written.tracked), record: Classifier.writtenThingOf(ask, written.thing) }
     }
-    // The store wrote nothing. The act tables say why, of the revision cited; where they find a write, a verdict names the check it failed.
+    // Postgres wrote nothing. The act tables say why, of the revision cited; where they find a write, a verdict names the check it failed.
     const stored = Classifier.storedCitedOf(ask, written.thing)
     const act    = Classifier.writeActOf(ask, stored)
     if (! Classifier.isWriteAct(act))  { return Classifier.unwrittenWriteOf(written.thing, { ask, act, world: { ...written.world, tracked: written.tracked } }) }
@@ -163,7 +163,7 @@ export class PostgresVaultDB extends AdapterVaultDB {
       const things = Classifier.writtenRootsOf(puts, written)
       return { ok: true, act: 'born', world: { ...things.bank, maingate: things.gate }, ...Classifier.trackedFieldOf(ask, written.tracked), things }
     }
-    // The store refused. The act tables name why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
+    // Postgres refused. The act tables name why: a live bank, or a root the birth would write over. Every other check is one a validated ask cannot fail.
     const unwritten = Classifier.unwrittenBirthOf(puts, written)
     if (unwritten === null) { throw storedNothing() }
     return unwritten

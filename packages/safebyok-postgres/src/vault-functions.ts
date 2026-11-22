@@ -125,7 +125,7 @@ export const VaultFunctionsSql = `-- safebyok-postgres: the functions PostgresVa
 --
 -- PostgresVaultDB has made every check below already. They are made again here because this is a boundary that counts:
 -- behind GraphQL, Postgres or Convex the adapter's TypeScript runs on the device, beside every script in the page, and
--- only what runs here holds against one that calls the store directly. And only the statement that writes a row sees the
+-- only what runs here holds against one that calls Postgres directly. And only the statement that writes a row sees the
 -- row it writes over: the checks sit in its WHERE, so when it waits on another writer of the row, Postgres checks them
 -- again against the row that writer left.
 --

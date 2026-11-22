@@ -95,7 +95,7 @@ const GenericChecks = Validator.Checkers('bad_record', ({ obj, str, int, uint, l
   const sparse       = obj({ ...thingScope.shape, label, fmt: lit(ThingFormat), ...revisioned })
   // What a write reads of the Thing stored before it carries its record forward: the rest of the row goes unread.
   const storedCited  = obj({ ...thingScope.shape, revtok: revisioned.revtok, revseq: uint, am, lifepath, born_at: epochMillis })
-  // The store checks only the shape of a sealed part: what is inside is the sealer's.
+  // AdapterVaultDB checks only the shape of a sealed part: what is inside is the sealer's.
   const sealed       = obj({
     /** The part's own key, fresh for each seal, wrapped under the bankKey. */
     key_wrapped:    CX.ciphered,
@@ -246,11 +246,11 @@ export const ThingChecks = Object.freeze({ ...GenericChecks, vaultDBShape, Thing
 
 /** Where a Thing is stored: its user, its bank, and its labelpath under the bank. */
 export type ThingScope   = Readonly<Z.infer<typeof ThingChecks.thingScope>>
-/** A write's citation of the Thing it expects to find: its revision, life and liveness, the only fields the store compares. The shell may be cited. */
+/** A write's citation of the Thing it expects to find: its revision, life and liveness, the only fields AdapterVaultDB compares. The shell may be cited. */
 export type ThingCited   = Readonly<Z.infer<typeof ThingChecks.thingCited>>
 /** The fields a write reads of the Thing stored at its scope: its scope, the fields the act tables compare, and the born_at a replace leaves unchanged. */
 export type StoredCited  = Readonly<Z.infer<typeof ThingChecks.storedCited>>
-/** The name of a Thing field: one of the fields every kind of Thing has, which the store reads. The rest of a record is its body. */
+/** The name of a Thing field: one of the fields every kind of Thing has, which AdapterVaultDB reads. The rest of a record is its body. */
 export type ThingFieldname = keyof Z.infer<typeof ThingChecks.sparse>
 /** The bank, as a Thing. */
 export type BankRecord   = Readonly<Z.infer<typeof PerKindChecks.bankThing>>

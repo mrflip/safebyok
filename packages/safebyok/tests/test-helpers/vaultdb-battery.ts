@@ -18,7 +18,7 @@ import { describeVaultDBTracked } from './vaultdb-battery-tracked'
 
 /** A vaultDB's stored Things, past its verbs: the cheat the battery plants a damaged Thing with, or removes one with. */
 export type VaultDBRowCheats = {
-  /** Stores `raw` as the Thing at `scope`, unchecked. A store that cannot write `raw` throws. */
+  /** Stores `raw` as the Thing at `scope`, unchecked. A concrete adapter that cannot write `raw` throws. */
   plant:  (scope: ThingScope, raw: unknown) => Helpers.Awaitable<void>
   /** Takes away the Thing at `scope`, if any, unchecked. */
   remove: (scope: ThingScope) => Helpers.Awaitable<void>
@@ -26,7 +26,7 @@ export type VaultDBRowCheats = {
 
 /** The options of {@link describeVaultDBBattery}: how to make a vaultDB, and the cheat into what it stores. */
 export type VaultDBBatteryOpts<DBT extends VaultDB = VaultDB> = {
-  /** A fresh, empty vaultDB. A store may empty one database for each it makes: a case uses only the vaultDB it made last. */
+  /** A fresh, empty vaultDB. A concrete adapter may empty one database for each it makes: a case uses only the vaultDB it made last. */
   makeVaultDB:   () => Helpers.Awaitable<DBT>
   /** The cheat into a vaultDB's stored Things. */
   _cheat_rowsOf: (vaultDB: DBT) => VaultDBRowCheats
