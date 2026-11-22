@@ -11,6 +11,10 @@ not write it.
 * *Orchestrator:* thread 1 moved #823 onto #825: `origin/20261122-multiples` at `908751892` carries all three library
   threads, and is the base of threads 2 to 6. `putBoxAction`'s catch is `return { box: null, err:
   sanitizeForeignError(err), texts: textsOfForm(form) }`.
+* *Orchestrator:* the workshop restacked its line after thread 1: `origin/20261122-multiples` is now `1c051f5f7`, on
+  #825 ← #824 ← the workshop's thread 11 (`minder_client`) ← #827 ← #821. Threads 4 and 6 caught up onto it; #822 and
+  #819 were filed on `908751892`, and their next filing rebases them (their `sprintbasebranch` is
+  `origin/20261122-multiples`).
 * Threads 2 and 3 rework the workshop's #822 and #819 in the workshop's own worktrees, rebased onto `908751892`.
 
 ## Where things are
@@ -28,12 +32,19 @@ not write it.
 * Thread 3 (#819): envman's Undo is a `type="button"` calling `draft.discard`; the add form passes
   `secretFieldnames: ['val']` and refills from `texts`; every catch in envman's `src/` wraps with
   `sanitizeForeignError` (re-exported by `safebyok`), no `as Error` left.
+* Thread 4 (#834): `usePassphraseField`, `useWhisperField`, `useWhisperText` (`textRef`), `useWhisperMask` (`maskRef`) in
+  the `parts` entry, `src/parts/use-*.ts`; the parts are markup over them. The hooks answer `isRevealed`, `isRevealing`,
+  `isCapsLockOn`; `useNewPassphrase()` answers `verdict` (no score: the core's has none) and `match`
+  (`'untyped' | 'differs' | 'matches'`). Hosts destructure the reveal hooks (React's refs lint).
+* Thread 6 (#835): option types asserted equal to their checkers' input, `true satisfies AssertEqual<T,
+  Readonly<CheckerInput<typeof Checks.x>>>`; an array field's check needs `.readonly()`.
 
 ## The sprint doc
 
 *Orchestrator:* [Sprint react_free](https://claude.ai/artifact/K5Tfgw5zf4eiW5SGbRPJPa), doc
 `9263e7b5-3849-4fb3-8433-bf6f10ec32f1`; tabs Open Matters `0dccff07-9b57` (body `772f52dd-31e7`), Cleanup
 `17a93409-b0ef` (body `69a0ec33-1add`), Progress `748b3543-647e` (body `f6dec94a-ad45`), Resolved `4e6a3a5e-8688` (body
-`9b083ff2-4a6f`); the `State` enum `87d1b810-c3e3`. Last read bookmark: rev 4 of Open Matters. A new row: insert `"as":"blocks"` at the matters table's end (table
+`9b083ff2-4a6f`); the `State` enum `87d1b810-c3e3`. Last read bookmark: rev 7 of Open Matters (no flips at rev 4). A new row: insert `"as":"blocks"` at the matters table's end (table
 `mgne8td40ga.57`) with a placeholder word in the State cell, then `replace` that paragraph by id with `"with":{"as":
-"markdown","blocks":{k: dropdown index 0},"from":…}` (replace takes `with`, not `source`).
+"markdown","blocks":{k: dropdown index 0},"from":…}` (replace takes `with`, not `source`). Keep backticks and braces out of a
+blocks-insert row's text: one such row was refused as a short row.

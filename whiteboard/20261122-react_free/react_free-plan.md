@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: threads 1, 2 (#822) and 3 (#819) done and filed; threads 4 and 6 building; then 5 on 4, then 7.
+* **Status**: threads 1, 2 (#822), 3 (#819) filed; 4 (#834) and 6 (#835) in review; 5 building on 4; then 7.
 
 ## Read first
 
@@ -107,6 +107,9 @@ In `packages/safebyok-react-lean`. *Depends on*: thread 1. *Look-ahead*: thread 
 part a thin layer over its hook, and its markup in one place. *Size*: medium; if it runs past four hooks and the
 verdict, the rest is thread 5's.
 
+*Status*: ready at `acca878ad` (#834, justify green), one compaction before readiness; in review at `high` on `opus`
+(*Orchestrator:* raised from `medium`: the hooks write whispers into elements). Three open matters, rows in the doc.
+
 ### 5. `kit_parts`: the parts' classes, state attributes, words and labels
 
 > (item 3's other half: `className` and `data-` state attributes on the parts; overridable words for the kit; visible
@@ -134,6 +137,10 @@ The base-32 line is a two-liner that rides along: wherever the docs (VOCABULARY.
 base-32. *Depends on*: thread 1. *Orchestrator:* `WithLockableWhisperOpts` lives in `parts/whisper-mask.tsx`, which thread 4
 rewrites, so it moves to thread 5; thread 6 keeps the other three and the base-32 line.
 *Size*: small to medium.
+
+*Status*: ready at `191244880` (#835, justify green); in review. Pattern: each type hand-written, asserted equal to
+its checker's input (`AssertEqual`, `CheckerInput`, newly re-exported by `safebyok/storage`). Three open matters,
+rows in the doc.
 
 ### 7. `browser_pass`: the demos in a real browser
 
