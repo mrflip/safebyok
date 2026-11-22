@@ -52,6 +52,11 @@ The design this sprint starts from is in the sprint directory, copied so that a 
   Assume every instance property is perfectly synchronized and every state change comes through a front door (every
   lock is a call to `lock()`). A lagging property earns no guard, subscription or test: one line under *For the
   instance-sync thread* in the thread file.
+* **The world has one home, read synchronously** (the Coach, 2026-11-22): "having the world centralized in one place
+  is good, and I don't mind where it is right now -- if there is code to syndicate it ok but there must be no more
+  than one place people read from and it must be sync (i.e. vaultdb-async->home and then it's instantly and perfectly
+  everywhere, no crossings shall be reported". The home is the BankMinder's world entry; no reader keeps a copy or
+  refetches it asynchronously (the giver's `useGate` reads it through `useSyncExternalStore`).
 * **Base case first; no crossing or gap reports** (the Coach, 2026-11-22): get each mechanism working in the base case
   and record where it glitches; a review accepts no finding about a gap or a crossing.
 * **Hosts are not the threat model** (the Coach, 2026-11-22): no check that hunts for guessed-at misuse, and no
