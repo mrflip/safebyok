@@ -1,6 +1,6 @@
 # Thread 9: wontfix_demos (2026-11-22)
 
-Branch `20261122-wontfix_demos`, PR to be numbered below, stacked on #825. Proved: `pnpm --filter safebyok-react-lean lint`, `typecheck`, `test` (21 files, 278 tests, 4 new); `pnpm justify` once at the end.
+Branch `20261122-wontfix_demos`, PR #826, stacked on #825. Proved: `pnpm --filter safebyok-react-lean lint`, `typecheck`, `test` (21 files, 278 tests, 4 new); `pnpm justify` once at the end.
 
 * **Built**: one demonstration test for each row of `notes/wontfix.md`'s `## React`, in `packages/safebyok-react-lean/tests/wontfix/`, each asserting what the row leaves as it is and failing with a message that names the row. Each row's *To reproduce* now names its test.
   - `form-reset-cancelled.test.tsx`: mocks nothing. A draft's field and a plain input in a form whose `onReset` calls `preventDefault()`; after the reset button the plain input keeps its text and the draft's field is empty.
