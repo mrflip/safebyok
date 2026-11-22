@@ -150,11 +150,17 @@ export const BankRootsMissing = "A live bank is stored without its main gate or 
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, MinderClientExpected, BankMindedInClient, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, NotARecord, RecordsOfOtherThings, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
 export const MinderFriendExpected = 'A ThingMinder is made with its friend: the device or bank whose Things it minds.'
 
+
+/** A minder made with a QueryClient that ThingMinder.makeClient did not make. */
+export const MinderClientExpected = 'A ThingMinder caches only in a QueryClient made by ThingMinder.makeClient, whose cache hands each fetched record to its minder.'
+
+/** A minder's hello while another minder of its bank is minding in the same QueryClient. */
+export const BankMindedInClient = "Another ThingMinder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
 
 /** A minder read or written through before `hello`, or after `goodbye`. */
 export const MinderNotStarted = 'This ThingMinder is not minding: call hello before reading from it or writing through it.'

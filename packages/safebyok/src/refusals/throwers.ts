@@ -112,11 +112,16 @@ export function bankRootsMissing(): Errors.VaultError { return new Errors.VaultE
 export function answerNotMade(): Errors.VaultError { return new Errors.VaultError('unexpected_error', Phrases.AnswerNotMade) }
 // --
 
-// == [Minding Throwers]: minderNotStarted, staleRead, childrenStoredDamaged, recordsOfOtherThings
+// == [Minding Throwers]: minderNotStarted, bankMindedInClient, staleRead, childrenStoredDamaged, recordsOfOtherThings
 
 /** The refusal of a read or a write on a minder that is not minding. */
 export function minderNotStarted(): Errors.VaultError {
   return new Errors.VaultError('disabled', Phrases.MinderNotStarted)
+}
+
+/** The refusal of a minder's hello while another minder of its bank is minding in the same client. */
+export function bankMindedInClient(): Errors.VaultError {
+  return new Errors.VaultError('bad_record', Phrases.BankMindedInClient)
 }
 
 /** The refusal of a get answered with a revision older than one cached when it began. */

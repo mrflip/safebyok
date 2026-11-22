@@ -1,5 +1,6 @@
 /** The checks and types of the bank and the device: what each is made from and given, and the bank's drafts and answers. */
 
+import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
@@ -85,6 +86,8 @@ export interface DeviceOpts {
   onBadNews?:       BadNewsHandler | undefined
   /** The defaults the device's minder sets on its items and lists in TanStack Query's cache. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
+  /** The client the device's minder caches in, made by `ThingMinder.makeClient`, which the minders of other devices may share. Default: a client of its own. */
+  queryClient?:     QueryClient | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
 }
