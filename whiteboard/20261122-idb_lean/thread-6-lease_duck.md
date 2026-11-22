@@ -1,6 +1,6 @@
 # Thread 6: lease_duck (2026-11-22)
 
-Branch `20261122-lease_duck`, PR [#842](https://github.com/mrflip/safebyok/pull/842), stacked on [#830](https://github.com/mrflip/safebyok/pull/830). Proved: `pnpm --filter safebyok lint`, `typecheck`, `test` green (29 files, 1403 tests).
+Branch `20261122-lease_duck`, PR [#842](https://github.com/mrflip/safebyok/pull/842), stacked on [#830](https://github.com/mrflip/safebyok/pull/830). Proved: `pnpm justify` green after the catch-up (14 test runs, 7322 tests; safebyok 29 files, 1403 tests).
 
 The Coach (2026-11-22): "can you give lease and wayin getters wherever they don't have it as a direct property -- label (return the gate label) labelpath (`label/${this.label}`), scope, am='a', modelkind -- anything else to make them reasonably duck-typed".
 
