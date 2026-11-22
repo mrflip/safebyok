@@ -46,8 +46,8 @@ export class IdbPersister implements Persister {
 
   constructor(opts: IdbPersisterOpts) {
     const { recordlabel, dbName, throttleMs = 1000, onBadNews = noop } = idbPersisterOpts.parse(opts, { where: "In IdbPersister's options" })
-    this.#shelf = persistShelfOf(dbName)
-    this.#recordlabel   = recordlabel
+    this.#shelf            = persistShelfOf(dbName)
+    this.#recordlabel      = recordlabel
     this.#persistThrottled = throttle((persisted: PersistedClient) => {
       void this.#save(persisted, onBadNews)
     }, throttleMs)

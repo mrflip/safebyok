@@ -96,10 +96,12 @@ describe("an IdbPersister", () => {
 describe("a device restored through IdbPersisters", () => {
   it("comes up in a fresh device with the boxes its predecessor cached", async () => {
     const dbName = freshDbName()
-    const persistersOf = (): DevicePersisters => ({
-      roots: new IdbPersister({ recordlabel: 'roots', dbName, throttleMs: 0, onBadNews: noop }),
-      boxes: new IdbPersister({ recordlabel: 'boxes', dbName, throttleMs: 0, onBadNews: noop }),
-    })
+    function persistersOf(): DevicePersisters {
+      return {
+        roots: new IdbPersister({ recordlabel: 'roots', dbName, throttleMs: 0, onBadNews: noop }),
+        boxes: new IdbPersister({ recordlabel: 'boxes', dbName, throttleMs: 0, onBadNews: noop }),
+      }
+    }
     const { vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { persisters: persistersOf() }) })
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     await settle()
