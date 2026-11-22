@@ -1,31 +1,31 @@
 /** The giver: a host's React layer over one bank, made once at module scope, before anyone signs in.
- * Its provider says who is signed in, and hands its hooks that user's device. Records come through the host's React Query.
+ * Its provider says who is signed in, and hands its hooks that user's device. Its hooks observe the provider's own QueryClient, which the device's minder caches records in.
  */
 
-import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, mutationOptions, queryOptions, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, QueryClient, mutationOptions, queryOptions, skipToken, useMutation, useQuery } from '@tanstack/react-query'
+import { pick } from 'es-toolkit'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
-  type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, type Sidecar, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
+  type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
+  PendingBank, type Sidecar, ThingMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
 import {
-  FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateQueryKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
+  FormMutationDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateQueryKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
 } from './giver-defaults'
 import { type Given, GiverContext } from './giver-context'
 import * as Phrases from './phrases-giver'
 import { popField } from './pop-field'
-import { bridgeMinder } from './react-bridge'
-import { type BoxQueryOpts, ConfigChecks, type GiverConfig, type GiverMount, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
+import { type BoxQueryOpts, ConfigChecks, type GiverConfig, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
-// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, GateQueryOpts, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
-  /** The signed-in user's id. The first one starts that user's device; null or undefined changes nothing. */
+  /** The signed-in user's id. The first one this mount of the provider is handed starts that user's device; null or undefined changes nothing. */
   userid:      string | null | undefined
   /** The vaultDB to use in place of the config's: a test's `MemoryVaultDB`, say. Only the one present when the first userid arrives is used. */
   vaultDB?:    VaultDB | undefined
@@ -52,13 +52,18 @@ export type GateShown = HeaderedGate | Tombstone<HeaderedGate>
 /** What the gate's query answers by default: the live gate, null where no bank is stored, or undefined. */
 export type GateSelected = HeaderedGate | null | undefined
 
-/** The `queryOptions` of a box, for `useQuery`, `useQueries`, `queryClient.query` and the rest. */
+/** React Query's options for `useGate`'s query that shape what that one hook shows. The giver sets every other. */
+export type GateQueryOpts<SelT> = Pick<BoxQueryOpts<GateShown, SelT>, 'select' | 'notifyOnChangeProps'>
+
+/** The `queryOptions` of a box, for `useQuery`, `useQueries`, `queryClient.query` and the rest, run in the giver's QueryClient. */
 export type BoxQueryOptions = UseQueryOptions<BoxShown, Error, BoxSelected> & Readonly<{ queryKey: DataTag<QueryKey, BoxShown, Error> }>
 
 /** The query factories of the signed-in user's bank, from `SOK.useQueryOptions()`. */
 export type BoxQueries = Readonly<{
-  /** The `queryOptions` of the box at `labelpath`. */
-  box: (labelpath: string) => BoxQueryOptions
+  /** The `queryOptions` of the box at `labelpath`, to run in `client`. */
+  box:    (labelpath: string) => BoxQueryOptions
+  /** The QueryClient each query from `box` runs in: hand it to `useQuery` and its kin as their second argument. Write nothing to it. */
+  client: QueryClient
 }>
 
 /** What a {@link BankGiver.withLockableWhisper} calls in place of its callback on a locked bank. */
@@ -116,14 +121,20 @@ export type ReactGiver<BanklabelT extends string = string> = ReturnType<typeof r
 /** The hooks and calls of a giver's bank, from `SOK.bank(banklabel)`. */
 export type BankGiver = ReturnType<ReactGiver['bank']>
 
-/** What a provider shows the hooks under it: its user's device, or none and the bank snapshot shown meanwhile. */
-type Shown = Readonly<{ device: Device, bank: null }> | Readonly<{ device: null, bank: BankSnapshot }>
+/** What a provider shows the hooks under it: its user's device, or none and the bank snapshot shown meanwhile; and the QueryClient they observe. */
+type Shown = Readonly<{ client: QueryClient } & ({ device: Device, bank: null } | { device: null, bank: BankSnapshot })>
+
+// A ref, in effect: the provider's effect sets `device` once, and the calls outside its hooks read it.
+/** What one mount of a provider owns: the QueryClient its hooks observe, made with the mount, and the device its first userid starts. */
+type ProviderMount = { readonly client: QueryClient, device: Device | null }
 
 /** What a bank's hooks and calls read of their giver. */
 type BankFriend = Readonly<{
   banklabel:    string
-  /** The signed-in user's device, or null while nobody is signed in: for the calls a host may make outside the provider. */
+  /** The device of the provider mounted, or null while there is none or nobody is signed in: for the calls a host may make outside the provider. */
   signedIn:     () => Device | null
+  /** The QueryClient of the provider mounted, or the giver's own while none is: for the calls a host may make outside the provider. */
+  clientNow:    () => QueryClient
   demandDevice: () => Device
   demandBank:   () => Bank
   demandVault:  () => Vault
@@ -131,7 +142,7 @@ type BankFriend = Readonly<{
 }>
 // --
 
-// == [The giver]: reactGiver, Unjudged, shownOf, SignedOutShown, StartingShown
+// == [The giver]: reactGiver, Unjudged, makeProviderMount, shownOf
 
 /** Make the giver of one bank: hold `config`, until someone signs in. Make it once, at module scope.
  * `config` is the bank, as `banks: { mybank: { vaultDB } }`, and the options of each Device it makes.
@@ -143,28 +154,17 @@ type BankFriend = Readonly<{
 export function reactGiver<BanklabelT extends string>(config: GiverConfig<BanklabelT>) {
   const [[banklabel, { vaultDB: configVaultDB }]] = ConfigChecks.giverConfig.parse(config).banks
   const { banks: _banks, ...configDeviceOpts } = config
-  /** The signed-in user's device, from the first userid a provider is handed, for the page's life. */
-  let device: Device | null = null
+  /** The provider mounted, whose device the calls outside its hooks act on, or null while none is. */
+  let mounted: ProviderMount | null = null
+  /** The QueryClient a hook observes outside every provider, where each query skips its fetch. */
+  const outsideClient = new QueryClient()
   // One context for each giver, so a hook of one giver never reads the device of another giver's provider.
   /** The device the nearest provider of this giver shows its children, or signed out outside every one. */
-  const ShownContext = createContext<Shown>(SignedOutShown)
+  const ShownContext = createContext<Shown>({ device: null, bank: SignedOutBank, client: outsideClient })
 
-  /** The giver's device: `userid`'s, made now, or the one already made, whatever `userid`.
-   * `mount`'s vaultDB and key deriver, where given, replace the config's; its client is the one the minder's records are bridged into.
-   */
-  function ensureDevice(userid: string, { client, vaultDB, keyDeriver }: GiverMount): Device {
-    if (device !== null) { return device }
-    const opts = { ...configDeviceOpts, vaultDB: vaultDB ?? configVaultDB, ...(keyDeriver && { keyDeriver }) }
-    // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
-    const made = Device.make({ userid, banklabel, device_tok: globalThis.crypto.randomUUID() }, opts)
-    device = made
-    // Nothing ends a device yet, so the bridge is never stopped.
-    bridgeMinder(client, made.minder, (badnews) => { made.tellBadNews(badnews) })
-    return made
-  }
-
-  /** The signed-in user's device. Refuses `absent_vault` while nobody is signed in. */
+  /** The signed-in user's device. Refuses `absent_vault` while nobody is signed in, or no provider is mounted. */
   function demandDevice(): Device {
+    const device = mounted?.device ?? null
     if (device === null) { throw new VaultError('absent_vault', Phrases.NobodySignedIn) }
     return device
   }
@@ -183,21 +183,36 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     return signedIn.vault
   }
 
-  /** Says who is signed in: mount it once, at the root, inside the host's `QueryClientProvider`.
-   * The first userid starts that user's device. A null or undefined userid changes nothing, and neither does unmounting.
-   * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead.
+  /** Says who is signed in: mount it once, at the root, inside the host's `QueryClientProvider`, which runs the form verbs' mutations.
+   * The first userid it is handed starts that user's device, for the life of this mount. A null or undefined userid changes nothing.
+   * Under it, a hook never shows a device whose userid is not the prop's: it shows `starting` instead. Until its effects run,
+   * as in a server render, a hook shows `starting` for a userid and `signed_out` for none.
+   * The calls that are not hooks act on the device of the provider mounted, and refuse once it unmounts. Unmounting ends nothing.
+   * Mount one at a time: under two mounted at once, those calls act on the one mounted last, until it unmounts.
    * The parts and the kit beneath it use its giver and bank, unless handed their own as props.
-   * Render it in the browser only: on a server, one device would serve every request.
    */
   function Provider({ userid, vaultDB, keyDeriver, children }: ProviderProps) {
-    const client = useQueryClient()
-    // The device is made during render, so the first render with a userid shows it, and a selecting hook renders no
-    // more than its selection changes. Each later call, StrictMode's or a discarded render's, answers the one device.
-    // `hello` fetches the bank, its main gate and root box through the minder, so it waits for the effect; it has no
-    // cleanup, as the device lives for the page.
-    const made = (typeof userid === 'string') ? ensureDevice(userid, { client, vaultDB, keyDeriver }) : device
-    useEffect(() => { void made?.hello() }, [made])
-    const shown = useMemo(() => shownOf(made, userid), [made, userid])
+    // StrictMode makes a second mount and discards it, and a server render discards its own: making one does no I/O.
+    const [mount] = useState(makeProviderMount)
+    const [device, setDevice] = useState<Device | null>(null)
+    // Made in the effect, not in render: Device.make checks the secure context, and a server has no device to make.
+    // The mount keeps its first device, so StrictMode's second run of the effect starts nothing more. `hello` fetches the
+    // bank, its main gate and root box through the minder, and answers its first call to every later one.
+    const startDevice = useEffectEvent((signedIn: string) => {
+      // Cheat (react_life): a fresh device_tok for each device. Nothing keeps one across a reload yet.
+      mount.device ??= Device.make({ userid: signedIn, banklabel, device_tok: globalThis.crypto.randomUUID() }, {
+        ...configDeviceOpts, vaultDB: vaultDB ?? configVaultDB, ...(keyDeriver && { keyDeriver }), queryClient: mount.client,
+      })
+      setDevice(mount.device)
+      void mount.device.hello()
+    })
+    useEffect(() => {
+      mounted = mount
+      return () => { if (mounted === mount) { mounted = null } }
+    }, [mount])
+    useEffect(() => { if (typeof userid === 'string') { startDevice(userid) } }, [userid])
+    useEffect(() => ((device === null) ? undefined : refetchMarked(device.minder)), [device])
+    const shown = useMemo(() => shownOf(device, userid, mount.client), [device, userid, mount])
     return <ShownContext value={shown}><GiverContext value={given}>{children}</GiverContext></ShownContext>
   }
 
@@ -231,22 +246,24 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
     return { ...judged, judge }
   }
 
-  const { bankGiver, boxQueryOf } = makeBankGiver({ banklabel, signedIn: () => device, demandDevice, demandBank, demandVault, useShown })
+  const { bankGiver, boxQueryOf } = makeBankGiver({
+    banklabel, signedIn: () => mounted?.device ?? null, clientNow: () => mounted?.client ?? outsideClient, demandDevice, demandBank, demandVault, useShown,
+  })
 
-  /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin.
+  /** The query factories of the signed-in user's bank, by banklabel, for the host's own `useQuery` and its kin, with the QueryClient they run in.
    * Every key it makes is the user's: it re-renders when the user changes, so each query made from it changes key with them.
    * Until the bank is brought up, a query from it fetches nothing.
    * @example
    *   const sok = SOK.useQueryOptions()
-   *   const { data: box } = useQuery(sok.knock.box('jokes'))
+   *   const { data: box } = useQuery(sok.knock.box('jokes'), sok.knock.client)
    */
   function useQueryOptions(): Readonly<Record<BanklabelT, BoxQueries>> {
-    const shownDevice = useShown().device
+    const { device: shownDevice, client } = useShown()
     const isUp = bankGiver.useBank(isBroughtUp)
     return useMemo(() => {
-      const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(shownDevice, labelpath, isUp) })
+      const queries: BoxQueries = Object.freeze({ box: (labelpath: string) => boxQueryOf(shownDevice, labelpath, isUp), client })
       return Object.freeze({ [banklabel]: queries }) as Record<BanklabelT, BoxQueries>
-    }, [shownDevice, isUp])
+    }, [shownDevice, isUp, client])
   }
 
   const giver = Object.freeze({
@@ -267,24 +284,25 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
 /** The fields of a {@link StrengthVerdictResult} before anything is judged. */
 const Unjudged = Object.freeze({ verdict: null, isJudging: false, lastErr: null })
 
-/** What a provider handed `userid` shows its children of `made`, the giver's device: none while it is another user's or not yet made. */
-function shownOf(made: Device | null, userid: string | null | undefined): Shown {
-  if (typeof userid !== 'string') { return (made === null) ? SignedOutShown : { device: made, bank: null } }
-  return ((made !== null) && (made.userid === userid)) ? { device: made, bank: null } : StartingShown
+/** A provider's mount, before its first userid: a QueryClient its devices' minders may cache in, and no device. */
+function makeProviderMount(): ProviderMount {
+  return { client: ThingMinder.makeClient(), device: null }
 }
 
-/** What a hook shows while nobody is signed in: no device, and stage `signed_out`. */
-const SignedOutShown: Shown = Object.freeze({ device: null, bank: SignedOutBank })
-
-/** What a hook shows while the provider's user has no device: no device, and stage `starting`. */
-const StartingShown: Shown = Object.freeze({ device: null, bank: PendingBank })
+/** What a provider handed `userid` shows its children of `device`, its mount's: none while it is another user's or not yet made, stage `starting` for a userid and `signed_out` for none. */
+function shownOf(device: Device | null, userid: string | null | undefined, client: QueryClient): Shown {
+  if ((device !== null) && ((typeof userid !== 'string') || (device.userid === userid))) { return { device, bank: null, client } }
+  return { device: null, bank: (typeof userid === 'string') ? PendingBank : SignedOutBank, client }
+}
 // --
 
 // == [The bank]: makeBankGiver
 
 /** The hooks and calls of the bank `friend` serves. */
 function makeBankGiver(friend: BankFriend) {
-  const { banklabel, signedIn, demandDevice, demandBank, demandVault, useShown } = friend
+  /** The main gate as the minder caches it: its whole record, or its shell where none is stored. */
+  type GateStored = GateRecord | Tombstone<GateRecord>
+  const { banklabel, signedIn, clientNow, demandDevice, demandBank, demandVault, useShown } = friend
 
   /** The bank's snapshot. Synchronous: it never waits and never suspends.
    * Switch a screen on its `stage`.
@@ -325,98 +343,102 @@ function makeBankGiver(friend: BankFriend) {
     return queryOptions({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf<BoxRecord> })
   }
 
+  // Left with no queryFn, a query of the minder's item fetches by the minder's own, set in the client at its `hello`,
+  // which lands the record as a get's.
   /** {@link boxQueryOf}, less its `select`. */
   function boxQueryBaseOf(device: Device | null, labelpath: string, isUp: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
     return {
       ...recordQueryDefaults(() => isBehindAt(device, boxLabelpath)),
       queryKey: boxQueryKeyOf({ userid: useridOf(device), banklabel, labelpath: boxLabelpath }),
-      queryFn:  (isUp && (device !== null)) ? () => getBoxShown(device, boxLabelpath) : skipToken,
+      ...((! isUp || (device === null)) && { queryFn: skipToken }),
     }
   }
 
   /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader, a prefetch, or `useQuery` outside the provider's reach.
-   * Its `data` is what {@link useBox} answers. Until the bank is brought up, it fetches nothing, and `queryClient.query` rejects:
-   * a loader waits for the stage to show `locked` or `unlocked` first.
+   * Run it in {@link queryClient}'s client, not the host's. Its `data` is what {@link useBox} answers. Until the bank is brought up,
+   * it fetches nothing, and `query` rejects: a loader waits for the stage to show `locked` or `unlocked` first.
    * @example
-   *   loader: () => queryClient.query(Knock.boxQuery('jokes'))
+   *   loader: () => Knock.queryClient().query(Knock.boxQuery('jokes'))
    */
   function boxQuery(labelpath: string): BoxQueryOptions {
     const device = signedIn()
     return boxQueryOf(device, labelpath, (device !== null) && isBroughtUp(device.getSnapshot().bank))
   }
 
+  /** The QueryClient that {@link boxQuery}'s queries and {@link keys} run in: the provider's mounted when called, or one where every query fetches nothing while none is.
+   * The records of the signed-in user's bank are cached there. Read it; write nothing to it.
+   */
+  function queryClient(): QueryClient { return clientNow() }
+
   /** The box's stored record, through React Query, its whisper still sealed.
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the bank is brought up.
    * A record overtaken by a newer revision shows until the newer one arrives.
-   * `opts` are React Query's own, and override the giver's. A `select` given there is handed the whole record, the box's
+   * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, the box's
    * tombstone, or its shell where none is stored: {@link liveOf} is the default.
    * @example
    *   const { data: box } = Knock.useBox('jokes')
    *   const mask = Knock.useBox('jokes', { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data
    */
   function useBox<SelT = BoxSelected>(labelpath: string, opts: BoxQueryOpts<BoxShown, SelT> = {}): UseQueryResult<SelT> {
-    const { device } = useShown()
+    const { device, client } = useShown()
     const isUp = useBank(isBroughtUp)
-    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf as (thing: BoxShown) => SelT, ...opts })
+    const shaping = pick(opts, BoxShapingOptnames)
+    return useQuery<BoxShown, Error, SelT>({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf as (thing: BoxShown) => SelT, ...shaping }, client)
   }
 
+  // The client caches the whole gate, so each `select` starts from the gate without the bankKeys its wayins wrap.
   /** The bank's main gate, through React Query: its wayins' headers, never the bankKey they wrap.
    * `data` is the gate, null when no bank is stored, and undefined while pending or until the bank is brought up.
    * Its `wayins.passkey0` is the header of the bank's passkey, or null while it has none: a passkey added or revoked on any device shows here.
-   * `opts` are React Query's own, as {@link useBox} takes them.
+   * `opts` are React Query's options that shape what this one hook shows, as {@link useBox} takes them.
    * @example
    *   const passkeyHeader = Knock.useGate({ select: passkeyHeaderOf }).data
    *   {(passkeyHeader === null) && <AddPasskeyForm username={user.email} />}
    */
-  function useGate<SelT = GateSelected>(opts: BoxQueryOpts<GateShown, SelT> = {}): UseQueryResult<SelT> {
-    const { device } = useShown()
+  function useGate<SelT = GateSelected>(opts: GateQueryOpts<SelT> = {}): UseQueryResult<SelT> {
+    const { device, client } = useShown()
     const isUp = useBank(isBroughtUp)
-    return useQuery<GateShown, Error, SelT>({ ...gateQueryBaseOf(device, isUp), select: liveGateOf as (gate: GateShown) => SelT, ...opts })
+    const { select = liveGateOf as (gate: GateShown) => SelT, ...shaping } = pick(opts, GateShapingOptnames)
+    return useQuery<GateStored, Error, SelT>({ ...gateQueryBaseOf(device, isUp), select: (gate) => select(gateShownOf(gate)), ...shaping }, client)
   }
 
   /** The key, fetch and defaults of the query of `device`'s main gate, skipping the fetch unless `isUp`, the bank brought up. */
-  function gateQueryBaseOf(device: Device | null, isUp: boolean): Pick<UseQueryOptions<GateShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
+  function gateQueryBaseOf(device: Device | null, isUp: boolean): Pick<UseQueryOptions<GateStored>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     return {
       ...recordQueryDefaults(() => isBehindAt(device, Labelpath.MainGate)),
       queryKey: gateQueryKeyOf({ userid: useridOf(device), banklabel }),
-      queryFn:  (isUp && (device !== null)) ? () => getGateShown(device) : skipToken,
+      ...((! isUp || (device === null)) && { queryFn: skipToken }),
     }
   }
 
-  /** The signed-in user's listing of the root box's children. */
-  async function getBoxListing(): Promise<readonly Labelpath[]> {
-    const device = demandDevice()
-    await device.minder.list(RootBoxLabelpath)
-    // The minder caches the root box's listing from `hello`, so there is always one to read.
-    return device.minder.listingAt({ ...device.scope, labelpath: RootBoxLabelpath })!
-  }
-
+  // The minder's listing fetches by a list, and is cached from `hello`, bare: TanStack reads it stale, as data no fetch has
+  // set, so the hook's first render once the bank is up lists the root box.
   /** The labelpaths of the bank's boxes, through React Query, for a list that renders each one by {@link useBox}.
-   * `data` is the labelpaths in labelpath order, and undefined while pending or until the bank is brought up. It is the same array until a box joins.
-   * A deleted box stays listed, and its `useBox` answers null. A box this device writes or hears of joins at once.
+   * `data` is the labelpaths in labelpath order, and undefined until the user's device starts. It is the same array until a box joins.
+   * Until the bank is brought up and its first list lands, it lists only the boxes this device has heard of: `isFetching` shows that list.
+   * A deleted box stays listed, and its `useBox` answers null. A box this device writes or hears of joins at once. A list refused shows as its `error`.
    * @example
    *   const { data: labelpaths } = Knock.useBoxList()
    *   labelpaths?.map((labelpath) => <JokeRow key={labelpath} labelpath={labelpath} />)
    */
   function useBoxList(): UseQueryResult<readonly string[]> {
-    const { device } = useShown()
+    const { device, client } = useShown()
     const isUp = useBank(isBroughtUp)
-    return useQuery({
-      ...ListingQueryDefaults,
+    return useQuery<readonly Labelpath[], Error, readonly string[]>({
       queryKey: boxListQueryKeyOf({ userid: useridOf(device), banklabel }),
-      queryFn:  (isUp && (device !== null)) ? getBoxListing : skipToken,
+      ...((! isUp || (device === null)) && { queryFn: skipToken }),
       select:   hostLabelpathsOf,
-    })
+    }, client)
   }
 
-  /** The keys of the signed-in user's boxes and gate in the host's React Query, reading whoever is signed in when called. */
+  /** The keys of the signed-in user's boxes and gate in {@link queryClient}'s client, reading whoever is signed in when called. */
   const keys = Object.freeze({
     /** The key of the box at `labelpath`'s query. */
     box:   (labelpath: string): QueryKey => boxQueryKeyOf({ userid: useridOf(signedIn()), banklabel, labelpath: boxLabelpathOf(labelpath) }),
     /** The key that starts the key of the box at `labelpath` and of every box under it, or of every box when left out: for `invalidateQueries`.
      * @example
-     *   void queryClient.invalidateQueries({ queryKey: Knock.keys.under('jokes') })
+     *   void Knock.queryClient().invalidateQueries({ queryKey: Knock.keys.under('jokes') })
      */
     under: (labelpath?: string): QueryKey => boxesQueryKeyUnder({ userid: useridOf(signedIn()), banklabel, labelpath: (labelpath === undefined) ? RootBoxLabelpath : boxLabelpathOf(labelpath) }),
     /** The key of {@link useBoxList}'s query, which no key from `under` starts. */
@@ -460,8 +482,7 @@ function makeBankGiver(friend: BankFriend) {
     return await ifLocked(box)
   }
 
-  // Each write tries once. By the time it resolves, the minder has cached what was written, and the bridge has copied it
-  // into the host's item of the box, wherever a hook made one.
+  // Each write tries once. By the time it resolves, the minder has cached what was written, in the item a hook shows.
 
   /** Seal and write the next revision of the box `boxNamed` names, applying `patch` and encrypting `secrets`. Resolves the stored box, its whisper sealed.
    * The write cites the newest revision the minder has heard of at that labelpath, whatever revision a record handed it is at.
@@ -651,7 +672,7 @@ function makeBankGiver(friend: BankFriend) {
   const useDraft = makeUseDraft({ useBank, useBox, withWhisper, demandVault })
 
   const bankGiver = Object.freeze({
-    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
+    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, queryClient, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
     birthGating, unlockGating, replacePassphraseGating, addPasskeyGating, revokePasskeyGating,
     birthMutationOptions, unlockMutationOptions, replacePassphraseMutationOptions, addPasskeyMutationOptions, revokePasskeyMutationOptions,
@@ -660,7 +681,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBroughtUp, isBehindAt, getBoxShown, getGateShown, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
+// == [Helpers]: useridOf, isBroughtUp, isBehindAt, refetchMarked, BoxShapingOptnames, GateShapingOptnames, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, textsOfForm, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -677,15 +698,26 @@ function isBehindAt(device: Device | null, labelpath: Labelpath): boolean {
   return device?.minder.isBehindAt({ ...device.scope, labelpath }) ?? false
 }
 
-/** `device`'s record of the box at `labelpath`, through its minder. */
-async function getBoxShown(device: Device, labelpath: BoxLabelpath): Promise<BoxShown> {
-  return await device.minder.get({ ...device.scope, labelpath })
+// The minder marks an item behind, or a listing stale, but refetches nothing: no get or list is waiting on it. A hook
+// showing it is, so each active one is fetched again. A soon's success refetches its item too: an item a refused get left
+// invalidated tells nothing when it falls behind again. A fetch already under way is left to land, and its landing tells
+// again where it landed behind.
+/** Refetch each item or listing of `minder`'s that a hook observes, once the minder marks it behind or stale. Returns the function that stops it. */
+function refetchMarked(minder: ThingMinder): () => void {
+  const client = minder.queryClient
+  return minder.listen((event) => {
+    if (event.type !== 'updated') { return }
+    const isSoon = (event.eventkind === 'soon')
+    if (event.action?.type !== (isSoon ? 'success' : 'invalidate')) { return }
+    void client.refetchQueries({ queryKey: isSoon ? minder.itemQueryKey(event) : event.queryKey, exact: true, type: 'active' }, { cancelRefetch: false })
+  }, MinderEventFormat)
 }
 
-/** `device`'s main gate, through its minder, as the host's React Query holds it. */
-async function getGateShown(device: Device): Promise<GateShown> {
-  return gateShownOf(await device.minder.get({ ...device.scope, labelpath: Labelpath.MainGate }))
-}
+/** The options of React Query's that a record hook takes from its caller: those that shape what that one hook shows. */
+const BoxShapingOptnames = ['select', 'placeholderData', 'notifyOnChangeProps'] as const
+
+/** The options of React Query's that `useGate` takes from its caller. */
+const GateShapingOptnames = ['select', 'notifyOnChangeProps'] as const
 
 /** The subscribe of a store that never changes, for `useSyncExternalStore` while there is no device. */
 function subscribeToNothing(): () => void { return unsubscribeFromNothing }

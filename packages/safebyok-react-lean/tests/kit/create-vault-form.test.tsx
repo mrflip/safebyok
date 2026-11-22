@@ -39,15 +39,15 @@ describe("CreateVaultForm", () => {
     await screen.findByText('Strong enough')
     expect(screen.getByText('The passphrases match')).to.exist
     expect(createButton().disabled).to.eq(false)
-    TH.expectTextUnheld(NewPassphrase, container, world.client)
+    TH.expectTextUnheld(NewPassphrase, container, world.clients())
 
     const release = world.deriver.hold()
     fireEvent.click(createButton())
     await screen.findByRole('button', { name: 'Creating…' })
-    TH.expectTextUnheld(NewPassphrase, container, world.client)
+    TH.expectTextUnheld(NewPassphrase, container, world.clients())
     release()
     await screen.findByText('unlocked')
-    TH.expectTextUnheld(NewPassphrase, container, world.client)
+    TH.expectTextUnheld(NewPassphrase, container, world.clients())
   })
 
   it("keeps Create disabled while the passphrase is weak, and says why", async () => {
@@ -89,6 +89,6 @@ describe("CreateVaultForm", () => {
     expect(document.activeElement).to.eq(screen.getByLabelText('New passphrase'))
     expect(screen.queryByText('Strong enough')).to.be.null
     expect(createButton().disabled).to.eq(true)
-    TH.expectTextUnheld(NewPassphrase, container, world.client)
+    TH.expectTextUnheld(NewPassphrase, container, world.clients())
   })
 })

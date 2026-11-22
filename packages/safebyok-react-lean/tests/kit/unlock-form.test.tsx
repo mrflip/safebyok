@@ -63,7 +63,7 @@ describe("UnlockForm", () => {
     const { world, container } = await renderWorld((world) => <StageScreen world={world} />, 'Unlock')
     typePassphrase(Passphrase)
     await screen.findByText('unlocked')
-    TH.expectTextUnheld(Passphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
   })
 
   it("keeps Unlock disabled and the passphrase hidden while the unlock runs, unlocking once for a double press", async () => {
@@ -76,7 +76,7 @@ describe("UnlockForm", () => {
     const pending = await screen.findByRole<HTMLButtonElement>('button', { name: 'Unlocking…' })
     expect([pending.disabled, field.type]).to.deep.equal([true, 'password'])
     fireEvent.click(pending)
-    TH.expectTextUnheld(Passphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
     release()
     await screen.findByText('unlocked')
     expect(world.deriver.heard).to.eq(1)
@@ -91,7 +91,7 @@ describe("UnlockForm", () => {
     await waitFor(() => { expect(field.value).to.eq('') })
     expect(document.activeElement).to.eq(field)
     expect(field.getAttribute('aria-invalid')).to.eq('true')
-    TH.expectTextUnheld(WrongPassphrase, container, world.client)
+    TH.expectTextUnheld(WrongPassphrase, container, world.clients())
 
     typePassphrase(Passphrase)
     await screen.findByText('unlocked')
@@ -133,7 +133,7 @@ describe("UnlockDialog", () => {
     expect(await asked).to.eq(TH.JokesKey)
     await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
     expect(screen.getByText('unlocked')).to.exist
-    TH.expectTextUnheld(Passphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
   })
 
   for (const kind of ['transition', 'formAction'] as const) {
@@ -150,8 +150,8 @@ describe("UnlockDialog", () => {
       typePassphrase(Passphrase)
       await screen.findByText(`Key ${TH.JokesKey}`)
       expect(screen.queryByRole('dialog')).to.be.null
-      TH.expectTextUnheld(Passphrase, container, world.client)
-      TH.expectTextUnheld(WrongPassphrase, container, world.client)
+      TH.expectTextUnheld(Passphrase, container, world.clients())
+      TH.expectTextUnheld(WrongPassphrase, container, world.clients())
     })
   }
 

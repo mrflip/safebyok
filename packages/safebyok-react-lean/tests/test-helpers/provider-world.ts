@@ -1,4 +1,4 @@
-/** The provider's world: the real giver over a memory vaultDB, a key deriver and a strength checker a test can hold, and a QueryClient of the test's own. */
+/** The provider's world: the real giver over a memory vaultDB, a key deriver and a strength checker a test can hold, and a QueryClient of the test's own for the host's. */
 
 import { QueryClient } from '@tanstack/react-query'
 import { noop } from 'es-toolkit'
@@ -97,15 +97,20 @@ export interface ProviderWorld {
   vaultDB: MemoryVaultDB
   deriver: HeldDeriver
   checker: HeldChecker
+  /** The host's QueryClient, which the form verbs' mutations run in. */
   client:  QueryClient
+  /** The host's QueryClient, and the one each device the giver made caches in: every client a secret could reach. */
+  clients(): readonly QueryClient[]
   /** How many watches have been opened on {@link vaultDB} since the world was built, one for each device started over it, and how many gets it has been asked. */
   counts:  { watches: number, gets: number }
   /** Pause every get {@link vaultDB} is asked from now on before it reads, until the function returned is called. */
   pauseGets(): () => void
   /** Pause every get {@link vaultDB} is asked from now on after it reads, until the function returned is called: it answers what it read. */
   pauseAnswers(): () => void
-  /** The device the giver made, once its provider has a userid: for a test to list its boxes through its minder, as no hook yet can. */
+  /** The device the giver made first, once a provider has a userid: for a test to read its minder. */
   _cheat_device(): Device
+  /** Every device the giver has made, in the order made. */
+  _cheat_devices(): readonly Device[]
   /** The vault of another device over {@link vaultDB}, unlocked, for a test to write a box as another tab would; null for a world with no bank stored. */
   _cheat_otherVault: Vault | null
   /** Put the joke service's key at {@link JokesPath} from another device over {@link vaultDB}, unlocked with `passphraseCleartext`, as another tab would: for a bank born since the world was built. */
@@ -179,7 +184,9 @@ export async function buildProviderWorld({ stored = 'none', isInConfig = false, 
     SOK, Bank: SOK.bank('acme'), vaultDB, deriver, checker, client, counts, _cheat_otherVault: otherVault,
     pauseGets:     () => pauseAt('ask'),
     pauseAnswers:  () => pauseAt('answer'),
+    clients:       () => [client, ...devices.map((device) => device.minder.queryClient)],
     _cheat_device: () => devices[0]!,
+    _cheat_devices: () => [...devices],
     _cheat_putJokesKey: async (passphraseCleartext) => {
       const device = makeDeviceUnspied({ ...LeanTH.WorldScope, device_tok: globalThis.crypto.randomUUID() }, { keyDeriver: LeanTH.testDeriver, logger: LeanTH.quietLogger, vaultDB })
       await device.hello()

@@ -123,11 +123,11 @@ async function renderKnockKnock(stored: 'none' | 'jokes' = 'jokes') {
   const { container } = render(TH.providerTreeOf(world, <app.App />, { userid: TH.ProviderUser }))
   if (stored === 'jokes') { await screen.findByText('Locked') }
   const derivedBefore = world.deriver.heard
-  /** Assert `passphrase` is in no bank snapshot the app rendered with, in nothing React has of the tree, and in no item or mutation of the host's React Query. */
+  /** Assert `passphrase` is in no bank snapshot the app rendered with, in nothing React has of the tree, and in no query or mutation of the host's QueryClient or the giver's. */
   function expectUnheld(passphrase: string): void {
     expect(app.shown.filter((snap) => TH.holdsText(snap, passphrase))).to.have.lengthOf(0)
     expect(TH.holdsText(TH.reactTreeOf(container), passphrase)).to.eq(false)
-    const entries = [...world.client.getQueryCache().getAll(), ...world.client.getMutationCache().getAll()]
+    const entries = world.clients().flatMap((client) => [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()])
     expect(TH.holdsText(entries.map((entry) => entry.state), passphrase)).to.eq(false)
   }
   /** How many passphrases the key deriver has been given since the app was rendered. */

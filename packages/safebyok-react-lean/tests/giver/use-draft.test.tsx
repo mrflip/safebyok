@@ -91,11 +91,11 @@ describe("useDraft", () => {
     expect([input.type, input.value, input.placeholder]).to.deep.equal(['password', '', '••••••••'])
     expect(input.hasAttribute('name')).to.eq(false)
     await revealIn(input)
-    TH.expectTextUnheld(TH.JokesKey, container, world.client)
+    TH.expectTextUnheld(TH.JokesKey, container, world.clients())
     typeKeyInto(input)
     await screen.findByText('Dirty')
-    TH.expectTextUnheld(TH.JokesKey, container, world.client)
-    TH.expectTextUnheld(TypedKey, container, world.client)
+    TH.expectTextUnheld(TH.JokesKey, container, world.clients())
+    TH.expectTextUnheld(TypedKey, container, world.clients())
     act(() => { input.blur() })
     expect([input.type, input.value]).to.deep.equal(['password', TypedKey])
     act(() => { screen.getByText('Save').click() })
@@ -103,9 +103,9 @@ describe("useDraft", () => {
     await screen.findByText('Clean')
     expect([input.type, input.value]).to.deep.equal(['password', ''])
     expect(await storedKeyOf(world)).to.eq(TypedKey)
-    expect(world.client.getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes' })
-    TH.expectTextUnheld(TH.JokesKey, container, world.client)
-    TH.expectTextUnheld(TypedKey, container, world.client)
+    expect(world.Bank.queryClient().getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes' })
+    TH.expectTextUnheld(TH.JokesKey, container, world.clients())
+    TH.expectTextUnheld(TypedKey, container, world.clients())
   })
 
   it("discards what was typed, emptying the field and leaving the stored key, with neither key held", async () => {
@@ -113,13 +113,13 @@ describe("useDraft", () => {
     await revealIn(input)
     typeKeyInto(input)
     await screen.findByText('Dirty')
-    TH.expectTextUnheld(TypedKey, container, world.client)
+    TH.expectTextUnheld(TypedKey, container, world.clients())
     act(() => { screen.getByText('Undo').click() })
     await screen.findByText('Clean')
     expect(input.value).to.eq('')
     expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
-    TH.expectTextUnheld(TH.JokesKey, container, world.client)
-    TH.expectTextUnheld(TypedKey, container, world.client)
+    TH.expectTextUnheld(TH.JokesKey, container, world.clients())
+    TH.expectTextUnheld(TypedKey, container, world.clients())
   })
 
   it("masks the field on blur, emptying it unless it was typed into, and shows what was typed on the next focus", async () => {
@@ -169,7 +169,7 @@ describe("useDraft", () => {
     act(() => { screen.getByText('Save').click() })
     await waitFor(() => { expect(seen.puts).to.eq(1) })
     await screen.findByText('Clean')
-    expect(world.client.getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' })
+    expect(world.Bank.queryClient().getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' })
     expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
   })
 
@@ -194,7 +194,7 @@ describe("useDraft", () => {
     act(() => { screen.getByText('Save').click() })
     await waitFor(() => { expect(seen.puts).to.eq(1) })
     expect(stamps).to.deep.equal([true])
-    expect(world.client.getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242', rotated_at: 1_760_000_000_000 })
+    expect(world.Bank.queryClient().getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242', rotated_at: 1_760_000_000_000 })
   })
 
   it("rejects its put with an Error when sidecarOf throws a value that is no Error, the value its cause", async () => {
@@ -262,7 +262,7 @@ describe("useDraft", () => {
     act(() => { screen.getByText('Save').click() })
     await waitFor(() => { expect(seen.puts).to.eq(1) })
     await screen.findByText('Clean')
-    expect(world.client.getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' })
+    expect(world.Bank.queryClient().getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' })
     expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
   })
 

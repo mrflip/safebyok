@@ -47,7 +47,7 @@ describe("WhisperText", () => {
     expect(isKeyShown()).to.eq(false)
     await showAndUnlock()
     expect(screen.getByRole('button', { name: 'Hide' }).getAttribute('aria-pressed')).to.eq('true')
-    TH.expectTextUnheld(TH.JokesKey, container, world.client)
+    TH.expectTextUnheld(TH.JokesKey, container, world.clients())
   })
 
   it("takes the text out of the page on Hide", async () => {

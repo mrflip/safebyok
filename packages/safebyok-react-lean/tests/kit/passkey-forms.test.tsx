@@ -64,10 +64,10 @@ describe("AddPasskeyForm", () => {
     const release = world.deriver.hold()
     submitPassphrase(Passphrase, 'Add passkey')
     await screen.findByRole('button', { name: 'Adding…' })
-    TH.expectTextUnheld(Passphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
     release()
     await screen.findByText('unlocked')
-    TH.expectTextUnheld(Passphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
     expect(authenticator.answersHanded().every((answer) => answer.every((byte) => byte === 0))).to.be.true
     const passkeyHeader = await TH._cheat_passkeyHeaderOf(world)
     expect(passkeyHeader?.credential_id).to.eq(authenticator.credentialIds()[0])
@@ -104,7 +104,7 @@ describe("AddPasskeyForm", () => {
     submitPassphrase(Passphrase, 'Add passkey')
     expect(await alertText()).to.eq(KitPhrases.noPrf)
     expect(await TH._cheat_passkeyHeaderOf(world)).to.be.null
-    TH.expectTextUnheld(Passphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
   })
 
   it("says a wrong passphrase is wrong, hands its field focus, and adds nothing", async () => {
@@ -116,7 +116,7 @@ describe("AddPasskeyForm", () => {
     await waitFor(() => { expect(document.activeElement).to.eq(field) })
     expect(field.getAttribute('aria-invalid')).to.eq('true')
     expect(await TH._cheat_passkeyHeaderOf(world)).to.be.null
-    TH.expectTextUnheld(WrongPassphrase, container, world.client)
+    TH.expectTextUnheld(WrongPassphrase, container, world.clients())
   })
 })
 
@@ -127,7 +127,7 @@ describe("RevokePasskeyForm", () => {
     const { container } = await renderWorld('revoke', world)
     submitPassphrase(Passphrase, 'Remove passkey')
     await screen.findByText('unlocked')
-    TH.expectTextUnheld(Passphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
     expect(await TH._cheat_passkeyHeaderOf(world)).to.be.null
   })
 
@@ -138,7 +138,7 @@ describe("RevokePasskeyForm", () => {
     submitPassphrase(WrongPassphrase, 'Remove passkey')
     expect(await alertText()).to.eq('That is not the passphrase.')
     expect(await TH._cheat_passkeyHeaderOf(world)).to.deep.equal(passkeyHeader)
-    TH.expectTextUnheld(WrongPassphrase, container, world.client)
+    TH.expectTextUnheld(WrongPassphrase, container, world.clients())
   })
 })
 

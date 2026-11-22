@@ -51,11 +51,11 @@ describe("ReplacePassphraseForm", () => {
     const release = world.deriver.hold()
     fireEvent.click(replaceButton())
     await screen.findByRole('button', { name: 'Replacing…' })
-    TH.expectTextUnheld(Passphrase, container, world.client)
-    TH.expectTextUnheld(NextPassphrase, container, world.client)
+    TH.expectTextUnheld(Passphrase, container, world.clients())
+    TH.expectTextUnheld(NextPassphrase, container, world.clients())
     release()
     await screen.findByText('unlocked')
-    for (const text of [Passphrase, NextPassphrase]) { TH.expectTextUnheld(text, container, world.client) }
+    for (const text of [Passphrase, NextPassphrase]) { TH.expectTextUnheld(text, container, world.clients()) }
     // React resets the form once the action settles, which may be after the stage shows `unlocked`.
     await waitFor(() => { expect(screen.getByLabelText<HTMLInputElement>('Current passphrase').value).to.eq('') })
 
@@ -78,7 +78,7 @@ describe("ReplacePassphraseForm", () => {
     const alerts = screen.getAllByRole('alert').map((alert) => alert.textContent)
     expect(alerts).to.include('That is not the passphrase.')
     expect(field.getAttribute('aria-invalid')).to.eq('true')
-    for (const text of [WrongPassphrase, NextPassphrase]) { TH.expectTextUnheld(text, container, world.client) }
+    for (const text of [WrongPassphrase, NextPassphrase]) { TH.expectTextUnheld(text, container, world.clients()) }
 
     fireEvent.change(screen.getByLabelText('Passphrase'), { target: { value: Passphrase } })
     fireEvent.click(screen.getByRole('button', { name: 'Unlock' }))
