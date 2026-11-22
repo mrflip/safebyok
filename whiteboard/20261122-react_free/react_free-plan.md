@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: thread 1 done; threads 2 (#822) and 3 (#819) in review; thread 4 building; 6 next, then 5 on 4, then 7.
+* **Status**: thread 1 done; thread 2 filed (#822); thread 3 in review (#819); threads 4 and 6 building; then 5 on 4, then 7.
 
 ## Read first
 
@@ -67,7 +67,8 @@ form stays `<form action={(form) => { save.mutate(form) }}>`, by ruling) and `Su
 covers the whole PR from thread 1's tip, since #822 was never reviewed. *Depends on*: thread 1. *Look-ahead*: thread
 7 runs this demo in a browser. *Size*: small.
 
-*Status*: built, ready at `2b7b31502` (justify green); reviewed `fixed`; filing.
+*Status*: built, ready at `2b7b31502` (justify green); reviewed `fixed`; filed at `e1dc7c60b`. Stays a draft: the workshop's PRs below it are drafts, and the line closes
+by the workshop's squash into #817.
 
 *Review:* fixed, at `e1dc7c60b`: `keyPuts` a `function` declaration and its doc block shortened (tests only). Four
 nits dropped with reasons (the key in the mutation cache on a throw, an unrestored spy, `liveOf` on a tombstone,
@@ -108,7 +109,8 @@ verdict, the rest is thread 5's.
 
 *Gloss.* Each part takes `className`, passes every other attribute through, and marks its state in `data-`
 attributes (`data-revealed`, `data-pending`, `data-invalid`; `docs/guide-headless.md`, *Three ways*); the kit's words
-overridable in one place (`notes/react_lib_principles.md`, *Words*); visible labels in the kit's forms. The demos'
+overridable in one place (`notes/react_lib_principles.md`, *Words*); visible labels in the kit's forms; and `WithLockableWhisperOpts` tied to its check, the way thread 6 ties the
+others (moved here from thread 6, since it lives in a part's file). The demos'
 tests may need their queries mended where a label changes. *Levels*: style pass on `opus` (the attribute and word names
 are naming). *Depends on*: thread 4 (the same parts). *Size*: medium.
 
@@ -124,7 +126,8 @@ are naming). *Depends on*: thread 4 (the same parts). *Size*: medium.
 *Gloss.* Each type derived from its check (or the check from one source), per STYLE.md *Validation* and *Shapes and
 duck typing*. `GiverConfig` is also in the way of the workshop's thread 12; change its type's source, not its fields.
 The base-32 line is a two-liner that rides along: wherever the docs (VOCABULARY.md, a README, a doc block) say
-base-32. *Depends on*: thread 1. Independent of threads 4 and 5 unless the worker finds a type in a part's file.
+base-32. *Depends on*: thread 1. *Orchestrator:* `WithLockableWhisperOpts` lives in `parts/whisper-mask.tsx`, which thread 4
+rewrites, so it moves to thread 5; thread 6 keeps the other three and the base-32 line.
 *Size*: small to medium.
 
 ### 7. `browser_pass`: the demos in a real browser
