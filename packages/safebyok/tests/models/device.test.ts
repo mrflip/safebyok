@@ -1,5 +1,6 @@
 /** The device: its options, the host's functions it wraps, and its sweep, over its MemoryVaultDB. */
 
+import { QueryClient } from '@tanstack/query-core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 // fake-indexeddb installs IndexedDB's globals, for the device database browserOpts() opens: no browser.
 import 'fake-indexeddb/auto'
@@ -8,6 +9,7 @@ import { browserOpts } from '../../src/browser'
 import { Bank } from '../../src/models/bank'
 import { DefaultLeaseMillis, DefaultOnBadNews, Device, tellBadNewsTo } from '../../src/models/device'
 import { BirthGating } from '../../src/models/gating'
+import { ThingMinder } from '../../src/minding/thing-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import { type BadNews, type DeviceSnapshot, PendingBank } from '../../src/shapes/shapes-bankish'
 import * as TH from '../test-helpers'
@@ -60,6 +62,12 @@ describe("Device.make(record, opts)", () => {
   it("refuses a queryCacheOpts the minder refuses, and gives its minder the one it is given", () => {
     TH.expectSyncRefusal(() => TH.makeDevice({}, { queryCacheOpts: { retry: 3 } } as never), 'bad_record')
     expect(TH.makeDevice({}, { queryCacheOpts: { staleTime: 5 } }).minder).to.be.an('object')
+  })
+
+  it("refuses a queryClient ThingMinder.makeClient did not make, and gives its minder the one it is given", () => {
+    TH.expectSyncRefusal(() => TH.makeDevice({}, { queryClient: new QueryClient() }), 'bad_record')
+    const queryClient = ThingMinder.makeClient()
+    expect(TH.makeDevice({}, { queryClient }).minder.queryClient).to.equal(queryClient)
   })
 
   it("serializes as its scope and token alone, and is frozen", () => {
