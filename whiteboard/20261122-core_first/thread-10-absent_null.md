@@ -24,6 +24,10 @@ gone and void refuses `gone` and `void`, no `val`, `dbhas` the tombstone and nul
   - Two `??` chains had relied on Absent being non-nullish, and null is not: `Minder.#doGet`'s `this.#itemAt(scoped) ?? fetched`
     would have returned the stale fetched record over a null item, and `Vault.#soonestAt`'s `soonAt ?? at ?? await get`
     would have fetched where the item is null. Both now test `=== undefined`, TanStack's cache miss, which is why null and not undefined.
+  - `useDraft`'s `pinned` state used null for "no base pinned" beside Absent for "base pinned, box not stored"; with Absent
+    now null the two collided (the "Dirty and behind" test caught it). "No base" is now `undefined`, and `citedOf` and
+    `isBehind` test `=== undefined` for it.
+  - The linter's `??` rules now fit where `isAbsent` ternaries stood (`citedOf`, a few tests), and the code uses `??`.
   - The invariant's wording is narrowed to hold in the base case: `gotlive` carries no `dbhas`, so "where `val` is null, its `dbhas`...".
     `get` returns only the record, so only `tryAt` shows a `dbhas`. No path breaks it.
   - `safebyok-big` has its own `Absent`-named words (`absent_vault`, `ifAbsent`) and was left alone.
