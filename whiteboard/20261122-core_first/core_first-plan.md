@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Thread 2 (#844) in rework: the Coach ruled the BankMinder a subclass of one minder class beside VaultMinder, made early and holding all users' rows, with no world entry (`worldAt` reads the three items synchronously); the paused review's `useGate` fix (`3f44feddc`) is on the branch. Thread 4 (#846, draft, base main) paused, blocked on thread 2's rework; it leans only on `make`, `worldAt`, `fetchWorld`. Thread 3 building.
+* **Status**: running (2026-11-22). Thread 2 (#844) in rework: the Coach ruled the BankMinder a subclass of one minder class beside VaultMinder, made early and holding all users' rows, with no world entry (`worldAt` reads the three items synchronously); the paused review's `useGate` fix (`3f44feddc`) is on the branch. Thread 4 (#846, draft, base main) paused, blocked on thread 2's rework; it leans only on `make`, `worldAt`, `fetchWorld`. Thread 3 ready (#847, `5c4c2254a`, justify green by its report), its review held until #844's rework lands and #847 is rebased onto it.
 
 The Coach's request, verbatim:
 
@@ -153,6 +153,8 @@ list, and neither (C) `known` nor (B) is built. *Touches*: `storage/` (the answe
 the VaultMinder's listing, STYLE.md. *Levels*: `thread-worker-400k` on `opus`, effort `high`; review `medium`. *Depends
 on*: 2. *Look-ahead*: thread 5 changes the get answer and moves tombstones to a `dead` entry; leave the get path alone.
 *Size*: L.
+
+*Status*: ready, [#847](https://github.com/mrflip/safebyok/pull/847) at `5c4c2254a`, on #844's `3f44feddc`. `ListThingsAnswer.val` is `Kids` with `read_tc` (uuid v7); `parentage`, `deltas`, `damaged_rows` beside it; the listing caches `Kids`. Rule (A) with two qualifiers in `#isFirstStored` (a first stored record over a shell counts; not while the item or soon already holds one). `list` keeps `staleTime: 0` (a *Finally* item). For its review: delete the obsolete wontfix row about a box joining between the host's listing fetch and `listingAt`. Review held until #844's rework lands and #847 is rebased.
 
 ### 4. `device_early`: a device that exists before its user
 
