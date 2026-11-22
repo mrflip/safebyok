@@ -6,5 +6,7 @@ export { type AddPasskeyFormProps, type PasskeyUnlockButtonProps, type RevokePas
 export { refusalTextOf } from './phrases-kit'
 export { ModalDialog } from './modal-dialog'
 export { type ReplacePassphraseFormProps, ReplacePassphraseForm } from './replace-passphrase-form'
-export { type NewPassphrase, type NewPassphraseFieldProps, useNewPassphrase } from './use-new-passphrase'
+export { type NewPassphrase, type NewPassphraseFieldProps, type PassphraseMatch, useNewPassphrase } from './use-new-passphrase'
+// The checker's verdict `useNewPassphrase` answers: the core's, one binding across both packages.
+export type { PassphraseVerdict } from 'safebyok'
 export { type UnlockDialogProps, type UnlockFormProps, UnlockDialog, UnlockForm } from './unlock-form'
