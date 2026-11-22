@@ -26,7 +26,9 @@ the hooks alone for full control, the kit for a working screen in an afternoon.
   opinion on layout. `PassphraseInput` and `WhisperInput` are uncontrolled inputs with Show / Hide;
   `WhisperText` reveals a field of a whisper on request; `WhisperMask` shows its mask, with the
   tail while unlocked; `SubmitButton` disables itself while its form's action runs. A part writes
-  a secret into the page, never into React's state.
+  a secret into the page, never into React's state. Each part but `SubmitButton` is markup over a
+  field hook of the same entry (`usePassphraseField`, `useWhisperField`, `useWhisperText`,
+  `useWhisperMask`), for a host that brings its own elements.
 * **`kit`** (`safebyok-react-lean/kit`): prefabricated forms for a fast start, assembled from the
   parts over the hooks. `CreateVaultForm`, `UnlockForm` and `UnlockDialog`, `ReplacePassphraseForm`,
   `AddPasskeyForm`, `RevokePasskeyForm` and `PasskeyUnlockButton`, with `useNewPassphrase`, the

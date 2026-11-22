@@ -60,10 +60,15 @@ function UnlockDialog() {
 //   textOf is the host's: a refusal has a `refusalkind` (`wrong_passphrase`, `weak_passphrase`, …) to pick its own words by.
 
 // The saved key, masked, with a reveal: the hook writes the text into the element it is given, and takes it out again.
-const key = useWhisperText('openai', 'apiKey')
-<code ref={key.textRef} className="font-mono" data-revealed={key.isRevealed} />
-{! key.isRevealed && <code className="font-mono">{box.sidecar.mask}</code>}
-<Button variant="outline" size="sm" {...key.toggleProps}>{key.isRevealed ? 'Hide' : 'Show'}</Button>
+// Destructure it: React's lint takes a read like `key.isRevealed`, from an object holding a ref, for a read of the ref.
+const { textRef, isRevealed, toggleProps } = useWhisperText('openai', 'apiKey')
+<code ref={textRef} className="font-mono" data-revealed={isRevealed} />
+{! isRevealed && <code className="font-mono">{box.sidecar.mask}</code>}
+<Button variant="outline" size="sm" {...toggleProps}>{isRevealed ? 'Hide' : 'Show'}</Button>
+
+// Or the mask alone, written into an element of the host's own: the stored mask while locked, the last few characters while unlocked.
+const { maskRef } = useWhisperMask('openai', 'apiKey', { tail: 4 })
+<code ref={maskRef} className="font-mono" />
 ```
 
 ## Doppler-lite: many secrets, each with settings
@@ -96,9 +101,9 @@ const field = useWhisperField()
 // Create the vault: the kit's form, copied in and restyled. The hook has the verdicts; the markup and the words are the host's.
 const newPassphrase = useNewPassphrase()
 <PassphraseField name="passphrase" label="New passphrase" {...newPassphrase.field} />
-<Progress value={newPassphrase.verdict?.score} />        {/* the checker's score, for a meter of the host's own */}
-<p className="text-sm">{newPassphrase.verdict?.reason}</p>
+{newPassphrase.verdict?.strong === false && <p className="text-sm">{newPassphrase.verdict.reason}</p>}  {/* the checker's, unworded */}
 <PassphraseField name="confirmation" label="Confirm passphrase" {...newPassphrase.confirmField} />
+<p className="text-sm" data-invalid={newPassphrase.match === 'differs'}>{newPassphrase.match === 'differs' && 'Not the same'}</p>
 <Button type="submit" disabled={! newPassphrase.isReady}>Create vault</Button>
 
 // Copy, from a command palette or a context menu: any element may start it, since it is a call and not a component.
@@ -110,11 +115,8 @@ const newPassphrase = useNewPassphrase()
 
 ## Not built yet
 
-* The field hooks: `usePassphraseField`, `useWhisperField`, `useWhisperText`, `useWhisperMask`. Today
-  each behaviour is inside its part, with fixed markup, a `Show` button of ours and a class name
-  (`whisper-input`). `useRevealToggle` exists, private to the parts.
 * `className` and `data-` state attributes on the parts.
 * The kit as copy-in source, and a registry to serve it.
 * `KitPhrasesProvider`: today `KitPhrases` is a frozen object of English.
-* `useNewPassphrase().verdict`: today it gives `verdictText` and `matchText`, already worded.
+* A score for a meter: the strength checker answers strong, or weak with a reason, and no score.
 * `actionOf` and gate verbs that take the form, as the [Suspense guide](guide-suspense.md) lists.
