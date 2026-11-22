@@ -14,11 +14,12 @@ export type AnthropicRequest = {
 
 /** Make a fake of Anthropic's messages endpoint, as a `fetch` function. It records every request and replies with `status`:
  * at 200 a message whose text is `jokeText`, and at any other status an authentication error.
- * Pass its `fetchFn` to the code under test, or stub the global `fetch` with it. `seen` lists the requests so far.
+ * Stub the global `fetch` with its `fetchFn`. `seen` lists the requests so far.
  *
  * @example
  *   const anthropic = TH.fakeAnthropic(200, 'Banana who? Banana split, gotta run!')
- *   await tellKnockKnockJoke('sk-ant-fake-key', 'Banana', anthropic.fetchFn)
+ *   vi.stubGlobal('fetch', anthropic.fetchFn)
+ *   await tellKnockKnockJoke('sk-ant-fake-key', 'Banana')
  *   anthropic.seen[0]?.apiKey  // => 'sk-ant-fake-key'
  */
 export function fakeAnthropic(status: number, jokeText = '') {

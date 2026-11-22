@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildJokePrompt, gripeForJokeErr, tellKnockKnockJoke } from '../../src/lib/anthropic'
 import * as TH from '../test-helpers'
 
@@ -13,7 +13,8 @@ describe("buildJokePrompt", () => {
 describe("tellKnockKnockJoke", () => {
   it("sends the key as a bearer token to the messages endpoint, and nothing else sees it", async () => {
     const fake = TH.fakeAnthropic(200, "Banana who? Banana split, gotta run!")
-    const joke = await tellKnockKnockJoke('sk-ant-fake-key', 'Banana', fake.fetchFn)
+    vi.stubGlobal('fetch', fake.fetchFn)
+    const joke = await tellKnockKnockJoke('sk-ant-fake-key', 'Banana')
     expect(joke).to.eq("Banana who? Banana split, gotta run!")
     expect(fake.seen).to.have.lengthOf(1)
     expect(fake.seen[0]?.url).to.include('api.anthropic.com/v1/messages')
@@ -22,7 +23,8 @@ describe("tellKnockKnockJoke", () => {
 
   it("asks the cheapest model, with the entry in the prompt", async () => {
     const fake = TH.fakeAnthropic(200, "Olive who? Olive you, that's who!")
-    await tellKnockKnockJoke('sk-ant-fake-key', 'Olive', fake.fetchFn)
+    vi.stubGlobal('fetch', fake.fetchFn)
+    await tellKnockKnockJoke('sk-ant-fake-key', 'Olive')
     expect(fake.seen[0]?.body.model).to.eq('claude-haiku-5-5')
     expect(JSON.stringify(fake.seen[0]?.body.messages)).to.include('Olive')
   })

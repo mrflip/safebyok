@@ -19,17 +19,14 @@ export function buildJokePrompt(whosThere: string): string {
 
 /** Ask Claude for one knock-knock joke, and return it as plain text.
  *
- * @param fetchFn - test seam: a fetch to use in place of the global one
- *
  * @example await tellKnockKnockJoke(apiKeyWhisper, 'Banana')
  */
-export async function tellKnockKnockJoke(apiKey: string, whosThere: string, fetchFn?: typeof fetch): Promise<string> {
+export async function tellKnockKnockJoke(apiKey: string, whosThere: string): Promise<string> {
   const anthropic = new Anthropic({
     apiKey,
     // A deliberate choice, not a shortcut: the key must stay on the user's device, so the
     // request must come from the browser.
     dangerouslyAllowBrowser: true,
-    ...(fetchFn !== undefined && { fetch: fetchFn }),
   })
   const response = await anthropic.messages.create({
     model:      JokeModel,
