@@ -871,6 +871,16 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
   return { KeyEditor, seen }
 }
 
+// The editor hands its result to `seen` in an effect, which runs after the render that shows the result: so a test
+// waits on `seen` itself, never on the rendered `Saved` or `Refused`.
+/** Wait for the key editor's action to resolve, and return its result. */
+function resultOf(seen: { result: PutBoxActionResult | null }): Promise<PutBoxActionResult> {
+  return waitFor(() => {
+    expect(seen.result).to.not.be.null
+    return seen.result!
+  })
+}
+
 /** Throw `val`, an `Error` or not, as a host's callback may. */
 function throwValue(val: unknown): never { throw val as Error }
 
@@ -898,11 +908,11 @@ describe("putBoxAction", () => {
   it("writes the box from the form, and useBox shows its new sidecar, with the whisper in no action result and neither cache", async () => {
     const { world, seen, container } = await renderKeyEditor()
     submitKey()
-    await screen.findByText('Saved')
+    const result = await resultOf(seen)
     await screen.findByText('Key …4242')
-    expect(seen.result?.box?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
+    expect(result.box?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
     expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq(TypedKey)
-    const kept = [seen.result, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
+    const kept = [result, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
     expect(kept.map((each) => TH.holdsText(each, TypedKey))).to.deep.equal([false, false, false, false])
   })
 
@@ -924,10 +934,10 @@ describe("putBoxAction", () => {
     const { world, seen } = await renderKeyEditor()
     act(() => { world.Bank.lock() })
     submitKey()
-    await screen.findByText('Refused')
-    const { err } = seen.result!
+    const result = await resultOf(seen)
+    const { err } = result
     expect(isVaultError(err) && err.refusalkind).to.eq('bank_locked')
-    expect(TH.holdsText(seen.result, TypedKey)).to.eq(false)
+    expect(TH.holdsText(result, TypedKey)).to.eq(false)
   })
 
   it("resolves what whisperOf throws, as thrown, and empties the form all the same", async () => {
@@ -938,8 +948,8 @@ describe("putBoxAction", () => {
       throw thrown
     } })
     submitKey()
-    await screen.findByText('Refused')
-    expect(seen.result?.err).to.eq(thrown)
+    const { err } = await resultOf(seen)
+    expect(err).to.eq(thrown)
     expect([...forms[0]!.keys()]).to.deep.equal([])
   })
 
@@ -951,9 +961,9 @@ describe("putBoxAction", () => {
       return throwValue(thrown)
     } })
     submitKey()
-    await screen.findByText('Refused')
-    expect(seen.result?.err).to.be.instanceOf(Error)
-    expect(seen.result?.err?.cause).to.eq(thrown)
+    const { err } = await resultOf(seen)
+    expect(err).to.be.instanceOf(Error)
+    expect(err?.cause).to.eq(thrown)
     expect([...forms[0]!.keys()]).to.deep.equal([])
   })
 
@@ -966,12 +976,12 @@ describe("putBoxAction", () => {
     act(() => { world.Bank.lock() })
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
     submitKey()
-    await screen.findByText('Refused')
-    expect(seen.result?.texts).to.deep.equal({ title: 'My jokes key' })
+    const result = await resultOf(seen)
+    expect(result.texts).to.deep.equal({ title: 'My jokes key' })
     expect([...forms[0]!.keys()]).to.deep.equal(['title'])
     expect(screen.getByLabelText<HTMLInputElement>('Title').value).to.eq('My jokes key')
     expect(screen.getByLabelText<HTMLInputElement>('Key').value).to.eq('')
-    const retained = [seen.result, forms, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
+    const retained = [result, forms, TH.reactTreeOf(container), world.client.getQueryCache().getAll(), world.client.getMutationCache().getAll()]
     expect(retained.map((each) => TH.holdsText(each, TypedKey))).to.deep.equal([false, false, false, false, false])
   })
 
@@ -979,8 +989,8 @@ describe("putBoxAction", () => {
     const { seen } = await renderKeyEditor({ secretFieldnames: ['apiKey'] })
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
     submitKey()
-    await screen.findByText('Saved')
-    expect(seen.result?.texts).to.deep.equal({})
+    const { texts } = await resultOf(seen)
+    expect(texts).to.deep.equal({})
     expect(screen.getByLabelText<HTMLInputElement>('Title').value).to.eq('')
   })
 
@@ -993,9 +1003,9 @@ describe("putBoxAction", () => {
     act(() => { world.Bank.lock() })
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'My jokes key' } })
     submitKey()
-    await screen.findByText('Refused')
+    const result = await resultOf(seen)
     expect([...forms[0]!.keys()]).to.deep.equal([])
-    expect(seen.result?.texts).to.deep.equal({})
+    expect(result.texts).to.deep.equal({})
   })
 
   it("refuses secretFieldnames that is not an array of names", async () => {
@@ -1053,6 +1063,15 @@ function makeMutationKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActi
   return { KeyEditor, seen }
 }
 
+// As with resultOf, the mutation reaches `seen` in an effect after the render that shows it.
+/** Wait for the mutation key editor's mutation to succeed or fail, and return it. */
+function settledPutOf(seen: ReturnType<typeof makeMutationKeyEditor>['seen']): Promise<UseMutationResult<LiveOf<BoxRecord>, Error, FormData>> {
+  return waitFor(() => {
+    expect(seen.put?.status).to.be.oneOf(['success', 'error'])
+    return seen.put!
+  })
+}
+
 /** Render the mutation key editor over a world with the joke service's key stored, its bank unlocked. */
 async function renderMutationKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
@@ -1071,28 +1090,28 @@ describe("putBoxMutationOptions", () => {
   it("writes the box from the form, and useBox shows its new sidecar, with the whisper in no variable, result or cache", async () => {
     const { world, seen, container } = await renderMutationKeyEditor()
     submitKey()
-    await screen.findByText('Saved')
+    const put = await settledPutOf(seen)
     await screen.findByText('Key …4242')
-    expect(seen.put?.data?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
+    expect(put.data?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242' })
     expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq(TypedKey)
     const mutations = world.client.getMutationCache().getAll()
     expect(mutations).to.have.lengthOf(1)
     expect([...(mutations[0]!.state.variables as FormData).keys()]).to.deep.equal([])
     TH.expectTextUnheld(TypedKey, container, world.client)
-    expect(TH.holdsText(seen.put, TypedKey)).to.eq(false)
+    expect(TH.holdsText(put, TypedKey)).to.eq(false)
   })
 
   it("rejects with the refusal, and the form is empty and holds no secret all the same", async () => {
     const { world, seen, container } = await renderMutationKeyEditor()
     act(() => { world.Bank.lock() })
     submitKey()
-    await screen.findByText('Refused')
-    const err = seen.put!.error
+    const put = await settledPutOf(seen)
+    const err = put.error
     expect(isVaultError(err) && err.refusalkind).to.eq('bank_locked')
     const mutations = world.client.getMutationCache().getAll()
     expect([...(mutations[0]!.state.variables as FormData).keys()]).to.deep.equal([])
     TH.expectTextUnheld(TypedKey, container, world.client)
-    expect(TH.holdsText(seen.put, TypedKey)).to.eq(false)
+    expect(TH.holdsText(put, TypedKey)).to.eq(false)
   })
 
   it("sets the mutation's error to what whisperOf throws, the same object, and empties the form all the same", async () => {
@@ -1103,8 +1122,8 @@ describe("putBoxMutationOptions", () => {
       throw thrown
     } })
     submitKey()
-    await screen.findByText('Refused')
-    expect(seen.put?.error).to.eq(thrown)
+    const { error: err } = await settledPutOf(seen)
+    expect(err).to.eq(thrown)
     expect([...forms[0]!.keys()]).to.deep.equal([])
   })
 
@@ -1126,9 +1145,9 @@ describe("putBoxMutationOptions", () => {
     const thrown = { code: 42 }
     const { seen } = await renderMutationKeyEditor({ whisperOf: () => throwValue(thrown) })
     submitKey()
-    await screen.findByText('Refused')
-    expect(seen.put?.error).to.be.instanceOf(Error)
-    expect(seen.put?.error?.cause).to.eq(thrown)
+    const { error: err } = await settledPutOf(seen)
+    expect(err).to.be.instanceOf(Error)
+    expect(err?.cause).to.eq(thrown)
   })
 
   it("runs offline and never retries, so a form is never left waiting in the variables", async () => {
