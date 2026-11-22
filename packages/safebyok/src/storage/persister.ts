@@ -4,7 +4,7 @@ import type { PersistedClient, Persister } from '@tanstack/query-persist-client-
 
 export type { PersistedClient, Persister } from '@tanstack/query-persist-client-core'
 
-// == [The plug]: DevicePersisters, isPersister
+// == [The plug]: DevicePersisters, isPersister, PersisterMembernames
 
 /** Where a device keeps its two caches between page loads, a TanStack Query `Persister` for each: `roots`, every user and bank's bank, main gate and root box, and `boxes`, the boxes and their listings.
  * Each keeps one snapshot of everything in its cache, which the device restores at `hello`. It is handed the whole
