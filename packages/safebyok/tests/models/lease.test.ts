@@ -6,7 +6,7 @@ import { NOVEL, PassphraseProving } from '../../src/models/proving'
 import type { BoxCleartexts, Sealer, TombstoneOf } from '../../src/shapes/shapes-sealers'
 import { LeaseFormat, type LeaseRecord } from '../../src/shapes/shapes-stamps'
 import { type EpochMillis, Lifeseq } from '../../src/shapes/primitives'
-import { type BoxRecord } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, ThingChecks } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
 
 TH.useFakeClock()
@@ -436,6 +436,42 @@ describe("a tampered lease record", () => {
     const tampered = Lease.make({ ...record, proved_at: TH.T0 + 1 }, { gate })
     await TH.expectRefusal(tampered.seal(BaseBox, TH.boxShellOf(), PublicProps, Cleartexts), 'damaged_lease')
     expect(gate.lock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("a lease's Thing-like getters", () => {
+  const GateLabelpathCases = [
+    ["gate",          "gate",      "lease/gate",      'under the main gate'],
+    ["gate/passkeys", "passkeys",  "lease/passkeys",  'under a gate with a label'],
+  ] as const
+
+  for (const [gate_labelpath, label, labelpath, blurb] of GateLabelpathCases) {
+    it(`name it for its gate's label, ${blurb}`, async () => {
+      const { gate, record } = await leaseWorld()
+      const lease = Lease.make({ ...record, gate_labelpath }, { gate })
+      expect(lease.label).to.eq(label)
+      expect(lease.labelpath).to.eq(labelpath)
+      expect(lease.scope).to.deep.equal({ userid: 'u1', banklabel: 'acme', labelpath })
+    })
+  }
+
+  it("give am 'a' and written_at its proved_at", async () => {
+    const { gate, record } = await leaseWorld()
+    const lease = Lease.make({ ...record, born_at: TH.T0 - 1 }, { gate })
+    expect(lease.am).to.eq('a')
+    expect(lease.written_at).to.eq(TH.T0)
+  })
+
+  it("give a scope that a check of a Thing's scope refuses", async () => {
+    const { lease } = await leaseWorld()
+    expect(ThingChecks.thingScope.safeParse(lease.scope).success).to.be.false
+  })
+
+  it("stay out of its keys, its stamp and its toJSON", async () => {
+    const { lease } = await leaseWorld()
+    for (const shown of [Object.keys(lease), Object.keys(lease.stamp), Object.keys(lease.toJSON()), Object.keys(TH.jsonOf(lease))]) {
+      expect(shown).to.have.members(StampFieldnames)
+    }
   })
 })
 

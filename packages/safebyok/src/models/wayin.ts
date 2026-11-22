@@ -26,7 +26,7 @@ export function wayinCtxOf(bankStamp: Stamps.BankStamp, gateStamp: Stamps.GateSt
 
 /** One way into a bank, recorded in its gate: its passphrase or its passkey. */
 export class Wayin {
-  // == [Props]: wayinkind, label, device_tok, born_at, bank_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, #pickle
+  // == [Props]: wayinkind, label, device_tok, born_at, bank_key_wayin_wrapped, key_deriver_label, salt_b64, credential_id, prf_salt_b64, labelpath, am, written_at, #pickle
 
   declare readonly wayinkind:              EX.Wayinkind
   /** The ckey its gate's `wayins` keep it under. */
@@ -42,6 +42,18 @@ export class Wayin {
   declare readonly credential_id?:         string
   /** Only on a passkey wayin. */
   declare readonly prf_salt_b64?:          CX.PrfSalt
+
+  /** Its labelpath, `wayin/` and its label: `wayin/main` or `wayin/passkey0`.
+   * It is no Thing's labelpath: a check of a Thing's scope refuses it.
+   */
+  get labelpath(): `wayin/${Wayin['label']}` { return `wayin/${this.label}` }
+
+  /** Always `'a'`: a wayin is never a tombstone. */
+  get am(): 'a' { return 'a' }
+
+  // A wayin is replaced, never rewritten, so it is written once, when it is born.
+  /** When it was minted: its `born_at`. */
+  get written_at(): EpochMillis { return this.born_at }
 
   readonly #pickle: WayinRecord
   // --
