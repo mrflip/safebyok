@@ -62,7 +62,7 @@ export type BoxQueryOptions = UseQueryOptions<BoxShown, Error, BoxSelected> & Re
 export type BoxQueries = Readonly<{
   /** The `queryOptions` of the box at `labelpath`, to run in `client`. */
   box:    (labelpath: string) => BoxQueryOptions
-  /** The QueryClient each query from `box` runs in: hand it to `useQuery` and its kin as their second argument. Write nothing to it. */
+  /** The QueryClient each query from `box` runs in: hand it to `useQuery` and its kin as their second argument. Set or remove nothing in it. */
   client: QueryClient
 }>
 
@@ -368,7 +368,7 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   /** The QueryClient that {@link boxQuery}'s queries and {@link keys} run in: the provider's mounted when called, or one where every query fetches nothing while none is.
-   * The records of the signed-in user's bank are cached there. Read it; write nothing to it.
+   * The records of the signed-in user's bank are cached there. Read, invalidate or refetch there; set or remove nothing.
    * A provider counts as mounted only once its effects have run, and `useQuery` keeps the client of its first render: called in the
    * provider's first render, this answers the one where nothing is fetched, and the hook never shows a later revision. In a component, take the giver's
    * `useQueryOptions()` and its `client`, the provider's from the first render.
