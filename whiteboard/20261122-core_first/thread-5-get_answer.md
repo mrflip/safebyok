@@ -1,6 +1,6 @@
 # Thread 5: get_answer (2026-11-22)
 
-Branch `20261122-get_answer`, PR #TBD, stacked on #847. Proved (before the catch-up): safebyok 1444, safebyok-react-lean 306,
+Branch `20261122-get_answer`, PR #850, stacked on #847. Proved (before the catch-up): safebyok 1444, safebyok-react-lean 306,
 safebyok-idb-lean 124, safebyok-postgres 351, each with its typecheck and lint clean; `pnpm justify` to come.
 
 * **Built**
