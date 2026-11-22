@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Thread 2 filed (#844, `00113d236`, out of draft). In review on opus: thread 3 (#847, medium) and thread 4 (#846, high), both to catch up onto #844's reviewed tip when filed. Thread 5 next, from thread 3's tip once its review is done.
+* **Status**: running (2026-11-22). Filed and out of draft: thread 2 (#844, `00113d236`, CI green), thread 4 (#846, `ce6385ea1`, on #844). Thread 3 (#847) reviewed (fixed); its filing met an e2e flake in safebyok-big's GraphQL watch test and is being retried. Thread 5 is cut from #847 once it files; thread 6 from #846 once 5 is under way.
 
 The Coach's request, verbatim:
 
