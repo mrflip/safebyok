@@ -236,7 +236,7 @@ describe("VaultMinder.listingAt", () => {
     try {
       const vaultDB = new MemoryVaultDB()
       await storedBoxOf(vaultDB)
-      const minder  = await minderOf(vaultDB)
+      const minder  = minderOf(vaultDB)
       minder.hello()
       await minder.list('box')
       await vi.advanceTimersByTimeAsync(Hours24)
@@ -449,9 +449,9 @@ describe("VaultMinder.tryAt", () => {
     expect(answer).to.have.nested.property('lastErr.refusalkind', 'storage_unavailable')
   })
 
-  it("answers unexpected_error, not a storage refusal, for anything else its own code throws", async () => {
+  it("answers unexpected_error, not a storage refusal, for anything else its own code throws", () => {
     const bank = { ...fakeBankOf(), makeGetAsk: () => { throw new Error('ask broke') } }
-    const minder = await minderOf(new MemoryVaultDB(), {}, bank)
+    const minder = minderOf(new MemoryVaultDB(), {}, bank)
     minder.hello()
     const answer = minder.tryAt(TH.BoxScope)
     expect(answer).to.deep.include({ ok: false, act: 'unclassified_storing' })

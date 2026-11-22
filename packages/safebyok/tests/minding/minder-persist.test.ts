@@ -8,7 +8,7 @@ import { MemoryPersister } from '../../src/storage/persister'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
 import { ThingFormat } from '../../src/shapes/shapes-thing'
 import * as TH from '../test-helpers'
-import { DownVaultDB, Hours24, bankMinderOf, boxScopeOf, cheatBox, fakeBankOf, storedBoxOf } from './vault-minder/world'
+import { DownVaultDB, Hours24, boxScopeOf, cheatBox, fakeBankOf, storedBoxOf } from './vault-minder/world'
 
 afterEach(() => { vi.restoreAllMocks() })
 
@@ -17,8 +17,8 @@ afterEach(() => { vi.restoreAllMocks() })
 async function nextTick(): Promise<void> { await new Promise((resolve) => { setTimeout(resolve, 0) }) }
 
 /** A minder over `vaultDB` caching in `queryClient`, started. */
-async function minderIn(queryClient: QueryClient, vaultDB: MemoryVaultDB): Promise<VaultMinder> {
-  const minder = VaultMinder.make({ vaultDB, bankMinder: await bankMinderOf(), queryClient }, fakeBankOf())
+function minderIn(queryClient: QueryClient, vaultDB: MemoryVaultDB): VaultMinder {
+  const minder = VaultMinder.make({ vaultDB, queryClient }, fakeBankOf())
   minder.hello()
   return minder
 }
@@ -28,7 +28,7 @@ async function savedGetOf(vaultDB: MemoryVaultDB): Promise<{ persister: MemoryPe
   const persister   = new MemoryPersister()
   const queryClient = VaultMinder.makeClient()
   await VaultMinder.persist(queryClient, persister)
-  const minder = await minderIn(queryClient, vaultDB)
+  const minder = minderIn(queryClient, vaultDB)
   await minder.get(TH.BoxScope)
   await nextTick()
   return { persister, minder }
@@ -50,7 +50,7 @@ describe("Minder.persist(queryClient, persister)", () => {
     const persister = new MemoryPersister()
     const queryClient = VaultMinder.makeClient()
     await VaultMinder.persist(queryClient, persister)
-    const minder = await minderIn(queryClient, vaultDB)
+    const minder = minderIn(queryClient, vaultDB)
     await minder.get(TH.BoxScope)
     await minder.list('box')
     await nextTick()
@@ -123,7 +123,7 @@ describe("Minder.persist(queryClient, persister)", () => {
     await expect(VaultMinder.persist(queryClient, persister)).rejects.toThrow('disk on fire')
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
-    const minder = await minderIn(queryClient, vaultDB)
+    const minder = minderIn(queryClient, vaultDB)
     await minder.get(TH.BoxScope)
     await nextTick()
     const saved = persister.restoreClient()!

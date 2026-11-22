@@ -43,12 +43,12 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */
-function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB, bankMinder: bank.device.bankMinder }, bank)) }
+function vaultBesideOf(bank: Bank): Vault { return Vault.make(bank, VaultMinder.make({ vaultDB: bank.vaultDB }, bank)) }
 
 describe("Vault.make(bank, minder)", () => {
   it("makes the vault of the bank's boxes, over the minder given, which waits for its hello", async () => {
     const { bank } = await TH.buildBornBank()
-    const minder = VaultMinder.make({ vaultDB: bank.vaultDB, bankMinder: bank.device.bankMinder }, bank)
+    const minder = VaultMinder.make({ vaultDB: bank.vaultDB }, bank)
     const vault = Vault.make(bank, minder)
     expect(vault.bank).to.equal(bank)
     expect(vault.minder).to.equal(minder)

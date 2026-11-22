@@ -3,7 +3,6 @@
 import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
-import type { BankMinder } from '../minding/bank-minder'
 import type { Bank } from '../models/bank'
 import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
@@ -283,9 +282,9 @@ export type ListingEvent = MinderEventOf<Kids, 'list'> & Readonly<{
 }>
 // --
 
-// == [A minder's making]: MinderOpts, VaultMinderOpts
+// == [A minder's making]: MinderOpts
 
-/** Options for `BankMinder.make`, and the options every minder is made with. */
+/** The options every minder is made with: `VaultMinder.make`'s and `BankMinder.make`'s. */
 export interface MinderOpts {
   /** Where the bank's Things are stored. */
   vaultDB:         VaultDB
@@ -293,11 +292,5 @@ export interface MinderOpts {
   queryCacheOpts?: Partial<QueryCacheOpts>
   /** The client to cache in, made by `makeClient`, which minders of other banks may share. Default: a client of its own. */
   queryClient?:    TSQ.QueryClient | undefined
-}
-
-/** Options for `VaultMinder.make`. */
-export interface VaultMinderOpts extends MinderOpts {
-  /** The minder of the bank's roots, which the root box is read from. */
-  bankMinder:      BankMinder
 }
 // --

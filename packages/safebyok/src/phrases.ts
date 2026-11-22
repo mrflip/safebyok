@@ -141,13 +141,10 @@ export const BankRootsMissing = "A bank is stored without its main gate or its r
 export const AnswerNotMade = "The vaultDB could not make an answer for a failure: this is a bug in safebyok."
 // --
 
-// == [Minding]: MinderFriendExpected, BankMinderExpected, NotMinded, WorldNotHeard, MinderClientExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
+// == [Minding]: MinderFriendExpected, NotMinded, WorldNotHeard, MinderClientExpected, MinderNotStarted, StaleRead, StaleTimeShape, FeedVersionOther, DeliveredOfOtherScope, ChildrenStoredDamaged
 
 /** A minder made without a friend: a device or a bank. */
 export const MinderFriendExpected = 'A minder is made with its friend: the device or bank whose Things it minds.'
-
-/** A VaultMinder made without the BankMinder it reads its bank's root box from. */
-export const BankMinderExpected = 'A VaultMinder is made with the BankMinder of its bank, which minds the bank, its main gate and its root box.'
 
 /** A write through a minder of a Thing it does not mind. */
 export const NotMinded = "A minder writes only the Things it minds: a VaultMinder the boxes under the root box, a BankMinder the bank, its main gate and its root box."

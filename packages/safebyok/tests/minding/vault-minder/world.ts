@@ -90,9 +90,9 @@ export async function bankMinderOf({ isWorldHeard = true } = {}): Promise<BankMi
   return bankMinder
 }
 
-/** A minder of `bank` over `vaultDB`, reading the root box from `bankMinder`, one that has the bank's roots by default. */
-export async function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf(), bankMinder?: BankMinder): Promise<VaultMinder> {
-  return VaultMinder.make({ vaultDB, bankMinder: bankMinder ?? await bankMinderOf(), queryCacheOpts }, bank)
+/** A minder of `bank` over `vaultDB`. */
+export function minderOf(vaultDB: MemoryVaultDB, queryCacheOpts: Partial<QueryCacheOpts> = {}, bank: MinderFriend = fakeBankOf()): VaultMinder {
+  return VaultMinder.make({ vaultDB, queryCacheOpts }, bank)
 }
 
 /** A bank's minder, what it stands on, and a way to hand its watch a notice. */
@@ -109,7 +109,7 @@ export async function minderWorldOf<VaultDBT extends MemoryVaultDB>(vaultDB: Vau
   const bank       = fakeBankOf()
   const bankMinder = await bankMinderOf({ isWorldHeard })
   const watching   = vi.spyOn(vaultDB as MemoryVaultDB, 'watch')
-  const minder     = await minderOf(vaultDB, {}, bank, bankMinder)
+  const minder     = minderOf(vaultDB, {}, bank)
   if (isStarted) { minder.hello() }
   function receive(notice: ThingNotice): void {
     for (const watched of watching.mock.calls) { watched[1](notice) }

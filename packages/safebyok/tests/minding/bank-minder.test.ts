@@ -107,7 +107,7 @@ describe("a BankMinder's watch", () => {
     const { bankMinder } = bankMinderOver(vaultDB)
     expect(bankMinder.at(TH.GateScope)).to.be.undefined
     const staleBank = { ...fakeBankOf(), makeGetAsk: (ask: { labelpath: string }) => getAskOf({ ...ask, ...TH.ThingBank, track: TH.GateStaleTrack }) }
-    const minder    = await minderOf(vaultDB, {}, staleBank, bankMinder)
+    const minder    = minderOf(vaultDB, {}, staleBank)
     minder.hello()
     await minder.get(TH.BoxScope)
     await TH.eventually(() => TH.itemRevtokOf(bankMinder.at(TH.GateScope)) === Gate1.revtok)

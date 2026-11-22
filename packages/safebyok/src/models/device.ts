@@ -218,7 +218,7 @@ export class Device implements MinderFriend {
     this.#userid = signedIn
     const { vaultDB } = this
     this.#bankMinder = BankMinder.make({ vaultDB, queryClient: this.#bankClient }, this)
-    this.#minder = VaultMinder.make({ vaultDB, bankMinder: this.#bankMinder, queryCacheOpts: this.#queryCacheOpts, queryClient: this.#queryClient }, this)
+    this.#minder = VaultMinder.make({ vaultDB, queryCacheOpts: this.#queryCacheOpts, queryClient: this.#queryClient }, this)
     this.#banklessSnapshot = PendingBank
     this.#align()
     this.#broughtUp = this.#bringUp(this.#bankMinder, this.#minder)
