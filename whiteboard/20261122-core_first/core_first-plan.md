@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Every thread filed and out of draft, one line: main ← #844 ← #847 ← #850 ← #846 ← #848 ← #849 ← #851 ← #852 (`952fdca35`, the top). Box-persisting plan on the sprint branch, awaiting the Coach. *Finally*: take over #833 (squash, rebase onto the tip, vocabulary changes as a second commit); wrap-up.
+* **Status**: done (2026-11-22). One line, every base `main`: main ← #844 ← #847 ← #850 ← #846 ← #848 ← #849 ← #851 ← #852 ← #833 (draft, taken over) ← #839 (this sprint PR, the top). Rulings in `core_first-resolutions.md`; the Closer Look in `core_first-closerlook.md`; the done note in `human/20261122-sprint_core_first_done.md`. Open matters still drafting in the sprint doc.
 
 The Coach's request, verbatim:
 
