@@ -48,7 +48,8 @@ function WhisperTextOf({ bank: bankProp, labelpath, field, masked = PartsPhrases
     }
   }
 
-  // The shown text lives in an element React renders empty and unmounts on Hide, taking the text with it.
+  // The shown text lives in an element React renders empty and unmounts on Hide, taking the text with it. The two keys
+  // keep React from reusing that element for the mask, which would leave the text beside a `masked` that is an element.
   return (
     <span className="whisper-text">
       {reveal.isRevealed ? <span key="text" ref={textRef} /> : <span key="masked">{masked}</span>}
