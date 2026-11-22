@@ -102,7 +102,7 @@ export abstract class Minder {
 
   // A subclass freezes the minder once its own fields are set.
   /** A minder of `bank`'s Things over `opts`, checked by the subclass's `make`. */
-  protected constructor(opts: CheckedMinderOpts, bank: MinderFriend) {
+  protected constructor(opts: MinderOpts & Readonly<{ queryCacheOpts: QueryCacheOpts }>, bank: MinderFriend) {
     const { userid, banklabel } = bank.scope
     this.userid          = userid
     this.banklabel       = banklabel
@@ -738,7 +738,7 @@ const landedListingOf = (prior: unknown, next: unknown): unknown => {
 }
 // --
 
-// == [Checks]: MinderOptsChecks, CheckedMinderOpts, DeliveredChecks
+// == [Checks]: MinderOptsChecks, DeliveredChecks
 
 /** The checks of the options every minder is made with, which each subclass's `make` extends. */
 export const MinderOptsChecks = Validator.Checkers('bad_record', ({ obj, custom }) => ({
@@ -748,9 +748,6 @@ export const MinderOptsChecks = Validator.Checkers('bad_record', ({ obj, custom 
     queryClient:    custom<TSQ.QueryClient>((val) => Minder.isClient(val), Phrases.MinderClientExpected).optional(),
   }),
 }))
-
-/** A minder's options as its `make` has checked them, its cache options defaulted. */
-export type CheckedMinderOpts = MinderOpts & Readonly<{ queryCacheOpts: QueryCacheOpts }>
 
 /** The check of a record the vaultDB delivers, refusing `unexpected_error`: a record of another scope is a bug in the vaultDB. */
 const DeliveredChecks = {

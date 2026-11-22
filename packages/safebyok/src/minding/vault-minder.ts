@@ -3,9 +3,9 @@
 import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import type { BoxRecord, VoidSentinel } from '../shapes/shapes-thing'
-import { type MinderFriend, type VaultMinderOpts, MinderChecks } from '../shapes/shapes-minder'
+import { type MinderFriend, type QueryCacheOpts, type VaultMinderOpts, MinderChecks } from '../shapes/shapes-minder'
 import { BankMinder } from './bank-minder'
-import { type CheckedMinderOpts, Minder, MinderOptsChecks } from './minder'
+import { Minder, MinderOptsChecks } from './minder'
 import * as Phrases from '../phrases'
 
 /** This device's cache of one bank's boxes under its root box, and their listings, the root box's included ({@link Minder}).
@@ -27,7 +27,7 @@ export class VaultMinder extends Minder {
     return new VaultMinder(checked.opts, checked.bank)
   }
 
-  private constructor(opts: CheckedMinderOpts & Pick<VaultMinderOpts, 'bankMinder'>, bank: MinderFriend) {
+  private constructor(opts: VaultMinderOpts & Readonly<{ queryCacheOpts: QueryCacheOpts }>, bank: MinderFriend) {
     super(opts, bank)
     this.#bankMinder = opts.bankMinder
     Object.freeze(this)

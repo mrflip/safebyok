@@ -4,10 +4,10 @@ import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
 import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope, type VoidSentinel, Shell } from '../shapes/shapes-thing'
 import type { BankRoots, BirthBankAsk } from '../shapes/shapes-asks'
-import { type MinderEvent, type MinderFriend, type MinderOpts, MinderChecks, MinderEventFormat } from '../shapes/shapes-minder'
+import { type MinderEvent, type MinderFriend, type MinderOpts, type QueryCacheOpts, MinderChecks, MinderEventFormat } from '../shapes/shapes-minder'
 import type { BirthBankAnswer } from '../storage/vault-db'
 import { Thing } from '../models/thing'
-import { type CheckedMinderOpts, Minder, MinderOptsChecks } from './minder'
+import { Minder, MinderOptsChecks } from './minder'
 import * as Throwers from '../refusals/throwers'
 
 /** This device's cache of one bank's roots: the bank, its main gate and its root box, each an item ({@link Minder}).
@@ -22,7 +22,7 @@ export class BankMinder extends Minder {
     return new BankMinder(checked.opts, checked.bank)
   }
 
-  private constructor(opts: CheckedMinderOpts, bank: MinderFriend) {
+  private constructor(opts: MinderOpts & Readonly<{ queryCacheOpts: QueryCacheOpts }>, bank: MinderFriend) {
     super(opts, bank)
     Object.freeze(this)
   }
