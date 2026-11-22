@@ -40,7 +40,7 @@ describe("PartsPhrasesProvider", () => {
   })
 
   const SloppyPhrases = [
-    [{ showButon: 'Afficher' },  'a misspelt word'],
+    [{ showButon: "Afficher" },  'a misspelt word'],
     [{ showButton: 42 },         'a word that is no string'],
     [{ showButton: undefined },  'a word given as undefined'],
     [null,                       'no words at all'],
