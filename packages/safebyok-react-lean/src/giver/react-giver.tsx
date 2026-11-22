@@ -9,6 +9,7 @@ import {
   type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
   PendingBank, type Sidecar, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
+import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
 import {
   FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateQueryKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
@@ -94,7 +95,7 @@ export type StrengthVerdictResult = Readonly<{
   /** True from a call to `judge` until its verdict lands. */
   isJudging: boolean
   /** The checker's refusal of the passphrase last judged, or null. */
-  lastErr:   unknown
+  lastErr:   Error | null
   /** Ask the signed-in user's strength checker for its verdict on `passphrase`, resolving once it lands. Never rejects.
    * Call it as the user types, with the field's value.
    */
@@ -216,7 +217,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
         const verdict = await demandDevice().judgeStrength(passphrase)
         if (ownseq === judgeseq.current) { setJudged({ verdict, isJudging: false, lastErr: null }) }
       } catch (err) {
-        if (ownseq === judgeseq.current) { setJudged({ verdict: null, isJudging: false, lastErr: err }) }
+        if (ownseq === judgeseq.current) { setJudged({ verdict: null, isJudging: false, lastErr: sanitizeForeignError(err) }) }
       }
     }, [])
     return { ...judged, judge }
@@ -483,8 +484,8 @@ function makeBankGiver(friend: BankFriend) {
   /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
    * Make it at module scope, or under `useMemo`, so its checks run once.
    * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then empties the form of every field before it writes.
-   * It never rejects: it resolves the box stored, or the `Error` that stopped it, a refusal or what `whisperOf` or `sidecarOf` threw.
-   * An `Error` they throw arrives as thrown; anything else they throw arrives wrapped in an `Error`, a thrown string as its message.
+   * It never rejects: it resolves the box stored, or the `Error` that stopped it, a refusal or what `whisperOf`, `sidecarOf` or the vaultDB threw.
+   * An `Error` thrown arrives as it is; anything else thrown arrives wrapped in an `Error`, a thrown string as its message.
    * @example
    *   const [put, putAction, isPutting] = useActionState(useMemo(() => Knock.putBoxAction('jokes', {
    *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
@@ -511,8 +512,7 @@ function makeBankGiver(friend: BankFriend) {
         const [patch, secrets] = takeForm(Checks.form.parse(form))
         return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), err: null }
       } catch (err) {
-        // What whisperOf and sidecarOf throw arrives as an Error, and everything else in the try throws one.
-        return { box: null, err: err as Error }
+        return { box: null, err: sanitizeForeignError(err) }
       }
     }
   }

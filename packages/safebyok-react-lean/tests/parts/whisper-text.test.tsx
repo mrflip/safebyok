@@ -7,7 +7,7 @@ import { WhisperText } from '../../src/parts'
 import * as TH from '../test-helpers'
 
 /** The bank's stage as a line of text, the joke service's key as a `WhisperText`, and the unlock dialog. */
-function KeyScreen({ world, field = 'apiKey', masked, onError }: Readonly<{ world: TH.ProviderWorld, field?: string, masked?: ReactNode, onError?: ((err: unknown) => void) | undefined }>) {
+function KeyScreen({ world, field = 'apiKey', masked, onError }: Readonly<{ world: TH.ProviderWorld, field?: string, masked?: ReactNode, onError?: ((err: Error) => void) | undefined }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
@@ -19,7 +19,7 @@ function KeyScreen({ world, field = 'apiKey', masked, onError }: Readonly<{ worl
 }
 
 /** A world with the joke service's key stored, rendered under its provider, once it shows the bank locked. */
-async function renderKey(onError?: (err: unknown) => void, masked?: ReactNode) {
+async function renderKey(onError?: (err: Error) => void, masked?: ReactNode) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
   const { container, rerender } = render(TH.providerTreeOf(world, <KeyScreen world={world} masked={masked} onError={onError} />, { userid: TH.ProviderUser }))
   await screen.findByText('locked')
@@ -98,7 +98,7 @@ describe("WhisperText", () => {
   })
 
   it("stays masked and reports the refusal when the unlock is dismissed", async () => {
-    const onError = vi.fn<(err: unknown) => void>()
+    const onError = vi.fn<(err: Error) => void>()
     await renderKey(onError)
     const show = screen.getByRole<HTMLButtonElement>('button', { name: 'Show' })
     fireEvent.click(show)
