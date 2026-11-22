@@ -1,6 +1,6 @@
 # Thread 10: absent_null (2026-11-22)
 
-Branch `20261122-absent_null`, PR #NNN, stacked on #833. Proved: see the PR's **Tests:** line.
+Branch `20261122-absent_null`, PR #853, stacked on #833. Proved: see the PR's **Tests:** line.
 
 The Coach and the orchestrator agreed the shape of a get's answer: `nil` over live, gone and void answers `gotlive`
 (`val` the record), `gotgone` (`val` null, `dbhas` the tombstone) and `gotvoid` (`val` null, `dbhas` null); `fail` over
