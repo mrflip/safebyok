@@ -3,7 +3,7 @@
 import { isEqual } from 'es-toolkit'
 import { type ChangeEventHandler, type FocusEventHandler, type RefCallback, useEffect, useRef, useState } from 'react'
 import {
-  type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sealable, Shell, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes, bulletproofHandlerOf, isAbsent,
+  type BoxRecord, type BoxUnsealed, Checkers, type LiveOf, type Sealable, Shell, type Sidecar, Thing, type Vault, VaultError, type Whisper, WhisperFieldAttributes, bulletproofHandlerOf,
 } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { PartsPhrases } from '../parts/phrases-parts'
@@ -226,21 +226,21 @@ const NoFieldnames: ReadonlySet<string> = new Set()
 /** The sidecar of a draft with no box to base it on. */
 const EmptySidecar: Sidecar = Object.freeze({})
 
-/** The `select` that hands a draft the whole record, or Absent, to compare revisions by. */
+/** The `select` that hands a draft the whole record, or null, to compare revisions by. */
 function wholeThingOf(thing: BoxShown): BoxShown { return thing }
 
 // The item never goes back, so a stored box other than the pinned one has moved past it.
-/** True when `stored` has moved past `pinned`: a newer revision, or one of them Absent and the other not. */
+/** True when `stored` has moved past `pinned`: a newer revision, or one of them null and the other not. */
 function isMovedPast(pinned: BoxShown, stored: BoxShown): boolean {
-  if (isAbsent(pinned) || isAbsent(stored)) { return (isAbsent(pinned) !== isAbsent(stored)) }
+  if ((pinned === null) || (stored === null)) { return ((pinned === null) !== (stored === null)) }
   return (Thing.cmp(pinned, stored) > 0)
 }
 
-// A base that is Absent cites the box's tombstone, or its shell, so a box written since refuses the put.
-/** What a draft's put cites: its base, the box's tombstone or shell where the base is Absent, or with no base the box unsealed. */
+// A base that is null cites the box's tombstone, or its shell, so a box written since refuses the put.
+/** What a draft's put cites: its base, the box's tombstone or shell where the base is null, or with no base the box unsealed. */
 function citedOf(vault: Vault, pinned: BoxShown | null, unsealed: BoxUnsealed): Sealable<LiveOf<BoxRecord>> {
   if (pinned === null) { return Thing.sparseOf(unsealed) }
-  if (! isAbsent(pinned)) { return pinned }
+  if (pinned !== null) { return pinned }
   const scope = { userid: unsealed.userid, banklabel: unsealed.banklabel, labelpath: unsealed.labelpath }
   return vault.minder.deadAt(scope) ?? Shell.of(scope, vault.bank.rootBox)
 }

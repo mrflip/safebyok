@@ -10,7 +10,7 @@ import type { BoxWriteAsk } from '../shapes/shapes-asks'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
 import { type BoxLabelpath, Labelpath } from '../shapes/primitives'
 import { type MinderGetOpts, type ScopeAt, MinderChecks } from '../shapes/shapes-minder'
-import { type BoxRecord, Shell, isAbsent } from '../shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
 
 /** One bank's boxes in this tab: a minder that caches them, and the verbs to write them and use their whispers.
@@ -63,7 +63,7 @@ export class Vault {
   // == [Writing boxes]: tryPutBoxOnce, putBoxOnce, tryDelBoxOnce, delBoxOnce
 
   /** Seal and write the next revision of the box `cited`, applying `patch` and encrypting `secrets`. Resolves an `Outcome` of the stored box.
-   * Given a labelpath, it writes over the soonest record the minder has of the box (its soon, else its item, else its tombstone or shell where the item is Absent), fetching it when none is cached.
+   * Given a labelpath, it writes over the soonest record the minder has of the box (its soon, else its item, else its tombstone or shell where the item is null), fetching it when none is cached.
    * It tries once. Where another revision is stored, it refuses `stale_write`, and the minder caches that revision when the watch tells of it.
    * Over a sparse box, a tombstone or no box, `patch` must give the sidecar.
    * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
@@ -89,7 +89,7 @@ export class Vault {
   }
 
   /** Delete the box at `labelpath`, resolving an `Outcome` of its stored tombstone.
-   * It writes over the soonest record the minder has of the box (its soon, else its item), fetching it when none is cached. The box's item is then Absent, and its dead entry has the tombstone.
+   * It writes over the soonest record the minder has of the box (its soon, else its item), fetching it when none is cached. The box's item is then null, and its dead entry has the tombstone.
    * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {
@@ -158,16 +158,16 @@ export class Vault {
     return await fn(await this.#bank.unsealBox(this.#demandReadableThing(scope)))
   }
 
-  // Read in one synchronous step, so the item and the soon are of one moment. A soon beside an Absent item is newer than
+  // Read in one synchronous step, so the item and the soon are of one moment. A soon beside a null item is newer than
   // the item's tombstone or none, and so of a newer life.
   /** The box `scope`'s item, a live record of the newest life heard of, behind within that life or not.
-   * Refuses `stale_read` for no item or a soon of a newer life, then `absent_box` for an item that is Absent.
+   * Refuses `stale_read` for no item or a soon of a newer life, then `absent_box` for an item that is null.
    */
   #demandReadableThing(scope: ScopeAt<BoxLabelpath>): BoxRecord {
     const item = this.#minder.at(scope)
     const soon = this.#minder.soonAt(scope)
-    if ((item === undefined) || ((soon !== undefined) && (isAbsent(item) || isOfNewerLife(item, soon)))) { throw Throwers.boxSoonestBare(scope.labelpath) }
-    if (isAbsent(item)) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
+    if ((item === undefined) || ((soon !== undefined) && ((item === null) || isOfNewerLife(item, soon)))) { throw Throwers.boxSoonestBare(scope.labelpath) }
+    if (item === null) { throw Throwers.boxAbsent({ boxlabel: scope.labelpath }) }
     return item
   }
   // --
@@ -187,11 +187,12 @@ export class Vault {
   }
 
   // The shell of a box is of the root box's life.
-  /** The soonest record the minder has of the box at `labelpath`: its soon, else its item, else fetched; where the item is Absent, its tombstone, else its shell. */
+  /** The soonest record the minder has of the box at `labelpath`: its soon, else its item, else fetched; where the item is null, its tombstone, else its shell. */
   async #soonestAt(labelpath: BoxLabelpath): Promise<Sealable<LiveOf<BoxRecord>>> {
     const scope   = this.#scopeAt(labelpath)
-    const soonest = this.#minder.soonAt(scope) ?? this.#minder.at(scope) ?? await this.#minder.get(scope)
-    if (! isAbsent(soonest)) { return soonest }
+    const heard   = this.#minder.soonAt(scope) ?? this.#minder.at(scope)
+    const soonest = (heard === undefined) ? await this.#minder.get(scope) : heard
+    if (soonest !== null) { return soonest }
     return this.#minder.deadAt(scope) ?? Shell.of(scope, this.#bank.rootBox)
   }
   // --

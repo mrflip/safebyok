@@ -4,7 +4,7 @@
 import 'fake-indexeddb/auto'
 import { noop } from 'es-toolkit'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Absent, Shell, VaultError } from 'safebyok/storage'
+import { Shell, VaultError } from 'safebyok/storage'
 import { IdbVaultDB } from '../src/idb-vault-db'
 import { VaultDBVersion } from '../src/vault-shelf'
 import * as TH from './test-helpers'
@@ -48,7 +48,7 @@ describe("IdbVaultDB's databases", () => {
     const other = TH.makeIdbVaultDB()
     await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
     const gotten = await TH.expectGood<unknown>(other.tryGetThing(TH.getGateAskOf()))
-    expect(gotten).to.deep.equal(Absent)
+    expect(gotten).to.deep.equal(null)
   })
 
   it("keeps its Things for a new instance on the same database", async () => {

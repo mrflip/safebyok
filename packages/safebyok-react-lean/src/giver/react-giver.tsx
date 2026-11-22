@@ -6,7 +6,7 @@ import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationR
 import { pick } from 'es-toolkit'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  type Absent, type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
+  type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
   PendingBank, Shell, type Sidecar, SignedOutBank, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
@@ -34,8 +34,8 @@ export type ProviderProps = Readonly<{
   children?:   ReactNode
 }>
 
-/** A box's record as the giver fetches it: the whole record, or Absent where none is stored or it was deleted. */
-export type BoxShown = BoxRecord | Absent
+/** A box's record as the giver fetches it: the whole record, or null where none is stored or it was deleted. */
+export type BoxShown = BoxRecord | null
 
 /** What names a box to a bank's writes: the host's labelpath, such as `'openai'`, or an object scoped to the box, such as its record. */
 export type BoxNamed = string | Readonly<{ labelpath: string }>
@@ -378,7 +378,7 @@ function makeBankGiver(friend: BankFriend) {
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the bank is brought up.
    * A record overtaken by a newer revision shows until the newer one arrives.
    * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, or
-   * Absent where none is stored or it was deleted: {@link liveOf} is the default.
+   * null where none is stored or it was deleted: {@link liveOf} is the default.
    * @example
    *   const { data: box } = Knock.useBox('jokes')
    *   const mask = Knock.useBox('jokes', { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data

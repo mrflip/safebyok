@@ -2,7 +2,7 @@ import * as TSQ from '@tanstack/query-core'
 import { describe, expect, it, vi } from 'vitest'
 import { type DeliverableThing, MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { Absent, Shell } from '../../../src/shapes/shapes-thing'
+import { Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, storedBoxOf, noticeOf, revtokAt, listenerOf, toldOf, labelpathsOf } from './world'
@@ -33,28 +33,28 @@ describe("VaultMinder.get", () => {
     expect(asked.mock.calls).to.have.lengthOf(1)
   })
 
-  it("returns Absent for a box not stored, with no tombstone", async () => {
+  it("returns null for a box not stored, with no tombstone", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = await minderWorldOf(vaultDB)
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(Absent)
-    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
+    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
     expect(minder.deadAt(TH.BoxScope)).to.be.undefined
   })
 
-  it("returns Absent for a deleted box, its tombstone cached by the time the get resolves", async () => {
+  it("returns null for a deleted box, its tombstone cached by the time the get resolves", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, tombstone)
     const { minder } = await minderWorldOf(vaultDB)
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(Absent)
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
-    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'gotgone', val: Absent, dbhas: tombstone })
+    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
   })
 
-  it("returns Absent for a box not stored while its BankMinder has no world of the bank", async () => {
+  it("returns null for a box not stored while its BankMinder has no world of the bank", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = await minderWorldOf(vaultDB, { isWorldHeard: false })
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(Absent)
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
   })
 
   it("asks the vaultDB once for two gets under way together", async () => {
@@ -127,7 +127,7 @@ describe("VaultMinder.get", () => {
     })
   }
 
-  it("refuses 'stale_read' a get answered with Absent for a tombstone older than the record cached, which lands nowhere", async () => {
+  it("refuses 'stale_read' a get answered with null for a tombstone older than the record cached, which lands nowhere", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     const reborn    = TH.boxRebornOf(tombstone)
@@ -307,7 +307,7 @@ describe("VaultMinder.list", () => {
     expect(await minder.get(TH.BoxScope)).to.deep.equal(box1)
   })
 
-  it("caches a box listed as a tombstone in its dead entry and Absent in its item, and answers it from the cache", async () => {
+  it("caches a box listed as a tombstone in its dead entry and null in its item, and answers it from the cache", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
@@ -316,10 +316,10 @@ describe("VaultMinder.list", () => {
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, tombstone)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     await minder.list('box')
-    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(tombstone))
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'gotgone', isTimely: true, dbhas: Thing.sparseOf(tombstone) })
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(Absent)
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
     expect(asked.mock.calls).to.have.lengthOf(0)
   })
 

@@ -3,7 +3,7 @@
 import { noop } from 'es-toolkit'
 import { EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import { type Sparse, type ThingRecord, Absent } from '../shapes/shapes-thing'
+import type { Sparse, ThingRecord } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import { Thing } from '../models/thing'
 import {
@@ -27,12 +27,12 @@ export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void, notify: (val: ThingRecord | Sparse<ThingRecord>) => void }
 
 /** The answer a verb gives for its concrete adapter's report: `record` becomes `val` when good, `dbhas` when refused.
- * A get that finds no live Thing answers {@link Absent}, with a tombstone as its `dbhas`.
+ * A get that finds no live Thing answers a `val` of null, with a tombstone or null as its `dbhas`.
  * Throws `storage_issue` if a good report other than `gotvoid` has no Thing.
  */
 function answerOf(actual: Actual<EX.GotAct>, oplabel: string, loggableAsk: LoggableAsk): GetThingAnswer
 function answerOf(actual: Actual<EX.PutAct | EX.DelAct>, oplabel: string, loggableAsk: LoggableAsk): WriteThingAnswer
-function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<ThingRecord | Absent, EX.GoodAct> | GetThingAnswer {
+function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<ThingRecord | null, EX.GoodAct> | GetThingAnswer {
   const { world, record } = actual
   const beside = trackedFieldOf(actual)
   if (! actual.ok) {
@@ -40,10 +40,10 @@ function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: Logg
     return { ok: false, ask: loggableAsk, act: actual.act, world, ...beside, dbhas: record, err }
   }
   const good = { ok: true, ask: loggableAsk, world, ...beside } as const
-  if (actual.act === 'gotvoid') { return { ...good, act: actual.act, val: Absent } }
+  if (actual.act === 'gotvoid') { return { ...good, act: actual.act, val: null, dbhas: null } }
   // Every good act but gotvoid finds or writes a Thing: a concrete adapter that reports none is broken.
   if (record === null) { throw Throwers.storageIssue() }
-  if (actual.act === 'gotgone') { return { ...good, act: actual.act, val: Absent, dbhas: record as TombstoneOf<ThingRecord> } }
+  if (actual.act === 'gotgone') { return { ...good, act: actual.act, val: null, dbhas: record as TombstoneOf<ThingRecord> } }
   return { ...good, act: actual.act, val: record }
 }
 

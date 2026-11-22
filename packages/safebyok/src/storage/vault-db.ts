@@ -2,7 +2,7 @@
 
 import type { EX, Errors } from 'safebyok-big/internals'
 import type { Labelpath, Lifepath, Lifeseq } from '../shapes/primitives'
-import type { Absent, Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
+import type { Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
 import type { TombstoneOf } from '../shapes/shapes-sealers'
 import type { BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, ThingWatchScope, Tracked, WorldRecord, WriteAsk } from '../shapes/shapes-asks'
 
@@ -25,13 +25,13 @@ export type BadAnswer<DbhasT = ThingRecord | null> = { ok: false, ask: LoggableA
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
 
-/** The answer to `tryGetThing`: the live Thing (`gotlive`), or {@link Absent} for a tombstone (`gotgone`) or none (`gotvoid`).
- * Under `gotgone` the tombstone is its `dbhas`, which the vaultDB's watch notifies before the answer.
+/** The answer to `tryGetThing`: the live Thing (`gotlive`), or a `val` of null for a tombstone (`gotgone`) or none (`gotvoid`).
+ * Every answer but `gotlive` carries a `dbhas`: the tombstone under `gotgone`, which the vaultDB's watch notifies before the answer, and null under `gotvoid`.
  */
 export type GetThingAnswer   =
   | GoodAnswer<ThingRecord, 'gotlive'>
-  | (GoodAnswer<Absent, 'gotgone'> & { dbhas: TombstoneOf<ThingRecord> })
-  | GoodAnswer<Absent, 'gotvoid'>
+  | (GoodAnswer<null, 'gotgone'> & { dbhas: TombstoneOf<ThingRecord> })
+  | (GoodAnswer<null, 'gotvoid'> & { dbhas: null })
   | BadAnswer
 /** The answer to `tryWriteThing`: the Thing the concrete adapter reports writing, or under `passed` the live Thing it found. */
 export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>

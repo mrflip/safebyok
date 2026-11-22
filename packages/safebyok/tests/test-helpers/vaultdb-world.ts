@@ -2,8 +2,8 @@
 
 import { type Labelpath, type Lifepath, type Revtok, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type Absent, type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord,
-  Shell, ThingFormat, isAbsent,
+  type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord,
+  Shell, ThingFormat,
 } from '../../src/shapes/shapes-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
@@ -143,7 +143,7 @@ export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
 /** The track of a sender with the root box at another revision. */
 export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
 
-/** The revtok of `val`, what a minder's item or soon has, or undefined for none or Absent. */
-export function itemRevtokOf(val: Sparse<ThingRecord> | Absent | undefined): Revtok | undefined {
-  return ((val === undefined) || isAbsent(val)) ? undefined : val.revtok
+/** The revtok of `val`, what a minder's item or soon has, or undefined for none or null. */
+export function itemRevtokOf(val: Sparse<ThingRecord> | null | undefined): Revtok | undefined {
+  return ((val === undefined) || (val === null)) ? undefined : val.revtok
 }

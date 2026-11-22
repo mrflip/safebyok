@@ -3,7 +3,7 @@ import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-li
 import { type ReactNode, useActionState, useEffect, useLayoutEffect, useMemo } from 'react'
 import { type Root, hydrateRoot } from 'react-dom/client'
 import { renderToString } from 'react-dom/server'
-import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, Absent, MemoryVaultDB, Thing, VaultMinder, isVaultError } from 'safebyok'
+import { type BankSnapshot, type BoxRecord, type Device, type GateRecord, type Gating, type LiveOf, type Whisper, MemoryVaultDB, Thing, VaultMinder, isVaultError } from 'safebyok'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { liveOf, passkeyHeaderOf } from '../../src/giver/giver-defaults'
@@ -629,13 +629,13 @@ describe("useBox", () => {
     expect(result.current.data).to.be.null
   })
 
-  it("answers null for a deleted box, and hands a select of its own Absent", async () => {
+  it("answers null for a deleted box, and hands a select of its own null", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const tombstone = await world._cheat_otherVault!.delBoxOnce(`box/${TH.JokesPath}`)
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result } = renderHook(() => ({ shown: world.Bank.useBox(TH.JokesPath), whole: world.Bank.useBox(TH.JokesPath, { select: (thing) => thing }) }), { wrapper: Wrapper })
     await waitFor(() => { expect(result.current.whole.isSuccess).to.eq(true) })
-    expect([result.current.shown.data, result.current.whole.data]).to.deep.equal([null, Absent])
+    expect([result.current.shown.data, result.current.whole.data]).to.deep.equal([null, null])
     expect(tombstone.sidecar).to.deep.equal({})
   })
 
@@ -682,14 +682,14 @@ describe("useBox", () => {
     expect((result.current.data as BoxRecord | undefined)?.labelpath).to.eq('box/puns')
   })
 
-  it("shows Absent when the labelpath changes to a box not stored, under a select that returns what it is handed", async () => {
+  it("shows null when the labelpath changes to a box not stored, under a select that returns what it is handed", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
     const { result, rerender } = renderHook(({ labelpath }) => world.Bank.useBox(labelpath, { select: (thing) => thing }), { wrapper: Wrapper, initialProps: { labelpath: TH.JokesPath } })
     await waitFor(() => { expect((result.current.data as BoxRecord | undefined)?.labelpath).to.eq(`box/${TH.JokesPath}`) })
     await act(() => world.Bank.queryClient().query(world.Bank.boxQuery('puns')))
     rerender({ labelpath: 'puns' })
-    expect(result.current.data).to.deep.equal(Absent)
+    expect(result.current.data).to.deep.equal(null)
   })
 
   it("shows what a new select returns from the same record, when it returns records", async () => {
@@ -922,11 +922,11 @@ describe("putBoxOnce", () => {
 })
 
 describe("delBoxOnce", () => {
-  it("deletes the box, Absent in the giver's query by the time it resolves, and useBox shows null", async () => {
+  it("deletes the box, null in the giver's query by the time it resolves, and useBox shows null", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     const tombstone = await act(() => world.Bank.delBoxOnce(result.current.data!))
-    expect(world.Bank.queryClient().getQueryData(JokesKey)).to.deep.equal(Absent)
+    expect(world.Bank.queryClient().getQueryData(JokesKey)).to.deep.equal(null)
     await waitFor(() => { expect(result.current.data).to.be.null })
     expect(tombstone.am).to.eq('x')
     await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_box')

@@ -1,25 +1,25 @@
 /** `newerThingOf`: the merge every record a minder caches lands through. */
 import * as TSQ from '@tanstack/query-core'
-import { type Absent, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Shell, ThingChecks, isAbsent } from '../shapes/shapes-thing'
+import { type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Shell, ThingChecks } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 
 // == [Merging]: newerThingOf, DeadAt
 
-/** Where {@link newerThingOf} finds the tombstone that {@link Absent} stands for at a scope: undefined where none is cached. */
+/** Where {@link newerThingOf} finds the tombstone that null stands for at a scope: undefined where none is cached. */
 export type DeadAt = (scope: ThingScope) => Tombstone<ThingRecord> | undefined
 
 // TanStack Query runs structural sharing on what a host's `select` returns as well as on the entry's own values, and
 // types both as unknown.
 /** The newer of two values of one Thing's item, soon or tombstone, by life and then revision, with `prior` on a tie and `next` where `prior` is undefined.
- * It serves as structural sharing for a TanStack query of one Thing's records. {@link Absent} stands for the tombstone `deadAt`
- * finds at the other value's scope, or, where it finds none, for nothing stored, older than every record. Of two Absents, `prior`.
- * Anything that is neither a record nor Absent gets TanStack's own default.
+ * It serves as structural sharing for a TanStack query of one Thing's records. Null stands for the tombstone `deadAt`
+ * finds at the other value's scope, or, where it finds none, for nothing stored, older than every record. Of two nulls, `prior`.
+ * Anything that is neither a record nor null gets TanStack's own default.
  */
 export function newerThingOf(prior: unknown, next: unknown, deadAt?: DeadAt): unknown {
   if (prior === undefined) { return next }
   if (! (isEntryVal(prior) && isEntryVal(next))) { return TSQ.replaceEqualDeep(prior, next) }
-  if (isAbsent(prior)) { return isAbsent(next) ? prior : newerOfCited(prior, next, citedOf(prior, next, deadAt), next) }
-  if (isAbsent(next))  { return newerOfCited(prior, next, prior, citedOf(next, prior, deadAt)) }
+  if (prior === null) { return (next === null) ? prior : newerOfCited(prior, next, citedOf(prior, next, deadAt), next) }
+  if (next === null)  { return newerOfCited(prior, next, prior, citedOf(next, prior, deadAt)) }
   return newerOfCited(prior, next, prior, next)
 }
 // --
@@ -29,14 +29,14 @@ export function newerThingOf(prior: unknown, next: unknown, deadAt?: DeadAt): un
 /** A record a minder's entry may have: a Thing's scope and citation, live or a tombstone, sparse or whole. */
 type EntryRecord = ThingScope & ThingCited
 
-/** True for a record, or {@link Absent}. */
-function isEntryVal(val: unknown): val is EntryRecord | Absent {
-  return isAbsent(val) || ThingChecks.scopedCited.safeParse(val).success
+/** True for a record, or null. */
+function isEntryVal(val: unknown): val is EntryRecord | null {
+  return (val === null) || ThingChecks.scopedCited.safeParse(val).success
 }
 
-/** The citation `val` compares by: its own, or where it is Absent, that of the tombstone at `scoped`'s scope, else the shell's. */
-function citedOf(val: EntryRecord | Absent, scoped: ThingScope, deadAt: DeadAt | undefined): Pick<ThingCited, 'lifepath' | 'revseq'> {
-  return isAbsent(val) ? (deadAt?.(scoped) ?? Shell.Cited) : val
+/** The citation `val` compares by: its own, or where it is null, that of the tombstone at `scoped`'s scope, else the shell's. */
+function citedOf(val: EntryRecord | null, scoped: ThingScope, deadAt: DeadAt | undefined): Pick<ThingCited, 'lifepath' | 'revseq'> {
+  return (val === null) ? (deadAt?.(scoped) ?? Shell.Cited) : val
 }
 
 /** `next` where `nextCited` is newer than `priorCited`, else `prior`. */

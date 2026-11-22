@@ -2,7 +2,7 @@
 
 import { type QueryKey, replaceEqualDeep } from '@tanstack/react-query'
 import {
-  type Absent, type DeadAt, type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, VaultMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, isAbsent, newerThingOf,
+  type DeadAt, type GateRecord, type Gating, type LiveOf, type PasskeyWayinHeader, type Sparse, Thing, type ThingCited, ThingChecks, VaultMinder, type ThingRecord, type Tombstone, type Userid, type WayinHeader, type WayinRecord, newerThingOf,
 } from 'safebyok'
 import type { GateShown, HeaderedGate } from './react-giver'
 
@@ -12,7 +12,7 @@ import type { GateShown, HeaderedGate } from './react-giver'
 // stale only on evidence: while the bank's minder has heard of a newer revision than the item has. Every record the
 // minder hears of lands in the item, so nothing ages it.
 /** The giver's defaults for a hook's query of the record at `labelpath` in the giver's QueryClient, stale while `isBehind` answers true.
- * `deadAt` finds the tombstone an Absent item stands for, as the minder's own does.
+ * `deadAt` finds the tombstone a null item stands for, as the minder's own does.
  */
 export function recordQueryDefaults(labelpath: string, isBehind: () => boolean, deadAt: DeadAt) {
   return {
@@ -27,31 +27,31 @@ export function recordQueryDefaults(labelpath: string, isBehind: () => boolean, 
 // them, so a value that is not a record gets TanStack's own default. When a hook's key changes, it shares the last key's
 // selected value with the new key's, so a record of another box than the query's gets the default too. A select run
 // again over the same revision may return a record-shaped value that differs, so two of one revision get the default as
-// well, and so do two Absents. Between values at different revisions it answers as the minder's own structural sharing
+// well, and so do two nulls. Between values at different revisions it answers as the minder's own structural sharing
 // does, which it replaces while a hook observes.
-/** Structural sharing for a hook's item of the box at `labelpath`: of two of its records or Absents at different revisions, the newer. Anything else goes to TanStack's default, `replaceEqualDeep`. */
+/** Structural sharing for a hook's item of the box at `labelpath`: of two of its records or nulls at different revisions, the newer. Anything else goes to TanStack's default, `replaceEqualDeep`. */
 function newerOrSharedOf(prior: unknown, next: unknown, labelpath: string, deadAt: DeadAt): unknown {
-  function isItemVal(val: unknown): boolean { return isAbsent(val) || (isRecord(val) && (val.labelpath === labelpath)) }
+  function isItemVal(val: unknown): boolean { return (val === null) || (isRecord(val) && (val.labelpath === labelpath)) }
   if (! (isItemVal(prior) && isItemVal(next))) { return replaceEqualDeep(prior, next) }
-  const isSame = (isAbsent(prior) && isAbsent(next)) || (isRecord(prior) && isRecord(next) && (Thing.cmp(prior, next) === 0))
+  const isSame = ((prior === null) && (next === null)) || (isRecord(prior) && isRecord(next) && (Thing.cmp(prior, next) === 0))
   if (isSame) { return replaceEqualDeep(prior, next) }
   return newerThingOf(prior, next, deadAt)
 }
 
-/** True when `val` carries a Thing's scope and revision, as every record, tombstone and shell does, and Absent does not. */
+/** True when `val` carries a Thing's scope and revision, as every record, tombstone and shell does, and null does not. */
 function isRecord(val: unknown): val is ThingCited & Readonly<{ labelpath: string }> {
   return ThingChecks.scopedCited.safeParse(val).success
 }
 
 // A minder's item never has a sparse record: its soon does. The case is here for a host's own select over a record it
 // found elsewhere, such as a soon.
-/** The record a host shows of `thing`: itself while live, null for Absent, a tombstone or the shell, undefined for a sparse record.
- * Absent is nothing stored, or deleted; a sparse record's body is not yet known. It is the default `select` of a box's query. Call it from a `select` of your own to start from what the default shows.
+/** The record a host shows of `thing`: itself while live, null for none stored, a tombstone or the shell, undefined for a sparse record.
+ * A null item is nothing stored, or deleted; a sparse record's body is not yet known. It is the default `select` of a box's query. Call it from a `select` of your own to start from what the default shows.
  * @example
  *   const title = useQuery({ ...sok.acme.box('openai'), select: (thing) => liveOf(thing)?.sidecar['title'] }, sok.acme.client).data
  */
-export function liveOf<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tombstone<RecordT> | Absent): LiveOf<RecordT> | null | undefined {
-  if (isAbsent(thing) || Thing.isTombstone(thing)) { return null }
+export function liveOf<RecordT extends Sparse<ThingRecord>>(thing: RecordT | Tombstone<RecordT> | null): LiveOf<RecordT> | null | undefined {
+  if ((thing === null) || Thing.isTombstone(thing)) { return null }
   if (Thing.isSparse(thing))    { return undefined }
   return thing as LiveOf<RecordT>
 }

@@ -4,7 +4,7 @@ import { type DeadEvent, type ListingEvent, type MinderEvent, type SoonEvent, ty
 import type { Kids } from '../../../src/storage/vault-db'
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { type BoxRecord, type GateRecord, type Sparse, type Tombstone, Absent } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, type GateRecord, type Sparse, type Tombstone } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, cheatBox, storedBoxOf, noticeOf, sparseNoticeOf, boxScopeOf, everyEventListenerOf, listenerOf, toldOf, isListingEvent, labelpathsOf } from './world'
 
@@ -35,8 +35,8 @@ describe("VaultMinder.listen", () => {
   })
 
   it("types an item's event and a soon's by its modelkind", () => {
-    expectTypeOf<Extract<ThingEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxRecord | Absent | undefined>()
-    expectTypeOf<Extract<ThingEvent, { modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateRecord | Absent | undefined>()
+    expectTypeOf<Extract<ThingEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxRecord | null | undefined>()
+    expectTypeOf<Extract<ThingEvent, { modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateRecord | null | undefined>()
     expectTypeOf<Extract<SoonEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<Sparse<BoxRecord> | undefined>()
     expectTypeOf<Extract<DeadEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<Tombstone<BoxRecord> | undefined>()
     expectTypeOf<Exclude<MinderEvent, ThingEvent | SoonEvent | DeadEvent>['state']['data']>().toEqualTypeOf<Kids | undefined>()
@@ -127,13 +127,13 @@ describe("VaultMinder.listen", () => {
     expect(heard.mock.calls[0]?.[0]).to.not.have.property('agerank')
   })
 
-  it("tells Absent, with no revision or life, where nothing is stored", async () => {
+  it("tells null, with no revision or life, where nothing is stored", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
     await minder.get(TH.BoxScope)
-    expect(toldOf(heard)).to.deep.equal([['box/openai', 'absent']])
+    expect(toldOf(heard)).to.deep.equal([['box/openai', 'null']])
     expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ revtok: undefined, revseq: undefined, am: undefined, lifeseq: undefined, lifepath: undefined })
     expect(heard.mock.calls.at(-1)?.[0]).to.have.nested.property('state.data', minder.at(TH.BoxScope))
   })
@@ -189,7 +189,7 @@ describe("VaultMinder.listen", () => {
     expect(items[1]).to.have.nested.property('state.data', cached)
   })
 
-  it("tells Absent, and then a tombstone in the dead entry before Absent again in the item", async () => {
+  it("tells null, and then a tombstone in the dead entry before null again in the item", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder, receive } = await minderWorldOf(vaultDB)
     await minder.get(TH.BoxScope)
@@ -197,10 +197,10 @@ describe("VaultMinder.listen", () => {
     minder.listen(heard, MinderEventFormat)
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     receive(noticeOf(tombstone))
-    expect(toldOf(heard)).to.deep.equal([['dead', 'box/openai', tombstone.revseq], ['box/openai', 'absent']])
+    expect(toldOf(heard)).to.deep.equal([['dead', 'box/openai', tombstone.revseq], ['box/openai', 'null']])
     expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', "action.type": 'success', modelkind: 'box', am: 'x', revtok: tombstone.revtok, queryKey: minder.deadQueryKey(TH.BoxScope) })
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', minder.deadAt(TH.BoxScope))
-    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
   })
 

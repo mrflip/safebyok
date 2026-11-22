@@ -43,7 +43,7 @@ export {
 } from './shapes/shapes-asks'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sparse, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind, type Tombstone,
-  type VoidSentinel, type Wayins, Absent, Shell, ThingChecks, isAbsent, thingkindVals,
+  type VoidSentinel, type Wayins, Shell, ThingChecks, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
 // A bank is made with the defaults its minders set on their cached items and lists; the minder itself is on the front door.

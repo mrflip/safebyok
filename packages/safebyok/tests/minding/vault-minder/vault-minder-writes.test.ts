@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { VaultMinder } from '../../../src/minding/vault-minder'
-import { type BoxRecord, Absent, Shell } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
@@ -122,7 +122,7 @@ describe("VaultMinder.tryWrite", () => {
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
   })
 
-  it("leaves a deleted box Absent in its item, its tombstone in its dead entry, and its labelpath in the root box's listing", async () => {
+  it("leaves a deleted box null in its item, its tombstone in its dead entry, and its labelpath in the root box's listing", async () => {
     const vaultDB = new QuietVaultDB()
     const box     = await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)
@@ -130,7 +130,7 @@ describe("VaultMinder.tryWrite", () => {
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     const answer    = await minder.tryWrite(TH.delAskFor(box, tombstone))
     expect(answer).to.deep.include({ ok: true, act: 'deleted', val: tombstone })
-    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
     expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
   })
@@ -147,7 +147,7 @@ describe("VaultMinder.tryWrite", () => {
     const tombstone = await bank.sealBox(box, { am: 'x' })
     const delAsk    = bank.makeDelAsk<BoxRecord>({ cited: Thing.sparseOf(box), record: tombstone })
     await TH.expectGood(minder.tryWrite(delAsk))
-    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
     expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
   })

@@ -2,7 +2,7 @@ import * as TSQ from '@tanstack/query-core'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { MaxTimerMillis } from '../../../src/shapes/shapes-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { type BoxRecord, type Sparse, type ThingRecord, type Tombstone, Absent } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, type Sparse, type ThingRecord, type Tombstone } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { Hours24, BoxGetAsk, DownVaultDB, fakeBankOf, minderOf, minderWorldOf, bornOf, storedBoxOf, noticeOf, sparseNoticeOf, actOf, boxScopeOf, cheatBox, boxBirthAskOf, isListingStaleAt, labelpathsOf } from './world'
@@ -61,9 +61,9 @@ describe("VaultMinder.at", () => {
     const { minder } = await minderWorldOf(new MemoryVaultDB())
     // Known only when run, as a host's labels are.
     const [label, labelpath] = ['openai' as string, 'box/openai' as string]
-    expectTypeOf(minder.at(TH.BoxScope)).toEqualTypeOf<BoxRecord | Absent | undefined>()
-    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath: `box/${label}` as const })).toEqualTypeOf<BoxRecord | Absent | undefined>()
-    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingRecord | Absent | undefined>()
+    expectTypeOf(minder.at(TH.BoxScope)).toEqualTypeOf<BoxRecord | null | undefined>()
+    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath: `box/${label}` as const })).toEqualTypeOf<BoxRecord | null | undefined>()
+    expectTypeOf(minder.at({ ...TH.ThingBank, labelpath })).toEqualTypeOf<ThingRecord | null | undefined>()
     expectTypeOf(minder.deadAt(TH.BoxScope)).toEqualTypeOf<Tombstone<BoxRecord> | undefined>()
   })
 })
@@ -292,9 +292,9 @@ describe("VaultMinder, a child's first landing", () => {
     await TH.eventually(() => isListingStaleAt(minder, TH.RootScope))
   })
 
-  it("marks the parent's listing stale for a box this device writes over the Absent it got", async () => {
+  it("marks the parent's listing stale for a box this device writes over the null it got", async () => {
     const { minder } = await listedWorld()
-    expect(await minder.get(boxScopeOf('anthropic'))).to.deep.equal(Absent)
+    expect(await minder.get(boxScopeOf('anthropic'))).to.deep.equal(null)
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
     await TH.expectGood(minder.tryWrite(boxBirthAskOf('anthropic')))
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.true
@@ -387,19 +387,18 @@ describe("VaultMinder.tryAt", () => {
     expect(answer).to.have.property('refreshedAt').above(0)
   })
 
-  it("answers gotvoid, with Absent and no dbhas, where storage has nothing", async () => {
+  it("answers gotvoid, with null and a null dbhas, where storage has nothing", async () => {
     const { minder } = await minderWorldOf(await bornOf(new MemoryVaultDB()))
     await minder.get(TH.BoxScope)
     const answer = minder.tryAt(TH.BoxScope)
-    expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: Absent, record: Absent, isTimely: true })
-    expect(answer).to.not.have.property('dbhas')
+    expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: null, dbhas: null, record: null, isTimely: true })
   })
 
-  it("answers gotgone with Absent, and the tombstone as its dbhas", async () => {
+  it("answers gotgone with null, and the tombstone as its dbhas", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     receive(noticeOf(tombstone))
-    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotgone', val: Absent, dbhas: tombstone })
+    expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotgone', val: null, dbhas: tombstone })
   })
 
   it("answers gotlive for a box born again, its old tombstone left in the dead entry", async () => {

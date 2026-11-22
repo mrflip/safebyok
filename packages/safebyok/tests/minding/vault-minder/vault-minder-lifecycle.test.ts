@@ -3,7 +3,6 @@ import { DefaultQueryCacheOpts, MaxTimerMillis } from '../../../src/shapes/shape
 import { VaultMinder } from '../../../src/minding/vault-minder'
 import { BankMinder } from '../../../src/minding/bank-minder'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { Absent } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import * as TH from '../../test-helpers'
 import { Hours24, fakeBankOf, minderOf, minderWorldOf, storedBoxOf, boxScopeOf, cheatBox, labelpathsOf } from './world'
@@ -115,7 +114,7 @@ describe("VaultMinder.hello", () => {
     minder.hello()
     await TH.expectRefusal(minder.get(TH.BoxScope), 'storage_issue')
     await TH.expectGood(bankMinder.tryBirthBank(TH.birthBankAskOf()))
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(Absent)
+    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
   })
 
   it("has every cached item, soon and listing until goodbye, however long after", async () => {

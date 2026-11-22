@@ -382,21 +382,6 @@ export const Shell = Object.freeze({
 })
 // --
 
-// == [Absent]: Absent, isAbsent
-
-/** What a get answers, and a minder's item has, for a Thing with no live record: none stored, or a tombstone.
- * It is one frozen object, but tell it by {@link isAbsent}, never by identity: a copy of it is Absent too.
- */
-export const Absent = Object.freeze({ modelkind: 'absent' } as const)
-/** The shape of {@link Absent}. */
-export type Absent = typeof Absent
-
-/** True for {@link Absent}, or a copy of it. */
-export function isAbsent(val: unknown): val is Absent {
-  return CX.isPlainBag(val) && (val['modelkind'] === Absent.modelkind)
-}
-// --
-
 // == [Reading records]: Tombstone
 
 /** A tombstone of a RecordT, sparse or whole. */

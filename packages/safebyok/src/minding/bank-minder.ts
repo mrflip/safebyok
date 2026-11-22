@@ -2,7 +2,7 @@
 
 import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope, isAbsent } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope } from '../shapes/shapes-thing'
 import type { BankRoots, BirthBankAsk } from '../shapes/shapes-asks'
 import { type MinderEvent, type MinderFriend, type MinderOpts, type QueryCacheOpts, MinderChecks, MinderEventFormat } from '../shapes/shapes-minder'
 import type { BirthBankAnswer } from '../storage/vault-db'
@@ -36,12 +36,12 @@ export class BankMinder extends Minder {
   // == [The world]: worldAt, fetchWorld, subscribe
 
   // Each call makes a new object of the items' own records, which stay the same until one lands.
-  /** The bank's roots as last heard of, or undefined while any of the three is not cached, or is Absent. Never asks the vaultDB. */
+  /** The bank's roots as last heard of, or undefined while any of the three is not cached, or is null. Never asks the vaultDB. */
   worldAt(): BankRoots | undefined {
     const bank = this.at(this.#scopeAt('bank'))
     const gate = this.at(this.#scopeAt(Labelpath.MainGate))
     const root = this.at(this.#scopeAt(Labelpath.RootBox))
-    if ([bank, gate, root].some((record) => (record === undefined) || isAbsent(record))) { return undefined }
+    if ([bank, gate, root].some((record) => (record === undefined) || (record === null))) { return undefined }
     return Object.freeze({ bank: bank as BankRecord, gate: gate as GateRecord, root: root as BoxRecord })
   }
 
@@ -53,7 +53,7 @@ export class BankMinder extends Minder {
     const root  = await this.get(this.#scopeAt(Labelpath.RootBox), { staleTime: 0 })
     const world = this.worldAt()
     if (world !== undefined) { return world }
-    const isNoneStored = isAbsent(root) && (this.deadAt(this.#scopeAt(Labelpath.RootBox)) === undefined)
+    const isNoneStored = (root === null) && (this.deadAt(this.#scopeAt(Labelpath.RootBox)) === undefined)
       && (this.at(this.#scopeAt('bank')) === undefined) && (this.at(this.#scopeAt(Labelpath.MainGate)) === undefined)
     if (isNoneStored) { return null }
     throw Throwers.bankRootsMissing()
