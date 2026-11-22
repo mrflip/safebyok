@@ -1,6 +1,6 @@
 # Thread 11: minder_client (2026-11-22)
 
-Branch `20261122-minder_client`, PR #TBD, stacked on #827. Proved: `pnpm --filter safebyok lint typecheck test` green (1415 tests before the new file's 13 and the device test, 31 files); safebyok-react-lean's 271 tests green; `pnpm justify` at the tip after the catch-up (the PR's **Tests:** line).
+Branch `20261122-minder_client`, PR #831, stacked on #827. Proved: `pnpm --filter safebyok lint typecheck test` green (1415 tests before the new file's 13 and the device test, 31 files); safebyok-react-lean's 271 tests green; `pnpm justify` at the tip after the catch-up (the PR's **Tests:** line).
 
 So the Provider can make the vault cache's client with the device, empty, and each signed-in user's minder attaches to it: TanStack binds a hook's observer to the QueryClient of its first render.
 
