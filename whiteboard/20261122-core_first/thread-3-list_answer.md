@@ -1,6 +1,6 @@
 # Thread 3: list_answer (2026-11-22)
 
-Branch `20261122-list_answer`, PR pending, stacked on #844. Proved (by package, before the catch-up): safebyok 1441, safebyok-react-lean 304, safebyok-postgres 350, safebyok-idb-lean 123 tests green; typecheck and lint clean in each.
+Branch `20261122-list_answer`, PR #847, stacked on #844. Proved (by package, before the catch-up): safebyok 1441, safebyok-react-lean 304, safebyok-postgres 350, safebyok-idb-lean 123 tests green; typecheck and lint clean in each.
 
 * **Built**:
   * `storage/vault-db.ts`: `Kids` (`{ modelkind: 'kids', parentpath, parentlife, items, gones, read_tc }`), `KidEntry`, `ReadTc`.
