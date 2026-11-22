@@ -1,4 +1,5 @@
 import { useActionState } from 'react'
+import { sanitizeForeignError } from 'safebyok'
 import { SubmitButton } from 'safebyok-react-lean/parts'
 import { formTextOf } from '../lib/form-text'
 import { type Session, signIn, signOut } from '../lib/session'
@@ -14,7 +15,7 @@ function signInAction(_prior: SignInResult, form: FormData): SignInResult {
     signIn(username)
     return { err: null, username: '' }
   } catch (err) {
-    return { err: err as Error, username }
+    return { err: sanitizeForeignError(err), username }
   }
 }
 

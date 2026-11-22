@@ -36,7 +36,7 @@ export function envFieldsOf(form: FormData, rotatedAt: number): EnvFields {
   return { title, description: formTextOf(form, 'description'), rotation_period_ms: rotationDays * DayMs, last_rotated_at }
 }
 
-/** The text typed into each of `form`'s fields but the value. Read it before the form is emptied. */
+/** The text typed into each of `form`'s fields but the value, trimmed. */
 export function envTextsOfForm(form: FormData): EnvTexts {
   return {
     title:            formTextOf(form, 'title'),

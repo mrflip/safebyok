@@ -1,5 +1,5 @@
 import { useActionState, useState } from 'react'
-import { isVaultError } from 'safebyok'
+import { isVaultError, sanitizeForeignError } from 'safebyok'
 import { SubmitButton, WhisperMask } from 'safebyok-react-lean/parts'
 import type { EnvFields } from '../lib/env-form'
 import { DayMs, dayValueOf, envSidecarOf, isOverdueAt, valMaskOf } from '../lib/env-sidecar'
@@ -29,7 +29,8 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
   const isOverdue = isOverdueAt(env, shownAt)
   const title = env.title || labelpath
 
-  // React empties the form once its action ends, and the draft discards with it: a refused value is typed again.
+  // React empties the form once its action ends, and the draft forgets the value typed: a refused value is typed again,
+  // while settings from the gear's dialog stay for the next Save.
   // A new value is a rotation: Save stamps it, and stores the new value's mask.
   /** Write the draft, resolving why it was refused, or null. */
   async function putDraftAction(): Promise<Error | null> {
@@ -39,7 +40,7 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
       })
       return null
     } catch (err) {
-      return err as Error
+      return sanitizeForeignError(err)
     }
   }
   const [putErr, putAction] = useActionState(putDraftAction, null)
@@ -62,8 +63,7 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
         <WhisperMask labelpath={labelpath} field="val" tail={4} />
         <input {...draft.whisperField('val')} aria-label={`Value of ${title}`} />
         <SubmitButton disabled={! draft.isDirty}>Save</SubmitButton>
-        {/* Resetting the form discards the draft. */}
-        <button type="reset" disabled={! draft.isDirty}>Undo</button>
+        <button type="button" disabled={! draft.isDirty} onClick={draft.discard}>Undo</button>
       </form>
       {draft.isBehind && <p role="status" className="gripe">Changed elsewhere since you started: Undo to see it.</p>}
       {(putErr !== null) && ! isVaultError(putErr, 'dismissed') && <p role="alert" className="gripe">{putErr.message}</p>}

@@ -1,8 +1,8 @@
 import { useActionState } from 'react'
 import type { Whisper } from 'safebyok'
-import type { PutBoxActionOpts } from 'safebyok-react-lean'
+import type { PutBoxActionOpts, PutBoxActionResult } from 'safebyok-react-lean'
 import { SubmitButton, WhisperInput } from 'safebyok-react-lean/parts'
-import { type EnvTexts, NewEnvTexts, envFieldsOf, envTextsOfForm } from '../lib/env-form'
+import { type EnvTexts, NewEnvTexts, envFieldsOf } from '../lib/env-form'
 import { newEnvLabel, valMaskOf } from '../lib/env-sidecar'
 import { formTextOf } from '../lib/form-text'
 import { Envman } from '../lib/sok'
@@ -15,26 +15,21 @@ const AddEnvOpts: PutBoxActionOpts = {
     return { val }
   },
   sidecarOf: (whisper, form) => ({ ...envFieldsOf(form, Date.now()), mask: valMaskOf(String(whisper['val'])) }),
+  // Only the value is deleted from the form: a refusal hands back what else was typed, for the form to show again.
+  secretFieldnames: ['val'],
 }
 
-/** What the add form's action resolves: why the env was refused, or null, and the fields the form shows next. */
-type AddEnvResult = Readonly<{ err: Error | null, texts: EnvTexts }>
-
-// React resets the form's inputs on the page once its action ends: a refused form shows again what was typed, all but
-// the value, which the user types again. `putBoxAction` deletes every field from the `FormData` it is handed, so the
-// fields to show again are read from it first.
 // Each new env is a box of its own, under a label minted at submit, so the put action is made per submit, not once.
 /** Write the add form's fields as a new env, never rejecting. */
-async function addEnvAction(_prior: AddEnvResult, form: FormData): Promise<AddEnvResult> {
-  const texts = envTextsOfForm(form)
-  const { err } = await Envman.putBoxAction(newEnvLabel(), AddEnvOpts)(null, form)
-  return { err, texts: (err === null) ? NewEnvTexts : texts }
+function addEnvAction(prior: PutBoxActionResult | null, form: FormData): Promise<PutBoxActionResult> {
+  return Envman.putBoxAction(newEnvLabel(), AddEnvOpts)(prior, form)
 }
 
 /** The form that adds an env: its title, description, rotation period, the day it was last rotated, and its value. */
 export function AddEnvForm() {
-  const [added, addAction] = useActionState(addEnvAction, { err: null, texts: NewEnvTexts })
-  const { texts } = added
+  const [added, addAction] = useActionState(addEnvAction, null)
+  // React resets the form's inputs once its action ends: a refused form shows again what was typed, all but the value.
+  const texts: EnvTexts = { ...NewEnvTexts, ...added?.texts }
   return (
     <section aria-labelledby="add-title" className="card">
       <h2 id="add-title">Add a secret</h2>
@@ -45,7 +40,7 @@ export function AddEnvForm() {
         <label>Last rotated <input name="last_rotated_day" type="date" defaultValue={texts.last_rotated_day} aria-label="Last rotated" /> (blank for today)</label>
         <WhisperInput name="val" aria-label="Value" placeholder="Value" required />
         <SubmitButton whilePending="Adding…">Add</SubmitButton>
-        {(added.err !== null) && <span role="alert" className="gripe">{added.err.message}</span>}
+        {added?.err && <span role="alert" className="gripe">{added.err.message}</span>}
       </form>
     </section>
   )

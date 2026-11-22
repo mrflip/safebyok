@@ -25,16 +25,17 @@ what was typed, all but a secret, through each input's `defaultValue`.
 * `src/components/EnvList.tsx`: `Envman.useBoxList()`, a row each.
 * `src/components/EnvRow.tsx`: each row's `Envman.useBox`, nothing for a deleted box, and `Envman.useDraft` for the
   value's Save and Undo on a plain input of its `whisperField('val')`. The input sits in a form whose action is the
-  draft's `put`, Save its `SubmitButton` and Undo its reset button: resetting the form discards the draft, so a refused
-  Save empties the value, to be typed again. Save stamps `last_rotated_at` when the value changed. Beside the input,
+  draft's `put`, Save its `SubmitButton` and Undo a button calling `draft.discard`. React resets the form once Save's
+  action ends, and the draft forgets the value typed with it: a refused Save empties the value, to be typed again, and
+  keeps the settings the gear set. Save stamps `last_rotated_at` when the value changed. Beside the input,
   the parts' `WhisperMask` writes the value's mask into the page: its last four characters while unlocked, the stored
   mask while locked. On a lock, `Envman.useStageChange` discards the row's open draft: the library leaves it alone, and
   this demo chooses to.
 * `src/components/EnvSettingsDialog.tsx`: the gear's dialog, the kit's `ModalDialog`, its form an Action setting the
   draft's sidecar.
 * `src/components/AddEnvForm.tsx`: `Envman.putBoxAction` under `useActionState`, a new box under a minted label per
-  submit, its sidecar mask from `mask` (`tail: 0`). `putBoxAction` deletes every field from the `FormData`, so the
-  app reads the fields to show again first.
+  submit, its sidecar mask from `mask` (`tail: 0`). Its `secretFieldnames` names the value alone, so `putBoxAction`
+  deletes only the value from the `FormData`, and a refusal hands back the text of the other fields to show again.
 * `src/lib/env-sidecar.ts`: the stored sidecar, `title`, `description`, `rotation_period_ms`, `last_rotated_at` and `mask`.
 
 ## Demo scaffolding
