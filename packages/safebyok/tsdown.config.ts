@@ -2,10 +2,11 @@ import { defineConfig } from 'tsdown'
 
 // The lean core, built as safebyok-big is (its tsdown.config.ts says why each setting is there). Each entry is a subpath:
 // `safebyok`, the front door of what a host touches, `safebyok/core` and `safebyok/storage`; `safebyok/browser`, so the
-// Argon2id deriver and zxcvbn reach only a host that imports them; and `safebyok/testing`, the battery an adapter's tests
-// run, built from tests/ and so named in an object beside the list.
+// Argon2id deriver and zxcvbn reach only a host that imports them; `safebyok/internals`, for this repository's sibling
+// packages and never a host; and `safebyok/testing`, the battery an adapter's tests run, built from tests/ and so named in
+// an object beside the list.
 export default defineConfig({
-  entry:      ['src/index.ts', 'src/browser.ts', 'src/core.ts', 'src/storage.ts', { testing: 'tests/test-helpers.ts' }],
+  entry:      ['src/index.ts', 'src/browser.ts', 'src/core.ts', 'src/internals.ts', 'src/storage.ts', { testing: 'tests/test-helpers.ts' }],
   format:     ['esm', 'cjs'],
   platform:   'neutral',
   target:     'es2022',

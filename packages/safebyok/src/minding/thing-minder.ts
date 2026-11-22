@@ -30,6 +30,16 @@ import * as Throwers from '../refusals/throwers'
 /** Anything naming a labelpath: a scope, an ask or a record. */
 export type Labelpathed = { labelpath: Labelpath }
 
+/** The QueryClient `minder` caches in, for {@link minderQueryClientOf}: set by the class's static block, the one place that may read it. */
+let tsqOfMinder: (minder: ThingMinder) => TSQ.QueryClient
+
+// For a sibling package's TanStack bindings to observe the minder's own cache (safebyok/internals), never a host.
+// Whatever is done through it bypasses every check the minder makes: read it, do not write it.
+/** The QueryClient `minder` caches its items, soons and listings in. */
+export function minderQueryClientOf(minder: ThingMinder): TSQ.QueryClient {
+  return tsqOfMinder(minder)
+}
+
 /** This device's cache of one bank's Things, kept from everything the vaultDB tells of them.
  * Each Thing has an item, with the whole record a host shows: live, its tombstone, or its shell where nothing is stored.
  * A Thing may also have a soon: a sparse record newer than the item, removed once the item catches up. The root box and
@@ -133,6 +143,8 @@ export class ThingMinder {
     tsq.setQueryDefaults([...bankHead, Soonkind], { queryFn: TSQ.skipToken, structuralSharing: newerThingOf })
     return tsq
   }
+
+  static { tsqOfMinder = (minder) => minder.#tsq }
   // --
 
   // == [Starting and ending]: hello, goodbye

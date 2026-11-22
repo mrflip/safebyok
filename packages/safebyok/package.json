@@ -76,6 +76,11 @@
       "import": "./dist/core.js",
       "require": "./dist/core.cjs"
     },
+    "./internals": {
+      "@safebyok/source": "./src/internals.ts",
+      "import": "./dist/internals.js",
+      "require": "./dist/internals.cjs"
+    },
     "./storage": {
       "@safebyok/source": "./src/storage.ts",
       "import": "./dist/storage.js",
@@ -117,6 +122,10 @@
         "import": "./dist/core.js",
         "require": "./dist/core.cjs"
       },
+      "./internals": {
+        "import": "./dist/internals.js",
+        "require": "./dist/internals.cjs"
+      },
       "./storage": {
         "import": "./dist/storage.js",
         "require": "./dist/storage.cjs"
@@ -138,6 +147,9 @@
       ],
       "core": [
         "./dist/core.d.cts"
+      ],
+      "internals": [
+        "./dist/internals.d.cts"
       ],
       "storage": [
         "./dist/storage.d.cts"
