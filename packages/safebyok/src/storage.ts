@@ -23,6 +23,8 @@ export {
   type Actual, type Answer, type BadAct, type BadAnswer, type BirthBankActual, type BirthBankAnswer, type DamagedThing, type GetThingAnswer, type GoodAnswer,
   type KidEntry, type Kids, type ListThingsActual, type ListThingsAnswer, type ListedBeside, type ReadTc, type ThingNotice, type VaultDB, type WriteThingAnswer, isVaultDB,
 } from './storage/vault-db'
+// What a host's persister is written against: TanStack Query's own interface, as a device takes it.
+export { type DevicePersisters, type PersistedClient, type Persister, MemoryPersister, isPersister } from './storage/persister'
 
 // From safebyok-big: what an adapter's `do*` methods answer and are named with, its throwers, and the checkers it checks its
 // own options and rows with.

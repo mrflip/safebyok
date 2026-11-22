@@ -8,10 +8,11 @@
 /** `Minder`, the code a VaultMinder and a BankMinder share: they mind the Things of one bank in a TanStack Query cache, its own or one shared with minders of other banks. */
 
 import * as TSQ from '@tanstack/query-core'
+import { type Persister, persistQueryClientRestore, persistQueryClientSubscribe } from '@tanstack/query-persist-client-core'
 import { deepFreeze } from 'es-toolkit'
 import { CX, Outcome, Validator } from 'safebyok-big/internals'
 import { type Banklabel, type Userid, Labelpath } from '../shapes/primitives'
-import { type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Absent, Shell, ThingChecks, isAbsent } from '../shapes/shapes-thing'
+import { type Sparse, type ThingCited, type ThingRecord, type ThingScope, type Tombstone, Absent, Shell, ThingChecks, ThingFormat, isAbsent } from '../shapes/shapes-thing'
 import { Thing } from '../models/thing'
 import type { BankScope } from '../shapes/shapes-stamps'
 import { type GetAsk, type ThingWatchScope, type WorldRecord, type WriteAsk } from '../shapes/shapes-asks'
@@ -93,7 +94,7 @@ export abstract class Minder {
   #isReady = false
   // --
 
-  // == [Construction]: constructor, makeClient, isClient, #setQueryDefaults
+  // == [Construction]: constructor, makeClient, isClient, persist, #setQueryDefaults
 
   // A subclass freezes the minder once its own fields are set.
   /** A minder of `bank`'s Things over `opts`, checked by the subclass's `make`. */
@@ -125,6 +126,22 @@ export abstract class Minder {
   /** True for a QueryClient {@link makeClient} made: the only kind `make` accepts. */
   static isClient(val: unknown): val is TSQ.QueryClient {
     return LandersOfClient.has(val as TSQ.QueryClient)
+  }
+
+  // TanStack's own restore and save, with our defaults where its own would drop what we keep: a refused get's item, and a
+  // snapshot more than a day old. A restore builds each entry with its saved state, so no structural sharing or onSuccess runs.
+  /** Restore `queryClient`, a client {@link makeClient} made, from the snapshot `persister` keeps, then save the whole client to it at each change.
+   * Call it before any minder attached to the client says `hello`: what a minder caches then lands over what was restored.
+   * Every entry with a record or a listing is saved, an item whose last get was refused among them, and restored however
+   * old, unless it was saved under another {@link ThingFormat}. No mutation is saved, paused or not.
+   * Rejects where the restore fails, discarding the snapshot; saving goes on.
+   */
+  static async persist(queryClient: TSQ.QueryClient, persister: Persister): Promise<void> {
+    try {
+      await persistQueryClientRestore({ queryClient, persister, buster: PersistBuster, maxAge: Infinity, hydrateOptions: RestoreOpts })
+    } finally {
+      persistQueryClientSubscribe({ queryClient, persister, buster: PersistBuster, dehydrateOptions: SaveOpts })
+    }
   }
 
   // The client's own defaults are left to whoever owns it. TanStack matches query defaults by key prefix, and the kind of
@@ -648,7 +665,7 @@ export abstract class Minder {
   // --
 }
 
-// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, Lander, LandersOfClient, TellableTSQEvent, isTellableTSQEvent, absentCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf
+// == [Helpers]: Itemkind, Soonkind, Deadkind, Listkind, EntrykindIdx, Marks, labelsOf, bankHashOf, Lander, LandersOfClient, TellableTSQEvent, isTellableTSQEvent, absentCitedOf, isNewer, isOlder, gotAnswerOf, isTimelyQuery, isKids, landedKidsOf, PersistBuster, RestoreOpts, SaveOpts, restoredSharingOf
 
 /** The entrykind segment of an item's query key. */
 const Itemkind = 'item'
@@ -735,6 +752,25 @@ function isKids(val: unknown): val is Kids {
 function landedKidsOf(prior: unknown, next: unknown): unknown {
   if (isKids(prior) && isKids(next) && (prior.read_tc > next.read_tc)) { return prior }
   return deepFreeze(TSQ.replaceEqualDeep(prior, next))
+}
+
+/** The buster a snapshot is saved under: a snapshot saved under another is discarded at restore. */
+const PersistBuster: string = ThingFormat
+
+// A restored entry keeps the options it was built with until a fetch replaces them with its kind's, and its minder has
+// set none yet: so they are the fixed ones, and its structural sharing stands for either kind's.
+/** How {@link Minder.persist} restores a snapshot: each entry kept until `goodbye`, its record or listing deeply frozen. */
+const RestoreOpts: TSQ.HydrateOptions = Object.freeze({
+  defaultOptions: { queries: { ...FixedQueryCacheOpts, structuralSharing: restoredSharingOf }, deserializeData: deepFreeze },
+})
+
+// A mutation's variables may hold the cleartexts it was handed: a whisper put, a passphrase for a gating.
+/** What {@link Minder.persist} saves: every entry with a record or a listing, whatever its last fetch did, and no mutation. */
+const SaveOpts: TSQ.DehydrateOptions = Object.freeze({ shouldDehydrateQuery: (tsqQuery: TSQ.Query) => (tsqQuery.state.data !== undefined), shouldDehydrateMutation: () => false })
+
+/** TanStack's structural sharing for an entry restored: a listing's for a listing, and a record's for a record. */
+function restoredSharingOf(prior: unknown, next: unknown): unknown {
+  return isKids(next) ? landedKidsOf(prior, next) : newerThingOf(prior, next)
 }
 // --
 
