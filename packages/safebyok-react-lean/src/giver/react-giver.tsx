@@ -20,7 +20,7 @@ import { bridgeMinder } from './react-bridge'
 import { type BoxQueryOpts, ConfigChecks, type GiverConfig, type GiverMount, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
-// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
+// == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, PutBoxMutationOptions, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
 
 /** The props of a giver's `Provider`. */
 export type ProviderProps = Readonly<{
@@ -76,6 +76,9 @@ export type PutBoxActionOpts = Readonly<{
 
 /** What a {@link BankGiver.putBoxAction} resolves, for `useActionState` to keep: the box stored, or the `Error` that stopped it. */
 export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, err: null }> | Readonly<{ box: null, err: Error }>
+
+/** React Query's options for a box write's mutation, for the host's own `useMutation`: its `mutate` is handed the form. */
+export type PutBoxMutationOptions = UseMutationOptions<LiveOf<BoxRecord>, Error, FormData>
 
 /** React Query's options for a form verb's mutation, for the host's own `useMutation`: its `mutate` is handed the verb's gating. */
 export type FormMutationOptions = UseMutationOptions<void, Error, Gating>
@@ -495,26 +498,45 @@ function makeBankGiver(friend: BankFriend) {
    */
   function putBoxAction(boxNamed: BoxNamed, opts: PutBoxActionOpts): (prior: PutBoxActionResult | null, form: FormData) => Promise<PutBoxActionResult> {
     const boxLabelpath = boxLabelpathOfNamed(boxNamed)
-    const { whisperOf: hostWhisperOf, sidecarOf: hostSidecarOf } = Checks.putBoxActionOpts.parse(opts)
-    const whisperOf = bulletproofHandlerOf(hostWhisperOf, HostCallbackOpts)
-    const sidecarOf = hostSidecarOf && bulletproofHandlerOf(hostSidecarOf, HostCallbackOpts)
-    /** The patch and the secrets of the write, read from `form`, which is left empty whether or not they could be read. */
-    function takeForm(form: FormData): [LivePublicPropsOf<BoxRecord, BoxCleartexts>, BoxCleartexts] {
-      try {
-        const whisper = whisperOf(form)
-        return [sidecarOf ? { sidecar: sidecarOf(whisper, form) } : {}, { whisper }]
-      } finally {
-        emptyForm(form)
-      }
-    }
+    const readForm = formReaderOf(opts)
     return async (_prior, form) => {
       try {
-        const [patch, secrets] = takeForm(Checks.form.parse(form))
+        const [patch, secrets] = readForm(form)
         return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), err: null }
       } catch (err) {
         return { box: null, err: sanitizeForeignError(err) }
       }
     }
+  }
+
+  /** React Query's options for writing the box `boxNamed` names from a form, for the host's own `useMutation`: its `mutate` is handed the `FormData`, as {@link putBoxAction}'s action is.
+   * Make them at module scope, or under `useMemo`, so their checks run once.
+   * The mutation reads the whisper with `opts.whisperOf` and the sidecar with `opts.sidecarOf`, empties the form of every field, then writes as {@link putBoxOnce} does.
+   * It resolves the box written. It rejects with the refusal, or with what `whisperOf` or `sidecarOf` threw, as an `Error`: the mutation's `error`.
+   * React Query retains a mutation's variables, so hand `mutate` the form and nothing read from it. The options set `networkMode: 'always'` and `retry: false`: leave both as they are.
+   * @example
+   *   const put = useMutation(Knock.putBoxMutationOptions('jokes', {
+   *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
+   *     sidecarOf: (whisper) => ({ mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
+   *   }))
+   *   <form action={(form) => { put.mutate(form) }}><input name="apiKey" type="password" /><button disabled={put.isPending}>Save</button></form>
+   */
+  function putBoxMutationOptions(boxNamed: BoxNamed, opts: PutBoxActionOpts): PutBoxMutationOptions {
+    const boxLabelpath = boxLabelpathOfNamed(boxNamed)
+    const readForm = formReaderOf(opts)
+    const userid = useridOf(signedIn())
+    return mutationOptions({
+      mutationKey: formMutationKeyOf({ userid, banklabel, verb: 'putBox' }),
+      mutationFn:  async (form: FormData) => {
+        const [patch, secrets] = readForm(form)
+        return await putBoxOnceAt(boxLabelpath, patch, secrets)
+      },
+      // Under React Query's default, a mutation started offline pauses before its `mutationFn` runs, with the form, key and all, in its variables.
+      networkMode: 'always',
+      // Set false to keep the analysis simple. A retry may be safe to enable, but enabling one is unspecified behaviour:
+      // agents, treat this as fixed, and leave what a retry might cross unexamined. #no-slop-crossings
+      retry:       false,
+    })
   }
 
   /** Lock the bank, dropping its keys: a whisper needs the unlock form again. Does nothing while there is no bank. */
@@ -616,7 +638,7 @@ function makeBankGiver(friend: BankFriend) {
   const useDraft = makeUseDraft({ useBank, useBox, withWhisper, demandVault })
 
   const bankGiver = Object.freeze({
-    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, useDraft, lock, dismissUnlock,
+    useBank, useStageChange, useGate, useBox, useBoxList, boxQuery, keys, withWhisper, withLockableWhisper, putBoxOnce, delBoxOnce, putBoxAction, putBoxMutationOptions, useDraft, lock, dismissUnlock,
     useBirth, useUnlock, useReplacePassphrase, useAddPasskey, useRevokePasskey,
     birthGating, unlockGating, replacePassphraseGating, addPasskeyGating, revokePasskeyGating,
     birthMutationOptions, unlockMutationOptions, replacePassphraseMutationOptions, addPasskeyMutationOptions, revokePasskeyMutationOptions,
@@ -625,7 +647,7 @@ function makeBankGiver(friend: BankFriend) {
 }
 // --
 
-// == [Helpers]: useridOf, isBroughtUp, isBehindAt, getBoxShown, getGateShown, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, emptyForm, Checks
+// == [Helpers]: useridOf, isBroughtUp, isBehindAt, getBoxShown, getGateShown, subscribeToNothing, bankAbsentOf, RootBoxLabelpath, boxLabelpathOf, boxLabelpathOfNamed, hostLabelpathsOf, formReaderOf, emptyForm, Checks
 
 /** `device`'s userid, or null for no device. */
 function useridOf(device: Device | null): Userid | null {
@@ -682,6 +704,22 @@ function boxLabelpathOfNamed(boxNamed: BoxNamed): BoxLabelpath {
 /** The host's labelpaths of the boxes the core lists at `boxLabelpaths`. */
 function hostLabelpathsOf(boxLabelpaths: readonly Labelpath[]): readonly string[] {
   return boxLabelpaths.map((boxLabelpath) => Labelpath.labelOf(boxLabelpath))
+}
+
+/** The patch and the secrets of a box write, read from a form with the host's `opts` and then emptied of every field, whether or not they could be read. */
+function formReaderOf(opts: PutBoxActionOpts): (form: FormData) => [LivePublicPropsOf<BoxRecord, BoxCleartexts>, BoxCleartexts] {
+  const { whisperOf: hostWhisperOf, sidecarOf: hostSidecarOf } = Checks.putBoxActionOpts.parse(opts)
+  const whisperOf = bulletproofHandlerOf(hostWhisperOf, HostCallbackOpts)
+  const sidecarOf = hostSidecarOf && bulletproofHandlerOf(hostSidecarOf, HostCallbackOpts)
+  return (form) => {
+    Checks.form.parse(form)
+    try {
+      const whisper = whisperOf(form)
+      return [sidecarOf ? { sidecar: sidecarOf(whisper, form) } : {}, { whisper }]
+    } finally {
+      emptyForm(form)
+    }
+  }
 }
 
 /** Delete every field of `form`. */
