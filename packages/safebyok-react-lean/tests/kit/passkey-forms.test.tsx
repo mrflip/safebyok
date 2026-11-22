@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { PasskeySaltSize, type WayinHeader, toB64 } from 'safebyok'
 import { AddPasskeyForm, PasskeyUnlockButton, RevokePasskeyForm } from '../../src/kit'
-import { KitPhrases } from '../../src/kit/phrases-kit'
+import { CeremonyPhrases, KitPhrases } from '../../src/kit/phrases-kit'
 import * as TH from '../test-helpers'
 
 const Passphrase = TH.TestPassphrase
@@ -102,7 +102,7 @@ describe("AddPasskeyForm", () => {
     TH.installFakeAuthenticator({ prf: false })
     const { world, container } = await renderWorld('add')
     submitPassphrase(Passphrase, 'Add passkey')
-    expect(await alertText()).to.eq(KitPhrases.noPrf)
+    expect(await alertText()).to.eq(CeremonyPhrases.noPrf)
     expect(await TH._cheat_passkeyHeaderOf(world)).to.be.null
     TH.expectTextUnheld(Passphrase, container, world.client)
   })
@@ -117,6 +117,11 @@ describe("AddPasskeyForm", () => {
     expect(field.getAttribute('aria-invalid')).to.eq('true')
     expect(await TH._cheat_passkeyHeaderOf(world)).to.be.null
     TH.expectTextUnheld(WrongPassphrase, container, world.client)
+  })
+
+  it("names its passphrase field with a visible label", async () => {
+    await renderWorld('add')
+    TH.expectVisiblyLabelled('Passphrase')
   })
 })
 
@@ -139,6 +144,13 @@ describe("RevokePasskeyForm", () => {
     expect(await alertText()).to.eq('That is not the passphrase.')
     expect(await TH._cheat_passkeyHeaderOf(world)).to.deep.equal(passkeyHeader)
     TH.expectTextUnheld(WrongPassphrase, container, world.client)
+  })
+
+  it("names its passphrase field with a visible label", async () => {
+    TH.installFakeAuthenticator()
+    const { world } = await buildPasskeyWorld()
+    await renderWorld('revoke', world)
+    TH.expectVisiblyLabelled('Passphrase')
   })
 })
 
@@ -225,7 +237,7 @@ describe("PasskeyUnlockButton", () => {
     await renderWorld('unlock', world, passkeyHeader)
     authenticator.refuseNext('UnknownError')
     fireEvent.click(screen.getByRole('button', { name: 'Unlock with a passkey' }))
-    expect(await alertText()).to.eq(KitPhrases.passkeyAskFailed)
+    expect(await alertText()).to.eq(CeremonyPhrases.passkeyAskFailed)
     expect(screen.getByText('locked')).to.exist
   })
 })

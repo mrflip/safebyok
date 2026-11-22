@@ -35,6 +35,18 @@ describe("PassphraseInput", () => {
     expect(field.type).to.eq('password')
   })
 
+  it("hides the passphrase again while isPending, for a form that submits from a handler", () => {
+    const { rerender } = render(<PassphraseInput name="passphrase" aria-label="Passphrase" />)
+    const field = screen.getByLabelText<HTMLInputElement>('Passphrase')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field.type).to.eq('text')
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" isPending />)
+    expect(field.type).to.eq('password')
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" />)
+    expect(field.type).to.eq('password')
+    expect(field.hasAttribute('ispending')).to.eq(false)
+  })
+
   it("warns while Caps Lock is on, and still hands the host its key and blur handlers", () => {
     const onKeyDown = vi.fn()
     const onBlur = vi.fn()
@@ -46,5 +58,18 @@ describe("PassphraseInput", () => {
     fireEvent.blur(field)
     expect(screen.getByRole('status').textContent).to.eq('')
     expect(onBlur).toHaveBeenCalledOnce()
+  })
+
+  it("hands className and other attributes to the input, and marks it revealed and invalid in data- attributes", () => {
+    const { rerender } = render(<PassphraseInput name="passphrase" aria-label="Passphrase" className="field" title="Your passphrase" />)
+    const field = screen.getByLabelText<HTMLInputElement>('Passphrase')
+    expect([field.className, field.title]).to.deep.equal(['field', 'Your passphrase'])
+    expect([Object.hasOwn(field.dataset, 'revealed'), Object.hasOwn(field.dataset, 'invalid')]).to.deep.equal([false, false])
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(Object.hasOwn(field.dataset, 'revealed')).to.eq(true)
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" aria-invalid="true" />)
+    expect(Object.hasOwn(field.dataset, 'invalid')).to.eq(true)
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" aria-invalid={false} />)
+    expect([Object.hasOwn(field.dataset, 'invalid'), field.getAttribute('aria-invalid')]).to.deep.equal([false, 'false'])
   })
 })

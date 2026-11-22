@@ -41,7 +41,9 @@ export const Labelpath = Object.freeze({
 // --
 
 // == [Lives]: Lifeseq, Lifepath, Lifenum, Revtok, VoidLifeseq, Revseq
-/** One life of a Thing, in base-32 digits (`0-9a-v`) padded to ten, so that lifeseqs sort in the order of the lives. The shell's is `-000000001`. */
+/** One life of a Thing, its lifenum in base-32 digits padded with zeros to ten, so that lifeseqs sort in the order of the lives. The shell's is `-000000001`.
+ * Base-32 here is lowercase `0-9a-v`, as `Number.prototype.toString(32)` writes it: not RFC 4648's base32, nor Crockford's.
+ */
 export type Lifeseq = string
 /** The lifeseq of each life from a root's down to a Thing's own, joined by `/`. */
 export type Lifepath = string
@@ -58,7 +60,7 @@ export const VoidLifeseq = '-000000001'
 
 /** The helpers for a {@link Lifeseq}. */
 export const Lifeseq = Object.freeze({
-  /** The lifeseq of life `lifenum`: its base-32 digits (`0-9a-v`) padded to 10, which sort in the order of the lives. Life -1's is the shell's. */
+  /** The lifeseq of life `lifenum`: its base-32 digits padded to 10, which sort in the order of the lives. Life -1's is the shell's. */
   ofLifenum(lifenum: Lifenum): Lifeseq { return paddedSeqOf(lifenum) },
   /** The lifenum of `lifeseq`, the number of the life it names: -1 for the shell's. */
   lifenumOf(lifeseq: Lifeseq): Lifenum { return Number.parseInt(lifeseq, 32) },

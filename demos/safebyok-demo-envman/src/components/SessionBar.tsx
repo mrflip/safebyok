@@ -1,10 +1,27 @@
-import { useState } from 'react'
+import { useActionState } from 'react'
+import { sanitizeForeignError } from 'safebyok'
+import { SubmitButton } from 'safebyok-react-lean/parts'
 import { formTextOf } from '../lib/form-text'
 import { type Session, signIn, signOut } from '../lib/session'
 
+/** The sign-in form's next state: why the username will not do, or null, and the username to show again. */
+type SignInResult = Readonly<{ err: Error | null, username: string }>
+
+// React empties the form after its action: a refused username shows again, for the user to mend.
+/** Sign in as the username typed, or say why it will not do. */
+const signInAction = (_prior: SignInResult, form: FormData): SignInResult => {
+  const username = formTextOf(form, 'username')
+  try {
+    signIn(username)
+    return { err: null, username: '' }
+  } catch (err) {
+    return { err: sanitizeForeignError(err), username }
+  }
+}
+
 /** Who is signed in, with Sign out; or, while nobody is, the fake sign-in form. */
 export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
-  const [gripe, setGripe] = useState<string | null>(null)
+  const [attempt, formAction] = useActionState(signInAction, { err: null, username: '' })
   if (session !== null) {
     return (
       <p className="row">
@@ -13,19 +30,11 @@ export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
       </p>
     )
   }
-  /** Sign in as the username typed, or say why it will not do. */
-  const action = (form: FormData): void => {
-    try {
-      signIn(formTextOf(form, 'username'))
-    } catch (err) {
-      setGripe((err as Error).message)
-    }
-  }
   return (
-    <form className="row" action={action}>
-      <input name="username" aria-label="Username" placeholder="Username" autoComplete="username" required />
-      <button type="submit">Sign in</button>
-      {(gripe !== null) && <span role="alert" className="gripe">{gripe}</span>}
+    <form className="row" action={formAction}>
+      <input name="username" defaultValue={attempt.username} aria-label="Username" placeholder="Username" autoComplete="username" required />
+      <SubmitButton>Sign in</SubmitButton>
+      {(attempt.err !== null) && <span role="alert" className="gripe">{attempt.err.message}</span>}
     </form>
   )
 }
