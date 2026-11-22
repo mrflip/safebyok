@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: thread 1 filed, out of draft (#840); thread 2 building. #828 and #829 merged; #840 rebased onto main at `f3fe4d495`, and thread 2 told to follow it and key the world on `lifetok`.
+* **Status**: **paused by the Coach** (2026-11-22, while the workshop agent tidies its tree). Thread 1 filed (#840, out of draft, `f3fe4d495`). Thread 2 ready (#844, `07c718450`, justify green by its report), held unreviewed until the Coach resumes.
 
 The Coach's request, verbatim:
 
@@ -104,6 +104,8 @@ once #828 has merged and 1 has caught up; if #828 has not merged when 1 is ready
 `banklife` with `lifetok` added when #828 lands (a *Finally* item). *Look-ahead*: thread 4 makes the BankMinder before
 any user is signed in, and has one VaultMinder per signed-in user attach to a client the device made; build the
 BankMinder so that it needs no userid to exist and holds many users' worlds. Thread 6 persists both clients. *Size*: L.
+
+*Status*: ready, [#844](https://github.com/mrflip/safebyok/pull/844) at `07c718450`, unreviewed (paused). World keyed `['sok', userid, banklabel, 'world', lifeseq, lifetok]`; `ThingMinder` renamed `VaultMinder`, boxes only. For thread 4: a VaultMinder cannot yet be handed its client (the `onSuccess` pin sits on the client it makes); the Gate object does not adopt a gate changed elsewhere (read it from the world); the stage is read once at bring-up. Deviations: a damaged bank or gate beside a root box refuses `storage_issue` (was `damaged_row`); react-lean gained `bridgeWorld` and a renamed host gate key.
 
 ### 3. `list_answer`: a list's answer under the feed principle, and the listing over it
 
