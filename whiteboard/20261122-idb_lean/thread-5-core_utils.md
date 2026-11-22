@@ -9,3 +9,6 @@ Branch `20261122-core_utils`, PR #841, cut from origin/main. Proved: `pnpm --fil
 * **Deviations**: the route above, not internals. Not added to `scripts/front-door.ts`'s check in the build (`. ./core ./storage`): the front door carries all but `MaskSchedule` and the type `MaskRow` of these names, so the check would report `MaskSchedule` missing; it was not asked for and the front door is not changed.
 * **Discoveries**: `index.ts` already re-exports `WhisperFieldAttributes, fromB64, mask, mash, toB64, type MaskOpts` from `safebyok-big/utils`; `MaskRow` and `MaskSchedule` are new to the new core's surface through this entry; the front door lacks both.
 * **For the Coach**: `VOCABULARY.md` is out of scope (another thread names `safebyok/utils`). No safety hatches added.
+
+* **Ride-along**: the "store" sweep of `safebyok-idb-lean`'s comments (two comments, the Coach's ruling on thread 4),
+  cherry-picked here: it was pushed to #829's branch after #829 merged, and #833's stack predates the package.
