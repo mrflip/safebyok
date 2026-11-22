@@ -1,6 +1,6 @@
 # Thread 7: multiples (2026-11-22)
 
-Branch `20261122-multiples`, PR to be filled in below, stacked on #821 (on #820, #818, #817). Proved: see the last line of this file.
+Branch `20261122-multiples`, PR #823, stacked on #821 (on #820, #818, #817). Proved: see the last line of this file.
 
 So a host may write its forms as TanStack mutations as fully as as React 19 Actions: three small additions to `packages/safebyok-react-lean`, each its own commit with its tests, and one empty changeset (`.changeset/20261122-multiples.md`).
 
