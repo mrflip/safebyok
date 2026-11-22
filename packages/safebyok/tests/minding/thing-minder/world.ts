@@ -8,19 +8,20 @@ import type { Labelpath, Revtok } from '../../../src/shapes/primitives'
 import { type GateRecord, type ThingRecord, type ThingScope, Shell } from '../../../src/shapes/shapes-thing'
 import { Thing } from '../../../src/models/thing'
 import { type GetAsk, type WriteAsk, getAskOf, listAskOf } from '../../../src/shapes/shapes-asks'
+import type { BankScope } from '../../../src/shapes/shapes-stamps'
 import type { GetThingAnswer, ThingNotice, WriteThingAnswer } from '../../../src/storage/vault-db'
 import * as TH from '../../test-helpers'
 
 /** The get ask a minder sends the vaultDB for the main gate: the bank's, tracking the roots at revision 0. */
 export const GateGetAsk: GetAsk = getAskOf({ ...TH.GateScope, ifAbsent: 'nil', track: TH.trackOf() })
 
-/** A bank as a minder reads it: its scope, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
-export function fakeBankOf() {
+/** A bank as a minder reads it, {@link TH.ThingBank} unless `scope` names another: its scope, its get and list asks tracking the roots at revision 0, and a spy for its bad news. */
+export function fakeBankOf(scope: BankScope = TH.ThingBank) {
   return {
-    scope:       { ...TH.ThingBank },
-    rootBox:     { ...TH.rootBoxOf(), am: 'a' },
-    makeGetAsk:  (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => getAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
-    makeListAsk: (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => listAskOf({ ...args, ...TH.ThingBank, track: TH.trackOf() }),
+    scope:       { ...scope },
+    rootBox:     { ...TH.rootBoxOf(scope), am: 'a' },
+    makeGetAsk:  (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => getAskOf({ ...args, ...scope, track: TH.trackOf() }),
+    makeListAsk: (args: { labelpath: Labelpath, ifAbsent?: 'nil' | 'fail' }) => listAskOf({ ...args, ...scope, track: TH.trackOf() }),
     tellBadNews: vi.fn<(badnews: readonly unknown[]) => void>(),
   } satisfies MinderFriend
 }
