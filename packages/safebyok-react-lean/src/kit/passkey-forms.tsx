@@ -160,9 +160,9 @@ export function PasskeyUnlockButton({ bank: bankProp, passkeyHeader: passkeyHead
   const refusal = ceremonyErr ?? unlock.error
   return (
     <form className="sok-passkey-unlock" onSubmit={(event) => { event.preventDefault(); void submit(event.currentTarget) }}>
-      <button type="submit" disabled={isUnlocking} aria-describedby={(refusal === null) ? undefined : alertId}>
-        {isUnlocking ? KitPhrases.askingPasskeyButton : KitPhrases.passkeyUnlockButton}
-      </button>
+      <SubmitButton isPending={isUnlocking} whilePending={KitPhrases.askingPasskeyButton} aria-describedby={(refusal === null) ? undefined : alertId}>
+        {KitPhrases.passkeyUnlockButton}
+      </SubmitButton>
       <div role="alert" id={alertId}>{(refusal !== null) && refusalTextOf(refusal)}</div>
     </form>
   )
