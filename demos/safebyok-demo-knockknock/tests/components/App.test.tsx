@@ -24,6 +24,9 @@ const NextPassphrase = 'brave walrus paints seven kites'
 /** Hue's Anthropic key, an obvious fake. */
 const ApiKey = 'sk-ant-fake-0123456789abcdef'
 
+/** The key Hue tries to replace it with, an obvious fake. */
+const NextApiKey = 'sk-ant-fake-fedcba9876543210'
+
 /** The key's mask as its sidecar stores it, no character of its tail shown: what a locked page shows. */
 const StoredMask = 'sk**********************'
 
@@ -168,6 +171,42 @@ describe("the Knock-Knock Machine", () => {
     unlockIn(locked, NextPassphrase)
     expect(await within(locked).findByText('That is not the passphrase.')).to.exist
     expect(screen.queryByText('Your vault is unlocked.')).to.be.null
+    expectUnheld(page)
+  })
+
+  it("puts the key by a mutation that retains none of it, whether the put lands or is refused", async () => {
+    const page = await loadWithKey()
+    /** The variables and error of each put of the key. */
+    function keyPuts() {
+      return page.client.getMutationCache().getAll()
+        .filter((mutation) => mutation.state.variables instanceof FormData)
+        .map(({ state }) => ({ variables: state.variables as FormData, err: state.error }))
+    }
+    expect(keyPuts().map(({ variables }) => [...variables.keys()])).to.deep.equal([[]])
+    expect(TH.holdsText(keyPuts(), ApiKey)).to.eq(false)
+
+    // A full localStorage: the browser refuses the vaultDB's next write.
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => { throw new DOMException('The quota has been exceeded.', 'QuotaExceededError') })
+    const keyPanel = region('Your Anthropic API key')
+    fireEvent.change(within(keyPanel).getByLabelText('Anthropic API key'), { target: { value: NextApiKey } })
+    fireEvent.click(within(keyPanel).getByRole('button', { name: 'Replace key' }))
+    const alert = await within(keyPanel).findByRole('alert')
+    expect(alert.textContent).to.match(/^The vault's storage could not be reached/)
+    expect(keyPuts().map(({ variables, err }) => [[...variables.keys()], err?.message])).to.deep.equal([[[], undefined], [[], alert.textContent]])
+    expect(TH.holdsText(keyPuts(), NextApiKey)).to.eq(false)
+    TH.expectTextUnheld(NextApiKey, page.container, page.client)
+    expect(document.body.textContent.includes(NextApiKey)).to.eq(false)
+    expectUnheld(page)
+  })
+
+  it("refuses a key of only whitespace, and keeps the key stored", async () => {
+    const page = await loadWithKey()
+    const keyPanel = region('Your Anthropic API key')
+    fireEvent.change(within(keyPanel).getByLabelText('Anthropic API key'), { target: { value: ' '.repeat(3) } })
+    fireEvent.click(within(keyPanel).getByRole('button', { name: 'Replace key' }))
+    const alert = await within(keyPanel).findByRole('alert')
+    expect(alert.textContent).to.eq('Paste your Anthropic API key first.')
+    expect(within(keyPanel).getByText(LiveMask)).to.exist
     expectUnheld(page)
   })
 

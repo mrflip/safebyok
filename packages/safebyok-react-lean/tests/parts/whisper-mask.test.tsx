@@ -96,12 +96,23 @@ describe("WhisperMask", () => {
     expect(maskTextOf(container)).to.eq('')
   })
 
-  it("stays empty and reports the refusal when the mask cannot be shown", async () => {
-    const onError = vi.fn<(err: unknown) => void>()
-    const { container } = await renderKey({ ifLocked: () => { throw new TypeError('no mask') }, onError })
+  it("stays empty and reports the refusal when the mask cannot be shown, an Error as it was thrown", async () => {
+    const thrown = new TypeError('no mask')
+    const onError = vi.fn<(err: Error) => void>()
+    const { container } = await renderKey({ ifLocked: () => { throw thrown }, onError })
     await waitFor(() => { expect(onError).toHaveBeenCalledOnce() })
-    expect((onError.mock.calls[0]?.[0] as Error).message).to.eq('no mask')
+    expect(onError.mock.calls[0]?.[0]).to.eq(thrown)
     expect(maskTextOf(container)).to.eq('')
     expect(isVaultError(onError.mock.calls[0]?.[0])).to.eq(false)
+  })
+
+  it("reports a thrown value that is no Error as an Error, the value its cause", async () => {
+    const thrown: unknown = { code: 42 }
+    const onError = vi.fn<(err: Error) => void>()
+    await renderKey({ ifLocked: () => { throw thrown as Error }, onError })
+    await waitFor(() => { expect(onError).toHaveBeenCalledOnce() })
+    const err = onError.mock.calls[0]?.[0]
+    expect(err).to.be.instanceOf(Error)
+    expect(err?.cause).to.eq(thrown)
   })
 })

@@ -13,6 +13,8 @@ export type PassphraseInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' |
   name:          string
   /** `current-password` (the default) for the passphrase the user has, `new-password` for one being chosen, so a password manager offers or saves it. */
   autoComplete?: 'current-password' | 'new-password' | undefined
+  /** True while a form that submits from an `onSubmit` handler, not a form action, is submitting: it hides the field again, as a form action's submit does. */
+  isPending?:    boolean | undefined
 }
 
 /** A masked, uncontrolled input for a passphrase, with a Show / Hide button and a Caps Lock warning. Read it in the form's action, from the `FormData`.
@@ -20,9 +22,9 @@ export type PassphraseInputProps = Omit<ComponentPropsWithRef<'input'>, 'name' |
  * @example
  *   <form action={unlockAction}><PassphraseInput name="passphrase" aria-label="Passphrase" /><SubmitButton>Unlock</SubmitButton></form>
  */
-export function PassphraseInput({ id, autoComplete = 'current-password', onKeyDown, onKeyUp, onBlur, ...passed }: PassphraseInputProps) {
+export function PassphraseInput({ id, autoComplete = 'current-password', isPending = false, onKeyDown, onKeyUp, onBlur, ...passed }: PassphraseInputProps) {
   const { pending } = useFormStatus()
-  const reveal = useRevealToggle(! pending)
+  const reveal = useRevealToggle(! (pending || isPending))
   const [isCapsOn, setIsCapsOn] = useState(false)
   const ownId = useId()
   const fieldId = id ?? ownId

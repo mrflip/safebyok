@@ -605,7 +605,13 @@ up for a poor name, or marks off a stanza that should be its own function is a s
 Vitest, in each package's `tests/`, path for path with its `src/`: `src/foo/bar.ts` is tested in
 `tests/foo/bar.test.ts`. A test file past about 1,500 lines becomes a folder, `tests/foo/bar/`, of
 `bar-<theme>.test.ts` files named for what a reader would look for (`bar-races`, `bar-refusals`),
-with the helpers they share in a `world.ts` beside them. A module reached only through another's
+with the helpers they share in a `world.ts` beside them. Tests with a cross-cutting concern have a
+folder named for it: `tests/wontfix/` has the demonstrations of rows in `notes/wontfix.md`, one
+file a row. A demonstration asserts the behaviour its row leaves as it is, mocking or injecting
+whatever it takes to show it, and names at its head what it mocks: the mocking measures how
+contrived the case is. Before reopening a row, ask: have you learned something that would show it
+without the mock? When a demonstration fails, the behaviour has changed: invert it into a promise,
+move it to the test file of the code it covers, and delete the row. A module reached only through another's
 public verb (`vault-opts.ts` through `Device.make`) is tested beside that verb. Every export is
 tested, in proportion to what it does and what a caller could get wrong.
 
