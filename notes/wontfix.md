@@ -349,8 +349,8 @@ only in the input.
 
 Workaround: ask before the reset is started, from the button that would start it, not in `onReset`.
 
-To reproduce: a draft's input inside a `<form onReset={(event) => { event.preventDefault() }}>`; type into it; press
-a `<button type="reset">`.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/form-reset-cancelled.test.tsx`, a draft's input inside a
+`<form onReset={(event) => { event.preventDefault() }}>`, typed into, then a `<button type="reset">` pressed.
 
 Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
 and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
@@ -368,8 +368,8 @@ forgotten, with a base and an `isDirty` to work out for each part.
 
 Workaround: put all of a draft's inputs in one form, or give each form a draft of its own.
 
-To reproduce: one `useDraft` with `whisperField('a')` inside a `<form>` and `whisperField('b')` outside it; type into
-both; reset the form.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/form-reset-split-draft.test.tsx`, one `useDraft` with a
+`whisperField` inside a `<form>` and another outside it, typed into, then the form reset.
 
 Reasoning for wontfix: one draft split across forms is rare, the outcome loses typed text and corrupts nothing stored,
 and `discard` has always emptied every input of the draft. Ruled by the Coach, 2026-11-22.
@@ -390,7 +390,8 @@ fetched puts a wait in the path of every lock and unlock.
 Workaround: place the `Suspense` boundary low, around the part that reads the record, with a fallback the size of what
 it replaces; or read with `useBox`, which does not suspend.
 
-To reproduce: under a stage switch, render at `'unlocked'` a component that suspends on a box not yet fetched; unlock.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/stage-change-suspends.test.tsx`, a stage switch that renders at
+`'unlocked'` a `useSuspenseQuery` over a box not yet fetched, then unlock.
 
 Reasoning for wontfix: the stage is synchronous on purpose, so that no screen shows a stage the bank has left, and
 that is worth more than one smoothed fallback. The limit is React's, stated in its manual. Ruled by the Coach,
@@ -410,8 +411,8 @@ by hand, is two records of one fact.
 
 Workaround: a host that minds remounts the form by a `key` it changes on Undo.
 
-To reproduce: in envman, on a locked vault, type a value in a row, press Save, and enter a passphrase the gate
-refuses for a reason the row shows; then press Undo.
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/action-refusal-after-undo.test.tsx`, a draft's form Action
+that resolves a refused put (`stale_write`) as its state, then Undo pressed.
 
 Reasoning for wontfix: the message is true of the last Save and harms nothing, and each way of removing it costs more
 code than it is worth in a demo meant to be read. Ruled by the Coach, 2026-11-22.
