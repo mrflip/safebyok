@@ -95,21 +95,21 @@ export function makeUseDraft(bank: DraftFriend) {
   function useDraft(labelpath: string): Draft {
     const stored = bank.useBox(labelpath, { select: wholeThingOf }).data
     const isLocked = bank.useBank((snap) => snap.isLocked)
-    const [pinned, setPinned] = useState<BoxShown | null>(null)
+    const [pinned, setPinned] = useState<BoxShown | undefined>(undefined)
     const [sidecarSet, setSidecarSet] = useState<Sidecar | null>(null)
     const [dirtyFieldnames, setDirtyFieldnames] = useState<ReadonlySet<string>>(NoFieldnames)
     const reveal = useReveal(bank, labelpath)
     const [lastErr, setLastErr] = useState<Error | null>(null)
     const inputs = useRef(new Map<string, HTMLInputElement>())
 
-    const baseThing = pinned ?? stored
+    const baseThing = (pinned === undefined) ? stored : pinned
     const base = (baseThing === undefined) ? undefined : liveOf<BoxRecord>(baseThing)
     const baseSidecar = base?.sidecar ?? EmptySidecar
     const sidecar = sidecarSet ?? baseSidecar
     const isWhisperDirty = dirtyFieldnames.size > 0
     const isSidecarDirty = ! isEqual(sidecar, baseSidecar)
     const isDirty = isWhisperDirty || isSidecarDirty
-    const isBehind = (pinned !== null) && (stored !== undefined) && isMovedPast(pinned, stored)
+    const isBehind = (pinned !== undefined) && (stored !== undefined) && isMovedPast(pinned, stored)
 
     // Locking the bank masks the field shown, and this empties every input not typed into.
     useEffect(() => {
@@ -125,7 +125,7 @@ export function makeUseDraft(bank: DraftFriend) {
     })
 
     /** Base the draft on the box stored now, unless it already has a base. */
-    function pin(): void { setPinned((prior) => prior ?? stored ?? null) }
+    function pin(): void { setPinned((prior) => (prior === undefined) ? stored : prior) }
 
     function setSidecar(next: Sidecar): void {
       pin()
@@ -190,7 +190,7 @@ export function makeUseDraft(bank: DraftFriend) {
 
     function discard(): void {
       emptyInputs(inputs.current, NoFieldnames)
-      setPinned(null)
+      setPinned(undefined)
       setSidecarSet(null)
       setDirtyFieldnames(NoFieldnames)
       reveal.mask()
@@ -202,7 +202,7 @@ export function makeUseDraft(bank: DraftFriend) {
       const edits = Object.fromEntries([...dirtyFieldnames].map((fieldname) => [fieldname, inputOf(inputs.current, fieldname).value]))
       const box = await bank.withWhisper(labelpath, async (whisper, unsealed) => {
         const nextWhisper = { ...whisper, ...edits }
-        const draftSidecar = sidecarSet ?? ((pinned === null) ? unsealed.sidecar : baseSidecar)
+        const draftSidecar = sidecarSet ?? ((pinned === undefined) ? unsealed.sidecar : baseSidecar)
         const patch = { sidecar: sidecarOf ? sidecarOf(nextWhisper, draftSidecar) : draftSidecar }
         const vault = bank.demandVault()
         return await vault.putBoxOnce(citedOf(vault, pinned, unsealed), patch, { whisper: nextWhisper })
@@ -238,8 +238,8 @@ function isMovedPast(pinned: BoxShown, stored: BoxShown): boolean {
 
 // A base that is null cites the box's tombstone, or its shell, so a box written since refuses the put.
 /** What a draft's put cites: its base, the box's tombstone or shell where the base is null, or with no base the box unsealed. */
-function citedOf(vault: Vault, pinned: BoxShown | null, unsealed: BoxUnsealed): Sealable<LiveOf<BoxRecord>> {
-  if (pinned === null) { return Thing.sparseOf(unsealed) }
+function citedOf(vault: Vault, pinned: BoxShown | undefined, unsealed: BoxUnsealed): Sealable<LiveOf<BoxRecord>> {
+  if (pinned === undefined) { return Thing.sparseOf(unsealed) }
   if (pinned !== null) { return pinned }
   const scope = { userid: unsealed.userid, banklabel: unsealed.banklabel, labelpath: unsealed.labelpath }
   return vault.minder.deadAt(scope) ?? Shell.of(scope, vault.bank.rootBox)
