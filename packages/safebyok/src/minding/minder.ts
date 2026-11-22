@@ -66,8 +66,8 @@ export type Labelpathed = { labelpath: Labelpath }
  *   {@link ThingEvent}, {@link SoonEvent}, {@link DeadEvent} and {@link ListingEvent} give the order of the events.
  * - A get answered with a revision older than the newest cached when it began refuses `stale_read`, and changes nothing.
  *   An answer of null counts as its tombstone, or as nothing stored.
- * - A good get or `tryAt` answers what the item holds once it resolves: its `val` is the item's record, or null, and where that is
- *   null its `dbhas` is the dead entry's tombstone, or null.
+ * - A good get resolves what the item holds once it resolves: its record, or null. A `tryAt` that answers `gotlive`,
+ *   `gotgone` or `gotvoid` has the same as its `val`, and where that is null, the dead entry's tombstone, or null, as its `dbhas`.
  * - A listing is what the vaultDB last answered a list of its parent with, never joined to: a list landing replaces it
  *   whole, unless the listing cached was read later, by `read_tc`. A list refused leaves it as it was.
  * - A child's first stored record to land, in its item, its soon or its dead entry while the others have none, marks its
@@ -405,7 +405,7 @@ export abstract class Minder {
     return deepFreeze(answer.val)
   }
 
-  /** What `scoped`'s item has: its live record, or undefined for no item. */
+  /** What `scoped`'s item has: its live record, null, or undefined for no item. */
   #itemAt(scoped: Labelpathed): ThingRecord | null | undefined {
     return this.#tsq.getQueryData<ThingRecord | null>(this.itemQueryKey(scoped))
   }
