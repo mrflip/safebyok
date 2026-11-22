@@ -92,6 +92,16 @@ describe("Minder.persist(queryClient, persister)", () => {
     }
   })
 
+  it("restores an item that is null as null, not as no item", async () => {
+    const vaultDB = new MemoryVaultDB()
+    await storedBoxOf(vaultDB)
+    const { persister, minder } = await savedGetOf(vaultDB)
+    expect(await minder.get(boxScopeOf('anthropic'))).to.be.null
+    await nextTick()
+    const restored = await restoredMinderOf(persister)
+    expect(restored.at(boxScopeOf('anthropic'))).to.be.null
+  })
+
   it("saves an item whose last get was refused, with the record it had", async () => {
     const vaultDB = new MemoryVaultDB()
     const box     = await storedBoxOf(vaultDB)
