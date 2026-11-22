@@ -215,6 +215,23 @@ datastore has read; let the list answer.
 Reasoning for wontfix: a crossing of a write and a list of milliseconds (CLAUDE.md, *Hours separate updates*); the
 listing holds only what the vaultDB answered. Written by core_first thread 3, 2026-11-22.
 
+### Two Postgres lists whose `read_tc` order is not the order of their reads
+
+* current outcome: `PostgresVaultDB` makes a list's `read_tc` in JavaScript, on the server that runs it, just before its
+  statement. Two lists over a pool, or on servers whose clocks disagree, can carry `read_tc`s in the other order from
+  their snapshots; the minder then keeps the listing read earlier, marked current, until a later list lands.
+* alternatives:
+  - Postgres 18's `uuidv7()` in the statement: the package supports Postgres before 18.
+  - build a UUID version 7 from the datastore's clock in SQL: a construction of our own, for a crossing.
+* workaround: none needed. The next list, or the next box new to the listing, lists it.
+
+Steps to reproduce: two lists of one parent on two pool connections, the first to make its `read_tc` running its
+statement second, after a box is written between the two statements.
+
+Reasoning for wontfix: a crossing of two lists and a write of milliseconds (CLAUDE.md, *Hours separate updates*), or a
+clock out of step; the listing still holds only what the vaultDB answered. Written by the core_first thread 3 reviewer,
+2026-11-22, awaiting a ruling.
+
 ### A lock that lands while a draft's field is on its way shows the field on a locked bank
 
 * current outcome: in `safebyok-react-lean`, focusing a draft's field (`useDraft(...).whisperField(fieldname)`) asks
