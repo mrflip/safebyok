@@ -388,7 +388,8 @@ screen that shows `'locked'` after the bank has unlocked. Holding the stage chan
 fetched puts a wait in the path of every lock and unlock.
 
 Workaround: place the `Suspense` boundary low, around the part that reads the record, with a fallback the size of what
-it replaces; or read with `useBox`, which does not suspend.
+it replaces; or read with `useBox`, which does not suspend. The package has no suspending hook yet, and
+`useSuspenseQuery` over one of its query factories needs a cast, since the factory's `queryFn` may be `skipToken`.
 
 To reproduce: `packages/safebyok-react-lean/tests/wontfix/stage-change-suspends.test.tsx`, a stage switch that renders at
 `'unlocked'` a `useSuspenseQuery` over a box not yet fetched, then unlock.
@@ -400,8 +401,9 @@ that is worth more than one smoothed fallback. The limit is React's, stated in i
 ### A refusal shown from a form Action's result outlives an Undo
 
 A form whose action resolves its refusal as the action's state (`useActionState`) shows that refusal until the action
-next runs. Envman's row shows a refused Save's message under the row; pressing Undo, or the bank locking, discards the
-draft and leaves the message where it is.
+next runs. Where the draft is still dirty after a refused Save, as it is with a sidecar edit pending, Undo discards the
+draft and leaves the message where it is. Envman's row, with its Save as a form Action, shows the message under the row;
+there the bank locking discards the draft too, by the demo's own code.
 
 Current outcome: a stale message under a row whose draft is clean again. The next Save replaces or removes it.
 
