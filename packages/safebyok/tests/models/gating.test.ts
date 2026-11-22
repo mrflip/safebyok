@@ -13,9 +13,9 @@ import type { GatingCleartexts } from '../../src/shapes/shapes-gateish'
 import type { BirthBankAnswer } from '../../src/storage/vault-db'
 import * as TH from '../test-helpers'
 
-/** A bank born on `device` by `Bank.birth`, once the device has said `hello`, from `cleartexts` as the caller hands them. */
+/** A bank born on `device` by `Bank.birth`, once the device has signed in, from `cleartexts` as the caller hands them. */
 async function birth(device: Device, cleartexts: unknown): Promise<Bank> {
-  await device.hello()
+  await device.signIn(TH.WorldScope.userid)
   return await Bank.birth(device, cleartexts as never)
 }
 
@@ -186,7 +186,7 @@ describe("Bank.birth(device, cleartexts): what it refuses before it derives a ke
     await TH.expectRefusal(Bank.birth(TH.provingDeviceOf() as never, { passphraseCleartext: TH.TestPassphrase }), 'bad_record')
   })
 
-  it("refuses a device whose `hello` has not answered, writing nothing", async () => {
+  it("refuses a device whose `signIn` has not answered, writing nothing", async () => {
     const device = TH.makeDevice()
     const births = TH.spyBirths(device)
     await TH.expectRefusal(Bank.birth(device, { passphraseCleartext: TH.TestPassphrase }), 'disabled')
@@ -244,7 +244,7 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
   it("zeroes a passkey answer handed as a bare ArrayBuffer", async () => {
     const prfBuffer = new Uint8Array(32).fill(7).buffer
     const device = TH.makeDevice()
-    await device.hello()
+    await device.signIn(TH.WorldScope.userid)
     // Whether the check accepts a bare buffer is not this test's subject: the bytes are vacated either way.
     await Bank.tryBirth(device, { passphraseCleartext: TH.TestPassphrase, passkeyCleartext: { ...TH.passkeyAnswerOf(), prfBytes: prfBuffer as never } })
     expect(TH.isZeroed(new Uint8Array(prfBuffer))).to.be.true
@@ -254,7 +254,7 @@ describe("a gating's vacating of the passkey answers it is handed", () => {
 describe("Bank.birthGating(device, cleartexts, attachBank)", () => {
   it("hands `attachBank` the bank it births", async () => {
     const device = TH.makeDevice()
-    await device.hello()
+    await device.signIn(TH.WorldScope.userid)
     const attachBank = vi.fn()
     const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }, attachBank).attempt()
     expect(attachBank).toHaveBeenCalledExactlyOnceWith(bank)
@@ -262,7 +262,7 @@ describe("Bank.birthGating(device, cleartexts, attachBank)", () => {
 
   it("births a bank its device does not show, where no `attachBank` is given", async () => {
     const device = TH.makeDevice()
-    await device.hello()
+    await device.signIn(TH.WorldScope.userid)
     const bank = await Bank.birthGating(device, { passphraseCleartext: TH.TestPassphrase }).attempt()
     expect(bank.isUnlocked).to.be.true
     expect(device.bank).to.be.null

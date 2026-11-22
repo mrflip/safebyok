@@ -1,6 +1,5 @@
 /** The checks and types of the bank and the device: what each is made from and given, and the bank's drafts and answers. */
 
-import type { QueryClient } from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { CX, type Deriver, type EX, type Errors, type Logger, Validator } from 'safebyok-big/internals'
 import type { Bank } from '../models/bank'
@@ -12,7 +11,7 @@ import type { DefaultQueryCacheOpts, QueryCacheOpts } from './shapes-minder'
 import type { BoxCleartexts, UnsealedOf } from './shapes-sealers'
 import type { BoxRecord } from './shapes-thing'
 import type { GetAsk, ListAsk } from './shapes-asks'
-import type { EpochMillis, Labelpath } from './primitives'
+import type { Banklabel, DeviceTok, EpochMillis, Labelpath, Userid } from './primitives'
 
 // == [The bank's forms]: BoxUnsealed
 
@@ -48,15 +47,22 @@ export interface HostedVault {
 }
 // --
 
-// == [The device]: BankishChecks, DeviceRecord, BadNews, BadNewsHandler, DeviceOpts
+// == [The device]: BankishChecks, DefaultBanklabel, DeviceRecord, DeviceJSON, BadNews, BadNewsHandler, DeviceOpts
 
-/** The check of a {@link DeviceRecord}. */
+/** The banklabel of the bank a device serves where its record names none. */
+export const DefaultBanklabel = 'main'
+
+/** The checks of a {@link DeviceRecord}, and of the userid `Device.signIn` is handed. */
 export const BankishChecks = Validator.Checkers('bad_record', ({ obj, user_id, banklabel, device_tok }) => ({
-  deviceRecord: obj({ userid: user_id, banklabel, device_tok }).strict(),
+  deviceRecord: obj({ banklabel: banklabel.default(DefaultBanklabel), device_tok }).strict(),
+  userid:       user_id,
 }), [CX])
 
-/** A device's record: the bank scope it serves, and its token there. */
-export type DeviceRecord = Z.infer<typeof BankishChecks.deviceRecord>
+/** A device's record, as `Device.make` takes it: the banklabel of the bank it serves each user, `'main'` where left out, and its token. */
+export type DeviceRecord = Z.input<typeof BankishChecks.deviceRecord>
+
+/** A device as it serializes: its record, and the user signed in on it, or null for none. */
+export type DeviceJSON = Readonly<{ userid: Userid | null, banklabel: Banklabel, device_tok: DeviceTok }>
 
 /** The argument of `onBadNews`: a refusal no caller waits on, and the device it reached. */
 export interface BadNews {
@@ -81,16 +87,14 @@ export interface DeviceOpts {
   autolockMinutes?: number | undefined
   /** Hears each refusal no caller waits on. Default: {@link DefaultOnBadNews}, a warning on the device's logger. */
   onBadNews?:       BadNewsHandler | undefined
-  /** The defaults the device's minder sets on its items and lists in TanStack Query's cache. A missing field defaults from {@link DefaultQueryCacheOpts}. */
+  /** The defaults each user's minder sets on its items and lists in the device's QueryClient. A missing field defaults from {@link DefaultQueryCacheOpts}. */
   queryCacheOpts?:  Partial<QueryCacheOpts> | undefined
-  /** The client the device's minder caches in, made by `VaultMinder.makeClient`, which the minders of other devices may share. Default: a client of its own. */
-  queryClient?:     QueryClient | undefined
   /** Ignored. Allowed so that `...browserOpts()` from `safebyok/browser` spreads in, though it carries a device database. */
   deviceDB?:        unknown
 }
 // --
 
-// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, DeviceSnapshot
+// == [Snapshots]: bankStageVals, BankStage, RefusalSnapshot, BankSnapshot, PendingBank, SignedOutBank, DeviceSnapshot
 
 /** The stages of a bank, each described at {@link BankStage}. */
 export const bankStageVals = ['signed_out', 'starting', 'unborn', 'locked', 'unlocked', 'swept', 'failed'] as const
@@ -132,14 +136,17 @@ export interface BankSnapshot {
 }
 
 // isLocked is true in the safe state, so it is spelled out: a snapshot left out would read as unlocked.
-/** The bank snapshot a device shows until its `hello` finds its bank stored or not. */
+/** The bank snapshot a device shows from `signIn` until it finds its user's bank stored or not. */
 export const PendingBank: BankSnapshot = Object.freeze({
   stage: 'starting', isLocked: true, isEnded: false, endCause: null, leaseEndsAt: null, lastErr: null, isUnlockWanted: false,
 })
 
+/** The bank snapshot a device shows until `signIn`, while nobody is signed in on it. */
+export const SignedOutBank: BankSnapshot = Object.freeze({ ...PendingBank, stage: 'signed_out' })
+
 /** A device's state, for a host to render. */
 export interface DeviceSnapshot {
-  /** The snapshot of this device's bank. With none yet, a stand-in at stage `'starting'` ({@link PendingBank}), `'unborn'` or `'failed'`. */
+  /** The snapshot of the signed-in user's bank. With none yet, a stand-in at stage `'signed_out'` ({@link SignedOutBank}), `'starting'` ({@link PendingBank}), `'unborn'` or `'failed'`. */
   readonly bank: BankSnapshot
 }
 // --

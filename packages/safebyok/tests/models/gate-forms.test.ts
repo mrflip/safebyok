@@ -366,7 +366,7 @@ describe("bank.gate.revokePasskey(cleartexts)", () => {
 describe("the try forms: tryUnlock, tryReplacePassphrase, tryAddPasskey, tryRevokePasskey, Bank.tryBirth", () => {
   it("each resolves a good outcome of the gate on success, and Bank.tryBirth of the bank", async () => {
     const device = TH.makeDevice()
-    await device.hello()
+    await device.signIn(TH.WorldScope.userid)
     const bank = await TH.expectGood(Bank.tryBirth(device, { passphraseCleartext: TH.TestPassphrase }))
     bank.lock()
     expect(await TH.expectGood(bank.gate.tryUnlock({ passphraseCleartext: TH.TestPassphrase }))).to.equal(bank.gate)

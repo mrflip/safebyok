@@ -130,7 +130,7 @@ async function birthBank(device: Device, cleartexts: unknown, friend: BirthGatin
   Checks.device.parse(device).demandEnabled()
   const { passphraseCleartext, passkeyCleartext } = CleartextChecks.birth.parse(cleartexts)
   // A birth's stamps are minted here, one pair per gating.
-  const { bankStamp, gateStamp } = Bank.mintStamps(device)
+  const { bankStamp, gateStamp } = Bank.mintStamps(device.scope)
   const passphraseProving = await PassphraseProving.buildNovel(device, bankStamp, gateStamp, passphraseCleartext)
   const passkeyProving    = passkeyCleartext ? await PasskeyProving.buildNovel(device, bankStamp, gateStamp, passkeyCleartext) : null
 

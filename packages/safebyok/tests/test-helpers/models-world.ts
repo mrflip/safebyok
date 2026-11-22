@@ -30,7 +30,7 @@ import { type Wayin, wayinCtxOf } from '../../src/models/wayin'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { BirthBankAsk } from '../../src/shapes/shapes-asks'
 import type { BirthBankAnswer, VaultDB } from '../../src/storage/vault-db'
-import { Lifeseq } from '../../src/shapes/primitives'
+import { type Userid, Lifeseq } from '../../src/shapes/primitives'
 
 // == [Time]: T0, useFakeClock
 
@@ -78,7 +78,7 @@ export const WorldGateStamp: GateStamp = Object.freeze({ ...WorldScope, labelpat
 export const WorldGate: GateRevisionedStamp = Object.freeze({ ...WorldGateStamp, revtok: revtokOf('gate1') })
 // --
 
-// == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, makeDevice, passkeyAnswerOf
+// == [Devices]: TestPassphrase, DeviceTok, ProvingDeviceGiven, provingDeviceOf, DeviceGiven, makeDevice, passkeyAnswerOf
 
 /** An obvious fake passphrase, never a real one. */
 export const TestPassphrase = GX.passphraseCleartext.parse('correct horse battery staple')
@@ -98,9 +98,18 @@ export function provingDeviceOf({ keyDeriver = testDeriver, strengthChecker = an
   return { keyDeriver: guardKeyDeriver(keyDeriver), strengthChecker: guardStrengthChecker(strengthChecker), device_tok }
 }
 
-/** A Device of {@link WorldScope} and {@link DeviceTok}, with `record` laid over them, over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those. */
-export function makeDevice(record: Partial<DeviceRecord> = {}, opts: Partial<DeviceOpts> = {}): Device {
-  return Device.make({ ...WorldScope, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
+/** What a {@link makeDevice} device is made of: its record, and the user it signs in, or null to leave it signed out. */
+export type DeviceGiven = Partial<DeviceRecord & { userid: Userid | null }>
+
+/** A Device of {@link WorldScope}'s banklabel and {@link DeviceTok}, signed in as its user and bringing up that user's bank, with `given` laid over them:
+ * over `testDeriver`, a checker that passes everything, a quiet logger and a fresh MemoryVaultDB, with `opts` laid over those.
+ * Await `device.signIn(device.userid!)` for its bank to come up.
+ */
+export function makeDevice(given: DeviceGiven = {}, opts: Partial<DeviceOpts> = {}): Device {
+  const { userid = WorldScope.userid, ...record } = given
+  const device = Device.make({ banklabel: WorldScope.banklabel, device_tok: DeviceTok, ...record }, { keyDeriver: testDeriver, strengthChecker: anyStrengthChecker, logger: quietLogger, vaultDB: new MemoryVaultDB(), ...opts })
+  if (userid !== null) { void device.signIn(userid) }
+  return device
 }
 
 /** A fresh passkey answer: a fake credential id, a fresh salt of the right length, and 32 random PRF bytes. */
@@ -133,11 +142,11 @@ export interface BornBank {
   proving:    PassphraseProving
 }
 
-/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB by `Bank.birth` once the device has said `hello`, and so unlocked.
+/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB by `Bank.birth` once the device has signed in, and so unlocked.
  * Its proving is a stored proving of the main gate, by {@link TestPassphrase}.
  */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
-  await device.hello()
+  await device.signIn(device.userid ?? WorldScope.userid)
   const mintStamps = vi.spyOn(Bank, 'mintStamps').mockReturnValue({ bankStamp: WorldBankStamp, gateStamp: WorldGateStamp })
   try {
     const bank = await Bank.birth(device, { passphraseCleartext: TestPassphrase, passkeyCleartext: passkeyCleartext && copyOfAnswer(passkeyCleartext) })
@@ -148,7 +157,7 @@ export async function buildBornBank({ passkeyCleartext, device = makeDevice() }:
   }
 }
 
-/** Another Bank over the records a {@link buildBornBank} birth stored, locked, as a device's `hello` makes one. Its device is not told of it. */
+/** Another Bank over the records a {@link buildBornBank} birth stored, locked, as a device's `signIn` makes one. Its device is not told of it. */
 export function makeStoredBank({ device, record, gateRecord }: Pick<BornBank, 'device' | 'record' | 'gateRecord'>): Bank {
   const { vaultDB } = device
   const gate = Gate.make(gateRecord, { device, vaultDB, bankStamp: record })
@@ -164,7 +173,7 @@ export interface BornVault extends BornBank {
 /** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth. */
 export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
   const born = await buildBornBank(given)
-  return { ...born, vault: born.device.vault!, minder: born.device.minder }
+  return { ...born, vault: born.device.vault!, minder: born.device.minder! }
 }
 // --
 

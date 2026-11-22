@@ -58,8 +58,8 @@ describe("Vault.make(bank, minder)", () => {
 
   it("refuses anything but a bank and a minder", async () => {
     const { bank, device } = await TH.buildBornBank()
-    TH.expectSyncRefusal(() => Vault.make({} as never, device.minder), 'bad_record')
-    TH.expectSyncRefusal(() => Vault.make(null as never, device.minder), 'bad_record')
+    TH.expectSyncRefusal(() => Vault.make({} as never, device.minder!), 'bad_record')
+    TH.expectSyncRefusal(() => Vault.make(null as never, device.minder!), 'bad_record')
     TH.expectSyncRefusal(() => Vault.make(bank, {} as never), 'bad_record')
     TH.expectSyncRefusal(() => Vault.make(bank, bank as never), 'bad_record')
   })
@@ -67,13 +67,13 @@ describe("Vault.make(bank, minder)", () => {
   it("refuses a minder of another bank", async () => {
     const { bank } = await TH.buildBornBank()
     const other = TH.makeDevice({ banklabel: 'other' })
-    TH.expectSyncRefusal(() => Vault.make(bank, other.minder), 'record_conflict')
+    TH.expectSyncRefusal(() => Vault.make(bank, other.minder!), 'record_conflict')
   })
 
   it("refuses a swept bank", async () => {
     const { bank, device } = await TH.buildBornBank()
     bank.sweep()
-    TH.expectSyncRefusal(() => Vault.make(bank, device.minder), 'disabled')
+    TH.expectSyncRefusal(() => Vault.make(bank, device.minder!), 'disabled')
   })
 })
 
