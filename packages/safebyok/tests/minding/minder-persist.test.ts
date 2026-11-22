@@ -53,6 +53,7 @@ describe("Minder.persist(queryClient, persister)", () => {
     const minder = await minderIn(queryClient, vaultDB)
     await minder.get(TH.BoxScope)
     await minder.list('box')
+    await nextTick()
     const restored = await restoredMinderOf(persister)
     expect(restored.at(TH.BoxScope)).to.deep.equal(box)
     expect(Object.isFrozen(restored.at(TH.BoxScope))).to.be.true
