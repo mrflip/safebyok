@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: threads 1, 2 (#822), 3 (#819), 6 (#835) filed; 4 (#834) in review; 5 building on 4; then 7.
+* **Status**: threads 1, 2 (#822), 3 (#819), 6 (#835) filed; 4 (#834) reviewed `fixed`, in rework; 5 building on 4; then 7.
 
 ## Read first
 
@@ -109,6 +109,13 @@ verdict, the rest is thread 5's.
 
 *Status*: ready at `acca878ad` (#834, justify green), one compaction before readiness; in review at `high` on `opus`
 (*Orchestrator:* raised from `medium`: the hooks write whispers into elements). Three open matters, rows in the doc.
+
+*Review:* fixed, at `c33ee9d46`: `useWhisperMask` writes into a host element mounted later. The invariant holds in all
+four hooks; the new wontfix row is true as written. Left, minor: a change of box showed the previous box's mask, and an
+async `ifLocked` left the live tail on a locked bank (*Orchestrator:* both sent to a rework, YOLO, a row in the doc;
+with `showText` and the `writeMask` doc block); `useWhisperText` and a host element remounted while shown; `verdict`
+while a newer one is judged (a row); `field` unvalidated, as before; an `@example`'s undefined `box`. A second review
+covers the rework's commits only.
 
 ### 5. `kit_parts`: the parts' classes, state attributes, words and labels
 

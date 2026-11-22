@@ -44,7 +44,7 @@ not write it.
 *Orchestrator:* [Sprint react_free](https://claude.ai/artifact/K5Tfgw5zf4eiW5SGbRPJPa), doc
 `9263e7b5-3849-4fb3-8433-bf6f10ec32f1`; tabs Open Matters `0dccff07-9b57` (body `772f52dd-31e7`), Cleanup
 `17a93409-b0ef` (body `69a0ec33-1add`), Progress `748b3543-647e` (body `f6dec94a-ad45`), Resolved `4e6a3a5e-8688` (body
-`9b083ff2-4a6f`); the `State` enum `87d1b810-c3e3`. Last read bookmark: rev 7 of Open Matters (no flips at rev 4). A new row: insert `"as":"blocks"` at the matters table's end (table
+`9b083ff2-4a6f`); the `State` enum `87d1b810-c3e3`. Last read bookmark: rev 4 (no flips); my own writes since reach rev 10. A new row: insert `"as":"blocks"` at the matters table's end (table
 `mgne8td40ga.57`) with a placeholder word in the State cell, then `replace` that paragraph by id with `"with":{"as":
-"markdown","blocks":{k: dropdown index 0},"from":…}` (replace takes `with`, not `source`). Keep backticks and braces out of a
-blocks-insert row's text: one such row was refused as a short row.
+"markdown","blocks":{k: dropdown index 0},"from":…}` (replace takes `with`, not `source`). Insert one row per op: a multi-row
+blocks insert has been refused as "a short row" twice, for no reason found.
