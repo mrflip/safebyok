@@ -1,5 +1,4 @@
 import { useActionState, useId } from 'react'
-import { sanitizeForeignError } from 'safebyok'
 import { ModalDialog } from 'safebyok-react-lean/kit'
 import { SubmitButton } from 'safebyok-react-lean/parts'
 import { type EnvFields, type EnvTexts, envFieldsOf, envTextsOfEnv, envTextsOfForm } from '../lib/env-form'
@@ -22,7 +21,7 @@ export function EnvSettingsDialog({ title, env, onApply, onCancel }: Readonly<{
       onApply(envFieldsOf(form, env.last_rotated_at))
       return { err: null, texts: envTextsOfForm(form) }
     } catch (err) {
-      return { err: sanitizeForeignError(err), texts: envTextsOfForm(form) }
+      return { err: err as Error, texts: envTextsOfForm(form) }
     }
   }
   const [applied, formAction] = useActionState(applyAction, { err: null, texts: envTextsOfEnv(env) })

@@ -1,5 +1,5 @@
 import { useActionState, useState } from 'react'
-import { isVaultError, sanitizeForeignError } from 'safebyok'
+import { isVaultError } from 'safebyok'
 import { SubmitButton, WhisperMask } from 'safebyok-react-lean/parts'
 import type { EnvFields } from '../lib/env-form'
 import { DayMs, dayValueOf, envSidecarOf, isOverdueAt, valMaskOf } from '../lib/env-sidecar'
@@ -40,7 +40,7 @@ function EnvEditor({ labelpath }: Readonly<{ labelpath: string }>) {
       })
       return null
     } catch (err) {
-      return sanitizeForeignError(err)
+      return err as Error
     }
   }
   const [putErr, putAction] = useActionState(putDraftAction, null)
