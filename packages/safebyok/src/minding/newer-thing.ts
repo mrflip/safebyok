@@ -36,7 +36,7 @@ function isEntryVal(val: unknown): val is EntryRecord | null {
 
 /** The citation `val` compares by: its own, or where it is null, that of the tombstone at `scoped`'s scope, else the shell's. */
 function citedOf(val: EntryRecord | null, scoped: ThingScope, deadAt: DeadAt | undefined): Pick<ThingCited, 'lifepath' | 'revseq'> {
-  return (val === null) ? (deadAt?.(scoped) ?? Shell.Cited) : val
+  return val ?? deadAt?.(scoped) ?? Shell.Cited
 }
 
 /** `next` where `nextCited` is newer than `priorCited`, else `prior`. */

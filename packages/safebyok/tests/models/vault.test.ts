@@ -29,7 +29,7 @@ function rowsOf(bank: Bank): Map<string, unknown> { return (bank.vaultDB as Memo
 async function unsealedAt(vault: Vault): Promise<BoxUnsealed> {
   const scope  = scopeAt(vault.bank, Openai)
   const got    = await vault.minder.get(scope)
-  const record = (got === null) ? vault.minder.deadAt(scope) : got
+  const record = got ?? vault.minder.deadAt(scope)
   if (record === undefined) { throw new Error('no box is stored') }
   // A tombstone the minder got is whole, though its type admits the sparse one.
   return vault.bank.unsealBox(record as BoxRecord)
@@ -40,7 +40,7 @@ async function bumpApicalls(vault: Vault): Promise<BoxRecord> {
   const newest   = await vault.minder.get(scopeAt(vault.bank, Openai))
   const old      = (newest === null) ? null : await vault.bank.unsealBox(newest)
   const apicalls = Number(old?.whisper['apicalls'] ?? 0) + 1
-  return vault.putBoxOnce((newest === null) ? Openai : newest, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
+  return vault.putBoxOnce(newest ?? Openai, { sidecar: { account: 'work' } }, { whisper: { ...TH.Whisper, apicalls } })
 }
 
 /** A vault of `bank` beside the one its device made, with a minder of its own, befriending the bank, that has not said `hello`. */

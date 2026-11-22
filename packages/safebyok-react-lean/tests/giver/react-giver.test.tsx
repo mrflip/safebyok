@@ -640,7 +640,7 @@ describe("useBox", () => {
   })
 
   it("hands a select of its own the whole record", async () => {
-    const { result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath, { select: (thing) => (thing as BoxRecord).revseq }), { stored: 'jokes' })
+    const { result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath, { select: (thing) => (thing!).revseq }), { stored: 'jokes' })
     await waitFor(() => { expect(result.current.data).to.eq(0) })
   })
 

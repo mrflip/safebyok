@@ -145,5 +145,5 @@ export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ 
 
 /** The revtok of `val`, what a minder's item or soon has, or undefined for none or null. */
 export function itemRevtokOf(val: Sparse<ThingRecord> | null | undefined): Revtok | undefined {
-  return ((val === undefined) || (val === null)) ? undefined : val.revtok
+  return val?.revtok
 }
