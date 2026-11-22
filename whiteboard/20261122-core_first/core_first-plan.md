@@ -129,10 +129,10 @@ vaultDB's list answer: `val` is the `kids` value with `read_tc`; `deltas` beside
 an array, injected at the feed; `read_tc` on the answer too, a UUID version 7 from a library (STYLE.md gains a line on
 `_tc` beside `_at`). Base-32 in our docs means lowercase `0-9a-v`, as `.toString(32)` makes (a STYLE.md line). The
 listing's cached value is the `kids` value, replaced whole and never joined to; a later `read_tc` is never replaced by
-an earlier one. The rule that invalidates a listing: first prove the handoff's four-row table with tests against rule
-(A), the first landing; if (A) misses the rebirth as predicted, build (C), `known`, the Coach's refinement, deciding the
-two questions the handoff leaves (replace or unite; from `hello` or from the first list), and record the choice as an
-open matter; (B) only if (C) proves heavy, saying why. *Touches*: `storage/` (the answer shapes, `AdapterVaultDB`,
+an earlier one. The rule that invalidates a listing is (A), the first landing (the Coach's `dataUpdateCount === 1`), proved by
+tests on the handoff's table rows that are not end states. *Orchestrator (2026-11-22, simplified):* the row (A) was
+predicted to miss is a bank's rebirth, an end state and out of bounds: it goes in the thread file's *End states*
+list, and neither (C) `known` nor (B) is built. *Touches*: `storage/` (the answer shapes, `AdapterVaultDB`,
 `MemoryVaultDB`, the classifier), `safebyok/testing`'s battery, `safebyok-postgres` where its rows feed the answer,
 the VaultMinder's listing, STYLE.md. *Levels*: `thread-worker-400k` on `opus`, effort `high`; review `medium`. *Depends
 on*: 2. *Look-ahead*: thread 5 changes the get answer and moves tombstones to a `dead` entry; leave the get path alone.
@@ -150,17 +150,19 @@ on*: 2. *Look-ahead*: thread 5 changes the get answer and moves tombstones to a 
 lifecycle* and *What the provider's `userid` does*. The core's `Device` is made with no user: its construction does no
 I/O, touches no browser global and subscribes to nothing, and makes the BankMinder and an empty vault client.
 `hello()` starts it. A verb that tells it who is signed in (named by the thread, after VOCABULARY) makes that user's
-bank, on banklabel `'main'`, and a VaultMinder attached to the device's vault client (#831's attach and detach, read
-for the idea). Telling it the same user again is safe; an absent user is no signal; a different user is a signal that
-ends the first user's bank (by today's sweep, unchanged) before the second starts. The stage: `'signed_out'` with no
+bank, on banklabel `'main'`, and a VaultMinder attached to the device's vault client (#831's attach, on main: keep it and its tests, and move the making of the vault client into the device; remove
+`VaultMinder.makeClient` and `Device.make`'s `queryClient` option if nothing needs them after). Telling it the same user again is safe; an absent user is no signal. *Orchestrator (2026-11-22, simplified):* a
+different user is a sign-out, an end state and out of bounds: the host reloads; no code ends one user's bank to start
+another's. The stage: `'signed_out'` with no
 user, `'starting'` until the device has what it needs, `'locked'` from a cached world, and an unlock that runs on the
 cached gate once a user is signed in, never before. Ruling 3 (the stage waits on the restore) is built by thread 6;
 this thread leaves the stage a seam where the restore will land. *Touches*: `models/device.ts`, `models/bank.ts`, the
-minders' construction, `core.ts`, `index.ts`, the React layer's construction of a device (mechanically: it may keep
-signing in at once). *Levels*: `thread-worker-400k` on `opus`, effort `high`; review `high` on `opus` (the unlock on a
+minders' construction, `core.ts`, `index.ts`, and #837's `makeProviderMount` in safebyok-react-lean, now on main: it makes the device where it now makes the
+client, and tells it the user in the effect that now makes the device. Keep `tests/giver/record-hooks.test.tsx` green
+(hooks bind the client on first render before any user; StrictMode makes one device; nothing at construction touches
+a browser global). *Levels*: `thread-worker-400k` on `opus`, effort `high`; review `high` on `opus` (the unlock on a
 cached gate). *Depends on*: 2. *Look-ahead*: thread 6 restores both clients before `hello` speaks to the vaultDB, and
-persists the userids seen; the React layer's provider (#837, later) makes this device at its mount and tells it the
-user from an effect. *Size*: L.
+persists the userids seen; thread 2's open matter on the Gate reading its gate from the world lands here if the Coach takes its Rec. *Size*: L.
 
 ### 5. `get_answer`: a get's answer, and tombstones in their own entry
 
@@ -191,8 +193,9 @@ and its limits*. The device takes a persister (TanStack's `Persister` interface,
 client persists every user and bank's world, and the userids seen; the vault client persists the active user's boxes,
 and the root listing of each user and bank. The restore lands before the minders say `hello` to the vaultDB, and the
 stage leaves `'starting'` only once it has. Our defaults where TanStack's are wrong for us: an item whose last get was
-refused is kept; no 24-hour discard; a `buster` from the stored format. What stays for a user not signed in is the
-host's to define: a predicate or option, not a policy of ours. *Touches*: `models/device.ts`, the minders, a new
+refused is kept; no 24-hour discard; a `buster` from the stored format. What stays for a user not signed in is the host's to
+define, later: *Orchestrator (2026-11-22, simplified):* this thread persists everything named above and adds no
+retention predicate or option; retention follows sign-out, an end state. *Touches*: `models/device.ts`, the minders, a new
 `minding/` or `storage/` file for the persister plug, `package.json`. *Levels*: worker `opus`, effort `high`; review
 `high` on `opus` (the wrapped bankKey and the gate's headers stay on the device). *Depends on*: 4 (and reads 5's
 entry kinds at the restack). *Size*: M.
@@ -202,8 +205,7 @@ entry kinds at the restack). *Size*: M.
 > "An opportunistic process (undesigned) will keep it synced with the local indexeddb"
 
 *Gloss.* A `Persister` over IndexedDB, storing objects without JSON, one snapshot per user and bank, in the device
-database's adapter package, not the core: `safebyok-idb-lean` (#829, another session's, ready for the Coach). Waits on
-#829 merging; if the sprint closes first, it is a *Finally* item. *Levels*: worker `sonnet`, effort `medium`; review
+database's adapter package, not the core: `safebyok-idb-lean` (#829, another session's, ready for the Coach). #829 merged (2026-11-22). *Levels*: worker `sonnet`, effort `medium`; review
 `low`. *Depends on*: 6 and #829. *Size*: S.
 
 ## For the Coach
