@@ -64,7 +64,7 @@ export type Labelpathed = { labelpath: Labelpath }
  * - A listing is what the vaultDB last answered a list of its parent with, never joined to: a list landing replaces it
  *   whole, unless the listing cached was read later, by `read_tc`. A list refused leaves it as it was.
  * - A child's first stored record to land, in its item or its soon while the other has none, marks its parent's listing
- *   stale, and a listing a host observes is listed again. A shell marks nothing.
+ *   stale, and a listing a host observes is listed again. A shell marks nothing, nor does a get's record that replaces one.
  * - An operation caches its own good answer (the record got or written, or the {@link Kids} value listed, never a write's
  *   ask) and the bank and main gate of the world its answer carries, refused or not. Any other record an answer carries (a
  *   refusal's `dbhas`, a list's parentage and deltas, or a tracked bank, main gate or root box) is cached only as the
