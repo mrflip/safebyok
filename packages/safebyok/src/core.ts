@@ -19,6 +19,7 @@ export {
   StampChecks,
 } from './shapes/shapes-stamps'
 export { Wayin } from './models/wayin'
+export { type PasskeyWayinHeader, type PasskeyWayinRecord, type PassphraseWayinHeader, type PassphraseWayinRecord, type WayinHeader, type WayinRecord, WayinChecks } from './shapes/shapes-wayin'
 export type { AddPasskeyGating, BirthGating, Gating, ReplacePassphraseGating, RevokePasskeyGating, UnlockGating } from './models/gating'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
@@ -54,6 +55,6 @@ export { HostErrorSanitizer } from 'safebyok-big'
 export type { BadOutcome, GoodOutcome, Outcome } from 'safebyok-big'
 export { DefaultLogger, setDefaultLogger, type KeyDeriver, type VaultLogger } from 'safebyok-big'
 export { PrfAnswerSize, type PasskeyAnswer, type PassphraseCleartext, type PassphraseVerdict, type Sidecar, type Whisper } from 'safebyok-big'
-export type { PasskeyWayinHeader, PassphraseWayinHeader, WayinHeader, Wayinkind } from 'safebyok-big'
-export type { CipherCtxRecord, IfAbsent, IfPresent, KeyDeriverLabel, PasskeyWayinRecord, PassphraseSalt, PassphraseWayinRecord, PrfSalt, PutIfAbsent, RefusalRows, WayinRecord } from 'safebyok-big/internals'
+export type { Wayinkind } from 'safebyok-big'
+export type { CipherCtxRecord, IfAbsent, IfPresent, KeyDeriverLabel, PassphraseSalt, PrfSalt, PutIfAbsent, RefusalRows } from 'safebyok-big/internals'
 export { refusalkindVals, type DelAct, type GoodAct, type GotAct, type PutAct } from 'safebyok-big/storage'

@@ -1,0 +1,4 @@
+---
+---
+
+safebyok, private: the lease and the wayin take a Thing's field names. A lease's record names its bank's stamp `bank_lifeseq`, `bank_born_at` and `bank_lifetok`, and gains its own `born_at`: a proof made while the gate holds a lease renews it, keeping that lease's `born_at` under a new `proved_at`, and with none held `born_at` is `proved_at`. A wayin's `wayinlabel` is now `label`, and its `registered_at` is now `born_at`. The new core checks wayins itself (`WayinChecks`, exported with the types `WayinHeader`, `WayinRecord` and each kind's header and record, in place of safebyok-big's). Both are bound into a ctx. A gate stored before fails today's checks as `damaged_row`; the new core caches no lease yet, so none is left behind. There is no migration. safebyok-big, and its wayins, are unchanged.

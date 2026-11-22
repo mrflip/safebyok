@@ -423,20 +423,20 @@ describe("guardKeyDeriver(hostDeriver)", () => {
 })
 
 describe("a proving's header", () => {
-  it("of a passphrase proving: the deriver's label, a fresh salt, the device's device_tok, and registered_at from the time now", async () => {
+  it("of a passphrase proving: the deriver's label, a fresh salt, the device's device_tok, and born_at from the time now", async () => {
     vi.setSystemTime(TH.T0 + 5)
     const { header } = await novelPassphrase(TH.provingDeviceOf())
-    expect(header).to.deep.include({ wayinkind: 'passphrase', wayinlabel: 'main', key_deriver_label: 'test_digest_v0', device_tok: TH.DeviceTok, registered_at: TH.T0 + 5 })
-    expect(Object.keys(header)).to.have.members(['wayinkind', 'wayinlabel', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'])
+    expect(header).to.deep.include({ wayinkind: 'passphrase', label: 'main', key_deriver_label: 'test_digest_v0', device_tok: TH.DeviceTok, born_at: TH.T0 + 5 })
+    expect(Object.keys(header)).to.have.members(['wayinkind', 'label', 'key_deriver_label', 'salt_b64', 'device_tok', 'born_at'])
     expect(Crypto.fromB64(header.salt_b64).length).to.eq(TH.testDeriver.salt_size)
     expect(Object.isFrozen(header)).to.be.true
   })
 
-  it("of a passkey proving: the answer's credential_id and salt, the device's device_tok, and registered_at", async () => {
+  it("of a passkey proving: the answer's credential_id and salt, the device's device_tok, and born_at", async () => {
     const answer = TH.passkeyAnswerOf()
     const { credential_id, prf_salt_b64 } = answer
     const { header } = await novelPasskey(answer)
-    expect(header).to.deep.equal({ wayinkind: 'passkey', wayinlabel: 'passkey0', credential_id, prf_salt_b64, device_tok: TH.DeviceTok, registered_at: TH.T0 })
+    expect(header).to.deep.equal({ wayinkind: 'passkey', label: 'passkey0', credential_id, prf_salt_b64, device_tok: TH.DeviceTok, born_at: TH.T0 })
   })
 
   it("draws a fresh salt for each passphrase proving", async () => {
@@ -557,7 +557,7 @@ const StampCases = [
 
 const HeaderCases = [
   [{ device_tok: '00000000-0000-4000-8000-0000000000ee' }, 'a header whose device_tok was swapped'],
-  [{ registered_at: TH.T0 + 1 },                           'a header whose registered_at moved'],
+  [{ born_at: TH.T0 + 1 },                                 'a header whose born_at moved'],
 ] as const
 
 describe("the ctx a wayin is wrapped under", () => {
@@ -622,9 +622,33 @@ describe("proving.buildLease(gate, cited)", () => {
     const leaseGate = TH.fakeLeaseGateOf()
     const proving = await PasskeyProving.buildStored(gate, answerOf())
     const lease = await proving.buildLease(leaseGate, gate)
-    expect(lease.toJSON()).to.deep.include({ ...TH.WorldBankStamp, gate_labelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
+    const { userid, banklabel, lifeseq, born_at, lifetok } = TH.WorldBankStamp
+    expect(lease.toJSON()).to.deep.include({ userid, banklabel, bank_lifeseq: lifeseq, bank_born_at: born_at, bank_lifetok: lifetok, gate_labelpath: 'gate', gate_lifeseq: gate.lifeseq, gate_revtok: gate.revtok, proved_at: TH.T0, wayinkind: 'passkey' })
     expect(lease.isEvicted).to.be.false
     expect(leaseGate.lock).not.toHaveBeenCalled()
+  })
+
+  it("is born when it is proved, given no lease it renews", async () => {
+    const proving = await novelPassphrase()
+    await proving.buildWayin(NOVEL)
+    vi.setSystemTime(TH.T0 + 5)
+    const lease = await proving.buildLease(TH.fakeLeaseGateOf(), TH.WorldGate)
+    expect(lease).to.include({ born_at: TH.T0 + 5, proved_at: TH.T0 + 5 })
+  })
+
+  it("keeps the born_at of the lease it renews, and is proved now", async () => {
+    const proving = await novelPassphrase()
+    await proving.buildWayin(NOVEL)
+    const renewed = await proving.buildLease(TH.fakeLeaseGateOf(), TH.WorldGate)
+    vi.setSystemTime(TH.T0 + 5)
+    const lease = await proving.buildLease(TH.fakeLeaseGateOf(), TH.WorldGate, renewed)
+    expect(lease).to.include({ born_at: TH.T0, proved_at: TH.T0 + 5 })
+  })
+
+  it("refuses a lease it renews with no born_at", async () => {
+    const proving = await novelPassphrase()
+    await proving.buildWayin(NOVEL)
+    await TH.expectRefusal(proving.buildLease(TH.fakeLeaseGateOf(), TH.WorldGate, {} as never))
   })
 
   it("records the revision of the gate cited", async () => {

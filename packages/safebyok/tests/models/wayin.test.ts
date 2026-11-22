@@ -6,11 +6,11 @@ import * as TH from '../test-helpers'
 function passphraseRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     wayinkind:              'passphrase',
-    wayinlabel:             'main',
+    label:                  'main',
     key_deriver_label:      'test_digest_v0',
     salt_b64:               Crypto.toB64(Crypto.randomBytes(16)),
     device_tok:             TH.DeviceTok,
-    registered_at:          TH.T0,
+    born_at:                TH.T0,
     bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pp'),
     ...overrides,
   }
@@ -19,11 +19,11 @@ function passphraseRecord(overrides: Record<string, unknown> = {}): Record<strin
 function passkeyRecord(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     wayinkind:              'passkey',
-    wayinlabel:             'passkey0',
+    label:                  'passkey0',
     credential_id:          'cred-test-1',
     prf_salt_b64:           Crypto.toB64(Crypto.randomBytes(Consts.PasskeySaltSize)),
     device_tok:             TH.DeviceTok,
-    registered_at:          TH.T0,
+    born_at:                TH.T0,
     bank_key_wayin_wrapped: TH.fakeCiphered('wayin-pk'),
     ...overrides,
   }
@@ -50,10 +50,10 @@ describe("Wayin.make(record)", () => {
     [() => passphraseRecord({ device_tok: undefined }),                                                  'refuses a record with no device_tok'],
     [() => passphraseRecord({ device_tok: 'device_one' }),                                               'refuses a record whose device_tok is a label'],
     [() => passphraseRecord({ wayinkind: 'password' }),                                                  'refuses a wayinkind of no known kind'],
-    [() => passphraseRecord({ wayinlabel: undefined }),                                                  'refuses a record with no wayinlabel'],
-    [() => passphraseRecord({ wayinlabel: 'passkey0' }),                                                 "refuses a passphrase record under the passkey's wayinlabel"],
-    [() => passkeyRecord({ wayinlabel: 'main' }),                                                        "refuses a passkey record under the passphrase's wayinlabel"],
-    [() => passphraseRecord({ registered_at: '2023-11-14T22:13:20.000Z' }),                              'refuses a time written as an ISO string'],
+    [() => passphraseRecord({ label: undefined }),                                                       'refuses a record with no label'],
+    [() => passphraseRecord({ label: 'passkey0' }),                                                      "refuses a passphrase record under the passkey's label"],
+    [() => passkeyRecord({ label: 'main' }),                                                             "refuses a passkey record under the passphrase's label"],
+    [() => passphraseRecord({ born_at: '2023-11-14T22:13:20.000Z' }),                                    'refuses a time written as an ISO string'],
     [() => passphraseRecord({ bank_key_wayin_wrapped: { ciphertext_b64: 'ct' } }),                       'refuses a wrap with no cipherIv'],
     // absurd:
     [() => null,                                                                                         'refuses null'],
@@ -108,8 +108,8 @@ describe("wayin.pickle()", () => {
 
 describe("wayin.toJSON()", () => {
   const HeaderCases = [
-    [passphraseRecord, ['wayinkind', 'wayinlabel', 'key_deriver_label', 'salt_b64', 'device_tok', 'registered_at'], 'a passphrase wayin'],
-    [passkeyRecord,    ['wayinkind', 'wayinlabel', 'credential_id', 'prf_salt_b64', 'device_tok', 'registered_at'], 'a passkey wayin'],
+    [passphraseRecord, ['wayinkind', 'label', 'key_deriver_label', 'salt_b64', 'device_tok', 'born_at'], 'a passphrase wayin'],
+    [passkeyRecord,    ['wayinkind', 'label', 'credential_id', 'prf_salt_b64', 'device_tok', 'born_at'], 'a passkey wayin'],
   ] as const
 
   for (const [recordOf, fieldnames, blurb] of HeaderCases) {
@@ -131,8 +131,8 @@ describe("wayin.toJSON()", () => {
 describe("wayinCtxOf(bankStamp, gateStamp, header)", () => {
   const BadHeaderCases = [
     [{ wayinkind: 'telepathy' }, 'of an unknown kind'],
-    [{ wayinlabel: 'passkey0' }, "under the other kind's wayinlabel"],
-    [{ wayinlabel: undefined },  'with no wayinlabel'],
+    [{ label: 'passkey0' },      "under the other kind's label"],
+    [{ label: undefined },       'with no label'],
   ] as const
 
   for (const [altered, blurb] of BadHeaderCases) {
