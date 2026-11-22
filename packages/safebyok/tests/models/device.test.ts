@@ -244,6 +244,16 @@ describe("a device's persisters", () => {
     expect(TH.makeDevice({ userid: null }).useridsSeen()).to.deep.equal([])
   })
 
+  it("tell the device of no user whose roots it has asked for and not heard of", async () => {
+    const vaultDB = new MemoryVaultDB()
+    vi.spyOn(vaultDB, 'tryGetThing').mockImplementation((ask) => Promise.resolve(refusedAnswerOf(ask, new Errors.VaultError('storage_unavailable', "Down."))))
+    const device = TH.makeDevice({ userid: null }, { vaultDB, logger: TH.quietLogger })
+    await device.hello()
+    await device.signIn(TH.WorldScope.userid)
+    expect(device.bankMinder.queryClient.getQueryCache().getAll()).to.not.be.empty
+    expect(device.useridsSeen()).to.deep.equal([])
+  })
+
   it("are refused where one is not a Persister, naming it", () => {
     const err = TH.expectSyncRefusal(() => TH.makeDevice({}, { persisters: { roots: new MemoryPersister(), boxes: {} } } as never), 'bad_record')
     expect(err.message).to.include('persisters.boxes')
