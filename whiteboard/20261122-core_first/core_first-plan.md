@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Filed and out of draft: thread 2 (#844); on it, thread 4 (#846) → thread 6 (#848, `f122dd2e3`) → thread 7 (#849, `80cd1a148`); and thread 3 (#847). Thread 5 (#850, on #847) in review (medium, opus). Then: restack the two branches into one line, and cut thread 8 (misuse_cull) from its tip. Restack note: thread 3 deletes `#seedListing`; thread 6 changed it; thread 3's deletion wins. *Finally*: `list`'s per-call `staleTime: 0`; `useridsSeen`'s data filter (thread 8).
+* **Status**: running (2026-11-22). The line, restacked and filed, every PR out of draft: main ← #844 ← #847 ← #850 ← #846 ← #848 ← #849 (top, `43c77ec2e`); justify green at the tip; rollback tags `*-prerestack-20261122T215742` in /workspace/byok. Thread 8 (misuse_cull) building from #849. A plan for persisting boxes being drafted (the Coach). Closer Look tab awaits the Coach's replies. *Finally*: take over #833 (vocab_adopt): squash its commits into one, rebase onto the line's tip, further vocabulary changes as a second commit (the Coach).
 
 The Coach's request, verbatim:
 
