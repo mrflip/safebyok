@@ -133,6 +133,8 @@ BankMinder so that it needs no userid to exist and holds many users' worlds. Thr
 
 *Status*: rework. *The Coach (2026-11-22):* "I didn't imagine there was any code in BankMinder different than ThingMinder at all" … "a bank-side minder made any time is fine, I'd conceived it was made before then and held all users' rows … if it breaks vaultdb then do it with the userid, or just cheat and keep it fed by magic or the idb" … "easier to have them be subclasses even if it's just different names". The paused high review (one fix kept: `useGate` reads the world through `useSyncExternalStore`, `3f44feddc`) left: the `select` pin to remove, the entrykind filter now dead, the world doc's false clause; all in the rework. A fresh high review follows it.
 
+*Review* (high, opus, `e7ae8b445...f5d6f9b3d`): fixed. Kept five fixes: the base's phrases say "minder", not VaultMinder; a giver test that could not fail; `VaultMinder.make`'s rows all refusing for a missing bankMinder; `fetchWorld`'s doc block; a style quote. Left, minor: the IdbMinderBridge no longer copies the roots (threads 6 and 7 replace it); test-title taste; no sloppy-input case for `tryBirthBank`; `GateResult.data`. End states gathered in the progress document, one of them able to corrupt what the bankDB stores (reported there, not fixed).
+
 ### 3. `list_answer`: a list's answer under the feed principle, and the listing over it
 
 > "the query function / write / mutaion handles only its return value; inject other records at the feed (they land
