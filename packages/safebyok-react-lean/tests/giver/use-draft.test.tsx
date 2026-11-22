@@ -266,6 +266,24 @@ describe("useDraft", () => {
     expect(await storedKeyOf(world)).to.eq(TH.JokesKey)
   })
 
+  it("keeps its base through its form's reset while a sidecar edit is pending, behind another device's write since", async () => {
+    const { world, device, input, seen } = await renderDraftEditor({ isLocked: true, isInForm: true })
+    act(() => { screen.getByText('Go pro').click() })
+    await screen.findByText('Tier pro')
+    const baseRevseq = seen.draft?.base?.revseq
+    typeKeyInto(input)
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(device.bank!.getSnapshot().isUnlockWanted).to.eq(true) })
+    act(() => { world.Bank.dismissUnlock() })
+    await waitFor(() => { expect(seen.draft?.isWhisperDirty).to.eq(false) })
+    await act(() => world._cheat_otherVault!.putBoxOnce(`box/${TH.JokesPath}`, { sidecar: { service: 'jokes', tier: 'max' } }, { whisper: LeanTH.Whisper }))
+    await screen.findByText('Dirty and behind')
+    expect([seen.draft?.base?.revseq, seen.draft?.sidecar]).to.deep.equal([baseRevseq, { service: 'jokes', tier: 'pro' }])
+    await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(isVaultError(seen.putErr) && seen.putErr.refusalkind).to.eq('stale_write') })
+  })
+
   it("keeps what was typed outside any form when a form elsewhere on the page is reset", async () => {
     const { input } = await renderDraftEditor()
     render(<form aria-label="Other"><input aria-label="Other field" defaultValue="other" /></form>)
