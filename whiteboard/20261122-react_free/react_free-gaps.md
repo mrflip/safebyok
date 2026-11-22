@@ -161,6 +161,10 @@ Either way envman should validate the way a professional does (below).
 * **The demos' localStorage vaultDB is a copy in each demo, reaching through a test door** (`// Cheat (react_life)`,
   `_cheat_things`). Root fix: idb_lean's browser vaultDB replaces both copies. Its half-made write is now a wontfix row
   with a demonstration (below).
+* **envman's `ApplyResult` is declared inside `EnvSettingsDialog`'s body** (left as it is). The look-over meant to move
+  it to module scope beside the other types; `unicorn/prefer-smaller-scope` refuses that for a type one component uses,
+  and an earlier thread put it inside for that reason. Root fix, if any: the lint rule's exemption for types, a Coach
+  call.
 * Found fine: the duplicated fake sessions and `formTextOf` (app code; a demo is a self-contained starter), the
   stage switches, `useIsKeyStored`'s `select`, Knock-Knock's `SessionBar` mutation over a synchronous `signIn`
   (`Promise.resolve()` keeps `require-await` quiet, and TanStack turns a throw into the mutation's `error`).
@@ -173,12 +177,13 @@ Only removals and corrections, each curing code that exists because of how it wa
   placed on a typed foreign field ... or coming from a possibly-insane source").
 * envman: the settings dialog echoes what was typed raw, as the add form does, and drops the echo nothing reads on
   success; the test asserts `' '`.
-* envman: `addEnvAction` and `signInAction` back to `function` declarations; `ApplyResult` at module scope.
+* envman: `addEnvAction` and `signInAction` back to `function` declarations.
 * Knock-Knock: the test-only `fetchFn` parameter on `tellKnockKnockJoke` removed; its test stubs the global.
 * The giver's `withLockableWhisper` lost its locked branch's last caller this sprint (the mask reads the stored
   record itself): it becomes `withUnlockedWhisper`, a pass-through to the vault; the mask's `ifLocked` is synchronous,
   and its async-locked blank and test go.
-* The put factories' "make it under `useMemo`, so its checks run once" advice removed, with Knock-Knock's `useMemo`.
+* The put factories' "make it under `useMemo`, so its checks run once" advice removed, with Knock-Knock's `useMemo`,
+  the giver test's and the form-status-twin demonstration's.
 * `useNewPassphrase`'s fields drop their `aria-label` and `placeholder`, and the kit forms their placeholders: each
   field showed its word twice (label above, placeholder inside) since the visible labels came (Coach row, explain).
 * The whisper-mask test that sampled once for "never blank between" removed.
