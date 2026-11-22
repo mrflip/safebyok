@@ -1,6 +1,6 @@
 # Thread 9: defaults_at_start (2026-11-22)
 
-Branch `20261122-defaults_at_start`, PR #TBD, stacked on #851. Proved: see the PR's **Tests:** line.
+Branch `20261122-defaults_at_start`, PR #852, stacked on #851. Proved: see the PR's **Tests:** line.
 
 The Coach: "If it's supposed to be given at start do that?", of `restoredSharingOf` and `RestoreOpts`' stand-in query
 options, which existed because each minder set its bank's query defaults at `hello`, after the restore.
