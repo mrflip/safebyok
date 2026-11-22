@@ -2,7 +2,8 @@
 
 import type { EX, Errors } from 'safebyok-big/internals'
 import type { Labelpath, Lifepath, Lifeseq } from '../shapes/primitives'
-import type { Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
+import type { Absent, Sparse, ThingRecord, ThingScope } from '../shapes/shapes-thing'
+import type { TombstoneOf } from '../shapes/shapes-sealers'
 import type { BankRoots, BirthBankAsk, GetAsk, ListAsk, LoggableAsk, ThingWatchScope, Tracked, WorldRecord, WriteAsk } from '../shapes/shapes-asks'
 
 // == [Answers]: GoodAnswer, BadAct, BadAnswer, Answer, GetThingAnswer, WriteThingAnswer, DamagedThing, ReadTc, KidEntry, Kids, ListedBeside, ListThingsAnswer, BirthBankAnswer, ThingNotice
@@ -24,8 +25,14 @@ export type BadAnswer<DbhasT = ThingRecord | null> = { ok: false, ask: LoggableA
 /** A vaultDB verb's answer: a {@link GoodAnswer} or a {@link BadAnswer}. Never thrown. */
 export type Answer<ValT, ActT extends EX.GoodAct> = GoodAnswer<ValT, ActT> | BadAnswer
 
-/** The answer to `tryGetThing`: a live Thing (`gotlive`), a tombstone (`gotgone`), or null (`gotvoid`). */
-export type GetThingAnswer   = GoodAnswer<ThingRecord, 'gotlive' | 'gotgone'> | GoodAnswer<null, 'gotvoid'> | BadAnswer
+/** The answer to `tryGetThing`: the live Thing (`gotlive`), or {@link Absent} for a tombstone (`gotgone`) or none (`gotvoid`).
+ * Under `gotgone` the tombstone is its `dbhas`, which the vaultDB's watch notifies before the answer.
+ */
+export type GetThingAnswer   =
+  | GoodAnswer<ThingRecord, 'gotlive'>
+  | (GoodAnswer<Absent, 'gotgone'> & { dbhas: TombstoneOf<ThingRecord> })
+  | GoodAnswer<Absent, 'gotvoid'>
+  | BadAnswer
 /** The answer to `tryWriteThing`: the Thing the concrete adapter reports writing, or under `passed` the live Thing it found. */
 export type WriteThingAnswer = Answer<ThingRecord, EX.PutAct | EX.DelAct>
 
@@ -74,7 +81,7 @@ export type ListThingsAnswer<RecordT extends ThingRecord = ThingRecord> =
 /** The answer to `tryBirthBank`: the three roots written (`born`), or found already stored (`passed`). */
 export type BirthBankAnswer = Answer<BankRoots, 'born' | 'passed'>
 
-/** A Thing that a watch reports, shaped like a get's answer: one Thing, without its bank's world. A Thing a list answers is reported sparse, as listed. */
+/** A Thing that a watch reports, live or a tombstone, as its `val`, with the act a get of it would answer. A Thing a list answers is reported sparse, as listed. */
 export type ThingNotice = Pick<GoodAnswer<ThingRecord | Sparse<ThingRecord>, 'gotlive' | 'gotgone'>, 'ok' | 'act' | 'val'>
 // --
 

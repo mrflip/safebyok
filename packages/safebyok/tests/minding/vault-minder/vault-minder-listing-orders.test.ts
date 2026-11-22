@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ThingRecord, Tombstone } from '../../../src/shapes/shapes-thing'
+import { type Absent, type ThingRecord, isAbsent } from '../../../src/shapes/shapes-thing'
 import type { Kids } from '../../../src/storage/vault-db'
 import { MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import { Thing } from '../../../src/models/thing'
@@ -87,11 +87,14 @@ async function eventsAfter(steps: readonly ListingStep[]) {
   return { events: heard.mock.calls.map(([event]) => event), refusalkinds }
 }
 
-/** Each record in `records`, told in that order, that is missing or older than the one told before it. */
-function backwardRecords(records: readonly (ThingRecord | Tombstone<ThingRecord> | undefined)[]) {
+// No step here deletes the box, so an item that is Absent is as wrong as one that is missing.
+/** Each record in `records`, told in that order, that is missing, Absent, or older than the one told before it. */
+function backwardRecords(records: readonly (ThingRecord | Absent | undefined)[]) {
   return records.filter((record, ii) => {
+    if (ii === 0) { return false }
     const prior = records[ii - 1]
-    return (ii > 0) && ((prior === undefined) || (record === undefined) || (Thing.cmp(prior, record) < 0))
+    if ((prior === undefined) || (record === undefined) || isAbsent(prior) || isAbsent(record)) { return true }
+    return (Thing.cmp(prior, record) < 0)
   })
 }
 

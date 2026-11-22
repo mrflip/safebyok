@@ -9,7 +9,7 @@ import type { RecordOfKind } from '../models/base-thing'
 import * as Phrases from '../phrases'
 import type { BadAnswer, GoodAnswer, Kids, VaultDB } from '../storage/vault-db'
 import type { Banklabel, BoxLabelpath, EpochMillis, Labelpath, Lifepath, Lifeseq, Revtok, Userid } from './primitives'
-import { type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, type VoidSentinel, ThingChecks, ThingFormat } from './shapes-thing'
+import { type Absent, type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingRecord, type ThingScope, type Thingkind, type Tombstone, ThingChecks, ThingFormat } from './shapes-thing'
 import { type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, AskChecks } from './shapes-asks'
 import type { BankAskDraft } from './shapes-bankish'
 
@@ -127,28 +127,28 @@ export type ThingAt<LabelpathT extends Labelpath> =
       : LabelpathT extends 'bank' ? BankRecord
         : ThingRecord
 
-/** A record the vaultDB tells a minder of: a Thing, whole or sparse, or the void sentinel. */
-export type DeliverableThing = ThingRecord | Sparse<ThingRecord> | VoidSentinel
+/** A record the vaultDB tells a minder of: a Thing, whole or sparse, live or a tombstone. */
+export type DeliverableThing = ThingRecord | Sparse<ThingRecord>
 // --
 
 // == [A minder's answers]: GotAnswer, TSQGotAnswer, TSQAnswer, ScopeAt
 
-// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely; null under `gotvoid`, where storage has nothing.
-/** A get's answer, read from the cache. Beside a get's own acts:
+// `val` is undefined under `vacant` and `untimely`, where the cache knows nothing timely.
+/** A get's answer, read from the cache: as the vaultDB answers a get, {@link Absent} under `gotgone` and `gotvoid`, with the tombstone cached as the `dbhas` of `gotgone`. Beside a get's own acts:
  * - `vacant`   -- nothing is cached
  * - `untimely` -- the item is behind a newer revision heard of, or missing beside one, or TanStack Query counts it stale under `staleTime`: older than it, or its last get refused
  */
 export type GotAnswer<RecordT extends ThingRecord = ThingRecord> = (
   | GoodAnswer<RecordT, 'gotlive'>
-  | GoodAnswer<Tombstone<RecordT>, 'gotgone'>
-  | GoodAnswer<null, 'gotvoid'>
+  | (GoodAnswer<Absent, 'gotgone'> & { dbhas: Tombstone<RecordT> })
+  | GoodAnswer<Absent, 'gotvoid'>
   | { ok: true, ask: LoggableAsk, act: 'vacant' | 'untimely', world: null, val: undefined }
 ) & { ask: GetAsk }
 
 /** A get's answer read from the cache, with the record the item has, however old, and the state of its gets. */
 export type TSQGotAnswer<RecordT extends ThingRecord = ThingRecord> = GotAnswer<RecordT> & Readonly<{
-  /** The whole record, tombstone or shell the item has, or undefined for no item. */
-  record:      RecordT | Tombstone<RecordT> | undefined
+  /** The live whole record or Absent the item has, or undefined for no item. */
+  record:      RecordT | Absent | undefined
   /** False where the act is `vacant` or `untimely`. */
   isTimely:    boolean
   /** When a record last arrived in the item, or 0 for none. */
@@ -166,16 +166,16 @@ export type TSQAnswer<RecordT extends ThingRecord = ThingRecord> = TSQGotAnswer<
 export type ScopeAt<LabelpathT extends Labelpath> = ThingScope & Readonly<{ labelpath: LabelpathT }>
 // --
 
-// == [What a listener is told]: MinderEvent, MinderEventkind, TSQQueryAction, MinderActionTyped, MinderActionOf, MinderEventOf, RecordEventFields, ThingEvent, SoonEvent, ListingEvent
+// == [What a listener is told]: MinderEvent, MinderEventkind, TSQQueryAction, MinderActionTyped, MinderActionOf, MinderEventOf, RecordEventFields, ThingEvent, SoonEvent, DeadEvent, ListingEvent
 
 // The emitted event pragmatically mimics the incoming TSQ event: it spreads TanStack Query's cache event into our own,
 // under TanStack's field names (`type`, `action`, `queryKey`, `queryHash`, `state`), so that a reader who knows its events
 // reads ours. Its version is MinderEventFormat, which `listen` is given.
-/** An event a minder's `listen` tells: an item's query changed, a soon's or a listing's, as its `eventkind` says. */
-export type MinderEvent = ThingEvent | SoonEvent | ListingEvent
+/** An event a minder's `listen` tells: an item's query changed, a soon's, a dead entry's or a listing's, as its `eventkind` says. */
+export type MinderEvent = ThingEvent | SoonEvent | DeadEvent | ListingEvent
 
-/** The kind of entry a minder's event is about, as its query key names it: `'item'`, `'soon'` or `'list'`. */
-export type MinderEventkind = 'item' | 'soon' | 'list'
+/** The kind of entry a minder's event is about, as its query key names it: `'item'`, `'soon'`, `'dead'` or `'list'`. */
+export type MinderEventkind = 'item' | 'soon' | 'dead' | 'list'
 
 /** TanStack Query's action that changed a query's state, as its cache tells it. */
 export type TSQQueryAction = Extract<TSQ.QueryCacheNotifyEvent, { type: 'updated' }>['action']
@@ -197,7 +197,7 @@ export type MinderEventOf<DataT, EventkindT extends MinderEventkind = MinderEven
   /** `'added'` when the cache made the query, `'updated'` when its state changed, `'removed'` when the cache dropped it. */
   type:      'added' | 'updated' | 'removed'
   /** A frozen copy of TanStack's action that changed the state, or undefined where the query was added or removed. Its `type`:
-   * - `'success'`    -- a record arrived in the item or the soon, or a list set the listing
+   * - `'success'`    -- a record arrived in the item, the soon or the dead entry, or a list set the listing
    * - `'error'`      -- a get or a list was refused
    * - `'invalidate'` -- the item fell behind a newer revision heard of, or the listing was marked stale
    * - `'fetch'`, `'pause'`, `'continue'`, `'failed'`, `'setState'` -- as TanStack dispatches them
@@ -215,11 +215,11 @@ export type MinderEventOf<DataT, EventkindT extends MinderEventkind = MinderEven
   userid:    Userid
   /** The bank. */
   banklabel: Banklabel
-  /** Where the Thing is stored in its bank: the Thing an item or a soon is of, or whose children a listing lists. */
+  /** Where the Thing is stored in its bank: the Thing an item, a soon or a dead entry is of, or whose children a listing lists. */
   labelpath: Labelpath
 }>
 
-/** The fields an item's event and a soon's add: the Thing's modelkind, and the revision and life of the record cached, each undefined where none is. */
+/** The fields an item's, a soon's and a dead entry's event add: the Thing's modelkind, and the revision and life of the record cached, each undefined where none is, or the item is Absent. */
 export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
   /** The modelkind of the Thing, which its labelpath starts with. */
   modelkind: KindT
@@ -227,7 +227,7 @@ export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
   revtok:    Revtok | undefined
   /** The revseq of the record. */
   revseq:    number | undefined
-  /** The am of the record. Tell a live record from a tombstone or the shell by `Thing.isLive`, `Thing.isGone` and `Thing.isVoidSentinel` on `state.data`. */
+  /** The am of the record: `'a'` in an item or a soon, `'x'` in a dead entry. */
   am:        DeliverableThing['am'] | undefined
   /** The lifeseq of the record. */
   lifeseq:   Lifeseq | undefined
@@ -235,11 +235,12 @@ export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
   lifepath:  Lifepath | undefined
 }>
 
-/** An item's query changed, its `eventkind` `'item'`. `state.data` is the item's record: live, a tombstone (a del answers one) or the shell, or undefined before any record.
+/** An item's query changed, its `eventkind` `'item'`. `state.data` is the item's live record, or {@link Absent}, or undefined before any record.
  * Its `modelkind` types the record, and its {@link RecordEventFields} are the record's.
  * `state.isInvalidated` is true while the item is behind a newer revision heard of, or since its last get was refused.
  * Its `action.type`:
- * - `'success'`    -- a whole record, tombstone or shell landed, even one that changes only the item's time
+ * - `'success'`    -- a live whole record or Absent landed, even one that changes only the item's time. A tombstone's
+ *   dead entry tells its `success` first ({@link DeadEvent}).
  * - `'error'`      -- a get was refused, and the item is unchanged
  * - `'invalidate'` -- the item fell behind, just after the soon's `success`. It is told once, and not at all where a
  *   refused get already left the item invalidated.
@@ -247,7 +248,7 @@ export type RecordEventFields<KindT extends Thingkind = Thingkind> = Readonly<{
  * again. A listener on that `success` already finds the item behind, by `isBehindAt`.
  */
 export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind
-  ? MinderEventOf<RecordOfKind<KindT> | Tombstone<RecordOfKind<KindT>>, 'item'> & RecordEventFields<KindT>
+  ? MinderEventOf<RecordOfKind<KindT> | Absent, 'item'> & RecordEventFields<KindT>
   : never
 
 /** A soon's query changed, its `eventkind` `'soon'`: a sparse record newer than the item arrived in it (`success`), or it was removed: once the item caught up, or at `goodbye`.
@@ -258,6 +259,14 @@ export type ThingEvent<KindT extends Thingkind = Thingkind> = KindT extends Thin
  */
 export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind
   ? MinderEventOf<Sparse<RecordOfKind<KindT>>, 'soon'> & RecordEventFields<KindT>
+  : never
+
+/** A dead entry's query changed, its `eventkind` `'dead'`: the Thing's newest tombstone heard of arrived (`success`), just before
+ * Absent lands in its item, or it was removed at `goodbye`. `state.data` is the tombstone, and its {@link RecordEventFields} are that tombstone's.
+ * A Thing born again keeps its dead entry, of the older life.
+ */
+export type DeadEvent<KindT extends Thingkind = Thingkind> = KindT extends Thingkind
+  ? MinderEventOf<Tombstone<RecordOfKind<KindT>>, 'dead'> & RecordEventFields<KindT>
   : never
 
 /** A listing's query changed, its `eventkind` `'list'`. `state.data` is the {@link Kids} value the vaultDB last answered a list with.

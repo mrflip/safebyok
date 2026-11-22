@@ -1,10 +1,10 @@
 import * as TSQ from '@tanstack/query-core'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { type ListingEvent, type MinderEvent, type SoonEvent, type ThingEvent, MinderEventFormat } from '../../../src/shapes/shapes-minder'
+import { type DeadEvent, type ListingEvent, type MinderEvent, type SoonEvent, type ThingEvent, MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import type { Kids } from '../../../src/storage/vault-db'
 import { Thing } from '../../../src/models/thing'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
-import { type BoxRecord, type GateRecord, type Sparse, type Tombstone } from '../../../src/shapes/shapes-thing'
+import { type BoxRecord, type GateRecord, type Sparse, type Tombstone, Absent } from '../../../src/shapes/shapes-thing'
 import * as TH from '../../test-helpers'
 import { badnewsOf, LateVaultDB, DownVaultDB, minderWorldOf, bornOf, cheatBox, storedBoxOf, noticeOf, sparseNoticeOf, boxScopeOf, everyEventListenerOf, listenerOf, toldOf, isListingEvent, labelpathsOf } from './world'
 
@@ -35,10 +35,11 @@ describe("VaultMinder.listen", () => {
   })
 
   it("types an item's event and a soon's by its modelkind", () => {
-    expectTypeOf<Extract<ThingEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxRecord | Tombstone<BoxRecord> | undefined>()
-    expectTypeOf<Extract<ThingEvent, { modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateRecord | Tombstone<GateRecord> | undefined>()
+    expectTypeOf<Extract<ThingEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<BoxRecord | Absent | undefined>()
+    expectTypeOf<Extract<ThingEvent, { modelkind: 'gate' }>['state']['data']>().toEqualTypeOf<GateRecord | Absent | undefined>()
     expectTypeOf<Extract<SoonEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<Sparse<BoxRecord> | undefined>()
-    expectTypeOf<Exclude<MinderEvent, ThingEvent | SoonEvent>['state']['data']>().toEqualTypeOf<Kids | undefined>()
+    expectTypeOf<Extract<DeadEvent, { modelkind: 'box' }>['state']['data']>().toEqualTypeOf<Tombstone<BoxRecord> | undefined>()
+    expectTypeOf<Exclude<MinderEvent, ThingEvent | SoonEvent | DeadEvent>['state']['data']>().toEqualTypeOf<Kids | undefined>()
   })
 
   it("tells an item's event, a soon's and a listing's apart by its eventkind", async () => {
@@ -126,13 +127,15 @@ describe("VaultMinder.listen", () => {
     expect(heard.mock.calls[0]?.[0]).to.not.have.property('agerank')
   })
 
-  it("tells the shell's revision and life where nothing is stored", async () => {
+  it("tells Absent, with no revision or life, where nothing is stored", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = await minderWorldOf(vaultDB)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    const { revtok, lifeseq, lifepath } = await minder.get(TH.BoxScope)
-    expect(heard.mock.calls[0]?.[0]).to.deep.include({ revtok, revseq: -1, am: 'x', lifeseq, lifepath })
+    await minder.get(TH.BoxScope)
+    expect(toldOf(heard)).to.deep.equal([['box/openai', 'absent']])
+    expect(heard.mock.calls.at(-1)?.[0]).to.deep.include({ revtok: undefined, revseq: undefined, am: undefined, lifeseq: undefined, lifepath: undefined })
+    expect(heard.mock.calls.at(-1)?.[0]).to.have.nested.property('state.data', minder.at(TH.BoxScope))
   })
 
   it("tells a newer sparse record in the soon, then the item invalidated, once, then each later sparse record in the soon", async () => {
@@ -186,17 +189,19 @@ describe("VaultMinder.listen", () => {
     expect(items[1]).to.have.nested.property('state.data', cached)
   })
 
-  it("tells the shell, and then a tombstone", async () => {
+  it("tells Absent, and then a tombstone in the dead entry before Absent again in the item", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder, receive } = await minderWorldOf(vaultDB)
+    await minder.get(TH.BoxScope)
     const heard = listenerOf()
     minder.listen(heard, MinderEventFormat)
-    await minder.get(TH.BoxScope)
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     receive(noticeOf(tombstone))
-    expect(toldOf(heard)).to.deep.equal([['box/openai', 'void'], ['box/openai', 'gone']])
-    expect(heard.mock.calls[1]?.[0]).to.have.nested.property('state.data', minder.at(TH.BoxScope))
-    expect(minder.at(TH.BoxScope)).to.deep.equal(tombstone)
+    expect(toldOf(heard)).to.deep.equal([['dead', 'box/openai', tombstone.revseq], ['box/openai', 'absent']])
+    expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', 'action.type': 'success', modelkind: 'box', am: 'x', revtok: tombstone.revtok, queryKey: minder.deadQueryKey(TH.BoxScope) })
+    expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', minder.deadAt(TH.BoxScope))
+    expect(minder.at(TH.BoxScope)).to.deep.equal(Absent)
+    expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
   })
 
   it("tells nothing while a get waits, then the record it lands", async () => {
@@ -224,7 +229,7 @@ describe("VaultMinder.listen", () => {
     await TH.expectRefusal(minder.get(TH.BoxScope, { staleTime: 0 }), 'stale_read')
     expect(heard.mock.calls).to.have.lengthOf(1)
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', cached)
-    expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', 'action.type': 'error', revtok: cached.revtok })
+    expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', 'action.type': 'error', revtok: TH.itemRevtokOf(cached) })
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.error.refusalkind', 'stale_read')
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.isInvalidated', true)
   })

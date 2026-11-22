@@ -1,9 +1,9 @@
 /** The Things and asks a vaultDB's tests share: a bank's three roots and a box under its root, and the asks that get, list and write them. */
 
-import { type Labelpath, type Lifepath, Lifeseq } from '../../src/shapes/primitives'
+import { type Labelpath, type Lifepath, type Revtok, Lifeseq } from '../../src/shapes/primitives'
 import {
-  type BankRecord, type BoxRecord, type GateRecord, type ThingCited, type ThingRecord,
-  Shell, ThingFormat,
+  type Absent, type BankRecord, type BoxRecord, type GateRecord, type Sparse, type ThingCited, type ThingRecord,
+  Shell, ThingFormat, isAbsent,
 } from '../../src/shapes/shapes-thing'
 import { WayinChecks } from '../../src/shapes/shapes-wayin'
 import { type BirthBankAsk, type CitedOf, type GetAsk, type ListAsk, type PutAskDraft, type Track, type WriteAsk, delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
@@ -142,3 +142,8 @@ export const GateStaleTrack = trackOf(bankThingOf(), gateThingOf({ lifepath: Lif
 export const BankStaleTrack = trackOf(bankThingOf({ revseq: 3 }), gateThingOf())
 /** The track of a sender with the root box at another revision. */
 export const RootStaleTrack = trackOf(bankThingOf(), gateThingOf(), rootBoxOf({ revseq: 3 }))
+
+/** The revtok of `val`, what a minder's item or soon has, or undefined for none or Absent. */
+export function itemRevtokOf(val: Sparse<ThingRecord> | Absent | undefined): Revtok | undefined {
+  return ((val === undefined) || isAbsent(val)) ? undefined : val.revtok
+}

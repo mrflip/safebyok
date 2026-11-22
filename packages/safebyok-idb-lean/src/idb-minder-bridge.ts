@@ -1,7 +1,7 @@
 /** IdbMinderBridge: copies the whole records a VaultMinder caches into an IdbVaultDB. */
 
 import { noop } from 'es-toolkit'
-import { type MinderEvent, type ThingRecord, type Tombstone, type VaultError, MinderEventFormat, Thing, VaultMinder } from 'safebyok'
+import { type MinderEvent, type ThingRecord, type Tombstone, type VaultError, MinderEventFormat, VaultMinder, isAbsent } from 'safebyok'
 import * as DB from 'safebyok/storage'
 import { IdbVaultDB } from './idb-vault-db'
 import * as Phrases from './phrases'
@@ -76,11 +76,12 @@ export class IdbMinderBridge {
 
 // == [Helpers]: cachedRecordOf
 
-/** The whole record or tombstone `event` says was cached, or null for none. */
+// A tombstone lands in its dead entry, and the item then has Absent, which is no record to copy.
+/** The whole record or tombstone `event` says was cached in an item or a dead entry, or null for none. */
 function cachedRecordOf(event: MinderEvent): ThingRecord | Tombstone<ThingRecord> | null {
-  if ((event.eventkind !== 'item') || (event.type !== 'updated') || (event.action?.type !== 'success')) { return null }
+  if (((event.eventkind !== 'item') && (event.eventkind !== 'dead')) || (event.type !== 'updated') || (event.action?.type !== 'success')) { return null }
   const record = event.state.data
-  return ((record === undefined) || Thing.isVoidSentinel(record)) ? null : record
+  return ((record === undefined) || isAbsent(record)) ? null : record
 }
 // --
 

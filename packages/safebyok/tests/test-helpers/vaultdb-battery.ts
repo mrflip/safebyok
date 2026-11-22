@@ -3,7 +3,7 @@ import { describe } from 'vitest'
 import { type Helpers, Validator } from 'safebyok-big/internals'
 import { expectGood } from 'safebyok-big/testing'
 import type { Labelpath, Lifepath } from '../../src/shapes/primitives'
-import { type BoxRecord, type GateRecord, type ThingRecord, type ThingScope, Shell } from '../../src/shapes/shapes-thing'
+import { type BoxRecord, type GateRecord, type ThingRecord, type ThingScope, type Absent, Shell } from '../../src/shapes/shapes-thing'
 
 import type { VaultDB } from '../../src/storage/vault-db'
 import { Life0, birthAskOf, birthBankAskOf, gateThingOf, getAskAt } from './vaultdb-world'
@@ -56,8 +56,8 @@ export type VaultDBBatteryWorld = {
   bornUnder: (vaultDB: VaultDB, thing: ThingRecord, parentLifepath: Lifepath) => Promise<void>
   /** Write each of `boxes` into `vaultDB`, born under the root box's life 0, and return them. */
   boxesBorn: (vaultDB: VaultDB, ...boxes: BoxRecord[]) => Promise<BoxRecord[]>
-  /** The Thing `vaultDB` stores at `labelpath`, or null for none; throws on a refusal. */
-  gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<ThingRecord | null>
+  /** The live Thing `vaultDB` stores at `labelpath`, or Absent for a tombstone or none; throws on a refusal. */
+  gotAt:     (vaultDB: VaultDB, labelpath: Labelpath) => Promise<ThingRecord | Absent>
   /** The cheat into what `vaultDB` stores. */
   rowsOf:    (vaultDB: VaultDB) => VaultDBRowCheats
   watches:   boolean
@@ -84,9 +84,9 @@ function worldOf<DBT extends VaultDB>({ makeVaultDB, _cheat_rowsOf, watches = tr
     for (const box of boxes) { await bornUnder(vaultDB, box, Life0) }
     return boxes
   }
-  async function gotAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<ThingRecord | null> {
+  async function gotAt(vaultDB: VaultDB, labelpath: Labelpath): Promise<ThingRecord | Absent> {
     const answer = await vaultDB.tryGetThing(getAskAt(labelpath))
-    return await expectGood(answer)
+    return await expectGood<ThingRecord | Absent>(answer)
   }
   return { fresh, bornBank, withGate, bornUnder, boxesBorn, gotAt, rowsOf: (vaultDB) => _cheat_rowsOf(vaultDB as DBT), watches }
 }

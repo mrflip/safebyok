@@ -2,11 +2,10 @@
 
 import { Validator } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope, type VoidSentinel, Shell } from '../shapes/shapes-thing'
+import { type BankRecord, type BoxRecord, type GateRecord, type ThingScope, type VoidSentinel, Shell, isAbsent } from '../shapes/shapes-thing'
 import type { BankRoots, BirthBankAsk } from '../shapes/shapes-asks'
 import { type MinderEvent, type MinderFriend, type MinderOpts, type QueryCacheOpts, MinderChecks, MinderEventFormat } from '../shapes/shapes-minder'
 import type { BirthBankAnswer } from '../storage/vault-db'
-import { Thing } from '../models/thing'
 import { Minder, MinderOptsChecks } from './minder'
 import * as Throwers from '../refusals/throwers'
 
@@ -36,19 +35,22 @@ export class BankMinder extends Minder {
   /** False: the root box's listing is its VaultMinder's. */
   protected mindsListingAt(): boolean { return false }
 
-  /** The bank's root box, the parent of every box, as last heard of: its shell while none is. */
-  get rootBox(): BoxRecord | VoidSentinel { return (this.at(this.#scopeAt(Labelpath.RootBox)) ?? Shell.of(this.#scopeAt(Labelpath.RootBox))) as BoxRecord | VoidSentinel }
+  /** The bank's root box, the parent of every box, as last heard of live: its shell while none is. */
+  get rootBox(): BoxRecord | VoidSentinel {
+    const root = this.at(this.#scopeAt(Labelpath.RootBox))
+    return ((root === undefined) || isAbsent(root)) ? Shell.of(this.#scopeAt(Labelpath.RootBox)) : root as BoxRecord
+  }
   // --
 
   // == [The world]: worldAt, fetchWorld, subscribe
 
   // Each call makes a new object of the items' own records, which stay the same until one lands.
-  /** The bank's roots as last heard of, or undefined while any of the three is not cached, or is a shell. Never asks the vaultDB. */
+  /** The bank's roots as last heard of, or undefined while any of the three is not cached, or is Absent. Never asks the vaultDB. */
   worldAt(): BankRoots | undefined {
     const bank = this.at(this.#scopeAt('bank'))
     const gate = this.at(this.#scopeAt(Labelpath.MainGate))
     const root = this.at(this.#scopeAt(Labelpath.RootBox))
-    if ([bank, gate, root].some((record) => (record === undefined) || Thing.isVoidSentinel(record))) { return undefined }
+    if ([bank, gate, root].some((record) => (record === undefined) || isAbsent(record))) { return undefined }
     return Object.freeze({ bank: bank as BankRecord, gate: gate as GateRecord, root: root as BoxRecord })
   }
 
@@ -60,7 +62,8 @@ export class BankMinder extends Minder {
     const root  = await this.get(this.#scopeAt(Labelpath.RootBox), { staleTime: 0 })
     const world = this.worldAt()
     if (world !== undefined) { return world }
-    const isNoneStored = Thing.isVoidSentinel(root) && (this.at(this.#scopeAt('bank')) === undefined) && (this.at(this.#scopeAt(Labelpath.MainGate)) === undefined)
+    const isNoneStored = isAbsent(root) && (this.deadAt(this.#scopeAt(Labelpath.RootBox)) === undefined)
+      && (this.at(this.#scopeAt('bank')) === undefined) && (this.at(this.#scopeAt(Labelpath.MainGate)) === undefined)
     if (isNoneStored) { return null }
     throw Throwers.bankRootsMissing()
   }

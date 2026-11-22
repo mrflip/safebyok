@@ -15,7 +15,7 @@ describe("MemoryVaultDB, what only a store in memory can show", () => {
   it("answers with a copy, which the caller can change without changing the store", async () => {
     const vaultDB = new MemoryVaultDB()
     await TH.expectGood(vaultDB.tryWriteThing(TH.birthAskOf()))
-    const val = await TH.expectGood(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: { planted?: boolean } }
+    const val = await TH.expectGood<unknown>(vaultDB.tryGetThing(TH.getGateAskOf())) as { auth: { planted?: boolean } }
     val.auth.planted = true
     const again = await vaultDB.tryGetThing(TH.getGateAskOf())
     expect(again).to.deep.include({ val: TH.gateThingOf() })

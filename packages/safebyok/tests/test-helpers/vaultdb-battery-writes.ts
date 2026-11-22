@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { expectBad, expectGood } from 'safebyok-big/testing'
 import * as Phrases from '../../src/phrases'
-import { Shell } from '../../src/shapes/shapes-thing'
+import { Absent, Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import { delAskOf, getAskOf, listAskOf, putAskOf } from '../../src/shapes/shapes-asks'
 import {
@@ -16,10 +16,11 @@ import { Lifeseq } from '../../src/shapes/primitives'
 /** Register the battery's cases of a Thing's get and write. */
 export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, gotAt, rowsOf }: VaultDBBatteryWorld): void {
   describe("tryGetThing(ask)", () => {
-    it("answers gotvoid, with no Thing, where none is stored", async () => {
+    it("answers gotvoid, with Absent and no dbhas, where none is stored", async () => {
       const vaultDB = await fresh()
       const answer = await vaultDB.tryGetThing(getGateAskOf('nil'))
-      expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: null, world: null })
+      expect(answer).to.deep.include({ ok: true, act: 'gotvoid', val: Absent, world: null })
+      expect(answer).to.not.have.property('dbhas')
     })
 
     it("refuses where none is stored and ifAbsent is 'fail'", async () => {
@@ -279,7 +280,7 @@ export function describeVaultDBWrites({ fresh, bornBank, withGate, boxesBorn, go
       const birth = birthAskOf(box, Shell.childCited(Life0))
       expect(await vaultDB.tryWriteThing(birth)).to.deep.include({ ok: true, act: 'born', val: box })
       expect(await vaultDB.tryWriteThing(delAskFor(box, tomb))).to.deep.include({ ok: true, act: 'deleted', val: tomb })
-      expect(await vaultDB.tryGetThing(getAskAt(box.labelpath))).to.deep.include({ ok: true, act: 'gotgone', val: tomb })
+      expect(await vaultDB.tryGetThing(getAskAt(box.labelpath))).to.deep.include({ ok: true, act: 'gotgone', val: Absent, dbhas: tomb })
       const reborn = boxRebornOf(tomb)
       expect(await vaultDB.tryWriteThing(replaceAskOf(tomb, reborn))).to.deep.include({ ok: false, act: 'gone' })
       expect(await vaultDB.tryWriteThing(birthAskOf(reborn, tomb))).to.deep.include({ ok: true, act: 'reborn', val: reborn })

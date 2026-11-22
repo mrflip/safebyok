@@ -6,7 +6,7 @@ export { type Watcher, MemoryVaultDB } from './storage/memory-vault-db'
 export { type Banklabel, type BoxLabelpath, type DeviceTok, type EpochMillis, type Lifenum, type Lifepath, type Lifetok, type Revtok, type Userid, Labelpath, Lifeseq, Revseq } from './shapes/primitives'
 export {
   type AnyThingRecord, type BankRecord, type BoxRecord, type GateRecord, type Modelkind, type Sealed, type Sparse, type StoredCited, type ThingCited, type ThingFieldname, type ThingRecord, type ThingScope, type Thingkind,
-  type VoidSentinel, type Wayins, Shell, ThingChecks, ThingFormat, thingkindVals,
+  type VoidSentinel, type Wayins, Absent, Shell, ThingChecks, ThingFormat, isAbsent, thingkindVals,
 } from './shapes/shapes-thing'
 export { BankChecks, BoxChecks, GateChecks, ThingkindChecks } from './shapes/shapes-thingkinds'
 export type { LiveOf, ShellOf, TombstoneOf } from './shapes/shapes-sealers'

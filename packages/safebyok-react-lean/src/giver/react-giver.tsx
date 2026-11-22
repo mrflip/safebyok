@@ -6,7 +6,7 @@ import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationR
 import { pick } from 'es-toolkit'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
+  type Absent, type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, type Kids, Labelpath,
   type LiveOf, type LivePublicPropsOf, MinderEventFormat, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
   PendingBank, Shell, type Sidecar, VaultMinder, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
@@ -34,8 +34,8 @@ export type ProviderProps = Readonly<{
   children?:   ReactNode
 }>
 
-/** A box's record as the giver fetches it: the whole record, its tombstone, or its shell where none is stored. */
-export type BoxShown = BoxRecord | Tombstone<BoxRecord>
+/** A box's record as the giver fetches it: the whole record, or Absent where none is stored or it was deleted. */
+export type BoxShown = BoxRecord | Absent
 
 /** What names a box to a bank's writes: the host's labelpath, such as `'openai'`, or an object scoped to the box, such as its record. */
 export type BoxNamed = string | Readonly<{ labelpath: string }>
@@ -350,7 +350,7 @@ function makeBankGiver(friend: BankFriend) {
   function boxQueryBaseOf(device: Device | null, labelpath: string, isUp: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     const boxLabelpath = boxLabelpathOf(labelpath)
     return {
-      ...recordQueryDefaults(() => isBehindAt(device, boxLabelpath)),
+      ...recordQueryDefaults(boxLabelpath, () => isBehindAt(device, boxLabelpath), (scoped) => device?.minder.deadAt(scoped)),
       queryKey: boxQueryKeyOf({ userid: useridOf(device), banklabel, labelpath: boxLabelpath }),
       ...((! isUp || (device === null)) && { queryFn: skipToken }),
     }
@@ -379,8 +379,8 @@ function makeBankGiver(friend: BankFriend) {
   /** The box's stored record, through React Query, its whisper still sealed.
    * `data` is the record, null when none is stored or it was deleted, and undefined while pending or until the bank is brought up.
    * A record overtaken by a newer revision shows until the newer one arrives.
-   * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, the box's
-   * tombstone, or its shell where none is stored: {@link liveOf} is the default.
+   * `opts` are React Query's options that shape what this one hook shows. A `select` given there is handed the whole record, or
+   * Absent where none is stored or it was deleted: {@link liveOf} is the default.
    * @example
    *   const { data: box } = Knock.useBox('jokes')
    *   const mask = Knock.useBox('jokes', { select: (thing) => liveOf(thing)?.sidecar['mask'] }).data

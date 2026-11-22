@@ -7,7 +7,7 @@ import type { ThingNotice, VaultDB } from '../../src/storage/vault-db'
 import { Shell } from '../../src/shapes/shapes-thing'
 import { Thing } from '../../src/models/thing'
 import {
-  BankStaleTrack, GateStaleTrack, Life0, RootStaleTrack, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
+  BankStaleTrack, GateStaleTrack, Life0, RootStaleTrack, ThingBank, bankThingOf, birthAskOf, birthBankAskOf, boxThingOf, boxTombOf, delAskFor, gateThingOf, getAskAt, listAskAt, nextGateOf, nextOf, replaceAskOf, rootBoxOf, trackOf,
 } from './vaultdb-world'
 import type { VaultDBBatteryWorld } from './vaultdb-battery'
 import { OtherRevtok } from './models-world'
@@ -63,6 +63,22 @@ export function describeVaultDBWatch({ fresh, bornBank, withGate }: VaultDBBatte
       expect(own.notices).to.have.lengthOf(1)
       expect(other.notices).to.deep.equal([])
       expect([...other.badNews, ...own.badNews]).to.deep.equal([])
+    })
+
+    it("hears the tombstone a get answers as its dbhas, before the answer, and nothing of a live Thing got", async () => {
+      const vaultDB = await bornBank()
+      const box = boxThingOf()
+      await vaultDB.tryWriteThing(birthAskOf(box, Shell.childCited(Life0)))
+      const tomb = boxTombOf(box)
+      await vaultDB.tryWriteThing(delAskFor(box, tomb))
+      await aWhile()
+      const { notices, badNews } = heardOf(vaultDB)
+      expect(await vaultDB.tryGetThing(getAskAt('box'))).to.deep.include({ ok: true, act: 'gotlive' })
+      expect(await vaultDB.tryGetThing(getAskAt(box.labelpath))).to.deep.include({ ok: true, act: 'gotgone', dbhas: tomb })
+      expect(notices).to.deep.equal([{ ok: true, act: 'gotgone', val: tomb }])
+      await aWhile()
+      expect(notices).to.have.lengthOf(1)
+      expect(badNews).to.deep.equal([])
     })
 
     it("hears the dbhas a thrown refusal carries, once", async () => {

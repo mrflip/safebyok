@@ -3,7 +3,8 @@
 import { noop } from 'es-toolkit'
 import { EX, Errors, Outcome, type Helpers } from 'safebyok-big/internals'
 import { Labelpath } from '../shapes/primitives'
-import type { Sparse, ThingRecord } from '../shapes/shapes-thing'
+import { type Sparse, type ThingRecord, Absent } from '../shapes/shapes-thing'
+import type { TombstoneOf } from '../shapes/shapes-sealers'
 import { Thing } from '../models/thing'
 import {
   type AnyAsk, type BirthBankAsk, type BirthPuts, type GetAsk, type ListAsk, type LoggableAsk, type ThingWatchScope, type Tracked, type WriteAsk, AskChecks, birthPutsOf, checkedBirthBankAsk, checkedWriteAsk, loggableAskOf,
@@ -26,20 +27,24 @@ export type Received = Pick<Actual<EX.GoodAct>, 'world'> & { record: unknown }
 type Feed = { scope: ThingWatchScope, tell: (raw: unknown) => void, notify: (val: ThingRecord | Sparse<ThingRecord>) => void }
 
 /** The answer a verb gives for its concrete adapter's report: `record` becomes `val` when good, `dbhas` when refused.
+ * A get that finds no live Thing answers {@link Absent}, with a tombstone as its `dbhas`.
  * Throws `storage_issue` if a good report other than `gotvoid` has no Thing.
  */
 function answerOf(actual: Actual<EX.GotAct>, oplabel: string, loggableAsk: LoggableAsk): GetThingAnswer
 function answerOf(actual: Actual<EX.PutAct | EX.DelAct>, oplabel: string, loggableAsk: LoggableAsk): WriteThingAnswer
-function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<ThingRecord | null, EX.GoodAct> {
+function answerOf(actual: Actual<EX.GoodAct>, oplabel: string, loggableAsk: LoggableAsk): Answer<ThingRecord | Absent, EX.GoodAct> | GetThingAnswer {
   const { world, record } = actual
   const beside = trackedFieldOf(actual)
   if (! actual.ok) {
     const err = Throwers.actRefused('vault', actual.act, { oplabel, ask: loggableAsk })
     return { ok: false, ask: loggableAsk, act: actual.act, world, ...beside, dbhas: record, err }
   }
+  const good = { ok: true, ask: loggableAsk, world, ...beside } as const
+  if (actual.act === 'gotvoid') { return { ...good, act: actual.act, val: Absent } }
   // Every good act but gotvoid finds or writes a Thing: a concrete adapter that reports none is broken.
-  if ((record === null) && (actual.act !== 'gotvoid')) { throw Throwers.storageIssue() }
-  return { ok: true, ask: loggableAsk, act: actual.act, world, ...beside, val: record }
+  if (record === null) { throw Throwers.storageIssue() }
+  if (actual.act === 'gotgone') { return { ...good, act: actual.act, val: Absent, dbhas: record as TombstoneOf<ThingRecord> } }
+  return { ...good, act: actual.act, val: record }
 }
 
 /** The `tracked` a concrete adapter reports, as a field to spread into an answer: none where it reports none. */
@@ -48,7 +53,7 @@ function trackedFieldOf({ tracked }: { tracked?: Tracked }): { tracked?: Tracked
 
 /** The base class of a vaultDB whose Things are in a datastore. A subclass writes the `do*` calls, each one atomic step.
  * The class checks each ask and classifies what a `do*` call fetches, per the act tables in `notes/answer-contract.md`.
- * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, of a refused answer's `dbhas` where it is a Thing,
+ * It notifies the bank's watches of each Thing in an answer's `tracked` that is not `'same'`, of an answer's `dbhas` where it is a Thing,
  * and of a list's parentage and deltas.
  */
 export abstract class AdapterVaultDB implements VaultDB {
@@ -182,10 +187,10 @@ export abstract class AdapterVaultDB implements VaultDB {
     }
   }
 
-  // The verb's caller gets the refusal and never lands its dbhas, so the watch notifies it. A get's or a write's good val is the caller's to land, and is not notified.
-  /** Notify each watch of the answer's bank of a refused answer's `dbhas`, where it is a Thing. */
-  protected notifyDbhas(answer: Answer<unknown, EX.GoodAct>): void {
-    if (answer.ok || (answer.dbhas === null)) { return }
+  // The verb's caller lands only a good answer's val, so the watch notifies the dbhas: a refusal's, or a gone get's tombstone.
+  /** Notify each watch of the answer's bank of its `dbhas`, where it is a Thing. */
+  protected notifyDbhas(answer: { ask: LoggableAsk, dbhas?: ThingRecord | null }): void {
+    if ((answer.dbhas === undefined) || (answer.dbhas === null)) { return }
     this.#queueNotices(answer.ask, answer.dbhas)
   }
 
