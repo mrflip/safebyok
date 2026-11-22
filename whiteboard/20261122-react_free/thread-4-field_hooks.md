@@ -1,6 +1,6 @@
 # Thread 4: field hooks (2026-11-22)
 
-Branch `20261122-field_hooks`, PR #TBD, stacked on #823. Proved: safebyok-react-lean 23 files / 307 tests, lint
+Branch `20261122-field_hooks`, PR #834, stacked on #823. Proved: safebyok-react-lean 23 files / 307 tests, lint
 and typecheck clean; both demos' tests (26 and 24) pass. `pnpm justify` not yet run.
 
 * **Built**: in `packages/safebyok-react-lean/src/parts/`, four field hooks, each in a file of its own beside its part,
