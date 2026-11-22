@@ -311,13 +311,13 @@ export abstract class Minder {
   /** Mark stale the listings under the Thing at `labelpath`, its own included, or every listing where `labelpath` is undefined.
    * Each listing marked tells one {@link ListingEvent} with `state.isInvalidated` true, and no more until a list sets it again.
    * A listing a refused list left stale tells none.
-   * It asks the vaultDB nothing, and leaves each listing unchanged.
+   * Each listing marked that an observer keeps active, a hook's, is listed again; the rest wait for the next list.
    */
   invalidate(labelpath: Labelpath | undefined, opts: MinderInvalidateOpts): void {
     MinderChecks.minderInvalidateOpts.parse(opts)
     const labels = (labelpath === undefined) ? [] : labelsOf(MinderChecks.minderLabelpath.parse(labelpath))
-    // refetchType 'none': TanStack would otherwise refetch each listing an observer keeps active, and invalidate asks the vaultDB nothing.
-    void this.#tsq.invalidateQueries({ queryKey: [...bankKeyHeadOf(this.scope), Listkind, ...labels], refetchType: 'none' })
+    // cancelRefetch false: a list under way takes in what it finds, and is joined rather than cancelled and started again.
+    void this.#tsq.invalidateQueries({ queryKey: [...bankKeyHeadOf(this.scope), Listkind, ...labels] }, { cancelRefetch: false })
   }
   // --
 

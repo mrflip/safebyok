@@ -1,9 +1,10 @@
+import * as TSQ from '@tanstack/query-core'
 import { describe, expect, it, vi } from 'vitest'
 import { type MinderEvent, MinderEventFormat } from '../../../src/shapes/shapes-minder'
 import type { Labelpath } from '../../../src/shapes/primitives'
 import { MemoryVaultDB } from '../../../src/storage/memory-vault-db'
 import * as TH from '../../test-helpers'
-import { isListingEvent, listenerOf, minderWorldOf, storedBoxOf, labelpathsOf } from './world'
+import { cheatBox, isListingEvent, listenerOf, minderWorldOf, storedBoxOf, labelpathsOf } from './world'
 
 /** The event a listener is told when the listing of the Thing at `labelpath` is invalidated, in {@link toldOf}'s form. */
 function invalidationOf(labelpath: Labelpath) {
@@ -36,11 +37,25 @@ describe("VaultMinder.invalidate", () => {
     expect(heard.mock.calls).to.have.lengthOf(2)
   })
 
-  it("asks the vaultDB nothing", async () => {
+  it("asks the vaultDB nothing for a listing no observer keeps active", async () => {
     const { minder, vaultDB } = await listedWorldOf()
     const asked = [vi.spyOn(vaultDB, 'tryGetThing'), vi.spyOn(vaultDB, 'tryListThings'), vi.spyOn(vaultDB, 'tryWriteThing')]
     minder.invalidate(undefined, { list: 'all' })
     for (const ask of asked) { expect(ask.mock.calls).to.have.lengthOf(0) }
+  })
+
+  it("lists again a listing an observer keeps active", async () => {
+    const { minder, vaultDB } = await listedWorldOf()
+    const observer    = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.listQueryKey(TH.RootScope) })
+    const unsubscribe = observer.subscribe(() => undefined)
+    try {
+      cheatBox(vaultDB, TH.boxThingOf('anthropic'))
+      minder.invalidate(undefined, { list: 'all' })
+      await TH.eventually(() => labelpathsOf(minder.listingAt(TH.RootScope))?.length === 2)
+      expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/anthropic', 'box/openai'])
+    } finally {
+      unsubscribe()
+    }
   })
 
   it("tells of the listing of a Thing with none under it, and of no listing above it", async () => {
