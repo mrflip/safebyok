@@ -7,6 +7,7 @@ import * as Browser from '../src/browser'
 import * as Core from '../src/core'
 import * as Front from '../src/index'
 import * as Storage from '../src/storage'
+import * as Utils from '../src/utils'
 
 describe("the front door, safebyok", () => {
   it("exports every value safebyok/core exports, the same value", () => {
@@ -15,6 +16,10 @@ describe("the front door, safebyok", () => {
 
   it("exports every value safebyok/storage exports, the same value", () => {
     for (const [exportname, val] of Object.entries(Storage)) { expect(Front, exportname).to.have.property(exportname).that.eq(val) }
+  })
+
+  it("exports every value safebyok/utils exports, the same value", () => {
+    for (const [exportname, val] of Object.entries(Utils)) { expect(Front, exportname).to.have.property(exportname).that.eq(val) }
   })
 
   it("exports the minder and the vault, which safebyok/core leaves out", () => {
