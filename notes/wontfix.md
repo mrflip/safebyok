@@ -144,9 +144,11 @@ lifecycle: new machinery in a primitive's critical path, for crossings the host 
 
 * current outcome, as built, and promised nowhere: a `get`, `list` or `write` the ThingMinder began before `goodbye`,
   answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may join its Thing
-  to the new root box's listing. What a get still waiting at `goodbye` refuses, even with no `hello`, is unspecified.
-  A list sets its listing and caches its sparse records, and a good write caches the record written, as though
-  begun after the `hello`. Each answers its caller as the vaultDB answered it. A bank's sweep calls `goodbye` on the
+  to the new root box's listing. What a get or a list still waiting at `goodbye` refuses, even with no `hello`, is
+  unspecified: as built, TanStack cancels it, and it rejects with TanStack's `CancelledError` (a `tryList` answers it as
+  `unexpected_error`), its listing not set. The Things such a list answers are still notified to each watch open when the
+  vaultDB answers, so a fresh `hello`'s watch caches them. A good write caches the record written, as though begun
+  after the `hello`, and answers its caller as the vaultDB answered it. A bank's sweep calls `goodbye` on the
   minder of each vault made on it, so an answer crossing that sweep is this case too.
 * alternatives:
   - a token for each stretch of minding, compared as each answer lands: a new state, and a check in the critical path
