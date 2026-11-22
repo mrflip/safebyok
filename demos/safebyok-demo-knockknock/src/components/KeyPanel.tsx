@@ -1,55 +1,53 @@
 import { useMutation } from '@tanstack/react-query'
-import { useActionState } from 'react'
-import type { Whisper } from 'safebyok'
-import { mask } from 'safebyok-react-lean'
-import { SubmitButton, WhisperInput, WhisperMask, WhisperText } from 'safebyok-react-lean/parts'
-import { formTextOf } from '../lib/form-text'
+import { mask, popField } from 'safebyok-react-lean'
+import { WhisperInput, WhisperMask, WhisperText } from 'safebyok-react-lean/parts'
+import { useIsKeyStored } from '../hooks/useIsKeyStored'
 import { KeyLabelpath, Knock } from '../lib/sok'
 
-// Made once, at module scope, as useActionState wants: it empties the form before it writes.
-const saveKeyAction = Knock.putBoxAction(KeyLabelpath, {
-  whisperOf: (form): Whisper => {
-    const apiKey = formTextOf(form, 'apiKey')
-    if (apiKey === '') { throw new Error('Paste your Anthropic API key first.') }
-    return { apiKey }
-  },
-  // The sidecar is stored readable, so its mask shows no character of the key's tail.
-  sidecarOf: (whisper) => ({ mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
-})
-
-/** The saved key: its mask, Show, and, while unlocked, the editor and Delete. */
+/** The stored key: its mask, Show, and, while unlocked, the editor and Delete. */
 export function KeyPanel() {
   const isLocked = Knock.useBank((bank) => bank.isLocked)
-  const { data: box } = Knock.useBox(KeyLabelpath)
+  const isKeyStored = useIsKeyStored()
   return (
     <section aria-labelledby="key-title" className="card">
       <h2 id="key-title">Your Anthropic API key</h2>
-      {(box === undefined) && <p className="quiet">Looking for your key…</p>}
-      {(box === null) && <p className="quiet">No key saved yet.</p>}
-      {(box !== null) && (box !== undefined) && (
+      {(isKeyStored === undefined) && <p className="quiet">Looking for your key…</p>}
+      {(isKeyStored === false) && <p className="quiet">No key saved yet.</p>}
+      {(isKeyStored === true) && (
         <p className="row">
           Saved key: <WhisperText labelpath={KeyLabelpath} field="apiKey" masked={<WhisperMask labelpath={KeyLabelpath} field="apiKey" tail={4} />} />
           {! isLocked && <DeleteKeyButton />}
         </p>
       )}
-      {! isLocked && <KeyEditor isReplacing={(box !== null) && (box !== undefined)} />}
+      {! isLocked && <KeyEditor isReplacing={isKeyStored === true} />}
     </section>
   )
 }
 
-/** The form that saves a new key, or replaces the saved one. */
+/** The form that puts a new key, or replaces the stored one. */
 function KeyEditor({ isReplacing }: Readonly<{ isReplacing: boolean }>) {
-  const [saved, saveAction] = useActionState(saveKeyAction, null)
+  const putKey = useMutation({
+    // TanStack retains `form` as this mutation's variables, so the key leaves it before the first await.
+    // Paused for want of a network, the mutation would wait with the key still in `form`: it runs offline too.
+    networkMode: 'always',
+    mutationFn:  async (form: FormData) => {
+      const apiKey = popField(form, 'apiKey').trim()
+      if (apiKey === '') { throw new Error('Paste your Anthropic API key first.') }
+      // The sidecar is stored readable, so its mask shows no character of the key's tail.
+      return await Knock.putBoxOnce(KeyLabelpath, { sidecar: { mask: mask(apiKey, { tail: 0 }) } }, { whisper: { apiKey } })
+    },
+  })
+  const label = isReplacing ? 'Replace key' : 'Save key'
   return (
-    <form className="row" action={saveAction}>
+    <form className="row" action={(form) => { putKey.mutate(form) }}>
       <WhisperInput name="apiKey" aria-label="Anthropic API key" placeholder="sk-ant-…" required />
-      <SubmitButton whilePending="Saving…">{isReplacing ? 'Replace key' : 'Save key'}</SubmitButton>
-      {(saved?.err !== undefined) && (saved.err !== null) && <span role="alert" className="gripe">{saved.err.message}</span>}
+      <button type="submit" disabled={putKey.isPending}>{putKey.isPending ? 'Saving…' : label}</button>
+      {(putKey.error !== null) && <span role="alert" className="gripe">{putKey.error.message}</span>}
     </form>
   )
 }
 
-/** Delete the saved key. */
+/** Delete the stored key. */
 function DeleteKeyButton() {
   const del = useMutation({ mutationFn: () => Knock.delBoxOnce(KeyLabelpath) })
   return (
