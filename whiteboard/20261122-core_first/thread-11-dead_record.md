@@ -1,6 +1,6 @@
 # Thread 11: dead_record (2026-11-22)
 
-Branch `20261122-dead_record`, PR to be filed (see the PR's **Tests:** line), stacked on [#853](https://github.com/mrflip/safebyok/pull/853). Docs and titles only; empty changeset.
+Branch `20261122-dead_record`, PR [#854](https://github.com/mrflip/safebyok/pull/854), stacked on [#853](https://github.com/mrflip/safebyok/pull/853). Docs and titles only; empty changeset.
 
 * **Built**
   - **The dead record.** "dead entry" is "dead record" in prose: VOCABULARY.md's row and its `item` row, the minder's class
