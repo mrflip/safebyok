@@ -5,7 +5,7 @@
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, mutationOptions, queryOptions, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type ReactNode, createContext, useCallback, useContext, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
-  Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
+  type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
   type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
   PendingBank, type Sidecar, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper,
 } from 'safebyok'
@@ -523,6 +523,7 @@ function makeBankGiver(friend: BankFriend) {
   // Each form mutation below resolves nothing: the bank's snapshot says what changed. Its error is the verb's refusal, to
   // branch on by `family`: a `condition` is the user's to correct, at the field or in a banner, with the form left open.
   // Each gating refuses `absent_vault` at a stage the verb has no bank for: show each form only at its own stage.
+  // The birth's gating refuses `disabled` at `'starting'`, until the device's `hello` answers.
   // A verb comes three ways: its gating, its mutation options for the host's own `useMutation`, and its hook, which is
   // the two together. The hook keys its mutation by the user the provider shows; the options, by whoever is signed in.
 
@@ -538,7 +539,7 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   /** The gating that births the bank under a new passphrase, for {@link birthMutationOptions}' mutation. */
-  function birthGating(cleartexts: BirthCleartexts): Gating { return Bank.birthGating(demandDevice(), cleartexts) }
+  function birthGating(cleartexts: BirthCleartexts): Gating { return demandDevice().birthGating(cleartexts) }
 
   /** React Query's options for the mutation that births the bank, for the host's own `useMutation`: hand its `mutate` a {@link birthGating}.
    * An `onSettled` of your own replaces the one that vacates the gating: vacate it there too.

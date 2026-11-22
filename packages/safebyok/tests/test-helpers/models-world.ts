@@ -123,10 +123,11 @@ export interface BornBank {
   proving: PassphraseProving
 }
 
-/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB by `Bank.birth`, and so unlocked.
+/** A bank of {@link WorldBankStamp}, its main gate of {@link WorldGateStamp}, born in its device's vaultDB by `Bank.birth` once the device has said `hello`, and so unlocked.
  * Its proving is a stored proving of the main gate, by {@link TestPassphrase}.
  */
 export async function buildBornBank({ passkeyCleartext, device = makeDevice() }: BornBankGiven = {}): Promise<BornBank> {
+  await device.hello()
   const mintStamps = vi.spyOn(Bank, 'mintStamps').mockReturnValue({ bankStamp: WorldBankStamp, gateStamp: WorldGateStamp })
   const makeRecord = vi.spyOn(Bank, 'makeRecord')
   try {
@@ -146,10 +147,9 @@ export interface BornVault extends BornBank {
   minder: ThingMinder
 }
 
-/** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth, the device having said `hello` since. */
+/** A {@link buildBornBank} bank, unlocked, and the vault of its boxes its device made at the birth. */
 export async function buildBornVault(given: BornBankGiven = {}): Promise<BornVault> {
   const born = await buildBornBank(given)
-  await born.device.hello()
   return { ...born, vault: born.device.vault!, minder: born.device.minder }
 }
 // --

@@ -1,6 +1,7 @@
 import { isEqual } from 'es-toolkit'
 import { Consts, Deriver, Errors, type GX, Logger, Phrases as PhrasesX, ReportError, VX, Validator } from 'safebyok-big/internals'
 import { Bank } from './bank'
+import type { BirthGating } from './gating'
 import { Proving, guardKeyDeriver } from './proving'
 import { Vault } from './vault'
 import { DefaultStrengthChecker, guardStrengthChecker } from '../helpers/passphrase-strength'
@@ -9,7 +10,7 @@ import { type BadNewsHandler, type BankAskDraft, type BankSnapshot, type DeviceO
 import { type GetAsk, type ListAsk, getAskOf, listAskOf } from '../shapes/shapes-asks'
 import { type MinderFriend, MinderChecks } from '../shapes/shapes-minder'
 import type { LiveOf, ShellOf } from '../shapes/shapes-sealers'
-import type { GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
+import type { BirthCleartexts, GuardedKeyDeriver, GuardedStrengthChecker, StrengthChecker } from '../shapes/shapes-gateish'
 import { type BankScope, StampChecks } from '../shapes/shapes-stamps'
 import { type Banklabel, type DeviceTok, Labelpath, type Userid } from '../shapes/primitives'
 import type { VaultDB } from '../storage/vault-db'
@@ -24,7 +25,7 @@ export const DefaultLeaseMillis = 14 * 24 * 60 * 60_000
 // --
 /** The signed-in user's presence in this browser for one bank scope: the host's functions, guarded, its minder, and its bank and vault.
  * Make it with `Device.make(record, opts)`, then call `hello()` to bring its bank up. Its snapshot's stage goes from
- * `'starting'` to `'locked'` for a bank stored, or to `'unborn'` for none, which `Bank.birth` on this device fills.
+ * `'starting'` to `'locked'` for a bank stored, or to `'unborn'` for none, which a {@link birthGating} on this device fills.
  */
 export class Device implements MinderFriend {
   // == [Props]: userid, banklabel, device_tok, vaultDB, keyDeriver, strengthChecker, logger, leaseMillis, #onBadNews, #minder, #rootShell, #bank, #vault, #broughtUp, #banklessSnapshot, #endCause, #snapshot, #subscribers, #getSnapshot, #subscribe, toJSON
@@ -138,31 +139,33 @@ export class Device implements MinderFriend {
   judgeStrength(passphraseCleartext: string): Promise<GX.PassphraseVerdict> { return Proving.judgeStrength(this, this.scope, passphraseCleartext) }
   // --
 
-  // == [Starting]: hello, adoptBornBank, #bringUp, #hold
+  // == [Starting]: hello, birthGating, #bringUp, #hold
 
   /** Start the minder and bring up the bank: resolves once the snapshot shows `'locked'`, `'unborn'` or `'failed'` (with `lastErr`). Never rejects.
-   * Each later call resolves as the first. A device that already has a bank, born on it before `hello`, keeps it.
+   * Each later call resolves as the first.
    */
   hello(): Promise<void> {
     this.#broughtUp ??= this.#bringUp()
     return this.#broughtUp
   }
 
-  // Cheat (react_life): the bank's birth hands the born bank over by calling this, a bank-to-device call, until birth's caller owns the handover.
-  /** Make `bank`, just born on this device, the device's bank, and make its vault. Internal. Returns `bank`. */
-  adoptBornBank(bank: Bank): Bank {
-    Checks.bank.parse(bank)
-    Validator.checkedConsistent(bank.scope, this.scope, { kind: 'record_conflict' })
-    this.#hold(bank)
-    return bank
+  /** The gating of a birth of this device's bank, for a form mutation to attempt: the bank it births is then this device's, unlocked.
+   * Call it once `hello` shows the stage `'unborn'`. See {@link Bank.birth} for what the birth refuses.
+   */
+  birthGating(cleartexts: BirthCleartexts): BirthGating {
+    // Made before the stage is checked, so a refusal here zeroes the host's passkey answer as every gating does (G2).
+    const gating = Bank.birthGating(this, cleartexts, (bank) => { this.#hold(bank) })
+    if (this.#snapshot.bank.stage === 'starting') {
+      gating.vacate()
+      throw Throwers.bankNotBroughtUp()
+    }
+    return gating
   }
 
-  /** Bring up this device's bank, if it has none. */
+  /** Bring up this device's bank. */
   async #bringUp(): Promise<void> {
-    // Cheat (react_life): tests birth a bank before they say hello, which a device's startup never does.
     try {
       this.#minder.hello()
-      if (this.#bank !== null) { return }
       const [bankRecord, maingate, rootBox] = await Promise.all([
         this.#minder.get({ ...this.scope, labelpath: 'bank' }),
         this.#minder.get({ ...this.scope, labelpath: Labelpath.MainGate }),
@@ -321,9 +324,8 @@ function refusalSnapshotOf(err: unknown): RefusalSnapshot {
 
 // == [Checks]: Checks
 
-/** The checks of {@link Device.make}'s arguments, {@link tellBadNewsTo}'s and {@link Device.adoptBornBank}'s. */
+/** The checks of {@link Device.make}'s arguments and {@link tellBadNewsTo}'s. */
 const Checks = Validator.Checkers('bad_record', ({ obj, arr, fn, custom }) => ({
-  bank: custom<Bank>((val) => val instanceof Bank, PhrasesX.BankExpected),
   deviceMakeArgs: obj({
     record: BankishChecks.deviceRecord,
     opts:   Validator.objCheck(() => ({

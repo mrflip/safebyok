@@ -14,10 +14,13 @@ import type { DamagedThing } from '../storage/vault-db'
 export * from 'safebyok-big/refusals/throwers'
 // --
 
-// == [Model Throwers]: bankSwept, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, boxSoonestBare
+// == [Model Throwers]: bankSwept, bankNotBroughtUp, unlockDismissed, gatingSpent, tombstoneSecretsGiven, sidecarMissing, boxOfOtherRoot, boxSoonestBare
 
 /** A `disabled` refusal: the bank was swept. */
 export function bankSwept(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankSwept) }
+
+/** A `disabled` refusal: the device's `hello` has not answered. */
+export function bankNotBroughtUp(): Errors.VaultError { return new Errors.VaultError('disabled', Phrases.BankNotBroughtUp) }
 
 /** A `dismissed` refusal: the wait for an `unlock` gating was dismissed. */
 export function unlockDismissed(): Errors.VaultError { return new Errors.VaultError('dismissed', Phrases.UnlockDismissed) }
