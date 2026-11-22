@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: threads 1, 2 (#822), 3 (#819), 6 (#835) filed; 4 (#834) filing after a second review; 5 (#836) in review; then 7.
+* **Status**: threads 1, 2 (#822), 3 (#819), 4 (#834), 6 (#835) filed; 5 (#836) filing; then the restack, then 7.
 
 ## Read first
 
@@ -136,7 +136,12 @@ are naming). *Depends on*: thread 4 (the same parts). *Size*: medium.
 
 *Status*: ready at `e07b84aaa` (#836, justify green), one compaction before readiness; in review. `WithLockableWhisperOpts`
 turned out to live in `react-giver.tsx`, beside #835's lines: a trivial restack conflict, keep both. Four open matters,
-rows in the doc.
+rows in the doc. Reviewed `fixed`; filing.
+
+*Review:* fixed, at `440926620`: a `KitPhrasesProvider` nested in a `PartsPhrasesProvider` dropped the outer parts
+words (fixed, with a test); both providers make their checks with `Checkers('bad_record', …)`; a quote style. Minor:
+the providers rebuild their value each render (*Orchestrator:* left, on Cleanup); two doc blocks for a documentarian
+pass; two test-only non-null assertions.
 
 ### 6. `opts_checked`: host-facing option types tied to their checks
 
