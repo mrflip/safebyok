@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Filed and out of draft: thread 2 (#844, `00113d236`), thread 4 (#846, `ce6385ea1`, on #844), thread 3 (#847, `7008af184`, on #844; its first filing met an e2e flake in safebyok-big's GraphQL watch test, the retry passed). Building: thread 5 (from #847) and thread 6 (from #846). Thread 7 waits on 6; thread 8 on the line's tip.
+* **Status**: running (2026-11-22). Filed and out of draft: thread 2 (#844), thread 4 (#846, on #844), thread 3 (#847, on #844). Thread 6 ready (#848, `b205bb784`, on #846), in high review. Building: thread 5 (from #847), thread 7 (from #848). Restack note: thread 3 deletes `#seedListing`; thread 6 changed it; thread 3's deletion wins.
 
 The Coach's request, verbatim:
 
