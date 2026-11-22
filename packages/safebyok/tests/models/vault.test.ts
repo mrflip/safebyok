@@ -345,7 +345,7 @@ describe("vault.tryDelBoxOnce(labelpath)", () => {
 })
 
 describe("vault.delBoxOnce(labelpath)", () => {
-  it("writes the tombstone over the newest revision: its item is null, and its dead entry has the tombstone", async () => {
+  it("writes the tombstone over the newest revision: its item is null, and its dead record has the tombstone", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const tombstone = await vault.delBoxOnce(Openai)

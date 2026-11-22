@@ -89,7 +89,7 @@ export class Vault {
   }
 
   /** Delete the box at `labelpath`, resolving an `Outcome` of its stored tombstone.
-   * It writes over the soonest record the minder has of the box (its soon, else its item), fetching it when none is cached. The box's item is then null, and its dead entry has the tombstone.
+   * It writes over the soonest record the minder has of the box (its soon, else its item), fetching it when none is cached. The box's item is then null, and its dead record has the tombstone.
    * Misuse is a bad outcome too. Rejects, whether or not the write was made, when the answer carries a record of another bank.
    */
   async tryDelBoxOnce(labelpath: BoxLabelpath): Promise<Outcome.Outcome<TombstoneOf<BoxRecord>>> {

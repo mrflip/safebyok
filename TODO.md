@@ -122,7 +122,7 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   stand-in snapshots. "this fits with upcoming changes, but it needs more design before anything should be
   rewritten, so leave the shim" (the Coach, 2026-11-21, react_life, survey after thread 12). Part of the ownership work, with Closer Look E11.
 * **What is the size limit on a persister's snapshot?** A persister saves each client's whole snapshot, every
-  item, soon, dead entry and listing, at every change. How large can that grow before it matters: TanStack's
+  item, soon, dead record and listing, at every change. How large can that grow before it matters: TanStack's
   persisted snapshot (dehydrated whole, as one string), IndexedDB's limits on one record and the origin's quota,
   and the cost of writing it whole each time. Find when a vault grows big enough to hit one, and what a host sees
   then (thread 8, core_first, 2026-11-22).

@@ -401,7 +401,7 @@ describe("VaultMinder.tryAt", () => {
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ ok: true, act: 'gotgone', val: null, dbhas: tombstone })
   })
 
-  it("answers gotlive for a box born again, its old tombstone left in the dead entry", async () => {
+  it("answers gotlive for a box born again, its old tombstone left in the dead record", async () => {
     const { minder, receive } = await minderWorldOf(new MemoryVaultDB())
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     const reborn    = TH.boxRebornOf(tombstone)

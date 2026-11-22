@@ -307,7 +307,7 @@ describe("VaultMinder.list", () => {
     expect(await minder.get(TH.BoxScope)).to.deep.equal(box1)
   })
 
-  it("caches a box listed as a tombstone in its dead entry and null in its item, and answers it from the cache", async () => {
+  it("caches a box listed as a tombstone in its dead record and null in its item, and answers it from the cache", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { minder } = await minderWorldOf(vaultDB)

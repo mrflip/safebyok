@@ -61,7 +61,7 @@ describe("Minder.persist(queryClient, persister)", () => {
     expect(restored.at(boxScopeOf('anthropic'))).to.be.undefined
   })
 
-  it("builds each entry it restores with the query defaults the client was made with, before any minder's hello", async () => {
+  it("builds each query it restores with the query defaults the client was made with, before any minder's hello", async () => {
     const vaultDB = new MemoryVaultDB()
     await storedBoxOf(vaultDB)
     const { persister, minder } = await savedGetOf(vaultDB)
