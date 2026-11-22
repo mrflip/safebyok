@@ -144,9 +144,11 @@ lifecycle: new machinery in a primitive's critical path, for crossings the host 
 
 * current outcome, as built, and promised nowhere: a `get`, `list` or `write` the ThingMinder began before `goodbye`,
   answered after `goodbye` and a fresh `hello`, may land in the new cache; one whose fetch had settled may join its Thing
-  to the new root box's listing. What a get still waiting at `goodbye` refuses, even with no `hello`, is unspecified.
-  A list sets its listing and caches its sparse records, and a good write caches the record written, as though
-  begun after the `hello`. Each answers its caller as the vaultDB answered it. A bank's sweep calls `goodbye` on the
+  to the new root box's listing. What a get or a list still waiting at `goodbye` refuses, even with no `hello`, is
+  unspecified: as built, TanStack cancels it, and it rejects with TanStack's `CancelledError` (a `tryList` answers it as
+  `unexpected_error`), its listing not set. The Things such a list answers are still notified to each watch open when the
+  vaultDB answers, so a fresh `hello`'s watch caches them. A good write caches the record written, as though begun
+  after the `hello`, and answers its caller as the vaultDB answered it. A bank's sweep calls `goodbye` on the
   minder of each vault made on it, so an answer crossing that sweep is this case too.
 * alternatives:
   - a token for each stretch of minding, compared as each answer lands: a new state, and a check in the critical path
@@ -308,3 +310,114 @@ while the unlock's lease is being built.
 Reasoning for wontfix: a gate change comes a few times a day, and a lease is built in milliseconds (CLAUDE.md, *Hours
 separate updates*, `#no-slop-crossings`). Nothing stored changes, and no secret moves. Written by the gate_super thread 1
 worker, 2026-11-21, awaiting a ruling.
+
+## React
+
+Cases in the React layer, `packages/safebyok-react-lean`, and in an app built on it.
+
+### A form reset that the host cancels still makes a draft in that form forget what was typed
+
+A `useDraft` whose inputs sit in a form forgets what was typed into them when the form is reset (`safebyok-react-lean`, `use-draft.ts`). A host
+whose `onReset` calls `preventDefault()`, to ask "keep your changes?" say, leaves its form as it was, but the draft has
+already emptied the fields typed into and forgotten them, though not its sidecar edits.
+
+Current outcome: the typed text is lost, and nothing is written. The draft and the page agree.
+
+Alternatives: hearing the reset after React's handlers, to see whether it was cancelled, means a listener on the root
+in place of the form, kept in step with React's own delegation. Putting the typed text back is not possible: it lived
+only in the input.
+
+Workaround: ask before the reset is started, from the button that would start it, not in `onReset`.
+
+To reproduce: a draft's input inside a `<form onReset={(event) => { event.preventDefault() }}>`; type into it; press
+a `<button type="reset">`.
+
+Reasoning for wontfix: a host that cancels a reset is rare, the outcome loses typed text and corrupts nothing stored,
+and the fix moves a listener to where React's internals decide its order. Ruled by the Coach, 2026-11-22.
+
+### A form's reset makes a draft forget what was typed into its inputs outside that form
+
+A `useDraft` hears the reset of the form that contains one of its inputs, and then forgets every field typed into, in
+whichever element it sits (`safebyok-react-lean`, `use-draft.ts`). So a host that puts one draft's inputs in two forms,
+or one in a form and one outside any, loses the text typed into both when either form resets.
+
+Current outcome: the typed text is lost from every input of the draft, and nothing is written. The draft and the page agree.
+
+Alternatives: forgetting only the fields whose input is inside the form that reset means a draft that is partly
+forgotten, with a base and an `isDirty` to work out for each part.
+
+Workaround: put all of a draft's inputs in one form, or give each form a draft of its own.
+
+To reproduce: one `useDraft` with `whisperField('a')` inside a `<form>` and `whisperField('b')` outside it; type into
+both; reset the form.
+
+Reasoning for wontfix: one draft split across forms is rare, the outcome loses typed text and corrupts nothing stored,
+and `discard` has always emptied every input of the draft. Ruled by the Coach, 2026-11-22.
+
+### A stage change that reveals a suspending subtree shows its fallback
+
+The bank's stage reaches React through `useSyncExternalStore` (`safebyok-react-lean`, `useBank`). React's manual: an
+update from an external store is never a transition. So when an unlock, or any other stage change, first renders a
+subtree that suspends on a record, React shows that subtree's `Suspense` fallback, and a host cannot have it wait
+behind the screen before by wrapping the change in `startTransition`.
+
+Current outcome: the fallback shows until the record arrives. Nothing is wrong on the page, and nothing is stored.
+
+Alternatives: a copy of the stage in React state, updated in a transition, gives a stage that lags the bank's, and a
+screen that shows `'locked'` after the bank has unlocked. Holding the stage change back until the subtree's records are
+fetched puts a wait in the path of every lock and unlock.
+
+Workaround: place the `Suspense` boundary low, around the part that reads the record, with a fallback the size of what
+it replaces; or read with `useBox`, which does not suspend.
+
+To reproduce: under a stage switch, render at `'unlocked'` a component that suspends on a box not yet fetched; unlock.
+
+Reasoning for wontfix: the stage is synchronous on purpose, so that no screen shows a stage the bank has left, and
+that is worth more than one smoothed fallback. The limit is React's, stated in its manual. Ruled by the Coach,
+2026-11-22.
+
+### A refusal shown from a form Action's result outlives an Undo
+
+A form whose action resolves its refusal as the action's state (`useActionState`) shows that refusal until the action
+next runs. Envman's row shows a refused Save's message under the row; pressing Undo, or the bank locking, discards the
+draft and leaves the message where it is.
+
+Current outcome: a stale message under a row whose draft is clean again. The next Save replaces or removes it.
+
+Alternatives: React gives an action's state no reset. Undo as a second submit through the same action makes Undo an
+action that writes nothing, and a reader has to learn why. A copy of the refusal in state beside the action's, cleared
+by hand, is two records of one fact.
+
+Workaround: a host that minds remounts the form by a `key` it changes on Undo.
+
+To reproduce: in envman, on a locked vault, type a value in a row, press Save, and enter a passphrase the gate
+refuses for a reason the row shows; then press Undo.
+
+Reasoning for wontfix: the message is true of the last Save and harms nothing, and each way of removing it costs more
+code than it is worth in a demo meant to be read. Ruled by the Coach, 2026-11-22.
+
+### A component inside a form that hands `mutate` its `FormData` can read the secret for one render
+
+`putBoxMutationOptions` deletes the form's secret fields in its `mutationFn` (`safebyok-react-lean`, `react-giver.tsx`).
+TanStack Query calls a `mutationFn` one turn of the microtask queue after `mutate`. Where the form is
+`<form action={(form) => { put.mutate(form) }}>`, React renders the form's pending status before that turn, with the
+same `FormData` as `useFormStatus().data`.
+
+Current outcome: a component inside the form that reads the secret's field from `useFormStatus().data` reads the typed
+secret on one render. Nothing retains it: the field is deleted from that `FormData` before the write begins, and the
+mutation's `variables`, its result and the cache never have it. No part and no kit form reads `data`. Under
+`putBoxAction` the fields are deleted before React renders, and no render reads the secret.
+
+Alternatives: a form that submits from `onSubmit` with `preventDefault()` puts no `FormData` in React's form status,
+and then every such form of a host's gives up `useFormStatus`, resets itself, and passes its button its pending state.
+A hook of ours that deleted the fields before it called `mutate` would need the secret in a variable of its own for
+that turn.
+
+Workaround: write the form as an Action, with `putBoxAction`; or read no secret's field from `useFormStatus().data`.
+
+To reproduce: `packages/safebyok-react-lean/tests/wontfix/form-status-twin.test.tsx`, which uses nothing a host could
+not write.
+
+Reasoning for wontfix: the only reader is a component the host wrote, inside the form the user typed the secret into,
+where it could read the input itself; nothing retains the secret; and each alternative costs every host more than this
+costs any. Ruled by the Coach, 2026-11-22.

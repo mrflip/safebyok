@@ -35,6 +35,18 @@ describe("PassphraseInput", () => {
     expect(field.type).to.eq('password')
   })
 
+  it("hides the passphrase again while isPending, for a form that submits from a handler", () => {
+    const { rerender } = render(<PassphraseInput name="passphrase" aria-label="Passphrase" />)
+    const field = screen.getByLabelText<HTMLInputElement>('Passphrase')
+    fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+    expect(field.type).to.eq('text')
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" isPending />)
+    expect(field.type).to.eq('password')
+    rerender(<PassphraseInput name="passphrase" aria-label="Passphrase" />)
+    expect(field.type).to.eq('password')
+    expect(field.hasAttribute('ispending')).to.eq(false)
+  })
+
   it("warns while Caps Lock is on, and still hands the host its key and blur handlers", () => {
     const onKeyDown = vi.fn()
     const onBlur = vi.fn()
