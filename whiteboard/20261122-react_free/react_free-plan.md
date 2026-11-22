@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: threads 1, 2 (#822), 3 (#819), 6 (#835) filed; 4 (#834) reviewed `fixed`, in rework; 5 building on 4; then 7.
+* **Status**: threads 1, 2 (#822), 3 (#819), 6 (#835) filed; 4 (#834) filing after a second review; 5 (#836) in review; then 7.
 
 ## Read first
 
@@ -117,6 +117,11 @@ with `showText` and the `writeMask` doc block); `useWhisperText` and a host elem
 while a newer one is judged (a row); `field` unvalidated, as before; an `@example`'s undefined `box`. A second review
 covers the rework's commits only.
 
+*Second review:* fixed, at `b0f1a9852`: a negation's spacing; the doc paragraph one sentence; `shownOf` is
+`maskShownRef`; a test that a changed `tail` empties the element. Left, minor: `maskShownRef` written at the start of a
+write (safe), per hook instance (a host's own placeholder shows until the mask lands), the sync branch without an
+`isCurrent()` check (safe inside the effect).
+
 ### 5. `kit_parts`: the parts' classes, state attributes, words and labels
 
 > (item 3's other half: `className` and `data-` state attributes on the parts; overridable words for the kit; visible
@@ -128,6 +133,10 @@ overridable in one place (`notes/react_lib_principles.md`, *Words*); visible lab
 others (moved here from thread 6, since it lives in a part's file). The demos'
 tests may need their queries mended where a label changes. *Levels*: style pass on `opus` (the attribute and word names
 are naming). *Depends on*: thread 4 (the same parts). *Size*: medium.
+
+*Status*: ready at `e07b84aaa` (#836, justify green), one compaction before readiness; in review. `WithLockableWhisperOpts`
+turned out to live in `react-giver.tsx`, beside #835's lines: a trivial restack conflict, keep both. Four open matters,
+rows in the doc.
 
 ### 6. `opts_checked`: host-facing option types tied to their checks
 
