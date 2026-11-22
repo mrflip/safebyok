@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { isVaultError } from 'safebyok'
+import { SubmitButton } from 'safebyok-react-lean/parts'
 import { gripeForJokeErr, tellKnockKnockJoke } from '../lib/anthropic'
 import { useIsKeyStored } from '../hooks/useIsKeyStored'
 import { formTextOf } from '../lib/form-text'
@@ -17,7 +18,7 @@ export function KnockForm() {
       <h2 id="knock-title">Knock, knock!</h2>
       <form className="row" action={(form) => { knock.mutate(formTextOf(form, 'whosThere')) }}>
         <input name="whosThere" aria-label="Who's there?" placeholder="Who's there?" required disabled={! isKeyStored} />
-        <button type="submit" disabled={! isKeyStored || knock.isPending}>{knock.isPending ? 'Knocking…' : 'Knock'}</button>
+        <SubmitButton isPending={knock.isPending} whilePending="Knocking…" disabled={! isKeyStored}>Knock</SubmitButton>
       </form>
       {! isKeyStored && <p className="quiet">Save your Anthropic API key below, then knock.</p>}
       {(knock.data !== undefined) && <output aria-label="Joke" className="joke">{knock.data}</output>}

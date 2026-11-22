@@ -1,7 +1,9 @@
 import { useMutation } from '@tanstack/react-query'
-import { mask, popField } from 'safebyok-react-lean'
-import { WhisperInput, WhisperMask, WhisperText } from 'safebyok-react-lean/parts'
+import { useMemo } from 'react'
+import { mask } from 'safebyok-react-lean'
+import { SubmitButton, WhisperInput, WhisperMask, WhisperText } from 'safebyok-react-lean/parts'
 import { useIsKeyStored } from '../hooks/useIsKeyStored'
+import { formTextOf } from '../lib/form-text'
 import { KeyLabelpath, Knock } from '../lib/sok'
 
 /** The stored key: its mask, Show, and, while unlocked, the editor and Delete. */
@@ -26,22 +28,19 @@ export function KeyPanel() {
 
 /** The form that puts a new key, or replaces the stored one. */
 function KeyEditor({ isReplacing }: Readonly<{ isReplacing: boolean }>) {
-  const putKey = useMutation({
-    // TanStack retains `form` as this mutation's variables, so the key leaves it before the first await.
-    // Paused for want of a network, the mutation would wait with the key still in `form`: it runs offline too.
-    networkMode: 'always',
-    mutationFn:  async (form: FormData) => {
-      const apiKey = popField(form, 'apiKey').trim()
+  const putKey = useMutation(useMemo(() => Knock.putBoxMutationOptions(KeyLabelpath, {
+    whisperOf: (form) => {
+      const apiKey = formTextOf(form, 'apiKey')
       if (apiKey === '') { throw new Error('Paste your Anthropic API key first.') }
-      // The sidecar is stored readable, so its mask shows no character of the key's tail.
-      return await Knock.putBoxOnce(KeyLabelpath, { sidecar: { mask: mask(apiKey, { tail: 0 }) } }, { whisper: { apiKey } })
+      return { apiKey }
     },
-  })
-  const label = isReplacing ? 'Replace key' : 'Save key'
+    // The sidecar is stored readable, so its mask shows no character of the key's tail.
+    sidecarOf: (whisper) => ({ mask: mask(String(whisper['apiKey']), { tail: 0 }) }),
+  }), []))
   return (
     <form className="row" action={(form) => { putKey.mutate(form) }}>
       <WhisperInput name="apiKey" aria-label="Anthropic API key" placeholder="sk-ant-…" required />
-      <button type="submit" disabled={putKey.isPending}>{putKey.isPending ? 'Saving…' : label}</button>
+      <SubmitButton isPending={putKey.isPending} whilePending="Saving…">{isReplacing ? 'Replace key' : 'Save key'}</SubmitButton>
       {(putKey.error !== null) && <span role="alert" className="gripe">{putKey.error.message}</span>}
     </form>
   )

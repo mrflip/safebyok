@@ -197,6 +197,17 @@ describe("the Knock-Knock Machine", () => {
     expectUnheld(page)
   })
 
+  it("refuses a key of only whitespace, and keeps the key stored", async () => {
+    const page = await loadWithKey()
+    const keyPanel = region('Your Anthropic API key')
+    fireEvent.change(within(keyPanel).getByLabelText('Anthropic API key'), { target: { value: ' '.repeat(3) } })
+    fireEvent.click(within(keyPanel).getByRole('button', { name: 'Replace key' }))
+    const alert = await within(keyPanel).findByRole('alert')
+    expect(alert.textContent).to.eq('Paste your Anthropic API key first.')
+    expect(within(keyPanel).getByText(LiveMask)).to.exist
+    expectUnheld(page)
+  })
+
   it("shows the saved key on Show, and deletes it", async () => {
     const page = await loadWithKey()
     const keyPanel = region('Your Anthropic API key')

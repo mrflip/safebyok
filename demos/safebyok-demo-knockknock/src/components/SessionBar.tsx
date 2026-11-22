@@ -1,4 +1,5 @@
 import { useMutation } from '@tanstack/react-query'
+import { SubmitButton } from 'safebyok-react-lean/parts'
 import { formTextOf } from '../lib/form-text'
 import { type Session, signIn, signOut } from '../lib/session'
 
@@ -17,7 +18,7 @@ export function SessionBar({ session }: Readonly<{ session: Session | null }>) {
   return (
     <form className="row" action={(form) => { signingIn.mutate(formTextOf(form, 'username')) }}>
       <input name="username" aria-label="Username" placeholder="Username" autoComplete="username" required />
-      <button type="submit">Sign in</button>
+      <SubmitButton isPending={signingIn.isPending} whilePending="Signing in…">Sign in</SubmitButton>
       {(signingIn.error !== null) && <span role="alert" className="gripe">{signingIn.error.message}</span>}
     </form>
   )
