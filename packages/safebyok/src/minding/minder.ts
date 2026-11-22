@@ -124,11 +124,11 @@ export abstract class Minder {
     type Keyed = Readonly<{ queryKey: TSQ.QueryKey }>
     const minders = new Map<string, Minder>()
     function minderOf(queryKey: TSQ.QueryKey): Minder | undefined { return minders.get(bankHashOf(queryKey)) }
-    function landed(val: unknown, { queryKey }: Keyed): void {
+    function settleFetch(val: unknown, { queryKey }: Keyed): void {
       const minder = minderOf(queryKey)
       if (minder !== undefined) { minder.#landedByFetch(val, queryKey) }
     }
-    async function fetched({ queryKey }: Keyed): Promise<ThingRecord | Absent | Kids> {
+    async function fetchAt({ queryKey }: Keyed): Promise<ThingRecord | Absent | Kids> {
       const minder = minderOf(queryKey)
       if (minder === undefined) { throw Throwers.minderNotStarted() }
       return await minder.#fetchAt(queryKey)
@@ -143,10 +143,10 @@ export abstract class Minder {
       const minder = minderOf(bankKeyHeadOf(scope))
       return (minder === undefined) ? undefined : minder.#deadAt(scope)
     }
-    const queryClient = new TSQ.QueryClient({ queryCache: new TSQ.QueryCache({ onSuccess: landed }) })
+    const queryClient = new TSQ.QueryClient({ queryCache: new TSQ.QueryCache({ onSuccess: settleFetch }) })
     queryClient.setQueryDefaults([MinderKeyRoot], {
       ...FixedQueryCacheOpts,
-      queryFn:           fetched,
+      queryFn:           fetchAt,
       staleTime:         staleTimeOf,
       structuralSharing: (prior: unknown, next: unknown) => (isKids(next) ? landedKidsOf(prior, next) : newerThingOf(prior, next, deadAt)),
     })
