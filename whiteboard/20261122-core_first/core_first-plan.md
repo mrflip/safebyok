@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: thread 1 building.
+* **Status**: thread 1 filed, out of draft (#840); thread 2 building (cut from #840; world keyed on `banklife` until #828 lands).
 
 The Coach's request, verbatim:
 
@@ -76,6 +76,8 @@ reword it as `core_first-design.md` proposes. *Touches*: `minding/thing-minder.t
 `medium`; review `low` (reviewed once as #827; the review reads only what the port changed from it).
 *Depends on*: nothing. *Look-ahead*: threads 2 and 3 rewrite this minder; nothing here should be polished for its own
 sake. *Size*: S.
+
+*Status*: filed, [#840](https://github.com/mrflip/safebyok/pull/840), out of draft. *Review* (low): clean; `git range-diff` shows the six cherry-picks identical to #827's, and the reworded invariant matches the code. #827's two open questions carried as Open Matters rows (`list`'s `staleTime: 0`, `select` pinned).
 
 ### 2. `bank_minder`: the BankMinder apart from the VaultMinder, and the world query
 
