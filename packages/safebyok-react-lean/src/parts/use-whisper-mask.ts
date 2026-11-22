@@ -35,8 +35,7 @@ export type WhisperMaskResult = Readonly<{
 
 /** A field of a box's whisper, masked into an element of your own: its last `tail` characters while the bank is unlocked, the stored mask while it is locked.
  * The mask is written into the element, never into React's state, and again on a lock, an unlock or a `putBox`.
- * Across an unlock, a `putBox`, or a lock whose `ifLocked` answers at once, the element keeps the mask it showed until
- * the next lands; for another box, field or `tail`, or a lock whose `ifLocked` answers with a promise, it is emptied first.
+ * The element is blank, never stale, while a mask for another box, field or `tail` is awaited, or the live tail of a bank now locked.
  * Destructure what it answers: React's lint takes any other read of an object holding a ref for a read of the ref.
  * @example
  *   const { maskRef } = useWhisperMask('openai', 'apiKey', { tail: 4 })
@@ -49,7 +48,7 @@ export function useWhisperMask(labelpath: string, field: string, { bank: bankOpt
   // In state, not a ref, so an element the host mounts later, or mounts again, has the mask written into it too.
   const [maskEl, setMaskEl] = useState<HTMLElement | null>(null)
   // What the element last showed a mask of, so a mask of another box, field or tail is never left beside the new label.
-  const shownOf = useRef<string | null>(null)
+  const maskShownRef = useRef<string | null>(null)
 
   // While locked, the mask comes from the record the box's query holds, so a mask `ifLocked` answers at once is written
   // before paint. Unlocked, the field is read from the box opened: until it lands, the element keeps what it showed.
@@ -63,8 +62,8 @@ export function useWhisperMask(labelpath: string, field: string, { bank: bankOpt
   /** Show the mask of the box as it now stands in `el`, or empty it and report why it cannot be shown. */
   const writeMask = useEffectEvent(async (el: HTMLElement, isCurrent: () => boolean) => {
     const maskOfWhat = JSON.stringify([ labelpath, field, tail ])
-    const isSameMask = (shownOf.current === maskOfWhat)
-    shownOf.current = maskOfWhat
+    const isSameMask = (maskShownRef.current === maskOfWhat)
+    maskShownRef.current = maskOfWhat
     try {
       const shown = maskOf()
       if (typeof shown === 'string') { el.textContent = shown; return }

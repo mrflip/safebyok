@@ -121,6 +121,18 @@ describe("WhisperMask", () => {
     await waitFor(() => { expect(maskTextOf(container)).to.eq(mask(TailedKey, { tail: 4 })) })
   })
 
+  it("empties the element when it is given another tail, never showing the last tail's mask beside it", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const tree = (tail: number) => TH.providerTreeOf(world, <KeyScreen world={world} tail={tail} />, { userid: TH.ProviderUser })
+    const { container, rerender } = render(tree(4))
+    await screen.findByText('locked')
+    await unlock(world)
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(LiveMask) })
+    rerender(tree(2))
+    expect(maskTextOf(container)).to.eq('')
+    await waitFor(() => { expect(maskTextOf(container)).to.eq(mask(TH.JokesKey, { tail: 2 })) })
+  })
+
   it("writes the mask again when the box is written", async () => {
     const { world, container } = await renderKey()
     await unlock(world)
