@@ -1,7 +1,7 @@
 # Thread 2: envman_actions (2026-11-22)
 
-Branch `20261122-envman_actions`, PR #TBD, stacked on #818. Proved: `pnpm --filter safebyok-demo-envman` lint,
-typecheck and test (30 tests, 4 files); `pnpm justify` at the end (see the PR's **Tests:** line).
+Branch `20261122-envman_actions`, PR #819, stacked on #818. Proved: `pnpm --filter safebyok-demo-envman` lint,
+typecheck and test (30 tests, 4 files); `pnpm justify` green (envman 30, react-lean 266, safebyok 1367, e2e 576).
 
 * **Built**: envman (`demos/safebyok-demo-envman`) is the worked example of React 19 Actions.
   - `AddEnvForm`, `EnvSettingsDialog` and `SessionBar` are form Actions under `useActionState`, each submit the parts'
