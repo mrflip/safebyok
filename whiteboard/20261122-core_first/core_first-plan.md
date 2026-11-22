@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: running (2026-11-22). Thread 1 merged (#840). #817, #831, #837, #841, #830, #842 merged; #845 (vaultDB comments) ready for the Coach. Thread 2 (#844) rebasing onto main by a fresh worker, which compacted once (19:52Z, mid-rebase, before its readiness check); it restacks onto #845 at filing. Its high review follows. Every other open PR stays in draft and outside this sprint (the Coach).
+* **Status**: running (2026-11-22). Thread 1 merged (#840). Thread 2 (#844) rebased onto main at `5cce9f369`, justify green by its report, in high review on opus. Threads 3 (`list_answer`) and 4 (`device_early`) building, cut from thread 2's branch. #845 ready for the Coach; every other open PR stays in draft, outside this sprint.
 
 The Coach's request, verbatim:
 
@@ -112,7 +112,7 @@ once #828 has merged and 1 has caught up; if #828 has not merged when 1 is ready
 any user is signed in, and has one VaultMinder per signed-in user attach to a client the device made; build the
 BankMinder so that it needs no userid to exist and holds many users' worlds. Thread 6 persists both clients. *Size*: L.
 
-*Status*: ready, [#844](https://github.com/mrflip/safebyok/pull/844) at `07c718450`, unreviewed (paused). World keyed `['sok', userid, banklabel, 'world', lifeseq, lifetok]`; `ThingMinder` renamed `VaultMinder`, boxes only. For thread 4: a VaultMinder cannot yet be handed its client (the `onSuccess` pin sits on the client it makes); the Gate object does not adopt a gate changed elsewhere (read it from the world); the stage is read once at bring-up. Deviations: a damaged bank or gate beside a root box refuses `storage_issue` (was `damaged_row`); react-lean gained `bridgeWorld` and a renamed host gate key.
+*Status*: ready, [#844](https://github.com/mrflip/safebyok/pull/844) at `5cce9f369`, rebased onto main over #831, #837, #830 and #842 by a second worker (one compaction, mid-rebase). In high review. World keyed `['sok', userid, banklabel, 'world', lifeseq, lifetok]`; `VaultMinder`, boxes only, forwards bank, gate and root on any client (no gap for thread 4). bridgeWorld moved into the giver: `useGate` caches only `GateShown` from `bankMinder.worldAt`, refetched on `subscribe`. Deviations: `storage_issue` for a damaged root; `#minderEventOf` skips non-item entrykinds; `IdbMinderBridge.goodbye` removed (the Coach).
 
 ### 3. `list_answer`: a list's answer under the feed principle, and the listing over it
 
