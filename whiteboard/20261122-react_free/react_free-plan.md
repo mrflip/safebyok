@@ -9,7 +9,8 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: threads 1, 2 (#822), 3 (#819), 4 (#834), 6 (#835) filed; 5 (#836) filing; then the restack, then 7.
+* **Status**: threads 1 to 6 filed and restacked into one line on #823: #822 ← #819 ← #835 ← #834 ← #836 (tip
+  `14cc583e6`, `pnpm justify` green, 7,423 tests); thread 7 (`browser_pass`) running from its tip.
 
 ## Read first
 
@@ -136,7 +137,7 @@ are naming). *Depends on*: thread 4 (the same parts). *Size*: medium.
 
 *Status*: ready at `e07b84aaa` (#836, justify green), one compaction before readiness; in review. `WithLockableWhisperOpts`
 turned out to live in `react-giver.tsx`, beside #835's lines: a trivial restack conflict, keep both. Four open matters,
-rows in the doc. Reviewed `fixed`; filing.
+rows in the doc. Reviewed `fixed`; filed at `328be3a63`.
 
 *Review:* fixed, at `440926620`: a `KitPhrasesProvider` nested in a `PartsPhrasesProvider` dropped the outer parts
 words (fixed, with a test); both providers make their checks with `Checkers('bad_record', …)`; a quote style. Minor:
@@ -175,7 +176,8 @@ the two re-exported types.
 browser, headless Chromium through Playwright if the repo has it, walking each app's flows (sign in, create the vault,
 unlock, save, reveal, a refusal), and record what breaks. Fix what is a plain bug in a demo; carry the rest back as
 matters. The comparison with the Coach's own run is the Coach's (a *For coach* row). *Levels*: review `none` unless it
-changes code. *Depends on*: threads 2 to 5, restacked into a line. *Size*: small to medium.
+changes code. *Orchestrator:* the machine has no browser; the worker installs Playwright and Chromium in its scratch
+directory only, and reports blocked if Chromium needs system libraries. *Depends on*: threads 2 to 5, restacked into a line. *Size*: small to medium.
 
 ### Not taken
 

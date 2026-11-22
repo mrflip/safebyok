@@ -17,6 +17,13 @@ not write it.
   `origin/20261122-multiples`).
 * Threads 2 and 3 rework the workshop's #822 and #819 in the workshop's own worktrees, rebased onto `908751892`.
 
+## The sprint's line (restacked 2026-11-22)
+
+*Orchestrator:* on #823 (`1c051f5f7`, the workshop's): #822 `782aa5d54` ← #819 `742699ea0` ← #835 `c31f46d71` ← #834
+`7c288890f` ← #836 `14cc583e6`, each body "Stacked on" the one below, all drafts, verified. One conflict, kept both
+assertion lines in `react-giver.tsx`. Rollback tags `<branch>-prerestack-rf1` in the base repo; local refs reset to
+origin and each `sprintbase`/`sprintbasebranch` set to the PR below.
+
 ## Where things are
 
 * *Orchestrator:* `notes/react_lib_principles.md` is committed only on the base checkout's branch, not on the line:
