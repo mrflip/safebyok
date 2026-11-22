@@ -144,13 +144,15 @@ describe("a minder on a shared client, after goodbye", () => {
 
 describe("a shared client's cache", () => {
   it("settles nothing a fetch lands under a key of a bank no minder is minding", async () => {
-    const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank])
+    const vaultDB     = await storedBanksOf(new MemoryVaultDB(), [TH.ThingBank, OtherUserBank])
     const queryClient = ThingMinder.makeClient()
     const mine        = sharingMinderOf(vaultDB, queryClient, TH.ThingBank)
+    sharingMinderOf(vaultDB, queryClient, OtherUserBank).minder.goodbye()
     const queryKey    = ThingMinder.itemQueryKeyOf(scopeIn(OtherUserBank, 'box/openai'))
     const listKey     = ThingMinder.listQueryKeyOf(scopeIn(OtherUserBank, 'box'))
+    queryClient.setQueryData(listKey, [])
     await queryClient.query({ queryKey, queryFn: () => boxIn(OtherUserBank) })
-    expect(queryClient.getQueryData(listKey)).to.be.undefined
+    expect(queryClient.getQueryData(listKey)).to.deep.equal([])
     expect(mine.minder.listingAt(TH.RootScope)).to.deep.equal([])
     expect(toldOf(mine.heard)).to.deep.equal([])
   })
