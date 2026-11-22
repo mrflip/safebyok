@@ -164,7 +164,7 @@ export function reactGiver<BanklabelT extends string>(config: GiverConfig<Bankla
 
   /** The device of the provider mounted, while someone is signed in on it, or null. */
   function signedInDevice(): Device | null {
-    return (mounted?.userid == null) ? null : mounted
+    return (typeof mounted?.userid === 'string') ? mounted : null
   }
 
   /** The signed-in user's device. Refuses `absent_vault` while nobody is signed in, or no provider is mounted. */
