@@ -342,8 +342,8 @@ function makeBankGiver(friend: BankFriend) {
     return queryOptions({ ...boxQueryBaseOf(device, labelpath, isUp), select: liveOf<BoxRecord> })
   }
 
-  // Left with no queryFn, a query of the minder's item fetches by the minder's own, set in the client at its `hello`,
-  // which lands the record as a get's.
+  // Left with no queryFn, a query of the minder's item fetches by the client's own, which asks the minder of the item's
+  // bank and lands the record as a get's.
   /** {@link boxQueryOf}, less its `select`. */
   function boxQueryBaseOf(device: Device | null, labelpath: string, isUp: boolean): Pick<UseQueryOptions<BoxShown>, 'queryKey' | 'queryFn' | 'networkMode' | 'staleTime' | 'structuralSharing'> {
     const boxLabelpath = boxLabelpathOf(labelpath)

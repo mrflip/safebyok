@@ -323,6 +323,8 @@ describe("VaultMinder, a child's first landing", () => {
     const observer = new TSQ.QueryObserver(minder.queryClient, { queryKey: minder.listQueryKey(TH.RootScope) })
     const unsubscribe = observer.subscribe(() => undefined)
     try {
+      // A listing is stale at once, so the observer lists as it mounts.
+      await TH.eventually(() => ! observer.getCurrentResult().isFetching)
       cheatBox(vaultDB, TH.boxThingOf('anthropic'))
       receive(noticeOf(TH.boxThingOf('anthropic')))
       await TH.eventually(() => labelpathsOf(minder.listingAt(TH.RootScope))?.length === 2)
