@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: threads 1, 2 (#822), 3 (#819) filed; 4 (#834) and 6 (#835) in review; 5 building on 4; then 7.
+* **Status**: threads 1, 2 (#822), 3 (#819), 6 (#835) filed; 4 (#834) in review; 5 building on 4; then 7.
 
 ## Read first
 
@@ -140,7 +140,11 @@ rewrites, so it moves to thread 5; thread 6 keeps the other three and the base-3
 
 *Status*: ready at `191244880` (#835, justify green); in review. Pattern: each type hand-written, asserted equal to
 its checker's input (`AssertEqual`, `CheckerInput`, newly re-exported by `safebyok/storage`). Three open matters,
-rows in the doc.
+rows in the doc. Reviewed `clean`; filed.
+
+*Review:* clean. Minor, kept: `.readonly()` on `secretFieldnames` freezes the parsed array, which its one consumer only
+reads; the `Lifeseq` doc block's "not RFC 4648's base32, nor Crockford's". `safebyok/storage` confirmed as the home of
+the two re-exported types.
 
 ### 7. `browser_pass`: the demos in a real browser
 
