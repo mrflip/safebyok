@@ -1,7 +1,8 @@
 # Thread 3: envman_rework (2026-11-22)
 
 Branch `20261122-envman_actions`, PR #819, stacked on #823 (`20261122-multiples`, 908751892). Proved:
-`pnpm --filter safebyok-demo-envman` lint, typecheck, test (32 passed, 4 files); `pnpm justify` below.
+`pnpm --filter safebyok-demo-envman` lint, typecheck, test (32 passed, 4 files); `pnpm justify` green after the
+catch-up (envman 32, react-lean 291, knockknock 26, safebyok 1399, e2e 576).
 
 The build before this rework is in `whiteboard/20261122-react_targets/thread-2-envman_actions.md` (react_targets
 workshop, thread 2): read it for why every envman form is a form Action.
