@@ -1,6 +1,6 @@
 # Thread 12: provider_owns (2026-11-22)
 
-Branch `20261122-provider_owns`, PR #837 (draft), stacked on #826. Proved: `pnpm --filter safebyok-react-lean test` (23 files, 304 tests), `tsc --noEmit` and `eslint src tests` clean in the package; `pnpm justify` at the tip before `ready`.
+Branch `20261122-provider_owns`, PR #837 (draft), stacked on #826. Proved: `pnpm justify` green at `5d6bddda4` (safebyok-react-lean 23 files, 304 tests, 17 of them in the new `record-hooks.test.tsx`; safebyok 1415; both lean demos, envman 24 and knockknock 26; e2e 576; every other package green).
 
 The brief's "holder" is `ProviderMount` in the code (`hold` is a word VOCABULARY.md asks us to avoid).
 
