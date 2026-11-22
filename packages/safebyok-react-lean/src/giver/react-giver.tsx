@@ -488,7 +488,7 @@ function makeBankGiver(friend: BankFriend) {
   }
 
   // React shows the form's FormData to the components inside it, through `useFormStatus().data`, until the action settles.
-  // Emptied before the first await, it holds the whisper during no render.
+  // With its secret fields deleted before the first await, it holds the whisper during no render.
   /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
    * Make it at module scope, or under `useMemo`, so its checks run once.
    * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then deletes the form's secret fields before it writes: every field, or only those `opts.secretFieldnames` names.
