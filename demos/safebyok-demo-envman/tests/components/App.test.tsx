@@ -50,14 +50,22 @@ function expectUnheld(page: Awaited<ReturnType<typeof loadPage>>): void {
   for (const text of [Passphrase, OpenaiKey, DatabaseUrl, NextOpenaiKey]) { TH.expectTextUnheld(text, page.container, page.client) }
 }
 
-/** The section of the page titled `title`. */
-function region(title: string): HTMLElement { return screen.getByRole('region', { name: title }) }
+/** The add form's section of the page. */
+function addFormRegion(): HTMLElement { return screen.getByRole('region', { name: 'Add a secret' }) }
 
 /** The row of the secret titled `title`, once it shows. */
 async function rowOf(title: string): Promise<HTMLElement> { return await screen.findByRole('listitem', { name: title }) }
 
 /** The value input of the secret titled `title`. */
 function valInputOf(row: HTMLElement, title: string): HTMLInputElement { return within(row).getByLabelText<HTMLInputElement>(`Value of ${title}`) }
+
+/** The labels of the add form's fields, the value last. */
+const AddFieldLabels = ['Title', 'Description', 'Rotation period in days', 'Last rotated', 'Value']
+
+/** The values of the inputs labelled `labels` inside `container`. */
+function valuesIn(container: HTMLElement, labels: readonly string[]): string[] {
+  return labels.map((label) => within(container).getByLabelText<HTMLInputElement>(label).value)
+}
 
 /** Sign in as Hue. */
 async function signIn(): Promise<void> {
@@ -77,7 +85,7 @@ async function createVault(): Promise<void> {
 
 /** Add a secret with the add form, last rotated on `lastRotatedDay` or, left out, today. */
 async function addEnv(title: string, val: string, lastRotatedDay = ''): Promise<void> {
-  const form = region('Add a secret')
+  const form = addFormRegion()
   fireEvent.change(within(form).getByLabelText('Title'), { target: { value: title } })
   fireEvent.change(within(form).getByLabelText('Description'), { target: { value: `The ${title} of production` } })
   fireEvent.change(within(form).getByLabelText('Rotation period in days'), { target: { value: '30' } })
@@ -133,6 +141,35 @@ describe("Envman", () => {
     expect(valInputOf(openai, 'OPENAI_API_KEY')).to.include({ type: 'password', value: '' })
     await within(openai).findByText(StoredMask)
     expectUnheld(reloaded)
+  })
+
+  it("keeps what was typed in the add form when it is refused, all but the value", async () => {
+    const page = await loadPage()
+    await signIn()
+    await createVault()
+    const form = addFormRegion()
+    fireEvent.change(within(form).getByLabelText('Title'), { target: { value: ' ' } })
+    fireEvent.change(within(form).getByLabelText('Description'), { target: { value: 'The OPENAI_API_KEY of production' } })
+    fireEvent.change(within(form).getByLabelText('Rotation period in days'), { target: { value: '30' } })
+    fireEvent.change(within(form).getByLabelText('Last rotated'), { target: { value: '2020-01-01' } })
+    fireEvent.change(within(form).getByLabelText('Value'), { target: { value: OpenaiKey } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Add' }))
+    await within(form).findByText('Give it a title.')
+    expect(valuesIn(form, AddFieldLabels)).to.deep.equal(['', 'The OPENAI_API_KEY of production', '30', '2020-01-01', ''])
+    expectUnheld(page)
+
+    await addEnv('OPENAI_API_KEY', OpenaiKey)
+    expect(within(form).queryByRole('alert')).to.be.null
+    expect(valuesIn(form, AddFieldLabels)).to.deep.equal(['', '', '90', '', ''])
+    expectUnheld(page)
+  })
+
+  it("keeps a username refused at sign-in", async () => {
+    await loadPage()
+    fireEvent.change(await screen.findByLabelText('Username'), { target: { value: 'Hue' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await screen.findByText('A username is', { exact: false })
+    expect(screen.getByLabelText<HTMLInputElement>('Username').value).to.eq('Hue')
   })
 
   it("shows a value on focus, and Undo masks it again unchanged", async () => {
@@ -226,6 +263,49 @@ describe("Envman", () => {
     const reloadedRow = await rowOf('OPENAI_KEY_PROD')
     expect(reloadedRow.className).to.contain('overdue')
     expect(within(reloadedRow).getByText('Last rotated 2021-06-01.', { exact: false })).to.exist
+  })
+
+  it("keeps what was typed in the settings when they are refused", async () => {
+    await loadWithEnvs()
+    const row = await rowOf('OPENAI_API_KEY')
+    fireEvent.click(within(row).getByRole('button', { name: 'Settings of OPENAI_API_KEY' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Settings of OPENAI_API_KEY' })
+    fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: ' ' } })
+    fireEvent.change(within(dialog).getByLabelText('Description'), { target: { value: 'Rotated by hand' } })
+    fireEvent.change(within(dialog).getByLabelText('Rotation period in days'), { target: { value: '7' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    await within(dialog).findByText('Give it a title.')
+    expect(valuesIn(dialog, ['Title', 'Description', 'Rotation period in days'])).to.deep.equal(['', 'Rotated by hand', '7'])
+
+    fireEvent.change(within(dialog).getByLabelText('Title'), { target: { value: 'OPENAI_KEY_PROD' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    const renamed = await rowOf('OPENAI_KEY_PROD')
+    expect(within(renamed).getByText('Rotated by hand')).to.exist
+    expect(within(renamed).getByText('Rotate every 7 days.', { exact: false })).to.exist
+  })
+
+  it("keeps a value typed when its Save is refused, and the next Save writes it", async () => {
+    await loadWithEnvs()
+    const page = await loadPage()
+    await screen.findByRole('heading', { name: 'Your vault is locked' })
+    const row = await rowOf('OPENAI_API_KEY')
+    const input = valInputOf(row, 'OPENAI_API_KEY')
+    const undo = within(row).getByRole<HTMLButtonElement>('button', { name: 'Undo' })
+    fireEvent.change(input, { target: { value: NextOpenaiKey } })
+    await waitFor(() => { expect(undo.disabled).to.eq(false) })
+    fireEvent.click(within(row).getByRole('button', { name: 'Save' }))
+    fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => { expect(screen.queryByRole('dialog')).to.be.null })
+    await waitFor(() => { expect(within(row).getByRole<HTMLButtonElement>('button', { name: 'Save' }).disabled).to.eq(false) })
+    expect([input.value, undo.disabled]).to.deep.equal([NextOpenaiKey, false])
+
+    fireEvent.click(within(row).getByRole('button', { name: 'Save' }))
+    unlockIn(await screen.findByRole('dialog'))
+    await waitFor(() => { expect(undo.disabled).to.eq(true) })
+    await within(row).findByText(NextLiveMask)
+    await revealIn(input, NextOpenaiKey)
+    expectUnheld(page)
   })
 
   it("asks for the passphrase when a value is focused on a locked vault, then shows it", async () => {

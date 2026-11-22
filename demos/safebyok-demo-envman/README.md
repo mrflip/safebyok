@@ -13,19 +13,28 @@ pnpm demo:envman          # from the repo root: builds what the demo needs, then
 
 ## What it shows
 
+Envman is the worked example of React 19 Actions (`docs/guide-suspense.md`, its Actions half): each form is an Action
+under `useActionState`, its submit the parts' `SubmitButton`, which reads `useFormStatus`; a refused form shows again
+what was typed, all but a secret, through each input's `defaultValue`.
+
 * `src/lib/sok.ts`: the giver and its bank, made once at module scope.
+* `src/components/SessionBar.tsx`: the fake sign-in form, an Action.
 * `src/components/EnvmanPage.tsx`: the page switched on `Envman.useBank().stage`, one component for locked and
   unlocked so a row waiting on the unlock dialog stays mounted, and the kit's `CreateVaultForm`, `UnlockForm` and
   `UnlockDialog`, each finding its bank through the provider.
 * `src/components/EnvList.tsx`: `Envman.useBoxList()`, a row each.
 * `src/components/EnvRow.tsx`: each row's `Envman.useBox`, nothing for a deleted box, and `Envman.useDraft` for the
-  value's Save and Undo on a plain input of its `whisperField('val')`; Save stamps `last_rotated_at` when the value
-  changed. Beside the input, the parts' `WhisperMask` writes the value's mask into the page: its last four characters
-  while unlocked, the stored mask while locked. On a lock, `Envman.useStageChange` discards the row's open draft: the
-  library leaves it alone, and this demo chooses to.
-* `src/components/EnvSettingsDialog.tsx`: the gear's dialog, the kit's `ModalDialog`, setting the draft's sidecar.
+  value's Save and Undo on a plain input of its `whisperField('val')`. Save is an Action on a button, through
+  `useTransition`, not a form: React empties a form's inputs after its action, and the draft would still count the
+  emptied value as typed. Save stamps `last_rotated_at` when the value changed. Beside the input, the parts'
+  `WhisperMask` writes the value's mask into the page: its last four characters while unlocked, the stored mask while
+  locked. On a lock, `Envman.useStageChange` discards the row's open draft: the library leaves it alone, and this demo
+  chooses to.
+* `src/components/EnvSettingsDialog.tsx`: the gear's dialog, the kit's `ModalDialog`, its form an Action setting the
+  draft's sidecar.
 * `src/components/AddEnvForm.tsx`: `Envman.putBoxAction` under `useActionState`, a new box under a minted label per
-  submit, its sidecar mask from `mask` (`tail: 0`).
+  submit, its sidecar mask from `mask` (`tail: 0`). `putBoxAction` empties the form's data before it writes, so the
+  app reads the fields to show again first.
 * `src/lib/env-sidecar.ts`: the stored sidecar, `title`, `description`, `rotation_period_ms`, `last_rotated_at` and `mask`.
 
 ## Demo scaffolding
