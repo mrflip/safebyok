@@ -71,7 +71,7 @@ describe("reactGiver", () => {
     const { SOK } = await TH.buildProviderWorld()
     expect(Object.keys(SOK)).to.deep.equal(['Provider', 'useStrengthVerdict', 'useQueryOptions', 'bank'])
     expect(Object.keys(SOK.bank('acme'))).to.deep.equal([
-      'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
+      'useBank', 'useStageChange', 'useGate', 'useBox', 'useBoxList', 'boxQuery', 'queryClient', 'keys', 'withWhisper', 'withLockableWhisper', 'putBoxOnce', 'delBoxOnce', 'putBoxAction', 'useDraft', 'lock', 'dismissUnlock',
       'useBirth', 'useUnlock', 'useReplacePassphrase', 'useAddPasskey', 'useRevokePasskey',
       'birthGating', 'unlockGating', 'replacePassphraseGating', 'addPasskeyGating', 'revokePasskeyGating',
       'birthMutationOptions', 'unlockMutationOptions', 'replacePassphraseMutationOptions', 'addPasskeyMutationOptions', 'revokePasskeyMutationOptions',
@@ -141,11 +141,16 @@ describe("the provider", () => {
     expect(world.counts.watches).to.eq(1)
   })
 
-  it("refuses to render outside a QueryClientProvider", async () => {
-    const { SOK } = await TH.buildProviderWorld()
+  it("shows records outside a QueryClientProvider, and refuses a form verb's mutation there", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const { SOK, Bank } = world
+    function ShowBox() { return <p>{Bank.useBox(TH.JokesPath).data?.sidecar['service'] as string | undefined}</p> }
+    function Unlock() { Bank.useUnlock(); return null }
+    render(<SOK.Provider userid={TH.ProviderUser} vaultDB={world.vaultDB} keyDeriver={world.deriver}><ShowBox /></SOK.Provider>)
+    await screen.findByText('jokes')
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
     onTestFinished(() => { vi.restoreAllMocks() })
-    expect(() => render(<SOK.Provider userid={TH.ProviderUser} />)).to.throw('No QueryClient set')
+    expect(() => render(<SOK.Provider userid={TH.ProviderUser}><Unlock /></SOK.Provider>)).to.throw('No QueryClient set')
   })
 })
 
@@ -345,12 +350,13 @@ describe("useGate", () => {
     await waitFor(() => { expect(result.current.gate.data).to.be.null })
   })
 
-  it("answers the stored gate with no passkey, keyed by keys.gate()", async () => {
+  it("answers the stored gate with no passkey, keyed by keys.gate() in the minder's own cache", async () => {
     const { result, world } = await renderGate()
     expect(result.current.header).to.be.null
     expect(result.current.gate.data?.wayins.main.wayinkind).to.eq('passphrase')
     expect(world.Bank.keys.gate()).to.deep.equal(['sok', 'u1', 'acme', 'item', 'gate', '!'])
-    expect(world.client.getQueryData(world.Bank.keys.gate())).to.have.property('wayins')
+    expect(world.Bank.queryClient().getQueryData(world.Bank.keys.gate())).to.have.nested.property('wayins.main.bank_key_wayin_wrapped')
+    expect(world.client.getQueryData(world.Bank.keys.gate())).to.be.undefined
   })
 
   // useGate @example
@@ -539,12 +545,19 @@ async function renderUnlocked<ResultT>(hook: (world: TH.ProviderWorld) => Result
 const JokesKey = ThingMinder.itemQueryKeyOf({ ...LeanTH.WorldScope, labelpath: `box/${TH.JokesPath}` })
 
 describe("useBox", () => {
-  it("shows the stored record once the device starts, and fetches nothing while nobody is signed in", async () => {
-    const { result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath), { stored: 'jokes' }, { userid: null })
+  // A finding of the one-cache spike: see useQueryOptions's test of a user signing in under the same mount.
+  it("fetches nothing while nobody is signed in, and once a user signs in under the same mount, shows the stored record but no newer revision", async () => {
+    const { world, result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath), { stored: 'jokes' }, { userid: null })
     expect([result.current.data, result.current.fetchStatus]).to.deep.equal([undefined, 'idle'])
     treeOpts.userid = TH.ProviderUser
     rerender()
     await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
+    const { minder } = world._cheat_device()
+    const jokes = { ...minder.scope, labelpath: `box/${TH.JokesPath}` } as const
+    await act(() => world._cheat_otherVault!.putBoxOnce(jokes.labelpath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
+    await waitFor(() => { expect(minder.at(jokes)?.revseq).to.eq(1) })
+    rerender()
+    expect(result.current.data?.revseq).to.eq(0)
   })
 
   it("fetches nothing while the bank is starting, and the stored record once it shows locked", async () => {
@@ -575,14 +588,15 @@ describe("useBox", () => {
     await waitFor(() => { expect(result.current.data).to.eq(0) })
   })
 
-  it("stays fresh until the host's item is invalidated, and then fetches again", async () => {
+  it("stays fresh until its item is invalidated, and then fetches again", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBox(TH.JokesPath), { stored: 'jokes' })
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     expect(result.current.isStale).to.eq(false)
     const queryKey = JokesKey
-    const updates = world.client.getQueryState(queryKey)!.dataUpdateCount
-    await act(() => world.client.invalidateQueries({ queryKey }))
-    await waitFor(() => { expect(world.client.getQueryState(queryKey)?.dataUpdateCount).to.eq(updates + 1) })
+    const client = world.Bank.queryClient()
+    const updates = client.getQueryState(queryKey)!.dataUpdateCount
+    await act(() => client.invalidateQueries({ queryKey }))
+    await waitFor(() => { expect(client.getQueryState(queryKey)?.dataUpdateCount).to.eq(updates + 1) })
     expect(result.current.isStale).to.eq(false)
   })
 
@@ -635,12 +649,16 @@ describe("useBox", () => {
 const BoxListKey = ThingMinder.listQueryKeyOf({ ...LeanTH.WorldScope, labelpath: 'box' })
 
 describe("useBoxList", () => {
-  it("lists the stored boxes once the device starts, and fetches nothing while nobody is signed in", async () => {
-    const { result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'jokes' }, { userid: null })
+  // A finding of the one-cache spike: TanStack binds an observer to the client of its first render, so a hook mounted while
+  // nobody is signed in stays on the giver's idle client, and never sees the listing the minder lists into its own.
+  it("fetches nothing while nobody is signed in, and lists nothing once a user signs in under the same mount", async () => {
+    const { world, result, treeOpts, rerender } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'jokes' }, { userid: null })
     expect([result.current.data, result.current.fetchStatus]).to.deep.equal([undefined, 'idle'])
     treeOpts.userid = TH.ProviderUser
     rerender()
-    await waitFor(() => { expect(result.current.data).to.deep.equal([TH.JokesPath]) })
+    await waitFor(() => { expect(world.Bank.queryClient().getQueryData(BoxListKey)).to.deep.equal([`box/${TH.JokesPath}`]) })
+    rerender()
+    expect(result.current.data).to.be.undefined
   })
 
   it("answers an empty listing for a user with no bank stored", async () => {
@@ -672,18 +690,19 @@ describe("useBoxList", () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBoxList(), { stored: 'jokes' })
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     expect(world.Bank.keys.boxList()).to.deep.equal(['sok', 'u1', 'acme', 'list', 'box', '#', 'kids'])
-    expect(world.client.getQueryData(BoxListKey)).to.deep.equal([`box/${TH.JokesPath}`])
-    await world.client.invalidateQueries({ queryKey: world.Bank.keys.under() })
-    expect(world.client.getQueryState(BoxListKey)?.isInvalidated).to.eq(false)
+    const client = world.Bank.queryClient()
+    expect(client.getQueryData(BoxListKey)).to.deep.equal([`box/${TH.JokesPath}`])
+    await client.invalidateQueries({ queryKey: world.Bank.keys.under() })
+    expect(client.getQueryState(BoxListKey)?.isInvalidated).to.eq(false)
   })
 })
 
 describe("boxQuery", () => {
-  it("gives a host's useQuery what useBox answers", async () => {
+  it("gives useQuery, in the giver's client, what useBox answers", async () => {
     const { world, result } = await renderUnder((world) => world.Bank.useBank((bank) => bank.stage), { stored: 'jokes' })
     await waitFor(() => { expect(result.current).to.eq('locked') })
     function Wrapper({ children }: Readonly<{ children: ReactNode }>) { return TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) }
-    const queried = renderHook(() => useQuery(world.Bank.boxQuery(TH.JokesPath)), { wrapper: Wrapper })
+    const queried = renderHook(() => useQuery(world.Bank.boxQuery(TH.JokesPath), world.Bank.queryClient()), { wrapper: Wrapper })
     await waitFor(() => { expect(queried.result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
   })
 
@@ -698,7 +717,7 @@ describe("boxQuery", () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const probe = renderHook(() => world.Bank.useBank((bank) => bank.stage), { wrapper: ({ children }: Readonly<{ children: ReactNode }>) => TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) })
     await waitFor(() => { expect(probe.result.current).to.eq('locked') })
-    const record = await world.client.query(world.Bank.boxQuery(TH.JokesPath))
+    const record = await world.Bank.queryClient().query(world.Bank.boxQuery(TH.JokesPath))
     const { gets } = world.counts
     const { result } = renderHook(() => world.Bank.useBox(TH.JokesPath), { wrapper: ({ children }: Readonly<{ children: ReactNode }>) => TH.providerTreeOf(world, children, { userid: TH.ProviderUser }) })
     expect([result.current.data, world.counts.gets]).to.deep.equal([record, gets])
@@ -707,17 +726,18 @@ describe("boxQuery", () => {
   it("never replaces a record with an older one", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
-    const first = world.client.getQueryData(JokesKey)
+    const client = world.Bank.queryClient()
+    const first = client.getQueryData(JokesKey)
     const second = await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
-    world.client.setQueryData(JokesKey, structuredClone(first))
-    expect(world.client.getQueryData(JokesKey)).to.deep.equal(second)
+    client.setQueryData(JokesKey, structuredClone(first))
+    expect(client.getQueryData(JokesKey)).to.deep.equal(second)
   })
 
   it("fetches nothing while nobody is signed in", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
     const options = world.Bank.boxQuery(TH.JokesPath)
     expect(options.queryKey).to.deep.equal(['sok', null, 'acme', 'box/jokes'])
-    await expect(world.client.query(options)).rejects.toThrow('Missing queryFn')
+    await expect(world.Bank.queryClient().query(options)).rejects.toThrow()
     expect(world.counts.gets).to.eq(0)
   })
 })
@@ -748,7 +768,7 @@ describe("keys", () => {
 
 describe("useQueryOptions", () => {
   it("gives the bank's query factories, keyed for the user shown, the same across renders", async () => {
-    const { result, rerender } = await renderUnder((world) => ({ sok: world.SOK.useQueryOptions(), box: useQuery(world.SOK.useQueryOptions().acme.box(TH.JokesPath)) }), { stored: 'jokes' })
+    const { result, rerender } = await renderUnder((world) => ({ sok: world.SOK.useQueryOptions(), box: useQuery(world.SOK.useQueryOptions().acme.box(TH.JokesPath), world.SOK.useQueryOptions().acme.client) }), { stored: 'jokes' })
     await waitFor(() => { expect(result.current.box.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
     const { sok } = result.current
     rerender()
@@ -756,13 +776,25 @@ describe("useQueryOptions", () => {
     expect(sok.acme.box(TH.JokesPath).queryKey).to.deep.equal(JokesKey)
   })
 
-  it("changes key with the user, and fetches nothing while nobody is signed in", async () => {
-    const { world, result, treeOpts, rerender } = await renderUnder((world) => useQuery(world.SOK.useQueryOptions().acme.box(TH.JokesPath)), { stored: 'jokes' }, { userid: null })
+  // A finding of the one-cache spike: the observer keeps the giver's idle client of its first render, while taking the
+  // minder's default queryFn from the client of each later one. So the record is fetched once, into the idle client, and the
+  // minder neither caches it nor tells the hook of a newer revision.
+  it("fetches nothing while nobody is signed in, and once a user signs in under the same mount, fetches once and shows no newer revision", async () => {
+    const { world, result, treeOpts, rerender } = await renderUnder((world) => {
+      const { acme } = world.SOK.useQueryOptions()
+      return useQuery(acme.box(TH.JokesPath), acme.client)
+    }, { stored: 'jokes' }, { userid: null })
     expect(result.current.fetchStatus).to.eq('idle')
     treeOpts.userid = TH.ProviderUser
     rerender()
     await waitFor(() => { expect(result.current.data?.sidecar).to.deep.equal({ service: 'jokes' }) })
-    expect(world.client.getQueryCache().getAll().map((entry) => entry.queryKey)).to.deep.include.members([['sok', null, 'acme', 'box/jokes'], JokesKey])
+    const { minder } = world._cheat_device()
+    const jokes = { ...minder.scope, labelpath: `box/${TH.JokesPath}` } as const
+    expect(minder.at(jokes)).to.be.undefined
+    await act(() => world._cheat_otherVault!.putBoxOnce(jokes.labelpath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: LeanTH.Whisper }))
+    await waitFor(() => { expect(minder.at(jokes)?.revseq).to.eq(1) })
+    rerender()
+    expect(result.current.data?.revseq).to.eq(0)
   })
 })
 
@@ -780,12 +812,12 @@ describe("liveOf", () => {
 })
 
 describe("putBoxOnce", () => {
-  it("writes the box, in the host's query of it by the time it resolves, and useBox shows it", async () => {
+  it("writes the box, in the minder's item by the time it resolves, and useBox shows it", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     // React Query re-renders a hook only for the fields it has read.
     await waitFor(() => { expect(result.current.data).to.not.be.undefined })
     const box = await act(() => world.Bank.putBoxOnce(TH.JokesPath, { sidecar: { service: 'jokes', tier: 'pro' } }, { whisper: { apiKey: 'sk-test-1111' } }))
-    expect(world.client.getQueryData(JokesKey)).to.deep.equal(box)
+    expect(world.Bank.queryClient().getQueryData(JokesKey)).to.deep.equal(box)
     await waitFor(() => { expect(result.current.data).to.deep.equal(box) })
     expect(box.sidecar).to.deep.equal({ service: 'jokes', tier: 'pro' })
     expect(await world.Bank.withWhisper(TH.JokesPath, (whisper) => String(whisper['apiKey']))).to.eq('sk-test-1111')
@@ -829,11 +861,11 @@ describe("putBoxOnce", () => {
 })
 
 describe("delBoxOnce", () => {
-  it("deletes the box, its tombstone in the host's query by the time it resolves, and useBox shows null", async () => {
+  it("deletes the box, its tombstone in the minder's item by the time it resolves, and useBox shows null", async () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     const tombstone = await act(() => world.Bank.delBoxOnce(result.current.data!))
-    expect(world.client.getQueryData(JokesKey)).to.deep.equal(tombstone)
+    expect(world.Bank.queryClient().getQueryData(JokesKey)).to.deep.equal(tombstone)
     await waitFor(() => { expect(result.current.data).to.be.null })
     expect(tombstone.am).to.eq('x')
     await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_box')
@@ -960,7 +992,7 @@ describe("putBoxAction", () => {
     const { world } = await renderKeyEditor({ sidecarOf: undefined })
     submitKey()
     await screen.findByText('Saved')
-    expect(world.client.getQueryData<BoxRecord>(JokesKey)?.sidecar).to.deep.equal({ service: 'jokes' })
+    expect(world.Bank.queryClient().getQueryData<BoxRecord>(JokesKey)?.sidecar).to.deep.equal({ service: 'jokes' })
   })
 
   it("refuses what names no box, and a whisperOf or sidecarOf that is not a function", async () => {

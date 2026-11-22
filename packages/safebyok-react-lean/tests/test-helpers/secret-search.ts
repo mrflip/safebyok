@@ -44,11 +44,11 @@ export function reactTreeOf(container: Element): unknown {
 
 // == [Asserting]: expectTextUnheld
 
-/** Assert `text` is in nothing React holds of the tree rendered into `container`, and, given `client`, in no query or mutation it keeps. */
-export function expectTextUnheld(text: string, container: Element, client?: QueryClient): void {
+/** Assert `text` is in nothing React holds of the tree rendered into `container`, and, given `clients`, in no query or mutation one keeps. */
+export function expectTextUnheld(text: string, container: Element, clients?: QueryClient | readonly QueryClient[]): void {
   expect(holdsText(reactTreeOf(container), text), 'React holds the text').to.eq(false)
-  if (client === undefined) { return }
-  const entries = [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()]
+  if (clients === undefined) { return }
+  const entries = [clients].flat().flatMap((client) => [...client.getQueryCache().getAll(), ...client.getMutationCache().getAll()])
   expect(holdsText(entries.map((entry) => entry.state), text), 'the QueryClient holds the text').to.eq(false)
 }
 // --
