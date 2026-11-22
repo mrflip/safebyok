@@ -41,8 +41,6 @@ export const FixedQueryCacheOpts = Object.freeze({
   persister:       (queryFn: TSQ.QueryFunction, context: TSQ.QueryFunctionContext): unknown => queryFn(context),
   // Initial data would seed each query as it is built with a record no vaultDB answered, fresh as of then.
   initialData:     (): undefined => undefined,
-  // TanStack's query() hands back what select makes of the data, so a get or a list would answer the host's transform.
-  select:          (val: unknown): unknown => val,
 } as const)
 
 // TanStack Query passes a finite staleTime to a timer unchanged, and a timer longer than 2^31 - 1 milliseconds
