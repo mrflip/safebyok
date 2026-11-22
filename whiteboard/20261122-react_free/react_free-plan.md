@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: planned; thread 1 next.
+* **Status**: thread 1 done (#823 on #825, tip `908751892`); threads 2, 3 and 4 building; 6 next, then 5 on 4, then 7.
 
 ## Read first
 
@@ -48,6 +48,11 @@ and #824 and #825 (`draft.discard` on a reset, the error wraps) under it; today 
 #825) stays where it is. *Levels*: worker `opus`, effort `low`; review `none` (no new code but the merge, which
 justify proves; the hunk is reported). *Depends on*: nothing. *Look-ahead*: threads 2 to 6 cut from its tip.
 *Size*: small.
+
+*Status*: done, 2026-11-22. #823 restacked onto #825, tip `908751892`, `pnpm justify` green. One conflict, in
+`putBoxAction`'s doc block and catch (`react-giver.tsx`): the catch is now `return { box: null, err:
+sanitizeForeignError(err), texts: textsOfForm(form) }`, #823's comment on thrown errors dropped as the wrap covers it.
+No review, by its levels.
 
 ### 2. `knock_rework`: Knock-Knock takes up the multiples (#822)
 

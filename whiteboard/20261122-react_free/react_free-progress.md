@@ -8,7 +8,10 @@ not write it.
 * #818 `react_fruit` ← #820 `bulletproof` ← #821 `unlock_urgent` (`9f0b0f591`): the workshop's, reviewed. On #821,
   as siblings: #824 `draft_truth` ← #825 `error_wraps` (`e8c1683f4`) ← #826 `wontfix_demos`; #823 `multiples`
   (`3f19f66e6`); #819 `envman_actions`; #822 `knock_query`; #827 `minder_house` ← the workshop's thread 11.
-* Thread 1 moves #823 onto #825, so that one tip carries all three library threads.
+* *Orchestrator:* thread 1 moved #823 onto #825: `origin/20261122-multiples` at `908751892` carries all three library
+  threads, and is the base of threads 2 to 6. `putBoxAction`'s catch is `return { box: null, err:
+  sanitizeForeignError(err), texts: textsOfForm(form) }`.
+* Threads 2 and 3 rework the workshop's #822 and #819 in the workshop's own worktrees, rebased onto `908751892`.
 
 ## The sprint doc
 
