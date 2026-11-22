@@ -570,7 +570,7 @@ function makeBankGiver(friend: BankFriend) {
    * Disable the submit while it is pending (`disabled={unlock.isPending}`), so a double press unlocks once.
    * @example
    *   const unlock = Knock.useUnlock()
-   *   <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: takeField(form, 'passphrase') })) }}>
+   *   <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: popField(form, 'passphrase') })) }}>
    */
   function useUnlock(): FormMutationResult<UnlockCleartexts> { return useFormMutation('unlock', unlockGating) }
 
