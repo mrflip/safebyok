@@ -4,8 +4,10 @@ import { Checkers } from 'safebyok'
 
 // == [Take]: takeField
 
-/** Take the text of `form`'s field `fieldname` out of `form`: its text, or '' for none or a file.
- * Call it before anything is awaited: React keeps the `FormData` after the action ends, as the form's pending status and in its queued update, and the secret must not be in it.
+// React shows the form's FormData to the components inside it, through `useFormStatus().data`, while the action is
+// pending, and keeps it after the action ends: as the form's pending status, and in the action's queued update.
+/** Take the text of `form`'s field `fieldname` out of `form`: its text, or '' when the field is missing or holds a file.
+ * Call it before the action's first `await`, so that no render sees the secret in the `FormData`.
  * @example
  *   <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: takeField(form, 'passphrase') })) }}>
  */
