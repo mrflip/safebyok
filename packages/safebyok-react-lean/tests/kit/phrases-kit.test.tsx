@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { VaultError } from 'safebyok'
 import { KitPhrases, KitPhrasesProvider, refusalTextOf, useKitPhrases } from '../../src/kit'
-import { PassphraseInput } from '../../src/parts'
+import { PartsPhrasesProvider, PassphraseInput } from '../../src/parts'
 import * as TH from '../test-helpers'
 
 /** The unlock button's word, as the nearest provider gives it. */
@@ -45,6 +45,19 @@ describe("KitPhrasesProvider", () => {
           <PassphraseInput name="passphrase" aria-label="Passphrase" />
         </KitPhrasesProvider>
       </KitPhrasesProvider>,
+    )
+    expect(screen.getByText('Déverrouiller')).to.exist
+    expect(screen.getByRole('button', { name: 'Afficher' })).to.exist
+  })
+
+  it("keeps the parts' words of a PartsPhrasesProvider above it", () => {
+    render(
+      <PartsPhrasesProvider phrases={{ showButton: 'Afficher' }}>
+        <KitPhrasesProvider phrases={{ unlockButton: 'Déverrouiller' }}>
+          <UnlockWord />
+          <PassphraseInput name="passphrase" aria-label="Passphrase" />
+        </KitPhrasesProvider>
+      </PartsPhrasesProvider>,
     )
     expect(screen.getByText('Déverrouiller')).to.exist
     expect(screen.getByRole('button', { name: 'Afficher' })).to.exist

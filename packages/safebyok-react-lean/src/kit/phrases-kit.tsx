@@ -3,7 +3,7 @@
 import { type ReactNode, createContext, useContext } from 'react'
 import { mapValues } from 'es-toolkit'
 import { Checkers, isVaultError } from 'safebyok'
-import { PartsPhrases, PartsPhrasesContext } from '../parts/phrases-parts'
+import { PartsPhrases, PartsPhrasesContext, usePartsPhrases } from '../parts/phrases-parts'
 
 // A sentence with a variable part would be one template function, so a translation could reorder it.
 
@@ -67,7 +67,8 @@ const KitPhrasesContext = createContext<KitPhrases>(KitPhrases)
  *   <KitPhrasesProvider phrases={{ unlockButton: 'Déverrouiller', passphraseField: 'Phrase secrète' }}><UnlockForm /></KitPhrasesProvider>
  */
 export function KitPhrasesProvider({ phrases, children }: KitPhrasesProviderProps) {
-  const merged = { ...useKitPhrases(), ...Checks.phrases.parse(phrases) }
+  // The parts' words come from the parts context too, so a `PartsPhrasesProvider` above keeps its words.
+  const merged = { ...useKitPhrases(), ...usePartsPhrases(), ...Checks.phrases.parse(phrases) }
   return <KitPhrasesContext value={merged}><PartsPhrasesContext value={merged}>{children}</PartsPhrasesContext></KitPhrasesContext>
 }
 
