@@ -36,7 +36,7 @@ export function AddEnvForm() {
         <label>Last rotated <input name="last_rotated_day" type="date" aria-label="Last rotated" /> (blank for today)</label>
         <WhisperInput name="val" aria-label="Value" placeholder="Value" required />
         <SubmitButton whilePending="Adding…">Add</SubmitButton>
-        {(added?.err !== undefined) && (added.err !== null) && <span role="alert" className="gripe">{(added.err as Error).message}</span>}
+        {(added?.err !== undefined) && (added.err !== null) && <span role="alert" className="gripe">{added.err.message}</span>}
       </form>
     </section>
   )

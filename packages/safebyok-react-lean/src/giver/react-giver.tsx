@@ -3,12 +3,14 @@
  */
 
 import { type DataTag, type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryOptions, type UseQueryResult, mutationOptions, queryOptions, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ReactNode, createContext, useCallback, useContext, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { type ReactNode, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
   type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
   PendingBank, type Sidecar, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper,
 } from 'safebyok'
+import { sanitizeForeignError } from 'safebyok/storage'
+import { useEffectEvent } from 'use-effect-event'
 import {
   FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateQueryKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
 } from './giver-defaults'
@@ -72,8 +74,8 @@ export type PutBoxActionOpts = Readonly<{
   sidecarOf?: ((whisper: Whisper, form: FormData) => Sidecar) | undefined
 }>
 
-/** What a {@link BankGiver.putBoxAction} resolves, for `useActionState` to keep: the box stored, or why it was not. */
-export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, err: null }> | Readonly<{ box: null, err: unknown }>
+/** What a {@link BankGiver.putBoxAction} resolves, for `useActionState` to keep: the box stored, or the `Error` that stopped it. */
+export type PutBoxActionResult = Readonly<{ box: LiveOf<BoxRecord>, err: null }> | Readonly<{ box: null, err: Error }>
 
 /** React Query's options for a form verb's mutation, for the host's own `useMutation`: its `mutate` is handed the verb's gating. */
 export type FormMutationOptions = UseMutationOptions<void, Error, Gating>
@@ -482,7 +484,8 @@ function makeBankGiver(friend: BankFriend) {
   /** A form action for `useActionState` that writes the box `boxNamed` names from the form's fields, as {@link putBoxOnce} does.
    * Make it at module scope, or under `useMemo`, so its checks run once.
    * It reads the whisper with `opts.whisperOf`, and the sidecar with `opts.sidecarOf`, then empties the form of every field before it writes.
-   * It never rejects: it resolves the box stored, or the error that stopped it, a refusal or what `whisperOf` or `sidecarOf` threw, as thrown.
+   * It never rejects: it resolves the box stored, or the `Error` that stopped it, a refusal or what `whisperOf` or `sidecarOf` threw.
+   * An `Error` they throw arrives as thrown; anything else they throw arrives wrapped in an `Error`, a thrown string as its message.
    * @example
    *   const [put, putAction, isPutting] = useActionState(useMemo(() => Knock.putBoxAction('jokes', {
    *     whisperOf: (form) => ({ apiKey: String(form.get('apiKey')) }),
@@ -507,7 +510,7 @@ function makeBankGiver(friend: BankFriend) {
         const [patch, secrets] = takeForm(Checks.form.parse(form))
         return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), err: null }
       } catch (err) {
-        return { box: null, err }
+        return { box: null, err: sanitizeForeignError(err) }
       }
     }
   }
@@ -567,11 +570,7 @@ function makeBankGiver(friend: BankFriend) {
    * Disable the submit while it is pending (`disabled={unlock.isPending}`), so a double press unlocks once.
    * @example
    *   const unlock = Knock.useUnlock()
-   *   <form action={(form) => {
-   *     const passphraseCleartext = String(form.get('passphrase'))
-   *     form.delete('passphrase')
-   *     unlock.mutate(unlock.gating({ passphraseCleartext }))
-   *   }}>
+   *   <form action={(form) => { unlock.mutate(unlock.gating({ passphraseCleartext: popField(form, 'passphrase') })) }}>
    */
   function useUnlock(): FormMutationResult<UnlockCleartexts> { return useFormMutation('unlock', unlockGating) }
 

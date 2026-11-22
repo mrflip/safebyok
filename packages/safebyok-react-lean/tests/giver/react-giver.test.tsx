@@ -870,6 +870,9 @@ function makeKeyEditor(world: TH.ProviderWorld, opts: Partial<PutBoxActionOpts> 
   return { KeyEditor, seen }
 }
 
+/** Throw `val`, an `Error` or not, as a host's callback may. */
+function throwValue(val: unknown): never { throw val as Error }
+
 /** Render the key editor over a world with the joke service's key stored, its bank unlocked. */
 async function renderKeyEditor(opts: Partial<PutBoxActionOpts> = {}) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
@@ -937,6 +940,28 @@ describe("putBoxAction", () => {
     await screen.findByText('Refused')
     expect(seen.result?.err).to.eq(thrown)
     expect([...forms[0]!.keys()]).to.deep.equal([])
+  })
+
+  it("wraps a thrown value that is no Error in an Error, the value its cause, and empties the form all the same", async () => {
+    const thrown = { code: 42 }
+    const forms: FormData[] = []
+    const { seen } = await renderKeyEditor({ whisperOf: (form) => {
+      forms.push(form)
+      return throwValue(thrown)
+    } })
+    submitKey()
+    await screen.findByText('Refused')
+    expect(seen.result?.err).to.be.instanceOf(Error)
+    expect(seen.result?.err?.cause).to.eq(thrown)
+    expect([...forms[0]!.keys()]).to.deep.equal([])
+  })
+
+  it("makes a thrown string the message of an Error", async () => {
+    const { seen } = await renderKeyEditor({ whisperOf: () => throwValue('The key field is missing') })
+    submitKey()
+    await screen.findByText('Refused')
+    expect(seen.result?.err).to.be.instanceOf(Error)
+    expect(seen.result?.err?.message).to.eq('The key field is missing')
   })
 
   it("keeps the box's sidecar when it has no sidecarOf", async () => {

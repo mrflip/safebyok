@@ -23,6 +23,9 @@ export default defineConfig({
   // it is, and tsdown writes it into package.json as an inlined dependency at each build.
   deps:       { neverBundle: [/^zod(\/|$)/, /^@tanstack\//, /^safebyok-big(\/|$)/] },
   exports:    { devExports: '@safebyok/source' },
+  // The three entries a host imports start with 'use client', so a Next.js Server Component can import a part or a form.
+  // A directive written in the entries' sources survives the build but warns on each, and `failOnWarn` fails CI on a warning.
+  banner:     ({ fileName }) => (/^(parts\/|kit\/)?index\.c?js$/.test(fileName) ? "'use client';" : undefined),
   publint:    { level: 'warning' },
   attw:       { profile: 'strict', level: 'error' },
   failOnWarn: 'ci-only',

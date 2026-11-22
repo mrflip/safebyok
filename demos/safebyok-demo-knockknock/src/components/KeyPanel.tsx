@@ -44,7 +44,7 @@ function KeyEditor({ isReplacing }: Readonly<{ isReplacing: boolean }>) {
     <form className="row" action={saveAction}>
       <WhisperInput name="apiKey" aria-label="Anthropic API key" placeholder="sk-ant-…" required />
       <SubmitButton whilePending="Saving…">{isReplacing ? 'Replace key' : 'Save key'}</SubmitButton>
-      {(saved?.err !== undefined) && (saved.err !== null) && <span role="alert" className="gripe">{(saved.err as Error).message}</span>}
+      {(saved?.err !== undefined) && (saved.err !== null) && <span role="alert" className="gripe">{saved.err.message}</span>}
     </form>
   )
 }

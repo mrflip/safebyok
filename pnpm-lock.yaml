@@ -241,6 +241,9 @@ importers:
       safebyok-react-lean:
         specifier: workspace:*
         version: link:../../packages/safebyok-react-lean
+      use-effect-event:
+        specifier: ^2.0.4
+        version: 2.0.4(react@19.3.1)
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -344,6 +347,9 @@ importers:
       safebyok-react-lean:
         specifier: workspace:*
         version: link:../../packages/safebyok-react-lean
+      use-effect-event:
+        specifier: ^2.0.4
+        version: 2.0.4(react@19.3.1)
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -1435,6 +1441,9 @@ importers:
       typescript-eslint:
         specifier: ^8.72.2
         version: 8.72.2(eslint@10.14.0)(typescript@6.0.3)
+      use-effect-event:
+        specifier: ^2.0.4
+        version: 2.0.4(react@19.3.1)
       vitest:
         specifier: ^5.1.0
         version: 5.1.0(@edge-runtime/vm@5.0.0)(@opentelemetry/api@1.9.1)(@types/node@24.19.2)(@vitest/coverage-v8@5.1.0)(jsdom@31.0.0(@noble/hashes@2.4.0))(vite@8.3.8(@types/node@24.19.2)(esbuild@0.27.0)(yaml@2.9.1))
@@ -4617,6 +4626,11 @@ packages:
 
   urlpattern-polyfill@10.1.0:
     resolution: {integrity: sha512-IGjKp/o0NL3Bso1PymYURCJxMPNAf/ILOpendP9f5B6e1rTJgdgiOvgfoT8VxCAdY+Wisb9uhGaJJf3yZ2V9nw==}
+
+  use-effect-event@2.0.4:
+    resolution: {integrity: sha512-il5ezAwTIxg1dr+eXP+1SS1EpXe6IFy1oADvGxmiCNGCDX1X+ygERRDOFoCyzc+r6ktqag3VITmrw1ZPfoig1g==}
+    peerDependencies:
+      react: ^18.3 || ^19.0.0-0
 
   validate-npm-package-name@5.0.1:
     resolution: {integrity: sha512-OljLrQ9SQdOUqTaQxqL5dEfZWrXExyyWsozYlAWFawPVNuD83igl7uJD2RTkNMbniIYgt8l81eCJGIdQF7avLQ==}
@@ -8236,6 +8250,10 @@ snapshots:
       punycode: 2.3.1
 
   urlpattern-polyfill@10.1.0: {}
+
+  use-effect-event@2.0.4(react@19.3.1):
+    dependencies:
+      react: 19.3.1
 
   validate-npm-package-name@5.0.1: {}
 
