@@ -234,7 +234,8 @@ export class ThingMinder {
     void this.tryGet(scoped, opts)
   }
 
-  /** List the labelpaths of the Things directly under `labelpath`, tombstones included, in labelpath order, asking the vaultDB each time. A list already under way is shared.
+  /** List the labelpaths of the Things directly under `labelpath`, tombstones included, in labelpath order, from the vaultDB.
+   * A list called while another of the same labelpath is under way answers what that one does.
    * They are added to the listing at `labelpath` ({@link listingAt}). A live Thing listed is cached as its soon where it
    * is newer than the item, so the next get fetches the item whole. A tombstone lands in the item, so a get of it answers
    * from the cache. A Thing stored damaged is left out, and reported to the bank's `tellBadNews`.
