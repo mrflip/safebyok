@@ -43,7 +43,7 @@ describe("takeField", () => {
   for (const [form, blurb] of [
     [null,                                    'null for a form'],
     [{ get: () => 'x', delete: () => null },  'an object that only looks like a FormData'],
-    ['passphrase=fake',                       'a string for a form'],
+    ["passphrase=fake",                       'a string for a form'],
   ] as const) {
     it(`refuses ${blurb}`, () => {
       TH.expectSyncRefusal(() => takeField(form as never, 'passphrase'), 'bad_record')
@@ -52,7 +52,7 @@ describe("takeField", () => {
 
   for (const [fieldname, blurb] of [
     [undefined, 'no fieldname'],
-    ['',        'an empty fieldname'],
+    ["",        'an empty fieldname'],
     [7,         'a number for a fieldname'],
   ] as const) {
     it(`refuses ${blurb}, taking nothing from the form`, () => {
