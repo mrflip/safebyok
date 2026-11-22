@@ -1,8 +1,8 @@
 # Thread 5: kit_parts (2026-11-22)
 
 Branch `20261122-kit_parts`, PR #836, stacked on #834 (thread 4, field_hooks). Proved:
-`pnpm --filter safebyok-react-lean` lint, typecheck, test (24 files, 332 tests); the demos'
-tests unchanged and green (knockknock 26, envman 24).
+`pnpm justify` green after the catch-up onto #834 (as cut): safebyok-react-lean 332 tests in 24
+files, the demos' tests unchanged (Knock-Knock 26, envman 24), e2e 576.
 
 * **Built**, all in `packages/safebyok-react-lean`:
   * **Parts take `className` and mark their state.** `PassphraseInput` and `WhisperInput` give
