@@ -168,10 +168,10 @@ export const WorldNotHeard = "A Bank is made of the bank whose world its device'
 export const MinderClientExpected = 'A minder caches only in a QueryClient made by makeClient, on VaultMinder or BankMinder, whose cache hands each fetched record to its minder.'
 
 /** A minder's hello while another minder of its bank is minding in the same QueryClient. */
-export const BankMindedInClient = "Another VaultMinder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
+export const BankMindedInClient = "Another minder of this bank is minding in this QueryClient: call its goodbye before this one's hello."
 
 /** A minder read or written through before `hello`, or after `goodbye`. */
-export const MinderNotStarted = 'This VaultMinder is not minding: call hello before reading from it or writing through it.'
+export const MinderNotStarted = 'This minder is not minding: call hello before reading from it or writing through it.'
 
 /** A get that storage answered older than the record the minder had cached when it began. */
 export const StaleRead = 'Storage answered with a revision older than one this device already had. The newer record stays cached, and a later get asks again.'
@@ -180,7 +180,7 @@ export const StaleRead = 'Storage answered with a revision older than one this d
 export const StaleTimeShape = 'A staleTime is Infinity, or a whole number of milliseconds from 0 to 2116800000 (24.5 days): a longer timer fires at once, so give Infinity instead.'
 
 /** A minder's `listen` given a feed version other than `MinderEventFormat`. */
-export const FeedVersionOther = "A VaultMinder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
+export const FeedVersionOther = "A minder's listen is given the version of the feed its listener reads, MinderEventFormat, and this listener was written for another: its events are not shaped as it expects."
 
 /** A value handed to newerThingOf that is not a Thing's record. */
 export const NotARecord = "newerThingOf compares the records of one Thing, and was given a value that is not a Thing's record, tombstone or shell."
@@ -189,7 +189,7 @@ export const NotARecord = "newerThingOf compares the records of one Thing, and w
 export const RecordsOfOtherThings = "newerThingOf compares the records of one Thing, and was given the records of two different Things."
 
 /** A record the vaultDB delivered to a minder of another bank, or of another Thing than the minder asked for. */
-export const DeliveredOfOtherScope = "The vaultDB delivered a VaultMinder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."
+export const DeliveredOfOtherScope = "The vaultDB delivered a minder a record of another bank than the minder's, or of another Thing than it asked for: this is a bug in the vaultDB."
 
 /** Children a list found stored damaged, and left out of its answer. */
 export const ChildrenStoredDamaged = "Some of the Things this list found are stored damaged, so it left them out: the refusal's meta.labelpaths names each one. They were left as they are in storage."
