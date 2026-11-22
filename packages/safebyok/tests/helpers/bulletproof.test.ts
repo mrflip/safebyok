@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sanitizeForeignError } from '../../src/refusals/throwers'
+import * as Throwers from '../../src/refusals/throwers'
 import { bulletproofAsyncHandlerOf, bulletproofHandlerOf } from '../../src/helpers/bulletproof'
 import * as TH from '../test-helpers'
 
@@ -29,23 +29,23 @@ const TellNothing = (_err: Error): void => { /* Told nothing. */ }
 
 const BadArgsCases = [
   // the handler:
-  [undefined,     { ifError: 'fail', transformer: sanitizeForeignError },                         'refuses a missing handler'],
-  ["handler",     { ifError: 'fail', transformer: sanitizeForeignError },                         'refuses a handler that is no function'],
+  [undefined,     { ifError: 'fail', transformer: Throwers.sanitizeForeignError },                         'refuses a missing handler'],
+  ["handler",     { ifError: 'fail', transformer: Throwers.sanitizeForeignError },                         'refuses a handler that is no function'],
   // the options:
-  [() => 1,       undefined,                                                                      'refuses missing options'],
-  [() => 1,       { ifError: 'retry', transformer: sanitizeForeignError },                        'refuses an ifError that is neither fail nor tell'],
-  [() => 1,       { ifError: 'fail' },                                                            'refuses options without a transformer'],
-  [() => 1,       { ifError: 'fail', transformer: 'sanitize' },                                   'refuses a transformer that is no function'],
-  [() => 1,       { ifError: 'tell', transformer: sanitizeForeignError },                         'refuses telling without an onBadNews'],
-  [() => 1,       { ifError: 'fail', transformer: sanitizeForeignError, onBadNews: TellNothing }, 'refuses an onBadNews where it would never be told'],
-  [() => 1,       { ifError: 'fail', transformer: sanitizeForeignError, retries: 3 },             'refuses an option it does not know'],
+  [() => 1,       undefined,                                                                               'refuses missing options'],
+  [() => 1,       { ifError: 'retry', transformer: Throwers.sanitizeForeignError },                        'refuses an ifError that is neither fail nor tell'],
+  [() => 1,       { ifError: 'fail' },                                                                     'refuses options without a transformer'],
+  [() => 1,       { ifError: 'fail', transformer: 'sanitize' },                                            'refuses a transformer that is no function'],
+  [() => 1,       { ifError: 'tell', transformer: Throwers.sanitizeForeignError },                         'refuses telling without an onBadNews'],
+  [() => 1,       { ifError: 'fail', transformer: Throwers.sanitizeForeignError, onBadNews: TellNothing }, 'refuses an onBadNews where it would never be told'],
+  [() => 1,       { ifError: 'fail', transformer: Throwers.sanitizeForeignError, retries: 3 },             'refuses an option it does not know'],
 ] as const
 
 describe("bulletproofHandlerOf", () => {
   it("returns what the handler returns, untouched, handed the caller's arguments", () => {
     const answer = { joke: 'knock knock' }
     const handed: unknown[] = []
-    const wrapped = bulletproofHandlerOf((first: string, second: number) => { handed.push(first, second); return answer }, { ifError: 'fail', transformer: sanitizeForeignError })
+    const wrapped = bulletproofHandlerOf((first: string, second: number) => { handed.push(first, second); return answer }, { ifError: 'fail', transformer: Throwers.sanitizeForeignError })
     expect(wrapped('who', 2)).to.eq(answer)
     expect(handed).to.deep.equal(['who', 2])
   })
@@ -69,8 +69,8 @@ describe("bulletproofHandlerOf", () => {
 
   it("rethrows a host's Error as the same object, and a thrown string as an Error's message, with sanitizeForeignError", () => {
     const hostErr = new TypeError('the form has no apiKey')
-    expect(bulletproofHandlerOf(throwing(hostErr), { ifError: 'fail', transformer: sanitizeForeignError })).to.throw(hostErr)
-    expect(bulletproofHandlerOf(throwing('no apiKey'), { ifError: 'fail', transformer: sanitizeForeignError })).to.throw(Error, 'no apiKey')
+    expect(bulletproofHandlerOf(throwing(hostErr), { ifError: 'fail', transformer: Throwers.sanitizeForeignError })).to.throw(hostErr)
+    expect(bulletproofHandlerOf(throwing('no apiKey'), { ifError: 'fail', transformer: Throwers.sanitizeForeignError })).to.throw(Error, 'no apiKey')
   })
 
   it("tells onBadNews the transformer's Error under tell, and returns undefined without throwing", () => {
@@ -95,7 +95,7 @@ describe("bulletproofHandlerOf", () => {
   it("lets what onBadNews throws reach the caller", () => {
     const tellerErr = new Error('the teller is broken')
     const onBadNews = (): void => { throw tellerErr }
-    expect(bulletproofHandlerOf(throwing('x'), { ifError: 'tell', transformer: sanitizeForeignError, onBadNews })).to.throw(tellerErr)
+    expect(bulletproofHandlerOf(throwing('x'), { ifError: 'tell', transformer: Throwers.sanitizeForeignError, onBadNews })).to.throw(tellerErr)
   })
 
   it("returns a handler's rejected promise as it is, catching nothing", async () => {
@@ -117,12 +117,12 @@ describe("bulletproofHandlerOf", () => {
 describe("bulletproofAsyncHandlerOf", () => {
   it("resolves what the handler resolves, untouched, handed the caller's arguments", async () => {
     const answer = { joke: 'knock knock' }
-    const wrapped = bulletproofAsyncHandlerOf(async (first: string) => { await Promise.resolve(); return first === 'who' ? answer : null }, { ifError: 'fail', transformer: sanitizeForeignError })
+    const wrapped = bulletproofAsyncHandlerOf(async (first: string) => { await Promise.resolve(); return first === 'who' ? answer : null }, { ifError: 'fail', transformer: Throwers.sanitizeForeignError })
     expect(await wrapped('who')).to.eq(answer)
   })
 
   it("resolves what a handler returns that is no promise", async () => {
-    const wrapped = bulletproofAsyncHandlerOf(() => 7, { ifError: 'fail', transformer: sanitizeForeignError })
+    const wrapped = bulletproofAsyncHandlerOf(() => 7, { ifError: 'fail', transformer: Throwers.sanitizeForeignError })
     expect(await wrapped()).to.eq(7)
   })
 
@@ -142,7 +142,7 @@ describe("bulletproofAsyncHandlerOf", () => {
 
   it("tells onBadNews the transformer's Error under tell, and resolves undefined", async () => {
     const { onBadNews, told } = recordingTeller()
-    expect(await bulletproofAsyncHandlerOf(rejecting('no deriver'), { ifError: 'tell', transformer: sanitizeForeignError, onBadNews })()).to.be.undefined
+    expect(await bulletproofAsyncHandlerOf(rejecting('no deriver'), { ifError: 'tell', transformer: Throwers.sanitizeForeignError, onBadNews })()).to.be.undefined
     expect(told).to.have.lengthOf(1)
     expect(told[0]?.message).to.eq('no deriver')
   })
