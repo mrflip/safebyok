@@ -1,6 +1,6 @@
 /** The shapes of a ThingMinder's arguments, options and answers, and of the records its items have, with their checks. */
 
-import type * as TSQ from '@tanstack/query-core'
+import * as TSQ from '@tanstack/query-core'
 import type * as Z from 'zod'
 import { type Errors, Validator } from 'safebyok-big/internals'
 import type { ThingMinder } from '../minding/thing-minder'
@@ -25,10 +25,25 @@ export interface QueryCacheOpts {
 /** The default {@link QueryCacheOpts}: an item stays timely for an hour. */
 export const DefaultQueryCacheOpts: Readonly<QueryCacheOpts> = Object.freeze({ staleTime: 60 * 60 * 1000 })
 
-// Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its
-// caller. A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
+// Each is an option a client's defaults could set, and that would change what lands in the cache, what a fetch answers
+// the minder, or when a fetch runs. Options only an observer reads (refetchInterval, the refetchOn* and enabled) are left
+// to whoever observes: the minder has no observer, and an observer's fetch still lands through the minder's queryFn.
 /** The TanStack Query options every minder sets, and no host can change: a get asks the vaultDB even offline, is never retried, and its item stays cached until `goodbye`. */
-export const FixedQueryCacheOpts = Object.freeze({ networkMode: 'always', retry: false, gcTime: Infinity } as const)
+export const FixedQueryCacheOpts = Object.freeze({
+  // Under TanStack's own networkMode, 'online', a get made while the browser reports itself offline waits, and so does its caller.
+  networkMode:     'always',
+  // A retry would put a whizbang in the critical path of a primitive operation (CLAUDE.md).
+  retry:           false,
+  gcTime:          Infinity,
+  // Another hash could merge two of the minder's keys into one query, or split one, and no prefix filter would find it.
+  queryKeyHashFn:  TSQ.hashKey,
+  // A persister answers a fetch in place of the queryFn, from storage of its own, and keeps what lands there. This one asks the queryFn.
+  persister:       (queryFn: TSQ.QueryFunction, context: TSQ.QueryFunctionContext): unknown => queryFn(context),
+  // Initial data would seed each query as it is built with a record no vaultDB answered, fresh as of then.
+  initialData:     (): undefined => undefined,
+  // TanStack's query() hands back what select makes of the data, so a get or a list would answer the host's transform.
+  select:          (val: unknown): unknown => val,
+} as const)
 
 // TanStack Query passes a finite staleTime to a timer unchanged, and a timer longer than 2^31 - 1 milliseconds
 // fires at once, in every JavaScript runtime. The bound is a whole number of hours, below that limit.
@@ -188,7 +203,7 @@ export type MinderEventOf<DataT, EventkindT extends MinderEventkind = MinderEven
   type:      'added' | 'updated' | 'removed'
   /** A frozen copy of TanStack's action that changed the state, or undefined where the query was added or removed. Its `type`:
    * - `'success'`    -- a record arrived in the item or the soon, or a list set the listing
-   * - `'error'`      -- a get was refused
+   * - `'error'`      -- a get or a list was refused
    * - `'invalidate'` -- the item fell behind a newer revision heard of, or the listing was marked stale
    * - `'fetch'`, `'pause'`, `'continue'`, `'failed'`, `'setState'` -- as TanStack dispatches them
    */
@@ -254,6 +269,9 @@ export type SoonEvent<KindT extends Thingkind = Thingkind> = KindT extends Thing
  * The array stays the same object until a labelpath joins. A listing marked stale has `state.isInvalidated` true, and still lists what it did.
  * It tells `success` each time a list sets it (even to the labelpaths it had), a labelpath joins it, or `hello` caches the
  * root box's, and `invalidate` when `invalidate` marks it stale.
+ * A list tells `fetch` as it starts, and `error` if refused, which leaves the listing as it was, `state.isInvalidated` true.
+ * The first list of a listing not cached tells it `added`, `state.data` undefined until the list lands.
+ * Each Thing a list answers lands before the list does: one new to the listing joins it, with its own `success`.
  */
 export type ListingEvent = MinderEventOf<readonly Labelpath[], 'list'> & Readonly<{
   /** The modelkind of the Thing at `labelpath` and of every Thing listed, which is the same: a labelpath starts with its parent's. */
