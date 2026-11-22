@@ -39,8 +39,9 @@ export type Labelpathed = { labelpath: Labelpath }
  * tombstone that last landed. Each Thing whose children it minds has a listing of them, once listed.
  * Records arrive from gets, lists, good writes, the world each answer carries, and the watch, in any order, late or more
  * than once. A live whole record lands in the item, a sparse record in the soon, and a tombstone in the dead entry and
- * then, as Absent, in the item. A listing is the {@link Kids} value a list answered, replaced whole by the next. A record
- * of a Thing it does not mind lands nowhere. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
+ * then, as Absent, in the item. A listing is the {@link Kids} value a list answered, replaced whole by the next. Of a Thing
+ * it does not mind, only what a get or list of it answers is cached, and no later record brings that up to date: get and
+ * list only the Things it minds. It caches only from `hello` until `goodbye`, and `goodbye` empties its cache.
  *
  * ## Invariants
  * - For a caller or listener using it as documented, what it shows depends only on which records the minder has heard

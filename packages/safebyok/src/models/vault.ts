@@ -3,11 +3,12 @@ import { Bank } from './bank'
 import { BaseBox } from './base-box'
 import { Thing } from './thing'
 import { VaultMinder } from '../minding/vault-minder'
+import * as Phrases from '../phrases'
 import * as Throwers from '../refusals/throwers'
 import type { BoxUnsealed } from '../shapes/shapes-bankish'
 import type { BoxWriteAsk } from '../shapes/shapes-asks'
 import type { BoxCleartexts, BoxPublicProps, LiveOf, LivePublicPropsOf, Sealable, TombstoneOf } from '../shapes/shapes-sealers'
-import type { BoxLabelpath } from '../shapes/primitives'
+import { type BoxLabelpath, Labelpath } from '../shapes/primitives'
 import { type MinderGetOpts, type ScopeAt, MinderChecks } from '../shapes/shapes-minder'
 import { type BoxRecord, Shell, isAbsent } from '../shapes/shapes-thing'
 import { BoxChecks } from '../shapes/shapes-thingkinds'
@@ -180,9 +181,9 @@ export class Vault {
     return BaseBox.isTombstone(record) ? this.#bank.makeDelAsk<BoxRecord>({ cited, record }) : this.#bank.makePutAsk<BoxRecord>({ cited, record })
   }
 
-  /** The scope of the box at `labelpath`, in this vault's bank. */
+  /** The scope of the box at `labelpath`, in this vault's bank. Refuses the root box's labelpath. */
   #scopeAt(labelpath: BoxLabelpath): ScopeAt<BoxLabelpath> {
-    return { ...this.#bank.scope, labelpath: BoxChecks.labelpath.parse(labelpath) as BoxLabelpath }
+    return { ...this.#bank.scope, labelpath: Checks.boxLabelpath.parse(labelpath) as BoxLabelpath }
   }
 
   // The shell of a box is of the root box's life.
@@ -206,8 +207,10 @@ function isOfNewerLife(item: Pick<BoxRecord, 'lifepath' | 'revseq'>, soon: Pick<
 
 // == [Checks]: Checks
 
-/** The check of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
+/** The checks of a box's labelpath, never the root box's, and of the `fn` {@link Vault.withWhisper} and {@link Vault.withUnlockedWhisper} call. */
 const Checks = Validator.Checkers('bad_record', ({ fn }) => ({
-  fn: fn<(box: BoxUnsealed) => unknown>(),
+  // The root box is the bank's, minded by its BankMinder: a vault's minder minds only the boxes under it.
+  boxLabelpath: BoxChecks.labelpath.refine((given) => given !== Labelpath.RootBox, Phrases.VaultBoxIsRoot),
+  fn:           fn<(box: BoxUnsealed) => unknown>(),
 }))
 // --

@@ -9,6 +9,7 @@ import { VaultMinder } from '../../src/minding/vault-minder'
 import { MemoryVaultDB } from '../../src/storage/memory-vault-db'
 import type { GetAsk } from '../../src/shapes/shapes-asks'
 import { refusedAnswerOf } from '../../src/storage/refused-answer'
+import * as Phrases from '../../src/phrases'
 import * as Throwers from '../../src/refusals/throwers'
 import type { MinderEvent } from '../../src/shapes/shapes-minder'
 import * as TH from '../test-helpers'
@@ -298,6 +299,16 @@ describe("vault.putBoxOnce(cited, patch, secrets)", () => {
     await TH.expectRefusal(vault.putBoxOnce('gate' as never, { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
   })
 
+  it("refuses the root box's labelpath, fetching and writing nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const fetched = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
+    const err = await TH.expectRefusal(vault.putBoxOnce('box', { sidecar: TH.Sidecar }, { whisper: TH.Whisper }), 'bad_record')
+    expect(err.message).to.include(Phrases.VaultBoxIsRoot)
+    expect(fetched).not.toHaveBeenCalled()
+    expect(written).not.toHaveBeenCalled()
+  })
+
   it("refuses while the bank is locked, or once its bank is swept, and writes nothing", async () => {
     const { bank, vault } = await TH.buildBornVault()
     const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
@@ -553,6 +564,16 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     await TH.expectRefusal(vault.withWhisper(Openai, undefined as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper(Openai, 'apiKey' as never), 'bad_record')
     await TH.expectRefusal(vault.withWhisper('gate' as never, () => undefined), 'bad_record')
+    expect(bank.getSnapshot().isUnlockWanted).to.be.false
+  })
+
+  it("refuses the root box's labelpath, wanting no unlock and fetching nothing", async () => {
+    const { bank, vault } = await TH.buildBornVault()
+    const fetched = vi.spyOn(bank.vaultDB, 'tryGetThing')
+    bank.lock()
+    const err = await TH.expectRefusal(vault.withWhisper('box', () => undefined), 'bad_record')
+    expect(err.message).to.include(Phrases.VaultBoxIsRoot)
+    expect(fetched).not.toHaveBeenCalled()
     expect(bank.getSnapshot().isUnlockWanted).to.be.false
   })
 })

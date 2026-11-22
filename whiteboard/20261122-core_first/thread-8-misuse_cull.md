@@ -14,7 +14,8 @@ shape), guards a real state the object passes through, or guards data integrity 
 
 * **Minder reads** (`at`, `soonAt`, `deadAt`, `isBehindAt`, `listingAt`, `tryAt`, `get`, `isStaleAt`, `list`): no
   longer refuse a Thing the minder does not mind (`#demandItemScope` there, `#demandListingScope`, the abstract
-  `mindsListingAt`). A read of a Thing another minder minds answers what this cache has: nothing.
+  `mindsListingAt`). A cache read of a Thing another minder minds answers nothing; a fetching one (`get`, `tryGet`,
+  `tryAt` with refresh, `list`) caches its answer, which no later record brings up to date (the class doc says so).
 * **`hello`'s `BankMindedInClient`**: refused a second minder of one bank in one client. Our device makes one.
 * **`newerThingOf`'s `RecordsOfOtherThings`**: two records of different Things; only the minder's own query calls it.
 * **`Gate.make`'s device and wayin, `Bank.make`'s device and gate, `tellBadNewsTo`'s device**: `instanceof` on
@@ -32,6 +33,12 @@ shape), guards a real state the object passes through, or guards data integrity 
 * **`tryWrite`'s `NotMinded`**: a VaultMinder's write of the bank, main gate or root box, or a BankMinder's of a box,
   would land in storage and nowhere in the cache: `sendToTSQ` drops a record its minder does not mind, and no watch
   notice brings the write's own record back. It stops a write that would silently cache nothing.
+* **Vault's box entry points refuse the root box `'box'`** (rework after review): `bad_record`, new phrase
+  `VaultBoxIsRoot`, in Vault's `#scopeAt`, before any fetch or unlock wait. A vault's boxes are under the root box;
+  without it `withWhisper('box')` fetched the root box into the vault client and `putBoxOnce('box')` fetched before
+  `NotMinded`. Set aside: restoring the minder's read refusals (guessed-at misuse of our own calls), and refining
+  `PerKindChecks.boxLabelpath` (the root box's own record has that labelpath). No existing phrase fit: `NotMinded`
+  speaks of writes and minders, `LabelpathOfOtherKind` of modelkinds.
 * **`MinderNotStarted`**: a real state, between make and hello.
 * **`MinderClientExpected` (`isClient`)**: a client not made by `makeClient` has no landers; the minder would fail
   on an undefined.

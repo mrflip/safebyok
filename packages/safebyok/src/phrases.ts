@@ -1,6 +1,6 @@
 // The messages of the refusals this package makes itself. The rest are `safebyok-big`'s, through its Throwers.
 
-// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
+// == [Models]: VaultDBExpected, PersisterExpected, SealerExpected, TombstoneSecretsGiven, BoxOfOtherRoot, VaultBoxIsRoot, BankSwept, BankNotBroughtUp, NobodySignedIn, GateSwept, UnlockDismissed, HostedVaultExpected, BoxSoonestBare
 
 /** A vaultDB that lacks one of its verbs or builders. */
 export const VaultDBExpected = 'Expected a VaultDB: an object with a function for each of its verbs, its builders and watch.'
@@ -16,6 +16,9 @@ export const TombstoneSecretsGiven = "A tombstone seals no secrets: give `{ am: 
 
 /** A box whose lifepath is not under the bank's root box. */
 export const BoxOfOtherRoot = "A box's lifepath starts with the lifeseq of its bank's root box: this one is of another life of the root."
+
+/** A vault's box entry point given the root box's labelpath. */
+export const VaultBoxIsRoot = "A vault's boxes are under its bank's root box: give a labelpath such as 'box/openai', never 'box' itself."
 
 /** A call on a bank after its sweep. */
 export const BankSwept = 'This bank was swept, so it answers nothing more: make it again with Bank.make.'
