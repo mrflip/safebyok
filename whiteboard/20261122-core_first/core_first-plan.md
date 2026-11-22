@@ -240,7 +240,11 @@ database's adapter package, not the core: `safebyok-idb-lean` (#829, another ses
 *Gloss.* Across `packages/safebyok/src`: remove each check whose only purpose is to catch a host misusing an interface
 in a way we guessed at (pinned TanStack options a host might pass, refusals for a call order nobody makes), with its
 phrase, thrower and tests. Validation at a module entrypoint of what the interface requires stays (CLAUDE.md). The
-thread lists what it removed and what it kept, with a line each, for the Coach. *Levels*: worker `opus`, effort
+thread lists what it removed and what it kept, with a line each, for the Coach. *Carried here from reviews:*
+`useridsSeen`'s filter to entries holding data (thread 6); `VaultMinder.rootBox`, `BankMinder.rootBox` and
+VaultMinder's `bankMinder` option, vestigial since thread 5; the dead entry's docs and VOCABULARY row narrowed to "the
+tombstone that last landed" (thread 5); `list`'s per-call `staleTime: 0` if plainly removable (the Coach: "gone by the
+end"). *Levels*: worker `opus`, effort
 `medium`; review `medium`. *Depends on*: the line's tip when 3 to 6 are ready (it touches what they touch). *Size*: M.
 
 ## For the Coach
