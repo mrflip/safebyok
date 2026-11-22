@@ -4,7 +4,7 @@
 /** The row "A stage change that reveals a suspending subtree shows its fallback". */
 import { type QueryFunction, useSuspenseQuery } from '@tanstack/react-query'
 import { act, render, screen, waitFor } from '@testing-library/react'
-import { Suspense } from 'react'
+import { Suspense, useLayoutEffect } from 'react'
 import * as LeanTH from 'safebyok/testing'
 import { describe, expect, it } from 'vitest'
 import type { BoxShown } from '../../src/giver/react-giver'
@@ -15,9 +15,10 @@ const RowChanged = 'notes/wontfix.md, "A stage change that reveals a suspending 
 describe("wontfix: a stage switch that shows a suspending subtree once unlocked", () => {
   it("renders the subtree's fallback when the bank unlocks", async () => {
     const world = await TH.buildProviderWorld({ stored: 'jokes' })
-    let fallbacksRendered = 0
+    let fallbacksShown = 0
+    // Counted on commit, not render: a transition renders a fallback it then keeps off the page.
     function Fallback() {
-      fallbacksRendered += 1
+      useLayoutEffect(() => { fallbacksShown += 1 }, [])
       return <p>Loading the box</p>
     }
     function BoxReader() {
@@ -30,15 +31,16 @@ describe("wontfix: a stage switch that shows a suspending subtree once unlocked"
     function StageSwitch() {
       const stage = world.Bank.useBank((snap) => snap.stage)
       if (stage !== 'unlocked') { return <p>{`The stage is ${stage}`}</p> }
-      return <Suspense fallback={<Fallback />}><BoxReader /></Suspense>
+      return <BoxReader />
     }
-    render(TH.providerTreeOf(world, <StageSwitch />, { userid: TH.ProviderUser }))
+    // The boundary sits above the switch, so the locked screen is content already shown: a transition would keep it, where a new boundary shows its fallback regardless.
+    render(TH.providerTreeOf(world, <Suspense fallback={<Fallback />}><StageSwitch /></Suspense>, { userid: TH.ProviderUser }))
     const device = await waitFor(() => world._cheat_device())
     await act(() => device.hello())
     await screen.findByText('The stage is locked')
-    expect(fallbacksRendered).to.eq(0)
+    expect(fallbacksShown).to.eq(0)
     await act(() => device.bank!.gate.unlock({ passphraseCleartext: LeanTH.TestPassphrase }))
     await screen.findByText('The box is for jokes')
-    expect(fallbacksRendered, RowChanged).to.be.greaterThan(0)
+    expect(fallbacksShown, RowChanged).to.be.greaterThan(0)
   })
 })
