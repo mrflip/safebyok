@@ -177,9 +177,11 @@ describe("the Knock-Knock Machine", () => {
   it("puts the key by a mutation that retains none of it, whether the put lands or is refused", async () => {
     const page = await loadWithKey()
     /** The variables and the error of each put of the key, by its form: none of them may contain the key. */
-    const keyPuts = () => page.client.getMutationCache().getAll()
-      .filter((mutation) => mutation.state.variables instanceof FormData)
-      .map(({ state }) => ({ variables: state.variables as FormData, err: state.error }))
+    function keyPuts() {
+      return page.client.getMutationCache().getAll()
+        .filter((mutation) => mutation.state.variables instanceof FormData)
+        .map(({ state }) => ({ variables: state.variables as FormData, err: state.error }))
+    }
     expect(keyPuts().map(({ variables }) => [...variables.keys()])).to.deep.equal([[]])
     expect(TH.holdsText(keyPuts(), ApiKey)).to.eq(false)
 
