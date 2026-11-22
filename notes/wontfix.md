@@ -442,3 +442,28 @@ form is open, rerender it with another field.
 Reasoning for wontfix: the text never lands in the wrong place, which React's stale-result flag in the hook sees to;
 what is left is a button that reads Hide one press too long. A guard for it would be a second state in the reveal's
 path. Written by the react_free thread 4 worker, 2026-11-22, awaiting a ruling.
+
+### A localStorage save the browser refuses leaves the demo's memory vaultDB ahead of what a reload finds
+
+The demos' `LocalStorageVaultDB` (`demos/*/src/lib/local-vault-db.ts`) writes a Thing into its memory vaultDB, which
+tells its watchers, and then saves the bank to `localStorage`. A browser that refuses the save, a full quota say,
+refuses the write `storage_unavailable`.
+
+Current outcome: the tab's memory keeps the refused write, and every device over that vaultDB reads it, until a reload
+finds the revision before it in `localStorage`. Only that tab sees the newer revision, and nothing outside the demo
+stores a vault this way.
+
+Alternatives: save before the memory write, which reaches into the memory vaultDB's checks to build the record it
+would store; or take the memory write back when the save throws, which needs an undo the memory vaultDB does not have.
+Each is machinery in a stand-in for the datastore a host brings.
+
+Workaround: none needed outside the demos. A real datastore commits a write whole or not at all, and the store is the
+only copy: an IndexedDB write's quota error aborts its transaction, and a server's database rolls back and answers
+only after COMMIT. The core's cache is updated from the store's answer, so memory never runs ahead of the store.
+
+To reproduce: `demos/safebyok-demo-knockknock/tests/wontfix/local-vault-db-half-made.test.ts`, which has to force the
+browser's refusal between the memory write and the save.
+
+Reasoning for wontfix: the demo's vaultDB keeps two copies with no transaction between them; they diverge only when the
+browser refuses a save, which corrupts no stored vault a host keeps. Asked for by the Coach, written by the react_free
+thread 8 worker, 2026-11-22.
