@@ -689,7 +689,7 @@ describe("useBox", () => {
     await waitFor(() => { expect((result.current.data as BoxRecord | undefined)?.labelpath).to.eq(`box/${TH.JokesPath}`) })
     await act(() => world.Bank.queryClient().query(world.Bank.boxQuery('puns')))
     rerender({ labelpath: 'puns' })
-    expect(result.current.data).to.deep.equal(null)
+    expect(result.current.data).to.be.null
   })
 
   it("shows what a new select returns from the same record, when it returns records", async () => {
@@ -926,7 +926,7 @@ describe("delBoxOnce", () => {
     const { world, result } = await renderUnlocked((world) => world.Bank.useBox(TH.JokesPath))
     await waitFor(() => { expect(result.current.isSuccess).to.eq(true) })
     const tombstone = await act(() => world.Bank.delBoxOnce(result.current.data!))
-    expect(world.Bank.queryClient().getQueryData(JokesKey)).to.deep.equal(null)
+    expect(world.Bank.queryClient().getQueryData(JokesKey)).to.be.null
     await waitFor(() => { expect(result.current.data).to.be.null })
     expect(tombstone.am).to.eq('x')
     await TH.expectRefusal(world.Bank.withWhisper(TH.JokesPath, (whisper) => whisper), 'absent_box')

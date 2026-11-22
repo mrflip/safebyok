@@ -294,7 +294,7 @@ describe("VaultMinder, a child's first landing", () => {
 
   it("marks the parent's listing stale for a box this device writes over the null it got", async () => {
     const { minder } = await listedWorld()
-    expect(await minder.get(boxScopeOf('anthropic'))).to.deep.equal(null)
+    expect(await minder.get(boxScopeOf('anthropic'))).to.be.null
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.false
     await TH.expectGood(minder.tryWrite(boxBirthAskOf('anthropic')))
     expect(isListingStaleAt(minder, TH.RootScope)).to.be.true

@@ -130,7 +130,7 @@ describe("VaultMinder.tryWrite", () => {
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     const answer    = await minder.tryWrite(TH.delAskFor(box, tombstone))
     expect(answer).to.deep.include({ ok: true, act: 'deleted', val: tombstone })
-    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
+    expect(minder.at(TH.BoxScope)).to.be.null
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
     expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
   })
@@ -147,7 +147,7 @@ describe("VaultMinder.tryWrite", () => {
     const tombstone = await bank.sealBox(box, { am: 'x' })
     const delAsk    = bank.makeDelAsk<BoxRecord>({ cited: Thing.sparseOf(box), record: tombstone })
     await TH.expectGood(minder.tryWrite(delAsk))
-    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
+    expect(minder.at(TH.BoxScope)).to.be.null
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
     expect(labelpathsOf(minder.listingAt(TH.RootScope))).to.deep.equal(['box/openai'])
   })

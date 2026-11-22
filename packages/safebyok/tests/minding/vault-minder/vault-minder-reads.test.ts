@@ -36,8 +36,8 @@ describe("VaultMinder.get", () => {
   it("returns null for a box not stored, with no tombstone", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = await minderWorldOf(vaultDB)
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
-    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
+    expect(await minder.get(TH.BoxScope)).to.be.null
+    expect(minder.at(TH.BoxScope)).to.be.null
     expect(minder.deadAt(TH.BoxScope)).to.be.undefined
   })
 
@@ -46,7 +46,7 @@ describe("VaultMinder.get", () => {
     const tombstone = TH.boxTombOf(TH.boxThingOf())
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, tombstone)
     const { minder } = await minderWorldOf(vaultDB)
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
+    expect(await minder.get(TH.BoxScope)).to.be.null
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'gotgone', val: null, dbhas: tombstone })
   })
@@ -54,7 +54,7 @@ describe("VaultMinder.get", () => {
   it("returns null for a box not stored while its BankMinder has no world of the bank", async () => {
     const vaultDB = await bornOf(new MemoryVaultDB())
     const { minder } = await minderWorldOf(vaultDB, { isWorldHeard: false })
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
+    expect(await minder.get(TH.BoxScope)).to.be.null
   })
 
   it("asks the vaultDB once for two gets under way together", async () => {
@@ -316,10 +316,10 @@ describe("VaultMinder.list", () => {
     vaultDB._cheat_things(TH.ThingBank).set(TH.BoxScope.labelpath, tombstone)
     const asked = vi.spyOn(vaultDB, 'tryGetThing')
     await minder.list('box')
-    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
+    expect(minder.at(TH.BoxScope)).to.be.null
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(Thing.sparseOf(tombstone))
     expect(minder.tryAt(TH.BoxScope)).to.deep.include({ act: 'gotgone', isTimely: true, dbhas: Thing.sparseOf(tombstone) })
-    expect(await minder.get(TH.BoxScope)).to.deep.equal(null)
+    expect(await minder.get(TH.BoxScope)).to.be.null
     expect(asked.mock.calls).to.have.lengthOf(0)
   })
 

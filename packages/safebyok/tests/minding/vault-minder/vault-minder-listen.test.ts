@@ -200,7 +200,7 @@ describe("VaultMinder.listen", () => {
     expect(toldOf(heard)).to.deep.equal([['dead', 'box/openai', tombstone.revseq], ['box/openai', 'null']])
     expect(heard.mock.calls[0]?.[0]).to.deep.nested.include({ type: 'updated', "action.type": 'success', modelkind: 'box', am: 'x', revtok: tombstone.revtok, queryKey: minder.deadQueryKey(TH.BoxScope) })
     expect(heard.mock.calls[0]?.[0]).to.have.nested.property('state.data', minder.deadAt(TH.BoxScope))
-    expect(minder.at(TH.BoxScope)).to.deep.equal(null)
+    expect(minder.at(TH.BoxScope)).to.be.null
     expect(minder.deadAt(TH.BoxScope)).to.deep.equal(tombstone)
   })
 

@@ -105,7 +105,7 @@ describe("bank.sweep() and device.sweep(), over the vaults made on the bank", ()
     await minder.get(scopeAt(bank, Openai))
     bank.sweep()
     minder.hello()
-    expect(await minder.get(scopeAt(bank, Openai))).to.deep.equal(null)
+    expect(await minder.get(scopeAt(bank, Openai))).to.be.null
   })
 
   it("go on past a watch whose stop throws, telling onBadNews", async () => {
@@ -145,7 +145,7 @@ describe("the box flows, through a vault and its bank's MemoryVaultDB", () => {
 
   it("gets null for a box not stored, and its first put by labelpath cites the shell under the root box's life", async () => {
     const { bank, vault, minder } = await TH.buildBornVault()
-    expect(await minder.get(scopeAt(bank, Openai))).to.deep.equal(null)
+    expect(await minder.get(scopeAt(bank, Openai))).to.be.null
     const written = vi.spyOn(bank.vaultDB, 'tryWriteThing')
     await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     expect(written.mock.calls[0]![0].cited).to.include({ revseq: -1, am: 'x', lifeseq: Shell.VoidLifeseq, lifepath: `${bank.rootBox.lifeseq}/${Shell.VoidLifeseq}` })
@@ -350,7 +350,7 @@ describe("vault.delBoxOnce(labelpath)", () => {
     const box = await vault.putBoxOnce(Openai, { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
     const tombstone = await vault.delBoxOnce(Openai)
     expect(tombstone).to.include({ labelpath: Openai, am: 'x', revseq: box.revseq + 1 })
-    expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(null)
+    expect(minder.at(scopeAt(bank, Openai))).to.be.null
     expect(minder.deadAt(scopeAt(bank, Openai))).to.deep.equal(tombstone)
   })
 
@@ -452,7 +452,7 @@ describe("vault.withWhisper(labelpath, fn)", () => {
     rowsOf(bank).set(Openai, tombstone)
     const fn = vi.fn()
     await TH.expectRefusal(vault.withWhisper(Openai, fn), 'stale_read')
-    expect(minder.at(scopeAt(bank, Openai))).to.deep.equal(null)
+    expect(minder.at(scopeAt(bank, Openai))).to.be.null
     expect(minder.deadAt(scopeAt(bank, Openai))).to.include({ revtok: tombstone.revtok })
     expect(fn).not.toHaveBeenCalled()
   })

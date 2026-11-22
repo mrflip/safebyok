@@ -50,7 +50,7 @@ describe("newerThingOf", () => {
   }
 
   it("keeps prior of two nulls", () => {
-    expect(newerThingOf(null, null, deadAtTomb)).to.eq(null)
+    expect(newerThingOf(null, null, deadAtTomb)).to.be.null
   })
 
   it("looks the tombstone up at the scope of the record beside null", () => {

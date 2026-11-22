@@ -48,7 +48,7 @@ describe("IdbVaultDB's databases", () => {
     const other = TH.makeIdbVaultDB()
     await TH.expectGood(idbVaultDB.tryBirthBank(TH.birthBankAskOf()))
     const gotten = await TH.expectGood<unknown>(other.tryGetThing(TH.getGateAskOf()))
-    expect(gotten).to.deep.equal(null)
+    expect(gotten).to.be.null
   })
 
   it("keeps its Things for a new instance on the same database", async () => {
