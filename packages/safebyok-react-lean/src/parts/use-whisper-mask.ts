@@ -1,6 +1,6 @@
 /** `useWhisperMask`, the behaviour of a whisper's mask written into the page, without its markup: the element it is written into. */
 
-import { type RefCallback, useCallback, useLayoutEffect, useRef } from 'react'
+import { type RefCallback, useLayoutEffect, useState } from 'react'
 import { type BoxRecord, type LiveOf, mask } from 'safebyok'
 import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
@@ -44,8 +44,8 @@ export function useWhisperMask(labelpath: string, field: string, { bank: bankOpt
   const bank = useGivenBank(bankOpt)
   const stage = bank.useBank((snap) => snap.stage)
   const box = bank.useBox(labelpath).data
-  const maskElRef = useRef<HTMLElement | null>(null)
-  const maskRef = useCallback((el: HTMLElement | null) => { maskElRef.current = el }, [])
+  // In state, not a ref, so an element the host mounts later, or mounts again, has the mask written into it too.
+  const [maskEl, setMaskEl] = useState<HTMLElement | null>(null)
 
   // While locked, the mask comes from the record the box's query holds, so a mask `ifLocked` answers at once is written
   // before paint. Unlocked, the field is read from the box opened: until it lands, the element keeps what it showed.
@@ -72,14 +72,13 @@ export function useWhisperMask(labelpath: string, field: string, { bank: bankOpt
   // React's stale-result flag: an answer that lands after the next stage, revision or prop is dropped, so a live mask
   // never lands over the stored one written after a lock.
   useLayoutEffect(() => {
-    const el = maskElRef.current
-    if (el === null) { return }
+    if (maskEl === null) { return }
     let isCurrent = true
-    void writeMask(el, () => isCurrent)
+    void writeMask(maskEl, () => isCurrent)
     return () => { isCurrent = false }
-  }, [stage, box?.revtok, labelpath, field, tail])
+  }, [maskEl, stage, box?.revtok, labelpath, field, tail])
 
-  return { maskRef }
+  return { maskRef: setMaskEl }
 }
 
 /** The `mask` field of the box's sidecar, or nothing. */

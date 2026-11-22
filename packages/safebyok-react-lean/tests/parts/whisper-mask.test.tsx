@@ -159,4 +159,24 @@ describe("useWhisperMask", () => {
     act(() => { world.Bank.lock() })
     expect(el.textContent).to.eq('jokes')
   })
+
+  it("writes the mask into an element the host mounts after the box has loaded", async () => {
+    const world = await TH.buildProviderWorld({ stored: 'jokes' })
+    const { rerender } = render(TH.providerTreeOf(world, <LateHostMask world={world} isShown={false} />, { userid: TH.ProviderUser }))
+    await screen.findByText('jokes loaded')
+    rerender(TH.providerTreeOf(world, <LateHostMask world={world} isShown={true} />, { userid: TH.ProviderUser }))
+    expect(screen.getByTestId('host-mask').textContent).to.eq('jokes')
+  })
 })
+
+/** The joke service's key masked into a `<span>` of the host's own, rendered only while `isShown`. */
+function LateHostMask({ world, isShown }: Readonly<{ world: TH.ProviderWorld, isShown: boolean }>) {
+  const box = world.Bank.useBox(TH.JokesPath).data
+  const { maskRef } = useWhisperMask(TH.JokesPath, 'apiKey', { tail: 4, ifLocked: serviceOf })
+  return (
+    <>
+      <p>{(box === undefined) ? 'loading' : 'jokes loaded'}</p>
+      {isShown && <span ref={maskRef} data-testid="host-mask" />}
+    </>
+  )
+}
