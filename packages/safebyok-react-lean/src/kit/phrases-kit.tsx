@@ -2,8 +2,7 @@
 
 import { type ReactNode, createContext, useContext } from 'react'
 import { mapValues } from 'es-toolkit'
-import { isVaultError } from 'safebyok'
-import { Checker } from 'safebyok/storage'
+import { Checkers, isVaultError } from 'safebyok'
 import { PartsPhrases, PartsPhrasesContext } from '../parts/phrases-parts'
 
 // A sentence with a variable part would be one template function, so a translation could reorder it.
@@ -110,8 +109,8 @@ export const CeremonyPhrases = Object.freeze({
 // == [Checks]: Checks
 
 /** The checks of what a host hands the kit's words. */
-const Checks = {
+const Checks = Checkers('bad_record', ({ obj, str }) => ({
   // Strict, so a misspelt word is refused, not left in English unnoticed.
-  phrases: Checker(({ obj, str }) => obj(mapValues(KitPhrases, () => str.exactOptional())).strict()),
-}
+  phrases: obj(mapValues(KitPhrases, () => str.exactOptional())).strict(),
+}))
 // --

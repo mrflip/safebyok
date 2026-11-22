@@ -2,7 +2,7 @@
 
 import { type ReactNode, createContext, useContext } from 'react'
 import { mapValues } from 'es-toolkit'
-import { Checker } from 'safebyok/storage'
+import { Checkers } from 'safebyok'
 
 // A sentence with a variable part would be one template function, so a translation could reorder it.
 
@@ -49,8 +49,8 @@ export function usePartsPhrases(): PartsPhrases {
 // == [Checks]: Checks
 
 /** The checks of what a host hands the parts' words. */
-const Checks = {
+const Checks = Checkers('bad_record', ({ obj, str }) => ({
   // Strict, so a misspelt word is refused, not left in English unnoticed.
-  phrases: Checker(({ obj, str }) => obj(mapValues(PartsPhrases, () => str.exactOptional())).strict()),
-}
+  phrases: obj(mapValues(PartsPhrases, () => str.exactOptional())).strict(),
+}))
 // --
