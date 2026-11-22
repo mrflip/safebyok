@@ -263,7 +263,7 @@ export class ThingMinder {
 
   /** Call `listener` with each change to the cache, and return the function that stops it.
    * Pass `MinderEventFormat` as `version`: the event shape `listener` was written for. Any other refuses.
-   * It tells of each query added, changed or removed, and of nothing an observer does. Narrow each event on its
+   * It tells of each of this bank's queries added, changed or removed, and of nothing an observer does. Narrow each event on its
    * `eventkind`: {@link ThingEvent}, {@link SoonEvent} and {@link ListingEvent} say what each tells, and when.
    * Nothing is told when an item ages past `staleTime`, and listening caches nothing.
    * What `listener` throws goes to the bank's `tellBadNews`, and stops nothing.
@@ -563,9 +563,10 @@ export class ThingMinder {
   // A key's kind says what its query caches: an item, a soon or a listing. A removed query still has its last state, which its
   // event tells, though the cache no longer has it. An item is invalidated when it falls behind its soon, or its get is
   // refused; a listing, by `invalidate`. A soon is never invalidated or fetched.
-  /** The event a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for an observer's. */
+  /** The event a listener is told of `tsqEvent`, an event of the minder's cache, or undefined for an observer's or another bank's. */
   #minderEventOf(tsqEvent: TSQ.QueryCacheNotifyEvent): MinderEvent | undefined {
     if (! isTellableTSQEvent(tsqEvent)) { return undefined }
+    if (! TSQ.partialMatchKey(tsqEvent.query.queryKey, bankKeyHeadOf(this.scope))) { return undefined }
     const { queryKey, queryHash, state } = tsqEvent.query
     const { labelpath } = this.#scopeOfQueryKey(queryKey)
     const told = {
