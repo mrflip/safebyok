@@ -1,7 +1,7 @@
 # Thread 5: get_answer (2026-11-22)
 
-Branch `20261122-get_answer`, PR #850, stacked on #847. Proved (before the catch-up): safebyok 1444, safebyok-react-lean 306,
-safebyok-idb-lean 124, safebyok-postgres 351, each with its typecheck and lint clean; `pnpm justify` to come.
+Branch `20261122-get_answer`, PR #850, stacked on #847. Proved: `pnpm justify` green at `4a6eafc2c`, after the catch-up
+(safebyok 1444, safebyok-react-lean 306, safebyok-idb-lean 124, safebyok-postgres 351, e2e 576, every other package and demo green).
 
 * **Built**
   * `Absent` and `isAbsent` (`shapes/shapes-thing.ts`, exported from `safebyok`, `safebyok/storage` and `core`):
