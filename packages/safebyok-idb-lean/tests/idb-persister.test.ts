@@ -102,11 +102,13 @@ describe("a device restored through IdbPersisters", () => {
         boxes: new IdbPersister({ recordlabel: 'boxes', dbName, throttleMs: 0, onBadNews: noop }),
       }
     }
-    const { vault } = await TH.buildBornVault({ device: TH.makeDevice({}, { persisters: persistersOf() }) })
+    const first     = TH.makeDevice({}, { persisters: persistersOf() })
+    const { vault } = await TH.buildBornVault({ device: first })
     await vault.putBoxOnce('box/openai', { sidecar: TH.Sidecar }, { whisper: TH.Whisper })
+    await first.minder.list('box')
     await settle()
     const device = TH.makeDevice({}, { vaultDB: vault.bank.vaultDB, persisters: persistersOf() })
     await device.signIn(TH.WorldScope.userid)
-    expect(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })).to.deep.equal(['box/openai'])
+    expect(Object.keys(device.minder.listingAt({ ...TH.WorldScope, labelpath: 'box' })?.items ?? {})).to.deep.equal(['openai'])
   })
 })
