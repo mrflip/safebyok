@@ -7,9 +7,8 @@ import { type ReactNode, createContext, useCallback, useContext, useEffect, useM
 import {
   type Bank, type BankSnapshot, type BankStage, type BirthCleartexts, type BoxCleartexts, type BoxLabelpath, type BoxRecord, type BoxUnsealed, Checkers, Device, type GateRecord, type Gating, type KeyDeriver, Labelpath,
   type LiveOf, type LivePublicPropsOf, type PasskeyAddCleartexts, type PasskeyRevokeCleartexts, type PasskeyWayinHeader, type PassphraseReplaceCleartexts, type PassphraseVerdict, type PassphraseWayinHeader,
-  PendingBank, type Sidecar, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper,
+  PendingBank, type Sidecar, type Tombstone, type TombstoneOf, type UnlockCleartexts, type Userid, type Vault, VaultError, type VaultDB, type Whisper, bulletproofHandlerOf,
 } from 'safebyok'
-import { sanitizeForeignError } from 'safebyok/storage'
 import { useEffectEvent } from 'use-effect-event'
 import {
   FormMutationDefaults, ListingQueryDefaults, boxListQueryKeyOf, boxQueryKeyOf, boxesQueryKeyUnder, formMutationKeyOf, gateQueryKeyOf, gateShownOf, liveGateOf, liveOf, recordQueryDefaults,
@@ -17,7 +16,7 @@ import {
 import { type Given, GiverContext } from './giver-context'
 import * as Phrases from './phrases-giver'
 import { bridgeMinder } from './react-bridge'
-import { type BoxQueryOpts, ConfigChecks, type GiverConfig, type GiverMount, ScopeChecks, SignedOutBank } from './shapes-giver'
+import { type BoxQueryOpts, ConfigChecks, type GiverConfig, type GiverMount, HostCallbackOpts, ScopeChecks, SignedOutBank } from './shapes-giver'
 import { makeUseDraft } from './use-draft'
 
 // == [Types]: ProviderProps, BoxShown, BoxNamed, BoxSelected, HeaderedGate, GateShown, GateSelected, BoxQueryOptions, BoxQueries, WithLockableWhisperOpts, PutBoxActionOpts, PutBoxActionResult, FormMutationOptions, FormMutationResult, StrengthVerdictResult, ReactGiver, BankGiver
@@ -495,7 +494,9 @@ function makeBankGiver(friend: BankFriend) {
    */
   function putBoxAction(boxNamed: BoxNamed, opts: PutBoxActionOpts): (prior: PutBoxActionResult | null, form: FormData) => Promise<PutBoxActionResult> {
     const boxLabelpath = boxLabelpathOfNamed(boxNamed)
-    const { whisperOf, sidecarOf } = Checks.putBoxActionOpts.parse(opts)
+    const { whisperOf: hostWhisperOf, sidecarOf: hostSidecarOf } = Checks.putBoxActionOpts.parse(opts)
+    const whisperOf = bulletproofHandlerOf(hostWhisperOf, HostCallbackOpts)
+    const sidecarOf = hostSidecarOf && bulletproofHandlerOf(hostSidecarOf, HostCallbackOpts)
     /** The patch and the secrets of the write, read from `form`, which is left empty whether or not they could be read. */
     function takeForm(form: FormData): [LivePublicPropsOf<BoxRecord, BoxCleartexts>, BoxCleartexts] {
       try {
@@ -510,7 +511,8 @@ function makeBankGiver(friend: BankFriend) {
         const [patch, secrets] = takeForm(Checks.form.parse(form))
         return { box: await putBoxOnceAt(boxLabelpath, patch, secrets), err: null }
       } catch (err) {
-        return { box: null, err: sanitizeForeignError(err) }
+        // What whisperOf and sidecarOf throw arrives as an Error, and everything else in the try throws one.
+        return { box: null, err: err as Error }
       }
     }
   }

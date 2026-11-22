@@ -192,6 +192,18 @@ describe("useDraft", () => {
     expect(world.client.getQueryData<BoxRecord>(JokesItemKey)?.sidecar).to.deep.equal({ service: 'jokes', mask: '…4242', rotated_at: 1_760_000_000_000 })
   })
 
+  it("rejects its put with an Error when sidecarOf throws a value that is no Error, the value its cause", async () => {
+    const thrown: unknown = { code: 42 }
+    const { input, seen } = await renderDraftEditor({ putOpts: { sidecarOf: () => { throw thrown as Error } } })
+    await revealIn(input)
+    typeKeyInto(input)
+    await waitFor(() => { expect(seen.draft?.isWhisperDirty).to.eq(true) })
+    act(() => { screen.getByText('Save').click() })
+    await waitFor(() => { expect(seen.putErr).to.be.instanceOf(Error) })
+    expect((seen.putErr as Error).cause).to.eq(thrown)
+    expect(seen.draft?.isWhisperDirty).to.eq(true)
+  })
+
   it("follows the stored box while untouched, and once edited is behind another device's write, its put refusing stale_write until discarded", async () => {
     const { world, seen } = await renderDraftEditor()
     const otherVault = world._cheat_otherVault!
