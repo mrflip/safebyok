@@ -100,3 +100,24 @@ The backlog of the new core, `packages/safebyok`. `TODO-big.md` is the backlog o
   that a host's object is a `VaultDB`, a device store or a query client by sampling its member names. Gathered in one
   module they would leave the files that hold them now, if the imports allow it without a cycle. Optional: one sitting
   alone in `ThingChecks` is fine (the Coach, 2026-11-18).
+* **Have `vaultDB.vacate` clear what an adapter's own client caches.** A vaultDB whose transport has a client cache
+  of its own (Apollo's and Convex's clients can) is one more place that holds a user's records on the device, and a
+  discard that ends at the minder's cache and the host's React Query does not reach it. Not yet checked against any
+  adapter: for each, find whether its client caches what it fetches, and have its `vacate` clear that
+  (the Coach, 2026-11-21, `whiteboard/20261121-react_life/`).
+* **A smarter policy in `mask` for a caller's tail.** `mask(text, { tail })` takes the caller's tail at every length,
+  so the demos' live reveal, `mask(val, { tail: 4 })`, shows four characters of a value of 12 or fewer, and all of a
+  four-character one, where the schedule shows none of short text. The flaw is in `mask`, not its callers: "make mask
+  have smarter policy for a locked/stored [use] case" (the Coach, 2026-11-21, react_life #808). `mask` is
+  safebyok-big's helper, re-exported by the core; broaden it there.
+* **Make the lean giver's device on the client only.** The provider makes the giver's device during render, at the
+  giver's module scope (react_life #809). Under server rendering, the first request's userid would keep a device for
+  the server process, bridged to that request's QueryClient, and `keys.*`, `boxQuery` and the `fooMutationOptions`
+  in later requests' server code would answer that first user's keys. It never says hello, so it fetches nothing and
+  holds no secret. When server-rendering hosts are in scope, make the device only on the client (a hydration flag, say).
+* **Read the bank's gate and root box from the minder rather than keep copies.** The lean core's `Bank` keeps its own
+  main gate and root box (`#maingate`, `#rootBox`, replaced by each gating) beside the minder's cached records of the
+  same things. With the device keeping only the lease and reading those records from the minder, only locked and
+  unlocked would live in a store, and starting, unborn and failed could come from the bank record's fetch instead of
+  stand-in snapshots. "this fits with upcoming changes, but it needs more design before anything should be
+  rewritten, so leave the shim" (the Coach, 2026-11-21, react_life, survey after thread 12). Part of the ownership work, with Closer Look E11.
