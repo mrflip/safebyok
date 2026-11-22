@@ -13,6 +13,16 @@ not write it.
   sanitizeForeignError(err), texts: textsOfForm(form) }`.
 * Threads 2 and 3 rework the workshop's #822 and #819 in the workshop's own worktrees, rebased onto `908751892`.
 
+## Where things are
+
+* *Orchestrator:* `notes/react_lib_principles.md` is committed only on the base checkout's branch, not on the line:
+  handoffs name it as `/workspace/byok/notes/react_lib_principles.md`. `docs/guide-headless.md` is on the line (#818).
+
+## What the threads found
+
+* Thread 2 (#822): Knock-Knock's key form is `useMutation` over `putBoxMutationOptions`; every submit in that demo is
+  the kit's `SubmitButton` with `isPending` (new pending labels "Signing in…", "Saving…", "Knocking…").
+
 ## The sprint doc
 
 *Orchestrator:* [Sprint react_free](https://claude.ai/artifact/K5Tfgw5zf4eiW5SGbRPJPa), doc

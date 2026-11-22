@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: thread 1 done (#823 on #825, tip `908751892`); threads 2, 3 and 4 building; 6 next, then 5 on 4, then 7.
+* **Status**: thread 1 done; thread 2 in review (#822); threads 3 and 4 building; 6 next, then 5 on 4, then 7.
 
 ## Read first
 
@@ -66,6 +66,8 @@ onto thread 1's tip, then `demos/safebyok-demo-knockknock` takes up `putBoxMutat
 form stays `<form action={(form) => { save.mutate(form) }}>`, by ruling) and `SubmitButton` with `isPending`. Review
 covers the whole PR from thread 1's tip, since #822 was never reviewed. *Depends on*: thread 1. *Look-ahead*: thread
 7 runs this demo in a browser. *Size*: small.
+
+*Status*: built, ready at `2b7b31502` (justify green); in review.
 
 ### 3. `envman_rework`: envman takes up the multiples (#819)
 
