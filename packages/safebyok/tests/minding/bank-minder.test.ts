@@ -62,9 +62,9 @@ describe("bankMinder.fetchWorld()", () => {
   })
 
   const BrokenCases = [
-    ['bank', 'a root box stored without its bank'],
-    ['gate', 'a root box stored without its main gate'],
-    ['box',  'a bank and main gate stored without their root box'],
+    ["bank", 'a root box stored without its bank'],
+    ["gate", 'a root box stored without its main gate'],
+    ["box",  'a bank and main gate stored without their root box'],
   ] as const
 
   for (const [labelpath, blurb] of BrokenCases) {
