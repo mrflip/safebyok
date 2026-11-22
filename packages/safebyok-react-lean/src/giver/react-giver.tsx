@@ -355,9 +355,10 @@ function makeBankGiver(friend: BankFriend) {
     }
   }
 
-  /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader, a prefetch, or `useQuery` outside the provider's reach.
+  /** The `queryOptions` of the box at `labelpath`, for whoever is signed in when called: for a route loader or a prefetch.
    * Run it in {@link queryClient}'s client, not the host's. Its `data` is what {@link useBox} answers. Until the bank is brought up,
    * it fetches nothing, and `query` rejects: a loader waits for the stage to show `locked` or `unlocked` first.
+   * In a component, take the giver's `useQueryOptions()` instead, as {@link queryClient} says.
    * @example
    *   loader: () => Knock.queryClient().query(Knock.boxQuery('jokes'))
    */
@@ -368,6 +369,9 @@ function makeBankGiver(friend: BankFriend) {
 
   /** The QueryClient that {@link boxQuery}'s queries and {@link keys} run in: the provider's mounted when called, or one where every query fetches nothing while none is.
    * The records of the signed-in user's bank are cached there. Read it; write nothing to it.
+   * A provider counts as mounted only once its effects have run, and `useQuery` keeps the client of its first render: called in the
+   * provider's first render, this answers the one where nothing is fetched, and the hook never shows a later revision. In a component, take the giver's
+   * `useQueryOptions()` and its `client`, the provider's from the first render.
    */
   function queryClient(): QueryClient { return clientNow() }
 
