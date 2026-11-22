@@ -9,7 +9,7 @@
 * **Levels** (defaults): review `medium`; worker `thread-worker` on `opus` at its own effort; reviewer `thread-reviewer`
   on its `sonnet` pin; style pass `style-reviewer` on its `sonnet` pin.
 * **Threads at once**: 3.
-* **Status**: thread 1 done; thread 2 in review (#822); threads 3 and 4 building; 6 next, then 5 on 4, then 7.
+* **Status**: thread 1 done; threads 2 (#822) and 3 (#819) in review; thread 4 building; 6 next, then 5 on 4, then 7.
 
 ## Read first
 
@@ -77,6 +77,8 @@ covers the whole PR from thread 1's tip, since #822 was never reviewed. *Depends
 then `demos/safebyok-demo-envman`'s Undo calls `draft.discard`, its remaining cast goes, and its wrapper around
 `putBoxAction` gives way to `secretFieldnames`. Review covers the whole PR from thread 1's tip. *Depends on*: thread 1.
 Independent of thread 2 (another demo). *Size*: small.
+
+*Status*: built, ready at `15100d45b` (justify green); in review. Three open matters, rows in the doc.
 
 ### 4. `field_hooks`: the headless field hooks and the verdict
 

@@ -22,10 +22,15 @@ not write it.
 
 * Thread 2 (#822): Knock-Knock's key form is `useMutation` over `putBoxMutationOptions`; every submit in that demo is
   the kit's `SubmitButton` with `isPending` (new pending labels "Signing in…", "Saving…", "Knocking…").
+* Thread 3 (#819): envman's Undo is a `type="button"` calling `draft.discard`; the add form passes
+  `secretFieldnames: ['val']` and refills from `texts`; every catch in envman's `src/` wraps with
+  `sanitizeForeignError` (re-exported by `safebyok`), no `as Error` left.
 
 ## The sprint doc
 
 *Orchestrator:* [Sprint react_free](https://claude.ai/artifact/K5Tfgw5zf4eiW5SGbRPJPa), doc
 `9263e7b5-3849-4fb3-8433-bf6f10ec32f1`; tabs Open Matters `0dccff07-9b57` (body `772f52dd-31e7`), Cleanup
 `17a93409-b0ef` (body `69a0ec33-1add`), Progress `748b3543-647e` (body `f6dec94a-ad45`), Resolved `4e6a3a5e-8688` (body
-`9b083ff2-4a6f`); the `State` enum `87d1b810-c3e3`. Last read bookmark: rev 2 of Open Matters.
+`9b083ff2-4a6f`); the `State` enum `87d1b810-c3e3`. Last read bookmark: rev 4 of Open Matters. A new row: insert `"as":"blocks"` at the matters table's end (table
+`mgne8td40ga.57`) with a placeholder word in the State cell, then `replace` that paragraph by id with `"with":{"as":
+"markdown","blocks":{k: dropdown index 0},"from":…}` (replace takes `with`, not `source`).
