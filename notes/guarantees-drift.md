@@ -94,3 +94,13 @@ what differs from big, in a sentence or two.
   device's vacate leave it. G3 holds in substance: the wayins are the ciphertext the bankDB stores, and no naked bankKey
   or handle to one is cached. What drifts is how long that ciphertext stays in memory once the bank is swept, which the
   ends (vacate, delete, goodbye) are to settle.
+
+* 2026-11-22 (core_first, thread 6, persist), G3: **The device keeps the gate's wayin-wrapped bankKeys.** In big the
+  device database had the bankKey only as `bank_key_lease_wrapped`, under the non-extractable leaseKey; the
+  `bank_key_wayin_wrapped` of each wayin lived only in the bankDB. A new-core device (`packages/safebyok/src/models/device.ts`,
+  `packages/safebyok/src/minding/minder.ts`, `Minder.persist`) saves both its QueryClients to the host's persisters
+  (`packages/safebyok/src/storage/persister.ts`), so the roots' snapshot holds each user's bank and main gate records,
+  each wayin's wrapped bankKey and header (salts, a passkey's credential id and PRF salt) among them, and the boxes'
+  snapshot holds the sealed boxes and their listings: what the bankDB holds, at rest on the device as well, by design.
+  No naked bankKey, no handle and no cleartext is saved: the clients hold only stored records, and no mutation (whose
+  variables may hold a form's cleartexts) is saved.
