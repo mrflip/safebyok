@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { isVaultError } from 'safebyok'
@@ -6,21 +7,21 @@ import { WhisperText } from '../../src/parts'
 import * as TH from '../test-helpers'
 
 /** The bank's stage as a line of text, the joke service's key as a `WhisperText`, and the unlock dialog. */
-function KeyScreen({ world, field = 'apiKey', onError }: Readonly<{ world: TH.ProviderWorld, field?: string, onError?: ((err: unknown) => void) | undefined }>) {
+function KeyScreen({ world, field = 'apiKey', masked, onError }: Readonly<{ world: TH.ProviderWorld, field?: string, masked?: ReactNode, onError?: ((err: unknown) => void) | undefined }>) {
   const stage = world.Bank.useBank((snap) => snap.stage)
   return (
     <>
       <p>{stage}</p>
-      <WhisperText labelpath={TH.JokesPath} field={field} onError={onError} />
+      <WhisperText labelpath={TH.JokesPath} field={field} masked={masked} onError={onError} />
       <UnlockDialog />
     </>
   )
 }
 
 /** A world with the joke service's key stored, rendered under its provider, once it shows the bank locked. */
-async function renderKey(onError?: (err: unknown) => void) {
+async function renderKey(onError?: (err: unknown) => void, masked?: ReactNode) {
   const world = await TH.buildProviderWorld({ stored: 'jokes' })
-  const { container, rerender } = render(TH.providerTreeOf(world, <KeyScreen world={world} onError={onError} />, { userid: TH.ProviderUser }))
+  const { container, rerender } = render(TH.providerTreeOf(world, <KeyScreen world={world} masked={masked} onError={onError} />, { userid: TH.ProviderUser }))
   await screen.findByText('locked')
   return { world, container, rerender }
 }
@@ -55,6 +56,14 @@ describe("WhisperText", () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hide' }))
     expect(isKeyShown()).to.eq(false)
     expect(screen.getByText('••••••••')).to.exist
+  })
+
+  it("takes the text out of the page on Hide when the mask is an element", async () => {
+    await renderKey(undefined, <code>MASK</code>)
+    await showAndUnlock()
+    fireEvent.click(screen.getByRole('button', { name: 'Hide' }))
+    expect(isKeyShown()).to.eq(false)
+    expect(screen.getByText('MASK')).to.exist
   })
 
   it("takes the text out of the page when the bank locks", async () => {
