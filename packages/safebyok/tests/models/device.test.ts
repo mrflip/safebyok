@@ -196,12 +196,12 @@ describe("device.hello()", () => {
 describe("a device's persisters", () => {
   it("restore its caches at hello, and the stage stays starting until they have, asking the vaultDB nothing before", async () => {
     const { born, device, persisters } = await bornAndReloaded()
-    const saved    = persisters.roots.restoreClient()
-    let land       = noop
+    const saved       = persisters.roots.restoreClient()
+    let land          = noop
     vi.spyOn(persisters.roots, 'restoreClient').mockReturnValue(new Promise((resolve) => { land = () => { resolve(saved) } }))
     const tryGetThing = vi.spyOn(born.device.vaultDB, 'tryGetThing')
-    const stages   = stagesOf(device)
-    const signingIn = device.signIn(TH.WorldScope.userid)
+    const stages      = stagesOf(device)
+    const signingIn   = device.signIn(TH.WorldScope.userid)
     await nextTick()
     expect([device.getSnapshot().bank.stage, tryGetThing.mock.calls.length]).to.deep.equal(['starting', 0])
     land()
