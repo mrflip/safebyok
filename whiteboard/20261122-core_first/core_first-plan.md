@@ -6,7 +6,7 @@
   for a thread marked *L*); reviewer `thread-reviewer` on its `sonnet` pin; style pass on `style-reviewer`'s `sonnet` pin.
   Three threads at once.
 * **Sprint doc**: https://claude.ai/artifact/4UuWDQtdM1ArXDYyXiWa8c (doc `1c30dab4-9b62-413f-aecb-39f5fc79b1b5`; tabs Open Matters `7dae936c-8cd1`, Cleanup `b6b9e28d-d826`, Progress `b34a4511-9bc7`, Resolved `4494379e-db5c`; State enum `ecdeb6f5-e69a`).
-* **Status**: resumed (2026-11-22). Thread 1 merged (#840, rebased onto main after #827 merged: one comment fix). #817, #831, #837, #841 merged. Thread 2 (#844) is being rebased onto #842 (on #830) by a fresh worker: #837 deleted react-bridge.ts, #831's attach and detach meet the rename. Its high review follows. #833, #832–#838, #843, #819, #822 are outside this sprint (the Coach).
+* **Status**: running (2026-11-22). Thread 1 merged (#840). #817, #831, #837, #841, #830, #842 merged; #845 (vaultDB comments) ready for the Coach. Thread 2 (#844) rebasing onto main by a fresh worker, which compacted once (19:52Z, mid-rebase, before its readiness check); it restacks onto #845 at filing. Its high review follows. Every other open PR stays in draft and outside this sprint (the Coach).
 
 The Coach's request, verbatim:
 
