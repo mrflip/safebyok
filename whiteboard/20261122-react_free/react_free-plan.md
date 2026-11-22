@@ -67,7 +67,12 @@ form stays `<form action={(form) => { save.mutate(form) }}>`, by ruling) and `Su
 covers the whole PR from thread 1's tip, since #822 was never reviewed. *Depends on*: thread 1. *Look-ahead*: thread
 7 runs this demo in a browser. *Size*: small.
 
-*Status*: built, ready at `2b7b31502` (justify green); in review.
+*Status*: built, ready at `2b7b31502` (justify green); reviewed `fixed`; filing.
+
+*Review:* fixed, at `e1dc7c60b`: `keyPuts` a `function` declaration and its doc block shortened (tests only). Four
+nits dropped with reasons (the key in the mutation cache on a throw, an unrestored spy, `liveOf` on a tombstone,
+a synchronous `signIn` in `mutationFn`). Left for the record: `KeyEditor`'s error alert resets when the vault locks
+and the editor remounts; it changes no stored state.
 
 ### 3. `envman_rework`: envman takes up the multiples (#819)
 
