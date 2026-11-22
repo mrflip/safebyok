@@ -1,15 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { takeField } from '../../src/index'
+import { popField } from '../../src/index'
 import * as TH from '../test-helpers'
 
 // An obvious fake of a passphrase.
 const FakePassphrase = 'fake-passphrase-for-a-test'
 
-describe("takeField", () => {
-  it("takes the text of a field out of the form", () => {
+describe("popField", () => {
+  it("returns the text of a field and deletes it from the form", () => {
     const form = new FormData()
     form.set('passphrase', FakePassphrase)
-    expect(takeField(form, 'passphrase')).to.eq(FakePassphrase)
+    expect(popField(form, 'passphrase')).to.eq(FakePassphrase)
     expect(form.has('passphrase')).to.eq(false)
   })
 
@@ -17,26 +17,26 @@ describe("takeField", () => {
     const form = new FormData()
     form.set('passphrase', FakePassphrase)
     form.set('nickname', 'ada')
-    takeField(form, 'passphrase')
+    popField(form, 'passphrase')
     expect([...form.keys()]).to.deep.equal(['nickname'])
   })
 
-  it("takes every entry of a field named twice, answering the first", () => {
+  it("deletes every value of a field named twice, returning the first", () => {
     const form = new FormData()
     form.append('passphrase', FakePassphrase)
     form.append('passphrase', 'another-fake')
-    expect(takeField(form, 'passphrase')).to.eq(FakePassphrase)
+    expect(popField(form, 'passphrase')).to.eq(FakePassphrase)
     expect(form.has('passphrase')).to.eq(false)
   })
 
   it("answers an empty string for a field the form lacks", () => {
-    expect(takeField(new FormData(), 'passphrase')).to.eq('')
+    expect(popField(new FormData(), 'passphrase')).to.eq('')
   })
 
-  it("answers an empty string for a file, and takes it out", () => {
+  it("returns an empty string for a file, and deletes it", () => {
     const form = new FormData()
     form.set('passphrase', new File(['fake'], 'fake.txt'))
-    expect(takeField(form, 'passphrase')).to.eq('')
+    expect(popField(form, 'passphrase')).to.eq('')
     expect(form.has('passphrase')).to.eq(false)
   })
 
@@ -46,7 +46,7 @@ describe("takeField", () => {
     ["passphrase=fake",                       'a string for a form'],
   ] as const) {
     it(`refuses ${blurb}`, () => {
-      TH.expectSyncRefusal(() => takeField(form as never, 'passphrase'), 'bad_record')
+      TH.expectSyncRefusal(() => popField(form as never, 'passphrase'), 'bad_record')
     })
   }
 
@@ -55,10 +55,10 @@ describe("takeField", () => {
     ["",        'an empty fieldname'],
     [7,         'a number for a fieldname'],
   ] as const) {
-    it(`refuses ${blurb}, taking nothing from the form`, () => {
+    it(`refuses ${blurb}, deleting nothing from the form`, () => {
       const form = new FormData()
       form.set('passphrase', FakePassphrase)
-      TH.expectSyncRefusal(() => takeField(form, fieldname as never), 'bad_record')
+      TH.expectSyncRefusal(() => popField(form, fieldname as never), 'bad_record')
       expect(form.get('passphrase')).to.eq(FakePassphrase)
     })
   }
