@@ -36,15 +36,22 @@ The design this sprint starts from is in the sprint directory, copied so that a 
 * **On main, core only.** Every thread is cut from `origin/main` or from a thread of this sprint. Its subject is
   `packages/safebyok`, and a package building on the core's storage contract (`safebyok-postgres` builds its vaultDB on
   `AdapterVaultDB`) only where a contract change forces it.
-* **The cart is not a source.** Do not read, port or build on #832 to #838. The React layer on main
-  (`safebyok-react-lean`, the demos) changes only as much as a core change forces to keep it building and its tests
-  passing: no React design, no new hook or prop. Where that would take more than a mechanical change, say so and stop.
-* **#827 and #831 are references, not contracts.** #827 (the minder keeps house) is carried onto main by thread 1;
-  #831 (a minder in a shared client) is read for its idea by thread 4. Change either freely, and say where.
+* **The cart is not a source.** Do not read, port or build on #832 to #838, #843, #819 or #822. #831 and #837
+  merged (2026-11-22) and are code on main, not contracts: change them freely and say where. The React layer on main
+  (`safebyok-react-lean`, the demos) changes only as much as a core change forces: no React design, no new hook or
+  prop. Where that would take more than a mechanical change, say so and stop. #833 (vocab_adopt) is the Coach's.
 * **The new core is not bound to the old interface or its guarantees** (CLAUDE.md): where a thread loosens or drops
   one, it says so in its PR body.
-* **The endings** (lock, sweep, vacate, delete, sign-out) and autolock are not subjects of design or repair here. A
-  thread whose work passes through an ending's code changes what it needs there and leaves how the ending behaves alone.
+* **End states are out of bounds** (the Coach, 2026-11-22). Every sweep, vacate, bank or gate delete, sign-out and
+  lock is, for this sprint, answered by a page reload. A collision with one earns no guard, test, state or open
+  matter: a worker writes one line under *End states, for the final report* in its thread file, a reviewer does the
+  same in its report, and the orchestrator gathers them in the progress document for the final report.
+* **No goodbye without a caller** (the Coach, 2026-11-22): no goodbye method on a bank, a device or anything else
+  until it has a caller and a feature need.
+* **Architecture first** (the Coach, 2026-11-22). The sprint puts the design's architecture in place. No machinery
+  the design does not describe; a design gap is written down, not closed with complexity, which moves the system
+  away from working. Never give up a contract or the common case for an edge case: follow-on sprints take those.
+  Reviews hold the threads to this, and fix or flag only what breaks it, a contract or the common case.
 * **Library first.** A UUID version 7 comes from a library (thread 3), persistence from TanStack's own (thread 6).
   Read PROCESS.md, *Dependencies*, before adding one.
 * **No back-compat before 1.0**, Postgres tables included: no migration, no version bump, no shim (the Coach,
@@ -52,7 +59,7 @@ The design this sprint starts from is in the sprint directory, copied so that a 
 * **The ordering pins stay** (the Coach): the React layer's stale-time function and the minder's cache-level
   `onSuccess` each settled an ordering problem. A thread that finds one in its way says so; it neither works around it
   nor reopens it.
-* **Git and gh on this sprint's own branches only** (the Coach, 2026-11-22): force-push under a lease on a known SHA, draft in and out, on this sprint's branches and PRs; never another session's or the workshop's, never the `queue` label, never a merge.
+* **Git and gh on every open PR but the release PR** (the Coach, 2026-11-22): force-push under a lease on a known SHA, draft in and out; never the `queue` label, never a merge.
 * **Every Agent call names its model.** Check with your orchestrating agent before fanning out.
 
 ## Threads
